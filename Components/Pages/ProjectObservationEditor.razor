@@ -1,0 +1,74 @@
+@using BlazorStoc.Services
+@inject IProjectRepository Repository
+@inject IAccessControl AccessControl
+@inject ILogger<ProjectObservationEditor> Logger
+@implements IDisposable
+
+<section class="product-editor" aria-labelledby="observation-editor-title">
+    <div class="catalog-heading"><h2 id="observation-editor-title">@(Original is null ? "Adaugă observație" : $"Editează observația {Original.Name}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="observation-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label class="full-width" for="observation-name">Denumire observație *<InputText id="observation-name" @bind-Value="input.Name" maxlength="200" /><ValidationMessage For="() => input.Name" /></label>
+                <label class="full-width" for="observation-content">Conținut<InputTextArea id="observation-content" @bind-Value="input.Content" maxlength="8000" rows="6" /><ValidationMessage For="() => input.Content" /></label>
+                @if (Original is not null)
+                {
+                    <ChangeReasonField Id="observation-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
+                }
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează observația")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter] public int ProjectId { get; set; }
+    [Parameter] public ProjectObservation? Original { get; set; }
+    [Parameter] public EventCallback<ProjectObservation> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    private ProjectObservationInput input = new();
+    private bool saving;
+    private string? error, reasonError;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override void OnInitialized()
+    {
+        input = Original is null ? new() : ProjectObservationInput.From(Original);
+    }
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
+        if (reasonError is not null) return;
+        saving = true;
+        error = null;
+        ProjectObservation? saved = null;
+        try
+        {
+            if (Original is null)
+            {
+                var author = await AccessControl.GetUsernameAsync(lifetime.Token) ?? "necunoscut";
+                saved = await Repository.CreateObservationAsync(ProjectId, input, author, lifetime.Token);
+            }
+            else saved = await Repository.UpdateObservationAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProjectOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Observation saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Observația nu a putut fi salvată. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) await Saved.InvokeAsync(saved);
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

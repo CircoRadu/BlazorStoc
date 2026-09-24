@@ -6,8 +6,14 @@ public static class DeleteConfirmationRules
     public const string CustomChoice = "custom";
     public const string ConfirmationWord = "sterge";
 
-    public static string DefaultReason(string subject) =>
-        $"{RequiredSubject(subject)} nu va mai fi folosit";
+    // Feminine subjects use the Romanian definite article "-a" (e.g. "Observația"); every other subject in the
+    // app uses the masculine/neuter "-ul" (e.g. "Produsul", "Beneficiarul"), so the ending selects agreement.
+    public static string DefaultReason(string subject)
+    {
+        var required = RequiredSubject(subject);
+        var participle = required.EndsWith('a') ? "folosită" : "folosit";
+        return $"{required} nu va mai fi {participle}";
+    }
 
     public static string? ValidateReason(string? choice, string? customReason)
     {

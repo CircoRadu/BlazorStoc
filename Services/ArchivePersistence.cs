@@ -36,7 +36,7 @@ internal static class ArchiveJson
 internal static class SqliteArchivePersistence
 {
     public static async Task InsertAsync(SqliteConnection connection, SqliteTransaction transaction,
-        ArchiveOperation operation, ArchiveFileRecord? file, CancellationToken token)
+        ArchiveOperation operation, IReadOnlyList<ArchiveFileRecord> files, CancellationToken token)
     {
         var request = operation.Request;
         var snapshot = request.Snapshot;
@@ -63,7 +63,7 @@ internal static class SqliteArchivePersistence
             await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         }
 
-        if (file is not null)
+        foreach (var file in files)
         {
             await using var command = SqliteLocalStore.Command(connection, transaction, """
                 INSERT INTO archive_files
@@ -117,6 +117,36 @@ internal static class SqliteArchivePersistence
                     ("@username", user.Username), ("@displayName", user.DisplayName), ("@role", user.Role),
                     ("@active", user.IsActive ? 1 : 0), ("@version", user.Version), ("@passwordHash", passwordHash));
                 break;
+            case AuditEntities.Project:
+                var project = ArchiveJson.Entity<Project>(snapshot);
+                command = SqliteLocalStore.Command(connection, transaction, """
+                    INSERT INTO archive_projects(archive_id,original_id,beneficiary_id,name,observations,version)
+                    VALUES(@archiveId,@id,@beneficiary,@name,@observations,@version)
+                    """, ("@archiveId", operation.Id.ToString("D")), ("@id", project.Id),
+                    ("@beneficiary", project.BeneficiaryId), ("@name", project.Name),
+                    ("@observations", project.Observations), ("@version", project.Version));
+                break;
+            case AuditEntities.ProjectObservation:
+                var observation = ArchiveJson.Entity<ProjectObservation>(snapshot);
+                command = SqliteLocalStore.Command(connection, transaction, """
+                    INSERT INTO archive_project_observations(archive_id,original_id,project_id,name,content,author,version)
+                    VALUES(@archiveId,@id,@project,@name,@content,@author,@version)
+                    """, ("@archiveId", operation.Id.ToString("D")), ("@id", observation.Id),
+                    ("@project", observation.ProjectId), ("@name", observation.Name), ("@content", observation.Content),
+                    ("@author", observation.Author), ("@version", observation.Version));
+                break;
+            case AuditEntities.ProjectObservationFile:
+                var observationFile = ArchiveJson.Entity<ProjectObservationFile>(snapshot);
+                command = SqliteLocalStore.Command(connection, transaction, """
+                    INSERT INTO archive_project_observation_files
+                        (archive_id,original_id,observation_id,original_name,content_type,byte_length,sha256,author,uploaded_utc)
+                    VALUES(@archiveId,@id,@observation,@name,@contentType,@length,@hash,@author,@uploaded)
+                    """, ("@archiveId", operation.Id.ToString("D")), ("@id", observationFile.Id),
+                    ("@observation", observationFile.ObservationId), ("@name", observationFile.OriginalName),
+                    ("@contentType", observationFile.ContentType), ("@length", observationFile.SizeBytes),
+                    ("@hash", observationFile.Sha256), ("@author", observationFile.Author),
+                    ("@uploaded", observationFile.UploadedAtUtc.ToString("O")));
+                break;
             default:
                 throw new ArchiveContractException(
                     $"Tipul «{snapshot.EntityType}» este înregistrat, dar nu are mapare SQLite pentru tabela sa archive_*.");
@@ -128,7 +158,7 @@ internal static class SqliteArchivePersistence
 internal static class MariaArchivePersistence
 {
     public static async Task InsertAsync(MySqlConnection connection, MySqlTransaction transaction,
-        ArchiveOperation operation, ArchiveFileRecord? file, CancellationToken token)
+        ArchiveOperation operation, IReadOnlyList<ArchiveFileRecord> files, CancellationToken token)
     {
         var request = operation.Request;
         var snapshot = request.Snapshot;
@@ -150,7 +180,7 @@ internal static class MariaArchivePersistence
                 """, token, ("@archiveId", operation.Id.ToString("D")), ("@type", relation.RelationType),
                 ("@originalId", relation.RelationId), ("@data", relation.DataJson)).ConfigureAwait(false);
 
-        if (file is not null)
+        foreach (var file in files)
             await ExecuteAsync(connection, transaction, """
                 INSERT INTO archive_files
                     (archive_id,relation_type,original_relation_id,live_relative_path,archive_relative_path,
@@ -211,6 +241,36 @@ internal static class MariaArchivePersistence
                     """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", user.Id),
                     ("@username", user.Username), ("@displayName", user.DisplayName), ("@role", user.Role),
                     ("@active", user.IsActive), ("@version", user.Version), ("@passwordHash", passwordHash)).ConfigureAwait(false);
+                break;
+            case AuditEntities.Project:
+                var project = ArchiveJson.Entity<Project>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_projects(archive_id,original_id,beneficiary_id,name,observations,version)
+                    VALUES(@archiveId,@id,@beneficiary,@name,@observations,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", project.Id),
+                    ("@beneficiary", project.BeneficiaryId), ("@name", project.Name),
+                    ("@observations", project.Observations), ("@version", project.Version)).ConfigureAwait(false);
+                break;
+            case AuditEntities.ProjectObservation:
+                var observation = ArchiveJson.Entity<ProjectObservation>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_project_observations(archive_id,original_id,project_id,name,content,author,version)
+                    VALUES(@archiveId,@id,@project,@name,@content,@author,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", observation.Id),
+                    ("@project", observation.ProjectId), ("@name", observation.Name), ("@content", observation.Content),
+                    ("@author", observation.Author), ("@version", observation.Version)).ConfigureAwait(false);
+                break;
+            case AuditEntities.ProjectObservationFile:
+                var observationFile = ArchiveJson.Entity<ProjectObservationFile>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_project_observation_files
+                        (archive_id,original_id,observation_id,original_name,content_type,byte_length,sha256,author,uploaded_utc)
+                    VALUES(@archiveId,@id,@observation,@name,@contentType,@length,@hash,@author,@uploaded)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", observationFile.Id),
+                    ("@observation", observationFile.ObservationId), ("@name", observationFile.OriginalName),
+                    ("@contentType", observationFile.ContentType), ("@length", observationFile.SizeBytes),
+                    ("@hash", observationFile.Sha256), ("@author", observationFile.Author),
+                    ("@uploaded", observationFile.UploadedAtUtc)).ConfigureAwait(false);
                 break;
             default:
                 throw new ArchiveContractException(

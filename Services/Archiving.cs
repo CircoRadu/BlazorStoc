@@ -11,7 +11,10 @@ public static class ArchiveSchemaRegistry
         {
             new ArchiveEntitySchema(AuditEntities.Product, "archive_products", true, true),
             new ArchiveEntitySchema(AuditEntities.Beneficiary, "archive_beneficiaries", true, false),
-            new ArchiveEntitySchema(AuditEntities.User, "archive_web_users", true, false)
+            new ArchiveEntitySchema(AuditEntities.User, "archive_web_users", true, false),
+            new ArchiveEntitySchema(AuditEntities.Project, "archive_projects", true, true),
+            new ArchiveEntitySchema(AuditEntities.ProjectObservation, "archive_project_observations", true, true),
+            new ArchiveEntitySchema(AuditEntities.ProjectObservationFile, "archive_project_observation_files", false, true)
         }.ToDictionary(schema => schema.EntityType, StringComparer.Ordinal);
 
     public static IReadOnlyCollection<ArchiveEntitySchema> All { get; } = Schemas.Values.ToArray();
@@ -161,6 +164,36 @@ public static class ArchiveRequests
         return new(ArchiveSnapshot.Create(AuditEntities.User, value.Id.ToString(), value.Version, value,
                 protectedValues: protectedValues),
             $"#{value.Id} · {value.Username}", details, motif);
+    }
+
+    public static ArchiveRequest Project(Project value, string beneficiaryName,
+        IEnumerable<ProjectObservation> observations, IEnumerable<ProjectObservationFile> files, string motif)
+    {
+        var details = AuditDetails.Identification(("Denumire", value.Name), ("Beneficiar", beneficiaryName),
+            ("Observații", value.Observations));
+        var relations = observations.Select(observation =>
+                ArchiveRelationSnapshot.Create(AuditEntities.ProjectObservation, observation.Id.ToString(), observation))
+            .Concat(files.Select(file =>
+                ArchiveRelationSnapshot.Create(AuditEntities.ProjectObservationFile, file.Id.ToString(), file)));
+        return new(ArchiveSnapshot.Create(AuditEntities.Project, value.Id.ToString(), value.Version, value, relations),
+            value.Name, details, motif);
+    }
+
+    public static ArchiveRequest ProjectObservation(ProjectObservation value, string projectName,
+        IEnumerable<ProjectObservationFile> files, string motif)
+    {
+        var details = AuditDetails.Identification(("Denumire", value.Name), ("Proiect", projectName), ("Autor", value.Author));
+        var relations = files.Select(file =>
+            ArchiveRelationSnapshot.Create(AuditEntities.ProjectObservationFile, file.Id.ToString(), file));
+        return new(ArchiveSnapshot.Create(AuditEntities.ProjectObservation, value.Id.ToString(), value.Version, value, relations),
+            value.Name, details, motif);
+    }
+
+    public static ArchiveRequest ProjectObservationFile(ProjectObservationFile value, string motif)
+    {
+        var details = AuditDetails.Identification(("Nume fișier", value.OriginalName), ("Autor", value.Author));
+        return new(ArchiveSnapshot.Create(AuditEntities.ProjectObservationFile, value.Id.ToString(), 0, value),
+            value.OriginalName, details, motif);
     }
 }
 

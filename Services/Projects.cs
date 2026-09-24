@@ -229,4 +229,72 @@ public static class ProjectFileRules
         if (suffix.Length is < 2 or > 11 || suffix[0] != '.' || !suffix[1..].All(char.IsAsciiLetterOrDigit)) suffix = "";
         return Guid.NewGuid().ToString("N") + suffix;
     }
+
+    public const long MaximumBytes = 20 * 1024 * 1024;
+    public const int MaximumFilesPerObservation = 20;
+    private static readonly HashSet<string> AcceptedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf",
+        "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/plain", "text/csv"
+    };
+
+    // The declared content type is checked against a signature sniffed from the actual bytes; browser-declared
+    // types and extensions are never trusted alone.
+    public static string DetectContentType(ReadOnlySpan<byte> content, string declaredContentType, string fileName)
+    {
+        if (content.Length == 0) throw new ProjectOperationException("Fișierul este gol.");
+        if (content.Length > MaximumBytes) throw new ProjectOperationException("Fișierul poate avea cel mult 20 MB.");
+        var sniffed = Sniff(content);
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        if (sniffed is not null)
+        {
+            if (!AcceptedContentTypes.Contains(sniffed)) throw new ProjectOperationException("Formatul fișierului nu este acceptat.");
+            return sniffed;
+        }
+        // Formats without a reliable binary signature (Office/CSV/plain text ZIP-or-text containers) fall back to
+        // the declared type only when it is already on the accepted list and matches a plausible extension.
+        var declared = (declaredContentType ?? "").Trim().ToLowerInvariant();
+        if (AcceptedContentTypes.Contains(declared) && extension.Length > 0) return declared;
+        throw new ProjectOperationException("Formatul fișierului nu a putut fi verificat. Folosește unul dintre formatele acceptate.");
+    }
+
+    private static string? Sniff(ReadOnlySpan<byte> content)
+    {
+        if (content.Length >= 8 && content[..8].SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })) return "image/png";
+        if (content.Length >= 3 && content[0] == 255 && content[1] == 216 && content[2] == 255) return "image/jpeg";
+        if (content.Length >= 12 && content[..4].SequenceEqual("RIFF"u8) && content.Slice(8, 4).SequenceEqual("WEBP"u8)) return "image/webp";
+        if (content.Length >= 6 && (content[..6].SequenceEqual("GIF87a"u8) || content[..6].SequenceEqual("GIF89a"u8))) return "image/gif";
+        if (content.Length >= 5 && content[..5].SequenceEqual("%PDF-"u8)) return "application/pdf";
+        return null;
+    }
+}
+
+public interface IProjectRepository
+{
+    Task<IReadOnlyList<Project>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default);
+    Task<Project?> GetAsync(int id, CancellationToken cancellationToken = default);
+    Task<Project> CreateAsync(ProjectInput input, CancellationToken cancellationToken = default);
+    Task<Project> UpdateAsync(Project original, ProjectInput input, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Project original, string reason, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ProjectObservation>> GetObservationsAsync(int projectId, CancellationToken cancellationToken = default);
+    Task<ProjectObservation?> GetObservationAsync(int id, CancellationToken cancellationToken = default);
+    Task<ProjectObservation> CreateObservationAsync(int projectId, ProjectObservationInput input, string author,
+        CancellationToken cancellationToken = default);
+    Task<ProjectObservation> UpdateObservationAsync(ProjectObservation original, ProjectObservationInput input,
+        CancellationToken cancellationToken = default);
+    Task DeleteObservationAsync(ProjectObservation original, string reason, CancellationToken cancellationToken = default);
+}
+
+public sealed record ProjectFileContent(byte[] Content, string ContentType, string OriginalName);
+
+public interface IProjectFileStore
+{
+    Task<IReadOnlyList<ProjectObservationFile>> GetFilesAsync(int observationId, CancellationToken cancellationToken = default);
+    Task<ProjectFileContent?> GetContentAsync(int fileId, CancellationToken cancellationToken = default);
+    Task<ProjectObservationFile> SaveAsync(int observationId, string originalName, string declaredContentType,
+        byte[] content, string author, CancellationToken cancellationToken = default);
+    Task DeleteAsync(int fileId, string reason, CancellationToken cancellationToken = default);
 }

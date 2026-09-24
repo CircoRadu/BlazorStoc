@@ -10,6 +10,9 @@ public static class AuditEntities
     public const string Beneficiary = "Beneficiar";
     public const string Category = "Categorie";
     public const string Subcategory = "Subcategorie";
+    public const string Project = "Proiect";
+    public const string ProjectObservation = "Observatie";
+    public const string ProjectObservationFile = "FisierObservatie";
 }
 
 public static class AuditActions
@@ -61,6 +64,8 @@ public static class AuditNavigation
             !int.TryParse(entry.EntityId, out var entityId) || entityId <= 0)
             return null;
 
+        // Project already has a stable read-only page; the other types still route through the editor's query trigger.
+        if (entry.EntityType == AuditEntities.Project) return $"/proiecte/{entityId}";
         var path = entry.EntityType switch
         {
             AuditEntities.Product => "/produse",

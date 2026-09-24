@@ -62,6 +62,8 @@ Check(DeleteConfirmationRules.ValidateReason(string.Empty, string.Empty) is not 
 Check(DeleteConfirmationRules.ResolveReason("Produsul", DeleteConfirmationRules.DefaultChoice, string.Empty) ==
       "Produsul nu va mai fi folosit",
     "The default deletion choice generates the object-specific audit reason");
+Check(DeleteConfirmationRules.DefaultReason("Observația") == "Observația nu va mai fi folosită",
+    "The default deletion reason agrees in gender with feminine subjects like Observația");
 Check(DeleteConfirmationRules.ResolveReason("Beneficiarul", DeleteConfirmationRules.CustomChoice,
           "  Contract incheiat  ") == "Contract incheiat",
     "The custom deletion reason is trimmed and retained for audit");
@@ -552,24 +554,34 @@ try
             """;
         Check(Convert.ToInt32(await tables.ExecuteScalarAsync()) == 6,
             "SQLite creates the complete archive table family");
+        await using var projectTables = schemaConnection.CreateCommand();
+        projectTables.CommandText = """
+            SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN
+                ('projects','project_observations','project_observation_files',
+                 'archive_projects','archive_project_observations','archive_project_observation_files')
+            """;
+        Check(Convert.ToInt32(await projectTables.ExecuteScalarAsync()) == 6,
+            "SQLite creates the project, observation and observation-file live and archive tables");
         await using var version = schemaConnection.CreateCommand();
         version.CommandText = "SELECT value FROM app_metadata WHERE key='schema_version'";
-        Check((string?)await version.ExecuteScalarAsync() == "4", "Archive schema is versioned with the live SQLite schema");
+        Check((string?)await version.ExecuteScalarAsync() == "5", "Archive schema is versioned with the live SQLite schema");
         await using var indexes = schemaConnection.CreateCommand();
         indexes.CommandText = """
             SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN
                 ('ix_archive_operations_object','ix_archive_operations_deleted','ix_archive_operations_actor',
-                 'ix_archive_products_original','ix_archive_beneficiaries_original','ix_archive_web_users_original')
+                 'ix_archive_products_original','ix_archive_beneficiaries_original','ix_archive_web_users_original',
+                 'ix_archive_projects_original','ix_archive_project_observations_original','ix_archive_project_observation_files_original')
             """;
-        Check(Convert.ToInt32(await indexes.ExecuteScalarAsync()) == 6,
+        Check(Convert.ToInt32(await indexes.ExecuteScalarAsync()) == 9,
             "Archive tables index original identity, deletion time and operator");
     }
     Check(ArchiveSchemaRegistry.All.Select(item => item.EntityType).Order()
-            .SequenceEqual(new[] { AuditEntities.Beneficiary, AuditEntities.Product, AuditEntities.User }.Order()),
+            .SequenceEqual(new[] { AuditEntities.Beneficiary, AuditEntities.Product, AuditEntities.User,
+                AuditEntities.Project, AuditEntities.ProjectObservation, AuditEntities.ProjectObservationFile }.Order()),
         "Every currently deletable entity is registered with an archive table");
     try
     {
-        ArchiveSnapshot.Create("Proiect", "1", 0, new { Name = "Proiect viitor" });
+        ArchiveSnapshot.Create("TipViitor", "1", 0, new { Name = "Entitate viitoare" });
         throw new Exception("Unregistered future entity accepted by archive contract");
     }
     catch (ArchiveContractException)
@@ -604,6 +616,17 @@ try
     });
     var firstImages = new SqliteProductImageStore(firstStore);
     await firstImages.SaveAsync(persistentProduct.Id, new ProductImageData(imageBytes, "image/png", "persistent.png"));
+
+    var firstProjects = new SqliteProjectRepository(firstStore, administrator);
+    var persistentProject = await firstProjects.CreateAsync(new ProjectInput
+        { BeneficiaryId = persistentBeneficiary.Id, Name = "  Proiect   persistent  ", Observations = "Observatii generale" });
+    Check(persistentProject.Name == "Proiect persistent" && persistentProject.Version == 0, "SQLite project creation normalizes the name and starts at version 0");
+    var firstProjectFiles = new SqliteProjectFileStore(firstStore);
+    var persistentObservation = await firstProjects.CreateObservationAsync(persistentProject.Id,
+        new ProjectObservationInput { Name = "Observatie initiala", Content = "Continut initial" }, "operator.persistent");
+    var persistentFile = await firstProjectFiles.SaveAsync(persistentObservation.Id, "poza produs.png", "image/png", imageBytes, "operator.persistent");
+    Check(persistentFile.OriginalName == "poza produs.png" && persistentFile.Sha256.Length == 64 && persistentFile.ContentType == "image/png",
+        "SQLite observation file upload sniffs the content type and stores a SHA-256 hash");
 
     var secondStore = new SqliteLocalStore(sqliteEnvironment, sqliteConfiguration, NullLogger<SqliteLocalStore>.Instance);
     await secondStore.InitializeAsync();
@@ -827,6 +850,84 @@ try
         Check((await secondBeneficiaries.GetBeneficiariesAsync()).Any(item => item.Id == editedBeneficiary.Id),
             "Rejected beneficiary delete preserves the stored object");
     }
+
+    var secondProjects = new SqliteProjectRepository(secondStore, administrator);
+    var secondProjectFiles = new SqliteProjectFileStore(secondStore);
+    var reloadedProject = await secondProjects.GetAsync(persistentProject.Id);
+    Check(reloadedProject is not null && reloadedProject.Name == "Proiect persistent" && reloadedProject.BeneficiaryId == editedBeneficiary.Id,
+        "SQLite project survives application restart");
+    var reloadedObservations = await secondProjects.GetObservationsAsync(persistentProject.Id);
+    Check(reloadedObservations.Single().Id == persistentObservation.Id, "SQLite project observation survives application restart");
+    var reloadedFiles = await secondProjectFiles.GetFilesAsync(persistentObservation.Id);
+    Check(reloadedFiles.Single().Id == persistentFile.Id, "SQLite observation file metadata survives application restart");
+    var reloadedFileContent = await secondProjectFiles.GetContentAsync(persistentFile.Id);
+    Check(reloadedFileContent is not null && reloadedFileContent.Content.SequenceEqual(imageBytes), "SQLite observation file content survives application restart");
+
+    try
+    {
+        await secondProjects.CreateAsync(new ProjectInput { BeneficiaryId = editedBeneficiary.Id, Name = "  PROIECT   persistent  " });
+        throw new Exception("Duplicate project name accepted for the same beneficiary");
+    }
+    catch (ProjectOperationException exception)
+    {
+        Check(exception.Message.Contains("Proiect persistent", StringComparison.Ordinal) && exception.Message.Contains(editedBeneficiary.Name, StringComparison.Ordinal),
+            "SQLite duplicate project name reports the beneficiary and the existing project");
+    }
+    var otherBeneficiaryProject = await secondProjects.CreateAsync(new ProjectInput { BeneficiaryId = 1, Name = "Proiect persistent" });
+    Check(otherBeneficiaryProject.Name == "Proiect persistent", "The same project name is accepted for a different beneficiary");
+
+    var projectConcurrencySuffix = Guid.NewGuid().ToString("N")[..8];
+    async Task<Project?> TryCreateSameProjectNameAsync(SqliteLocalStore store, string name)
+    {
+        try { return await new SqliteProjectRepository(store, administrator).CreateAsync(new ProjectInput { BeneficiaryId = 2, Name = name }); }
+        catch (ProjectOperationException) { return null; }
+    }
+    var sameProjectNameWrites = await Task.WhenAll(
+        TryCreateSameProjectNameAsync(firstStore, $"Proiect concurent {projectConcurrencySuffix}"),
+        TryCreateSameProjectNameAsync(secondStore, $"  proiect   CONCURENT {projectConcurrencySuffix} "));
+    Check(sameProjectNameWrites.Count(result => result is not null) == 1,
+        "Two concurrent SQLite sessions cannot create the same project name for the same beneficiary");
+
+    var projectEditInput = ProjectInput.From(reloadedProject!);
+    projectEditInput.Name = "Proiect fara motiv";
+    try { await secondProjects.UpdateAsync(reloadedProject!, projectEditInput); throw new Exception("SQLite project edit without reason accepted"); }
+    catch (ProjectOperationException) { Check(true, "SQLite project edits require a reason"); }
+    projectEditInput.Reason = "Actualizare observatii proiect";
+    var editedProjectRecord = await secondProjects.UpdateAsync(reloadedProject!, projectEditInput);
+    Check(editedProjectRecord.Version == 1 && editedProjectRecord.Name == "Proiect fara motiv", "SQLite project edit increments the version");
+    try { await secondProjects.UpdateAsync(reloadedProject!, projectEditInput); throw new Exception("Stale SQLite project accepted"); }
+    catch (ProjectOperationException) { Check(true, "Stale SQLite project edit is rejected"); }
+
+    var observationEditInput = ProjectObservationInput.From(persistentObservation);
+    observationEditInput.Content = "Continut fara motiv";
+    try { await secondProjects.UpdateObservationAsync(persistentObservation, observationEditInput); throw new Exception("SQLite observation edit without reason accepted"); }
+    catch (ProjectOperationException) { Check(true, "SQLite observation edits require a reason"); }
+    observationEditInput.Reason = "Completare continut observatie";
+    var editedObservationRecord = await secondProjects.UpdateObservationAsync(persistentObservation, observationEditInput);
+    Check(editedObservationRecord.Version == 1 && editedObservationRecord.Content == "Continut fara motiv", "SQLite observation edit increments the version");
+
+    await secondProjectFiles.DeleteAsync(persistentFile.Id, "Fisier inlocuit");
+    Check((await secondProjectFiles.GetFilesAsync(persistentObservation.Id)).Count == 0, "SQLite observation file removal archives and clears the live file");
+    Check(await secondProjectFiles.GetContentAsync(persistentFile.Id) is null, "An archived observation file is no longer served live");
+
+    try
+    {
+        await secondBeneficiaries.DeleteAsync(editedBeneficiary, "Curatare beneficiar persistent");
+        throw new Exception("Beneficiary with a live project was deleted");
+    }
+    catch (BeneficiaryOperationException exception)
+    {
+        Check(exception.Message.Contains("proiect", StringComparison.OrdinalIgnoreCase),
+            "SQLite beneficiary deletion is blocked while a live project exists");
+    }
+    var secondObservation = await secondProjects.CreateObservationAsync(editedProjectRecord.Id,
+        new ProjectObservationInput { Name = "Observatie suplimentara", Content = "Text suplimentar" }, "operator.persistent");
+    await secondProjectFiles.SaveAsync(secondObservation.Id, "nota.txt", "text/plain", "Continut text simplu"u8.ToArray(), "operator.persistent");
+    await secondProjects.DeleteAsync(editedProjectRecord, "Curatare proiect persistent");
+    Check(await secondProjects.GetAsync(editedProjectRecord.Id) is null, "Deleting a project removes it and its observations/files from the live tables");
+    Check((await secondProjectFiles.GetFilesAsync(secondObservation.Id)).Count == 0, "Deleting a project archives its remaining observation files");
+    await secondProjects.DeleteAsync(otherBeneficiaryProject, "Curatare proiect suplimentar");
+
     await secondBeneficiaries.DeleteAsync(editedBeneficiary, "Curatare beneficiar persistent");
 
     var secondUsers = new SqliteUserRepository(secondStore, administrator);
@@ -1045,6 +1146,20 @@ try
     Check(integratedEvents.Any(entry => entry.EntityType == AuditEntities.Category && entry.Target.Contains("Categorie persistenta", StringComparison.Ordinal)) &&
           integratedEvents.Any(entry => entry.EntityType == AuditEntities.Subcategory && entry.Target.Contains("Subcategorie persistenta", StringComparison.Ordinal)),
         "SQLite audit includes categories and subcategories created through the dedicated catalogue flow");
+    Check(integratedEvents.Count(entry => entry.EntityType == AuditEntities.Project && entry.Action == AuditActions.Delete) >= 1 &&
+          integratedEvents.Any(entry => entry.EntityType == AuditEntities.ProjectObservation) &&
+          integratedEvents.Any(entry => entry.EntityType == AuditEntities.ProjectObservationFile),
+        "SQLite audit records project, observation and observation file operations");
+    await using (var archiveConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={secondStore.DatabasePath}"))
+    {
+        await archiveConnection.OpenAsync();
+        await using var archivedProjects = archiveConnection.CreateCommand();
+        archivedProjects.CommandText = "SELECT COUNT(*) FROM archive_projects";
+        Check(Convert.ToInt32(await archivedProjects.ExecuteScalarAsync()) >= 1, "Deleting a project writes a row into archive_projects");
+        await using var archivedFiles = archiveConnection.CreateCommand();
+        archivedFiles.CommandText = "SELECT COUNT(*) FROM archive_project_observation_files";
+        Check(Convert.ToInt32(await archivedFiles.ExecuteScalarAsync()) >= 1, "Removing an observation file writes a row into archive_project_observation_files");
+    }
 }
 finally
 {

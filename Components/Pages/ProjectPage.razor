@@ -1,0 +1,177 @@
+@page "/proiecte/{Id:int}"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProjectRepository Repository
+@inject IProjectFileStore FileStore
+@inject IBeneficiaryRepository Beneficiaries
+@inject NavigationManager Navigation
+@inject ILogger<Project> Logger
+@implements IDisposable
+
+<PageTitle>@(project?.Name ?? "Proiect") · BlazorStoc</PageTitle>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă proiectul</h3></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+}
+else if (project is not null)
+{
+    <a class="nav-back" href="@($"/beneficiari/{project.BeneficiaryId}")"><span>←</span> @beneficiaryName</a>
+    <div class="page-heading">
+        <div><p class="eyebrow">PROIECT</p><h1>@project.Name</h1><p class="muted">Beneficiar: <a class="category-table-link" href="@($"/beneficiari/{project.BeneficiaryId}")">@beneficiaryName</a></p></div>
+        <div class="heading-actions">
+            <button class="primary" disabled="@editing" @onclick="OpenEditAsync">Editează</button>
+            <button class="danger" disabled="@editing" @onclick="RequestDeleteAsync">Șterge proiectul</button>
+        </div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+    @if (editing)
+    {
+        <ProjectEditor @key="editorKey" Original="project" Saved="ProjectSavedAsync" Closed="() => editing = false" />
+    }
+
+    @if (!string.IsNullOrWhiteSpace(project.Observations))
+    {
+        <section class="catalog"><div class="catalog-heading"><h2>Observații generale</h2></div><p class="section-text">@project.Observations</p></section>
+    }
+
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Conținutul proiectului</h2><small>Creat @project.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · actualizat @project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</small></div>
+        <div class="heading-actions section-actions"><button class="primary" disabled="@addingObservation" @onclick="OpenAddObservationAsync">+ Adaugă observație</button></div>
+        @if (addingObservation)
+        {
+            <div class="section-inline-editor"><ProjectObservationEditor @key="observationEditorKey" ProjectId="Id" Original="null" Saved="ObservationSavedAsync" Closed="() => addingObservation = false" /></div>
+        }
+        <div class="table-scroll"><table><thead><tr><th>ELEMENT</th><th>DETALII</th></tr></thead><tbody>
+            <tr><td><a class="category-table-link" href="@($"/proiecte/{Id}/echipamente")"><strong>Echipamente</strong></a></td><td class="muted">Materiale și echipamente scoase din inventar pentru acest proiect</td></tr>
+            @if (observationsLoading)
+            {
+                <tr><td colspan="2">Se încarcă observațiile…</td></tr>
+            }
+            else
+            {
+                @foreach (var observation in observations)
+                {
+                    <tr @key="observation.Id">
+                        <td><a class="category-table-link" href="@($"/proiecte/{Id}/observatii/{observation.Id}")"><strong>@observation.Name</strong></a></td>
+                        <td class="muted">@observation.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @observation.Author · @FileCount(observation.Id) fișier(e)</td>
+                    </tr>
+                }
+            }
+        </tbody></table></div>
+    </section>
+}
+
+@if (deleting)
+{
+    <DeleteConfirmationDialog Title="Ștergi proiectul?" Subject="Proiectul"
+                              ObjectLabel="@(project?.Name ?? "")"
+                              Description="Proiectele care au mișcări de stoc asociate nu pot fi șterse; observațiile și fișierele sale sunt arhivate împreună cu proiectul."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteProjectAsync"
+                              Cancelled="() => { deleting = false; deleteError = null; }" />
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Project? project;
+    private string beneficiaryName = "";
+    private IReadOnlyList<ProjectObservation> observations = Array.Empty<ProjectObservation>();
+    private readonly Dictionary<int, int> fileCounts = new();
+    private bool loading = true, observationsLoading, editing, addingObservation, deleting, deleteBusy;
+    private string? error, notice, deleteError;
+    private Guid editorKey, observationEditorKey;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (project is not null && project.Id != Id) await LoadAsync();
+    }
+
+    private int FileCount(int observationId) => fileCounts.GetValueOrDefault(observationId);
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            project = await Repository.GetAsync(Id, lifetime.Token);
+            if (project is null) { error = "Proiectul solicitat nu mai există."; return; }
+            var beneficiary = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).FirstOrDefault(item => item.Id == project.BeneficiaryId);
+            beneficiaryName = beneficiary?.Name ?? "Beneficiar necunoscut";
+            await LoadObservationsAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Project loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Proiectul nu a putut fi încărcat.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task LoadObservationsAsync()
+    {
+        observationsLoading = true;
+        try
+        {
+            observations = await Repository.GetObservationsAsync(Id, lifetime.Token);
+            fileCounts.Clear();
+            foreach (var observation in observations)
+                fileCounts[observation.Id] = (await FileStore.GetFilesAsync(observation.Id, lifetime.Token)).Count;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        finally { observationsLoading = false; }
+    }
+
+    private Task OpenEditAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
+    private Task OpenAddObservationAsync() { addingObservation = true; observationEditorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
+    private async Task ObservationSavedAsync(ProjectObservation observation)
+    {
+        addingObservation = false;
+        Navigation.NavigateTo($"/proiecte/{Id}/observatii/{observation.Id}");
+        await Task.CompletedTask;
+    }
+
+    private async Task ProjectSavedAsync(Project updated)
+    {
+        project = updated;
+        editing = false;
+        notice = "Proiectul a fost actualizat.";
+        var beneficiary = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).FirstOrDefault(item => item.Id == updated.BeneficiaryId);
+        beneficiaryName = beneficiary?.Name ?? "Beneficiar necunoscut";
+    }
+
+    private void RequestDeleteAsync() { deleting = true; deleteError = null; }
+
+    private async Task DeleteProjectAsync(string reason)
+    {
+        if (deleteBusy || project is null) return;
+        deleteBusy = true;
+        deleteError = null;
+        try
+        {
+            await Repository.DeleteAsync(project, reason, lifetime.Token);
+            Navigation.NavigateTo($"/beneficiari/{project.BeneficiaryId}");
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProjectOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Project deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Proiectul nu a putut fi șters. Actualizează pagina și reîncearcă.";
+        }
+        finally { deleteBusy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -103,7 +103,10 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
                 await using (var relations = SqliteLocalStore.Command(connection, transaction,
                     "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE beneficiary_id=@id)", ("@id", original.Id)))
                     BeneficiaryRules.CheckDelete(Convert.ToBoolean(await relations.ExecuteScalarAsync(token).ConfigureAwait(false)));
-                await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, null, token)
+                await using (var projects = SqliteLocalStore.Command(connection, transaction,
+                    "SELECT COUNT(*) FROM projects WHERE beneficiary_id=@id", ("@id", original.Id)))
+                    BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
+                await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, [], token)
                     .ConfigureAwait(false);
                 await using var delete = SqliteLocalStore.Command(connection, transaction,
                     "DELETE FROM beneficiaries WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));

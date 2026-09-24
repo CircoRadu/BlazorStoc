@@ -4,7 +4,7 @@ namespace BlazorStoc.Services;
 
 public static class MariaArchiveSchema
 {
-    public const int Version = 2;
+    public const int Version = 3;
 
     public static async Task InitializeAsync(IConfiguration configuration,
         CancellationToken cancellationToken = default)
@@ -101,6 +101,46 @@ public static class MariaArchiveSchema
             password_hash TEXT NOT NULL,
             INDEX ix_archive_web_users_original(original_id),
             CONSTRAINT fk_archive_web_users_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS archive_projects (
+            archive_id CHAR(36) CHARACTER SET ascii NOT NULL PRIMARY KEY,
+            original_id INT NOT NULL,
+            beneficiary_id INT NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            observations TEXT NOT NULL,
+            version BIGINT UNSIGNED NOT NULL,
+            INDEX ix_archive_projects_original(original_id),
+            CONSTRAINT fk_archive_projects_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS archive_project_observations (
+            archive_id CHAR(36) CHARACTER SET ascii NOT NULL PRIMARY KEY,
+            original_id INT NOT NULL,
+            project_id INT NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            content TEXT NOT NULL,
+            author VARCHAR(191) NOT NULL,
+            version BIGINT UNSIGNED NOT NULL,
+            INDEX ix_archive_project_observations_original(original_id),
+            CONSTRAINT fk_archive_project_observations_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS archive_project_observation_files (
+            archive_id CHAR(36) CHARACTER SET ascii NOT NULL PRIMARY KEY,
+            original_id INT NOT NULL,
+            observation_id INT NOT NULL,
+            original_name VARCHAR(500) NOT NULL,
+            content_type VARCHAR(255) NOT NULL,
+            byte_length BIGINT UNSIGNED NOT NULL,
+            sha256 CHAR(64) NOT NULL,
+            author VARCHAR(191) NOT NULL,
+            uploaded_utc DATETIME(6) NOT NULL,
+            INDEX ix_archive_project_observation_files_original(original_id),
+            CONSTRAINT fk_archive_project_observation_files_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """,
         """

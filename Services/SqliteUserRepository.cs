@@ -162,7 +162,7 @@ public sealed class SqliteUserRepository(SqliteLocalStore store, IAccessControl?
                 if (original.Role == AccessRoles.Administrator && original.IsActive &&
                     await CountOtherAdministratorsAsync(connection, transaction, original.Id, token).ConfigureAwait(false) == 0)
                     throw new UserOperationException("Sistemul trebuie să păstreze cel puțin un administrator activ.");
-                await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, null, token)
+                await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, [], token)
                     .ConfigureAwait(false);
                 await using var delete = SqliteLocalStore.Command(connection, transaction,
                     "DELETE FROM web_users WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));

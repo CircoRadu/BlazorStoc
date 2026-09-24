@@ -101,6 +101,40 @@ Regulile de domeniu din `Services/Projects.cs` sunt acoperite integral de `Blazo
 3. Crearea pornește de la versiunea 0, editarea incrementează versiunea și păstrează `CreatedAtUtc`; timestampurile care nu sunt UTC sunt respinse; o versiune învechită sau un proiect/observație eliminat(ă) este respins(ă).
 4. Editările proiectelor și observațiilor cer motivare; denumirile goale sau mai lungi de 200 de caractere sunt respinse; observația cere autor.
 5. Metadatele fișierelor păstrează numai numele fișierului din calea trimisă, generează un nume intern unic (GUID + extensie validată), resping fișierele goale și hash-urile care nu sunt SHA-256.
-6. `BeneficiaryRules.CheckNoLiveProjects` respinge ștergerea unui beneficiar cu proiecte live. Aplicarea regulii în repository-uri se face odată cu tabelele proiectelor (Subtask 2.1 curent).
+6. `BeneficiaryRules.CheckNoLiveProjects` respinge ștergerea unui beneficiar cu proiecte live. Aplicarea regulii în repository-uri s-a făcut ulterior, odată cu tabelele proiectelor (vezi secțiunea următoare).
 
-Nu există încă modificări de interfață sau de schemă; verificarea în browser nu este aplicabilă acestui pas.
+## Proiecte — persistență, pagini, fișiere, audit și arhivare (Task 2 finalizat)
+
+Implementat de Claude la 24 septembrie 2026, peste modelul de domeniu de mai sus.
+
+### Persistență
+
+- SQLite: tabelele `projects`, `project_observations`, `project_observation_files`, plus `archive_projects`, `archive_project_observations`, `archive_project_observation_files` (schema versiunea 5). Index unic `(beneficiary_id, normalized_name)` pe `projects`. `stock_movements.project_id` pregătește contractul pentru viitoarele mișcări de stoc.
+- MariaDB: tabelele `project`, `project_observation`, `project_observation_file` sunt create de aplicație la prima folosire (nu există în `BlazorStoc_create.sql`, fiind o entitate nouă); arhiva corespunzătoare este creată de `MariaArchiveSchema` (versiunea 3). Nu a fost testată pe un server MariaDB real în acest ciclu. Coloana `io.id_project` (legătura mișcare de stoc → proiect) este amânată până la implementarea efectivă a modulului de intrări/ieșiri; până atunci, MariaDB nu blochează ștergerea unui proiect pe baza mișcărilor de stoc (SQLite o face).
+- Fișierele observațiilor sunt scrise pe disc (`data/project-files` în SQLite, configurabil prin `App:ProjectFilesPath`), niciodată ca BLOB; metadatele includ hash SHA-256, dimensiune, tip media verificat prin semnătura conținutului (nu doar extensia sau tipul declarat de browser) și autor.
+
+### Interfață
+
+- `/beneficiari/{id}`: pagina de detaliu a beneficiarului, cu numele, CUI-ul, lista proiectelor (căutare + paginare) și butonul „Adaugă proiect” (beneficiar preselectat, needitabil).
+- `/proiecte/{id}`: pagina proiectului, cu beneficiarul (link), observațiile generale, tabelul de navigare cu „Echipamente” mereu primul, apoi observațiile ordonate descrescător după data creării.
+- `/proiecte/{id}/echipamente`: stare goală explicită, fără date simulate, până la implementarea mișcărilor de stoc.
+- `/proiecte/{projectId}/observatii/{observationId}`: denumire, conținut, autor, timestampuri locale, listă de fișiere cu link de descărcare (`/media/project-files/{fileId}`, endpoint autorizat), încărcare multiplă și eliminare individuală cu motiv și confirmare.
+- Ștergerea proiectului și a observației folosește `DeleteConfirmationDialog` existent (motiv + cuvântul `sterge`); ștergerea unui fișier folosește același dialog cu motiv obligatoriu.
+- Beneficiarul din tabelul „Beneficiari” este acum link către pagina sa de detaliu.
+
+### Audit și arhivare
+
+- Evenimente noi: `AuditEntities.Project` („Proiect”), `ProjectObservation` („Observatie”), `ProjectObservationFile` („FisierObservatie”), cu `Details`/`Motif` fără conținut de fișier.
+- „Țintă” pentru proiecte este link către `/proiecte/{id}` la adăugare/editare (`AuditNavigation.EditUrl`); pentru observații rămâne text (identificator compus proiect+observație, neînregistrat încă în registrul de rute — vezi TODO).
+- Ștergerea unui proiect arhivează, în aceeași operație de arhivă, proiectul, observațiile și fișierele rămase (ca relații + copii fizice), numai dacă nu există mișcări de stoc asociate (verificat în SQLite).
+
+### Verificare manuală (browser, admin demo, `http://127.0.0.1:5082`)
+
+1. Beneficiar → link „Construct Demo SRL” → pagina de detaliu → „Adaugă proiect” → formular cu beneficiarul blocat → salvare → proiectul apare în listă cu data ultimei modificări.
+2. Pagina proiectului → tabelul de navigare afișează „Echipamente” primul → link funcțional către starea goală explicită.
+3. „Adaugă observație” → salvare → navigare automată la pagina observației.
+4. Ștergerea observației: dialogul de confirmare afișează corect „Observația nu va mai fi folosită” (acord de gen corectat în `DeleteConfirmationRules.DefaultReason`, care anterior genera doar forma masculină „folosit”); după confirmare cu `sterge`, observația dispare din proiect.
+5. Ștergerea proiectului: dialogul afișează „Proiectul nu va mai fi folosit”; după confirmare, revine la pagina beneficiarului, iar proiectul nu mai apare în listă.
+6. Jurnalul de activitate afișează evenimentele „Adăugare”/„Ștergere” pentru „Proiect” și „Observatie”, cu `Details` (valori inițiale/finale), `Motif` (fără diacritice, conform regulii generale de stocare) și fără conținut de fișier.
+
+Suita automată (`BlazorStoc.Checks`, 229 verificări) acoperă, pe lângă modelul de domeniu: persistența proiectelor/observațiilor/fișierelor după repornire, unicitatea per beneficiar (inclusiv mesajul de duplicat cu numele beneficiarului), reutilizarea denumirii la alt beneficiar, două sesiuni SQLite concurente care încearcă același proiect pentru același beneficiar (una singură reușește), concurența optimistă la editare, ștergerea individuală a unui fișier (arhivare + indisponibilitate ulterioară), blocarea ștergerii beneficiarului cu proiect live, ștergerea proiectului cu arhivarea observației/fișierului rămas, evenimentele de audit pentru proiect/observație/fișier și rândurile scrise în `archive_projects`/`archive_project_observation_files`.

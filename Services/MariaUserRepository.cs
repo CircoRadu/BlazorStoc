@@ -178,7 +178,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                 if (original.Role == AccessRoles.Administrator && original.IsActive &&
                     await CountOtherActiveAdministratorsAsync(connection, transaction, original.Id, token).ConfigureAwait(false) == 0)
                     throw new UserOperationException("Sistemul trebuie să păstreze cel puțin un administrator activ.");
-                await MariaArchivePersistence.InsertAsync(connection, transaction, operation, null, token)
+                await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token)
                     .ConfigureAwait(false);
                 await AuditAsync(connection, transaction, auditActor, "delete", current, null, token).ConfigureAwait(false);
                 await using var command = Command(connection, transaction,

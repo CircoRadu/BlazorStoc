@@ -1,0 +1,215 @@
+@page "/proiecte/{ProjectId:int}/observatii/{Id:int}"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProjectRepository Repository
+@inject IProjectFileStore FileStore
+@inject IAccessControl AccessControl
+@inject NavigationManager Navigation
+@inject ILogger<ProjectObservation> Logger
+@implements IDisposable
+
+<PageTitle>@(observation?.Name ?? "Observație") · BlazorStoc</PageTitle>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă observația</h3></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error</div>
+}
+else if (observation is not null && project is not null)
+{
+    <a class="nav-back" href="@($"/proiecte/{ProjectId}")"><span>←</span> @project.Name</a>
+    <div class="page-heading">
+        <div><p class="eyebrow">OBSERVAȚIE · @project.Name</p><h1>@observation.Name</h1><p class="muted">@observation.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @observation.Author</p></div>
+        <div class="heading-actions">
+            <button class="primary" disabled="@editing" @onclick="OpenEditAsync">Editează</button>
+            <button class="danger" disabled="@editing" @onclick="() => { deleting = true; deleteError = null; }">Șterge observația</button>
+        </div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+    @if (editing)
+    {
+        <ProjectObservationEditor @key="editorKey" ProjectId="ProjectId" Original="observation" Saved="ObservationSavedAsync" Closed="() => editing = false" />
+    }
+    else if (!string.IsNullOrWhiteSpace(observation.Content))
+    {
+        <section class="catalog"><div class="catalog-heading"><h2>Conținut</h2></div><p class="section-text">@observation.Content</p></section>
+    }
+
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Fișiere <span>@files.Count</span></h2></div>
+        <div class="image-inputs section-actions">
+            <InputFile OnChange="FilesSelectedAsync" multiple />
+            <small>Dimensiune maximă per fișier: 20 MB. Cel mult @ProjectFileRules.MaximumFilesPerObservation fișiere per observație.</small>
+            @if (uploadError is not null) { <span class="validation-message">@uploadError</span> }
+            @if (uploading) { <span>Se încarcă…</span> }
+        </div>
+        @if (files.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">▦</span><h3>Nu există fișiere încărcate</h3></div>
+        }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>FIȘIER</th><th>TIP</th><th>DIMENSIUNE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var file in files)
+            {
+                <tr @key="file.Id">
+                    <td><a href="@($"/media/project-files/{file.Id}")" target="_blank" rel="noopener">@file.OriginalName</a></td>
+                    <td class="muted">@file.ContentType</td>
+                    <td class="muted">@FormatSize(file.SizeBytes)</td>
+                    <td><button class="row-action delete" aria-label="Elimină @file.OriginalName" @onclick="() => RequestRemoveFileAsync(file)">×</button></td>
+                </tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+}
+
+@if (deleting)
+{
+    <DeleteConfirmationDialog Title="Ștergi observația?" Subject="Observația" ObjectLabel="@(observation?.Name ?? "")"
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteObservationAsync"
+                              Cancelled="() => { deleting = false; deleteError = null; }" />
+}
+@if (removingFile is not null)
+{
+    <DeleteConfirmationDialog Title="Elimini fișierul?" Subject="Fișierul" ObjectLabel="@removingFile.OriginalName"
+                              Busy="@removeFileBusy" Error="@removeFileError" Confirmed="RemoveFileAsync"
+                              Cancelled="() => { removingFile = null; removeFileError = null; }" />
+}
+
+@code {
+    [Parameter] public int ProjectId { get; set; }
+    [Parameter] public int Id { get; set; }
+    private Project? project;
+    private ProjectObservation? observation;
+    private IReadOnlyList<ProjectObservationFile> files = Array.Empty<ProjectObservationFile>();
+    private bool loading = true, editing, uploading, deleting, deleteBusy, removeFileBusy;
+    private string? error, notice, uploadError, deleteError, removeFileError;
+    private ProjectObservationFile? removingFile;
+    private Guid editorKey;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (observation is not null && observation.Id != Id) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            observation = await Repository.GetObservationAsync(Id, lifetime.Token);
+            if (observation is null || observation.ProjectId != ProjectId) { error = "Observația solicitată nu mai există."; return; }
+            project = await Repository.GetAsync(ProjectId, lifetime.Token);
+            if (project is null) { error = "Proiectul acestei observații nu mai există."; return; }
+            files = await FileStore.GetFilesAsync(Id, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Observation page loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Observația nu a putut fi încărcată.";
+        }
+        finally { loading = false; }
+    }
+
+    private Task ObservationSavedAsync(ProjectObservation updated)
+    {
+        observation = updated;
+        editing = false;
+        notice = "Observația a fost actualizată.";
+        return Task.CompletedTask;
+    }
+
+    private async Task FilesSelectedAsync(InputFileChangeEventArgs eventArgs)
+    {
+        uploadError = null;
+        uploading = true;
+        try
+        {
+            var author = await AccessControl.GetUsernameAsync(lifetime.Token) ?? "necunoscut";
+            foreach (var file in eventArgs.GetMultipleFiles(ProjectFileRules.MaximumFilesPerObservation))
+            {
+                if (file.Size > ProjectFileRules.MaximumBytes) { uploadError = $"Fișierul «{file.Name}» depășește 20 MB."; continue; }
+                await using var stream = file.OpenReadStream(ProjectFileRules.MaximumBytes, lifetime.Token);
+                using var memory = new MemoryStream();
+                await stream.CopyToAsync(memory, lifetime.Token);
+                var saved = await FileStore.SaveAsync(Id, file.Name, file.ContentType, memory.ToArray(), author, lifetime.Token);
+                files = files.Append(saved).OrderBy(item => item.UploadedAtUtc).ToArray();
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProjectOperationException exception) { uploadError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Observation file upload failed ({ErrorType}).", exception.GetType().Name);
+            uploadError = "Fișierul nu a putut fi încărcat.";
+        }
+        finally { uploading = false; }
+    }
+
+    private void OpenEditAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; }
+    private void RequestRemoveFileAsync(ProjectObservationFile file) { removingFile = file; removeFileError = null; }
+
+    private async Task RemoveFileAsync(string reason)
+    {
+        if (removeFileBusy || removingFile is null) return;
+        removeFileBusy = true;
+        removeFileError = null;
+        try
+        {
+            await FileStore.DeleteAsync(removingFile.Id, reason, lifetime.Token);
+            files = files.Where(item => item.Id != removingFile.Id).ToArray();
+            removingFile = null;
+            notice = "Fișierul a fost mutat în arhivă.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProjectOperationException exception) { removeFileError = exception.Message; }
+        catch (AccessDeniedException exception) { removeFileError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Observation file removal failed ({ErrorType}).", exception.GetType().Name);
+            removeFileError = "Fișierul nu a putut fi eliminat. Actualizează pagina și reîncearcă.";
+        }
+        finally { removeFileBusy = false; }
+    }
+
+    private async Task DeleteObservationAsync(string reason)
+    {
+        if (deleteBusy || observation is null) return;
+        deleteBusy = true;
+        deleteError = null;
+        try
+        {
+            await Repository.DeleteObservationAsync(observation, reason, lifetime.Token);
+            Navigation.NavigateTo($"/proiecte/{ProjectId}");
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProjectOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Observation deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Observația nu a putut fi ștearsă. Actualizează pagina și reîncearcă.";
+        }
+        finally { deleteBusy = false; }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:0.#} KB";
+        return $"{bytes / (1024.0 * 1024.0):0.#} MB";
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

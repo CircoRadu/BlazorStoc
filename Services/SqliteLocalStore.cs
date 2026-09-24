@@ -15,6 +15,8 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
         Path.Combine(environment.ContentRootPath, "data", "blazorstoc-local.db"));
     public string ProductImagesPath { get; } = Path.GetFullPath(configuration["App:ProductImagesPath"] ??
         Path.Combine(environment.ContentRootPath, "data", "product-images"));
+    public string ProjectFilesPath { get; } = Path.GetFullPath(configuration["App:ProjectFilesPath"] ??
+        Path.Combine(environment.ContentRootPath, "data", "project-files"));
     public string ArchiveFilesPath { get; } = Path.GetFullPath(configuration["App:ArchiveFilesPath"] ??
         Path.Combine(environment.ContentRootPath, "data", "archive", "files"));
     private string LegacyAuditPath { get; } = Path.GetFullPath(configuration["App:AuditPath"] ??
@@ -29,14 +31,18 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             if (initialized) return;
             Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
             Directory.CreateDirectory(ProductImagesPath);
+            Directory.CreateDirectory(ProjectFilesPath);
             Directory.CreateDirectory(ArchiveFilesPath);
             await using var connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await ConfigureConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, SchemaSql, cancellationToken).ConfigureAwait(false);
             await EnsureAuditArchiveOperationColumnAsync(connection, cancellationToken).ConfigureAwait(false);
+            await EnsureColumnAsync(connection, "stock_movements", "project_id",
+                "ALTER TABLE stock_movements ADD COLUMN project_id INTEGER NULL REFERENCES projects(id) ON DELETE RESTRICT",
+                cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, """
-                INSERT INTO app_metadata(key,value) VALUES('schema_version','4')
+                INSERT INTO app_metadata(key,value) VALUES('schema_version','5')
                 ON CONFLICT(key) DO UPDATE SET value=excluded.value;
                 """, cancellationToken).ConfigureAwait(false);
             await SeedIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -85,6 +91,19 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
         await ExecuteAsync(connection, null,
             "CREATE INDEX IF NOT EXISTS ix_audit_events_archive_operation ON audit_events(archive_operation_id)", token)
             .ConfigureAwait(false);
+    }
+
+    // Adds a column to an existing table when a schema addition (like stock_movements.project_id) predates the
+    // table's original creation; CREATE TABLE IF NOT EXISTS alone would not reach databases created before it.
+    private static async Task EnsureColumnAsync(SqliteConnection connection, string table, string column,
+        string alterSql, CancellationToken token)
+    {
+        var exists = false;
+        await using (var columns = Command(connection, null, $"PRAGMA table_info({table})"))
+        await using (var reader = await columns.ExecuteReaderAsync(token).ConfigureAwait(false))
+            while (await reader.ReadAsync(token).ConfigureAwait(false))
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase)) exists = true;
+        if (!exists) await ExecuteAsync(connection, null, alterSql, token).ConfigureAwait(false);
     }
 
     internal static SqliteCommand Command(SqliteConnection connection, SqliteTransaction? transaction, string sql,
@@ -414,8 +433,41 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
             beneficiary_id INTEGER REFERENCES beneficiaries(id) ON DELETE RESTRICT,
+            project_id INTEGER REFERENCES projects(id) ON DELETE RESTRICT,
             quantity INTEGER NOT NULL,
             created_utc TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            beneficiary_id INTEGER NOT NULL REFERENCES beneficiaries(id) ON DELETE RESTRICT,
+            name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL,
+            observations TEXT NOT NULL DEFAULT '',
+            version INTEGER NOT NULL DEFAULT 0,
+            created_utc TEXT NOT NULL,
+            updated_utc TEXT NOT NULL,
+            UNIQUE(beneficiary_id, normalized_name)
+        );
+        CREATE TABLE IF NOT EXISTS project_observations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
+            name TEXT NOT NULL,
+            content TEXT NOT NULL DEFAULT '',
+            author TEXT NOT NULL,
+            version INTEGER NOT NULL DEFAULT 0,
+            created_utc TEXT NOT NULL,
+            updated_utc TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS project_observation_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            observation_id INTEGER NOT NULL REFERENCES project_observations(id) ON DELETE RESTRICT,
+            relative_path TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            byte_length INTEGER NOT NULL,
+            sha256 TEXT NOT NULL,
+            author TEXT NOT NULL,
+            uploaded_utc TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS audit_events (
             id TEXT PRIMARY KEY,
@@ -471,6 +523,34 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             version INTEGER NOT NULL,
             password_hash TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS archive_projects (
+            archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            original_id INTEGER NOT NULL,
+            beneficiary_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            observations TEXT NOT NULL,
+            version INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS archive_project_observations (
+            archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            original_id INTEGER NOT NULL,
+            project_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            author TEXT NOT NULL,
+            version INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS archive_project_observation_files (
+            archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            original_id INTEGER NOT NULL,
+            observation_id INTEGER NOT NULL,
+            original_name TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            byte_length INTEGER NOT NULL,
+            sha256 TEXT NOT NULL,
+            author TEXT NOT NULL,
+            uploaded_utc TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS archive_relations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             archive_id TEXT NOT NULL REFERENCES archive_operations(id) ON DELETE RESTRICT,
@@ -496,12 +576,19 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
         CREATE INDEX IF NOT EXISTS ix_audit_events_timestamp ON audit_events(timestamp_utc DESC);
         CREATE INDEX IF NOT EXISTS ix_products_group ON products(category_id,subcategory_id);
         CREATE INDEX IF NOT EXISTS ix_stock_movements_beneficiary ON stock_movements(beneficiary_id);
+        CREATE INDEX IF NOT EXISTS ix_stock_movements_project ON stock_movements(project_id);
+        CREATE INDEX IF NOT EXISTS ix_projects_beneficiary ON projects(beneficiary_id);
+        CREATE INDEX IF NOT EXISTS ix_project_observations_project ON project_observations(project_id,created_utc DESC,id);
+        CREATE INDEX IF NOT EXISTS ix_project_observation_files_observation ON project_observation_files(observation_id);
         CREATE INDEX IF NOT EXISTS ix_archive_operations_object ON archive_operations(entity_type,original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_operations_deleted ON archive_operations(deleted_utc DESC);
         CREATE INDEX IF NOT EXISTS ix_archive_operations_actor ON archive_operations(actor_username,deleted_utc DESC);
         CREATE INDEX IF NOT EXISTS ix_archive_products_original ON archive_products(original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_beneficiaries_original ON archive_beneficiaries(original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_web_users_original ON archive_web_users(original_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_projects_original ON archive_projects(original_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_project_observations_original ON archive_project_observations(original_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_project_observation_files_original ON archive_project_observation_files(original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_relations_object ON archive_relations(relation_type,original_relation_id);
         CREATE INDEX IF NOT EXISTS ix_archive_files_object ON archive_files(relation_type,original_relation_id);
         """;

@@ -1,0 +1,141 @@
+@page "/beneficiari/{Id:int}"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IBeneficiaryRepository Beneficiaries
+@inject IProjectRepository Projects
+@inject NavigationManager Navigation
+@inject ILogger<BeneficiaryDetail> Logger
+@implements IDisposable
+
+<PageTitle>@(beneficiary?.Name ?? "Beneficiar") · BlazorStoc</PageTitle>
+<a class="nav-back" href="/beneficiari"><span>←</span> Beneficiari</a>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă beneficiarul</h3></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+}
+else if (beneficiary is not null)
+{
+    <div class="page-heading">
+        <div><p class="eyebrow">BENEFICIAR</p><h1>@beneficiary.Name</h1><p class="muted">CUI @beneficiary.Cui</p></div>
+        <div class="heading-actions"><button class="primary" disabled="@(addingProject)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button></div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+    @if (addingProject)
+    {
+        <ProjectEditor @key="editorKey" Original="null" FixedBeneficiaryId="Id" FixedBeneficiaryName="@beneficiary.Name"
+                       Saved="ProjectSavedAsync" Closed="CloseAddProjectAsync" />
+    }
+
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
+        <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută proiecte" placeholder="Caută după denumire…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label></div>
+        @if (projectsLoading)
+        {
+            <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă proiectele</h3></div>
+        }
+        else if (FilteredProjects.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">▦</span><h3>Nu există proiecte pentru căutarea curentă</h3><p>Adaugă primul proiect al acestui beneficiar sau șterge textul din câmpul de căutare.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>PROIECT</th><th>ULTIMA MODIFICARE</th></tr></thead><tbody>
+            @foreach (var project in PagedProjects)
+            {
+                <tr @key="project.Id"><td><a class="category-table-link" href="@($"/proiecte/{project.Id}")"><strong>@project.Name</strong></a></td><td>@project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td></tr>
+            }
+            </tbody></table></div>
+            <div class="table-footer">
+                <span>@FilteredProjects.Count proiecte</span>
+                @if (TotalPages > 1)
+                {
+                    <nav class="pagination" aria-label="Paginare proiecte">
+                        <button type="button" aria-label="Pagina anterioară" disabled="@(pageNumber <= 1)" @onclick="() => pageNumber--">‹</button>
+                        <span>Pagina <strong>@pageNumber</strong> din <strong>@TotalPages</strong></span>
+                        <button type="button" aria-label="Pagina următoare" disabled="@(pageNumber >= TotalPages)" @onclick="() => pageNumber++">›</button>
+                    </nav>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Beneficiary? beneficiary;
+    private IReadOnlyList<Project> projects = Array.Empty<Project>();
+    private bool loading = true, projectsLoading, addingProject;
+    private string? error, notice;
+    private string query = "";
+    private int pageNumber = 1;
+    private const int PageSize = 10;
+    private Guid editorKey;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private List<Project> FilteredProjects
+    {
+        get
+        {
+            var trimmed = query.Trim();
+            var filtered = trimmed.Length == 0 ? projects : projects.Where(project => project.Name.Contains(trimmed, StringComparison.OrdinalIgnoreCase));
+            return filtered.OrderBy(project => project.Name).ToList();
+        }
+    }
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredProjects.Count / (double)PageSize));
+    private IEnumerable<Project> PagedProjects => FilteredProjects.Skip((pageNumber - 1) * PageSize).Take(PageSize);
+    private void ResetPage() => pageNumber = 1;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (beneficiary is not null && beneficiary.Id != Id) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            var all = await Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
+            beneficiary = all.FirstOrDefault(item => item.Id == Id);
+            if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }
+            await LoadProjectsAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Beneficiary detail loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Beneficiarul nu a putut fi încărcat.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        projectsLoading = true;
+        try { projects = await Projects.GetForBeneficiaryAsync(Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        finally { projectsLoading = false; }
+    }
+
+    private Task OpenAddProjectAsync() { addingProject = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
+    private Task CloseAddProjectAsync() { addingProject = false; return Task.CompletedTask; }
+    private async Task ProjectSavedAsync(Project project)
+    {
+        addingProject = false;
+        notice = "Proiectul a fost adăugat.";
+        await LoadProjectsAsync();
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

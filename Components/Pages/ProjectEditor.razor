@@ -1,0 +1,106 @@
+@using BlazorStoc.Services
+@inject IProjectRepository Repository
+@inject IBeneficiaryRepository Beneficiaries
+@inject ILogger<ProjectEditor> Logger
+@implements IDisposable
+
+<section class="product-editor" aria-labelledby="project-editor-title">
+    <div class="catalog-heading"><h2 id="project-editor-title">@(Original is null ? "Adaugă proiect" : $"Editează proiectul {Original.Name}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="project-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                @if (Original is null && FixedBeneficiaryId is not null)
+                {
+                    <label class="full-width">Beneficiar<input value="@FixedBeneficiaryName" disabled /></label>
+                }
+                else
+                {
+                    <label for="project-beneficiary" class="full-width">Beneficiar *
+                        <InputSelect id="project-beneficiary" @bind-Value="input.BeneficiaryId">
+                            @foreach (var beneficiary in beneficiaries)
+                            {
+                                <option value="@beneficiary.Id">@beneficiary.Name</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => input.BeneficiaryId" />
+                    </label>
+                }
+                <label class="full-width" for="project-name">Denumire proiect *<InputText id="project-name" @bind-Value="input.Name" maxlength="200" /><ValidationMessage For="() => input.Name" /></label>
+                <label class="full-width" for="project-observations">Observații<InputTextArea id="project-observations" @bind-Value="input.Observations" maxlength="4000" rows="4" /><ValidationMessage For="() => input.Observations" /></label>
+                @if (Original is not null)
+                {
+                    <ChangeReasonField Id="project-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
+                }
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează proiectul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter] public Project? Original { get; set; }
+    [Parameter] public int? FixedBeneficiaryId { get; set; }
+    [Parameter] public string? FixedBeneficiaryName { get; set; }
+    [Parameter] public EventCallback<Project> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    private ProjectInput input = new();
+    private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
+    private bool saving;
+    private string? error, reasonError;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Original is null && FixedBeneficiaryId is { } fixedId)
+        {
+            input = new ProjectInput { BeneficiaryId = fixedId };
+            return;
+        }
+        input = Original is null ? new ProjectInput() : ProjectInput.From(Original);
+        try
+        {
+            beneficiaries = await Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
+            if (Original is null && beneficiaries.Count > 0) input.BeneficiaryId = beneficiaries[0].Id;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Beneficiary list loading for project editor failed ({ErrorType}).", exception.GetType().Name);
+            error = "Lista beneficiarilor nu a putut fi încărcată.";
+        }
+    }
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        if (Original is null && FixedBeneficiaryId is { } fixedId) input.BeneficiaryId = fixedId;
+        reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
+        if (reasonError is not null) return;
+        saving = true;
+        error = null;
+        Project? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProjectOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Project saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Proiectul nu a putut fi salvat. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) await Saved.InvokeAsync(saved);
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

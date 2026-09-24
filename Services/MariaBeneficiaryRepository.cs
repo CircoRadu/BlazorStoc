@@ -92,7 +92,16 @@ public sealed class MariaBeneficiaryRepository(
                 BeneficiaryRules.CheckCurrent(current, original);
                 await using (var relations = Command(connection, transaction, "SELECT EXISTS(SELECT 1 FROM io WHERE id_beneficiar=@id)", ("@id", original.Id)))
                     BeneficiaryRules.CheckDelete(Convert.ToBoolean(await relations.ExecuteScalarAsync(token).ConfigureAwait(false)));
-                await MariaArchivePersistence.InsertAsync(connection, transaction, operation, null, token)
+                // The `project` table is created lazily by the project module; a beneficiary can be deleted safely
+                // before it exists, since no project could reference it yet.
+                try
+                {
+                    await using var projects = Command(connection, transaction,
+                        "SELECT COUNT(*) FROM project WHERE id_beneficiar=@id", ("@id", original.Id));
+                    BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
+                }
+                catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.NoSuchTable) { }
+                await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token)
                     .ConfigureAwait(false);
                 await using var command = Command(connection, transaction,
                     "DELETE FROM beneficiar WHERE id_beneficiar=@id AND beneficiar_versiune=@version", ("@id", original.Id), ("@version", original.Version));

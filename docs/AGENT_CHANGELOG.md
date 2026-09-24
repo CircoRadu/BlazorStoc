@@ -215,3 +215,44 @@ Acest fișier este append-only. Intrările noi sunt adăugate automat de `tools/
 - **Validare:** Build Release: 0 avertismente, 0 erori. BlazorStoc.Checks: 205 verificări trecute (29 noi: normalizare, unicitate per beneficiar și reutilizare la alt beneficiar, versiuni și UTC, motivare la editare, metadate fișiere și nume sigure, blocarea ștergerii beneficiarului). Preview-ul nu a necesitat repornire (fără schimbări de interfață).
 - **Commit:** `claude: add project domain model and rules`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-24T12:32:37.1128486Z â€” claude
+
+- **Task:** Task 2 — restul subtaskurilor pentru proiecte (persistență, pagini, observații, fișiere, autorizare/audit/arhivare, verificări); ordine schimbată la cererea explicită a utilizatorului, nextAgent era codex
+- **Rezumat:** Task 2 finalizat aproape integral (restul subtaskurilor dupa modelul de date din ciclul anterior): persistenta SQLite si MariaDB pentru proiecte/observatii/fisiere (SqliteProjectRepository, SqliteProjectFileStore, MariaProjectRepository, MariaProjectFileStore), cu chei externe, index unic per beneficiar, arhivare in cascada (ArchivePersistence.InsertAsync generalizat la o lista de fisiere per operatie) si BeneficiaryRules.CheckNoLiveProjects aplicat efectiv la stergerea beneficiarului. Interfata noua: /beneficiari/{id} (lista proiecte, cautare, paginare), /proiecte/{id} (Echipamente mereu primul, apoi observatii), /proiecte/{id}/echipamente (stare goala), /proiecte/{projectId}/observatii/{id} (incarcare/descarcare/eliminare fisiere cu validare a continutului dupa semnatura binara, nu doar extensie). Audit extins cu Proiect/Observatie/FisierObservatie si link din jurnal catre /proiecte/{id}. Corectie: DeleteConfirmationRules.DefaultReason genera mereu forma masculina 'nu va mai fi folosit', gresita pentru 'Observatia'; corectat cu acord de gen, depistat prin testare manuala in browser. Fisierele Project.razor si ProjectObservation.razor au fost redenumite (ProjectPage.razor, ProjectObservationPage.razor) pentru a evita coliziunea de nume cu entitatile de domeniu omonime. Ramane neterminat: restaurarea contextului de navigare la revenire, registrul de rute al jurnalului pentru observatii, citirea efectiva a miscarilor de stoc in Echipamente si sincronizarea cu Task 8 (documentate explicit in TODO ca subtaskuri separate).
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/Beneficiaries.razor`
+  - `Components/Pages/BeneficiaryDetail.razor`
+  - `Components/Pages/ProjectEditor.razor`
+  - `Components/Pages/ProjectEquipment.razor`
+  - `Components/Pages/ProjectObservationEditor.razor`
+  - `Components/Pages/ProjectObservationPage.razor`
+  - `Components/Pages/ProjectPage.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Program.cs`
+  - `Services/ArchivePersistence.cs`
+  - `Services/Archiving.cs`
+  - `Services/AuditTrail.cs`
+  - `Services/DeleteConfirmation.cs`
+  - `Services/MariaArchiveSchema.cs`
+  - `Services/MariaBeneficiaryRepository.cs`
+  - `Services/MariaProductRepository.Crud.cs`
+  - `Services/MariaProjectFileStore.cs`
+  - `Services/MariaProjectRepository.cs`
+  - `Services/MariaUserRepository.cs`
+  - `Services/Projects.cs`
+  - `Services/SqliteBeneficiaryRepository.cs`
+  - `Services/SqliteLocalStore.cs`
+  - `Services/SqliteProductRepository.cs`
+  - `Services/SqliteProjectFileStore.cs`
+  - `Services/SqliteProjectRepository.cs`
+  - `Services/SqliteUserRepository.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+- **Validare:** Build Release: 0 avertismente, 0 erori (proiect principal si BlazorStoc.Checks). BlazorStoc.Checks: 229 verificari trecute (24 noi fata de ciclul anterior: persistenta dupa repornire, unicitate per beneficiar cu mesaj de duplicat, reutilizare nume la alt beneficiar, doua sesiuni SQLite concurente pe acelasi proiect, concurenta optimista, stergere fisier individual cu arhivare, blocarea stergerii beneficiarului cu proiect live, stergere proiect cu arhivarea observatiei/fisierului ramas, evenimente audit si randuri in archive_projects/archive_project_observation_files, acordul de gen din DeleteConfirmationRules). Verificare manuala in browser (admin demo, sesiune existenta): creare proiect, pagina proiectului cu Echipamente primul, adaugare observatie cu navigare automata, stergere observatie si stergere proiect (dialog de confirmare in doi pasi), jurnal cu evenimentele Proiect/Observatie corecte; datele de test au fost sterse.
+- **Commit:** `claude: add project persistence, pages, files and archiving`
+- **Predat cÄƒtre:** codex

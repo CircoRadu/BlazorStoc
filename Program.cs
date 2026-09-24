@@ -65,6 +65,16 @@ builder.Services.AddScoped<IBeneficiaryRepository>(services => demo
 builder.Services.AddSingleton<IProductImageStore>(services => demo
     ? new SqliteProductImageStore(services.GetRequiredService<SqliteLocalStore>())
     : new FileProductImageStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>()));
+builder.Services.AddScoped<IProjectFileStore>(services => demo
+    ? new SqliteProjectFileStore(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
+    : new MariaProjectFileStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>(),
+        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>()));
+builder.Services.AddScoped<IProjectRepository>(services => demo
+    ? new SqliteProjectRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(),
+        services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProjectFileStore>())
+    : new MariaProjectRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IWebHostEnvironment>(),
+        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(),
+        services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProjectFileStore>()));
 var app = builder.Build();
 if (demo) await app.Services.GetRequiredService<SqliteLocalStore>().InitializeAsync();
 else await MariaArchiveSchema.InitializeAsync(app.Configuration);
@@ -83,6 +93,13 @@ app.MapGet("/media/products/{productId:int}", async (int productId, IProductImag
     return image is null
         ? Results.Redirect(ProductImageRules.PlaceholderUrl)
         : Results.File(image.Content, image.ContentType, enableRangeProcessing: true);
+}).RequireAuthorization();
+app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileStore files, CancellationToken token) =>
+{
+    var file = await files.GetContentAsync(fileId, token);
+    return file is null
+        ? Results.NotFound()
+        : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
 }).RequireAuthorization();
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();

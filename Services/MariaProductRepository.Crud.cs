@@ -97,7 +97,7 @@ public sealed partial class MariaProductRepository
                         "SELECT EXISTS(SELECT 1 FROM io WHERE id_produs=@id)", ("@id", original.Id));
                     ProductRules.CheckDelete(current!, Convert.ToBoolean(
                         await relations.ExecuteScalarAsync(archiveToken).ConfigureAwait(false)));
-                    await MariaArchivePersistence.InsertAsync(connection, transaction, operation, file, archiveToken)
+                    await MariaArchivePersistence.InsertAsync(connection, transaction, operation, file is null ? [] : [file], archiveToken)
                         .ConfigureAwait(false);
                     await Audit(connection, transaction, userId, "delete", current, null,
                         "Ștergere produs arhivat", archiveToken).ConfigureAwait(false);

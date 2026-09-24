@@ -141,7 +141,7 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
                         "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE product_id=@id)", ("@id", original.Id)))
                         ProductRules.CheckDelete(original,
                             Convert.ToBoolean(await relations.ExecuteScalarAsync(archiveToken).ConfigureAwait(false)));
-                    await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, file, archiveToken)
+                    await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, file is null ? [] : [file], archiveToken)
                         .ConfigureAwait(false);
                     await using var delete = SqliteLocalStore.Command(connection, transaction,
                         "DELETE FROM products WHERE id=@id AND version=@version",

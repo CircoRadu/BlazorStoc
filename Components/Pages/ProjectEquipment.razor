@@ -1,0 +1,52 @@
+@page "/proiecte/{Id:int}/echipamente"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProjectRepository Repository
+@inject ILogger<ProjectEquipment> Logger
+@implements IDisposable
+
+<PageTitle>Echipamente @(project?.Name is { } name ? $"· {name}" : "") · BlazorStoc</PageTitle>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă proiectul</h3></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error</div>
+}
+else if (project is not null)
+{
+    <a class="nav-back" href="@($"/proiecte/{Id}")"><span>←</span> @project.Name</a>
+    <div class="page-heading"><div><p class="eyebrow">PROIECT · @project.Name</p><h1>Echipamente</h1><p class="muted">Materiale și echipamente scoase din inventar pentru acest proiect.</p></div></div>
+    <section class="catalog">
+        <div class="empty-state">
+            <span class="empty-icon">▦</span>
+            <h3>Nu există încă mișcări de ieșire asociate</h3>
+            <p>Pagina va afișa aici codul produsului, cantitatea, data, operatorul și referința mișcării, imediat ce modulul de mișcări de stoc va fi implementat.</p>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Project? project;
+    private bool loading = true;
+    private string? error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { project = await Repository.GetAsync(Id, lifetime.Token); if (project is null) error = "Proiectul solicitat nu mai există."; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Project equipment page loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Proiectul nu a putut fi încărcat.";
+        }
+        finally { loading = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

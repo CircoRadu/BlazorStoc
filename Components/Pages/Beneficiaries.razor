@@ -32,7 +32,7 @@
         <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>CUI</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var beneficiary in Filtered)
         {
-            <tr @key="beneficiary.Id"><td><strong>@beneficiary.Name</strong><small class="user-id">#@beneficiary.Id</small></td><td><span class="role-badge limited">@beneficiary.Cui</span></td><td><div class="row-buttons"><button class="row-action edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)">✎</button><button class="row-action delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)">×</button></div></td></tr>
+            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Cui</span></td><td><div class="row-buttons"><button class="row-action edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)">✎</button><button class="row-action delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)">×</button></div></td></tr>
         }
         </tbody></table></div>
     }
@@ -42,7 +42,7 @@
 {
     <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi beneficiarul?" Subject="Beneficiarul"
                               ObjectLabel="@($"{deleting.Name} · {deleting.Cui}")"
-                              Description="Beneficiarii care au mișcări de stoc asociate nu pot fi șterși."
+                              Description="Beneficiarii care au proiecte sau mișcări de stoc asociate nu pot fi șterși."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteBeneficiaryAsync"
                               Cancelled="CancelDeleteAsync" />
 }
