@@ -1,4 +1,4 @@
-# TODO — funcționalități viitoare
+﻿# TODO — funcționalități viitoare
 
 ## Regula de prioritizare
 
@@ -25,28 +25,19 @@ Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură
 
 Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul de legătură dintre beneficiar, observațiile de lucru, fișierele atașate și viitoarele mișcări de ieșire din inventar. Implementarea păstrează separat câmpul general „Observații” al proiectului și lista de observații individuale, fiecare cu propria denumire, descriere și fișiere.
 
-### Subtask 2.1 — Modelul de date și regulile de domeniu
-
-- [ ] Definește entitatea `Project` cu identificator stabil, beneficiar obligatoriu, denumire obligatorie, câmp text „Observații”, versiune și timestampuri UTC pentru creare și ultima modificare.
-- [ ] Definește entitatea `ProjectObservation` cu proiect obligatoriu, denumire obligatorie, conținut text, autor, versiune și timestampuri UTC pentru creare și ultima modificare.
-- [ ] Definește metadatele fișierelor asociate unei observații: identificator, observație, nume original, nume intern, tip media, dimensiune, hash, autor și timestamp UTC.
-- [ ] Aplică regula curentă de curățare a denumirilor: elimină spațiile exterioare, reduce spațiile consecutive la unul singur și aplică regulile existente privind diacriticele.
-- [ ] Validează unicitatea denumirii proiectului numai în cadrul aceluiași beneficiar, fără diferențe între majuscule, minuscule, diacritice sau spațiere echivalentă.
-- [ ] Permite aceeași denumire de proiect pentru beneficiari diferiți.
-- [ ] Folosește versiuni pentru concurență optimistă la editarea proiectelor și observațiilor.
-- [ ] Blochează eliminarea unui beneficiar cât timp acesta are proiecte live asociate.
-
-### Subtask 2.2 — Persistența și repository-urile asincrone
+### Subtask 2.1 — Persistența și repository-urile asincrone
 
 - [ ] Creează structurile persistente pentru proiecte, observații și metadatele fișierelor în SQLite și MariaDB, plus structurile echivalente pentru modul demonstrativ.
 - [ ] Adaugă cheia externă obligatorie dintre proiect și beneficiar și cheia externă dintre observație și proiect.
-- [ ] Adaugă o constrângere sau un index unic concurent sigur pentru combinația beneficiar și denumire normalizată a proiectului.
+- [ ] Adaugă o constrângere sau un index unic concurent sigur pentru combinația beneficiar și denumire normalizată a proiectului, folosind `ProjectRules.NormalizedName`; traduce încălcarea indexului în `ProjectRules.ConcurrentDuplicateMessage`.
+- [ ] Aplică `BeneficiaryRules.CheckNoLiveProjects` în ștergerea beneficiarului din modul demonstrativ, SQLite și MariaDB, în aceeași tranzacție cu verificarea mișcărilor de stoc.
+- [ ] Construiește și editează înregistrările numai prin `ProjectRules.Create`/`Edited`, `CreateObservation`/`EditedObservation` și `ProjectFileRules.Create`, cu timestamp UTC furnizat de server.
 - [ ] Adaugă indexuri pentru beneficiar, proiect, data creării observației și relația fișier–observație.
 - [ ] Definește repository-uri complet asincrone pentru listare, consultare, creare, editare și ștergere/arhivare.
 - [ ] Păstrează operațiile asupra proiectului, observațiilor, fișierelor și auditului în tranzacții coerente, cu operații compensatorii pentru fișiere când este necesar.
 - [ ] Nu genera un fișier SQL de upgrade separat; actualizează doar schema și inițializarea gestionate în cadrul proiectului.
 
-### Subtask 2.3 — Navigarea prin beneficiari și CRUD-ul proiectelor
+### Subtask 2.2 — Navigarea prin beneficiari și CRUD-ul proiectelor
 
 - [ ] Nu adăuga o secțiune „Proiecte” în meniul principal și nu crea o listă globală a proiectelor.
 - [ ] Transformă denumirea beneficiarului din tabelul „Beneficiari” într-un link spre ruta stabilă de consultare `/beneficiari/{id}`.
@@ -61,7 +52,7 @@ Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul d
 - [ ] La revenirea din pagina proiectului, restaurează pagina, filtrul și poziția anterioară din lista proiectelor beneficiarului.
 - [ ] Aplică stilul unitar al linkurilor și butoanelor și păstrează datele formularului după o validare respinsă.
 
-### Subtask 2.4 — Pagina proiectului și legătura cu inventarul
+### Subtask 2.3 — Pagina proiectului și legătura cu inventarul
 
 - [ ] Creează o rută stabilă de consultare `/proiecte/{id}` care nu deschide automat editarea.
 - [ ] Afișează denumirea proiectului, beneficiarul cu link spre pagina sa, observațiile generale și datele de creare/actualizare în ora locală.
@@ -72,7 +63,7 @@ Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul d
 - [ ] Până la implementarea mișcărilor de stoc, afișează o stare goală explicită și nu introduce date simulate.
 - [ ] Nu permite ștergerea/arhivarea unui proiect care are mișcări de stoc asociate; istoricul de inventar trebuie păstrat.
 
-### Subtask 2.5 — Observațiile proiectului
+### Subtask 2.4 — Observațiile proiectului
 
 - [ ] Adaugă în pagina proiectului butonul „Adaugă observație”.
 - [ ] Permite adăugarea mai multor observații, fiecare cu denumire obligatorie și câmp text pentru conținut.
@@ -83,7 +74,7 @@ Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul d
 - [ ] Permite editarea denumirii și textului observației cu motivare obligatorie, verificarea versiunii și păstrarea formularului după erori.
 - [ ] Permite ștergerea/arhivarea unei observații numai prin fluxul comun de confirmare în doi pași.
 
-### Subtask 2.6 — Fișierele observațiilor
+### Subtask 2.5 — Fișierele observațiilor
 
 - [ ] Permite încărcarea unuia sau mai multor fișiere pentru o observație existentă, atât din pagina observației, cât și imediat după crearea acesteia.
 - [ ] Stochează conținutul fișierelor în structura de fișiere a serverului, nu ca BLOB în baza de date; baza păstrează doar metadatele și calea internă controlată.
@@ -95,7 +86,7 @@ Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul d
 - [ ] Permite adăugarea de fișiere noi și eliminarea individuală a celor existente, cu motiv obligatoriu și confirmare.
 - [ ] La eliminare, mută fișierul și metadatele în arhivă conform contractului existent; nu șterge definitiv singura copie.
 
-### Subtask 2.7 — Autorizare, audit și arhivare
+### Subtask 2.6 — Autorizare, audit și arhivare
 
 - [ ] Permite administratorilor acces complet și acordă utilizatorilor cu drepturi limitate accesul operațional la proiecte, observații și fișiere, conform regulilor existente pentru produse și beneficiari.
 - [ ] Verifică autorizarea atât în interfață, cât și în repository-uri și endpointurile de fișiere.
@@ -105,7 +96,7 @@ Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul d
 - [ ] Extinde registrul și tabelele `archive_*` pentru proiecte, observații și fișiere în aceeași modificare, conform contractului obligatoriu pentru orice entitate nouă care poate fi ștearsă.
 - [ ] Arhivează proiectul împreună cu observațiile și fișierele sale numai dacă nu există mișcări de stoc asociate și păstrează date suficiente pentru restaurarea ulterioară.
 
-### Subtask 2.8 — Sincronizare și verificări
+### Subtask 2.7 — Sincronizare și verificări
 
 - [ ] Publică evenimente de modificare pentru proiecte, observații și fișiere prin contractul ce va fi consumat de Task 8.
 - [ ] Actualizează lista proiectelor din pagina beneficiarului și pagina proiectului fără pierderea formularelor deschise atunci când Task 8 implementează sincronizarea între utilizatori.
@@ -114,6 +105,21 @@ Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul d
 - [ ] Verifică încărcarea, descărcarea, integritatea, autorizarea, eliminarea și recuperarea după erori pentru fișiere.
 - [ ] Verifică ordinea tabelului: „Echipamente” primul, urmat de observații în ordinea stabilită.
 - [ ] Verifică două sesiuni concurente care încearcă să creeze același proiect pentru același beneficiar.
+
+### Subtaskuri finalizate
+
+### Finalizat — Modelul de date și regulile de domeniu
+
+Implementat la 24 septembrie 2026 de Claude în `Services/Projects.cs`. Persistența și aplicarea regulilor în repository-uri rămân în Subtask 2.1.
+
+- [x] Definește entitatea `Project` cu identificator stabil, beneficiar obligatoriu, denumire obligatorie, câmp text „Observații”, versiune și timestampuri UTC pentru creare și ultima modificare.
+- [x] Definește entitatea `ProjectObservation` cu proiect obligatoriu, denumire obligatorie, conținut text, autor, versiune și timestampuri UTC pentru creare și ultima modificare.
+- [x] Definește metadatele fișierelor asociate unei observații: identificator, observație, nume original, nume intern, tip media, dimensiune, hash, autor și timestamp UTC.
+- [x] Aplică regula curentă de curățare a denumirilor: elimină spațiile exterioare, reduce spațiile consecutive la unul singur și aplică regulile existente privind diacriticele.
+- [x] Validează unicitatea denumirii proiectului numai în cadrul aceluiași beneficiar, fără diferențe între majuscule, minuscule, diacritice sau spațiere echivalentă.
+- [x] Permite aceeași denumire de proiect pentru beneficiari diferiți.
+- [x] Folosește versiuni pentru concurență optimistă la editarea proiectelor și observațiilor.
+- [x] Blochează eliminarea unui beneficiar cât timp acesta are proiecte live asociate (regula `BeneficiaryRules.CheckNoLiveProjects`; aplicarea în repository-uri este inclusă în Subtask 2.1, odată cu tabelele proiectelor).
 
 ### Criterii de acceptare
 

@@ -198,3 +198,20 @@ Acest fișier este append-only. Intrările noi sunt adăugate automat de `tools/
 - **Validare:** Build Release: 0 avertismente, 0 erori. BlazorStoc.Checks: 176 verificări trecute (10 noi pentru Cod produs, inclusiv două sesiuni SQLite concurente cu același cod). Browser pe http://127.0.0.1:5082 (admin demo): catalog, detalii, editor și jurnal fără #<id>, etichete Cod produs, cod duplicat respins cu mesaj clar și formular păstrat. Preview actualizat la http://127.0.0.1:5082. Unicitatea MariaDB nu a fost testată pe server real.
 - **Commit:** `claude: implement product code field`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-24T11:57:58.9171962Z â€” claude
+
+- **Task:** Task 2 / Subtask 2.1 — Modelul de date și regulile de domeniu pentru proiecte (ordine schimbată la cererea explicită a utilizatorului; nextAgent era codex)
+- **Rezumat:** Task 2 — modelul de date și regulile de domeniu pentru proiecte (fostul Subtask 2.1), pornit la cererea explicită a utilizatorului deși nextAgent era codex. Services/Projects.cs adaugă entitățile Project, ProjectObservation și ProjectObservationFile (timestampuri UTC, versiune, autor, metadate fișier cu nume original sigur, nume intern GUID și SHA-256), inputurile validate cu regulile existente de curățare a denumirilor și diacriticelor, unicitatea denumirii proiectului numai în cadrul beneficiarului (ProjectRules.EnsureUniqueName/NormalizedName), fabricile de creare/editare cu versionare optimistă și CheckCurrent. BeneficiaryRules.CheckNoLiveProjects blochează ștergerea beneficiarului cu proiecte live; aplicarea în repository-uri este un punct explicit din noul Subtask 2.1 (persistență), deoarece tabelele proiectelor nu există încă. TODO renumerotat, VALIDARE și PROJECT_STATE actualizate. Fără modificări de UI sau schemă.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Services/Beneficiaries.cs`
+  - `Services/Projects.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+- **Validare:** Build Release: 0 avertismente, 0 erori. BlazorStoc.Checks: 205 verificări trecute (29 noi: normalizare, unicitate per beneficiar și reutilizare la alt beneficiar, versiuni și UTC, motivare la editare, metadate fișiere și nume sigure, blocarea ștergerii beneficiarului). Preview-ul nu a necesitat repornire (fără schimbări de interfață).
+- **Commit:** `claude: add project domain model and rules`
+- **Predat cÄƒtre:** codex

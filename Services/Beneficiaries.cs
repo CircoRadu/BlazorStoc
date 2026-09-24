@@ -72,6 +72,15 @@ public static class BeneficiaryRules
         if (hasStockMovements)
             throw new BeneficiaryOperationException("Beneficiarul are mișcări de stoc asociate și nu poate fi șters.");
     }
+
+    // Live projects must be moved to another beneficiary or archived first; archived projects do not block deletion.
+    public static void CheckNoLiveProjects(int liveProjectCount)
+    {
+        if (liveProjectCount > 0)
+            throw new BeneficiaryOperationException(liveProjectCount == 1
+                ? "Beneficiarul are un proiect asociat și nu poate fi șters. Mută sau arhivează mai întâi proiectul."
+                : $"Beneficiarul are {liveProjectCount} proiecte asociate și nu poate fi șters. Mută sau arhivează mai întâi proiectele.");
+    }
 }
 
 public sealed class DemoBeneficiaryStore

@@ -5,10 +5,10 @@
     "activeAgent":  null,
     "lastAgent":  "claude",
     "nextAgent":  "codex",
-    "currentTask":  "Task 1 — Cod produs",
-    "startedAtUtc":  "2026-09-24T11:39:26.1757103Z",
-    "completedAtUtc":  "2026-09-24T11:50:29.5146305Z",
-    "lastSummary":  "Task 1 (Cod produs) finalizat. Câmpul Denumire al produsului a devenit Cod produs în formular, catalog, detalii, căutare, validări, mesajele de duplicat, audit și arhivă, fără câmp separat și fără generare automată. Unicitatea normalizată (spații, majuscule, diacritice) rămâne globală în demo, SQLite și MariaDB; în SQLite, încălcarea indexului UNIQUE la cereri concurente este tradusă într-un mesaj clar. Identificatorul intern #\u003cid\u003e nu mai este afișat pentru produse (catalog, detalii, titlul editorului, ținte de audit și arhivă); evenimentele vechi din jurnal sunt afișate fără prefix prin AuditNavigation.DisplayTarget, iar linkurile folosesc în continuare EntityId. Logica comună este centralizată în ProductCode. Proprietatea tehnică Name și coloanele bazei au fost păstrate pentru compatibilitatea instantaneelor din arhivă și a log-ului MariaDB. TODO, README, VALIDARE și PROJECT_STATE au fost actualizate.",
-    "lastCommitSubject":  "claude: implement product code field",
+    "currentTask":  "Task 2 / Subtask 2.1 — Modelul de date și regulile de domeniu pentru proiecte (ordine schimbată la cererea explicită a utilizatorului; nextAgent era codex)",
+    "startedAtUtc":  "2026-09-24T11:54:50.8841395Z",
+    "completedAtUtc":  "2026-09-24T11:57:58.9171962Z",
+    "lastSummary":  "Task 2 — modelul de date și regulile de domeniu pentru proiecte (fostul Subtask 2.1), pornit la cererea explicită a utilizatorului deși nextAgent era codex. Services/Projects.cs adaugă entitățile Project, ProjectObservation și ProjectObservationFile (timestampuri UTC, versiune, autor, metadate fișier cu nume original sigur, nume intern GUID și SHA-256), inputurile validate cu regulile existente de curățare a denumirilor și diacriticelor, unicitatea denumirii proiectului numai în cadrul beneficiarului (ProjectRules.EnsureUniqueName/NormalizedName), fabricile de creare/editare cu versionare optimistă și CheckCurrent. BeneficiaryRules.CheckNoLiveProjects blochează ștergerea beneficiarului cu proiecte live; aplicarea în repository-uri este un punct explicit din noul Subtask 2.1 (persistență), deoarece tabelele proiectelor nu există încă. TODO renumerotat, VALIDARE și PROJECT_STATE actualizate. Fără modificări de UI sau schemă.",
+    "lastCommitSubject":  "claude: add project domain model and rules",
     "claudeStatus":  "active"
 }

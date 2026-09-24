@@ -1052,6 +1052,79 @@ finally
     if (Directory.Exists(sqliteTestRoot)) Directory.Delete(sqliteTestRoot, true);
 }
 
+void ProjectRejected(Action operation, string message)
+{
+    try { operation(); }
+    catch (ProjectOperationException) { Check(true, message); return; }
+    throw new Exception("Expected project rejection: " + message);
+}
+var projectNow = new DateTime(2026, 9, 24, 12, 0, 0, DateTimeKind.Utc);
+var projectInput = new ProjectInput { BeneficiaryId = 1, Name = "  Hală   producție  ", Observations = "  Montaj în două etape  " }.Validated();
+Check(projectInput.Name == "Hala productie" && projectInput.Observations == "Montaj in doua etape",
+    "Project name and general observations use the existing trimming, space and diacritic rules");
+ProjectRejected(() => new ProjectInput { BeneficiaryId = 1, Name = "   " }.Validated(), "Project name is required");
+ProjectRejected(() => new ProjectInput { BeneficiaryId = 0, Name = "Proiect" }.Validated(), "Project requires a beneficiary");
+ProjectRejected(() => new ProjectInput { BeneficiaryId = 1, Name = new string('P', 201) }.Validated(), "Project name is limited to 200 characters");
+var project = ProjectRules.Create(10, projectInput, projectNow);
+Check(project.Version == 0 && project.CreatedAtUtc == projectNow && project.UpdatedAtUtc == projectNow &&
+      project.CreatedAtUtc.Kind == DateTimeKind.Utc, "New projects start at version 0 with UTC creation and update timestamps");
+try { ProjectRules.Create(11, projectInput, DateTime.SpecifyKind(projectNow, DateTimeKind.Local)); throw new Exception("Local project timestamp accepted"); }
+catch (ArgumentException) { Check(true, "Project timestamps must be UTC"); }
+var existingProjects = new[] { project, ProjectRules.Create(12, new ProjectInput { BeneficiaryId = 2, Name = "Alt proiect" }.Validated(), projectNow) };
+ProjectRejected(() => ProjectRules.EnsureUniqueName(existingProjects, 1, "  HALĂ  PRODUCȚIE ", null, "Construct Demo SRL"),
+    "Project names are unique per beneficiary regardless of case, diacritics and spacing");
+ProjectRules.EnsureUniqueName(existingProjects, 2, "Hala productie", null, "Atelier Tehnic SRL");
+Check(true, "The same project name is allowed for a different beneficiary");
+ProjectRules.EnsureUniqueName(existingProjects, 1, "Hala productie", project.Id, "Construct Demo SRL");
+Check(true, "A project keeps its own name when edited");
+try { ProjectRules.EnsureUniqueName(existingProjects, 1, "hala productie", null, "Construct Demo SRL"); throw new Exception("Duplicate project name accepted"); }
+catch (ProjectOperationException exception)
+{
+    Check(exception.Message.Contains("Construct Demo SRL", StringComparison.Ordinal) && exception.Message.Contains("Hala productie", StringComparison.Ordinal),
+        "Duplicate project message names the beneficiary and the existing project");
+}
+Check(ProjectRules.NormalizedName("  hală   PRODUCȚIE ") == ProjectRules.NormalizedName("Hala productie"),
+    "Normalized project name key is stable for the per-beneficiary unique index");
+var projectEdit = ProjectInput.From(project); projectEdit.BeneficiaryId = 2; projectEdit.Name = "Hala noua";
+ProjectRejected(() => projectEdit.Validated(true), "Project edits require a reason");
+projectEdit.Reason = "Mutare la beneficiarul corect";
+var editedProject = ProjectRules.Edited(project, projectEdit.Validated(true), projectNow.AddMinutes(5));
+Check(editedProject.Version == 1 && editedProject.BeneficiaryId == 2 && editedProject.CreatedAtUtc == projectNow &&
+      editedProject.UpdatedAtUtc == projectNow.AddMinutes(5), "Project edits increment the version and keep the creation timestamp");
+ProjectRejected(() => ProjectRules.CheckCurrent(editedProject, project), "Stale project version is rejected");
+ProjectRejected(() => ProjectRules.CheckCurrent(null, project), "Deleted project is rejected on edit");
+ProjectRejected(() => ProjectRules.CheckBeneficiaryExists(null), "Project save is rejected when the beneficiary no longer exists");
+var observationInput = new ProjectObservationInput { Name = "  Verificare   șantier ", Content = " Fundația este turnată " }.Validated();
+var observation = ProjectRules.CreateObservation(1, project.Id, observationInput, "operator", projectNow);
+Check(observation.Name == "Verificare santier" && observation.Content == "Fundatia este turnata" &&
+      observation.Author == "operator" && observation.Version == 0 && observation.CreatedAtUtc.Kind == DateTimeKind.Utc,
+    "Project observations normalize text and keep author, version and UTC timestamps");
+ProjectRejected(() => new ProjectObservationInput { Name = " " }.Validated(), "Observation name is required");
+ProjectRejected(() => ProjectRules.CreateObservation(2, project.Id, observationInput, " ", projectNow), "Observation author is required");
+var observationEdit = ProjectObservationInput.From(observation); observationEdit.Content = "Actualizat";
+ProjectRejected(() => observationEdit.Validated(true), "Observation edits require a reason");
+observationEdit.Reason = "Completare";
+var editedObservation = ProjectRules.EditedObservation(observation, observationEdit.Validated(true), projectNow.AddMinutes(1));
+Check(editedObservation.Version == 1 && editedObservation.CreatedAtUtc == projectNow, "Observation edits increment the version");
+ProjectRejected(() => ProjectRules.CheckCurrent(editedObservation, observation), "Stale observation version is rejected");
+var projectFile = ProjectFileRules.Create(1, observation.Id, @"..\..\C:\secret\Plan  fațadă.PDF", "application/pdf", 1024,
+    new string('A', 64), "operator", projectNow);
+Check(projectFile.OriginalName == "Plan  fațadă.PDF" && projectFile.StoredName.EndsWith(".pdf", StringComparison.Ordinal) &&
+      projectFile.StoredName.Length == 36 && !projectFile.StoredName.Contains("Plan", StringComparison.Ordinal) &&
+      projectFile.Sha256 == new string('a', 64) && projectFile.UploadedAtUtc.Kind == DateTimeKind.Utc,
+    "Observation file metadata keeps a safe original name, a generated internal name and a normalized hash");
+Check(ProjectFileRules.NewStoredName(".exe/../x") is { Length: 32 } && ProjectFileRules.NewStoredName(".pdf") != ProjectFileRules.NewStoredName(".pdf"),
+    "Internal file names are unique and reject unsafe extensions");
+ProjectRejected(() => ProjectFileRules.Create(2, observation.Id, "gol.txt", "text/plain", 0, new string('a', 64), "operator", projectNow),
+    "Empty observation files are rejected");
+ProjectRejected(() => ProjectFileRules.Create(2, observation.Id, "a.txt", "text/plain", 1, "nu-este-hash", "operator", projectNow),
+    "Observation file metadata requires a SHA-256 hash");
+ProjectRejected(() => ProjectFileRules.SafeOriginalName("../.."), "Path-only file names are rejected");
+try { BeneficiaryRules.CheckNoLiveProjects(2); throw new Exception("Beneficiary with live projects accepted for deletion"); }
+catch (BeneficiaryOperationException exception) { Check(exception.Message.Contains("2 proiecte", StringComparison.Ordinal), "Beneficiary deletion is blocked while live projects exist"); }
+BeneficiaryRules.CheckNoLiveProjects(0);
+Check(true, "Beneficiary without live projects passes the project deletion rule");
+
 // Run only against an explicitly started local test instance with the documented test credentials.
 if (args.Length == 2 && args[0] == "--http")
 {

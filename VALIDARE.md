@@ -91,3 +91,16 @@ Verificări pentru câmpul „Cod produs” (fostul „Denumire”):
 5. Linkurile din jurnal către produse continuă să folosească identificatorul stabil (`/produse?edit=<id>`).
 
 Suita automată acoperă unicitatea normalizată în modul demonstrativ și SQLite, inclusiv două sesiuni SQLite concurente care încearcă același cod (una singură reușește), mesajele de validare, ținta de audit și de arhivă fără `#<id>` și afișarea evenimentelor vechi. Pentru MariaDB, unicitatea folosește aceeași comparație normalizată sub tranzacție `Serializable` cu `FOR UPDATE`; nu a fost testată pe un server MariaDB în acest ciclu.
+
+## Proiecte — modelul de date (Subtask finalizat din Task 2)
+
+Regulile de domeniu din `Services/Projects.cs` sunt acoperite integral de `BlazorStoc.Checks` (29 de verificări):
+
+1. Denumirile proiectelor și observațiilor sunt curățate prin `TextNormalization.ForObjectNameOrCode` (spații exterioare, spații consecutive, diacritice); textele libere prin `ForStorage`.
+2. Unicitatea denumirii proiectului este verificată numai în cadrul aceluiași beneficiar, fără diferențe de majuscule, diacritice sau spațiere; aceeași denumire este acceptată la alt beneficiar, iar proiectul editat își poate păstra denumirea.
+3. Crearea pornește de la versiunea 0, editarea incrementează versiunea și păstrează `CreatedAtUtc`; timestampurile care nu sunt UTC sunt respinse; o versiune învechită sau un proiect/observație eliminat(ă) este respins(ă).
+4. Editările proiectelor și observațiilor cer motivare; denumirile goale sau mai lungi de 200 de caractere sunt respinse; observația cere autor.
+5. Metadatele fișierelor păstrează numai numele fișierului din calea trimisă, generează un nume intern unic (GUID + extensie validată), resping fișierele goale și hash-urile care nu sunt SHA-256.
+6. `BeneficiaryRules.CheckNoLiveProjects` respinge ștergerea unui beneficiar cu proiecte live. Aplicarea regulii în repository-uri se face odată cu tabelele proiectelor (Subtask 2.1 curent).
+
+Nu există încă modificări de interfață sau de schemă; verificarea în browser nu este aplicabilă acestui pas.

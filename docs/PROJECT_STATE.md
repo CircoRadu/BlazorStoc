@@ -2,38 +2,40 @@
 
 Actualizat de: **Claude**
 Data: **24 septembrie 2026**
-Stare ciclu: **Task „Cod produs” finalizat; pregătit pentru predarea următorului ciclu către Codex după commitul curent**
+Stare ciclu: **Task 2 — modelul de date și regulile de domeniu pentru proiecte finalizat; pregătit pentru predarea următorului ciclu către Codex după commitul curent**
 
 ## Rezumat
 
 BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLite și suport MariaDB. Rulează direct cu .NET, fără Docker. Integrarea și publicarea NAS/QNAP sunt în afara fazei curente.
 
-Sunt implementate CRUD-urile pentru produse, beneficiari și utilizatori, autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` și identificarea produselor prin „Cod produs”.
+Sunt implementate CRUD-urile pentru produse, beneficiari și utilizatori, autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection`, identificarea produselor prin „Cod produs” și, nou, modelul de domeniu al proiectelor (fără persistență și fără interfață).
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
-## Ultimele modificări funcționale (ciclul Claude — Cod produs)
+## Ultimele modificări funcționale (ciclul Claude — Task 2, modelul de date)
 
-- Câmpul „Denumire” al produsului a devenit „Cod produs” în formularul de creare/editare, catalog (coloana „COD PRODUS”, căutarea „după cod produs sau descriere”), panoul de detalii, validări, mesajele de duplicat, audit și arhivă. Nu există un câmp separat și nici generare automată de cod; formularul explică faptul că se introduce codul producătorului.
-- Obligativitatea, limita de 100 de caractere, curățarea spațiilor/diacriticelor la salvare, căutarea și ordonarea au rămas neschimbate.
-- Unicitatea folosește `TextNormalization.UniquenessKey` (fără diferențe de spații, majuscule sau diacritice) în toate modurile. Mesajul la duplicat: „Codul produsului «…» există deja în catalog (categoria «…», subcategoria «…»). Introdu alt cod.”
-- Concurență: SQLite verifică în tranzacție `Serializable`, iar indexul `UNIQUE` pe `products.normalized_name` este garda finală; o încălcare a lui este tradusă în mesajul `ProductCode.ConcurrentDuplicateMessage`. MariaDB verifică sub `Serializable` cu `FOR UPDATE` pe toate produsele. Modul demo folosește lock-ul existent.
-- Identificatorul intern `#<id>` nu mai este afișat pentru produse: catalog, panou de detalii („COD PRODUS”), titlul editorului („Editează produsul <cod>”), ținta de audit și de arhivă. Evenimentele vechi din jurnal cu ținta `#<id> · <cod>` sunt afișate fără prefix prin `AuditNavigation.DisplayTarget`; datele salvate nu sunt modificate. Linkurile din jurnal folosesc în continuare `EntityId`.
-- Codul comun pentru etichetă, mesaje, ținta de audit, identificare și modificări este centralizat în `ProductCode` (`Services/ProductInput.cs`), eliminând trei copii ale `ProductAuditChanges`.
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează 2.1”), deși `nextAgent` era `codex`; working tree-ul era curat și nu exista un ciclu Codex deschis. Tranziția `start` a fost aplicată manual în `.collaboration/state.json`, deoarece scriptul refuză schimbarea ordinii.
+
+- `Services/Projects.cs` (nou):
+  - Entitățile `Project` (beneficiar obligatoriu, denumire, „Observații” generale, versiune, `CreatedAtUtc`/`UpdatedAtUtc`), `ProjectObservation` (proiect, denumire, conținut, autor, versiune, timestampuri UTC) și `ProjectObservationFile` (observație, nume original, nume intern, tip media, dimensiune, SHA-256, autor, `UploadedAtUtc`). Identificatorii sunt `int`, la fel ca la celelalte entități.
+  - `ProjectInput`/`ProjectObservationInput` cu `Validated(requiresReason)`: denumiri prin `TextNormalization.ForObjectNameOrCode`, texte libere prin `ForStorage`, limite 200 (denumiri), 4.000 (observații generale), 8.000 (conținut observație), motivare obligatorie la editare.
+  - `ProjectRules`: `EnsureUniqueName` (unicitate numai în cadrul beneficiarului, cheie `TextNormalization.UniquenessKey`), `NormalizedName` pentru viitorul index unic `(beneficiar, denumire normalizată)`, `ConcurrentDuplicateMessage`, fabricile `Create`/`Edited`/`CreateObservation`/`EditedObservation` (versiune 0 la creare, +1 la editare, `CreatedAtUtc` păstrat, respingerea timestampurilor non-UTC), `CheckCurrent` pentru concurență optimistă și `CheckBeneficiaryExists`.
+  - `ProjectFileRules`: `SafeOriginalName` (păstrează doar numele fișierului, elimină segmente de cale și caractere invalide, limită 255), `NewStoredName` (GUID + extensie alfanumerică validată), `Create` (respinge fișiere goale, tip lipsă, hash non-SHA-256).
+- `Services/Beneficiaries.cs`: `BeneficiaryRules.CheckNoLiveProjects(int)` respinge ștergerea beneficiarului cu proiecte live.
+- `TODO.md`: subtaskul „Modelul de date și regulile de domeniu” a fost mutat în grupul finalizat al Task 2; subtaskurile rămase au fost renumerotate (persistența este acum **Subtask 2.1**) și completate cu obligațiile de integrare a regulilor noi.
 
 ## Decizii și limitări
 
-- Proprietatea C# `Product.Name`/`ProductInput.Name` și coloanele `products.name`/`produs_denumire` au fost păstrate intenționat: sunt serializate în instantaneele JSON din `archive_operations` și în `log`-ul MariaDB; redenumirea ar fi fragmentat formatul arhivei. Semantica lor este „Cod produs” (comentariu în `ProductInput`).
-- Detaliile text ale evenimentelor vechi din jurnal pot conține încă „Denumire: …”; jurnalul este append-only și nu a fost rescris.
-- Beneficiarii și utilizatorii afișează în continuare `#<id>`; nu fac parte din acest task.
-- Unicitatea MariaDB nu a fost testată pe un server MariaDB real în acest ciclu.
+- Regula de blocare a ștergerii beneficiarului nu este încă apelată de repository-uri: tabelele/structurile proiectelor nu există încă, deci în prezent nu pot exista proiecte live. Aplicarea în demo, SQLite și MariaDB este un punct explicit din noul Subtask 2.1.
+- Numele original al fișierului își păstrează diacriticele (este destinat afișării și descărcării); numele intern nu derivă din inputul utilizatorului.
+- Limitele de dimensiune, număr și tipuri acceptate pentru fișiere rămân pentru subtaskul „Fișierele observațiilor”.
+- Nu există modificări de interfață sau de schemă, deci preview-ul nu a necesitat repornire.
+- Constantele de audit (`AuditEntities`) și arhivarea pentru proiecte nu au fost adăugate; aparțin subtaskului „Autorizare, audit și arhivare”.
 
 ## Validare
 
-- Build Release: 0 avertismente, 0 erori.
-- `BlazorStoc.Checks`: 176 verificări trecute (166 anterioare + 10 noi: duplicate cu variante de spații/majuscule/diacritice, cod gol, limită 100, mesajul de duplicat, ținta de arhivă și de audit fără `#<id>`, afișarea evenimentelor vechi, două sesiuni SQLite concurente cu același cod — una singură reușește).
-- Browser, `http://127.0.0.1:5082` (admin demo): catalog fără `#<id>`, coloana și căutarea „Cod produs”, panoul de detalii, titlul și eticheta editorului, fără buton de generare; cod duplicat introdus cu alte majuscule și spații respins cu mesaj clar și formular păstrat; toate cele 23 de evenimente de produs din jurnal fără `#<id>`, cu linkuri `/produse?edit=<id>` funcționale.
-- Preview-ul rulează din `bin\Release\net9.0\BlazorStoc.exe --urls http://127.0.0.1:5082`. Notă: preview-ul anterior fusese pornit sub contul sandbox Codex și a trebuit oprit manual de utilizator; repository-ul aparține aceluiași cont, deci Git cere `safe.directory` pentru contul local (folosit doar per proces, fără modificarea configurației globale).
+- Build Release (`BlazorStoc.Checks` cu proiectul principal): 0 avertismente, 0 erori.
+- `BlazorStoc.Checks`: 205 verificări trecute (176 anterioare + 29 noi pentru proiecte, observații, metadatele fișierelor și regula de ștergere a beneficiarului).
 
 ## Reguli active ale proiectului
 
@@ -47,13 +49,13 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este Task 2 — „Proiecte asociate beneficiarilor” din `TODO.md` (se recomandă începerea cu Subtask 2.1 și 2.2).
+Următorul agent este **Codex**. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este Task 2 / **Subtask 2.1 — Persistența și repository-urile asincrone** din `TODO.md`, construit peste `Services/Projects.cs`.
 
 ## Fișiere de orientare
 
 - `TODO.md` — backlog și criterii de acceptare.
 - `README.md` — configurare și comportament general.
-- `VALIDARE.md` — verificări istorice, inclusiv secțiunea „Cod produs”.
+- `VALIDARE.md` — verificări istorice, inclusiv secțiunile „Cod produs” și „Proiecte — modelul de date”.
 - `ARCHIVE_RECOVERY.md` — contractul de arhivare și recuperare.
 - `docs/SEQUENTIAL_COLLABORATION.md` — protocolul Codex–Claude.
 - `docs/AGENT_CHANGELOG.md` — istoricul handoff-urilor.
