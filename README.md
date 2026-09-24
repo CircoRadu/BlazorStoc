@@ -79,8 +79,10 @@ Sistemul refuză eliminarea ultimului administrator activ. Un administrator nu �
 
 ### Utilizarea catalogului
 
-- **Adaugă produs** deschide formularul pentru denumire, descriere, categorie, subcategorie și stoc inițial. Categoriile noi se creează la salvare, inclusiv în baza goală.
-- Apasă pe denumirea unui produs, apoi **Editează** sau **Șterge** în panoul de detalii.
+- **Adaugă produs** deschide formularul pentru cod produs, descriere, categorie, subcategorie și stoc inițial. Categoria și subcategoria se aleg dintre cele create în pagina „Categorii și subcategorii”.
+- **Cod produs** este codul stabilit de producător, introdus manual. Este obligatoriu, are cel mult 100 de caractere și este unic în tot catalogul: două coduri care diferă doar prin spații, majuscule/minuscule sau diacritice sunt considerate identice. Aplicația nu generează coduri interne.
+- Identificatorul numeric intern al produsului rămâne folosit pentru persistență, rute, relații și jurnalizare tehnică (`EntityId`), dar nu mai este afișat în interfață în forma `#<număr>`.
+- Apasă pe codul unui produs, apoi **Editează** sau **Șterge** în panoul de detalii.
 - Cantitatea inițială trebuie să fie zero sau pozitivă. O cantitate negativă deja existentă poate fi păstrată când modifici descrierea sau corectată la o valoare nenegativă.
 - Schimbarea cantității cere un motiv. În modul MariaDB, operațiile și valorile înainte/după se salvează ca JSON în `log`, în aceeași tranzacție cu produsul. Nu se creează mișcări `io` fictive.
 - Ștergerea cere confirmare și este permisă numai cu stoc zero, fără rânduri asociate în `io` sau `imagine`. Categoriile nu se șterg automat.

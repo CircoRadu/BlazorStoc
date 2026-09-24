@@ -48,13 +48,14 @@
                 <td><button type="button" class="audit-filter-link" title="Filtrează după acest operator" @onclick="() => FilterByActor(entry.ActorUsername)">@entry.ActorUsername</button><small class="user-id">@entry.ActorRole</small></td>
                 <td><button type="button" class="audit-action audit-filter-link @ActionClass(entry.Action)" title="Filtrează după această operație" @onclick="() => FilterByAction(entry.Action)">@entry.Action</button><small class="user-id">@entry.EntityType</small></td>
                 <td>
+                    @{ var target = AuditNavigation.DisplayTarget(entry); }
                     @if (AuditNavigation.EditUrl(entry) is { } editUrl)
                     {
-                        <a class="audit-target-link" href="@editUrl" title="Deschide pagina de editare pentru @entry.Target"><strong>@entry.Target</strong></a>
+                        <a class="audit-target-link" href="@editUrl" title="Deschide pagina de editare pentru @target"><strong>@target</strong></a>
                     }
                     else
                     {
-                        <strong>@entry.Target</strong>
+                        <strong>@target</strong>
                     }
                 </td><td class="audit-details"><span>Descriere modificare: <em>@entry.Details</em></span><span>Motiv: <em>@(string.IsNullOrWhiteSpace(entry.Motif) ? "—" : entry.Motif)</em></span></td>
             </tr>
@@ -100,7 +101,7 @@
         (actor.Length == 0 || string.Equals(entry.ActorUsername, actor, StringComparison.OrdinalIgnoreCase)) &&
         (selectedDateKey is null || LocalTimestamp(entry).DateKey == selectedDateKey) &&
         (query.Trim().Length == 0 || entry.ActorUsername.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
-         entry.Target.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) || entry.Details.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         AuditNavigation.DisplayTarget(entry).Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) || entry.Details.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
          entry.Motif.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)))
         .ToList();
     private int TotalPages => pageSize == 0 ? 1 : Math.Max(1, (Filtered.Count + pageSize - 1) / pageSize);

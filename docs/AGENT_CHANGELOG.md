@@ -173,3 +173,28 @@ Acest fișier este append-only. Intrările noi sunt adăugate automat de `tools/
 - **Validare:** Fișierul de stare JSON a fost validat; scriptul PowerShell de coordonare a fost verificat sintactic; git diff --check a trecut. Nu au fost necesare teste funcționale deoarece schimbarea privește numai protocolul de colaborare.
 - **Commit:** `codex: hand off next cycle to claude`
 - **Predat către:** claude
+
+## 2026-09-24T11:50:29.5146305Z â€” claude
+
+- **Task:** Task 1 — Cod produs
+- **Rezumat:** Task 1 (Cod produs) finalizat. Câmpul Denumire al produsului a devenit Cod produs în formular, catalog, detalii, căutare, validări, mesajele de duplicat, audit și arhivă, fără câmp separat și fără generare automată. Unicitatea normalizată (spații, majuscule, diacritice) rămâne globală în demo, SQLite și MariaDB; în SQLite, încălcarea indexului UNIQUE la cereri concurente este tradusă într-un mesaj clar. Identificatorul intern #<id> nu mai este afișat pentru produse (catalog, detalii, titlul editorului, ținte de audit și arhivă); evenimentele vechi din jurnal sunt afișate fără prefix prin AuditNavigation.DisplayTarget, iar linkurile folosesc în continuare EntityId. Logica comună este centralizată în ProductCode. Proprietatea tehnică Name și coloanele bazei au fost păstrate pentru compatibilitatea instantaneelor din arhivă și a log-ului MariaDB. TODO, README, VALIDARE și PROJECT_STATE au fost actualizate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/Audit.razor`
+  - `Components/Pages/Home.razor`
+  - `Components/Pages/ProductEditor.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `README.md`
+  - `Services/Archiving.cs`
+  - `Services/AuditTrail.cs`
+  - `Services/DemoProductRepository.Crud.cs`
+  - `Services/MariaProductRepository.Crud.cs`
+  - `Services/ProductInput.cs`
+  - `Services/SqliteProductRepository.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+- **Validare:** Build Release: 0 avertismente, 0 erori. BlazorStoc.Checks: 176 verificări trecute (10 noi pentru Cod produs, inclusiv două sesiuni SQLite concurente cu același cod). Browser pe http://127.0.0.1:5082 (admin demo): catalog, detalii, editor și jurnal fără #<id>, etichete Cod produs, cod duplicat respins cu mesaj clar și formular păstrat. Preview actualizat la http://127.0.0.1:5082. Unicitatea MariaDB nu a fost testată pe server real.
+- **Commit:** `claude: implement product code field`
+- **Predat cÄƒtre:** codex

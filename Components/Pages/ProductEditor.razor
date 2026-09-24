@@ -7,7 +7,7 @@
 @implements IAsyncDisposable
 
 <section class="product-editor" aria-labelledby="editor-title">
-    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? "Adaugă produs" : $"Editează produsul #{Original.Id}")</h2><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></div>
+    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? "Adaugă produs" : $"Editează produsul {Original.Name}")</h2><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></div>
     @if (Mode.IsDemo) { <p class="form-note">Mod demo: modificările sunt salvate în baza de date locală și rămân disponibile după repornirea aplicației.</p> }
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="product-editor">
@@ -15,7 +15,7 @@
         <ValidationSummary />
         <fieldset disabled="@saving">
             <div class="editor-grid">
-                <label class="full-width" for="product-name">Denumire *<InputText id="product-name" @bind-Value="input.Name" maxlength="100" autocomplete="off" /><ValidationMessage For="() => input.Name" /></label>
+                <label class="full-width" for="product-code">@ProductCode.Label *<InputText id="product-code" @bind-Value="input.Name" maxlength="100" autocomplete="off" aria-describedby="product-code-note" /><small id="product-code-note" class="form-note">Introdu codul stabilit de producător. Codul trebuie să fie unic în catalog.</small><ValidationMessage For="() => input.Name" /></label>
                 <label for="product-category">Categorie *<InputSelect id="product-category" @bind-Value="input.Category" @bind-Value:after="CategoryChangedAsync">@foreach (var category in Categories) { <option value="@category">@category</option> }</InputSelect><ValidationMessage For="() => input.Category" /></label>
                 <label for="product-subcategory">Subcategorie *<InputSelect id="product-subcategory" @bind-Value="input.Subcategory">@foreach (var subcategory in Subcategories) { <option value="@subcategory">@subcategory</option> }</InputSelect><ValidationMessage For="() => input.Subcategory" /></label>
                 <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>.</p>

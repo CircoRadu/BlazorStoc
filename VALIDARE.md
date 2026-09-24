@@ -79,3 +79,15 @@ Componenta comună `CollapsibleSection` trebuie verificată după orice modifica
 8. Pentru ierarhii imbricate viitoare, fiecare nivel primește un `Id` unic și o instanță proprie `CollapsibleSection`; starea unui nivel nu trebuie să modifice frații.
 
 Validarea din 24 septembrie 2026 a acoperit manual toate cele trei utilizări existente, inclusiv mouse, Enter, Space, ARIA, filtrarea catalogului, independența acțiunilor și viewportul de 800 px. Buildul Release și suita `BlazorStoc.Checks` au trecut integral.
+
+## Cod produs
+
+Verificări pentru câmpul „Cod produs” (fostul „Denumire”):
+
+1. Formularele „Adaugă produs” și „Editează produsul” afișează eticheta „Cod produs *” și nota despre codul producătorului; nu există buton de generare a codului.
+2. Salvarea fără cod afișează „Completează codul produsului.”; un cod de peste 100 de caractere este respins.
+3. Un cod care diferă de unul existent doar prin spații, majuscule/minuscule sau diacritice este respins cu mesajul „Codul produsului «…» există deja în catalog…”, iar formularul rămâne completat.
+4. Catalogul, panoul de detalii, titlul formularului de editare, dialogul de ștergere și jurnalul nu afișează identificatorul intern în forma `#<număr>`; evenimentele vechi de produs din jurnal sunt afișate fără prefixul `#<număr> · `.
+5. Linkurile din jurnal către produse continuă să folosească identificatorul stabil (`/produse?edit=<id>`).
+
+Suita automată acoperă unicitatea normalizată în modul demonstrativ și SQLite, inclusiv două sesiuni SQLite concurente care încearcă același cod (una singură reușește), mesajele de validare, ținta de audit și de arhivă fără `#<id>` și afișarea evenimentelor vechi. Pentru MariaDB, unicitatea folosește aceeași comparație normalizată sub tranzacție `Serializable` cu `FOR UPDATE`; nu a fost testată pe un server MariaDB în acest ciclu.

@@ -1,14 +1,14 @@
-{
-  "schemaVersion": 1,
-  "mode": "sequential",
-  "status": "ready_for_handoff",
-  "activeAgent": null,
-  "lastAgent": "codex",
-  "nextAgent": "claude",
-  "currentTask": "Reactivarea colaborării secvențiale și predarea următorului ciclu către Claude",
-  "startedAtUtc": "2026-09-24T11:13:44.6878687Z",
-  "completedAtUtc": "2026-09-24T11:15:42.4199888Z",
-  "lastSummary": "Colaborarea secvențială Codex-Claude a fost reactivată la cererea utilizatorului. Documentația, regulile agenților și starea de coordonare indică acum predarea următorului ciclu către Claude, fără modificări funcționale ale aplicației.",
-  "lastCommitSubject": "codex: hand off next cycle to claude",
-  "claudeStatus": "active"
+﻿{
+    "schemaVersion":  1,
+    "mode":  "sequential",
+    "status":  "ready_for_handoff",
+    "activeAgent":  null,
+    "lastAgent":  "claude",
+    "nextAgent":  "codex",
+    "currentTask":  "Task 1 — Cod produs",
+    "startedAtUtc":  "2026-09-24T11:39:26.1757103Z",
+    "completedAtUtc":  "2026-09-24T11:50:29.5146305Z",
+    "lastSummary":  "Task 1 (Cod produs) finalizat. Câmpul Denumire al produsului a devenit Cod produs în formular, catalog, detalii, căutare, validări, mesajele de duplicat, audit și arhivă, fără câmp separat și fără generare automată. Unicitatea normalizată (spații, majuscule, diacritice) rămâne globală în demo, SQLite și MariaDB; în SQLite, încălcarea indexului UNIQUE la cereri concurente este tradusă într-un mesaj clar. Identificatorul intern #\u003cid\u003e nu mai este afișat pentru produse (catalog, detalii, titlul editorului, ținte de audit și arhivă); evenimentele vechi din jurnal sunt afișate fără prefix prin AuditNavigation.DisplayTarget, iar linkurile folosesc în continuare EntityId. Logica comună este centralizată în ProductCode. Proprietatea tehnică Name și coloanele bazei au fost păstrate pentru compatibilitatea instantaneelor din arhivă și a log-ului MariaDB. TODO, README, VALIDARE și PROJECT_STATE au fost actualizate.",
+    "lastCommitSubject":  "claude: implement product code field",
+    "claudeStatus":  "active"
 }

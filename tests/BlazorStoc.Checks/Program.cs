@@ -129,7 +129,36 @@ catch (ProductOperationException exception)
 {
     Check(exception.Message.Contains("Categorie noua", StringComparison.Ordinal) && exception.Message.Contains("Subcategorie noua", StringComparison.Ordinal),
         "Duplicate product is rejected globally and reports its category and subcategory");
+    Check(exception.Message.Contains("Codul produsului «Surub nou» există deja", StringComparison.Ordinal),
+        "Duplicate product code message names the existing code");
 }
+foreach (var variant in new[] { "  surub   NOU ", "ȘURUB NOU", "Șurub nou" })
+    await Rejected(() => repository.CreateAsync(new ProductInput
+        { Name = variant, Category = "Categorie nouă", Subcategory = "Subcategorie nouă" }),
+        $"Product code «{variant}» is a duplicate despite spacing, case or diacritics");
+try
+{
+    new ProductInput { Name = "   ", Category = "Test", Subcategory = "Test" }.Validated();
+    throw new Exception("Empty product code accepted");
+}
+catch (ProductOperationException exception)
+{
+    Check(exception.Message.Contains("Completează codul produsului.", StringComparison.Ordinal),
+        "A product cannot be saved without a product code");
+}
+try
+{
+    new ProductInput { Name = new string('C', 101), Category = "Test", Subcategory = "Test" }.Validated();
+    throw new Exception("Overlong product code accepted");
+}
+catch (ProductOperationException exception)
+{
+    Check(exception.Message.Contains("Codul produsului poate avea cel mult 100 de caractere.", StringComparison.Ordinal),
+        "Product code keeps the existing 100-character limit");
+}
+Check(!ArchiveRequests.Product(created, "Motiv test").Target.Contains('#') &&
+      ArchiveRequests.Product(created, "Motiv test").Details.Contains("Cod produs: Surub nou", StringComparison.Ordinal),
+    "Product archive target hides the internal identifier and labels the product code");
 var duplicateRename = ProductEdit(created);
 duplicateRename.Name = "MAȘINĂ DE GĂURIT CU ACUMULATOR";
 await Rejected(() => repository.UpdateAsync(created, duplicateRename), "Renaming a product to an existing catalogue name is rejected");
@@ -378,6 +407,11 @@ Check(sessionAuditTrail.Entries.Count == 2 &&
 
 var productAuditLink = new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "admin", AccessRoles.Administrator,
     AuditEntities.Product, AuditActions.Create, "#12 · Produs", "Denumire: Produs", EntityId: "12");
+Check(AuditNavigation.DisplayTarget(productAuditLink) == "Produs" &&
+      AuditNavigation.DisplayTarget(productAuditLink with { Target = "Cod #7" }) == "Cod #7" &&
+      AuditNavigation.DisplayTarget(productAuditLink with { Target = "#AB · Cod" }) == "#AB · Cod" &&
+      AuditNavigation.DisplayTarget(productAuditLink with { EntityType = AuditEntities.Beneficiary }) == "#12 · Produs",
+    "Legacy product audit targets are displayed without the internal identifier");
 var beneficiaryAuditLink = productAuditLink with
     { EntityType = AuditEntities.Beneficiary, Action = AuditActions.Edit, EntityId = "7" };
 var userAuditLink = productAuditLink with
@@ -404,7 +438,9 @@ var auditRulesUpdated = await auditRulesProducts.UpdateAsync(auditRulesProduct, 
 var productEditEvent = auditRulesTrail.Entries.Single(entry => entry.Action == AuditActions.Edit);
 Check(productEditEvent.EntityId == auditRulesUpdated.Id.ToString() && productEditEvent.Target.Contains(auditRulesUpdated.Name, StringComparison.Ordinal),
     "Edit audit target uses the saved object and its stable identifier");
-Check(productEditEvent.Details.Contains("Denumire: Produs inainte → Produs dupa", StringComparison.Ordinal) &&
+Check(productEditEvent.Target == "Produs dupa" && productEditEvent.EntityId == auditRulesProduct.Id.ToString(),
+    "Product audit target shows only the product code while the entity id keeps the internal identifier");
+Check(productEditEvent.Details.Contains("Cod produs: Produs inainte → Produs dupa", StringComparison.Ordinal) &&
       productEditEvent.Details.Contains("Descriere: Descriere inainte → Descriere dupa", StringComparison.Ordinal) &&
       productEditEvent.Details.Contains("Cantitate: 0 → 3", StringComparison.Ordinal) &&
       !productEditEvent.Details.Contains("Categorie", StringComparison.Ordinal) && productEditEvent.Motif == "Inventariere",
@@ -691,6 +727,30 @@ try
             Subcategory = $"Subcategorie B {concurrentSuffix}", Quantity = 0
         }));
     var afterConcurrentWrites = await secondProducts.GetProductsAsync();
+    var sameCodeSuffix = Guid.NewGuid().ToString("N")[..8];
+    async Task<Product?> TryCreateSameCodeAsync(SqliteLocalStore targetStore, string code)
+    {
+        try
+        {
+            return await new SqliteProductRepository(targetStore, administrator).CreateAsync(new ProductInput
+            {
+                Name = code, Category = $"Categorie A {concurrentSuffix}",
+                Subcategory = $"Subcategorie A {concurrentSuffix}", Quantity = 0
+            });
+        }
+        catch (ProductOperationException exception) when (exception.Message.StartsWith("Codul produsului", StringComparison.Ordinal))
+        {
+            return null;
+        }
+    }
+    var sameCodeWrites = await Task.WhenAll(
+        TryCreateSameCodeAsync(firstStore, $"Cod concurent {sameCodeSuffix}"),
+        TryCreateSameCodeAsync(secondStore, $"  COD   concurent {sameCodeSuffix.ToUpperInvariant()} "));
+    var sameCodeKey = TextNormalization.UniquenessKey($"Cod concurent {sameCodeSuffix}");
+    Check(sameCodeWrites.Count(result => result is not null) == 1 &&
+          (await secondProducts.GetProductsAsync()).Count(product =>
+              TextNormalization.UniquenessKey(product.Name) == sameCodeKey) == 1,
+        "Two concurrent SQLite sessions cannot save the same normalized product code");
     Check(concurrentWrites.All(createdItem => afterConcurrentWrites.Any(saved => saved.Id == createdItem.Id)),
         "Two repository sessions persist concurrent writes without losing products");
     var eventsAfterConcurrentWrites = await new SqliteAuditTrail(secondStore).GetEventsAsync();

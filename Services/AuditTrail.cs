@@ -45,6 +45,16 @@ public sealed record AuditWrite(string ActorUsername, string ActorRole, string E
 
 public static class AuditNavigation
 {
+    // Older product events stored "#<id> · <code>"; the internal identifier is hidden when they are displayed.
+    public static string DisplayTarget(AuditEvent entry)
+    {
+        if (entry.EntityType != AuditEntities.Product || !entry.Target.StartsWith('#')) return entry.Target;
+        var separator = entry.Target.IndexOf(" · ", StringComparison.Ordinal);
+        return separator > 1 && entry.Target[1..separator].All(char.IsAsciiDigit)
+            ? entry.Target[(separator + 3)..]
+            : entry.Target;
+    }
+
     public static string? EditUrl(AuditEvent entry)
     {
         if (entry.Action is not (AuditActions.Create or AuditActions.Edit) ||

@@ -4,8 +4,9 @@ namespace BlazorStoc.Services;
 
 public sealed class ProductInput
 {
-    [Required(ErrorMessage = "Completează denumirea produsului.")]
-    [StringLength(100, ErrorMessage = "Denumirea poate avea cel mult 100 de caractere.")]
+    // Holds the manufacturer's product code; the property keeps its historical name for storage and archive snapshots.
+    [Required(ErrorMessage = "Completează codul produsului.")]
+    [StringLength(100, ErrorMessage = "Codul produsului poate avea cel mult 100 de caractere.")]
     public string Name { get; set; } = "";
     [StringLength(1000, ErrorMessage = "Descrierea poate avea cel mult 1.000 de caractere.")]
     public string Description { get; set; } = "";
@@ -44,6 +45,32 @@ public sealed class ProductInput
 }
 
 public sealed class ProductOperationException(string message) : Exception(message);
+
+public static class ProductCode
+{
+    public const string Label = "Cod produs";
+    public const string ConcurrentDuplicateMessage =
+        "Codul produsului a fost folosit între timp pentru alt produs. Actualizează catalogul și introdu alt cod.";
+
+    public static string DuplicateMessage(string existingCode, string category, string subcategory) =>
+        $"Codul produsului «{existingCode}» există deja în catalog (categoria «{category}», subcategoria «{subcategory}»). Introdu alt cod.";
+
+    // The internal numeric identifier stays in EntityId and is never part of the visible target.
+    public static string AuditTarget(Product product) => product.Name;
+
+    public static string AuditIdentification(Product product) => AuditDetails.Identification(
+        (Label, product.Name), ("Categorie", product.Category), ("Subcategorie", product.Subcategory),
+        ("Cantitate", product.Quantity.ToString()));
+
+    public static AuditChange[] AuditChanges(Product before, Product after) =>
+    [
+        new(Label, before.Name, after.Name),
+        new("Categorie", before.Category, after.Category),
+        new("Subcategorie", before.Subcategory, after.Subcategory),
+        new("Descriere", before.Description, after.Description),
+        new("Cantitate", before.Quantity.ToString(), after.Quantity.ToString())
+    ];
+}
 
 public static class ProductRules
 {

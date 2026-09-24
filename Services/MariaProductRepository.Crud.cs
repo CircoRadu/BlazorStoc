@@ -43,9 +43,7 @@ public sealed partial class MariaProductRepository
         var product = result.Product;
         await RecordCreatedGroupsAsync(result.Group, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Product, product.Id.ToString(),
-            $"#{product.Id} · {product.Name}", AuditDetails.Identification(
-                ("Denumire", product.Name), ("Categorie", product.Category), ("Subcategorie", product.Subcategory),
-                ("Cantitate", product.Quantity.ToString())), cancellationToken).ConfigureAwait(false);
+            ProductCode.AuditTarget(product), ProductCode.AuditIdentification(product), cancellationToken).ConfigureAwait(false);
         return product;
     }
 
@@ -77,7 +75,7 @@ public sealed partial class MariaProductRepository
         var product = result.Product;
         await RecordCreatedGroupsAsync(result.Group, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Product, product.Id.ToString(),
-            $"#{product.Id} · {product.Name}", ProductAuditChanges(original, product), value.Reason, cancellationToken).ConfigureAwait(false);
+            ProductCode.AuditTarget(product), ProductCode.AuditChanges(original, product), value.Reason, cancellationToken).ConfigureAwait(false);
         return product;
     }
 
@@ -120,15 +118,6 @@ public sealed partial class MariaProductRepository
                 await images.ArchiveDeleteAsync(original.Id, operation, CommitDatabaseAsync, token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
     }
-
-    private static AuditChange[] ProductAuditChanges(Product before, Product after) =>
-    [
-        new("Denumire", before.Name, after.Name),
-        new("Categorie", before.Category, after.Category),
-        new("Subcategorie", before.Subcategory, after.Subcategory),
-        new("Descriere", before.Description, after.Description),
-        new("Cantitate", before.Quantity.ToString(), after.Quantity.ToString())
-    ];
 
     private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, int, Task<T>> action, CancellationToken token)
     {
@@ -258,9 +247,7 @@ public sealed partial class MariaProductRepository
         {
             var existingName = reader.GetString(1);
             if (!TextNormalization.SameUniqueValue(existingName, name)) continue;
-            var category = reader.GetString(2);
-            var subcategory = reader.GetString(3);
-            throw new ProductOperationException($"Produsul «{existingName}» există deja în categoria «{category}», subcategoria «{subcategory}».");
+            throw new ProductOperationException(ProductCode.DuplicateMessage(existingName, reader.GetString(2), reader.GetString(3)));
         }
     }
 

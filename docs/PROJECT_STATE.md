@@ -1,35 +1,39 @@
 # Starea curentă a proiectului
 
-Actualizat de: **Codex**
+Actualizat de: **Claude**
 Data: **24 septembrie 2026**
-Stare ciclu: **Task 0 finalizat; pregătit pentru predarea următorului ciclu către Claude după commitul curent**
+Stare ciclu: **Task „Cod produs” finalizat; pregătit pentru predarea următorului ciclu către Codex după commitul curent**
 
 ## Rezumat
 
 BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLite și suport MariaDB. Rulează direct cu .NET, fără Docker. Integrarea și publicarea NAS/QNAP sunt în afara fazei curente.
 
-Sunt implementate CRUD-urile pentru produse, beneficiari și utilizatori, autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse și preview-ul local.
+Sunt implementate CRUD-urile pentru produse, beneficiari și utilizatori, autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` și identificarea produselor prin „Cod produs”.
 
-Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude de modificare, verificare, documentare și commit. Colaborarea este activă, iar următorul ciclu îi este predat lui Claude.
+Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
-## Ultimele modificări funcționale
+## Ultimele modificări funcționale (ciclul Claude — Cod produs)
 
-- Task 0 este finalizat prin componenta reutilizabilă `CollapsibleSection`, bazată pe `details/summary`, cu identificatori stabili, `aria-expanded`, `aria-controls`, regiuni etichetate și suport mouse, touch, Enter și Space.
-- Secțiunea „Administrare”, categoriile din meniul produselor și categoriile din pagina de administrare folosesc aceeași componentă, păstrând stilul fiecărei zone.
-- Ramura activă din meniul produselor se deschide automat; extinderea unei categorii aplică filtrul, iar restrângerea revine la catalogul complet.
-- Categoriile din pagina de administrare pornesc restrânse, își păstrează starea la actualizări, iar acțiunile de adăugare și editare funcționează independent de collapse.
-- Interfața comună are feedback pentru hover, focus și disabled, iar la lățimi sub 900 px meniul și cardurile se reașază fără depășire orizontală.
-- Numărul subcategoriilor este afișat textual în același stil ca numărul produselor asociate.
-- Denumirile și codurile obiectelor sunt curățate la creare și editare: spațiile exterioare sunt eliminate, iar secvențele de spații sunt reduse la unul singur.
-- Categoriile și subcategoriile pot fi create numai în pagina lor de administrare; formularul produsului selectează doar valori existente.
-- `TODO.md` arhivează Task 0 ca finalizat; următoarele priorități active sunt Task 1 pentru „Cod produs” și Task 2 pentru proiecte asociate beneficiarilor.
+- Câmpul „Denumire” al produsului a devenit „Cod produs” în formularul de creare/editare, catalog (coloana „COD PRODUS”, căutarea „după cod produs sau descriere”), panoul de detalii, validări, mesajele de duplicat, audit și arhivă. Nu există un câmp separat și nici generare automată de cod; formularul explică faptul că se introduce codul producătorului.
+- Obligativitatea, limita de 100 de caractere, curățarea spațiilor/diacriticelor la salvare, căutarea și ordonarea au rămas neschimbate.
+- Unicitatea folosește `TextNormalization.UniquenessKey` (fără diferențe de spații, majuscule sau diacritice) în toate modurile. Mesajul la duplicat: „Codul produsului «…» există deja în catalog (categoria «…», subcategoria «…»). Introdu alt cod.”
+- Concurență: SQLite verifică în tranzacție `Serializable`, iar indexul `UNIQUE` pe `products.normalized_name` este garda finală; o încălcare a lui este tradusă în mesajul `ProductCode.ConcurrentDuplicateMessage`. MariaDB verifică sub `Serializable` cu `FOR UPDATE` pe toate produsele. Modul demo folosește lock-ul existent.
+- Identificatorul intern `#<id>` nu mai este afișat pentru produse: catalog, panou de detalii („COD PRODUS”), titlul editorului („Editează produsul <cod>”), ținta de audit și de arhivă. Evenimentele vechi din jurnal cu ținta `#<id> · <cod>` sunt afișate fără prefix prin `AuditNavigation.DisplayTarget`; datele salvate nu sunt modificate. Linkurile din jurnal folosesc în continuare `EntityId`.
+- Codul comun pentru etichetă, mesaje, ținta de audit, identificare și modificări este centralizat în `ProductCode` (`Services/ProductInput.cs`), eliminând trei copii ale `ProductAuditChanges`.
 
-## Validare cunoscută
+## Decizii și limitări
 
-- Suita completă `BlazorStoc.Checks` a trecut integral după implementarea componentei comune.
-- Buildul Release a reușit cu 0 avertismente și 0 erori.
-- Verificarea în browser a confirmat stările inițiale, click, Enter, Space, actualizarea ARIA, navigarea filtrată, acțiunile independente și afișarea fără overflow la 800 px.
-- Preview-ul actualizat rulează la `http://127.0.0.1:5082/categorii`.
+- Proprietatea C# `Product.Name`/`ProductInput.Name` și coloanele `products.name`/`produs_denumire` au fost păstrate intenționat: sunt serializate în instantaneele JSON din `archive_operations` și în `log`-ul MariaDB; redenumirea ar fi fragmentat formatul arhivei. Semantica lor este „Cod produs” (comentariu în `ProductInput`).
+- Detaliile text ale evenimentelor vechi din jurnal pot conține încă „Denumire: …”; jurnalul este append-only și nu a fost rescris.
+- Beneficiarii și utilizatorii afișează în continuare `#<id>`; nu fac parte din acest task.
+- Unicitatea MariaDB nu a fost testată pe un server MariaDB real în acest ciclu.
+
+## Validare
+
+- Build Release: 0 avertismente, 0 erori.
+- `BlazorStoc.Checks`: 176 verificări trecute (166 anterioare + 10 noi: duplicate cu variante de spații/majuscule/diacritice, cod gol, limită 100, mesajul de duplicat, ținta de arhivă și de audit fără `#<id>`, afișarea evenimentelor vechi, două sesiuni SQLite concurente cu același cod — una singură reușește).
+- Browser, `http://127.0.0.1:5082` (admin demo): catalog fără `#<id>`, coloana și căutarea „Cod produs”, panoul de detalii, titlul și eticheta editorului, fără buton de generare; cod duplicat introdus cu alte majuscule și spații respins cu mesaj clar și formular păstrat; toate cele 23 de evenimente de produs din jurnal fără `#<id>`, cu linkuri `/produse?edit=<id>` funcționale.
+- Preview-ul rulează din `bin\Release\net9.0\BlazorStoc.exe --urls http://127.0.0.1:5082`. Notă: preview-ul anterior fusese pornit sub contul sandbox Codex și a trebuit oprit manual de utilizator; repository-ul aparține aceluiași cont, deci Git cere `safe.directory` pentru contul local (folosit doar per proces, fără modificarea configurației globale).
 
 ## Reguli active ale proiectului
 
@@ -43,13 +47,13 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 
 ## Următorul pas
 
-Următorul agent este **Claude**. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este Task 1 — „Cod produs” din `TODO.md`.
+Următorul agent este **Codex**. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este Task 2 — „Proiecte asociate beneficiarilor” din `TODO.md` (se recomandă începerea cu Subtask 2.1 și 2.2).
 
 ## Fișiere de orientare
 
 - `TODO.md` — backlog și criterii de acceptare.
 - `README.md` — configurare și comportament general.
-- `VALIDARE.md` — verificări istorice.
+- `VALIDARE.md` — verificări istorice, inclusiv secțiunea „Cod produs”.
 - `ARCHIVE_RECOVERY.md` — contractul de arhivare și recuperare.
 - `docs/SEQUENTIAL_COLLABORATION.md` — protocolul Codex–Claude.
 - `docs/AGENT_CHANGELOG.md` — istoricul handoff-urilor.

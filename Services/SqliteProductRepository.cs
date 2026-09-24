@@ -61,11 +61,15 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
             var product = new Product(id, group.Category, group.Subcategory, value.Name, value.Description, value.Quantity);
             await RecordGroupsAsync(connection, transaction, actor, group, cancellationToken).ConfigureAwait(false);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
-                AuditEntities.Product, AuditActions.Create, $"#{product.Id} · {product.Name}", AuditDetails.Identification(
-                    ("Denumire", product.Name), ("Categorie", product.Category), ("Subcategorie", product.Subcategory),
-                    ("Cantitate", product.Quantity.ToString())), string.Empty, product.Id.ToString()), cancellationToken).ConfigureAwait(false);
+                AuditEntities.Product, AuditActions.Create, ProductCode.AuditTarget(product),
+                ProductCode.AuditIdentification(product), string.Empty, product.Id.ToString()), cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return product;
+        }
+        catch (SqliteException exception) when (IsProductCodeConflict(exception))
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new ProductOperationException(ProductCode.ConcurrentDuplicateMessage);
         }
         catch
         {
@@ -100,10 +104,15 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
             var product = new Product(original.Id, group.Category, group.Subcategory, value.Name, value.Description, value.Quantity, version);
             await RecordGroupsAsync(connection, transaction, actor, group, cancellationToken).ConfigureAwait(false);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
-                AuditEntities.Product, AuditActions.Edit, $"#{product.Id} · {product.Name}",
-                AuditDetails.Changes(ProductAuditChanges(original, product)), value.Reason, product.Id.ToString()), cancellationToken).ConfigureAwait(false);
+                AuditEntities.Product, AuditActions.Edit, ProductCode.AuditTarget(product),
+                AuditDetails.Changes(ProductCode.AuditChanges(original, product)), value.Reason, product.Id.ToString()), cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return product;
+        }
+        catch (SqliteException exception) when (IsProductCodeConflict(exception))
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new ProductOperationException(ProductCode.ConcurrentDuplicateMessage);
         }
         catch
         {
@@ -179,7 +188,7 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
             """, ("@normalized", TextNormalization.UniquenessKey(name)), ("@id", excludedId));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         if (await reader.ReadAsync(token).ConfigureAwait(false))
-            throw new ProductOperationException($"Produsul «{reader.GetString(0)}» există deja în categoria «{reader.GetString(1)}», subcategoria «{reader.GetString(2)}».");
+            throw new ProductOperationException(ProductCode.DuplicateMessage(reader.GetString(0), reader.GetString(1), reader.GetString(2)));
     }
 
     private static async Task<(int CategoryId, int SubcategoryId, string Category, string Subcategory,
@@ -234,12 +243,9 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
                 string.Empty, group.SubcategoryId.ToString()), token).ConfigureAwait(false);
     }
 
-    private static AuditChange[] ProductAuditChanges(Product before, Product after) =>
-    [
-        new("Denumire", before.Name, after.Name), new("Categorie", before.Category, after.Category),
-        new("Subcategorie", before.Subcategory, after.Subcategory), new("Descriere", before.Description, after.Description),
-        new("Cantitate", before.Quantity.ToString(), after.Quantity.ToString())
-    ];
+    private static bool IsProductCodeConflict(SqliteException exception) =>
+        exception.SqliteErrorCode == 19 &&
+        exception.Message.Contains("products.normalized_name", StringComparison.OrdinalIgnoreCase);
 
     private Task EnsureOperatorAsync(CancellationToken token) =>
         accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;

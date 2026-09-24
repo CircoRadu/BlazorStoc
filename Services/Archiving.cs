@@ -142,10 +142,8 @@ public static class ArchiveRequests
 {
     public static ArchiveRequest Product(Product value, string motif)
     {
-        var details = AuditDetails.Identification(("Denumire", value.Name), ("Categorie", value.Category),
-            ("Subcategorie", value.Subcategory), ("Cantitate", value.Quantity.ToString()));
         return new(ArchiveSnapshot.Create(AuditEntities.Product, value.Id.ToString(), value.Version, value),
-            $"#{value.Id} · {value.Name}", details, motif);
+            ProductCode.AuditTarget(value), ProductCode.AuditIdentification(value), motif);
     }
 
     public static ArchiveRequest Beneficiary(Beneficiary value, string motif)

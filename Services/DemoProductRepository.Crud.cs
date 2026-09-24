@@ -30,9 +30,7 @@ public sealed partial class DemoProductRepository
         }
         await RecordCreatedGroupsAsync(product.Category, product.Subcategory, categoryCreated, subcategoryCreated, cancellationToken);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Product, product.Id.ToString(),
-            $"#{product.Id} · {product.Name}", AuditDetails.Identification(
-                ("Denumire", product.Name), ("Categorie", product.Category), ("Subcategorie", product.Subcategory),
-                ("Cantitate", product.Quantity.ToString())), cancellationToken);
+            ProductCode.AuditTarget(product), ProductCode.AuditIdentification(product), cancellationToken);
         return product;
     }
     public async Task<Product> UpdateAsync(Product original, ProductInput input, CancellationToken cancellationToken = default)
@@ -54,7 +52,7 @@ public sealed partial class DemoProductRepository
         }
         await RecordCreatedGroupsAsync(product.Category, product.Subcategory, categoryCreated, subcategoryCreated, cancellationToken);
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Product, product.Id.ToString(),
-            $"#{product.Id} · {product.Name}", ProductAuditChanges(original, product), value.Reason, cancellationToken);
+            ProductCode.AuditTarget(product), ProductCode.AuditChanges(original, product), value.Reason, cancellationToken);
         return product;
     }
     public async Task DeleteAsync(Product original, string reason, CancellationToken cancellationToken = default)
@@ -75,15 +73,6 @@ public sealed partial class DemoProductRepository
             await AuditRecorder.RecordDeleteAsync(auditTrail, operation, token);
         }, cancellationToken);
     }
-
-    private static AuditChange[] ProductAuditChanges(Product before, Product after) =>
-    [
-        new("Denumire", before.Name, after.Name),
-        new("Categorie", before.Category, after.Category),
-        new("Subcategorie", before.Subcategory, after.Subcategory),
-        new("Descriere", before.Description, after.Description),
-        new("Cantitate", before.Quantity.ToString(), after.Quantity.ToString())
-    ];
 
     private Task EnsureProductOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 
@@ -123,6 +112,6 @@ public sealed partial class DemoProductRepository
     {
         var existing = products.FirstOrDefault(product => product.Id != excludedId && TextNormalization.SameUniqueValue(product.Name, name));
         if (existing is not null)
-            throw new ProductOperationException($"Produsul «{existing.Name}» există deja în categoria «{existing.Category}», subcategoria «{existing.Subcategory}».");
+            throw new ProductOperationException(ProductCode.DuplicateMessage(existing.Name, existing.Category, existing.Subcategory));
     }
 }

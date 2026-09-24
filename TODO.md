@@ -14,35 +14,12 @@
 Taskurile sunt grupate în patru etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
 
 1. **Interacțiuni comune finalizate:** componenta comună de extindere și restrângere este implementată și devine contract obligatoriu pentru structurile ierarhice actuale și viitoare.
-2. **Stabilizarea entităților și formularelor:** Task 1 definitivează identificarea produsului, Task 2 introduce proiectele și relațiile lor folosind componenta din Task 0, iar Task 4 uniformizează validarea beneficiarilor.
+2. **Stabilizarea entităților și formularelor:** identificarea produsului prin „Cod produs” (fostul Task 1) este finalizată, Task 2 introduce proiectele și relațiile lor folosind componenta din Task 0, iar Task 4 uniformizează validarea beneficiarilor.
 3. **Navigare și dialoguri comune:** Taskurile 1 și 2 → Task 3; Taskurile 1, 2 și 4 → Task 5; Taskurile 1 și 5 → Task 6; Task 5 și dialogurile comune finalizate → Task 7.
 4. **Colaborare în timp real:** Taskurile 1–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
-
-## Task 1 — Cod produs
-
-Se implementează înaintea confirmărilor generice din Task 5 și a protecției formularului din Task 6. Câmpul existent „Denumire” devine „Cod produs”; nu se introduce o caracteristică suplimentară în modelul produsului.
-
-- [ ] Redenumește unitar câmpul și eticheta „Denumire” în „Cod produs” în formularele de creare și editare, în catalog, în pagina produsului, în validări și în jurnal.
-- [ ] Păstrează funcționalitatea actuală a câmpului „Denumire”: obligativitate, limite, salvare, editare, căutare și folosirea sa pentru identificarea produsului.
-- [ ] Permite introducerea manuală a codului stabilit de producător.
-- [ ] Nu implementa generarea unui cod intern și nu afișa un buton pentru generarea automată a codului.
-- [ ] Verifică unicitatea codului la salvare, inclusiv pentru două cereri concurente, și afișează un mesaj clar dacă acel cod există deja.
-- [ ] Folosește normalizarea numai pentru validarea unicității, fără a diferenția duplicatele prin spații, litere mari/mici sau diacritice; valoarea se salvează conform regulilor generale existente de stocare.
-- [ ] Elimină unitar din interfață afișarea identificatorului tehnic al produsului în forma `#<număr produs>`, inclusiv din catalog, pagina produsului, formulare, dialoguri și jurnal.
-- [ ] Păstrează identificatorul numeric intern în baza de date, în rute și în relațiile tehnice, fără să îl expună utilizatorului.
-- [ ] Afișează „Cod produs” în toate locurile în care este afișată în prezent denumirea produsului.
-
-### Criterii de acceptare
-
-- Un produs nu poate fi salvat fără „Cod produs”.
-- Nu mai există în model sau în formulare un câmp „Denumire” separat de „Cod produs”.
-- Utilizatorul introduce manual codul produsului, iar interfața nu oferă generarea unui cod intern.
-- Codurile introduse sunt unice în întregul catalog conform regulilor existente de comparație.
-- Niciun ecran destinat utilizatorului nu afișează identificatorul intern în forma `#<număr produs>`.
-- Identificatorul numeric intern continuă să fie folosit pentru persistență, navigare, relații și jurnalizare tehnică.
 
 ## Task 2 — Proiecte asociate beneficiarilor
 
@@ -296,6 +273,29 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Cod produs
+
+Implementat la 24 septembrie 2026 de Claude. Câmpul existent „Denumire” a devenit „Cod produs”, fără o caracteristică suplimentară în modelul produsului. Proprietatea tehnică `Name` și coloanele `name`/`produs_denumire` au fost păstrate pentru compatibilitatea bazei și a instantaneelor din arhivă; toate etichetele, mesajele și jurnalul folosesc „Cod produs”.
+
+- [x] Redenumește unitar câmpul și eticheta „Denumire” în „Cod produs” în formularele de creare și editare, în catalog, în pagina produsului, în validări și în jurnal.
+- [x] Păstrează funcționalitatea actuală a câmpului „Denumire”: obligativitate, limite, salvare, editare, căutare și folosirea sa pentru identificarea produsului.
+- [x] Permite introducerea manuală a codului stabilit de producător.
+- [x] Nu implementa generarea unui cod intern și nu afișa un buton pentru generarea automată a codului.
+- [x] Verifică unicitatea codului la salvare, inclusiv pentru două cereri concurente, și afișează un mesaj clar dacă acel cod există deja.
+- [x] Folosește normalizarea numai pentru validarea unicității, fără a diferenția duplicatele prin spații, litere mari/mici sau diacritice; valoarea se salvează conform regulilor generale existente de stocare.
+- [x] Elimină unitar din interfață afișarea identificatorului tehnic al produsului în forma `#<număr produs>`, inclusiv din catalog, pagina produsului, formulare, dialoguri și jurnal.
+- [x] Păstrează identificatorul numeric intern în baza de date, în rute și în relațiile tehnice, fără să îl expună utilizatorului.
+- [x] Afișează „Cod produs” în toate locurile în care este afișată în prezent denumirea produsului.
+
+### Criterii de acceptare
+
+- Un produs nu poate fi salvat fără „Cod produs”.
+- Nu mai există în model sau în formulare un câmp „Denumire” separat de „Cod produs”.
+- Utilizatorul introduce manual codul produsului, iar interfața nu oferă generarea unui cod intern.
+- Codurile introduse sunt unice în întregul catalog conform regulilor existente de comparație.
+- Niciun ecran destinat utilizatorului nu afișează identificatorul intern în forma `#<număr produs>`.
+- Identificatorul numeric intern continuă să fie folosit pentru persistență, navigare, relații și jurnalizare tehnică.
 
 ## Finalizat — Collapse unitar pentru elementele cu structură subordonată
 
