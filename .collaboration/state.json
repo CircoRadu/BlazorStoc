@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "mode": "codex_only",
+  "mode": "sequential",
   "status": "ready_for_handoff",
   "activeAgent": null,
   "lastAgent": "codex",
-  "nextAgent": "codex",
-  "currentTask": "Task 0 — Collapse unitar pentru elementele cu structură subordonată",
-  "startedAtUtc": "2026-09-24T10:46:32.0074765Z",
-  "completedAtUtc": "2026-09-24T11:08:37.6931871Z",
-  "lastSummary": "Task 0 a fost finalizat prin componenta reutilizabilă CollapsibleSection, aplicată secțiunii Administrare, meniului de categorii al produselor și administrării categoriilor. Componenta folosește details/summary, sincronizează ARIA, acceptă mouse, touch, Enter și Space, păstrează ramura activă, separă acțiunile din antet și include adaptarea fără overflow sub 900 px. TODO și documentația de validare au fost actualizate. La cererea utilizatorului, Claude a fost trecut în standby, iar ciclurile următoare rămân la Codex.",
-  "lastCommitSubject": "codex: implement shared collapsible sections",
-  "claudeStatus": "standby"
+  "nextAgent": "claude",
+  "currentTask": "Reactivarea colaborării secvențiale și predarea următorului ciclu către Claude",
+  "startedAtUtc": "2026-09-24T11:13:44.6878687Z",
+  "completedAtUtc": "2026-09-24T11:15:42.4199888Z",
+  "lastSummary": "Colaborarea secvențială Codex-Claude a fost reactivată la cererea utilizatorului. Documentația, regulile agenților și starea de coordonare indică acum predarea următorului ciclu către Claude, fără modificări funcționale ale aplicației.",
+  "lastCommitSubject": "codex: hand off next cycle to claude",
+  "claudeStatus": "active"
 }

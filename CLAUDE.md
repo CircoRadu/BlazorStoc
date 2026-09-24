@@ -1,10 +1,6 @@
 # Instrucțiuni pentru Claude
 
-## Stare curentă: standby
-
-Claude nu începe și nu modifică proiectul cât timp `.collaboration/state.json` are `mode: "codex_only"` sau `claudeStatus: "standby"`. Reluarea colaborării necesită o cerere explicită a utilizatorului și schimbarea stării la `mode: "sequential"`, `claudeStatus: "active"`, `status: "ready_for_handoff"` și `nextAgent: "claude"`.
-
-După reactivare, proiectul folosește colaborare strict secvențială între Claude și Codex. Claude nu lucrează niciodată simultan cu Codex.
+Acest proiect folosește colaborare strict secvențială între Claude și Codex. Claude nu lucrează niciodată simultan cu Codex.
 
 ## Înainte de orice modificare
 

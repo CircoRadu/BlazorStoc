@@ -2,7 +2,7 @@
 
 ## Stare operațională curentă
 
-Colaborarea cu Claude este suspendată la cererea utilizatorului. Modul activ este `codex_only`: Claude rămâne în standby, iar fiecare commit Codex pregătește următorul ciclu tot pentru Codex. Reactivarea alternanței Codex–Claude se face numai printr-o cerere explicită a utilizatorului și actualizarea controlată a `.collaboration/state.json`.
+Colaborarea secvențială Codex–Claude este activă. Următorul ciclu este predat lui Claude după commitul de handoff curent; agenții continuă apoi să alterneze, fără lucru simultan.
 
 ## Principiul obligatoriu
 

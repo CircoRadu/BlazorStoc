@@ -1,6 +1,6 @@
 # Instrucțiuni pentru Codex
 
-Proiectul este momentan în modul `codex_only`; Claude este în standby. Codex lucrează în cicluri succesive de modificare, verificare, documentare și commit. Colaborarea secvențială cu Claude se reactivează numai la cererea explicită a utilizatorului.
+Acest proiect folosește colaborare strict secvențială între Codex și Claude. Codex nu lucrează niciodată simultan cu Claude.
 
 ## Înainte de orice modificare
 
@@ -27,7 +27,7 @@ Proiectul este momentan în modul `codex_only`; Claude este în standby. Codex l
 
 1. Rulează verificările adecvate și inspectează toate modificările.
 2. Actualizează `docs/PROJECT_STATE.md` cu starea efectivă, validările, riscurile și următorul pas.
-3. Încheie ciclul cu o descriere completă; scriptul actualizează jurnalul, face commit și pregătește următorul ciclu Codex cât timp modul `codex_only` este activ:
+3. Încheie ciclul cu o descriere completă; scriptul actualizează jurnalul, face commit și predă proiectul lui Claude:
 
    ```powershell
    .\tools\agent-cycle.ps1 finish -Agent codex `

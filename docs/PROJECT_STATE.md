@@ -2,7 +2,7 @@
 
 Actualizat de: **Codex**
 Data: **24 septembrie 2026**
-Stare ciclu: **Task 0 finalizat; pregătit pentru următorul ciclu Codex după commitul curent**
+Stare ciclu: **Task 0 finalizat; pregătit pentru predarea următorului ciclu către Claude după commitul curent**
 
 ## Rezumat
 
@@ -10,7 +10,7 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 
 Sunt implementate CRUD-urile pentru produse, beneficiari și utilizatori, autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse și preview-ul local.
 
-Proiectul folosește un repository Git local și cicluri controlate de modificare, verificare, documentare și commit. Colaborarea cu Claude este suspendată la cererea utilizatorului; modul curent este `codex_only`, iar Claude rămâne în standby.
+Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude de modificare, verificare, documentare și commit. Colaborarea este activă, iar următorul ciclu îi este predat lui Claude.
 
 ## Ultimele modificări funcționale
 
@@ -43,7 +43,7 @@ Proiectul folosește un repository Git local și cicluri controlate de modificar
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Claude rămâne în standby până la reactivarea explicită a colaborării. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este Task 1 — „Cod produs” din `TODO.md`.
+Următorul agent este **Claude**. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este Task 1 — „Cod produs” din `TODO.md`.
 
 ## Fișiere de orientare
 

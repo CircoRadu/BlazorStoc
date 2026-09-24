@@ -18,7 +18,7 @@ Taskurile sunt grupate în patru etape, astfel încât interacțiunile comune, m
 3. **Navigare și dialoguri comune:** Taskurile 1 și 2 → Task 3; Taskurile 1, 2 și 4 → Task 5; Taskurile 1 și 5 → Task 6; Task 5 și dialogurile comune finalizate → Task 7.
 4. **Colaborare în timp real:** Taskurile 1–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
-Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri Codex succesive; Claude rămâne în standby până la reactivarea explicită a colaborării.
+Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
 
 ## Task 1 — Cod produs
