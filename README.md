@@ -27,7 +27,7 @@ Faza curentă acoperă dezvoltarea și verificarea locală. Integrarea, configur
 - Încărcarea produselor și a grupurilor categorie/subcategorie rulează în paralel, cu anulare la închiderea componentei.
 - Configurare locală prin `appsettings.json` și variabile de mediu .NET.
 
-Include stoc inițial, corecții de cantitate cu motiv obligatoriu și gestiunea beneficiarilor. Nu include încă intrări/ieșiri de stoc către beneficiari, importul datelor, imaginile, export Excel, rapoarte sau conturile individuale din aplicația veche. Nu citește parolele Base64 existente.
+Afișează stocul produselor, dar nu îl permite introdus manual: produsele noi au stoc 0, iar stocul se va modifica numai prin intrări și ieșiri (Task 1 din `TODO.md`). Include gestiunea beneficiarilor. Nu include încă intrări/ieșiri de stoc către beneficiari, importul datelor, imaginile, export Excel, rapoarte sau conturile individuale din aplicația veche. Nu citește parolele Base64 existente.
 
 ## Beneficiari
 
@@ -79,12 +79,12 @@ Sistemul refuză eliminarea ultimului administrator activ. Un administrator nu �
 
 ### Utilizarea catalogului
 
-- **Adaugă produs** deschide formularul pentru cod produs, descriere, categorie, subcategorie și stoc inițial. Categoria și subcategoria se aleg dintre cele create în pagina „Categorii și subcategorii”.
+- **Adaugă produs** deschide formularul pentru cod produs, descriere, categorie și subcategorie. Produsul nou este creat cu stoc 0. Categoria și subcategoria se aleg dintre cele create în pagina „Categorii și subcategorii”.
 - **Cod produs** este codul stabilit de producător, introdus manual. Este obligatoriu, are cel mult 100 de caractere și este unic în tot catalogul: două coduri care diferă doar prin spații, majuscule/minuscule sau diacritice sunt considerate identice. Aplicația nu generează coduri interne.
 - Identificatorul numeric intern al produsului rămâne folosit pentru persistență, rute, relații și jurnalizare tehnică (`EntityId`), dar nu mai este afișat în interfață în forma `#<număr>`.
 - Apasă pe codul unui produs, apoi **Editează** sau **Șterge** în panoul de detalii.
-- Cantitatea inițială trebuie să fie zero sau pozitivă. O cantitate negativă deja existentă poate fi păstrată când modifici descrierea sau corectată la o valoare nenegativă.
-- Schimbarea cantității cere un motiv. În modul MariaDB, operațiile și valorile înainte/după se salvează ca JSON în `log`, în aceeași tranzacție cu produsul. Nu se creează mișcări `io` fictive.
+- Formularele de creare și editare nu conțin câmp pentru cantitate: stocul se afișează numai pentru consultare și nu poate fi introdus sau corectat manual. Un stoc existent (inclusiv negativ) rămâne neschimbat la editarea produsului.
+- Fiecare editare a produsului cere un motiv. În modul MariaDB, operațiile și valorile înainte/după se salvează ca JSON în `log`, în aceeași tranzacție cu produsul. Nu se creează mișcări `io` fictive.
 - Ștergerea cere confirmare și este permisă numai cu stoc zero, fără rânduri asociate în `io` sau `imagine`. Categoriile nu se șterg automat.
 - O versiune veche a produsului nu poate suprascrie sau șterge o versiune mai nouă. În caz de conflict, închide formularul, actualizează catalogul și reia editarea.
 - Dacă se întrerupe conexiunea în timpul salvării, verifică mai întâi catalogul: operația poate fi deja confirmată de server. Nu există retry automat.

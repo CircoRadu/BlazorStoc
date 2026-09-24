@@ -2,15 +2,27 @@
 
 Actualizat de: **Claude**
 Data: **24 septembrie 2026**
-Stare ciclu: **Task 2 („Proiecte asociate beneficiarilor”) finalizat aproape integral; pregătit pentru predarea următorului ciclu către Codex după commitul curent**
+Stare ciclu: **Task 0 („Stoc exclusiv prin mișcări de intrare și ieșire”) finalizat; Task 2 finalizat aproape integral; pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
 BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLite și suport MariaDB. Rulează direct cu .NET, fără Docker. Integrarea și publicarea NAS/QNAP sunt în afara fazei curente.
 
-Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` și identificarea produselor prin „Cod produs”.
+Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs” și stocul modificabil exclusiv prin mișcări (în prezent doar afișat; mișcările vin cu Task 1).
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Ultimele modificări funcționale (ciclul Claude — Task 0)
+
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 0”), deși `nextAgent` era `codex`; working tree-ul era curat și nu exista un ciclu Codex deschis. Tranziția `start` a fost aplicată manual în `.collaboration/state.json`, ca în ciclul anterior.
+
+- **Stocul nu mai poate fi introdus manual.** `ProductInput.Quantity` a fost eliminat. `CreateAsync` creează produsul cu stoc 0 în toate repository-urile (`DemoProductRepository.Crud.cs`, `SqliteProductRepository.cs`, `MariaProductRepository.Crud.cs`); `UpdateAsync` nu mai scrie `quantity` / `produs_cantitate` și returnează produsul cu stocul curent din bază.
+- **Editorul de produs** (`Components/Pages/ProductEditor.razor`): câmpul „Stoc inițial”/„Cantitate” a fost înlocuit cu o notă: la creare „Produsul nou este creat cu stoc 0…”, la editare „Stoc curent: N buc.” (doar afișare).
+- **Concurență**: `ProductRules.CheckCurrent` compară produsul fără `Quantity`, deci o mișcare de stoc viitoare (Task 1) nu invalidează o editare deschisă. Consecință: ștergerea verifică acum stocul **curent** din bază (`ProductRules.CheckDelete(current, …)` în SQLite și demo; MariaDB o făcea deja), nu instantaneul formularului.
+- **Audit**: `ProductCode.AuditIdentification` și `AuditChanges` nu mai includ „Cantitate”. Instantaneul de arhivă al produsului păstrează cantitatea ca dată istorică. Jurnalul din MariaDB (`log`, JSON înainte/după) serializează în continuare întregul produs, inclusiv cantitatea.
+- **Neschimbat intenționat**: produsele existente își păstrează stocul; catalogul, filtrele de stoc și `SqliteLocalStore` (reconcilierea unică a stării vechi, care citește „Cantitate” din audit istoric) nu au fost modificate. Nu s-au generat mișcări și nu s-au modificat date.
+- **Preview**: nu rula niciun proces pe 5082; a fost pornit din `bin\Release\net9.0\BlazorStoc.exe --urls http://127.0.0.1:5082` (cont `Alex`, deci Codex sau Claude îl pot opri fără probleme de acces).
+- **Documentație**: `README.md`, `VALIDARE.md`, `TODO.md` (Task 0 mutat în „Taskuri finalizate”; Task 1 = „Intrări și ieșiri pentru un produs existent”, dependențele actualizate).
 
 ## Ultimele modificări funcționale (ciclul Claude — Task 2, restul subtaskurilor)
 
@@ -37,7 +49,9 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 ## Validare
 
 - Build Release: 0 avertismente, 0 erori (proiect principal și `BlazorStoc.Checks`).
-- `BlazorStoc.Checks`: 229 verificări trecute (176 de dinaintea Task 2 + 29 pentru modelul de domeniu al proiectelor + 24 noi pentru persistență/pagini/arhivare/corecția de gramatică).
+- `BlazorStoc.Checks`: 234 de verificări trecute (229 dinainte de Task 0; +5 net: produs nou cu stoc 0, editare care păstrează stocul, diferență de stoc în instantaneu, `CheckCurrent`, comportamentul SQLite; eliminată verificarea „stoc inițial negativ”).
+- Task 0, browser (`http://127.0.0.1:5082`, sesiune existentă): formularul de creare fără „Stoc inițial”, editorul cu „Stoc curent: 120 buc.” fără câmp de introducere. Salvarea editării și jurnalul nu au fost exersate manual (nu s-au modificat datele demo); sunt acoperite de verificările automate. MariaDB neverificat pe un server real.
+- Task 2 (istoric): 176 de verificări dinaintea lui + 29 pentru modelul de domeniu al proiectelor + 24 pentru persistență/pagini/arhivare/corecția de gramatică.
 - Browser, `http://127.0.0.1:5082` (admin demo, sesiune existentă): creare proiect din pagina beneficiarului, pagina proiectului cu „Echipamente” primul, adăugare observație cu navigare automată, ștergere observație și ștergere proiect (ambele cu dialogul de confirmare în doi pași), verificare jurnal (evenimente „Proiect”/„Observatie” cu `Details`/`Motif` corecte, fără diacritice în motiv, conform regulii de stocare). Datele de test au fost curățate (proiectul creat pentru verificare a fost șters).
 - Preview-ul a fost repornit din `bin\Release\net9.0\BlazorStoc.exe --urls http://127.0.0.1:5082` de către Claude, care a putut opri de această dată procesul anterior (proprietar același cont local, nu contul sandbox Codex menționat în ciclurile trecute).
 
@@ -53,7 +67,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este Task 2 / **Subtask 2.3 — Restaurarea contextului de navigare și registrul jurnalului** din `TODO.md` (cele mai mici bucăți rămase din Task 2), sau Task 4 („Identificarea beneficiarului cu CUI duplicat”), care nu mai depinde de nimic neterminat.
+Următorul agent este **Codex**. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este **Task 1 — Intrări și ieșiri pentru un produs existent** din `TODO.md` (pagina de mișcări de stoc; Task 0 este finalizat, deci produsele noi au stoc 0 și stocul nu mai poate fi modificat din aplicație până la Task 1). Alternativ: Task 2 / **Subtask 2.3 — Restaurarea contextului de navigare și registrul jurnalului** din `TODO.md` (cele mai mici bucăți rămase din Task 2), sau Task 4 („Identificarea beneficiarului cu CUI duplicat”), care nu mai depinde de nimic neterminat.
 
 ## Fișiere de orientare
 

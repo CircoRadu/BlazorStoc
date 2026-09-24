@@ -109,7 +109,7 @@ async Task<Product> CreateProductAsync(IProductRepository productRepository, Pro
     await EnsureProductGroupAsync(productRepository, input.Category, input.Subcategory);
     return await productRepository.CreateAsync(input);
 }
-var created = await CreateProductAsync(repository, new ProductInput { Name = "  Șurub   nou  ", Category = "Categorie nouă", Subcategory = "Subcategorie nouă", Description = "Țeavă și șaibă", Quantity = 0 });
+var created = await CreateProductAsync(repository, new ProductInput { Name = "  Șurub   nou  ", Category = "Categorie nouă", Subcategory = "Subcategorie nouă", Description = "Țeavă și șaibă" });
 Check(created.Id == 13 && created.Name == "Surub nou" && created.Description == "Teava si saiba" && (await repository.GetProductsAsync()).Contains(created), "Create removes diacritics before persistence");
 Check((await repository.GetGroupsAsync()).Contains(new ProductGroup("Categorie noua", "Subcategorie noua")), "New category and subcategory are available without diacritics");
 var selectionRulesRepository = new DemoProductRepository();
@@ -184,7 +184,7 @@ catch (ProductOperationException exception)
 Check((await new DemoProductRepository().GetProductsAsync()).Count == 12, "Demo changes are isolated to a session");
 var sharedProductStore = new DemoProductStore();
 var sharedWriter = new DemoProductRepository(sharedStore: sharedProductStore);
-await CreateProductAsync(sharedWriter, new ProductInput { Name = "Produs meniu", Category = "Categorie meniu", Subcategory = "Subcategorie meniu", Quantity = 1 });
+await CreateProductAsync(sharedWriter, new ProductInput { Name = "Produs meniu", Category = "Categorie meniu", Subcategory = "Subcategorie meniu" });
 var sharedReader = new DemoProductRepository(sharedStore: sharedProductStore);
 Check((await sharedReader.GetGroupsAsync()).Contains(new ProductGroup("Categorie meniu", "Subcategorie meniu")), "Product menu sees categories created by another repository scope");
 var emptyGroupStore = new DemoProductStore();
@@ -202,8 +202,7 @@ var productToMove = await CreateProductAsync(emptyGroupRepository, new ProductIn
 {
     Name = "Produs pentru grup gol",
     Category = "Categorie pastrata",
-    Subcategory = "Subcategorie pastrata",
-    Quantity = 0
+    Subcategory = "Subcategorie pastrata"
 });
 var moveProduct = ProductInput.From(productToMove);
 moveProduct.Category = "Categorie destinatie";
@@ -223,8 +222,7 @@ var reusedEmptyGroup = await emptyGroupRepository.CreateAsync(new ProductInput
 {
     Name = "Produs grup refolosit",
     Category = "CATEGORIE PASTRATA",
-    Subcategory = "SUBCATEGORIE PASTRATA",
-    Quantity = 0
+    Subcategory = "SUBCATEGORIE PASTRATA"
 });
 Check(reusedEmptyGroup.Category == "Categorie pastrata" && reusedEmptyGroup.Subcategory == "Subcategorie pastrata" &&
       (await emptyGroupRepository.GetGroupsAsync()).Count(group =>
@@ -247,7 +245,7 @@ await Rejected(() => emptyGroupRepository.RenameCategoryAsync("Categorie redenum
 var spacingRepository = new DemoProductRepository();
 var spacingProduct = await spacingRepository.CreateAsync(new ProductInput
 {
-    Name = "  Produs   cu   spatii  ", Category = "Măsurare", Subcategory = "Nivelare", Quantity = 0
+    Name = "  Produs   cu   spatii  ", Category = "Măsurare", Subcategory = "Nivelare"
 });
 Check(spacingProduct.Name == "Produs cu spatii", "Product creation removes exterior and repeated spaces from its name");
 var spacingProductEdit = ProductInput.From(spacingProduct);
@@ -267,20 +265,19 @@ await Rejected(() => repository.CreateAsync(new ProductInput { Name = "  ", Cate
 await Rejected(() => repository.CreateAsync(new ProductInput { Name = new string('a', 101), Category = "A", Subcategory = "B" }), "Oversize product name is rejected");
 var invalid = ProductEdit(created); invalid.Description = new string('a', 1001);
 await Rejected(() => repository.UpdateAsync(created, invalid), "Oversize description is rejected");
-invalid = ProductInput.From(created); invalid.Quantity = -1;
-await Rejected(() => repository.CreateAsync(invalid), "Negative initial stock is rejected");
-invalid = ProductInput.From(created); invalid.Quantity = 5;
-await Rejected(() => repository.UpdateAsync(created, invalid), "Stock correction requires a reason");
+Check(created.Quantity == 0, "A new product starts with stock 0");
+invalid = ProductInput.From(created); invalid.Description = "Editare nouă";
+await Rejected(() => repository.UpdateAsync(created, invalid), "Product edit requires a reason");
 var metadataWithoutReason = ProductInput.From(created); metadataWithoutReason.Description = "Editare fără motiv";
 await Rejected(() => repository.UpdateAsync(created, metadataWithoutReason), "Every product edit requires a reason");
 invalid.Reason = "Inventariere";
 var updated = await repository.UpdateAsync(created, invalid);
-Check(updated.Quantity == 5 && updated.Version == 1, "Stock correction saves with a new version");
+Check(updated.Quantity == 0 && updated.Version == 1, "Product edit keeps the stock and saves with a new version");
 await Rejected(() => repository.UpdateAsync(created, ProductEdit(created)), "Stale edit cannot overwrite changes");
 await Rejected(() => repository.DeleteAsync(created, "Test automat"), "Stale delete cannot remove changed product");
-await Rejected(() => repository.DeleteAsync(updated, "Test automat"), "Nonzero stock prevents deletion");
-var reset = ProductInput.From(updated); reset.Quantity = 0; reset.Reason = "Corecție inventar";
-var empty = await repository.UpdateAsync(updated, reset);
+var stockedProduct = (await repository.GetProductsAsync()).Single(p => p.Id == 8);
+await Rejected(() => repository.DeleteAsync(stockedProduct, "Test automat"), "Nonzero stock prevents deletion");
+var empty = updated;
 try { ProductRules.CheckDelete(empty, true); throw new Exception("Associated records ignored"); }
 catch (ProductOperationException) { Check(true, "Related stock movements or images prevent deletion"); }
 await Rejected(() => repository.DeleteAsync(empty, " "), "Product deletion requires a reason");
@@ -294,6 +291,13 @@ Check(next.Id > created.Id, "Deleted IDs are not reused");
 var legacy = (await repository.GetProductsAsync()).Single(p => p.Id == 8);
 var legacyEdit = ProductEdit(legacy); legacyEdit.Description = "Descriere corectată";
 Check((await repository.UpdateAsync(legacy, legacyEdit)).Quantity == -2, "Legacy negative stock can be preserved during metadata edits");
+var stockSnapshot = (await repository.GetProductsAsync()).Single(p => p.Id == 8);
+var stockDifferenceEdit = ProductEdit(stockSnapshot); stockDifferenceEdit.Description = "Altă descriere";
+Check((await repository.UpdateAsync(stockSnapshot with { Quantity = 99 }, stockDifferenceEdit)).Quantity == -2,
+    "A stock difference in the edit snapshot neither blocks the edit nor overwrites the stored stock");
+ProductRules.CheckCurrent(stockSnapshot, stockSnapshot with { Quantity = 7 });
+await Rejected(() => Task.Run(() => ProductRules.CheckCurrent(stockSnapshot, stockSnapshot with { Name = "Alt cod" })),
+    "Concurrency check still rejects a changed product code");
 var imageBytes = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 };
 Check(ProductImageRules.DetectContentType(imageBytes) == "image/png", "Product image format is detected from file content");
 try { ProductImageRules.DetectContentType("<svg></svg>"u8); throw new Exception("Unsafe image format accepted"); }
@@ -376,12 +380,12 @@ var auditTrail = new TestAuditTrail();
 var auditedProducts = new DemoProductRepository(limitedAccess, auditTrail);
 await auditedProducts.CreateCategoryAsync("Test");
 await auditedProducts.CreateSubcategoryAsync("Test", "Audit");
-var auditedProduct = await auditedProducts.CreateAsync(new ProductInput { Name = "Produs auditat", Category = "Test", Subcategory = "Audit", Quantity = 0 });
+var auditedProduct = await auditedProducts.CreateAsync(new ProductInput { Name = "Produs auditat", Category = "Test", Subcategory = "Audit" });
 Check(auditTrail.Entries.Count(entry => entry.EntityType == AuditEntities.Category && entry.Action == AuditActions.Create) == 1 &&
       auditTrail.Entries.Count(entry => entry.EntityType == AuditEntities.Subcategory && entry.Action == AuditActions.Create) == 1 &&
       auditTrail.Entries.Count(entry => entry.EntityType == AuditEntities.Product && entry.Action == AuditActions.Create && entry.EntityId == auditedProduct.Id.ToString()) == 1,
     "Explicit group creation and product creation each record one audit event");
-var auditedProductSameGroup = await auditedProducts.CreateAsync(new ProductInput { Name = "Al doilea produs auditat", Category = "test", Subcategory = "audit", Quantity = 1 });
+var auditedProductSameGroup = await auditedProducts.CreateAsync(new ProductInput { Name = "Al doilea produs auditat", Category = "test", Subcategory = "audit" });
 Check(auditTrail.Entries.Count(entry => entry.EntityType is AuditEntities.Category or AuditEntities.Subcategory) == 2 &&
       auditTrail.Entries.Count(entry => entry.EntityType == AuditEntities.Product && entry.Action == AuditActions.Create && entry.EntityId == auditedProductSameGroup.Id.ToString()) == 1,
     "Reusing an existing group does not duplicate category or subcategory events");
@@ -430,11 +434,10 @@ Check(AuditNavigation.EditUrl(productAuditLink with { Action = AuditActions.Dele
 var auditRulesTrail = new TestAuditTrail();
 var auditRulesProducts = new DemoProductRepository(limitedAccess, auditRulesTrail);
 var auditRulesProduct = await CreateProductAsync(auditRulesProducts, new ProductInput
-    { Name = "Produs înainte", Category = "Test", Subcategory = "Reguli", Description = "Descriere înainte", Quantity = 0 });
+    { Name = "Produs înainte", Category = "Test", Subcategory = "Reguli", Description = "Descriere înainte" });
 var auditRulesInput = ProductInput.From(auditRulesProduct);
 auditRulesInput.Name = "Produs după";
 auditRulesInput.Description = "Descriere după";
-auditRulesInput.Quantity = 3;
 auditRulesInput.Reason = "Inventariere";
 var auditRulesUpdated = await auditRulesProducts.UpdateAsync(auditRulesProduct, auditRulesInput);
 var productEditEvent = auditRulesTrail.Entries.Single(entry => entry.Action == AuditActions.Edit);
@@ -444,14 +447,14 @@ Check(productEditEvent.Target == "Produs dupa" && productEditEvent.EntityId == a
     "Product audit target shows only the product code while the entity id keeps the internal identifier");
 Check(productEditEvent.Details.Contains("Cod produs: Produs inainte → Produs dupa", StringComparison.Ordinal) &&
       productEditEvent.Details.Contains("Descriere: Descriere inainte → Descriere dupa", StringComparison.Ordinal) &&
-      productEditEvent.Details.Contains("Cantitate: 0 → 3", StringComparison.Ordinal) &&
+      !productEditEvent.Details.Contains("Cantitate", StringComparison.Ordinal) &&
       !productEditEvent.Details.Contains("Categorie", StringComparison.Ordinal) && productEditEvent.Motif == "Inventariere",
     "Edit audit details contain only changed before and after values, with the reason stored separately");
 var successfulAuditCount = auditRulesTrail.Entries.Count;
 try
 {
     await auditRulesProducts.CreateAsync(new ProductInput
-        { Name = "PRODUS DUPA", Category = "Alta", Subcategory = "Alta", Quantity = 0 });
+        { Name = "PRODUS DUPA", Category = "Alta", Subcategory = "Alta" });
     throw new Exception("Duplicate audited product accepted");
 }
 catch (ProductOperationException)
@@ -595,13 +598,32 @@ try
         Name = "Produs persistent",
         Category = "Categorie persistenta",
         Subcategory = "Subcategorie persistenta",
-        Description = "Valoare initiala",
-        Quantity = 0
+        Description = "Valoare initiala"
     });
     var persistentEdit = ProductInput.From(persistentProduct);
     persistentEdit.Description = "Valoare salvata dupa repornire";
     persistentEdit.Reason = "Verificare persistenta";
     persistentProduct = await firstProducts.UpdateAsync(persistentProduct, persistentEdit);
+    var stockProduct = await CreateProductAsync(firstProducts, new ProductInput
+        { Name = "Produs stoc paralel", Category = "Categorie persistenta", Subcategory = "Subcategorie persistenta" });
+    Check(stockProduct.Quantity == 0, "SQLite product creation starts with stock 0");
+    await using (var stockConnection = await firstStore.OpenConnectionAsync())
+    {
+        await using var setStock = TestSqliteCommand(stockConnection, "UPDATE products SET quantity=7 WHERE id=@id", ("@id", stockProduct.Id));
+        await setStock.ExecuteNonQueryAsync();
+    }
+    var stockPreservingEdit = ProductInput.From(stockProduct);
+    stockPreservingEdit.Description = "Editare cu stoc modificat in paralel";
+    stockPreservingEdit.Reason = "Verificare stoc";
+    var stockPreserved = await firstProducts.UpdateAsync(stockProduct, stockPreservingEdit);
+    Check(stockPreserved.Quantity == 7 && (await firstProducts.GetProductsAsync()).Single(p => p.Id == stockProduct.Id).Quantity == 7,
+        "SQLite product edit does not overwrite a stock changed after the form was opened");
+    await Rejected(() => firstProducts.DeleteAsync(stockPreserved with { Quantity = 0 }, "Test automat"), "SQLite deletion is blocked by the current stock, not by the stale snapshot");
+    await using (var stockResetConnection = await firstStore.OpenConnectionAsync())
+    {
+        await using var resetStock = TestSqliteCommand(stockResetConnection, "UPDATE products SET quantity=0 WHERE id=@id", ("@id", stockProduct.Id));
+        await resetStock.ExecuteNonQueryAsync();
+    }
 
     var firstBeneficiaries = new SqliteBeneficiaryRepository(firstStore, administrator);
     var persistentBeneficiary = await firstBeneficiaries.CreateAsync(new BeneficiaryInput
@@ -642,8 +664,7 @@ try
     {
         Name = $"Produs grup gol {emptyGroupSuffix}",
         Category = $"Categorie sursa {emptyGroupSuffix}",
-        Subcategory = $"Subcategorie sursa {emptyGroupSuffix}",
-        Quantity = 0
+        Subcategory = $"Subcategorie sursa {emptyGroupSuffix}"
     });
     var sqliteMove = ProductInput.From(sqliteProductToMove);
     sqliteMove.Category = $"Categorie destinatie {emptyGroupSuffix}";
@@ -663,12 +684,12 @@ try
     var managedProduct = await CreateProductAsync(secondProducts, new ProductInput
     {
         Name = $"Produs administrare {managementSuffix}", Category = $"Categorie administrare {managementSuffix}",
-        Subcategory = $"Subcategorie administrare {managementSuffix}", Quantity = 0
+        Subcategory = $"Subcategorie administrare {managementSuffix}"
     });
     var destinationProduct = await CreateProductAsync(secondProducts, new ProductInput
     {
         Name = $"Produs destinatie {managementSuffix}", Category = $"Categorie tinta {managementSuffix}",
-        Subcategory = $"Subcategorie tinta {managementSuffix}", Quantity = 0
+        Subcategory = $"Subcategorie tinta {managementSuffix}"
     });
     await secondProducts.RenameCategoryAsync(managedProduct.Category, $"Categorie redenumita {managementSuffix}", "Corectie categorie");
     var renamedCategoryProduct = (await secondProducts.GetProductsAsync()).Single(product => product.Id == managedProduct.Id);
@@ -742,12 +763,12 @@ try
         new SqliteProductRepository(firstStore, administrator).CreateAsync(new ProductInput
         {
             Name = $"Produs concurent A {concurrentSuffix}", Category = $"Categorie A {concurrentSuffix}",
-            Subcategory = $"Subcategorie A {concurrentSuffix}", Quantity = 0
+            Subcategory = $"Subcategorie A {concurrentSuffix}"
         }),
         new SqliteProductRepository(secondStore, administrator).CreateAsync(new ProductInput
         {
             Name = $"Produs concurent B {concurrentSuffix}", Category = $"Categorie B {concurrentSuffix}",
-            Subcategory = $"Subcategorie B {concurrentSuffix}", Quantity = 0
+            Subcategory = $"Subcategorie B {concurrentSuffix}"
         }));
     var afterConcurrentWrites = await secondProducts.GetProductsAsync();
     var sameCodeSuffix = Guid.NewGuid().ToString("N")[..8];
@@ -758,7 +779,7 @@ try
             return await new SqliteProductRepository(targetStore, administrator).CreateAsync(new ProductInput
             {
                 Name = code, Category = $"Categorie A {concurrentSuffix}",
-                Subcategory = $"Subcategorie A {concurrentSuffix}", Quantity = 0
+                Subcategory = $"Subcategorie A {concurrentSuffix}"
             });
         }
         catch (ProductOperationException exception) when (exception.Message.StartsWith("Codul produsului", StringComparison.Ordinal))
@@ -984,7 +1005,7 @@ try
     var concurrentDeleteProduct = await CreateProductAsync(secondProducts, new ProductInput
     {
         Name = $"Produs stergere concurenta {concurrentSuffix}", Category = $"Categorie concurenta {concurrentSuffix}",
-        Subcategory = $"Subcategorie concurenta {concurrentSuffix}", Quantity = 0
+        Subcategory = $"Subcategorie concurenta {concurrentSuffix}"
     });
     async Task<bool> TryConcurrentDeleteAsync(SqliteLocalStore currentStore)
     {
@@ -1019,8 +1040,7 @@ try
         {
             Name = $"Produs rollback {stage} {concurrentSuffix}",
             Category = $"Categorie rollback {stage} {concurrentSuffix}",
-            Subcategory = $"Subcategorie rollback {stage} {concurrentSuffix}",
-            Quantity = 0
+            Subcategory = $"Subcategorie rollback {stage} {concurrentSuffix}"
         });
         await secondImages.SaveAsync(value.Id, new ProductImageData(imageBytes, "image/png", $"{stage}.png"));
         return value;

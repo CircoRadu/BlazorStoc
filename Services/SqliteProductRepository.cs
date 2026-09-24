@@ -56,9 +56,9 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
                 SELECT last_insert_rowid();
                 """, ("@category", group.CategoryId), ("@subcategory", group.SubcategoryId),
                 ("@name", value.Name), ("@normalized", TextNormalization.UniquenessKey(value.Name)),
-                ("@description", value.Description), ("@quantity", value.Quantity));
+                ("@description", value.Description), ("@quantity", 0));
             var id = checked((int)(long)(await insert.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!);
-            var product = new Product(id, group.Category, group.Subcategory, value.Name, value.Description, value.Quantity);
+            var product = new Product(id, group.Category, group.Subcategory, value.Name, value.Description, 0);
             await RecordGroupsAsync(connection, transaction, actor, group, cancellationToken).ConfigureAwait(false);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
                 AuditEntities.Product, AuditActions.Create, ProductCode.AuditTarget(product),
@@ -87,21 +87,22 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
         try
         {
-            ProductRules.CheckCurrent(await GetAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false), original);
+            var current = await GetAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
+            ProductRules.CheckCurrent(current, original);
             await EnsureUniqueProductNameAsync(connection, transaction, value.Name, original.Id, cancellationToken).ConfigureAwait(false);
             var group = await ResolveGroupAsync(connection, transaction, value.Category, value.Subcategory, cancellationToken).ConfigureAwait(false);
             var version = checked(original.Version + 1);
             await using var update = SqliteLocalStore.Command(connection, transaction, """
                 UPDATE products SET category_id=@category,subcategory_id=@subcategory,name=@name,
-                    normalized_name=@normalized,description=@description,quantity=@quantity,version=@version
+                    normalized_name=@normalized,description=@description,version=@version
                 WHERE id=@id AND version=@oldVersion
                 """, ("@category", group.CategoryId), ("@subcategory", group.SubcategoryId),
                 ("@name", value.Name), ("@normalized", TextNormalization.UniquenessKey(value.Name)),
-                ("@description", value.Description), ("@quantity", value.Quantity), ("@version", version),
+                ("@description", value.Description), ("@version", version),
                 ("@id", original.Id), ("@oldVersion", original.Version));
             if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                 throw new ProductOperationException("Produsul s-a schimbat între timp. Actualizează catalogul.");
-            var product = new Product(original.Id, group.Category, group.Subcategory, value.Name, value.Description, value.Quantity, version);
+            var product = new Product(original.Id, group.Category, group.Subcategory, value.Name, value.Description, current!.Quantity, version);
             await RecordGroupsAsync(connection, transaction, actor, group, cancellationToken).ConfigureAwait(false);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
                 AuditEntities.Product, AuditActions.Edit, ProductCode.AuditTarget(product),
@@ -139,7 +140,7 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
                     ProductRules.CheckCurrent(current, original);
                     await using (var relations = SqliteLocalStore.Command(connection, transaction,
                         "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE product_id=@id)", ("@id", original.Id)))
-                        ProductRules.CheckDelete(original,
+                        ProductRules.CheckDelete(current!,
                             Convert.ToBoolean(await relations.ExecuteScalarAsync(archiveToken).ConfigureAwait(false)));
                     await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, file is null ? [] : [file], archiveToken)
                         .ConfigureAwait(false);

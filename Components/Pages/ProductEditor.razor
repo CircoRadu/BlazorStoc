@@ -38,7 +38,10 @@
                         @if (imageError is not null) { <span class="validation-message">@imageError</span> }
                     </div>
                 </div>
-                <label for="product-quantity">@(Original is null ? "Stoc inițial (bucăți)" : "Cantitate (bucăți)")<InputNumber id="product-quantity" @bind-Value="input.Quantity" ParsingErrorMessage="Introdu un număr întreg valid pentru cantitate." /><ValidationMessage For="() => input.Quantity" /></label>
+                <div class="form-note full-width" id="product-stock">
+                    @if (Original is null) { <span>Produsul nou este creat cu stoc 0. Stocul se modifică numai prin intrări și ieșiri.</span> }
+                    else { <span>Stoc curent: <strong>@Original.Quantity buc.</strong> Stocul nu se editează aici; se modifică numai prin intrări și ieșiri.</span> }
+                </div>
                 @if (Original is not null)
                 {
                     <ChangeReasonField Id="product-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />

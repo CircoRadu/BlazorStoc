@@ -34,9 +34,9 @@ public sealed partial class MariaProductRepository
                 INSERT INTO produs (id_categorie,id_subcategorie,id_user,produs_denumire,produs_descriere,produs_cantitate,produs_versiune)
                 VALUES (@category,@subcategory,@user,@name,@description,@quantity,0)
                 """, ("@category", categoryId), ("@subcategory", subcategoryId), ("@user", userId),
-                ("@name", value.Name), ("@description", value.Description), ("@quantity", value.Quantity));
+                ("@name", value.Name), ("@description", value.Description), ("@quantity", 0));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            var product = new Product(checked((int)command.LastInsertedId), category, subcategory, value.Name, value.Description, value.Quantity);
+            var product = new Product(checked((int)command.LastInsertedId), category, subcategory, value.Name, value.Description, 0);
             await Audit(connection, transaction, userId, "create", null, product, value.Reason, cancellationToken).ConfigureAwait(false);
             return (Product: product, Group: group);
         }, cancellationToken).ConfigureAwait(false);
@@ -61,14 +61,14 @@ public sealed partial class MariaProductRepository
             var version = checked(original.Version + 1);
             await using var command = Command(connection, transaction, """
                 UPDATE produs SET id_categorie=@category,id_subcategorie=@subcategory,
-                    produs_denumire=@name,produs_descriere=@description,produs_cantitate=@quantity,produs_versiune=@version
+                    produs_denumire=@name,produs_descriere=@description,produs_versiune=@version
                 WHERE id_produs=@id AND produs_versiune=@oldVersion
                 """, ("@category", categoryId), ("@subcategory", subcategoryId), ("@name", value.Name),
-                ("@description", value.Description), ("@quantity", value.Quantity), ("@version", version),
+                ("@description", value.Description), ("@version", version),
                 ("@id", original.Id), ("@oldVersion", original.Version));
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                 throw new ProductOperationException("Produsul s-a schimbat între timp. Actualizează catalogul.");
-            var product = new Product(original.Id, category, subcategory, value.Name, value.Description, value.Quantity, version);
+            var product = new Product(original.Id, category, subcategory, value.Name, value.Description, current!.Quantity, version);
             await Audit(connection, transaction, userId, "update", current, product, value.Reason, cancellationToken).ConfigureAwait(false);
             return (Product: product, Group: group);
         }, cancellationToken).ConfigureAwait(false);

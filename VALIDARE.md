@@ -92,6 +92,18 @@ Verificări pentru câmpul „Cod produs” (fostul „Denumire”):
 
 Suita automată acoperă unicitatea normalizată în modul demonstrativ și SQLite, inclusiv două sesiuni SQLite concurente care încearcă același cod (una singură reușește), mesajele de validare, ținta de audit și de arhivă fără `#<id>` și afișarea evenimentelor vechi. Pentru MariaDB, unicitatea folosește aceeași comparație normalizată sub tranzacție `Serializable` cu `FOR UPDATE`; nu a fost testată pe un server MariaDB în acest ciclu.
 
+## Stoc exclusiv prin mișcări (Task 0)
+
+Verificări pentru eliminarea stocului introdus manual:
+
+1. Formularul „Adaugă produs” nu mai conține „Stoc inițial”; afișează nota „Produsul nou este creat cu stoc 0. Stocul se modifică numai prin intrări și ieșiri.”
+2. Formularul „Editează produsul” afișează „Stoc curent: N buc.” ca text, fără câmp de introducere (`#product-quantity` nu mai există).
+3. Repository-urile (demo, SQLite, MariaDB) creează produsul cu stoc 0 și nu scriu `quantity` / `produs_cantitate` la editare; `ProductInput` nu mai are proprietatea `Quantity`, deci serverul nu poate primi o cantitate de la client.
+4. `ProductRules.CheckCurrent` ignoră stocul (o modificare de stoc nu invalidează o editare deschisă), dar respinge în continuare orice altă diferență; regula de ștergere folosește stocul curent din bază, nu instantaneul formularului.
+5. Jurnalul creării și editării produsului nu mai conține „Cantitate”. Reconcilierea unică a stării vechi din `audit-events.jsonl` (`SqliteLocalStore`) citește în continuare „Cantitate” din evenimentele istorice.
+
+Suita automată (`tests/BlazorStoc.Checks`, 234 de verificări) acoperă: produs nou cu stoc 0, editare care păstrează stocul, stoc negativ vechi păstrat, diferență de stoc în instantaneu (SQLite și demo), ștergere blocată de stocul curent, `CheckCurrent` și absența cantității din detaliile jurnalului. Verificare în browser: formularele de creare și editare (fără câmp de cantitate). Neverificat: MariaDB pe un server real.
+
 ## Proiecte — modelul de date (Subtask finalizat din Task 2)
 
 Regulile de domeniu din `Services/Projects.cs` sunt acoperite integral de `BlazorStoc.Checks` (29 de verificări):

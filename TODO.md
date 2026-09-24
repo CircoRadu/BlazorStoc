@@ -14,60 +14,16 @@
 Taskurile sunt grupate în patru etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
 
 1. **Interacțiuni comune finalizate:** componenta comună de extindere și restrângere este implementată și devine contract obligatoriu pentru structurile ierarhice actuale și viitoare.
-2. **Stabilizarea entităților și formularelor:** identificarea produsului prin „Cod produs” este finalizată, Task 0 elimină stocul introdus manual (stoc 0 la creare, fără editarea cantității), Task 1 introduce pagina de intrări/ieșiri a produsului (mișcările de stoc), Task 2 introduce proiectele și relațiile lor folosind componenta comună de collapse finalizată, iar Task 4 uniformizează validarea beneficiarilor.
+2. **Stabilizarea entităților și formularelor:** identificarea produsului prin „Cod produs” este finalizată, stocul introdus manual a fost eliminat (fostul Task 0 finalizat: stoc 0 la creare, fără editarea cantității), Task 1 introduce pagina de intrări/ieșiri a produsului (mișcările de stoc), Task 2 introduce proiectele și relațiile lor folosind componenta comună de collapse finalizată, iar Task 4 uniformizează validarea beneficiarilor.
 3. **Navigare și dialoguri comune:** Taskurile 1 și 2 → Task 3; Taskurile 1, 2 și 4 → Task 5; Taskurile 1 și 5 → Task 6; Task 5 și dialogurile comune finalizate → Task 7.
-4. **Colaborare în timp real:** Taskurile 0–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
+4. **Colaborare în timp real:** Taskurile 1–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
 
-## Task 0 — Stoc exclusiv prin mișcări de intrare și ieșire
-
-Stocul unui produs nu se mai introduce manual. Orice produs nou este creat cu stoc 0, iar orice modificare a stocului se face numai prin mișcări de intrare și ieșire (Task 1). Task 0 elimină din interfață și din persistență căile care setează direct cantitatea și pregătește terenul pentru pagina de mișcări.
-
-Decizii stabilite cu utilizatorul (24 septembrie 2026):
-
-- Formularul de creare a produsului nu mai are câmpul „Stoc inițial”; fiecare produs este creat cu stoc 0.
-- Editorul de produs nu permite editarea manuală a cantității.
-- Produsele existente își păstrează stocul curent; nu se generează mișcări și nu se modifică date.
-- Până la livrarea Task 1, stocul nu poate fi modificat din aplicație; Taskurile 0 și 1 se livrează în cicluri consecutive.
-
-### Subtask 0.1 — Crearea produsului fără stoc inițial
-
-- [ ] Elimină din formularul de creare câmpul „Stoc inițial (bucăți)” și mesajele lui de validare.
-- [ ] Creează produsul cu stoc 0 în toate implementările (`DemoProductRepository`, `SqliteProductRepository`, `MariaProductRepository`); serverul nu acceptă și nu folosește o cantitate primită de la client la creare.
-- [ ] Elimină din `ProductInput` cantitatea ca valoare introdusă de utilizator și regula `Quantity < 0` (validarea „stoc inițial negativ”); adaptează construirea produsului la stoc 0.
-- [ ] Jurnalul creării produsului nu mai prezintă „Cantitate” ca valoare introdusă de utilizator; identificarea produsului rămâne prin cod, categorie și subcategorie.
-- [ ] Verifică toate căile de creare (formular, seed-ul modului demonstrativ, teste) și adaptează-le astfel încât niciuna să nu seteze un stoc diferit de zero pentru produse noi.
-
-### Subtask 0.2 — Editarea produsului fără cantitate editabilă
-
-- [ ] Elimină câmpul editabil „Cantitate (bucăți)” din editorul de produs; afișează stocul curent numai pentru consultare (text, nu câmp de introducere), cu mențiunea că se modifică prin intrări și ieșiri.
-- [ ] Actualizarea produsului (SQLite, MariaDB, modul demonstrativ) nu mai scrie cantitatea (`quantity` / `produs_cantitate`) și nu acceptă o cantitate primită de la client; stocul existent rămâne neschimbat la salvare.
-- [ ] `ProductRules.CheckCurrent` compară acum și `Quantity`; exclude stocul din comparație (și din verificarea de versiune unde este cazul), astfel încât o modificare a stocului, prezentă sau viitoare, să nu invalideze un formular de editare deschis în paralel.
-- [ ] Jurnalul editării produsului nu mai conține modificări de cantitate (`ProductInput`: `new("Cantitate", …)`).
-- [ ] Păstrează regula de ștergere existentă: un produs se șterge numai cu stoc zero și fără mișcări asociate; snapshot-ul arhivei produsului păstrează cantitatea ca dată istorică.
-
-### Subtask 0.3 — Verificări
-
-- [ ] Teste: crearea unui produs produce stoc 0 indiferent de datele trimise; editarea nu schimbă stocul; două sesiuni (una editează produsul, alta modifică stocul direct în bază) nu produc eroare falsă de concurență din cauza stocului.
-- [ ] Verifică în browser, cu preview-ul actualizat la `http://127.0.0.1:5082/`: formularul de creare fără „Stoc inițial”, produs nou cu stoc 0 în catalog, editorul cu stoc doar afișat, salvarea unei editări fără modificarea stocului, jurnalul creării/editării fără cantitate.
-- [ ] Verifică produsele existente: stocul afișat în catalog, filtrele de stoc și regula de ștergere rămân neschimbate.
-- [ ] Rulează build Release și suita `tests/BlazorStoc.Checks`; actualizează `VALIDARE.md` și `docs/PROJECT_STATE.md`.
-
-### Criterii de acceptare
-
-- Formularul de creare nu conține „Stoc inițial”, iar orice produs nou are stoc 0.
-- Editorul de produs nu permite modificarea manuală a cantității; stocul este afișat numai pentru consultare.
-- Serverul ignoră sau respinge orice cantitate trimisă la creare sau editare; stocul nu poate fi schimbat prin editorul de produs.
-- Stocul produselor existente rămâne neschimbat.
-- O modificare de stoc nu invalidează o editare de produs deschisă în paralel.
-- Jurnalul produsului nu prezintă cantitatea ca valoare introdusă sau modificată de utilizator.
-- Funcționalitatea rămâne asincronă, fără Docker, fără integrare NAS/QNAP și fără fișiere SQL de upgrade separate.
-
 ## Task 1 — Intrări și ieșiri pentru un produs existent
 
-Pagina de mișcări de stoc a unui produs: se deschide prin selectarea produsului din tabelul catalogului, permite înregistrarea intrărilor și ieșirilor, afișează istoricul lor și stocul curent. Depinde de Task 0 (stoc exclusiv prin mișcări) și este prerequisit pentru Task 2 / Subtask 2.4 („Echipamente” citește mișcările asociate proiectului) și înlocuiește aplicația veche `IO.cs` (WinForms, ecranul „Intrări/Ieșiri”).
+Pagina de mișcări de stoc a unui produs: se deschide prin selectarea produsului din tabelul catalogului, permite înregistrarea intrărilor și ieșirilor, afișează istoricul lor și stocul curent. Depinde de taskul finalizat „Stoc exclusiv prin mișcări de intrare și ieșire” (stoc 0 la creare, fără editarea manuală a cantității) și este prerequisit pentru Task 2 / Subtask 2.4 („Echipamente” citește mișcările asociate proiectului) și înlocuiește aplicația veche `IO.cs` (WinForms, ecranul „Intrări/Ieșiri”).
 
 Decizii stabilite cu utilizatorul (24 septembrie 2026):
 
@@ -75,7 +31,7 @@ Decizii stabilite cu utilizatorul (24 septembrie 2026):
 - „Beneficiar” și „Proiect” sunt două căsuțe independente, vizibile numai la ieșire; proiectul poate fi activat numai după beneficiar, este opțional și este limitat la proiectele beneficiarului ales.
 - Stocul este calculat din mișcări și poate deveni negativ; o ieșire care depășește stocul nu este blocată și nu cere avertisment.
 - Descrierea este obligatorie la intrare și la ieșire; data mișcării este independentă de data și ora curentă și poate fi oricând, inclusiv în viitor.
-- Stocul se modifică exclusiv prin mișcările acestui task: Task 0 elimină „Stoc inițial” din crearea produsului (orice produs nou are stoc 0) și editarea manuală a cantității din editorul de produs.
+- Stocul se modifică exclusiv prin mișcările acestui task: taskul finalizat „Stoc exclusiv prin mișcări” a eliminat „Stoc inițial” din crearea produsului (orice produs nou are stoc 0) și editarea manuală a cantității din editorul de produs.
 
 ### Subtask 1.1 — Acces și pagina produsului
 
@@ -402,7 +358,7 @@ Reutilizează infrastructura dialogului de ștergere finalizat și confirmarea c
 
 ## Task 8 — Sincronizare între utilizatori
 
-Se implementează după stabilizarea operațiilor și contractelor de date din Taskurile 0–7. Furnizează canalul de notificare folosit ulterior de mecanismul de lock din Task 9.
+Se implementează după stabilizarea operațiilor și contractelor de date din Taskurile 1–7. Furnizează canalul de notificare folosit ulterior de mecanismul de lock din Task 9.
 
 - [ ] Adaugă un mecanism de înregistrare a modificărilor din baza de date pentru produse, utilizatori, proiecte, observații și fișierele asociate.
 - [ ] Folosește trigger-ele bazei de date numai pentru a scrie evenimente într-un tabel dedicat, astfel încât să fie detectate și modificările făcute de aplicații externe.
@@ -453,6 +409,50 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Stoc exclusiv prin mișcări de intrare și ieșire
+
+Implementat la 24 septembrie 2026 de Claude. Stocul unui produs nu se mai introduce manual. Orice produs nou este creat cu stoc 0, iar orice modificare a stocului se face numai prin mișcări de intrare și ieșire (Task 1). Task 0 elimină din interfață și din persistență căile care setează direct cantitatea și pregătește terenul pentru pagina de mișcări.
+
+Decizii stabilite cu utilizatorul (24 septembrie 2026):
+
+- Formularul de creare a produsului nu mai are câmpul „Stoc inițial”; fiecare produs este creat cu stoc 0.
+- Editorul de produs nu permite editarea manuală a cantității.
+- Produsele existente își păstrează stocul curent; nu se generează mișcări și nu se modifică date.
+- Până la livrarea Task 1 („Intrări și ieșiri pentru un produs existent”), stocul nu poate fi modificat din aplicație; cele două taskuri se livrează în cicluri consecutive.
+
+### Subtask 0.1 — Crearea produsului fără stoc inițial
+
+- [x] Elimină din formularul de creare câmpul „Stoc inițial (bucăți)” și mesajele lui de validare.
+- [x] Creează produsul cu stoc 0 în toate implementările (`DemoProductRepository`, `SqliteProductRepository`, `MariaProductRepository`); serverul nu acceptă și nu folosește o cantitate primită de la client la creare.
+- [x] Elimină din `ProductInput` cantitatea ca valoare introdusă de utilizator și regula `Quantity < 0` (validarea „stoc inițial negativ”); adaptează construirea produsului la stoc 0.
+- [x] Jurnalul creării produsului nu mai prezintă „Cantitate” ca valoare introdusă de utilizator; identificarea produsului rămâne prin cod, categorie și subcategorie.
+- [x] Verifică toate căile de creare (formular, seed-ul modului demonstrativ, teste) și adaptează-le astfel încât niciuna să nu seteze un stoc diferit de zero pentru produse noi.
+
+### Subtask 0.2 — Editarea produsului fără cantitate editabilă
+
+- [x] Elimină câmpul editabil „Cantitate (bucăți)” din editorul de produs; afișează stocul curent numai pentru consultare (text, nu câmp de introducere), cu mențiunea că se modifică prin intrări și ieșiri.
+- [x] Actualizarea produsului (SQLite, MariaDB, modul demonstrativ) nu mai scrie cantitatea (`quantity` / `produs_cantitate`) și nu acceptă o cantitate primită de la client; stocul existent rămâne neschimbat la salvare.
+- [x] `ProductRules.CheckCurrent` compară acum și `Quantity`; exclude stocul din comparație (și din verificarea de versiune unde este cazul), astfel încât o modificare a stocului, prezentă sau viitoare, să nu invalideze un formular de editare deschis în paralel.
+- [x] Jurnalul editării produsului nu mai conține modificări de cantitate (`ProductInput`: `new("Cantitate", …)`).
+- [x] Păstrează regula de ștergere existentă: un produs se șterge numai cu stoc zero și fără mișcări asociate; snapshot-ul arhivei produsului păstrează cantitatea ca dată istorică.
+
+### Subtask 0.3 — Verificări
+
+- [x] Teste: crearea unui produs produce stoc 0 indiferent de datele trimise; editarea nu schimbă stocul; două sesiuni (una editează produsul, alta modifică stocul direct în bază) nu produc eroare falsă de concurență din cauza stocului. Verificat pe modul demonstrativ și SQLite; MariaDB nu a fost testat pe un server real.
+- [x] Verificat în browser, cu preview-ul actualizat la `http://127.0.0.1:5082/`: formularul de creare fără „Stoc inițial” (cu nota despre stoc 0) și editorul cu stocul afișat numai pentru consultare, fără câmp de cantitate. Salvarea editării și jurnalul creării/editării fără cantitate sunt acoperite de verificările automate, nu de un test manual în browser.
+- [x] Verifică produsele existente: stocul afișat în catalog, filtrele de stoc și regula de ștergere rămân neschimbate.
+- [x] Rulează build Release și suita `tests/BlazorStoc.Checks`; actualizează `VALIDARE.md` și `docs/PROJECT_STATE.md`.
+
+### Criterii de acceptare
+
+- Formularul de creare nu conține „Stoc inițial”, iar orice produs nou are stoc 0.
+- Editorul de produs nu permite modificarea manuală a cantității; stocul este afișat numai pentru consultare.
+- Serverul ignoră sau respinge orice cantitate trimisă la creare sau editare; stocul nu poate fi schimbat prin editorul de produs.
+- Stocul produselor existente rămâne neschimbat.
+- O modificare de stoc nu invalidează o editare de produs deschisă în paralel.
+- Jurnalul produsului nu prezintă cantitatea ca valoare introdusă sau modificată de utilizator.
+- Funcționalitatea rămâne asincronă, fără Docker, fără integrare NAS/QNAP și fără fișiere SQL de upgrade separate.
 
 ## Finalizat — Cod produs
 

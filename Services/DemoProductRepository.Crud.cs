@@ -25,7 +25,7 @@ public sealed partial class DemoProductRepository
             var group = ResolveGroup(value.Category, value.Subcategory);
             var (category, subcategory) = (group.Category, group.Subcategory);
             (categoryCreated, subcategoryCreated) = (group.CategoryCreated, group.SubcategoryCreated);
-            product = new Product(store.NextId++, category, subcategory, value.Name, value.Description, value.Quantity);
+            product = new Product(store.NextId++, category, subcategory, value.Name, value.Description, 0);
             products.Add(product);
         }
         await RecordCreatedGroupsAsync(product.Category, product.Subcategory, categoryCreated, subcategoryCreated, cancellationToken);
@@ -42,12 +42,13 @@ public sealed partial class DemoProductRepository
         bool categoryCreated, subcategoryCreated;
         lock (gate)
         {
-            ProductRules.CheckCurrent(products.SingleOrDefault(p => p.Id == original.Id), original);
+            var current = products.SingleOrDefault(p => p.Id == original.Id);
+            ProductRules.CheckCurrent(current, original);
             EnsureUniqueProductName(value.Name, original.Id);
             var group = ResolveGroup(value.Category, value.Subcategory);
             var (category, subcategory) = (group.Category, group.Subcategory);
             (categoryCreated, subcategoryCreated) = (group.CategoryCreated, group.SubcategoryCreated);
-            product = new Product(original.Id, category, subcategory, value.Name, value.Description, value.Quantity, checked(original.Version + 1));
+            product = new Product(original.Id, category, subcategory, value.Name, value.Description, current!.Quantity, checked(original.Version + 1));
             products[products.FindIndex(p => p.Id == original.Id)] = product;
         }
         await RecordCreatedGroupsAsync(product.Category, product.Subcategory, categoryCreated, subcategoryCreated, cancellationToken);
@@ -66,8 +67,9 @@ public sealed partial class DemoProductRepository
         {
             lock (gate)
             {
-                ProductRules.CheckCurrent(products.SingleOrDefault(p => p.Id == original.Id), original);
-                ProductRules.CheckDelete(original, false);
+                var current = products.SingleOrDefault(p => p.Id == original.Id);
+                ProductRules.CheckCurrent(current, original);
+                ProductRules.CheckDelete(current!, false);
                 products.RemoveAll(p => p.Id == original.Id);
             }
             await AuditRecorder.RecordDeleteAsync(auditTrail, operation, token);
