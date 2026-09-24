@@ -48,20 +48,22 @@ else
     <div class="category-management-list">
         @foreach (var category in Categories)
         {
-            <section class="catalog category-management-card" aria-labelledby="@CategoryId(category)">
-                <div class="catalog-heading">
-                    <button type="button"
-                            class="category-disclosure"
-                            aria-expanded="@IsCategoryExpanded(category)"
-                            aria-controls="@CategoryContentId(category)"
-                            @onclick="() => ToggleCategory(category)">
-                        <span class="category-disclosure-text"><span class="category-title" id="@CategoryId(category)">@category</span><small>@SubcategoryCountLabel(category)</small><small>@ProductCount(category) produse asociate</small></span>
-                    </button>
-                    <div class="heading-actions"><button class="primary" disabled="@(saving || IsEditing)" @onclick="() => CreateSubcategory(category)">+ Adaugă subcategorie</button><button class="soft-success" disabled="@(saving || IsEditing)" @onclick="() => EditCategory(category)">Editează categoria</button></div>
-                </div>
-                @if (IsCategoryExpanded(category))
-                {
-                    <div id="@CategoryContentId(category)">
+            <CollapsibleSection Id="@CategoryId(category)"
+                                RootClass="catalog category-management-card"
+                                HeaderRowClass="catalog-heading collapsible-header"
+                                ToggleClass="category-disclosure"
+                                ActionsClass="heading-actions"
+                                ContentClass="category-management-content"
+                                Expanded="@IsCategoryExpanded(category)"
+                                ExpandedChanged="@(expanded => SetCategoryExpanded(category, expanded))">
+                <Header>
+                    <span class="category-disclosure-text"><span class="category-title">@category</span><small>@SubcategoryCountLabel(category)</small><small>@ProductCount(category) produse asociate</small></span>
+                </Header>
+                <Actions>
+                    <button class="primary" disabled="@(saving || IsEditing)" @onclick="() => CreateSubcategory(category)">+ Adaugă subcategorie</button>
+                    <button class="soft-success" disabled="@(saving || IsEditing)" @onclick="() => EditCategory(category)">Editează categoria</button>
+                </Actions>
+                <ChildContent>
                     @if (Subcategories(category).Count == 0)
                     {
                         <div class="empty-state compact"><p>Categoria nu are subcategorii.</p></div>
@@ -75,9 +77,8 @@ else
                         }
                         </tbody></table></div>
                     }
-                    </div>
-                }
-            </section>
+                </ChildContent>
+            </CollapsibleSection>
         }
     </div>
 }
@@ -131,13 +132,13 @@ else
     private int ProductCount(ProductGroup group) => products.Count(product =>
         string.Equals(product.Category, group.Category, StringComparison.OrdinalIgnoreCase) &&
         string.Equals(product.Subcategory, group.Subcategory, StringComparison.OrdinalIgnoreCase));
-    private static string CategoryId(string category) => $"category-{TextNormalization.UniquenessKey(category).GetHashCode():x}";
-    private static string CategoryContentId(string category) => $"{CategoryId(category)}-content";
+    private static string CategoryId(string category) => $"category-{Uri.EscapeDataString(TextNormalization.UniquenessKey(category))}";
     private bool IsCategoryExpanded(string category) => expandedCategories.Contains(TextNormalization.UniquenessKey(category));
-    private void ToggleCategory(string category)
+    private void SetCategoryExpanded(string category, bool expanded)
     {
         var key = TextNormalization.UniquenessKey(category);
-        if (!expandedCategories.Add(key)) expandedCategories.Remove(key);
+        if (expanded) expandedCategories.Add(key);
+        else expandedCategories.Remove(key);
     }
 
     private void CreateCategory() { CancelEdit(); creatingCategory = true; categoryName = ""; notice = null; }

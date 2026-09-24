@@ -2,7 +2,7 @@
 
 Actualizat de: **Codex**
 Data: **24 septembrie 2026**
-Stare ciclu: **pregătit pentru predare către Claude după commitul curent**
+Stare ciclu: **Task 0 finalizat; pregătit pentru următorul ciclu Codex după commitul curent**
 
 ## Rezumat
 
@@ -10,22 +10,26 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 
 Sunt implementate CRUD-urile pentru produse, beneficiari și utilizatori, autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse și preview-ul local.
 
-Proiectul folosește acum un repository Git local și un protocol strict secvențial Codex–Claude. Fiecare agent începe numai dintr-un handoff curat, modifică, verifică, actualizează starea și jurnalul, creează propriul commit, predă celuilalt agent și se oprește.
+Proiectul folosește un repository Git local și cicluri controlate de modificare, verificare, documentare și commit. Colaborarea cu Claude este suspendată la cererea utilizatorului; modul curent este `codex_only`, iar Claude rămâne în standby.
 
 ## Ultimele modificări funcționale
 
-- Categoriile din pagina de administrare pornesc restrânse și afișează/ascund subcategoriile prin apăsarea antetului.
-- Secțiunea „Administrare” din meniul lateral folosește collapse nativ accesibil și păstrează stilul meniului.
+- Task 0 este finalizat prin componenta reutilizabilă `CollapsibleSection`, bazată pe `details/summary`, cu identificatori stabili, `aria-expanded`, `aria-controls`, regiuni etichetate și suport mouse, touch, Enter și Space.
+- Secțiunea „Administrare”, categoriile din meniul produselor și categoriile din pagina de administrare folosesc aceeași componentă, păstrând stilul fiecărei zone.
+- Ramura activă din meniul produselor se deschide automat; extinderea unei categorii aplică filtrul, iar restrângerea revine la catalogul complet.
+- Categoriile din pagina de administrare pornesc restrânse, își păstrează starea la actualizări, iar acțiunile de adăugare și editare funcționează independent de collapse.
+- Interfața comună are feedback pentru hover, focus și disabled, iar la lățimi sub 900 px meniul și cardurile se reașază fără depășire orizontală.
 - Numărul subcategoriilor este afișat textual în același stil ca numărul produselor asociate.
 - Denumirile și codurile obiectelor sunt curățate la creare și editare: spațiile exterioare sunt eliminate, iar secvențele de spații sunt reduse la unul singur.
 - Categoriile și subcategoriile pot fi create numai în pagina lor de administrare; formularul produsului selectează doar valori existente.
-- `TODO.md` are ca priorități active Task 0 pentru collapse unitar, Task 1 pentru „Cod produs” și Task 2 pentru proiecte asociate beneficiarilor.
+- `TODO.md` arhivează Task 0 ca finalizat; următoarele priorități active sunt Task 1 pentru „Cod produs” și Task 2 pentru proiecte asociate beneficiarilor.
 
 ## Validare cunoscută
 
-- Ultima suită completă `BlazorStoc.Checks` a trecut integral după introducerea normalizării spațiilor.
-- Ultimul build Release a reușit cu 0 avertismente și 0 erori.
-- Preview-ul se rulează la `http://127.0.0.1:5082/` și trebuie repornit după schimbările de cod.
+- Suita completă `BlazorStoc.Checks` a trecut integral după implementarea componentei comune.
+- Buildul Release a reușit cu 0 avertismente și 0 erori.
+- Verificarea în browser a confirmat stările inițiale, click, Enter, Space, actualizarea ARIA, navigarea filtrată, acțiunile independente și afișarea fără overflow la 800 px.
+- Preview-ul actualizat rulează la `http://127.0.0.1:5082/categorii`.
 
 ## Reguli active ale proiectului
 
@@ -39,7 +43,7 @@ Proiectul folosește acum un repository Git local și un protocol strict secven�
 
 ## Următorul pas
 
-Următorul agent este **Claude**. Va prelua numai după commitul Codex și după verificarea unui working tree curat. Taskul concret este stabilit de următorul prompt al utilizatorului; dacă nu este specificat, prioritatea curentă este Task 0 din `TODO.md`.
+Următorul agent este **Codex**. Claude rămâne în standby până la reactivarea explicită a colaborării. Dacă utilizatorul nu stabilește altă prioritate, următorul element activ este Task 1 — „Cod produs” din `TODO.md`.
 
 ## Fișiere de orientare
 

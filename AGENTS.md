@@ -1,13 +1,13 @@
 # Instrucțiuni pentru Codex
 
-Acest proiect folosește colaborare strict secvențială între Codex și Claude. Codex nu lucrează niciodată simultan cu Claude.
+Proiectul este momentan în modul `codex_only`; Claude este în standby. Codex lucrează în cicluri succesive de modificare, verificare, documentare și commit. Colaborarea secvențială cu Claude se reactivează numai la cererea explicită a utilizatorului.
 
 ## Înainte de orice modificare
 
 1. Citește `docs/SEQUENTIAL_COLLABORATION.md`, `docs/PROJECT_STATE.md`, `TODO.md` și ultimele intrări din `docs/AGENT_CHANGELOG.md`.
 2. Rulează `git status --short` și `git log -1 --oneline`.
 3. Working tree-ul trebuie să fie curat. Dacă există modificări necomise, nu le elimina și nu începe alt task; urmează procedura de recuperare din protocol.
-4. Verifică `.collaboration/state.json`. Codex poate începe doar când `status` este `ready_for_handoff` și `nextAgent` este `codex`, exceptând cazul în care utilizatorul cere explicit schimbarea ordinii.
+4. Verifică `.collaboration/state.json`. Codex poate începe doar când `status` este `ready_for_handoff` și `nextAgent` este `codex`.
 5. Pornește ciclul cu:
 
    ```powershell
@@ -27,7 +27,7 @@ Acest proiect folosește colaborare strict secvențială între Codex și Claude
 
 1. Rulează verificările adecvate și inspectează toate modificările.
 2. Actualizează `docs/PROJECT_STATE.md` cu starea efectivă, validările, riscurile și următorul pas.
-3. Încheie ciclul cu o descriere completă; scriptul actualizează jurnalul, face commit și predă lui Claude:
+3. Încheie ciclul cu o descriere completă; scriptul actualizează jurnalul, face commit și pregătește următorul ciclu Codex cât timp modul `codex_only` este activ:
 
    ```powershell
    .\tools\agent-cycle.ps1 finish -Agent codex `

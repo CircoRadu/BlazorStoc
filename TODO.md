@@ -13,63 +13,12 @@
 
 Taskurile sunt grupate în patru etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
 
-1. **Interacțiuni comune:** Task 0 definește comportamentul unitar de extindere și restrângere folosit de toate structurile ierarhice actuale și viitoare.
+1. **Interacțiuni comune finalizate:** componenta comună de extindere și restrângere este implementată și devine contract obligatoriu pentru structurile ierarhice actuale și viitoare.
 2. **Stabilizarea entităților și formularelor:** Task 1 definitivează identificarea produsului, Task 2 introduce proiectele și relațiile lor folosind componenta din Task 0, iar Task 4 uniformizează validarea beneficiarilor.
 3. **Navigare și dialoguri comune:** Taskurile 1 și 2 → Task 3; Taskurile 1, 2 și 4 → Task 5; Taskurile 1 și 5 → Task 6; Task 5 și dialogurile comune finalizate → Task 7.
-4. **Colaborare în timp real:** Taskurile 0–7 → Task 8 → Task 9.
+4. **Colaborare în timp real:** Taskurile 1–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
-Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate în paralel numai dacă nu modifică aceleași repository-uri, formulare sau contracte de audit.
-
-
-## Task 0 — Collapse unitar pentru elementele cu structură subordonată
-
-Toate elementele actuale și viitoare care afișează elemente subordonate folosesc aceeași interacțiune de extindere și restrângere, după modelul funcțional al secțiunii „Administrare” din meniul lateral.
-
-### Subtask 0.1 — Componentă și contract vizual comun
-
-- [ ] Creează o componentă reutilizabilă pentru elementele extensibile, bazată pe comportamentul nativ accesibil al browserului sau pe un mecanism Blazor echivalent stabil.
-- [ ] Definește un contract comun pentru antet, conținut subordonat, starea extinsă/restrânsă și identificatorii necesari accesibilității.
-- [ ] Păstrează stilul nivelului în care componenta este folosită, fără a transforma toate elementele în carduri sau meniuri identice vizual.
-- [ ] Folosește un indicator discret și unitar al stării, integrat în antet; nu afișa indicatorul într-un buton sau badge separat.
-- [ ] Aplică stări unitare pentru normal, hover, activ, focus și disabled, folosind nuanțele existente ale aplicației.
-- [ ] Întreaga zonă principală a antetului poate fi apăsată pentru extindere sau restrângere.
-- [ ] Butoanele și linkurile de acțiune aflate în același antet rămân independente și nu schimbă accidental starea collapse.
-
-### Subtask 0.2 — Comportament și accesibilitate
-
-- [ ] Permite operarea completă cu mouse, touch și tastatură, inclusiv Enter și Space.
-- [ ] Expune corect starea prin `aria-expanded`, relația prin `aria-controls` și etichete accesibile pentru conținutul subordonat.
-- [ ] La restrângere, elimină conținutul ascuns din ordinea de focus.
-- [ ] Păstrează starea deschisă a ramurii care conține pagina sau selecția activă.
-- [ ] Pentru listele fără selecție activă, folosește starea inițială definită de ecran; pagina de administrare a categoriilor continuă să pornească cu toate categoriile restrânse.
-- [ ] Păstrează starea utilizatorului pe durata aceleiași pagini și nu o resetează la actualizări de date care nu schimbă structura relevantă.
-- [ ] Asigură comportament corect pentru niveluri imbricate, fără ca extinderea unui părinte să modifice automat frații săi.
-
-### Subtask 0.3 — Aplicare în interfața actuală și viitoare
-
-- [ ] Migrează secțiunea „Administrare” din meniul lateral la componenta comună fără schimbarea aspectului actual.
-- [ ] Aplică mecanismul categoriilor cu subcategorii din meniul produselor.
-- [ ] Aplică mecanismul categoriilor din pagina de administrare a categoriilor, păstrând acțiunile și tabelul subcategoriilor existente.
-- [ ] Aplică mecanismul oricărei alte liste sau secțiuni existente care afișează copii, detalii ori acțiuni subordonate.
-- [ ] Folosește obligatoriu aceeași componentă pentru ierarhiile viitoare beneficiar–proiect și proiect–observații din Task 2, dacă acestea sunt prezentate extensibil în aceeași pagină.
-- [ ] Documentează componenta drept regulă pentru toate entitățile adăugate ulterior care au elemente subordonate.
-- [ ] Evită implementări locale paralele de collapse și elimină stilurile sau logica redundantă după migrare.
-
-### Subtask 0.4 — Verificări
-
-- [ ] Verifică stările inițiale, extinderea și restrângerea pentru fiecare utilizare existentă.
-- [ ] Verifică faptul că acțiunile din antet nu declanșează collapse și că linkurile subordonate navighează corect.
-- [ ] Verifică accesibilitatea cu tastatura și atributele ARIA pentru stările deschis și închis.
-- [ ] Verifică aspectul pe dimensiuni desktop și mobile și previne depășirea sau suprapunerea conținutului.
-- [ ] Adaugă verificări de regresie pentru ramura activă, actualizarea datelor și structurile imbricate.
-
-### Criterii de acceptare
-
-- Orice element cu elemente subordonate poate fi extins și restrâns prin aceeași interacțiune.
-- Stilul rămâne coerent cu zona în care elementul este afișat și oferă feedback vizual clar la hover și focus.
-- Starea activă este vizibilă, iar ramura care conține selecția curentă rămâne deschisă.
-- Componenta funcționează cu mouse, touch și tastatură și expune corect starea tehnologiilor asistive.
-- Adăugarea unei noi ierarhii folosește componenta comună, fără implementarea unei noi logici locale de collapse.
+Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri Codex succesive; Claude rămâne în standby până la reactivarea explicită a colaborării.
 
 
 ## Task 1 — Cod produs
@@ -347,6 +296,56 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Collapse unitar pentru elementele cu structură subordonată
+
+Implementat la 24 septembrie 2026. Toate elementele actuale și viitoare care afișează elemente subordonate folosesc aceeași interacțiune de extindere și restrângere, după modelul funcțional al secțiunii „Administrare” din meniul lateral.
+
+### Subtask 0.1 — Componentă și contract vizual comun
+
+- [x] Creează o componentă reutilizabilă pentru elementele extensibile, bazată pe comportamentul nativ accesibil al browserului sau pe un mecanism Blazor echivalent stabil.
+- [x] Definește un contract comun pentru antet, conținut subordonat, starea extinsă/restrânsă și identificatorii necesari accesibilității.
+- [x] Păstrează stilul nivelului în care componenta este folosită, fără a transforma toate elementele în carduri sau meniuri identice vizual.
+- [x] Folosește un indicator discret și unitar al stării, integrat în antet; nu afișa indicatorul într-un buton sau badge separat.
+- [x] Aplică stări unitare pentru normal, hover, activ, focus și disabled, folosind nuanțele existente ale aplicației.
+- [x] Întreaga zonă principală a antetului poate fi apăsată pentru extindere sau restrângere.
+- [x] Butoanele și linkurile de acțiune aflate în același antet rămân independente și nu schimbă accidental starea collapse.
+
+### Subtask 0.2 — Comportament și accesibilitate
+
+- [x] Permite operarea completă cu mouse, touch și tastatură, inclusiv Enter și Space.
+- [x] Expune corect starea prin `aria-expanded`, relația prin `aria-controls` și etichete accesibile pentru conținutul subordonat.
+- [x] La restrângere, elimină conținutul ascuns din ordinea de focus.
+- [x] Păstrează starea deschisă a ramurii care conține pagina sau selecția activă.
+- [x] Pentru listele fără selecție activă, folosește starea inițială definită de ecran; pagina de administrare a categoriilor continuă să pornească cu toate categoriile restrânse.
+- [x] Păstrează starea utilizatorului pe durata aceleiași pagini și nu o resetează la actualizări de date care nu schimbă structura relevantă.
+- [x] Asigură comportament corect pentru niveluri imbricate, fără ca extinderea unui părinte să modifice automat frații săi.
+
+### Subtask 0.3 — Aplicare în interfața actuală și viitoare
+
+- [x] Migrează secțiunea „Administrare” din meniul lateral la componenta comună fără schimbarea aspectului actual.
+- [x] Aplică mecanismul categoriilor cu subcategorii din meniul produselor.
+- [x] Aplică mecanismul categoriilor din pagina de administrare a categoriilor, păstrând acțiunile și tabelul subcategoriilor existente.
+- [x] Aplică mecanismul oricărei alte liste sau secțiuni existente care afișează copii, detalii ori acțiuni subordonate.
+- [x] Folosește obligatoriu aceeași componentă pentru ierarhiile viitoare beneficiar–proiect și proiect–observații din Task 2, dacă acestea sunt prezentate extensibil în aceeași pagină.
+- [x] Documentează componenta drept regulă pentru toate entitățile adăugate ulterior care au elemente subordonate.
+- [x] Evită implementări locale paralele de collapse și elimină stilurile sau logica redundantă după migrare.
+
+### Subtask 0.4 — Verificări
+
+- [x] Verifică stările inițiale, extinderea și restrângerea pentru fiecare utilizare existentă.
+- [x] Verifică faptul că acțiunile din antet nu declanșează collapse și că linkurile subordonate navighează corect.
+- [x] Verifică accesibilitatea cu tastatura și atributele ARIA pentru stările deschis și închis.
+- [x] Verifică aspectul pe dimensiuni desktop și mobile și previne depășirea sau suprapunerea conținutului.
+- [x] Adaugă verificări de regresie pentru ramura activă, actualizarea datelor și structurile imbricate.
+
+### Criterii de acceptare
+
+- Orice element cu elemente subordonate poate fi extins și restrâns prin aceeași interacțiune.
+- Stilul rămâne coerent cu zona în care elementul este afișat și oferă feedback vizual clar la hover și focus.
+- Starea activă este vizibilă, iar ramura care conține selecția curentă rămâne deschisă.
+- Componenta funcționează cu mouse, touch și tastatură și expune corect starea tehnologiilor asistive.
+- Adăugarea unei noi ierarhii folosește componenta comună, fără implementarea unei noi logici locale de collapse.
 
 ## Finalizat — Crearea categoriilor exclusiv din pagina de administrare
 

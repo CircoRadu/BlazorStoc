@@ -2,7 +2,7 @@
 
 ## Colaborare Codex–Claude
 
-Dezvoltarea folosește un flux strict secvențial: un singur agent modifică proiectul, verifică, documentează, face commit și se oprește înainte ca celălalt agent să preia. Protocolul complet este în [`docs/SEQUENTIAL_COLLABORATION.md`](docs/SEQUENTIAL_COLLABORATION.md), iar starea curentă pentru handoff este în [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md).
+Dezvoltarea folosește cicluri controlate: agentul activ modifică proiectul, verifică, documentează, face commit și se oprește. Momentan este activ numai Codex, iar Claude rămâne în standby până la reactivarea explicită a colaborării. Protocolul complet este în [`docs/SEQUENTIAL_COLLABORATION.md`](docs/SEQUENTIAL_COLLABORATION.md), iar starea curentă este în [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md).
 
 Migrarea ESP_Stoc: CRUD produse, beneficiari și utilizatori web, două niveluri de acces, catalog, căutare, filtre, paginare și detalii. Interfața este în română, exclusiv pentru browser pe calculator (lățime recomandată minimum 1100 px). Versiunea mobilă nu face parte din această etapă.
 

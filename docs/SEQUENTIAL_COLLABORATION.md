@@ -1,5 +1,9 @@
 # Colaborare secvențială Codex–Claude
 
+## Stare operațională curentă
+
+Colaborarea cu Claude este suspendată la cererea utilizatorului. Modul activ este `codex_only`: Claude rămâne în standby, iar fiecare commit Codex pregătește următorul ciclu tot pentru Codex. Reactivarea alternanței Codex–Claude se face numai printr-o cerere explicită a utilizatorului și actualizarea controlată a `.collaboration/state.json`.
+
 ## Principiul obligatoriu
 
 La un moment dat lucrează un singur agent. Fluxul este:

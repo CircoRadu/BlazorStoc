@@ -107,7 +107,7 @@ switch ($Action) {
         Invoke-Git -Arguments @('add', '-A')
         Invoke-Git -Arguments @('diff', '--cached', '--check')
 
-        $nextAgent = if ($Agent -eq 'codex') { 'claude' } else { 'codex' }
+        $nextAgent = if ($state.mode -eq 'codex_only') { 'codex' } elseif ($Agent -eq 'codex') { 'claude' } else { 'codex' }
         $completed = [DateTime]::UtcNow.ToString('o')
         $state.status = 'ready_for_handoff'
         $state.activeAgent = $null

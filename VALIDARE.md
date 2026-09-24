@@ -64,3 +64,18 @@ dotnet run --project tests/BlazorStoc.Checks -c Release -- --http http://127.0.0
 ```
 
 Portul trebuie să coincidă cu portul instanței de test. Verificările HTTP refuză destinații care nu sunt localhost.
+
+# Verificare Task 0 — collapse unitar
+
+Componenta comună `CollapsibleSection` trebuie verificată după orice modificare a meniului lateral sau a unei ierarhii din interfață:
+
+1. Pe pagina principală, secțiunea „Administrare” pornește închisă și răspunde identic la click, Enter și Space; `aria-expanded` alternează între `false` și `true`.
+2. Pe o rută de administrare, secțiunea „Administrare” pornește deschisă și păstrează vizibilă ramura activă.
+3. În meniul produselor, deschiderea unei categorii aplică filtrul categoriei și afișează subcategoriile; restrângerea categoriei active revine la toate produsele.
+4. În administrarea categoriilor, toate categoriile pornesc închise. Deschiderea uneia nu modifică starea celorlalte.
+5. Butoanele „Adaugă subcategorie” și „Editează categoria” nu deschid și nu închid secțiunea părinte.
+6. Conținutul unei secțiuni închise nu intră în ordinea de focus, iar antetul expune `aria-controls` către regiunea subordonată.
+7. La lățimi de 800 px și la dimensiunea desktop implicită, pagina nu produce depășire orizontală, iar acțiunile rămân accesibile.
+8. Pentru ierarhii imbricate viitoare, fiecare nivel primește un `Id` unic și o instanță proprie `CollapsibleSection`; starea unui nivel nu trebuie să modifice frații.
+
+Validarea din 24 septembrie 2026 a acoperit manual toate cele trei utilizări existente, inclusiv mouse, Enter, Space, ARIA, filtrarea catalogului, independența acțiunilor și viewportul de 800 px. Buildul Release și suita `BlazorStoc.Checks` au trecut integral.

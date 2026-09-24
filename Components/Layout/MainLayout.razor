@@ -16,16 +16,22 @@
             @foreach (var category in categories)
             {
                 var isSelected = string.Equals(category, selectedCategory, StringComparison.OrdinalIgnoreCase);
-                <a class="nav-item category-item @(isSelected ? "active" : "")" href="@ProductUrl(category)"><span>▪</span> @category <span class="nav-arrow">@(isSelected ? "⌄" : "→")</span></a>
-                @if (isSelected)
-                {
-                    <div class="category-submenu" aria-label="Subcategorii @category">
+                <CollapsibleSection Id="@ProductCategoryId(category)"
+                                    RootClass="product-category-menu"
+                                    HeaderRowClass="collapsible-header"
+                                    ToggleClass="@($"nav-item category-item {(isSelected ? "active" : "")}")"
+                                    ContentClass="category-submenu"
+                                    Expanded="@isSelected"
+                                    OpenHref="@ProductUrl(category)"
+                                    CloseHref="/produse">
+                    <Header><span>▪</span> @category</Header>
+                    <ChildContent>
                         @foreach (var subcategory in Subcategories(category))
                         {
                             <a class="@(string.Equals(subcategory, selectedSubcategory, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@ProductUrl(category, subcategory)">@subcategory</a>
                         }
-                    </div>
-                }
+                    </ChildContent>
+                </CollapsibleSection>
             }
         }
         else
@@ -33,14 +39,19 @@
             <p class="nav-label">SPAȚIU DE LUCRU</p>
             <NavLink class="nav-item" href="/" Match="NavLinkMatch.All"><span>⌂</span> Pagina principală <span class="nav-arrow">→</span></NavLink>
             <NavLink class="nav-item" href="/produse" Match="NavLinkMatch.Prefix"><span>▦</span> Produse și stocuri <span class="nav-arrow">→</span></NavLink>
-            <details class="administration-menu" open="@administrationSection">
-                <summary class="nav-item administration-parent @(administrationSection ? "active" : "")"><span>⚙</span> Administrare <span class="nav-arrow administration-arrow" aria-hidden="true"></span></summary>
-                <div id="administration-submenu" class="administration-submenu" aria-label="Administrare">
+            <CollapsibleSection Id="administration-menu"
+                                RootClass="administration-menu"
+                                HeaderRowClass="collapsible-header"
+                                ToggleClass="@($"nav-item administration-parent {(administrationSection ? "active" : "")}")"
+                                ContentClass="administration-submenu"
+                                Expanded="@administrationExpanded">
+                <Header><span>⚙</span> Administrare</Header>
+                <ChildContent>
                     <NavLink href="/categorii" Match="NavLinkMatch.Prefix">Categorii</NavLink>
                     <NavLink href="/beneficiari" Match="NavLinkMatch.Prefix">Beneficiari</NavLink>
                     <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView>
-                </div>
-            </details>
+                </ChildContent>
+            </CollapsibleSection>
             <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>@(Mode.IsDemo ? "Date demonstrative" : "BlazorStoc · MariaDB")</small></div>
@@ -52,7 +63,7 @@
 @code {
     private IReadOnlyList<BlazorStoc.Services.ProductGroup> groups = Array.Empty<BlazorStoc.Services.ProductGroup>();
     private List<string> categories = [];
-    private bool productSection, administrationSection;
+    private bool productSection, administrationSection, administrationExpanded;
     private string selectedCategory = "", selectedSubcategory = "";
     private readonly CancellationTokenSource lifetime = new();
 
@@ -86,6 +97,7 @@
         administrationSection = uri.AbsolutePath.StartsWith("/categorii", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/beneficiari", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase);
+        if (administrationSection) administrationExpanded = true;
         var query = QueryHelpers.ParseQuery(uri.Query);
         selectedCategory = productSection && query.TryGetValue("categorie", out var categoryValue) ? categoryValue.ToString() : "";
         selectedSubcategory = productSection && query.TryGetValue("subcategorie", out var subcategoryValue) ? subcategoryValue.ToString() : "";
@@ -109,6 +121,8 @@
         var url = $"/produse?categorie={Uri.EscapeDataString(category)}";
         return string.IsNullOrWhiteSpace(subcategory) ? url : $"{url}&subcategorie={Uri.EscapeDataString(subcategory)}";
     }
+
+    private static string ProductCategoryId(string category) => $"product-category-{Uri.EscapeDataString(BlazorStoc.Services.TextNormalization.UniquenessKey(category))}";
 
     public void Dispose()
     {

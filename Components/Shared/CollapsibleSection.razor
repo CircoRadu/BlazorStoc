@@ -1,0 +1,68 @@
+<div class="@RootClass" data-collapsible-container>
+    <details class="collapsible-details"
+             open="@isExpanded"
+             data-collapsible-section
+             data-expanded="@isExpanded.ToString().ToLowerInvariant()"
+             data-collapsible-open-href="@OpenHref"
+             data-collapsible-close-href="@CloseHref">
+        <summary id="@ToggleId"
+                 class="@HeaderRowClass"
+                 role="button"
+                 aria-expanded="@isExpanded.ToString().ToLowerInvariant()"
+                 aria-controls="@ContentId"
+                 aria-disabled="@Disabled.ToString().ToLowerInvariant()"
+                 tabindex="@(Disabled ? "-1" : null)"
+                 @onclick="ToggleAsync">
+            <span class="@ToggleClass">
+                @Header
+                <span class="collapsible-indicator @IndicatorClass" aria-hidden="true"></span>
+            </span>
+        </summary>
+        <div id="@ContentId" class="@ContentClass" role="region" aria-labelledby="@ToggleId">
+            @ChildContent
+        </div>
+    </details>
+    @if (Actions is not null)
+    {
+        <div class="@ActionsClass">@Actions</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = "collapsible";
+    [Parameter, EditorRequired] public RenderFragment Header { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = default!;
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public bool Expanded { get; set; }
+    [Parameter] public EventCallback<bool> ExpandedChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? OpenHref { get; set; }
+    [Parameter] public string? CloseHref { get; set; }
+    [Parameter] public string RootClass { get; set; } = "collapsible-section";
+    [Parameter] public string HeaderRowClass { get; set; } = "collapsible-header";
+    [Parameter] public string ToggleClass { get; set; } = "collapsible-toggle";
+    [Parameter] public string ActionsClass { get; set; } = "collapsible-actions";
+    [Parameter] public string ContentClass { get; set; } = "collapsible-content";
+    [Parameter] public string IndicatorClass { get; set; } = "";
+
+    private bool initialized, isExpanded, previousExpanded;
+    private string ToggleId => $"{Id}-toggle";
+    private string ContentId => $"{Id}-content";
+
+    protected override void OnParametersSet()
+    {
+        if (!initialized || Expanded != previousExpanded)
+        {
+            isExpanded = Expanded;
+            previousExpanded = Expanded;
+            initialized = true;
+        }
+    }
+
+    private async Task ToggleAsync()
+    {
+        if (Disabled) return;
+        isExpanded = !isExpanded;
+        await ExpandedChanged.InvokeAsync(isExpanded);
+    }
+}
