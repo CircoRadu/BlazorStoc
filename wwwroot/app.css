@@ -191,3 +191,54 @@
     text-align:center;
 }
 .administration-parent { margin-top:0; }
+
+/* Pagina de intrări/ieșiri a produsului. */
+.movement-layout { display:grid; grid-template-columns:minmax(260px,340px) 1fr; gap:20px; margin-bottom:20px; align-items:start; }
+.movement-card { background:white; border:1px solid var(--line); border-radius:10px; padding:20px 24px; }
+.movement-card h2 { font-size:15px; margin:0 0 14px; }
+.movement-facts { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0 0 16px; font-size:13px; }
+.movement-facts dt { color:#60766c; }
+.movement-facts dd { margin:0; font-weight:600; overflow-wrap:anywhere; }
+.movement-product-media { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+.movement-image { flex:0 0 140px; width:140px; height:140px; padding:4px; }
+.movement-image img { width:100%; height:100%; object-fit:contain; }
+.movement-actions .row-action { font-size:12px; font-weight:650; padding:5px 8px; }
+.movement-actions .row-action:hover { background:#f2f6f4; border-radius:5px; }
+.movement-product-actions { display:flex; flex-direction:column; gap:8px; }
+.movement-link-danger { text-decoration:none; text-align:center; display:inline-block; }
+.movement-form fieldset { border:0; padding:0; margin:0; display:grid; gap:16px; }
+.movement-form label, .movement-dialog label { display:block; font-size:13px; font-weight:600; }
+.movement-form input:not([type=checkbox]):not([type=radio]), .movement-form textarea, .movement-form select,
+.movement-dialog input:not([type=checkbox]):not([type=radio]), .movement-dialog textarea, .movement-dialog select { display:block; width:100%; margin-top:8px; font:inherit; border:1px solid #e0e7e3; border-radius:6px; padding:10px 12px; background:white; }
+.movement-form textarea, .movement-dialog textarea { resize:vertical; }
+.movement-form-top { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; }
+.movement-date { flex:0 0 190px; }
+.movement-kind { display:flex; gap:10px; flex-wrap:wrap; }
+.kind-button { display:inline-flex; align-items:center; gap:8px; padding:12px 20px; font-size:14px; font-weight:650; background:white; border:2px solid var(--line); border-radius:8px; color:var(--ink); }
+.kind-button svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.kind-in.selected { background:#dff5e3; border-color:#3aa356; color:#1f6f35; }
+.kind-out.selected { background:#fbe7e4; border-color:#c0473c; color:#8d302a; }
+.movement-form-bottom { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; }
+.movement-form-bottom label { flex:0 0 160px; }
+.relation-picker { display:grid; gap:10px; }
+.relation-row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.relation-check { display:inline-flex !important; align-items:center; gap:8px; flex:0 0 120px; font-weight:600; }
+.relation-row select, .relation-row .relation-filter { width:auto !important; margin-top:0 !important; flex:1 1 200px; min-width:160px; }
+.movement-list-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; align-items:baseline; }
+.movement-stock { font-size:13px; }
+.movement-stock.negative strong { color:#a3332c; }
+.movement-filters { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; align-items:center; margin-bottom:12px; }
+.movement-radios { display:flex; gap:18px; border:0; padding:0; margin:0; font-size:13px; }
+.movement-radios label { display:inline-flex; align-items:center; gap:6px; }
+.movement-radios .in, .kind-label.in { color:#1f7a3a; }
+.movement-radios .out, .kind-label.out { color:#b93a30; }
+.movement-page-size { font-size:12px; display:flex; align-items:center; gap:8px; }
+.movement-page-size select { width:auto; margin:0; }
+.movement-table td.movement-text { white-space:pre-wrap; overflow-wrap:anywhere; max-width:420px; }
+.movement-actions { white-space:nowrap; text-align:right; }
+.movement-legend { font-size:12px; color:#60766c; margin:10px 0 0; }
+.movement-dialog { width:min(640px,92vw); max-height:90vh; overflow:auto; }
+.movement-summary { font-size:13px; margin:14px 0 0; }
+.movement-history-list { list-style:none; margin:0 0 12px; padding:0; display:grid; gap:12px; font-size:13px; }
+.movement-history-list li { border-left:3px solid var(--line); padding-left:12px; overflow-wrap:anywhere; }
+@media (max-width:900px) { .movement-layout { grid-template-columns:1fr; } .movement-date { flex:1 1 100%; } }

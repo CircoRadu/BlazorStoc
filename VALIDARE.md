@@ -92,6 +92,20 @@ Verificări pentru câmpul „Cod produs” (fostul „Denumire”):
 
 Suita automată acoperă unicitatea normalizată în modul demonstrativ și SQLite, inclusiv două sesiuni SQLite concurente care încearcă același cod (una singură reușește), mesajele de validare, ținta de audit și de arhivă fără `#<id>` și afișarea evenimentelor vechi. Pentru MariaDB, unicitatea folosește aceeași comparație normalizată sub tranzacție `Serializable` cu `FOR UPDATE`; nu a fost testată pe un server MariaDB în acest ciclu.
 
+## Intrări și ieșiri pentru un produs (Task 1)
+
+Verificări pentru pagina `/produse/<id>/miscari`:
+
+1. Codul produsului și „↗” din catalog deschid pagina; panoul de detalii din catalog nu mai există. `/miscari/<id>` redirecționează către pagina produsului mișcării; `/produse?sterge=<id>` deschide dialogul de ștergere al produsului.
+2. Formularul: data implicită azi, comutatorul Intrare/Ieșire, „Beneficiar” și „Proiect” doar la Ieșire (proiectul se poate bifa numai după alegerea beneficiarului), descriere și cantitate obligatorii. „Beneficiar”/„Proiect” bifate fără selecție sunt respinse cu mesaj, iar formularul rămâne completat. După salvare se golesc descrierea și cantitatea; data, tipul și beneficiarul rămân.
+3. Tabelul: Data (`zz-LL-aaaa`), Intrare/Ieșire cu `[*]` pentru mișcările modificate, Număr bucăți, Descriere, Beneficiar (beneficiar și proiect ca linkuri); filtru, sortare după dată, paginare 10/20/50/Toate; „Total produse în stoc” actualizat după fiecare operație, inclusiv negativ.
+4. Editare: motiv obligatoriu, tipul nu se schimbă, rezumat „Cantitate veche/nouă · Corecție stoc”, respingerea unei editări fără modificări sau pe o versiune veche. Istoric: click dreapta pe un rând cu `[*]` (sau butonul „Istoric”) afișează operatorul, ora locală, valorile, corecția și motivul; Escape închide dialogul.
+5. Ștergere: dialogul în doi pași afișează corecția de stoc; mișcarea și istoricul ei sunt mutate în `archive_stock_movements`/`archive_relations` (`IstoricMiscareStoc`), stocul se corectează, iar un produs sau proiect cu mișcări nu poate fi șters.
+6. Jurnalul: evenimente `MiscareStoc` (Adăugare/Editare/Ștergere) cu ținta „cod produs”, detalii, motiv și legătura către arhivă la ștergere; linkurile duc la `/miscari/<id>`.
+7. Migrarea SQLite (schema 6): coloanele noi se adaugă tabelului `stock_movements` existent, iar produsele cu stoc și fără mișcări primesc o singură dată o mișcare „Stoc initial”.
+
+Suita automată (`tests/BlazorStoc.Checks`, 285 de verificări) acoperă regulile de domeniu, stocul atomic (8 adăugări simultane), corecțiile la editare/ștergere, istoricul, arhivarea, auditul, ordonarea după dată, filtrarea, paginarea, `GetForProjectAsync`, blocarea ștergerii produsului/proiectului și migrarea. Verificat în browser (desktop, 375 și 768 px): vezi `TODO.md`, „Intrări și ieșiri pentru un produs existent”. Neverificat: MariaDB pe un server real; ieșirea cu proiect, filtrul, sortarea și paginarea în browser.
+
 ## Stoc exclusiv prin mișcări (Task 0)
 
 Verificări pentru eliminarea stocului introdus manual:

@@ -41,13 +41,25 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             await EnsureColumnAsync(connection, "stock_movements", "project_id",
                 "ALTER TABLE stock_movements ADD COLUMN project_id INTEGER NULL REFERENCES projects(id) ON DELETE RESTRICT",
                 cancellationToken).ConfigureAwait(false);
+            foreach (var (column, definition) in new[]
+                     {
+                         ("kind", "INTEGER NOT NULL DEFAULT 1"), ("movement_date", "TEXT NOT NULL DEFAULT ''"),
+                         ("description", "TEXT NOT NULL DEFAULT ''"), ("operator", "TEXT NOT NULL DEFAULT ''"),
+                         ("version", "INTEGER NOT NULL DEFAULT 0"), ("updated_utc", "TEXT NOT NULL DEFAULT ''")
+                     })
+                await EnsureColumnAsync(connection, "stock_movements", column,
+                    $"ALTER TABLE stock_movements ADD COLUMN {column} {definition}", cancellationToken).ConfigureAwait(false);
+            await ExecuteAsync(connection, null,
+                "CREATE INDEX IF NOT EXISTS ix_stock_movements_product ON stock_movements(product_id,movement_date,id)",
+                cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, """
-                INSERT INTO app_metadata(key,value) VALUES('schema_version','5')
+                INSERT INTO app_metadata(key,value) VALUES('schema_version','6')
                 ON CONFLICT(key) DO UPDATE SET value=excluded.value;
                 """, cancellationToken).ConfigureAwait(false);
             await SeedIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
             await ImportLegacyAuditIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
             await ReconcileLegacyProductStateAsync(connection, cancellationToken).ConfigureAwait(false);
+            await CreateStockBaselineMovementsAsync(connection, cancellationToken).ConfigureAwait(false);
             initialized = true;
         }
         finally { initializationGate.Release(); }
@@ -135,6 +147,36 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
     {
         await using var command = Command(connection, transaction, sql);
         await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
+    // One-time migration: products that already carry stock but have no movements receive an opening movement, so the
+    // stock equals the sum of the movements from now on. Runs once (marker in app_metadata), never for later deletions.
+    private static async Task CreateStockBaselineMovementsAsync(SqliteConnection connection, CancellationToken token)
+    {
+        await using (var check = Command(connection, null,
+            "SELECT 1 FROM app_metadata WHERE key='stock_movements_baseline' LIMIT 1"))
+            if (await check.ExecuteScalarAsync(token).ConfigureAwait(false) is not null) return;
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
+        try
+        {
+            var now = DateTime.UtcNow;
+            await using (var insert = Command(connection, transaction, """
+                INSERT INTO stock_movements(product_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc)
+                SELECT p.id,ABS(p.quantity),@now,CASE WHEN p.quantity>0 THEN 1 ELSE 0 END,@date,'Stoc initial','sistem',0,@now
+                FROM products p
+                WHERE p.quantity<>0 AND NOT EXISTS(SELECT 1 FROM stock_movements m WHERE m.product_id=p.id)
+                """, ("@now", now.ToString("O")), ("@date", StockMovementRules.StorageDate(DateOnly.FromDateTime(now.ToLocalTime())))))
+                await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await using (var marker = Command(connection, transaction,
+                "INSERT INTO app_metadata(key,value) VALUES('stock_movements_baseline',@value)", ("@value", now.ToString("O"))))
+                await marker.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await transaction.CommitAsync(token).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
     }
 
     private static async Task SeedIfNeededAsync(SqliteConnection connection, CancellationToken token)
@@ -435,7 +477,22 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             beneficiary_id INTEGER REFERENCES beneficiaries(id) ON DELETE RESTRICT,
             project_id INTEGER REFERENCES projects(id) ON DELETE RESTRICT,
             quantity INTEGER NOT NULL,
-            created_utc TEXT NOT NULL
+            created_utc TEXT NOT NULL,
+            kind INTEGER NOT NULL DEFAULT 1,
+            movement_date TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            operator TEXT NOT NULL DEFAULT '',
+            version INTEGER NOT NULL DEFAULT 0,
+            updated_utc TEXT NOT NULL DEFAULT ''
+        );
+        CREATE TABLE IF NOT EXISTS stock_movement_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            movement_id INTEGER NOT NULL REFERENCES stock_movements(id) ON DELETE RESTRICT,
+            actor TEXT NOT NULL,
+            timestamp_utc TEXT NOT NULL,
+            changes TEXT NOT NULL,
+            stock_correction INTEGER NOT NULL,
+            reason TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS projects (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -551,6 +608,19 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             author TEXT NOT NULL,
             uploaded_utc TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS archive_stock_movements (
+            archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            original_id INTEGER NOT NULL,
+            product_id INTEGER NOT NULL,
+            kind INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            movement_date TEXT NOT NULL,
+            description TEXT NOT NULL,
+            beneficiary_id INTEGER NULL,
+            project_id INTEGER NULL,
+            operator TEXT NOT NULL,
+            version INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS archive_relations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             archive_id TEXT NOT NULL REFERENCES archive_operations(id) ON DELETE RESTRICT,
@@ -577,6 +647,8 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
         CREATE INDEX IF NOT EXISTS ix_products_group ON products(category_id,subcategory_id);
         CREATE INDEX IF NOT EXISTS ix_stock_movements_beneficiary ON stock_movements(beneficiary_id);
         CREATE INDEX IF NOT EXISTS ix_stock_movements_project ON stock_movements(project_id);
+        CREATE INDEX IF NOT EXISTS ix_stock_movement_history_movement ON stock_movement_history(movement_id,id);
+        CREATE INDEX IF NOT EXISTS ix_archive_stock_movements_original ON archive_stock_movements(original_id);
         CREATE INDEX IF NOT EXISTS ix_projects_beneficiary ON projects(beneficiary_id);
         CREATE INDEX IF NOT EXISTS ix_project_observations_project ON project_observations(project_id,created_utc DESC,id);
         CREATE INDEX IF NOT EXISTS ix_project_observation_files_observation ON project_observation_files(observation_id);

@@ -59,6 +59,11 @@ builder.Services.AddScoped<IProductRepository>(services => demo
     : new MariaProductRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>(),
         services.GetRequiredService<IProductImageStore>()));
+builder.Services.AddScoped<IStockMovementRepository>(services => demo
+    ? new SqliteStockMovementRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(),
+        services.GetRequiredService<IArchiveService>())
+    : new MariaStockMovementRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
+        services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddScoped<IBeneficiaryRepository>(services => demo
     ? new SqliteBeneficiaryRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
     : new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));

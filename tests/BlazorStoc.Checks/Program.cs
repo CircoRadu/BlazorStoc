@@ -567,7 +567,7 @@ try
             "SQLite creates the project, observation and observation-file live and archive tables");
         await using var version = schemaConnection.CreateCommand();
         version.CommandText = "SELECT value FROM app_metadata WHERE key='schema_version'";
-        Check((string?)await version.ExecuteScalarAsync() == "5", "Archive schema is versioned with the live SQLite schema");
+        Check((string?)await version.ExecuteScalarAsync() == "6", "Archive schema is versioned with the live SQLite schema");
         await using var indexes = schemaConnection.CreateCommand();
         indexes.CommandText = """
             SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN
@@ -580,7 +580,8 @@ try
     }
     Check(ArchiveSchemaRegistry.All.Select(item => item.EntityType).Order()
             .SequenceEqual(new[] { AuditEntities.Beneficiary, AuditEntities.Product, AuditEntities.User,
-                AuditEntities.Project, AuditEntities.ProjectObservation, AuditEntities.ProjectObservationFile }.Order()),
+                AuditEntities.Project, AuditEntities.ProjectObservation, AuditEntities.ProjectObservationFile,
+                AuditEntities.StockMovement }.Order()),
         "Every currently deletable entity is registered with an archive table");
     try
     {
@@ -1293,6 +1294,218 @@ if (args.Length == 2 && args[0] == "--http")
     Check(response.StatusCode == System.Net.HttpStatusCode.Redirect, "Logout accepts authenticated antiforgery token");
     response = await http.GetAsync("/");
     Check(response.StatusCode == System.Net.HttpStatusCode.Redirect, "Logout revokes the browser session");
+}
+
+// ---- Stock movements (Task 1) ----
+async Task RejectedMovement(Func<Task> operation, string message)
+{
+    try { await operation(); }
+    catch (StockMovementOperationException) { Check(true, message); return; }
+    throw new Exception("Expected rejection: " + message);
+}
+StockMovementInput MovementInput(StockMovementKind kind, int quantity, string description = "Test", DateOnly? date = null,
+    int? beneficiaryId = null, int? projectId = null, string reason = "") => new()
+{
+    Kind = kind, Quantity = quantity, Description = description, Date = date ?? new DateOnly(2026, 9, 24),
+    BeneficiaryId = beneficiaryId, ProjectId = projectId, Reason = reason
+};
+
+var entryRule = StockMovementRules.Validated(MovementInput(StockMovementKind.Entry, 3, "  Factură nouă  "), StockMovementKind.Entry, false);
+Check(entryRule.Description == "Factura noua" && entryRule.Quantity == 3, "Movement description is normalized like other stored text");
+Check(StockMovementRules.Effect(StockMovementKind.Entry, 5) == 5 && StockMovementRules.Effect(StockMovementKind.Exit, 5) == -5, "Entries add and exits subtract stock");
+Check(StockMovementRules.DisplayDate(new DateOnly(2022, 8, 22)) == "22-08-2022" && StockMovementRules.ParseLegacyDate("01-03-2024") == new DateOnly(2024, 3, 1),
+    "Movement dates use the legacy dd-MM-yyyy display format");
+try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, "  "), StockMovementKind.Exit, false); throw new Exception("Blank description accepted"); }
+catch (StockMovementOperationException) { Check(true, "Movement description is mandatory"); }
+try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 0), StockMovementKind.Exit, false); throw new Exception("Zero quantity accepted"); }
+catch (StockMovementOperationException) { Check(true, "Movement quantity must be at least 1"); }
+try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, StockMovementRules.MaxQuantity + 1), StockMovementKind.Exit, false); throw new Exception("Oversize quantity accepted"); }
+catch (StockMovementOperationException) { Check(true, "Movement quantity has an upper limit"); }
+try { StockMovementRules.Validated(MovementInput(StockMovementKind.Entry, 1, beneficiaryId: 1), StockMovementKind.Entry, false); throw new Exception("Entry with beneficiary accepted"); }
+catch (StockMovementOperationException) { Check(true, "Beneficiary and project are refused for entries"); }
+try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, projectId: 1), StockMovementKind.Exit, false); throw new Exception("Project without beneficiary accepted"); }
+catch (StockMovementOperationException) { Check(true, "A project requires a beneficiary"); }
+try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1), StockMovementKind.Exit, true); throw new Exception("Edit without reason accepted"); }
+catch (StockMovementOperationException) { Check(true, "Editing a movement requires a reason"); }
+Check(StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, date: new DateOnly(2099, 1, 1)), StockMovementKind.Exit, false).Date == new DateOnly(2099, 1, 1),
+    "Movement date may be in the future");
+Check(AuditNavigation.EditUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Create, "t", "d", "", "5")) == "/miscari/5" &&
+      AuditNavigation.EditUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Delete, "t", "d", "", "5")) is null,
+    "Journal links movement events to their product page and not after deletion");
+
+var movementRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-movements-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(movementRoot);
+try
+{
+    var movementConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["App:LocalDatabasePath"] = Path.Combine(movementRoot, "movements.db"),
+        ["App:ProductImagesPath"] = Path.Combine(movementRoot, "product-images"),
+        ["App:ArchiveFilesPath"] = Path.Combine(movementRoot, "archive-files"),
+        ["App:AuditPath"] = Path.Combine(movementRoot, "legacy-audit.jsonl")
+    }).Build();
+    var movementEnvironment = new TestWebHostEnvironment(movementRoot);
+    var movementAccess = new TestAccessControl(true, "operator.stoc");
+    var movementStore = new SqliteLocalStore(movementEnvironment, movementConfiguration, NullLogger<SqliteLocalStore>.Instance);
+    var movementProducts = new SqliteProductRepository(movementStore, movementAccess);
+    var movementBeneficiaries = new SqliteBeneficiaryRepository(movementStore, movementAccess);
+    var movementProjects = new SqliteProjectRepository(movementStore, movementAccess);
+    var stockMovements = new SqliteStockMovementRepository(movementStore, movementAccess);
+    var all = new StockMovementQuery(null, false, 1, 0);
+
+    // One-time baseline: seeded products with stock receive an opening movement, so stock = sum of movements.
+    var seededStock = await stockMovements.GetPageAsync(1, all);
+    Check(seededStock.Stock == 12 && seededStock.Items.Count == 1 && seededStock.Items[0].Description == "Stoc initial" &&
+          seededStock.Items.Sum(m => m.Effect) == seededStock.Stock, "Seeded stock becomes a single opening entry");
+    var seededNegative = await stockMovements.GetPageAsync(8, all);
+    Check(seededNegative.Stock == -2 && seededNegative.Items.Count == 1 && seededNegative.Items[0].Kind == StockMovementKind.Exit &&
+          seededNegative.Items[0].Quantity == 2, "A negative seeded stock becomes an opening exit");
+    Check((await stockMovements.GetPageAsync(5, all)).Items.Count == 0, "Products without stock get no opening movement");
+
+    var product = await CreateProductAsync(movementProducts, new ProductInput { Name = "Produs miscari", Category = "Miscari", Subcategory = "Test" });
+    Check(product.Quantity == 0, "A product used for movements starts with stock 0");
+    var first = await stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Entry, 10, "Factura 1", new DateOnly(2026, 9, 1)));
+    Check(first.Stock == 10 && first.Movement.Version == 0 && !first.Movement.Modified && first.Movement.Operator == "operator.stoc", "An entry increases the stock");
+    var exitNoBeneficiary = await stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 4, "Iesire fara beneficiar", new DateOnly(2026, 9, 2)));
+    Check(exitNoBeneficiary.Stock == 6 && exitNoBeneficiary.Movement.BeneficiaryId is null, "An exit without beneficiary decreases the stock");
+    var overdraw = await stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 8, "Peste stoc", new DateOnly(2099, 5, 5)));
+    Check(overdraw.Stock == -2 && (await movementProducts.GetProductAsync(product.Id))!.Quantity == -2, "An exit may take the stock below zero without blocking");
+
+    await RejectedMovement(() => stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Entry, 1, "")), "The repository rejects a blank description");
+    await RejectedMovement(() => stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 1, beneficiaryId: 9999)), "An unknown beneficiary is rejected");
+    await RejectedMovement(() => stockMovements.CreateAsync(9999, MovementInput(StockMovementKind.Entry, 1)), "A missing product is rejected");
+    Check((await movementProducts.GetProductAsync(product.Id))!.Quantity == -2, "Rejected movements do not change the stock");
+
+    var movementBeneficiary = await movementBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar miscari", Cui = "RO18888881" });
+    var otherBeneficiary = await movementBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Alt beneficiar", Cui = "RO18888882" });
+    var movementProject = await movementProjects.CreateAsync(new ProjectInput { BeneficiaryId = movementBeneficiary.Id, Name = "Proiect miscari", Observations = "" });
+    await RejectedMovement(() => stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 1, beneficiaryId: otherBeneficiary.Id, projectId: movementProject.Id)),
+        "A project must belong to the chosen beneficiary");
+    var projectExit = await stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 1, "Montaj", new DateOnly(2026, 9, 3),
+        movementBeneficiary.Id, movementProject.Id));
+    Check(projectExit.Stock == -3 && projectExit.Movement.BeneficiaryName == "Beneficiar miscari" && projectExit.Movement.ProjectName == "Proiect miscari",
+        "An exit stores the beneficiary and project");
+    var projectMovements = await stockMovements.GetForProjectAsync(movementProject.Id);
+    Check(projectMovements.Count == 1 && projectMovements[0].ProductCode == "Produs miscari" && projectMovements[0].Quantity == 1 &&
+          projectMovements[0].Date == new DateOnly(2026, 9, 3), "Project movements are readable through project_id");
+    try { await movementProjects.DeleteAsync(movementProject, "Test automat"); throw new Exception("Project with movements deleted"); }
+    catch (ProjectOperationException) { Check(true, "A project with movements cannot be deleted"); }
+    await Rejected(() => movementProducts.DeleteAsync(product with { Quantity = 0 }, "Test automat"), "A product with movements cannot be deleted");
+
+    var ascending = await stockMovements.GetPageAsync(product.Id, all);
+    Check(ascending.Items.Select(m => m.Date).SequenceEqual(ascending.Items.Select(m => m.Date).Order()) && ascending.Items.Last().Date == new DateOnly(2099, 5, 5),
+        "Movements are ordered by their own date, not by the time they were entered");
+    var descendingPage = await stockMovements.GetPageAsync(product.Id, new StockMovementQuery(null, true, 1, 0));
+    Check(descendingPage.Items.First().Date == new DateOnly(2099, 5, 5), "Descending order lists the latest date first");
+    var exitsOnly = await stockMovements.GetPageAsync(product.Id, new StockMovementQuery(StockMovementKind.Exit, false, 1, 0));
+    Check(exitsOnly.Items.Count == 3 && exitsOnly.Items.All(m => m.Kind == StockMovementKind.Exit) && exitsOnly.TotalCount == 3, "The kind filter keeps only exits");
+    var secondPage = await stockMovements.GetPageAsync(product.Id, new StockMovementQuery(null, false, 2, 3));
+    Check(secondPage.TotalCount == 4 && secondPage.Items.Count == 1, "Pagination is applied after filtering");
+
+    // Edit: reason, stock correction, history and the modified marker.
+    await RejectedMovement(() => stockMovements.UpdateAsync(first.Movement, MovementInput(StockMovementKind.Entry, 12, "Factura 1")), "Editing requires a reason");
+    await RejectedMovement(() => stockMovements.UpdateAsync(first.Movement, MovementInput(StockMovementKind.Entry, 10, "Factura 1", new DateOnly(2026, 9, 1), reason: "Nimic")),
+        "An edit that changes nothing is rejected");
+    var edited = await stockMovements.UpdateAsync(first.Movement, MovementInput(StockMovementKind.Entry, 12, "Factura 1 corectata", new DateOnly(2026, 9, 1), reason: "Eroare de tastare"));
+    Check(edited.Stock == -1 && edited.Movement.Quantity == 12 && edited.Movement.Version == 1 && edited.Movement.Modified, "Editing an entry applies the stock correction and marks the movement");
+    var editHistory = await stockMovements.GetHistoryAsync(first.Movement.Id);
+    Check(editHistory.Count == 1 && editHistory[0].StockCorrection == 2 && editHistory[0].Reason == "Eroare de tastare" && editHistory[0].Actor == "operator.stoc" &&
+          editHistory[0].Changes.Contains("Cantitate: 10 → 12") && editHistory[0].Changes.Contains("Corecție stoc: +2"), "The edit is kept in the movement history");
+    await RejectedMovement(() => stockMovements.UpdateAsync(first.Movement, MovementInput(StockMovementKind.Entry, 15, "Factura 1", reason: "Vechi")), "A stale edit cannot overwrite a newer version");
+    var kindStays = await stockMovements.UpdateAsync(edited.Movement, MovementInput(StockMovementKind.Exit, 11, "Factura 1 corectata", new DateOnly(2026, 9, 1), reason: "Schimb tip"));
+    Check(kindStays.Movement.Kind == StockMovementKind.Entry && kindStays.Stock == -2, "The movement type cannot be changed by an edit");
+    var exitEdit = await stockMovements.UpdateAsync(projectExit.Movement, MovementInput(StockMovementKind.Exit, 1, "Montaj", new DateOnly(2026, 9, 3), reason: "Fara beneficiar"));
+    Check(exitEdit.Movement.BeneficiaryId is null && exitEdit.Movement.ProjectId is null && exitEdit.Stock == kindStays.Stock, "An exit edit can remove the beneficiary and project");
+    Check((await stockMovements.GetPageAsync(product.Id, all)).AnyModified, "The page reports modified movements");
+
+    // Atomic stock under concurrent movements.
+    var concurrentBefore = (await movementProducts.GetProductAsync(product.Id))!.Quantity;
+    await Task.WhenAll(Enumerable.Range(0, 8).Select(index => new SqliteStockMovementRepository(movementStore, movementAccess)
+        .CreateAsync(product.Id, MovementInput(StockMovementKind.Entry, 1, $"Concurent {index}"))));
+    var concurrentPage = await stockMovements.GetPageAsync(product.Id, all);
+    Check(concurrentPage.Stock == concurrentBefore + 8 && concurrentPage.Items.Sum(m => m.Effect) == concurrentPage.Stock,
+        "Concurrent movements keep the stock equal to the sum of the movements");
+
+    // Delete: reason, archive, stock correction, history archived.
+    var beforeDelete = concurrentPage.Stock;
+    await RejectedMovement(() => stockMovements.DeleteAsync(edited.Movement with { Version = 0 }, "Test automat"), "A stale delete is rejected");
+    await RejectedMovement(() => stockMovements.DeleteAsync(kindStays.Movement, " "), "Deleting a movement requires a reason");
+    var stockAfterDelete = await stockMovements.DeleteAsync(kindStays.Movement, "Test automat");
+    Check(stockAfterDelete == beforeDelete - 11 && (await stockMovements.GetAsync(kindStays.Movement.Id)) is null, "Deleting an entry removes it and corrects the stock");
+    await RejectedMovement(() => stockMovements.DeleteAsync(kindStays.Movement, "Test automat"), "A movement cannot be deleted twice");
+    await using (var archiveConnection = await movementStore.OpenConnectionAsync())
+    {
+        await using var archived = TestSqliteCommand(archiveConnection, """
+            SELECT COUNT(*) FROM archive_operations o INNER JOIN archive_stock_movements a ON a.archive_id=o.id
+            WHERE o.entity_type='MiscareStoc' AND a.original_id=@id AND a.quantity=11 AND a.kind=1 AND o.motif='Test automat'
+              AND (SELECT COUNT(*) FROM archive_relations r WHERE r.archive_id=o.id AND r.relation_type='IstoricMiscareStoc')=2
+            """, ("@id", kindStays.Movement.Id));
+        Check(Convert.ToInt32(await archived.ExecuteScalarAsync()) == 1, "A deleted movement is archived together with its modification history");
+        await using var liveHistory = TestSqliteCommand(archiveConnection, "SELECT COUNT(*) FROM stock_movement_history WHERE movement_id=@id", ("@id", kindStays.Movement.Id));
+        Check(Convert.ToInt32(await liveHistory.ExecuteScalarAsync()) == 0, "The live history of a deleted movement is moved to the archive");
+        await using var audit = TestSqliteCommand(archiveConnection, """
+            SELECT
+              (SELECT COUNT(*) FROM audit_events WHERE entity_type='MiscareStoc' AND action='Adăugare' AND target='Produs miscari' AND details LIKE '%Cod produs: Produs miscari%'),
+              (SELECT COUNT(*) FROM audit_events WHERE entity_type='MiscareStoc' AND action='Editare' AND motif='Eroare de tastare' AND details LIKE '%Cantitate: 10 → 12%'),
+              (SELECT COUNT(*) FROM audit_events WHERE entity_type='MiscareStoc' AND action='Ștergere' AND motif='Test automat' AND archive_operation_id IS NOT NULL)
+            """);
+        await using var auditReader = await audit.ExecuteReaderAsync();
+        await auditReader.ReadAsync();
+        Check(auditReader.GetInt32(0) >= 12 && auditReader.GetInt32(1) == 1 && auditReader.GetInt32(2) == 1,
+            "Movement creation, edit and deletion are audited with target, details, reason and archive link");
+    }
+    var finalPage = await stockMovements.GetPageAsync(product.Id, all);
+    Check(finalPage.Stock == finalPage.Items.Sum(m => m.Effect), "The stock always equals the sum of the remaining movements");
+
+    // The baseline runs once: deleting an opening movement is not undone by a restart.
+    var seededDelete = await stockMovements.DeleteAsync(seededStock.Items[0], "Test automat");
+    var restartedStore = new SqliteLocalStore(movementEnvironment, movementConfiguration, NullLogger<SqliteLocalStore>.Instance);
+    var restartedPage = await new SqliteStockMovementRepository(restartedStore, movementAccess).GetPageAsync(1, all);
+    Check(seededDelete == 0 && restartedPage.Items.Count == 0 && restartedPage.Stock == 0, "The opening-movement migration does not run again after a restart");
+}
+finally
+{
+    try { Directory.Delete(movementRoot, true); } catch (IOException) { }
+}
+
+// Databases created before this module keep their stock_movements rows and receive the new columns.
+var legacyMovementRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-legacy-movements-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(legacyMovementRoot);
+try
+{
+    var legacyDatabase = Path.Combine(legacyMovementRoot, "legacy.db");
+    await using (var legacyConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={legacyDatabase}"))
+    {
+        await legacyConnection.OpenAsync();
+        await using var create = legacyConnection.CreateCommand();
+        create.CommandText = """
+            CREATE TABLE stock_movements (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, beneficiary_id INTEGER,
+                project_id INTEGER, quantity INTEGER NOT NULL, created_utc TEXT NOT NULL);
+            INSERT INTO stock_movements(product_id,quantity,created_utc) VALUES(1,3,'2026-01-02T10:00:00.0000000Z');
+            """;
+        await create.ExecuteNonQueryAsync();
+    }
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    var legacyConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["App:LocalDatabasePath"] = legacyDatabase,
+        ["App:ProductImagesPath"] = Path.Combine(legacyMovementRoot, "product-images"),
+        ["App:ArchiveFilesPath"] = Path.Combine(legacyMovementRoot, "archive-files"),
+        ["App:AuditPath"] = Path.Combine(legacyMovementRoot, "legacy-audit.jsonl")
+    }).Build();
+    var legacyMovementStore = new SqliteLocalStore(new TestWebHostEnvironment(legacyMovementRoot), legacyConfiguration, NullLogger<SqliteLocalStore>.Instance);
+    await using var migrated = await legacyMovementStore.OpenConnectionAsync();
+    await using var columns = TestSqliteCommand(migrated, """
+        SELECT COUNT(*) FROM pragma_table_info('stock_movements') WHERE name IN ('kind','movement_date','description','operator','version','updated_utc')
+        """);
+    Check(Convert.ToInt32(await columns.ExecuteScalarAsync()) == 6, "A pre-existing stock_movements table receives the movement columns");
+    await using var kept = TestSqliteCommand(migrated, "SELECT COUNT(*) FROM stock_movements WHERE product_id=1 AND quantity=3 AND kind=1 AND version=0");
+    Check(Convert.ToInt32(await kept.ExecuteScalarAsync()) == 1, "Existing movement rows are kept and default to entries at version 0");
+}
+finally
+{
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    try { Directory.Delete(legacyMovementRoot, true); } catch (IOException) { }
 }
 
 sealed class TestAccessControl(bool administrator, string username) : IAccessControl

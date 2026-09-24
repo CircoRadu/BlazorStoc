@@ -13,6 +13,7 @@ public static class AuditEntities
     public const string Project = "Proiect";
     public const string ProjectObservation = "Observatie";
     public const string ProjectObservationFile = "FisierObservatie";
+    public const string StockMovement = "MiscareStoc";
 }
 
 public static class AuditActions
@@ -66,6 +67,8 @@ public static class AuditNavigation
 
         // Project already has a stable read-only page; the other types still route through the editor's query trigger.
         if (entry.EntityType == AuditEntities.Project) return $"/proiecte/{entityId}";
+        // The event stores the movement id; /miscari/{id} resolves it to the product's movements page.
+        if (entry.EntityType == AuditEntities.StockMovement) return StockMovementNavigation.MovementUrl(entityId);
         var path = entry.EntityType switch
         {
             AuditEntities.Product => "/produse",

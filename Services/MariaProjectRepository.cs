@@ -124,8 +124,8 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
                 {
                     var current = await GetLockedAsync(connection, transaction, original.Id, token).ConfigureAwait(false);
                     ProjectRules.CheckCurrent(current, original);
-                    // Stock movements are not yet linked to projects in MariaDB (`io` has no id_project column);
-                    // this check will apply once the future stock-movement module adds that association.
+                    if (await MariaStockMovementRepository.ProjectHasMovementsAsync(connection, transaction, original.Id, token).ConfigureAwait(false))
+                        throw new ProjectOperationException("Proiectul are mișcări de stoc asociate și nu poate fi șters. Istoricul trebuie păstrat.");
                     await MariaArchivePersistence.InsertAsync(connection, transaction, operation, prepared, token).ConfigureAwait(false);
                     await using (var deleteFiles = Command(connection, transaction,
                         "DELETE FROM project_observation_file WHERE id_observation IN (SELECT id_observation FROM project_observation WHERE id_project=@id)",
@@ -323,7 +323,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         finally { SchemaGate.Release(); }
     }
 
-    private static readonly string[] SchemaStatements =
+    internal static readonly string[] SchemaStatements =
     [
         """
         CREATE TABLE IF NOT EXISTS project (

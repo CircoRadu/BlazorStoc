@@ -1,0 +1,45 @@
+@page "/miscari/{Id:int}"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IStockMovementRepository Movements
+@inject NavigationManager Navigation
+@inject ILogger<StockMovementRedirect> Logger
+
+<PageTitle>Mișcare de stoc · BlazorStoc</PageTitle>
+<a class="nav-back" href="/produse"><span>←</span> Produse și stocuri</a>
+@if (missing)
+{
+    <div class="empty-state"><span class="empty-icon">⇅</span><h3>Mișcarea nu mai există</h3><p>Mișcarea a fost ștearsă (mutată în arhivă) sau linkul nu este valid.</p><a class="refresh" href="/produse">Înapoi la catalog</a></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error</div>
+}
+else
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se deschide pagina produsului</h3></div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private bool missing;
+    private string? error;
+
+    // Audit events store the movement id; resolve it to the product page that lists the movement.
+    protected override async Task OnParametersSetAsync()
+    {
+        missing = false; error = null;
+        try
+        {
+            var movement = await Movements.GetAsync(Id);
+            if (movement is null) missing = true;
+            else Navigation.NavigateTo(StockMovementNavigation.ProductUrl(movement.ProductId), replace: true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Movement lookup failed ({ErrorType}).", ex.GetType().Name);
+            error = "Mișcarea nu a putut fi deschisă. Verifică serverul și reîncearcă.";
+        }
+    }
+}

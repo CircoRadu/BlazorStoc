@@ -147,6 +147,18 @@ internal static class SqliteArchivePersistence
                     ("@hash", observationFile.Sha256), ("@author", observationFile.Author),
                     ("@uploaded", observationFile.UploadedAtUtc.ToString("O")));
                 break;
+            case AuditEntities.StockMovement:
+                var movement = ArchiveJson.Entity<StockMovement>(snapshot);
+                command = SqliteLocalStore.Command(connection, transaction, """
+                    INSERT INTO archive_stock_movements
+                        (archive_id,original_id,product_id,kind,quantity,movement_date,description,beneficiary_id,project_id,operator,version)
+                    VALUES(@archiveId,@id,@product,@kind,@quantity,@date,@description,@beneficiary,@project,@operator,@version)
+                    """, ("@archiveId", operation.Id.ToString("D")), ("@id", movement.Id), ("@product", movement.ProductId),
+                    ("@kind", (int)movement.Kind), ("@quantity", movement.Quantity),
+                    ("@date", StockMovementRules.StorageDate(movement.Date)), ("@description", movement.Description),
+                    ("@beneficiary", movement.BeneficiaryId), ("@project", movement.ProjectId),
+                    ("@operator", movement.Operator), ("@version", movement.Version));
+                break;
             default:
                 throw new ArchiveContractException(
                     $"Tipul «{snapshot.EntityType}» este înregistrat, dar nu are mapare SQLite pentru tabela sa archive_*.");
@@ -271,6 +283,18 @@ internal static class MariaArchivePersistence
                     ("@contentType", observationFile.ContentType), ("@length", observationFile.SizeBytes),
                     ("@hash", observationFile.Sha256), ("@author", observationFile.Author),
                     ("@uploaded", observationFile.UploadedAtUtc)).ConfigureAwait(false);
+                break;
+            case AuditEntities.StockMovement:
+                var movement = ArchiveJson.Entity<StockMovement>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_stock_movements
+                        (archive_id,original_id,product_id,kind,quantity,movement_date,description,beneficiary_id,project_id,operator,version)
+                    VALUES(@archiveId,@id,@product,@kind,@quantity,@date,@description,@beneficiary,@project,@operator,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", movement.Id), ("@product", movement.ProductId),
+                    ("@kind", (int)movement.Kind), ("@quantity", movement.Quantity),
+                    ("@date", StockMovementRules.StorageDate(movement.Date)), ("@description", movement.Description),
+                    ("@beneficiary", movement.BeneficiaryId), ("@project", movement.ProjectId),
+                    ("@operator", movement.Operator), ("@version", movement.Version)).ConfigureAwait(false);
                 break;
             default:
                 throw new ArchiveContractException(

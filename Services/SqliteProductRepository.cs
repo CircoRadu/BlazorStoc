@@ -8,6 +8,11 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
 {
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
     private readonly IProductImageStore images = imageStore ?? new SqliteProductImageStore(store);
+    public async Task<Product?> GetProductAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        return await GetAsync(connection, null, id, cancellationToken).ConfigureAwait(false);
+    }
     public async Task<IReadOnlyList<Product>> GetProductsAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -164,7 +169,7 @@ public sealed partial class SqliteProductRepository(SqliteLocalStore store, IAcc
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    private static async Task<Product?> GetAsync(SqliteConnection connection, SqliteTransaction transaction, int id,
+    private static async Task<Product?> GetAsync(SqliteConnection connection, SqliteTransaction? transaction, int id,
         CancellationToken token)
     {
         await using var command = SqliteLocalStore.Command(connection, transaction, """

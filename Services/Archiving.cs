@@ -14,7 +14,8 @@ public static class ArchiveSchemaRegistry
             new ArchiveEntitySchema(AuditEntities.User, "archive_web_users", true, false),
             new ArchiveEntitySchema(AuditEntities.Project, "archive_projects", true, true),
             new ArchiveEntitySchema(AuditEntities.ProjectObservation, "archive_project_observations", true, true),
-            new ArchiveEntitySchema(AuditEntities.ProjectObservationFile, "archive_project_observation_files", false, true)
+            new ArchiveEntitySchema(AuditEntities.ProjectObservationFile, "archive_project_observation_files", false, true),
+            new ArchiveEntitySchema(AuditEntities.StockMovement, "archive_stock_movements", true, false)
         }.ToDictionary(schema => schema.EntityType, StringComparer.Ordinal);
 
     public static IReadOnlyCollection<ArchiveEntitySchema> All { get; } = Schemas.Values.ToArray();
@@ -187,6 +188,17 @@ public static class ArchiveRequests
             ArchiveRelationSnapshot.Create(AuditEntities.ProjectObservationFile, file.Id.ToString(), file));
         return new(ArchiveSnapshot.Create(AuditEntities.ProjectObservation, value.Id.ToString(), value.Version, value, relations),
             value.Name, details, motif);
+    }
+
+    public const string StockMovementHistoryRelation = "IstoricMiscareStoc";
+
+    public static ArchiveRequest StockMovement(StockMovement value, string productCode,
+        IEnumerable<StockMovementHistoryEntry> history, string motif)
+    {
+        var relations = history.Select(entry =>
+            ArchiveRelationSnapshot.Create(StockMovementHistoryRelation, entry.Id.ToString(), entry));
+        return new(ArchiveSnapshot.Create(AuditEntities.StockMovement, value.Id.ToString(), value.Version, value, relations),
+            StockMovementRules.Target(productCode), StockMovementRules.AuditIdentification(value, productCode), motif);
     }
 
     public static ArchiveRequest ProjectObservationFile(ProjectObservationFile value, string motif)

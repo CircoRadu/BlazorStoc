@@ -1,0 +1,472 @@
+@page "/produse/{Id:int}/miscari"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProductRepository Products
+@inject IStockMovementRepository Movements
+@inject IBeneficiaryRepository Beneficiaries
+@inject IProjectRepository Projects
+@inject IAccessControl Access
+@inject NavigationManager Navigation
+@inject ILogger<ProductMovements> Logger
+@implements IDisposable
+
+<PageTitle>@(product is null ? "Intrări/ieșiri" : $"Intrări/ieșiri · {product.Name}") · BlazorStoc</PageTitle>
+<a class="nav-back" href="@CatalogUrl"><span>←</span> Produse și stocuri</a>
+
+@if (loading && product is null)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsul</h3></div>
+}
+else if (error is not null && product is null)
+{
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+}
+else if (product is null)
+{
+    <div class="empty-state"><span class="empty-icon">▦</span><h3>Produsul nu mai există</h3><p>Produsul a fost șters sau linkul nu este valid.</p><a class="refresh" href="/produse">Înapoi la catalog</a></div>
+}
+else
+{
+    <div class="page-heading">
+        <div><p class="eyebrow">INTRĂRI / IEȘIRI</p><h1>@product.Name</h1><p class="muted">Mișcările de stoc ale produsului. Stocul se modifică numai prin intrări și ieșiri.</p></div>
+    </div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadPageAsync">Reîncearcă</button></div> }
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+    <div class="movement-layout">
+        <section class="movement-card movement-product" aria-labelledby="movement-product-title">
+            <h2 id="movement-product-title">Produs</h2>
+            <dl class="movement-facts">
+                <dt>Categorie</dt><dd>@product.Category</dd>
+                <dt>Subcategorie</dt><dd>@product.Subcategory</dd>
+                <dt>@ProductCode.Label</dt><dd>@product.Name</dd>
+            </dl>
+            <div class="movement-product-media">
+                <button type="button" class="product-thumbnail movement-image" title="Mărește imaginea" aria-label="Mărește imaginea pentru @product.Name" @onclick="() => imagePreview = true"><img src="@ImageUrl" alt="" /></button>
+                @if (canManage)
+                {
+                    <div class="movement-product-actions">
+                        <a class="refresh" href="@($"/produse?edit={product.Id}")">Editare produs</a>
+                        <a class="danger movement-link-danger" href="@($"/produse?sterge={product.Id}")">Șterge produs</a>
+                    </div>
+                }
+            </div>
+        </section>
+
+        @if (canManage)
+        {
+            <section class="movement-card movement-form" aria-labelledby="movement-form-title">
+                <h2 id="movement-form-title">Înregistrează o mișcare</h2>
+                <EditForm Model="form" OnSubmit="AddAsync" FormName="stock-movement-add">
+                    <fieldset disabled="@saving">
+                        <div class="movement-form-top">
+                            <label class="movement-date" for="movement-date">Data mișcării *
+                                <InputDate id="movement-date" TValue="DateOnly?" @bind-Value="form.Date" /></label>
+                            <div class="movement-kind" role="group" aria-label="Tipul mișcării">
+                                <button type="button" class="kind-button kind-in @(form.Kind == StockMovementKind.Entry ? "selected" : "")" aria-pressed="@(form.Kind == StockMovementKind.Entry)" @onclick="() => SetKindAsync(StockMovementKind.Entry)">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v13m0 0-5-5m5 5 5-5M5 20h14" /></svg> Intrare</button>
+                                <button type="button" class="kind-button kind-out @(form.Kind == StockMovementKind.Exit ? "selected" : "")" aria-pressed="@(form.Kind == StockMovementKind.Exit)" @onclick="() => SetKindAsync(StockMovementKind.Exit)">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V7m0 0-5 5m5-5 5 5M5 4h14" /></svg> Ieșire</button>
+                            </div>
+                        </div>
+                        @if (form.Kind == StockMovementKind.Exit)
+                        {
+                            <RelationPicker Prefix="add" Beneficiaries="beneficiaries" Projects="projects" Disabled="saving"
+                                            UseBeneficiary="useBeneficiary" UseProject="useProject"
+                                            BeneficiaryId="form.BeneficiaryId" ProjectId="form.ProjectId"
+                                            BeneficiaryToggled="v => ToggleBeneficiaryAsync(form, v, false)"
+                                            ProjectToggled="v => ToggleProject(form, v, false)"
+                                            BeneficiaryChanged="id => SelectBeneficiaryAsync(form, id, false)"
+                                            ProjectChanged="id => SetProject(form, id)" />
+                        }
+                        <label class="movement-description" for="movement-description">Descriere *
+                            <InputTextArea id="movement-description" @bind-Value="form.Description" rows="3" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
+                        <div class="movement-form-bottom">
+                            <label for="movement-quantity">Cantitate *
+                                <InputNumber id="movement-quantity" TValue="int?" @bind-Value="form.Quantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
+                            <button class="primary" type="submit">@(saving ? "Se salvează…" : "Adaugă")</button>
+                        </div>
+                        @if (formError is not null) { <div class="validation-message" role="alert">@formError</div> }
+                    </fieldset>
+                </EditForm>
+            </section>
+        }
+    </div>
+
+    <section class="movement-card movement-history" aria-labelledby="movement-list-title">
+        <div class="movement-list-head">
+            <h2 id="movement-list-title">Intrări/ieșiri produs: @product.Name</h2>
+            <span class="movement-stock @StockClass" role="status">Total produse în stoc: <strong>@stock</strong></span>
+        </div>
+        <div class="movement-filters">
+            <fieldset class="movement-radios">
+                <legend class="sr-only">Filtrează mișcările</legend>
+                <label><input type="radio" name="movement-filter" checked="@(filter is null)" @onchange="() => SetFilterAsync(null)" /> Intrări/Ieșiri</label>
+                <label class="in"><input type="radio" name="movement-filter" checked="@(filter == StockMovementKind.Entry)" @onchange="() => SetFilterAsync(StockMovementKind.Entry)" /> Intrări</label>
+                <label class="out"><input type="radio" name="movement-filter" checked="@(filter == StockMovementKind.Exit)" @onchange="() => SetFilterAsync(StockMovementKind.Exit)" /> Ieșiri</label>
+            </fieldset>
+            <label class="movement-page-size">Rânduri pe pagină
+                <select @onchange="PageSizeChangedAsync">
+                    @foreach (var option in PageSizes) { <option value="@option" selected="@(option == pageSize)">@(option == 0 ? "Toate" : option.ToString())</option> }
+                </select></label>
+        </div>
+
+        @if (loading)
+        {
+            <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă mișcările</h3></div>
+        }
+        else if (pageData.Items.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">⇅</span><h3>@(filter is null ? "Nu există intrări/ieșiri pentru acest produs" : "Nu există mișcări pentru filtrul ales")</h3><p>@(canManage && filter is null ? "Folosește formularul de mai sus pentru prima mișcare." : "Schimbă filtrul pentru a vedea celelalte mișcări.")</p></div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="movement-table">
+                    <thead><tr>
+                        <th aria-sort="@(descending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleSortAsync" aria-label="Sortează după dată @(descending ? "crescător" : "descrescător")">DATA <span aria-hidden="true">@(descending ? "▼" : "▲")</span></button></th>
+                        <th>INTRARE/IEȘIRE</th><th class="number">NUMĂR BUCĂȚI</th><th>DESCRIERE</th><th>BENEFICIAR</th>
+                        @if (canManage) { <th><span class="sr-only">Acțiuni</span></th> }
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var m in pageData.Items)
+                        {
+                            <tr @key="m.Id" class="@(m.Modified ? "modified" : "")" @oncontextmenu="() => OpenHistoryAsync(m)" @oncontextmenu:preventDefault="@m.Modified">
+                                <td>@StockMovementRules.DisplayDate(m.Date)</td>
+                                <td><span class="kind-label @(m.Kind == StockMovementKind.Entry ? "in" : "out")">@StockMovementRules.KindLabel(m.Kind)@(m.Modified ? "[*]" : "")</span></td>
+                                <td class="number">@m.Quantity</td>
+                                <td class="movement-text">@m.Description</td>
+                                <td>
+                                    @if (m.BeneficiaryName is not null)
+                                    {
+                                        <a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a>
+                                        @if (m.ProjectName is not null) { <span class="movement-project"> · <a class="category-table-link" href="@($"/proiecte/{m.ProjectId}")">@m.ProjectName</a></span> }
+                                    }
+                                </td>
+                                @if (canManage)
+                                {
+                                    <td class="movement-actions">
+                                        <button class="row-action edit" aria-label="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenEditAsync(m)">Editează</button>
+                                        <button class="row-action delete" aria-label="Șterge mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => RequestDelete(m)">Șterge</button>
+                                        @if (m.Modified) { <button class="row-action" aria-label="Istoricul modificărilor mișcării din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenHistoryAsync(m)">Istoric</button> }
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        <footer class="table-footer">
+            <span>@pageData.TotalCount @(pageData.TotalCount == 1 ? "mișcare" : "mișcări")</span>
+            @if (pageSize > 0)
+            {
+                <div class="pagination"><button disabled="@(pageNumber <= 1 || loading)" @onclick="PreviousPageAsync" aria-label="Pagina anterioară">‹</button><span>Pagina <strong>@pageNumber</strong> din <strong>@TotalPages</strong></span><button disabled="@(pageNumber >= TotalPages || loading)" @onclick="NextPageAsync" aria-label="Pagina următoare">›</button></div>
+            }
+        </footer>
+        @if (pageData.AnyModified) { <p class="movement-legend">Intrările/ieșirile cu [*] au suferit modificări. Click dreapta pe rând sau butonul „Istoric” pentru a vedea istoricul modificărilor.</p> }
+    </section>
+}
+
+@if (imagePreview && product is not null)
+{
+    <div class="image-lightbox" role="dialog" aria-modal="true" aria-label="Imagine mărită pentru @product.Name" @onclick="() => imagePreview = false" @onkeydown="ImageKeyAsync">
+        <button type="button" class="image-lightbox-close" aria-label="Închide imaginea" @onclick="() => imagePreview = false">×</button>
+        <figure @onclick:stopPropagation="true"><img src="@ImageUrl" alt="Imagine mărită pentru @product.Name" /><figcaption>@product.Name</figcaption></figure>
+    </div>
+}
+
+@if (editing is not null)
+{
+    <div class="delete-overlay" @onkeydown="EditKeyAsync">
+        <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-edit-title">
+            <h2 id="movement-edit-title">Editează @StockMovementRules.KindLabel(editing.Kind).ToLowerInvariant()a din @StockMovementRules.DisplayDate(editing.Date)</h2>
+            <EditForm Model="editForm" OnSubmit="SaveEditAsync" FormName="stock-movement-edit">
+                <fieldset disabled="@editSaving">
+                    <div class="editor-grid">
+                        <label for="edit-date">Data mișcării *<InputDate id="edit-date" TValue="DateOnly?" @bind-Value="editForm.Date" /></label>
+                        <label for="edit-quantity">Cantitate *<InputNumber id="edit-quantity" TValue="int?" @bind-Value="editForm.Quantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
+                        @if (editing.Kind == StockMovementKind.Exit)
+                        {
+                            <div class="full-width">
+                                <RelationPicker Prefix="edit" Beneficiaries="beneficiaries" Projects="editProjects" Disabled="editSaving"
+                                                UseBeneficiary="editUseBeneficiary" UseProject="editUseProject"
+                                                BeneficiaryId="editForm.BeneficiaryId" ProjectId="editForm.ProjectId"
+                                                BeneficiaryToggled="v => ToggleBeneficiaryAsync(editForm, v, true)"
+                                                ProjectToggled="v => ToggleProject(editForm, v, true)"
+                                                BeneficiaryChanged="id => SelectBeneficiaryAsync(editForm, id, true)"
+                                                ProjectChanged="id => SetProject(editForm, id)" />
+                            </div>
+                        }
+                        <label class="full-width" for="edit-description">Descriere *<InputTextArea id="edit-description" @bind-Value="editForm.Description" rows="3" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
+                        <ChangeReasonField Id="movement-edit-reason" @bind-Value="editForm.Reason" Disabled="editSaving" />
+                    </div>
+                    <p class="movement-summary" role="status">Cantitate veche: <strong>@editing.Quantity</strong> · Cantitate nouă: <strong>@(editForm.Quantity?.ToString() ?? "—")</strong> · Corecție stoc: <strong>@CorrectionText</strong></p>
+                    @if (editError is not null) { <div class="validation-message" role="alert">@editError</div> }
+                    <div class="editor-actions"><button class="primary" type="submit">@(editSaving ? "Se salvează…" : "Salvează modificarea")</button><button type="button" class="danger" @onclick="CloseEdit">Anulează</button></div>
+                </fieldset>
+            </EditForm>
+        </section>
+    </div>
+}
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi mișcarea?" Subject="Mișcarea"
+                              ObjectLabel="@($"{StockMovementRules.KindLabel(deleting.Kind)} · {deleting.Quantity} buc. · {StockMovementRules.DisplayDate(deleting.Date)}")"
+                              Description="@DeleteDescription" Busy="@deleteBusy" Error="@deleteError"
+                              Confirmed="DeleteAsync" Cancelled="CancelDelete" />
+}
+
+@if (historyFor is not null)
+{
+    <div class="delete-overlay" @onkeydown="HistoryKeyAsync">
+        <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-history-title">
+            <h2 id="movement-history-title">Istoricul modificărilor · @StockMovementRules.KindLabel(historyFor.Kind) din @StockMovementRules.DisplayDate(historyFor.Date)</h2>
+            @if (historyError is not null) { <div class="error-banner" role="alert">@historyError</div> }
+            else if (history.Count == 0) { <p class="muted">Nu există modificări înregistrate.</p> }
+            else
+            {
+                <ol class="movement-history-list">
+                    @foreach (var entry in history)
+                    {
+                        <li><strong>@entry.TimestampUtc.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</strong> · @entry.Actor
+                            <div>@entry.Changes</div>
+                            <div class="muted">Motiv: @entry.Reason</div></li>
+                    }
+                </ol>
+            }
+            <div class="editor-actions"><button type="button" class="primary" autofocus @onclick="CloseHistory">Închide</button></div>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private static readonly int[] PageSizes = [10, 20, 50, 0];
+    private Product? product;
+    private StockMovementPage pageData = new([], 0, 0, false);
+    private int stock;
+    private bool loading = true, canManage, saving, editSaving, deleteBusy, imagePreview;
+    private string? error, notice, formError, editError, deleteError, historyError;
+    private StockMovementKind? filter;
+    private bool descending;
+    private int pageNumber = 1, pageSize = 10;
+    private StockMovementInput form = NewForm();
+    private bool useBeneficiary, useProject;
+    private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
+    private IReadOnlyList<Project> projects = Array.Empty<Project>(), editProjects = Array.Empty<Project>();
+    private StockMovement? editing, deleting, historyFor;
+    private StockMovementInput editForm = new();
+    private bool editUseBeneficiary, editUseProject;
+    private IReadOnlyList<StockMovementHistoryEntry> history = Array.Empty<StockMovementHistoryEntry>();
+    private readonly CancellationTokenSource lifetime = new();
+
+    private string ImageUrl => $"/media/products/{Id}?v={product?.Version}";
+    // Back to the catalog scoped to the product's category and subcategory, as the catalog's own links do.
+    private string CatalogUrl => product is null ? "/produse"
+        : $"/produse?categorie={Uri.EscapeDataString(product.Category)}&subcategorie={Uri.EscapeDataString(product.Subcategory)}";
+    private int TotalPages => pageSize <= 0 ? 1 : Math.Max(1, (pageData.TotalCount + pageSize - 1) / pageSize);
+    private string StockClass => stock < 0 ? "negative" : stock == 0 ? "zero" : "positive";
+    private string CorrectionText
+    {
+        get
+        {
+            if (editing is null || editForm.Quantity is not { } quantity) return "—";
+            var correction = StockMovementRules.Effect(editing.Kind, quantity) - editing.Effect;
+            return correction > 0 ? $"+{correction}" : correction.ToString();
+        }
+    }
+    private string DeleteDescription => deleting is null ? string.Empty
+        : $"Stocul produsului va fi corectat cu {(deleting.Effect <= 0 ? "+" : "-")}{Math.Abs(deleting.Effect)} buc. Mișcarea și istoricul ei vor fi mutate în arhivă.";
+
+    private static StockMovementInput NewForm() => new() { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (product is not null && product.Id != Id) { product = null; filter = null; pageNumber = 1; form = NewForm(); useBeneficiary = useProject = false; }
+        if (product is null) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            var productTask = Products.GetProductAsync(Id, lifetime.Token);
+            var accessTask = Access.CanManageProductsAsync(lifetime.Token);
+            await Task.WhenAll(productTask, accessTask);
+            product = await productTask; canManage = await accessTask;
+            if (product is not null) await LoadPageAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogError("Movement page loading failed ({ErrorType}).", ex.GetType().Name); error = "Pagina nu a putut fi încărcată. Verifică serverul și conexiunea la baza de date."; }
+        finally { loading = false; }
+    }
+
+    private async Task LoadPageAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            pageData = await Movements.GetPageAsync(Id, new StockMovementQuery(filter, descending, pageNumber, pageSize), lifetime.Token);
+            stock = pageData.Stock;
+            var pages = TotalPages;
+            if (pageNumber > pages) { pageNumber = pages; pageData = await Movements.GetPageAsync(Id, new StockMovementQuery(filter, descending, pageNumber, pageSize), lifetime.Token); }
+            if (product is not null) product = product with { Quantity = stock };
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (StockMovementOperationException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Movement list loading failed ({ErrorType}).", ex.GetType().Name); error = "Mișcările nu au putut fi încărcate. Verifică serverul și conexiunea la baza de date."; }
+        finally { loading = false; }
+    }
+
+    private async Task EnsureBeneficiariesAsync()
+    {
+        if (beneficiaries.Count > 0) return;
+        try { beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).ToArray(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogError("Beneficiary list loading failed ({ErrorType}).", ex.GetType().Name); formError = "Lista beneficiarilor nu a putut fi încărcată."; }
+    }
+
+    private async Task SetKindAsync(StockMovementKind kind)
+    {
+        form.Kind = kind; formError = null;
+        if (kind == StockMovementKind.Entry) { useBeneficiary = useProject = false; form.BeneficiaryId = form.ProjectId = null; }
+        else await EnsureBeneficiariesAsync();
+    }
+
+    private async Task ToggleBeneficiaryAsync(StockMovementInput target, bool value, bool isEdit)
+    {
+        if (isEdit) editUseBeneficiary = value; else useBeneficiary = value;
+        if (value) { await EnsureBeneficiariesAsync(); return; }
+        target.BeneficiaryId = target.ProjectId = null;
+        if (isEdit) { editUseProject = false; editProjects = Array.Empty<Project>(); } else { useProject = false; projects = Array.Empty<Project>(); }
+    }
+
+    private static void SetProject(StockMovementInput target, int? projectId) => target.ProjectId = projectId;
+
+    // A checked "Beneficiar"/"Proiect" box without a selection is refused instead of silently ignored.
+    private static string? RelationError(StockMovementKind kind, bool useBeneficiary, bool useProject, StockMovementInput input)
+    {
+        if (kind != StockMovementKind.Exit) return null;
+        if (useBeneficiary && input.BeneficiaryId is null) return "Alege un beneficiar din listă sau debifează opțiunea beneficiar.";
+        if (useProject && input.ProjectId is null) return "Alege un proiect din listă sau debifează opțiunea proiect.";
+        return null;
+    }
+
+    private void ToggleProject(StockMovementInput target, bool value, bool isEdit)
+    {
+        if (isEdit) editUseProject = value; else useProject = value;
+        if (!value) target.ProjectId = null;
+    }
+
+    private async Task SelectBeneficiaryAsync(StockMovementInput target, int? beneficiaryId, bool isEdit)
+    {
+        target.BeneficiaryId = beneficiaryId; target.ProjectId = null;
+        var list = Array.Empty<Project>() as IReadOnlyList<Project>;
+        if (beneficiaryId is { } id)
+        {
+            try { list = await Projects.GetForBeneficiaryAsync(id, lifetime.Token); }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+            catch (Exception ex) { Logger.LogError("Project list loading failed ({ErrorType}).", ex.GetType().Name); }
+        }
+        if (isEdit) editProjects = list; else projects = list;
+    }
+
+    private async Task AddAsync()
+    {
+        if (saving || product is null) return;
+        formError = RelationError(form.Kind, useBeneficiary, useProject, form);
+        if (formError is not null) return;
+        saving = true; notice = null;
+        try
+        {
+            var result = await Movements.CreateAsync(product.Id, form, lifetime.Token);
+            stock = result.Stock; product = product with { Quantity = stock };
+            form.Description = ""; form.Quantity = null;
+            notice = $"Mișcarea a fost adăugată. Stoc curent: {stock} buc.";
+            pageNumber = 1; await LoadPageAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockMovementOperationException or AccessDeniedException) { formError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Movement creation failed ({ErrorType}).", ex.GetType().Name); formError = "Mișcarea nu a putut fi salvată. Verifică datele introduse și reîncearcă."; }
+        finally { saving = false; }
+    }
+
+    private async Task SetFilterAsync(StockMovementKind? kind) { filter = kind; pageNumber = 1; await LoadPageAsync(); }
+    private async Task ToggleSortAsync() { descending = !descending; pageNumber = 1; await LoadPageAsync(); }
+    private async Task PreviousPageAsync() { if (pageNumber > 1) { pageNumber--; await LoadPageAsync(); } }
+    private async Task NextPageAsync() { if (pageNumber < TotalPages) { pageNumber++; await LoadPageAsync(); } }
+    private async Task PageSizeChangedAsync(ChangeEventArgs args) { if (int.TryParse(args.Value?.ToString(), out var size) && PageSizes.Contains(size)) { pageSize = size; pageNumber = 1; await LoadPageAsync(); } }
+
+    private async Task OpenEditAsync(StockMovement movement)
+    {
+        notice = null; editError = null; editing = movement; editForm = StockMovementInput.From(movement);
+        editUseBeneficiary = movement.BeneficiaryId is not null; editUseProject = movement.ProjectId is not null; editProjects = Array.Empty<Project>();
+        if (movement.Kind == StockMovementKind.Exit)
+        {
+            await EnsureBeneficiariesAsync();
+            if (movement.BeneficiaryId is { } beneficiaryId)
+            {
+                try { editProjects = await Projects.GetForBeneficiaryAsync(beneficiaryId, lifetime.Token); }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+                catch (Exception ex) { Logger.LogError("Project list loading failed ({ErrorType}).", ex.GetType().Name); }
+            }
+        }
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (editSaving || editing is null) return;
+        editError = RelationError(editing.Kind, editUseBeneficiary, editUseProject, editForm);
+        if (editError is not null) return;
+        editSaving = true;
+        try
+        {
+            var result = await Movements.UpdateAsync(editing, editForm, lifetime.Token);
+            editing = null; stock = result.Stock; notice = $"Modificarea a fost salvată. Stoc curent: {stock} buc.";
+            await LoadPageAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockMovementOperationException or AccessDeniedException) { editError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Movement update failed ({ErrorType}).", ex.GetType().Name); editError = "Modificarea nu a putut fi salvată. Actualizează pagina și reîncearcă."; }
+        finally { editSaving = false; }
+    }
+
+    private void CloseEdit() { if (!editSaving) editing = null; }
+    private void EditKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") CloseEdit(); }
+    private void ImageKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") imagePreview = false; }
+    private void RequestDelete(StockMovement movement) { notice = null; deleteError = null; deleting = movement; }
+    private Task CancelDelete() { deleting = null; deleteError = null; return Task.CompletedTask; }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleteBusy || deleting is null) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            stock = await Movements.DeleteAsync(deleting, reason, lifetime.Token);
+            deleting = null; notice = $"Mișcarea a fost mutată în arhivă. Stoc curent: {stock} buc.";
+            await LoadPageAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockMovementOperationException or AccessDeniedException or ArchiveContractException) { deleteError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Movement deletion failed ({ErrorType}).", ex.GetType().Name); deleteError = "Ștergerea nu a putut fi confirmată. Actualizează pagina înainte să reîncerci."; }
+        finally { deleteBusy = false; }
+    }
+
+    private async Task OpenHistoryAsync(StockMovement movement)
+    {
+        if (!movement.Modified) return;
+        historyFor = movement; history = Array.Empty<StockMovementHistoryEntry>(); historyError = null;
+        try { history = await Movements.GetHistoryAsync(movement.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogError("Movement history loading failed ({ErrorType}).", ex.GetType().Name); historyError = "Istoricul nu a putut fi încărcat."; }
+    }
+
+    private void CloseHistory() => historyFor = null;
+    private void HistoryKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") CloseHistory(); }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

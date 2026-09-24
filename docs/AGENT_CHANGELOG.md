@@ -279,3 +279,38 @@ Acest fișier este append-only. Intrările noi sunt adăugate automat de `tools/
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-24T13:24:19.8988850Z â€” claude
+
+- **Task:** Task 1 — Intrări și ieșiri pentru un produs existent (pagina de mișcări de stoc); ordine schimbată la cererea explicită a utilizatorului, nextAgent era codex
+- **Rezumat:** Task 1 (intrari si iesiri pentru un produs) implementat: pagina /produse/{id}/miscari (panou Produs, formular cu data, Intrare/Iesire, beneficiar si proiect doar la iesire, descriere obligatorie, cantitate; tabel cu filtru, sortare dupa data, paginare, Total produse in stoc; editare si stergere cu motiv, marcaj [*], istoric prin click dreapta sau buton). Catalogul deschide pagina (panoul de detalii inlocuit; stergerea produsului prin /produse?sterge=id); /miscari/id redirectioneaza din jurnal. Persistenta SQLite (schema 6: coloane noi in stock_movements, stock_movement_history, archive_stock_movements, migrare unica Stoc initial pentru produsele cu stoc) cu stoc actualizat atomic in aceeasi tranzactie; MariaDB mapat pe io/io_history cu id_project, io_versiune si io_numar_bucati lartit la INT (netestat pe server real). Arhivare (entitate MiscareStoc cu istoricul ca relatie), audit, IProductRepository.GetProductAsync, IStockMovementRepository.GetForProjectAsync pentru Task 2 / 2.4, blocarea stergerii proiectului cu miscari si in MariaDB. Stocul poate deveni negativ fara blocare; data poate fi oricand. Ciclu pornit la cererea explicita a utilizatorului desi nextAgent era codex. Urmatorul pas recomandat: Task 2 / Subtask 2.4.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/Home.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Pages/StockMovementRedirect.razor`
+  - `Components/Shared/RelationPicker.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Program.cs`
+  - `README.md`
+  - `Services/ArchivePersistence.cs`
+  - `Services/Archiving.cs`
+  - `Services/AuditTrail.cs`
+  - `Services/MariaArchiveSchema.cs`
+  - `Services/MariaProjectRepository.cs`
+  - `Services/MariaStockMovementRepository.cs`
+  - `Services/Products.cs`
+  - `Services/SqliteLocalStore.cs`
+  - `Services/SqliteProductRepository.cs`
+  - `Services/SqliteStockMovementRepository.cs`
+  - `Services/StockMovements.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 285 verificari trecute (51 noi); browser 5082 desktop, 375 si 768 px: adaugare, iesire cu beneficiar, editare cu motiv, marcaj, istoric, stergere in doi pasi, jurnal, redirect. Neverificat: MariaDB pe server real; iesire cu proiect, filtru, sortare si paginare nu au fost exersate manual in browser; erori injectate pe etape nu au test dedicat.
+- **Commit:** `claude: add stock movements page (entries and exits per product)
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
+- **Predat cÄƒtre:** codex

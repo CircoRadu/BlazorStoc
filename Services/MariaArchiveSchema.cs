@@ -4,7 +4,7 @@ namespace BlazorStoc.Services;
 
 public static class MariaArchiveSchema
 {
-    public const int Version = 3;
+    public const int Version = 4;
 
     public static async Task InitializeAsync(IConfiguration configuration,
         CancellationToken cancellationToken = default)
@@ -141,6 +141,23 @@ public static class MariaArchiveSchema
             uploaded_utc DATETIME(6) NOT NULL,
             INDEX ix_archive_project_observation_files_original(original_id),
             CONSTRAINT fk_archive_project_observation_files_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS archive_stock_movements (
+            archive_id CHAR(36) CHARACTER SET ascii NOT NULL PRIMARY KEY,
+            original_id INT NOT NULL,
+            product_id INT NOT NULL,
+            kind TINYINT NOT NULL,
+            quantity INT NOT NULL,
+            movement_date CHAR(10) NOT NULL,
+            description TEXT NOT NULL,
+            beneficiary_id INT NULL,
+            project_id INT NULL,
+            operator VARCHAR(191) NOT NULL,
+            version BIGINT UNSIGNED NOT NULL,
+            INDEX ix_archive_stock_movements_original(original_id),
+            CONSTRAINT fk_archive_stock_movements_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """,
         """

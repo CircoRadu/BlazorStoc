@@ -27,7 +27,7 @@ Faza curentă acoperă dezvoltarea și verificarea locală. Integrarea, configur
 - Încărcarea produselor și a grupurilor categorie/subcategorie rulează în paralel, cu anulare la închiderea componentei.
 - Configurare locală prin `appsettings.json` și variabile de mediu .NET.
 
-Afișează stocul produselor, dar nu îl permite introdus manual: produsele noi au stoc 0, iar stocul se va modifica numai prin intrări și ieșiri (Task 1 din `TODO.md`). Include gestiunea beneficiarilor. Nu include încă intrări/ieșiri de stoc către beneficiari, importul datelor, imaginile, export Excel, rapoarte sau conturile individuale din aplicația veche. Nu citește parolele Base64 existente.
+Stocul unui produs se modifică numai prin intrări și ieșiri (pagina „Intrări/ieșiri” a produsului); produsele noi au stoc 0 și cantitatea nu se introduce manual. Include gestiunea beneficiarilor. Nu include încă importul datelor, imaginile, export Excel, rapoarte sau conturile individuale din aplicația veche. Nu citește parolele Base64 existente.
 
 ## Beneficiari
 
@@ -82,7 +82,14 @@ Sistemul refuză eliminarea ultimului administrator activ. Un administrator nu �
 - **Adaugă produs** deschide formularul pentru cod produs, descriere, categorie și subcategorie. Produsul nou este creat cu stoc 0. Categoria și subcategoria se aleg dintre cele create în pagina „Categorii și subcategorii”.
 - **Cod produs** este codul stabilit de producător, introdus manual. Este obligatoriu, are cel mult 100 de caractere și este unic în tot catalogul: două coduri care diferă doar prin spații, majuscule/minuscule sau diacritice sunt considerate identice. Aplicația nu generează coduri interne.
 - Identificatorul numeric intern al produsului rămâne folosit pentru persistență, rute, relații și jurnalizare tehnică (`EntityId`), dar nu mai este afișat în interfață în forma `#<număr>`.
-- Apasă pe codul unui produs, apoi **Editează** sau **Șterge** în panoul de detalii.
+- Apasă pe codul unui produs (sau pe „↗”) pentru a deschide pagina **Intrări/ieșiri** a produsului (`/produse/<id>/miscari`). De acolo folosești **Editare produs** sau **Șterge produs** (acesta deschide fluxul de ștergere din catalog, `/produse?sterge=<id>`).
+- Pagina de intrări/ieșiri arată produsul, formularul de mișcare și tabelul mișcărilor:
+  - Data mișcării este aleasă de utilizator (implicit azi), independentă de data și ora curentă, și poate fi și în viitor. Descrierea este obligatorie; cantitatea este un număr întreg între 1 și 100.000.
+  - La **Ieșire** poți bifa „Beneficiar” și, după alegerea acestuia, „Proiect” (proiectele beneficiarului). Fără ele se completează numai data, cantitatea și descrierea. La **Intrare** aceste câmpuri nu apar.
+  - Stocul este suma intrărilor minus suma ieșirilor și poate deveni negativ; o ieșire peste stoc nu este blocată.
+  - Coloana „Beneficiar” arată beneficiarul și proiectul ieșirii. Tabelul se filtrează (Intrări/Ieșiri), se sortează după dată și se paginează.
+  - **Editează**/**Șterge** cer un motiv; editarea corectează stocul și marchează mișcarea cu `[*]`. Istoricul modificărilor se deschide cu click dreapta pe rând sau cu butonul „Istoric”. Ștergerea (în doi pași) mută mișcarea și istoricul ei în arhivă.
+  - Produsele care aveau deja stoc în baza de date locală primesc o singură dată o mișcare „Stoc initial”, ca stocul să fie egal cu suma mișcărilor.
 - Formularele de creare și editare nu conțin câmp pentru cantitate: stocul se afișează numai pentru consultare și nu poate fi introdus sau corectat manual. Un stoc existent (inclusiv negativ) rămâne neschimbat la editarea produsului.
 - Fiecare editare a produsului cere un motiv. În modul MariaDB, operațiile și valorile înainte/după se salvează ca JSON în `log`, în aceeași tranzacție cu produsul. Nu se creează mișcări `io` fictive.
 - Ștergerea cere confirmare și este permisă numai cu stoc zero, fără rânduri asociate în `io` sau `imagine`. Categoriile nu se șterg automat.

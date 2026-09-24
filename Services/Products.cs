@@ -8,6 +8,7 @@ public sealed record ProductGroup(string Category, string Subcategory);
 public interface IProductRepository
 {
     Task<IReadOnlyList<Product>> GetProductsAsync(CancellationToken cancellationToken = default);
+    Task<Product?> GetProductAsync(int id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProductGroup>> GetGroupsAsync(CancellationToken cancellationToken = default);
     Task CreateCategoryAsync(string category, CancellationToken cancellationToken = default);
     Task<ProductGroup> CreateSubcategoryAsync(string category, string subcategory, CancellationToken cancellationToken = default);
@@ -40,6 +41,24 @@ public sealed partial class MariaProductRepository(IConfiguration configuration,
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
     private readonly IProductImageStore? images = imageStore;
     private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
+    public async Task<Product?> GetProductAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("""
+            SELECT p.id_produs, c.categorie_nume, s.subcategorie_nume,
+                   p.produs_denumire, p.produs_descriere, COALESCE(p.produs_cantitate, 0), p.produs_versiune
+            FROM produs p
+            INNER JOIN categorie c ON p.id_categorie = c.id_categorie
+            INNER JOIN subcategorie s ON p.id_subcategorie = s.id_subcategorie
+            WHERE p.id_produs = @id
+            """, connection);
+        command.Parameters.AddWithValue("@id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ? new Product(reader.GetInt32(0), Text(reader, 1), Text(reader, 2), Text(reader, 3), Text(reader, 4), reader.GetInt32(5), reader.GetInt64(6))
+            : null;
+    }
     public async Task<IReadOnlyList<Product>> GetProductsAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = CreateConnection();
@@ -96,6 +115,11 @@ public sealed partial class DemoProductRepository(IAccessControl? accessControl 
     private List<Product> products => store.Products;
     private List<string> categories => store.Categories;
     private List<ProductGroup> groups => store.Groups;
+    public Task<Product?> GetProductAsync(int id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (gate) return Task.FromResult(products.FirstOrDefault(product => product.Id == id));
+    }
     public Task<IReadOnlyList<Product>> GetProductsAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
