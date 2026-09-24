@@ -1,0 +1,11 @@
+@page
+@model BlazorStoc.Pages.Account.LoginModel
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{ Layout = null; }
+<!DOCTYPE html>
+<html lang="ro"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Autentificare · BlazorStoc</title><link rel="stylesheet" href="/app.css" /></head>
+<body class="login-body"><main class="login-card"><span class="brand-icon">B</span><p class="eyebrow">ESP · GESTIUNE STOCURI</p><h1>Bine ai revenit.</h1><p class="muted">Autentifică-te pentru a accesa gestiunea stocurilor.</p>
+@if (Model.IsDemo) { <section class="demo-credentials"><strong>Conturi pentru testare</strong><span>Administrator: <code>administrator.demo</code> / <code>admin-demo-123</code></span><span>Utilizator: <code>utilizator.demo</code> / <code>utilizator-demo-123</code></span></section> }
+<form method="post"><input asp-for="ReturnUrl" type="hidden" /><label>Utilizator<input asp-for="Username" autocomplete="username" required autofocus /></label><label>Parolă<input asp-for="Password" type="password" autocomplete="current-password" required /></label>
+@if (Model.Error is not null) { <p role="alert" class="error-text">@Model.Error</p> }
+<button class="primary" type="submit">Intră în aplicație →</button></form><p class="muted small">BlazorStoc · versiunea 0.3</p></main></body></html>

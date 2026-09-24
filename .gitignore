@@ -1,0 +1,12 @@
+bin/
+obj/
+.dotnet-home/
+.env
+.env.*
+!.env.example
+keys/
+keys-test/
+artifacts/
+data/
+*.user
+*.log

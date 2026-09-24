@@ -1,0 +1,221 @@
+@page "/jurnal"
+@attribute [Authorize(Roles = AccessRoles.Administrator)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IAuditTrail AuditTrail
+@inject ILogger<Audit> Logger
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Jurnal activitate · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal activitate</h1><p class="muted">Acțiunile operate în sistem, în ordine cronologică.</p></div></div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+<section class="metrics audit-metrics" aria-label="Rezumat activitate">
+    <article><span>Evenimente</span><strong>@(loaded ? events.Count.ToString("N0") : "—")</strong><small>În jurnalul disponibil</small><i>≡</i></article>
+    <article><span>Astăzi</span><strong>@(loaded ? events.Count(entry => entry.TimestampUtc.Date == DateTime.UtcNow.Date).ToString("N0") : "—")</strong><small>Operații UTC</small><i>◷</i></article>
+    <article><span>Operatori</span><strong>@(loaded ? events.Select(entry => entry.ActorUsername).Distinct(StringComparer.OrdinalIgnoreCase).Count().ToString() : "—")</strong><small>Utilizatori distincți</small><i>♙</i></article>
+    <article><span>Produse</span><strong>@(loaded ? events.Count(entry => entry.EntityType == AuditEntities.Product).ToString("N0") : "—")</strong><small>Editări produse</small><i>▦</i></article>
+</section>
+<section class="catalog">
+    <div class="catalog-heading"><h2>Istoric operații <span>@Filtered.Count</span></h2><small>Sincronizare automată la 15 secunde · afișare în ora locală · stocare UTC</small></div>
+    <div class="filters audit-filters">
+        <label class="search-box"><span>⌕</span><input aria-label="Caută în jurnal" placeholder="Utilizator, țintă sau detalii…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label>
+        <label><span class="sr-only">Tip înregistrare</span><select @bind="entity" @bind:after="ResetPage"><option value="">Toate tipurile</option><option value="@AuditEntities.Product">Produse</option><option value="@AuditEntities.Beneficiary">Beneficiari</option><option value="@AuditEntities.User">Utilizatori</option></select></label>
+        <label><span class="sr-only">Operație</span><select @bind="action" @bind:after="ResetPage"><option value="">Toate operațiile</option><option value="@AuditActions.Create">Adăugare</option><option value="@AuditActions.Edit">Editare</option><option value="@AuditActions.Delete">Ștergere</option><option value="@AuditActions.Login">Conectare</option><option value="@AuditActions.Logout">Deconectare</option></select></label>
+    </div>
+    @if (HasFilters)
+    {
+        <div class="audit-active-filters" role="status">
+            <span>Filtre active:</span>
+            @if (actor.Length > 0) { <strong class="audit-filter-chip">operator: @actor <button type="button" aria-label="Elimină filtrul operator" title="Elimină filtrul operator" @onclick="RemoveActorFilter">×</button></strong> }
+            @if (action.Length > 0) { <strong class="audit-filter-chip">operație: @action <button type="button" aria-label="Elimină filtrul operație" title="Elimină filtrul operație" @onclick="RemoveActionFilter">×</button></strong> }
+            @if (selectedDateKey is not null) { <strong class="audit-filter-chip">data: @selectedDateLabel <button type="button" aria-label="Elimină filtrul dată" title="Elimină filtrul dată" @onclick="RemoveDateFilter">×</button></strong> }
+            @if (entity.Length > 0) { <strong class="audit-filter-chip">tip: @entity <button type="button" aria-label="Elimină filtrul tip" title="Elimină filtrul tip" @onclick="RemoveEntityFilter">×</button></strong> }
+            @if (query.Trim().Length > 0) { <strong class="audit-filter-chip">căutare: „@query.Trim()” <button type="button" aria-label="Elimină filtrul de căutare" title="Elimină filtrul de căutare" @onclick="RemoveQueryFilter">×</button></strong> }
+            <button type="button" class="audit-clear-filters danger" @onclick="ClearFilters">Șterge filtrele</button>
+        </div>
+    }
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă jurnalul</h3></div> }
+    else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">≡</span><h3>Nu există evenimente pentru filtrul selectat</h3><p>Jurnalul se completează automat după adăugări, editări și ștergeri.</p></div> }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>DATA ȘI ORA</th><th>OPERATOR</th><th>OPERAȚIE</th><th>ȚINTĂ</th><th>DETALII</th></tr></thead><tbody>
+        @foreach (var entry in VisibleEvents)
+        {
+            var localTimestamp = LocalTimestamp(entry);
+            <tr @key="entry.Id">
+                <td class="audit-time"><button type="button" class="audit-filter-link" title="Filtrează după această dată locală" @onclick="() => FilterByDate(entry)">@localTimestamp.Date</button> <time datetime="@entry.TimestampUtc.ToString("O")">@localTimestamp.Time</time> <small>local</small></td>
+                <td><button type="button" class="audit-filter-link" title="Filtrează după acest operator" @onclick="() => FilterByActor(entry.ActorUsername)">@entry.ActorUsername</button><small class="user-id">@entry.ActorRole</small></td>
+                <td><button type="button" class="audit-action audit-filter-link @ActionClass(entry.Action)" title="Filtrează după această operație" @onclick="() => FilterByAction(entry.Action)">@entry.Action</button><small class="user-id">@entry.EntityType</small></td>
+                <td>
+                    @if (AuditNavigation.EditUrl(entry) is { } editUrl)
+                    {
+                        <a class="audit-target-link" href="@editUrl" title="Deschide pagina de editare pentru @entry.Target"><strong>@entry.Target</strong></a>
+                    }
+                    else
+                    {
+                        <strong>@entry.Target</strong>
+                    }
+                </td><td class="audit-details"><span>Descriere modificare: <em>@entry.Details</em></span><span>Motiv: <em>@(string.IsNullOrWhiteSpace(entry.Motif) ? "—" : entry.Motif)</em></span></td>
+            </tr>
+        }
+        </tbody></table></div>
+        <div class="table-footer audit-table-footer">
+            <div class="audit-page-size">
+                <label for="audit-page-size">Evenimente pe pagină</label>
+                <select id="audit-page-size" @bind="pageSize" @bind:after="ResetPage">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="0">Toate</option>
+                </select>
+                <span>@ResultSummary</span>
+            </div>
+            @if (pageSize > 0)
+            {
+                <nav class="pagination" aria-label="Paginare jurnal">
+                    <button type="button" aria-label="Pagina anterioară" title="Pagina anterioară" disabled="@(currentPage <= 1)" @onclick="PreviousPage">‹</button>
+                    <span>Pagina <strong>@currentPage</strong> din <strong>@TotalPages</strong></span>
+                    <button type="button" aria-label="Pagina următoare" title="Pagina următoare" disabled="@(currentPage >= TotalPages)" @onclick="NextPage">›</button>
+                </nav>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<AuditEvent> events = Array.Empty<AuditEvent>();
+    private string query = "", entity = "", action = "", actor = "";
+    private string? selectedDateKey, selectedDateLabel;
+    private string? error;
+    private bool loading, loaded, syncing;
+    private bool timestampsDirty;
+    private int pageSize = 10, currentPage = 1;
+    private IJSObjectReference? timeModule;
+    private Dictionary<Guid, LocalAuditTime> localTimes = [];
+    private readonly CancellationTokenSource lifetime = new();
+    private List<AuditEvent> Filtered => events.Where(entry =>
+        (entity.Length == 0 || entry.EntityType == entity) &&
+        (action.Length == 0 || entry.Action == action) &&
+        (actor.Length == 0 || string.Equals(entry.ActorUsername, actor, StringComparison.OrdinalIgnoreCase)) &&
+        (selectedDateKey is null || LocalTimestamp(entry).DateKey == selectedDateKey) &&
+        (query.Trim().Length == 0 || entry.ActorUsername.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         entry.Target.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) || entry.Details.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         entry.Motif.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)))
+        .ToList();
+    private int TotalPages => pageSize == 0 ? 1 : Math.Max(1, (Filtered.Count + pageSize - 1) / pageSize);
+    private List<AuditEvent> VisibleEvents => pageSize == 0
+        ? Filtered
+        : Filtered.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
+    private string ResultSummary
+    {
+        get
+        {
+            var count = Filtered.Count;
+            if (pageSize == 0 || count == 0) return $"{count} rezultate";
+            var first = (currentPage - 1) * pageSize + 1;
+            var last = Math.Min(currentPage * pageSize, count);
+            return $"{first}–{last} din {count} rezultate";
+        }
+    }
+    private bool HasFilters => query.Trim().Length > 0 || entity.Length > 0 || action.Length > 0 || actor.Length > 0 || selectedDateKey is not null;
+
+    private void FilterByActor(string value) { actor = value; ResetPage(); }
+    private void FilterByAction(string value) { action = value; ResetPage(); }
+    private void FilterByDate(AuditEvent entry)
+    {
+        var value = LocalTimestamp(entry);
+        selectedDateKey = value.DateKey;
+        selectedDateLabel = value.Date;
+        ResetPage();
+    }
+    private void RemoveActorFilter() { actor = ""; ResetPage(); }
+    private void RemoveActionFilter() { action = ""; ResetPage(); }
+    private void RemoveDateFilter() { (selectedDateKey, selectedDateLabel) = (null, null); ResetPage(); }
+    private void RemoveEntityFilter() { entity = ""; ResetPage(); }
+    private void RemoveQueryFilter() { query = ""; ResetPage(); }
+    private void ClearFilters()
+    {
+        query = entity = action = actor = "";
+        (selectedDateKey, selectedDateLabel) = (null, null);
+        ResetPage();
+    }
+
+    private void ResetPage() => currentPage = 1;
+    private void PreviousPage() => currentPage = Math.Max(1, currentPage - 1);
+    private void NextPage() => currentPage = Math.Min(TotalPages, currentPage + 1);
+    private void NormalizePage() => currentPage = Math.Clamp(currentPage, 1, TotalPages);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(true);
+        _ = SynchronizePeriodicallyAsync();
+    }
+
+    private async Task LoadAsync(bool showLoading)
+    {
+        if (syncing) return;
+        syncing = true;
+        if (showLoading) loading = true;
+        try
+        {
+            events = await AuditTrail.GetEventsAsync(lifetime.Token);
+            loaded = true;
+            timestampsDirty = true;
+            NormalizePage();
+            error = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Audit loading failed ({ErrorType}).", exception.GetType().Name); error = "Jurnalul nu a putut fi încărcat."; }
+        finally { loading = false; syncing = false; }
+    }
+
+    private async Task SynchronizePeriodicallyAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(async () => { await LoadAsync(false); StateHasChanged(); });
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!timestampsDirty || !loaded || lifetime.IsCancellationRequested) return;
+        timestampsDirty = false;
+        try
+        {
+            timeModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./audit-time.js");
+            var values = await timeModule.InvokeAsync<LocalAuditTime[]>("formatAuditTimestamps", lifetime.Token,
+                events.Select(entry => new { id = entry.Id, timestampUtc = entry.TimestampUtc.ToString("O") }));
+            localTimes = values.ToDictionary(value => value.Id);
+            NormalizePage();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (JSDisconnectedException) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Local audit timestamp formatting failed ({ErrorType}).", exception.GetType().Name);
+        }
+    }
+
+    private LocalAuditTime LocalTimestamp(AuditEvent entry) => localTimes.TryGetValue(entry.Id, out var value)
+        ? value
+        : new(entry.Id, entry.TimestampUtc.ToString("dd.MM.yyyy"), entry.TimestampUtc.ToString("HH:mm:ss"),
+            entry.TimestampUtc.ToString("yyyy-MM-dd"));
+
+    private static string ActionClass(string value) => value == AuditActions.Delete ? "delete" : value == AuditActions.Create ? "create" : "update";
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (timeModule is not null)
+            try { await timeModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        lifetime.Dispose();
+    }
+
+    private sealed record LocalAuditTime(Guid Id, string Date, string Time, string DateKey);
+}

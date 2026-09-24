@@ -1,0 +1,182 @@
+@page "/categorii"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProductRepository Repository
+@inject IAccessControl Access
+@inject ILogger<ProductGroups> Logger
+@implements IDisposable
+
+<PageTitle>Categorii produse · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">ORGANIZARE CATALOG</p><h1>Categorii și subcategorii</h1><p class="muted">Redenumește categoriile și mută subcategoriile fără să pierzi produsele asociate.</p></div>
+    <div class="heading-actions"><button class="primary" disabled="@(saving || IsEditing)" @onclick="CreateCategory">+ Adaugă categorie</button></div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (creatingCategory || editingCategory is not null)
+{
+    <section class="product-editor" aria-labelledby="category-editor-title">
+        <div class="catalog-heading"><h2 id="category-editor-title">@(creatingCategory ? "Adaugă categorie" : $"Editează categoria „{editingCategory}”")</h2></div>
+        <div class="editor-grid">
+            <label class="full-width" for="category-name">Denumire categorie *<input id="category-name" maxlength="100" @bind="categoryName" disabled="@saving" /></label>
+            @if (!creatingCategory) { <ChangeReasonField Id="category-reason" @bind-Value="reason" Disabled="@saving" /> }
+        </div>
+        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="SaveCategoryAsync">@(creatingCategory ? "Adaugă categoria" : "Salvează categoria")</button><button class="danger" disabled="@saving" @onclick="CancelEdit">Anulează</button></div>
+    </section>
+}
+else if (creatingSubcategory || editingSubcategory is not null)
+{
+    <section class="product-editor" aria-labelledby="subcategory-editor-title">
+        <div class="catalog-heading"><h2 id="subcategory-editor-title">@(creatingSubcategory ? $"Adaugă subcategorie în „{targetCategory}”" : $"Editează subcategoria „{editingSubcategory!.Subcategory}”")</h2></div>
+        <div class="editor-grid">
+            <label for="subcategory-name">Denumire subcategorie *<input id="subcategory-name" maxlength="100" @bind="subcategoryName" disabled="@saving" /></label>
+            <label for="subcategory-category">Categorie *<select id="subcategory-category" @bind="targetCategory" disabled="@(saving || creatingSubcategory)">@foreach (var category in Categories) { <option value="@category">@category</option> }</select></label>
+            @if (!creatingSubcategory) { <ChangeReasonField Id="subcategory-reason" @bind-Value="reason" Disabled="@saving" /> }
+        </div>
+        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="SaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="CancelEdit">Anulează</button></div>
+    </section>
+}
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă structura catalogului</h3></div>
+}
+else
+{
+    <div class="category-management-list">
+        @foreach (var category in Categories)
+        {
+            <section class="catalog category-management-card" aria-labelledby="@CategoryId(category)">
+                <div class="catalog-heading">
+                    <button type="button"
+                            class="category-disclosure"
+                            aria-expanded="@IsCategoryExpanded(category)"
+                            aria-controls="@CategoryContentId(category)"
+                            @onclick="() => ToggleCategory(category)">
+                        <span class="category-disclosure-text"><span class="category-title" id="@CategoryId(category)">@category</span><small>@SubcategoryCountLabel(category)</small><small>@ProductCount(category) produse asociate</small></span>
+                    </button>
+                    <div class="heading-actions"><button class="primary" disabled="@(saving || IsEditing)" @onclick="() => CreateSubcategory(category)">+ Adaugă subcategorie</button><button class="soft-success" disabled="@(saving || IsEditing)" @onclick="() => EditCategory(category)">Editează categoria</button></div>
+                </div>
+                @if (IsCategoryExpanded(category))
+                {
+                    <div id="@CategoryContentId(category)">
+                    @if (Subcategories(category).Count == 0)
+                    {
+                        <div class="empty-state compact"><p>Categoria nu are subcategorii.</p></div>
+                    }
+                    else
+                    {
+                        <div class="table-scroll"><table><thead><tr><th>SUBCATEGORIE</th><th>PRODUSE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                        @foreach (var group in Subcategories(category))
+                        {
+                            <tr @key="@($"{group.Category}:{group.Subcategory}")"><td><strong>@group.Subcategory</strong></td><td>@ProductCount(group) produse</td><td><button class="soft-success" disabled="@(saving || IsEditing)" @onclick="() => EditSubcategory(group)">Editează / Mută</button></td></tr>
+                        }
+                        </tbody></table></div>
+                    }
+                    </div>
+                }
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ProductGroup> groups = Array.Empty<ProductGroup>();
+    private IReadOnlyList<Product> products = Array.Empty<Product>();
+    private string? editingCategory;
+    private ProductGroup? editingSubcategory;
+    private bool creatingCategory, creatingSubcategory;
+    private string categoryName = "", subcategoryName = "", targetCategory = "", reason = "";
+    private string? error, notice;
+    private bool loading, saving;
+    private readonly HashSet<string> expandedCategories = new(StringComparer.Ordinal);
+    private readonly CancellationTokenSource lifetime = new();
+    private bool IsEditing => creatingCategory || creatingSubcategory || editingCategory is not null || editingSubcategory is not null;
+    private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Access.CanManageProductsAsync(lifetime.Token)) { error = "Nu ai dreptul să administrezi catalogul."; return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            var groupsTask = Repository.GetGroupsAsync(lifetime.Token);
+            var productsTask = Repository.GetProductsAsync(lifetime.Token);
+            await Task.WhenAll(groupsTask, productsTask);
+            groups = await groupsTask;
+            products = await productsTask;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Product group loading failed ({ErrorType}).", exception.GetType().Name); error = "Structura catalogului nu a putut fi încărcată."; }
+        finally { loading = false; }
+    }
+
+    private List<ProductGroup> Subcategories(string category) => groups
+        .Where(group => string.Equals(group.Category, category, StringComparison.OrdinalIgnoreCase) && group.Subcategory.Length > 0)
+        .OrderBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase).ToList();
+    private int ProductCount(string category) => products.Count(product => string.Equals(product.Category, category, StringComparison.OrdinalIgnoreCase));
+    private string SubcategoryCountLabel(string category)
+    {
+        var count = Subcategories(category).Count;
+        return $"{count} {(count == 1 ? "subcategorie" : "subcategorii")}";
+    }
+    private int ProductCount(ProductGroup group) => products.Count(product =>
+        string.Equals(product.Category, group.Category, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(product.Subcategory, group.Subcategory, StringComparison.OrdinalIgnoreCase));
+    private static string CategoryId(string category) => $"category-{TextNormalization.UniquenessKey(category).GetHashCode():x}";
+    private static string CategoryContentId(string category) => $"{CategoryId(category)}-content";
+    private bool IsCategoryExpanded(string category) => expandedCategories.Contains(TextNormalization.UniquenessKey(category));
+    private void ToggleCategory(string category)
+    {
+        var key = TextNormalization.UniquenessKey(category);
+        if (!expandedCategories.Add(key)) expandedCategories.Remove(key);
+    }
+
+    private void CreateCategory() { CancelEdit(); creatingCategory = true; categoryName = ""; notice = null; }
+    private void CreateSubcategory(string category) { CancelEdit(); creatingSubcategory = true; targetCategory = category; subcategoryName = ""; notice = null; }
+    private void EditCategory(string category) { CancelEdit(); editingCategory = category; categoryName = category; notice = null; }
+    private void EditSubcategory(ProductGroup group) { CancelEdit(); editingSubcategory = group; subcategoryName = group.Subcategory; targetCategory = group.Category; notice = null; }
+    private void CancelEdit() { creatingCategory = creatingSubcategory = false; editingCategory = null; editingSubcategory = null; reason = ""; error = null; }
+
+    private async Task SaveCategoryAsync()
+    {
+        if (saving || (!creatingCategory && editingCategory is null)) return;
+        saving = true; error = null;
+        try
+        {
+            if (creatingCategory) await Repository.CreateCategoryAsync(categoryName, lifetime.Token);
+            else await Repository.RenameCategoryAsync(editingCategory!, categoryName, reason, lifetime.Token);
+            var created = creatingCategory; CancelEdit(); notice = created ? "Categoria a fost adăugată." : "Categoria a fost actualizată."; await LoadAsync();
+        }
+        catch (ProductOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Category update failed ({ErrorType}).", exception.GetType().Name); error = "Categoria nu a putut fi actualizată."; }
+        finally { saving = false; }
+    }
+
+    private async Task SaveSubcategoryAsync()
+    {
+        if (saving || (!creatingSubcategory && editingSubcategory is null)) return;
+        saving = true; error = null;
+        try
+        {
+            if (creatingSubcategory) await Repository.CreateSubcategoryAsync(targetCategory, subcategoryName, lifetime.Token);
+            else await Repository.UpdateSubcategoryAsync(editingSubcategory!, subcategoryName, targetCategory, reason, lifetime.Token);
+            var created = creatingSubcategory; CancelEdit(); notice = created ? "Subcategoria a fost adăugată." : "Subcategoria a fost actualizată."; await LoadAsync();
+        }
+        catch (ProductOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Subcategory update failed ({ErrorType}).", exception.GetType().Name); error = "Subcategoria nu a putut fi actualizată."; }
+        finally { saving = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

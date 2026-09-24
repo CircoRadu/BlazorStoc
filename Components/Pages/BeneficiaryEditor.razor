@@ -1,0 +1,70 @@
+@using BlazorStoc.Services
+@inject IBeneficiaryRepository Repository
+@inject ILogger<BeneficiaryEditor> Logger
+@implements IDisposable
+
+<section class="product-editor" aria-labelledby="beneficiary-editor-title">
+    <div class="catalog-heading"><h2 id="beneficiary-editor-title">@(Original is null ? "Adaugă beneficiar" : $"Editează beneficiarul #{Original.Id}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="beneficiary-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="beneficiary-name">Nume beneficiar *<InputText id="beneficiary-name" @bind-Value="input.Name" maxlength="200" autocomplete="organization" /><ValidationMessage For="() => input.Name" /></label>
+                <label for="beneficiary-cui">CUI *<InputText id="beneficiary-cui" @bind-Value="input.Cui" maxlength="12" autocomplete="off" /><small>2–10 cifre, opțional precedate de RO.</small><ValidationMessage For="() => input.Cui" /></label>
+                @if (Original is not null)
+                {
+                    <ChangeReasonField Id="beneficiary-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
+                }
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează beneficiarul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter] public Beneficiary? Original { get; set; }
+    [Parameter] public EventCallback<Beneficiary> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    private BeneficiaryInput input = new();
+    private bool saving;
+    private string? error, reasonError;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override Task OnInitializedAsync()
+    {
+        input = Original is null ? new() : BeneficiaryInput.From(Original);
+        return Task.CompletedTask;
+    }
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
+        if (reasonError is not null) return;
+        saving = true;
+        error = null;
+        Beneficiary? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (BeneficiaryOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Beneficiary saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Beneficiarul nu a putut fi salvat. Datele formularului au fost păstrate; actualizează lista înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) await Saved.InvokeAsync(saved);
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

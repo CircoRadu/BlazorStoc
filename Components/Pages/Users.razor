@@ -1,0 +1,145 @@
+@page "/utilizatori"
+@attribute [Authorize(Roles = AccessRoles.Administrator)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IUserRepository Repository
+@inject IAccessControl Access
+@inject AppMode Mode
+@inject NavigationManager Navigation
+@inject ILogger<Users> Logger
+@implements IDisposable
+
+<PageTitle>Utilizatori · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">ADMINISTRARE ACCES</p><h1>Utilizatori</h1><p class="muted">Gestionează persoanele care se pot autentifica și nivelul lor de acces.</p></div>@if (authorized) { <div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă utilizator</button></div> }</div>
+@if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Mod demonstrativ.</strong> Modificările utilizatorilor sunt salvate în baza de date locală și rămân disponibile după repornire.</div></div> }
+@if (!authorized && !loading) { <div class="error-banner" role="alert">Nu ai drepturi de administrator. Conturile cu acces limitat pot consulta numai catalogul.</div> }
+@if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (editing) { <UserEditor @key="editorKey" Original="editingUser" Saved="UserSavedAsync" Closed="CloseEditorAsync" /> }
+
+@if (authorized)
+{
+    <section class="metrics users-metrics" aria-label="Rezumat utilizatori">
+        <article><span>Total utilizatori</span><strong>@(loaded ? users.Count.ToString() : "—")</strong><small>Conturi configurate</small><i>♙</i></article>
+        <article><span>Administratori activi</span><strong>@(loaded ? users.Count(user => user.IsActive && user.Role == AccessRoles.Administrator).ToString() : "—")</strong><small>Acces complet</small><i>◆</i></article>
+        <article><span>Utilizatori</span><strong>@(loaded ? users.Count(user => user.Role == AccessRoles.LimitedUser).ToString() : "—")</strong><small>Gestiune produse</small><i>◇</i></article>
+        <article><span>Conturi inactive</span><strong>@(loaded ? users.Count(user => !user.IsActive).ToString() : "—")</strong><small>Autentificare blocată</small><i class="amber">○</i></article>
+    </section>
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Conturi web <span>@users.Count</span></h2><small>Parolele nu sunt afișate și nu pot fi recuperate</small></div>
+        @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă utilizatorii</h3></div> }
+        else if (users.Count == 0) { <div class="empty-state"><span class="empty-icon">♙</span><h3>Nu există utilizatori web</h3><p>Adaugă primul cont. Administratorul configurat în mediu poate fi folosit pentru inițializare.</p></div> }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>UTILIZATOR</th><th>NUME AFIȘAT</th><th>NIVEL ACCES</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var user in users)
+            {
+                <tr @key="user.Id"><td><strong>@user.Username</strong><small class="user-id">#@user.Id</small></td><td>@user.DisplayName</td><td><span class="role-badge @(user.Role == AccessRoles.Administrator ? "admin" : "limited")">@user.Role</span></td><td><span class="stock-badge @(user.IsActive ? "positive" : "zero")">@(user.IsActive ? "Activ" : "Inactiv")</span></td><td><div class="row-buttons"><button class="row-action edit" aria-label="Editează @user.Username" @onclick="() => OpenEditorAsync(user)">✎</button><button class="row-action delete" aria-label="Șterge @user.Username" @onclick="() => RequestDeleteAsync(user)">×</button></div></td></tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+}
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi utilizatorul?" Subject="Utilizatorul"
+                              ObjectLabel="@($"{deleting.Username} · {deleting.DisplayName}")"
+                              Description="Contul nu se va mai putea autentifica. Pentru o suspendare temporară, folosește editarea și debifează «Cont activ»."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteUserAsync"
+                              Cancelled="CancelDeleteAsync" />
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
+    private IReadOnlyList<WebUser> users = Array.Empty<WebUser>();
+    private WebUser? editingUser, deleting;
+    private bool loading, syncing, loaded, authorized, editing, deleteBusy;
+    private string? error, notice, deleteError;
+    private Guid editorKey;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(true);
+        _ = SynchronizePeriodicallyAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (EditId is > 0 && loaded && (!editing || editingUser?.Id != EditId.Value))
+        {
+            var requested = users.FirstOrDefault(user => user.Id == EditId.Value);
+            if (requested is not null) await OpenEditorAsync(requested);
+            else error = "Utilizatorul solicitat pentru editare nu mai există.";
+        }
+    }
+
+    private Task RetryLoadAsync() => LoadAsync(true);
+
+    private async Task LoadAsync(bool showLoading)
+    {
+        if (syncing) return;
+        syncing = true;
+        if (showLoading) loading = true;
+        error = null;
+        try
+        {
+            authorized = await Access.IsAdministratorAsync(lifetime.Token);
+            users = authorized ? await Repository.GetUsersAsync(lifetime.Token) : Array.Empty<WebUser>();
+            loaded = authorized;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { authorized = false; error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("User loading failed ({ErrorType}).", exception.GetType().Name); error = "Utilizatorii nu au putut fi încărcați. Verifică schema și conexiunea locală la baza de date."; }
+        finally { loading = false; syncing = false; }
+    }
+
+    private async Task SynchronizePeriodicallyAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+            {
+                await InvokeAsync(async () =>
+                {
+                    if (!editing && deleting is null)
+                    {
+                        await LoadAsync(false);
+                        StateHasChanged();
+                    }
+                });
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+    }
+    private Task OpenEditorAsync(WebUser? user) { editingUser = user; editorKey = Guid.NewGuid(); editing = true; notice = null; return Task.CompletedTask; }
+    private Task CloseEditorAsync()
+    {
+        editing = false; editingUser = null;
+        if (EditId is not null) { EditId = null; Navigation.NavigateTo("/utilizatori"); }
+        return Task.CompletedTask;
+    }
+    private async Task UserSavedAsync(WebUser user)
+    {
+        var created = editingUser is null;
+        users = users.Where(existing => existing.Id != user.Id).Append(user).OrderBy(existing => existing.Username).ToArray();
+        await CloseEditorAsync();
+        notice = created ? "Utilizatorul a fost adăugat." : "Utilizatorul a fost actualizat.";
+    }
+    private Task RequestDeleteAsync(WebUser user) { deleting = user; deleteError = null; notice = null; return Task.CompletedTask; }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+    private async Task DeleteUserAsync(string reason)
+    {
+        if (deleteBusy || deleting is null) return;
+        deleteBusy = true; deleteError = null;
+        try { await Repository.DeleteAsync(deleting, reason, lifetime.Token); users = users.Where(user => user.Id != deleting.Id).ToArray(); deleting = null; notice = "Utilizatorul a fost mutat în arhivă."; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("User deletion failed ({ErrorType}).", exception.GetType().Name); deleteError = "Utilizatorul nu a putut fi șters. Actualizează lista și reîncearcă."; }
+        finally { deleteBusy = false; }
+    }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

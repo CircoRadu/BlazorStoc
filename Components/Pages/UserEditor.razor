@@ -1,0 +1,72 @@
+@using BlazorStoc.Services
+@inject IUserRepository Repository
+@inject ILogger<UserEditor> Logger
+@implements IDisposable
+
+<section class="product-editor" aria-labelledby="user-editor-title">
+    <div class="catalog-heading"><h2 id="user-editor-title">@(Original is null ? "Adaugă utilizator" : $"Editează utilizatorul #{Original.Id}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="user-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="user-username">Nume utilizator *<InputText id="user-username" @bind-Value="input.Username" maxlength="100" autocomplete="off" /><ValidationMessage For="() => input.Username" /></label>
+                <label for="user-display-name">Nume afișat *<InputText id="user-display-name" @bind-Value="input.DisplayName" maxlength="150" autocomplete="off" /><ValidationMessage For="() => input.DisplayName" /></label>
+                <label for="user-role">Nivel de acces *<InputSelect id="user-role" @bind-Value="input.Role"><option value="@AccessRoles.LimitedUser">Utilizator — gestiune produse</option><option value="@AccessRoles.Administrator">Administrator — acces complet</option></InputSelect></label>
+                <label for="user-password">@(Original is null ? "Parolă *" : "Parolă nouă")<InputText id="user-password" type="password" @bind-Value="input.Password" maxlength="200" autocomplete="new-password" /><small>@(Original is null ? "Minimum 12 caractere." : "Lasă necompletat pentru a păstra parola actuală.")</small><ValidationMessage For="() => input.Password" /></label>
+                @if (Original is not null)
+                {
+                    <label class="check-label full-width" for="user-active"><InputCheckbox id="user-active" @bind-Value="input.IsActive" /> Cont activ</label>
+                    <ChangeReasonField Id="user-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
+                }
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează utilizatorul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter] public WebUser? Original { get; set; }
+    [Parameter] public EventCallback<WebUser> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    private WebUserInput input = new();
+    private bool saving;
+    private string? error, reasonError;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override Task OnInitializedAsync()
+    {
+        input = Original is null ? new WebUserInput() : WebUserInput.From(Original);
+        return Task.CompletedTask;
+    }
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
+        if (reasonError is not null) return;
+        saving = true; error = null;
+        WebUser? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("User saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Utilizatorul nu a putut fi salvat. Datele formularului sunt păstrate; actualizează lista înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) await Saved.InvokeAsync(saved);
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

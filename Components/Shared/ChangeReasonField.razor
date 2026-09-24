@@ -1,0 +1,25 @@
+@using BlazorStoc.Services
+
+<label class="change-reason-field @CssClass" for="@Id">
+    <span>Motivare modificare *</span>
+    <textarea id="@Id" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@Disabled"
+              value="@Value" @oninput="ValueInputAsync" aria-required="true" aria-describedby="@DescriptionId"></textarea>
+    <small id="@DescriptionId">Descrie motivul editării sau al ștergerii. Informația va fi păstrată în jurnalul de activitate.</small>
+    @if (Error is not null) { <span class="validation-message" role="alert">@Error</span> }
+</label>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string CssClass { get; set; } = "full-width";
+    private string DescriptionId => $"{Id}-description";
+
+    private async Task ValueInputAsync(ChangeEventArgs args)
+    {
+        Value = args.Value?.ToString() ?? string.Empty;
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

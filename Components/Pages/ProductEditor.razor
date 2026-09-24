@@ -1,0 +1,180 @@
+@using BlazorStoc.Services
+@inject IProductRepository Repository
+@inject IProductImageStore ImageStore
+@inject AppMode Mode
+@inject ILogger<ProductEditor> Logger
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<section class="product-editor" aria-labelledby="editor-title">
+    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? "Adaugă produs" : $"Editează produsul #{Original.Id}")</h2><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></div>
+    @if (Mode.IsDemo) { <p class="form-note">Mod demo: modificările sunt salvate în baza de date locală și rămân disponibile după repornirea aplicației.</p> }
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="product-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label class="full-width" for="product-name">Denumire *<InputText id="product-name" @bind-Value="input.Name" maxlength="100" autocomplete="off" /><ValidationMessage For="() => input.Name" /></label>
+                <label for="product-category">Categorie *<InputSelect id="product-category" @bind-Value="input.Category" @bind-Value:after="CategoryChangedAsync">@foreach (var category in Categories) { <option value="@category">@category</option> }</InputSelect><ValidationMessage For="() => input.Category" /></label>
+                <label for="product-subcategory">Subcategorie *<InputSelect id="product-subcategory" @bind-Value="input.Subcategory">@foreach (var subcategory in Subcategories) { <option value="@subcategory">@subcategory</option> }</InputSelect><ValidationMessage For="() => input.Subcategory" /></label>
+                <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>.</p>
+                @if (!HasSelectableGroup) { <p class="validation-message full-width" role="alert">Nu există nicio combinație categorie–subcategorie disponibilă. Creează mai întâi o subcategorie în pagina dedicată.</p> }
+                <label class="full-width" for="product-description">Descriere<InputTextArea id="product-description" @bind-Value="input.Description" maxlength="1000" rows="3" /><ValidationMessage For="() => input.Description" /></label>
+                <div class="product-image-editor full-width">
+                    <div class="image-preview-card">
+                        <img src="@ImagePreviewUrl" alt="Previzualizare imagine pentru produs" />
+                    </div>
+                    <div class="image-inputs">
+                        <strong>Imagine produs (opțional)</strong>
+                        <InputFile id="product-image-input" OnChange="ImageSelectedAsync" accept="image/jpeg,image/png,image/webp,image/gif" />
+                        <div class="clipboard-zone" @ref="pasteArea" tabindex="0">
+                            <span>Lipește aici imaginea cu <kbd>Ctrl</kbd> + <kbd>V</kbd></span>
+                            <button type="button" class="refresh" @onclick="ReadClipboardAsync">Preia imaginea din clipboard</button>
+                        </div>
+                        <small>Dacă nu alegi o imagine, produsul va folosi automat imaginea generică „No img available”.</small>
+                        <small>Formate acceptate: JPG, PNG, WebP sau GIF. Dimensiune maximă: 5 MB.</small>
+                        @if (imageFileName is not null) { <span class="selected-image-name">Imagine selectată: @imageFileName</span> }
+                        @if (imageError is not null) { <span class="validation-message">@imageError</span> }
+                    </div>
+                </div>
+                <label for="product-quantity">@(Original is null ? "Stoc inițial (bucăți)" : "Cantitate (bucăți)")<InputNumber id="product-quantity" @bind-Value="input.Quantity" ParsingErrorMessage="Introdu un număr întreg valid pentru cantitate." /><ValidationMessage For="() => input.Quantity" /></label>
+                @if (Original is not null)
+                {
+                    <ChangeReasonField Id="product-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
+                }
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit" disabled="@(!HasSelectableGroup)">@(saving ? "Se salvează…" : "Salvează produsul")</button><button class="danger" type="button" @onclick="Close">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter] public Product? Original { get; set; }
+    [Parameter] public string InitialCategory { get; set; } = "";
+    [Parameter] public string InitialSubcategory { get; set; } = "";
+    [Parameter] public IReadOnlyList<ProductGroup> Groups { get; set; } = Array.Empty<ProductGroup>();
+    [Parameter] public EventCallback<Product> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    private ProductInput input = new();
+    private bool saving;
+    private string? error, reasonError, imageError, imageFileName, imagePreviewUrl;
+    private ProductImageData? selectedImage;
+    private ElementReference pasteArea;
+    private IJSObjectReference? imageModule;
+    private readonly CancellationTokenSource lifetime = new();
+    private string ImagePreviewUrl => imagePreviewUrl ?? (Original is null ? ProductImageRules.PlaceholderUrl : $"/media/products/{Original.Id}?v={Original.Version}");
+    private IReadOnlyList<string> Categories => Groups.Select(group => group.Category)
+        .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase)
+        .Order(StringComparer.CurrentCultureIgnoreCase).ToArray();
+    private IReadOnlyList<string> Subcategories => Groups
+        .Where(group => string.Equals(group.Category, input.Category, StringComparison.OrdinalIgnoreCase))
+        .Select(group => group.Subcategory).Where(value => !string.IsNullOrWhiteSpace(value))
+        .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToArray();
+    private bool HasSelectableGroup => Categories.Count > 0 && Subcategories.Count > 0;
+
+    protected override void OnInitialized()
+    {
+        input = Original is null
+            ? new ProductInput { Category = InitialCategory, Subcategory = InitialSubcategory }
+            : ProductInput.From(Original);
+        NormalizeGroupSelection();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            imageModule = await JS.InvokeAsync<IJSObjectReference>("import", "./product-image.js");
+            await imageModule.InvokeVoidAsync("attachPaste", pasteArea, "product-image-input");
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException exception)
+        {
+            Logger.LogWarning("Product image clipboard module could not be loaded ({ErrorType}).", exception.GetType().Name);
+            imageError = "Preluarea din clipboard nu este disponibilă momentan. Poți selecta imaginea dintr-un fișier.";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+    private Task CategoryChangedAsync()
+    {
+        input.Subcategory = Subcategories.FirstOrDefault() ?? "";
+        return Task.CompletedTask;
+    }
+    private void NormalizeGroupSelection()
+    {
+        input.Category = Categories.FirstOrDefault(category =>
+            string.Equals(category, input.Category, StringComparison.OrdinalIgnoreCase)) ?? Categories.FirstOrDefault() ?? "";
+        input.Subcategory = Subcategories.FirstOrDefault(subcategory =>
+            string.Equals(subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)) ?? Subcategories.FirstOrDefault() ?? "";
+    }
+    private Task Close() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
+        if (reasonError is not null) return;
+        saving = true; error = null;
+        Product? saved = null;
+        try
+        {
+            saved = Original is null ? await Repository.CreateAsync(input, lifetime.Token) : await Repository.UpdateAsync(Original, input, lifetime.Token);
+            if (selectedImage is not null) await ImageStore.SaveAsync(saved.Id, selectedImage, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProductOperationException ex) { error = ex.Message; }
+        catch (Exception ex)
+        {
+            Logger.LogError("Product saving failed ({ErrorType}).", ex.GetType().Name);
+            error = "Salvarea nu a putut fi confirmată. Datele formularului sunt păstrate. Verifică în catalog dacă modificarea apare înainte să reîncerci; dacă problema continuă, verifică accesul de scriere și pregătirea bazei cu administratorul.";
+        }
+        finally { saving = false; }
+        if (saved is not null) await Saved.InvokeAsync(saved);
+    }
+
+    private async Task ImageSelectedAsync(InputFileChangeEventArgs eventArgs)
+    {
+        imageError = null;
+        try
+        {
+            var file = eventArgs.File;
+            if (file.Size > ProductImageRules.MaximumBytes) throw new ProductImageException("Imaginea poate avea cel mult 5 MB.");
+            await using var stream = file.OpenReadStream(ProductImageRules.MaximumBytes, lifetime.Token);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory, lifetime.Token);
+            var content = memory.ToArray();
+            var contentType = ProductImageRules.DetectContentType(content);
+            selectedImage = new(content, contentType, file.Name);
+            imageFileName = file.Name;
+            imagePreviewUrl = $"data:{contentType};base64,{Convert.ToBase64String(content)}";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProductImageException exception) { selectedImage = null; imageError = exception.Message; }
+        catch (Exception exception) { selectedImage = null; Logger.LogError("Product image loading failed ({ErrorType}).", exception.GetType().Name); imageError = "Imaginea nu a putut fi citită."; }
+    }
+
+    private async Task ReadClipboardAsync()
+    {
+        imageError = null;
+        try
+        {
+            if (imageModule is null) throw new InvalidOperationException();
+            if (!await imageModule.InvokeAsync<bool>("readClipboard", "product-image-input"))
+                imageError = "Clipboard-ul nu conține o imagine.";
+        }
+        catch (JSException) { imageError = "Browserul nu a permis citirea clipboard-ului. Selectează zona și folosește Ctrl+V."; }
+        catch (InvalidOperationException) { imageError = "Funcția clipboard nu este încă disponibilă. Reîncearcă."; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (imageModule is not null)
+        {
+            try { await imageModule.InvokeVoidAsync("detachPaste", pasteArea); await imageModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+        lifetime.Dispose();
+    }
+}

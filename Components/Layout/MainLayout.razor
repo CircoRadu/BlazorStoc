@@ -1,0 +1,119 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@using Microsoft.AspNetCore.WebUtilities
+@inject BlazorStoc.Services.AppMode Mode
+@inject BlazorStoc.Services.IProductRepository Products
+@inject NavigationManager Navigation
+
+<div class="app-shell">
+    <aside class="sidebar">
+        <a class="brand" href="/"><span class="brand-icon">B</span><span>Blazor<span class="brand-light">Stoc</span><small>ESP · GESTIUNE</small></span></a>
+        @if (productSection)
+        {
+            <a class="nav-back" href="/"><span>←</span> Meniu principal</a>
+            <p class="nav-label category-label">CATEGORII PRODUSE</p>
+            <a class="nav-item @(selectedCategory.Length == 0 ? "active" : "")" href="/produse"><span>▦</span> Toate produsele <span class="nav-arrow">→</span></a>
+            @foreach (var category in categories)
+            {
+                var isSelected = string.Equals(category, selectedCategory, StringComparison.OrdinalIgnoreCase);
+                <a class="nav-item category-item @(isSelected ? "active" : "")" href="@ProductUrl(category)"><span>▪</span> @category <span class="nav-arrow">@(isSelected ? "⌄" : "→")</span></a>
+                @if (isSelected)
+                {
+                    <div class="category-submenu" aria-label="Subcategorii @category">
+                        @foreach (var subcategory in Subcategories(category))
+                        {
+                            <a class="@(string.Equals(subcategory, selectedSubcategory, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@ProductUrl(category, subcategory)">@subcategory</a>
+                        }
+                    </div>
+                }
+            }
+        }
+        else
+        {
+            <p class="nav-label">SPAȚIU DE LUCRU</p>
+            <NavLink class="nav-item" href="/" Match="NavLinkMatch.All"><span>⌂</span> Pagina principală <span class="nav-arrow">→</span></NavLink>
+            <NavLink class="nav-item" href="/produse" Match="NavLinkMatch.Prefix"><span>▦</span> Produse și stocuri <span class="nav-arrow">→</span></NavLink>
+            <details class="administration-menu" open="@administrationSection">
+                <summary class="nav-item administration-parent @(administrationSection ? "active" : "")"><span>⚙</span> Administrare <span class="nav-arrow administration-arrow" aria-hidden="true"></span></summary>
+                <div id="administration-submenu" class="administration-submenu" aria-label="Administrare">
+                    <NavLink href="/categorii" Match="NavLinkMatch.Prefix">Categorii</NavLink>
+                    <NavLink href="/beneficiari" Match="NavLinkMatch.Prefix">Beneficiari</NavLink>
+                    <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView>
+                </div>
+            </details>
+            <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+        }
+        <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>@(Mode.IsDemo ? "Date demonstrative" : "BlazorStoc · MariaDB")</small></div>
+    </aside>
+    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">@(Mode.IsDemo ? "Mod demonstrativ" : "Sesiune autentificată")</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><a class="logout-action" href="/Account/Logout">Deconectare</a><span class="avatar">ES</span></div></header><main class="workspace">@Body</main></div>
+</div>
+<div id="blazor-error-ui" role="alert">Conexiunea cu aplicația a fost întreruptă. <a href="" class="reload">Reîncarcă pagina</a><a class="dismiss">×</a></div>
+
+@code {
+    private IReadOnlyList<BlazorStoc.Services.ProductGroup> groups = Array.Empty<BlazorStoc.Services.ProductGroup>();
+    private List<string> categories = [];
+    private bool productSection, administrationSection;
+    private string selectedCategory = "", selectedSubcategory = "";
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += LocationChanged;
+        ReadLocation();
+        if (productSection) await LoadGroupsAsync();
+    }
+
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => _ = RefreshNavigationAsync();
+
+    private async Task RefreshNavigationAsync()
+    {
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                ReadLocation();
+                if (productSection) await LoadGroupsAsync();
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+    }
+
+    private void ReadLocation()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        productSection = uri.AbsolutePath.Equals("/produse", StringComparison.OrdinalIgnoreCase);
+        administrationSection = uri.AbsolutePath.StartsWith("/categorii", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/beneficiari", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        selectedCategory = productSection && query.TryGetValue("categorie", out var categoryValue) ? categoryValue.ToString() : "";
+        selectedSubcategory = productSection && query.TryGetValue("subcategorie", out var subcategoryValue) ? subcategoryValue.ToString() : "";
+    }
+
+    private async Task LoadGroupsAsync()
+    {
+        groups = await Products.GetGroupsAsync(lifetime.Token);
+        categories = groups.Select(g => g.Category).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    private IEnumerable<string> Subcategories(string category) => groups
+        .Where(g => string.Equals(g.Category, category, StringComparison.OrdinalIgnoreCase))
+        .Select(g => g.Subcategory)
+        .Where(s => !string.IsNullOrWhiteSpace(s))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Order(StringComparer.CurrentCultureIgnoreCase);
+
+    private static string ProductUrl(string category, string? subcategory = null)
+    {
+        var url = $"/produse?categorie={Uri.EscapeDataString(category)}";
+        return string.IsNullOrWhiteSpace(subcategory) ? url : $"{url}&subcategorie={Uri.EscapeDataString(subcategory)}";
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= LocationChanged;
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

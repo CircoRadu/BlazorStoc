@@ -1,0 +1,139 @@
+@using BlazorStoc.Services
+
+<div class="delete-overlay">
+    <section class="delete-dialog delete-confirmation-dialog" role="dialog" aria-modal="true"
+             aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
+        @if (step == DeleteStep.Reason)
+        {
+            <h2 id="@TitleId">@Title</h2>
+            <p class="delete-object"><strong>@ObjectLabel</strong></p>
+            @if (!string.IsNullOrWhiteSpace(Description))
+            {
+                <p id="@DescriptionId">@Description</p>
+            }
+            <fieldset class="delete-reason-options" disabled="@Busy">
+                <legend>Motivul ștergerii</legend>
+                <label>
+                    <input type="radio" name="@ChoiceName" value="@DeleteConfirmationRules.DefaultChoice"
+                           autofocus
+                           checked="@(choice == DeleteConfirmationRules.DefaultChoice)"
+                           @onchange="() => SelectChoice(DeleteConfirmationRules.DefaultChoice)" />
+                    <span>@DefaultReason</span>
+                </label>
+                <label>
+                    <input type="radio" name="@ChoiceName" value="@DeleteConfirmationRules.CustomChoice"
+                           checked="@(choice == DeleteConfirmationRules.CustomChoice)"
+                           @onchange="() => SelectChoice(DeleteConfirmationRules.CustomChoice)" />
+                    <span>Alt motiv</span>
+                </label>
+            </fieldset>
+            @if (choice == DeleteConfirmationRules.CustomChoice)
+            {
+                <ChangeReasonField Id="@ReasonId" @bind-Value="customReason" Error="@reasonError"
+                                   Disabled="@Busy" CssClass="delete-custom-reason" />
+            }
+            else if (reasonError is not null)
+            {
+                <div class="validation-message" role="alert">@reasonError</div>
+            }
+            @if (Error is not null)
+            {
+                <div class="error-banner delete-error" role="alert">@Error</div>
+            }
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@Busy" @onclick="ContinueAsync">Continuă</button>
+                <button type="button" class="danger" disabled="@Busy" @onclick="CancelAsync">Anulează</button>
+            </div>
+        }
+        else
+        {
+            <h2 id="@TitleId">Confirmă definitiv ștergerea</h2>
+            <p id="@DescriptionId">Introdu cuvântul <strong><code>@DeleteConfirmationRules.ConfirmationWord</code></strong> pentru a continua.</p>
+            <label class="delete-confirmation-input" for="@ConfirmationId">
+                Confirmare
+                <input id="@ConfirmationId" autocomplete="off" spellcheck="false" disabled="@Busy"
+                       @bind="confirmation" @bind:event="oninput" />
+            </label>
+            <p class="form-note">Operația va muta obiectul în arhivă și va fi înregistrată în jurnal.</p>
+            <div class="editor-actions">
+                <button type="button" class="danger" disabled="@(Busy || !CanConfirm)" @onclick="ConfirmAsync">
+                    @(Busy ? "Se șterge…" : "Confirmă ștergerea")
+                </button>
+                <button type="button" class="danger" disabled="@Busy" @onclick="CancelAsync">Anulează</button>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Subject { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ObjectLabel { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> Confirmed { get; set; }
+    [Parameter, EditorRequired] public EventCallback Cancelled { get; set; }
+
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private DeleteStep step;
+    private string choice = string.Empty;
+    private string customReason = string.Empty;
+    private string confirmation = string.Empty;
+    private string? reasonError;
+    private string TitleId => $"delete-title-{instanceId}";
+    private string DescriptionId => $"delete-description-{instanceId}";
+    private string ChoiceName => $"delete-reason-{instanceId}";
+    private string ReasonId => $"delete-custom-reason-{instanceId}";
+    private string ConfirmationId => $"delete-confirmation-{instanceId}";
+    private string DefaultReason => DeleteConfirmationRules.DefaultReason(Subject);
+    private bool CanConfirm => DeleteConfirmationRules.IsConfirmationValid(confirmation);
+
+    protected override void OnParametersSet()
+    {
+        if (!Busy && Error is not null && step == DeleteStep.Confirmation)
+        {
+            step = DeleteStep.Reason;
+            confirmation = string.Empty;
+        }
+    }
+
+    private Task ContinueAsync()
+    {
+        reasonError = DeleteConfirmationRules.ValidateReason(choice, customReason);
+        if (reasonError is null)
+        {
+            step = DeleteStep.Confirmation;
+            confirmation = string.Empty;
+        }
+        return Task.CompletedTask;
+    }
+
+    private void SelectChoice(string value)
+    {
+        choice = value;
+        reasonError = null;
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (Busy || !CanConfirm) return;
+        reasonError = DeleteConfirmationRules.ValidateReason(choice, customReason);
+        if (reasonError is not null)
+        {
+            step = DeleteStep.Reason;
+            return;
+        }
+        await Confirmed.InvokeAsync(DeleteConfirmationRules.ResolveReason(Subject, choice, customReason));
+    }
+
+    private async Task CancelAsync()
+    {
+        step = DeleteStep.Reason;
+        choice = customReason = confirmation = string.Empty;
+        reasonError = null;
+        await Cancelled.InvokeAsync();
+    }
+
+    private enum DeleteStep { Reason, Confirmation }
+}

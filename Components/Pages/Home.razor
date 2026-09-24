@@ -1,0 +1,164 @@
+@page "/produse"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProductRepository Repository
+@inject IProductImageStore ImageStore
+@inject AppMode Mode
+@inject IAccessControl Access
+@inject NavigationManager Navigation
+@inject ILogger<Home> Logger
+@implements IDisposable
+
+<PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">INVENTAR CENTRALIZAT</p><h1>Produse și stocuri</h1><p class="muted">Găsește rapid produsele și verifică disponibilitatea lor.</p></div><div class="heading-actions"><a class="refresh" href="/">← Meniu principal</a>@if (canManage) { <a class="refresh" href="/categorii">Administrează categorii</a><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă produs</button> }<button class="refresh" disabled="@(loading || editing || deleting is not null)" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
+@if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Explorezi o colecție demonstrativă.</strong> Produsele de mai jos sunt exemple, fără legătură cu stocul real.</div></div> }
+@if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (editing) { <ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" /> }
+<section class="metrics" aria-label="Rezumat inventar">
+    <article><span>Produse în selecție</span><strong>@(loaded ? ScopedProducts.Count.ToString("N0") : "—")</strong><small>@SelectionDescription</small><i>▦</i></article>
+    <article><span>Categorii</span><strong>@(loaded ? ScopedProducts.Select(p => p.Category).Distinct(StringComparer.OrdinalIgnoreCase).Count().ToString() : "—")</strong><small>În selecția curentă</small><i>▤</i></article>
+    <article><span>Fără stoc</span><strong>@(loaded ? ScopedProducts.Count(p => p.Quantity == 0).ToString() : "—")</strong><small>Cantitate disponibilă zero</small><i class="amber">○</i></article>
+    <article><span>Stoc negativ</span><strong>@(loaded ? ScopedProducts.Count(p => p.Quantity < 0).ToString() : "—")</strong><small>De verificat în selecție</small><i class="red">!</i></article>
+</section>
+<section class="catalog"><div class="catalog-heading"><h2>Catalog produse <span>@Filtered.Count</span></h2><small>@(lastLoaded is null ? "În așteptarea datelor" : $"Actualizat la {lastLoaded:HH:mm:ss} UTC")</small></div>
+<div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după nume sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label></div>
+@if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
+else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
+else { <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => selected = p">@p.Name</button><small>#@p.Id.ToString("D4") · @p.Description</small></div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small></td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td><button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => selected = p">↗</button></td></tr> }</tbody></table></div> }
+<footer class="table-footer"><span>@Filtered.Count @(Filtered.Count == 1 ? "rezultat" : "rezultate")</span><div class="pagination"><button disabled="@(page <= 1)" @onclick="() => page--" aria-label="Pagina anterioară">‹</button><span>Pagina @(page) din @Pages</span><button disabled="@(page >= Pages)" @onclick="() => page++" aria-label="Pagina următoare">›</button></div></footer></section>
+<p class="workspace-note"><span class="status-dot"></span> @(Mode.IsDemo ? "Date demonstrative" : "Date din BlazorStoc") <span>·</span> Catalog și gestiune produse</p>
+@if (selected is not null) { <div class="detail-overlay" @onclick="CloseDetailsAsync"><section class="detail-panel" role="dialog" aria-modal="true" aria-labelledby="detail-title" @onclick:stopPropagation="true"><button class="close-detail" @onclick="CloseDetailsAsync" aria-label="Închide detaliile">×</button><p class="eyebrow">PRODUS #@selected.Id</p><h2 id="detail-title">@selected.Name</h2><button type="button" class="detail-product-image" aria-label="Mărește imaginea pentru @selected.Name" @onclick="() => imagePreview = selected"><img src="@ProductImageUrl(selected)" alt="Imagine pentru @selected.Name" /></button><span class="stock-badge @StockClass(selected.Quantity)">@StockLabel(selected.Quantity)</span><dl><dt>Categorie</dt><dd>@selected.Category</dd><dt>Subcategorie</dt><dd>@selected.Subcategory</dd><dt>Cantitate</dt><dd>@selected.Quantity buc.</dd><dt>Descriere</dt><dd>@selected.Description</dd></dl>@if (canManage) { <div class="editor-actions"><button class="primary" disabled="@editing" @onclick="() => OpenEditorAsync(selected)">Editează</button><button class="danger" disabled="@editing" @onclick="() => RequestDeleteAsync(selected)">Șterge</button></div> }</section></div> }
+
+@if (imagePreview is not null)
+{
+    <div class="image-lightbox" role="dialog" aria-modal="true" aria-label="Imagine mărită pentru @imagePreview.Name" @onclick="CloseImagePreviewAsync">
+        <button type="button" class="image-lightbox-close" aria-label="Închide imaginea" @onclick="CloseImagePreviewAsync">×</button>
+        <figure @onclick:stopPropagation="true"><img src="@ProductImageUrl(imagePreview)" alt="Imagine mărită pentru @imagePreview.Name" /><figcaption>@imagePreview.Name</figcaption></figure>
+    </div>
+}
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi produsul?" Subject="Produsul"
+                              ObjectLabel="@deleting.Name"
+                              Description="Produsul trebuie să aibă stoc zero și să nu aibă mișcări de stoc. Imaginea asociată va fi mutată în arhivă."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteProductAsync"
+                              Cancelled="CancelDeleteAsync" />
+}
+@code {
+    [SupplyParameterFromQuery(Name = "categorie")] public string? CategoryQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "subcategorie")] public string? SubcategoryQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
+    private IReadOnlyList<Product> products = Array.Empty<Product>();
+    private string query = "", category = "", subcategory = "", stock = "";
+    private string? error, notice, deleteError;
+    private IReadOnlyList<ProductGroup> groups = Array.Empty<ProductGroup>();
+    private Product? editingProduct, deleting;
+    private bool editing, deleteBusy;
+    private bool canManage;
+    private Guid editorKey;
+    private bool loading, loaded;
+    private bool quantityDescending = true;
+    private int page = 1;
+    private const int PageSize = 10;
+    private Product? selected, imagePreview;
+    private DateTime? lastLoaded;
+    private readonly CancellationTokenSource lifetime = new();
+    private List<Product> ScopedProducts => products
+        .Where(p => string.IsNullOrWhiteSpace(category) || string.Equals(p.Category, category, StringComparison.OrdinalIgnoreCase))
+        .Where(p => string.IsNullOrWhiteSpace(subcategory) || string.Equals(p.Subcategory, subcategory, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+    private string SelectionDescription => !string.IsNullOrWhiteSpace(subcategory)
+        ? $"Subcategoria {subcategory}"
+        : !string.IsNullOrWhiteSpace(category) ? $"Categoria {category}" : "Întregul catalog";
+    private List<Product> Filtered
+    {
+        get
+        {
+            var filtered = ProductSearch.Filter(products, query, "all", category, stock)
+                .Where(p => string.IsNullOrWhiteSpace(subcategory) || string.Equals(p.Subcategory, subcategory, StringComparison.OrdinalIgnoreCase));
+            return (quantityDescending ? filtered.OrderByDescending(p => p.Quantity) : filtered.OrderBy(p => p.Quantity))
+                .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        }
+    }
+    private int Pages => Math.Max(1, (Filtered.Count + PageSize - 1) / PageSize);
+    private IEnumerable<Product> Paged => Filtered.Skip((page - 1) * PageSize).Take(PageSize);
+    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        category = CategoryQuery?.Trim() ?? "";
+        subcategory = SubcategoryQuery?.Trim() ?? "";
+        ResetPage();
+        if (EditId is > 0 && loaded && (!editing || editingProduct?.Id != EditId.Value))
+        {
+            var requested = products.FirstOrDefault(product => product.Id == EditId.Value);
+            if (requested is not null && canManage) await OpenEditorAsync(requested);
+            else if (requested is null) error = "Produsul solicitat pentru editare nu mai există.";
+        }
+    }
+    private async Task LoadAsync()
+    {
+        if (loading) return;
+        loading = true; error = null; selected = null;
+        try
+        {
+            var productsTask = Repository.GetProductsAsync(lifetime.Token);
+            var groupsTask = Repository.GetGroupsAsync(lifetime.Token);
+            var accessTask = Access.CanManageProductsAsync(lifetime.Token);
+            await Task.WhenAll(productsTask, groupsTask, accessTask);
+            products = await productsTask;
+            groups = await groupsTask;
+            canManage = await accessTask;
+            loaded = true; lastLoaded = DateTime.UtcNow; ResetPage();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogError("Product loading failed ({ErrorType}).", ex.GetType().Name); error = "Catalogul nu a putut fi încărcat. Verifică serverul, accesul contului SQL și configurarea conexiunii."; products = Array.Empty<Product>(); loaded = false; lastLoaded = null; ResetPage(); }
+        finally { loading = false; }
+    }
+    private Task OpenEditorAsync(Product? product) { selected = null; editingProduct = product; editorKey = Guid.NewGuid(); editing = true; notice = null; return Task.CompletedTask; }
+    private Task CloseEditorAsync()
+    {
+        editing = false; editingProduct = null;
+        if (EditId is not null) { EditId = null; Navigation.NavigateTo(ProductUrl(category, subcategory)); }
+        return Task.CompletedTask;
+    }
+    private async Task ProductSavedAsync(Product product)
+    {
+        var created = editingProduct is null;
+        products = products.Where(p => p.Id != product.Id).Append(product).OrderBy(p => p.Subcategory).ThenBy(p => p.Name).ThenBy(p => p.Id).ToArray();
+        groups = groups.Append(new(product.Category, product.Subcategory)).Distinct().ToArray();
+        await CloseEditorAsync(); query = stock = ""; selected = product; loaded = true; error = null;
+        notice = created ? "Produsul a fost adăugat." : "Modificările au fost salvate.";
+        Navigation.NavigateTo(ProductUrl(product.Category, product.Subcategory));
+    }
+    private Task RequestDeleteAsync(Product? product) { selected = null; deleting = product; deleteError = null; notice = null; return Task.CompletedTask; }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+    private Task CloseDetailsAsync() { selected = null; return Task.CompletedTask; }
+    private async Task DeleteProductAsync(string reason)
+    {
+        if (deleteBusy || deleting is null) return;
+        deleteBusy = true; deleteError = null;
+        try { var deletedId = deleting.Id; await Repository.DeleteAsync(deleting, reason, lifetime.Token); products = products.Where(p => p.Id != deletedId).ToArray(); deleting = null; page = Math.Min(page, Pages); notice = "Produsul a fost mutat în arhivă."; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProductOperationException ex) { deleteError = ex.Message; }
+        catch (AccessDeniedException ex) { deleteError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Product deletion failed ({ErrorType}).", ex.GetType().Name); deleteError = "Ștergerea nu a putut fi confirmată. Actualizează catalogul înainte să reîncerci. Verifică accesul de scriere cu administratorul dacă problema continuă."; }
+        finally { deleteBusy = false; }
+    }
+    private void ResetPage() => page = 1;
+    private void ToggleQuantitySort() { quantityDescending = !quantityDescending; ResetPage(); }
+    private void ClearFilters() { query = stock = ""; Navigation.NavigateTo("/produse"); ResetPage(); }
+    private static string ProductUrl(string? category, string? subcategory = null)
+    {
+        if (string.IsNullOrWhiteSpace(category)) return "/produse";
+        var url = $"/produse?categorie={Uri.EscapeDataString(category)}";
+        return string.IsNullOrWhiteSpace(subcategory) ? url : $"{url}&subcategorie={Uri.EscapeDataString(subcategory)}";
+    }
+    private Task CloseImagePreviewAsync() { imagePreview = null; return Task.CompletedTask; }
+    private static string ProductImageUrl(Product product) => $"/media/products/{product.Id}?v={product.Version}";
+    private static string StockClass(int quantity) => quantity < 0 ? "negative" : quantity == 0 ? "zero" : "positive";
+    private static string StockLabel(int quantity) => quantity < 0 ? "Stoc negativ" : quantity == 0 ? "Fără stoc" : "În stoc";
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

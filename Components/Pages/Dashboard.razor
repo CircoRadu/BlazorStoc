@@ -1,0 +1,24 @@
+@page "/"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Pagina principală · BlazorStoc</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">SPAȚIU DE LUCRU</p>
+        <h1>Pagina principală</h1>
+        <p class="muted">Alege secțiunea în care dorești să lucrezi.</p>
+    </div>
+</div>
+
+<section class="main-menu-grid" aria-label="Secțiunile aplicației">
+    <a href="/produse"><span class="main-menu-icon">▦</span><div><h2>Produse și stocuri</h2><p>Consultă inventarul și gestionează produsele pe categorii.</p></div><span class="main-menu-arrow">→</span></a>
+    <a href="/categorii"><span class="main-menu-icon">▤</span><div><h2>Categorii și subcategorii</h2><p>Editează denumirile și mută subcategoriile între categorii.</p></div><span class="main-menu-arrow">→</span></a>
+    <a href="/beneficiari"><span class="main-menu-icon">♧</span><div><h2>Beneficiari</h2><p>Adaugă, editează și consultă beneficiarii.</p></div><span class="main-menu-arrow">→</span></a>
+    <AuthorizeView Roles="Administrator">
+        <Authorized>
+            <a href="/utilizatori"><span class="main-menu-icon">♙</span><div><h2>Utilizatori</h2><p>Administrează accesul și rolurile utilizatorilor.</p></div><span class="main-menu-arrow">→</span></a>
+            <a href="/jurnal"><span class="main-menu-icon">≡</span><div><h2>Jurnal activitate</h2><p>Urmărește operațiunile efectuate în sistem.</p></div><span class="main-menu-arrow">→</span></a>
+        </Authorized>
+    </AuthorizeView>
+</section>

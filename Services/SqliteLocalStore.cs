@@ -1,0 +1,521 @@
+using System.Data;
+using System.Text.Json;
+using Microsoft.Data.Sqlite;
+
+namespace BlazorStoc.Services;
+
+public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfiguration configuration,
+    ILogger<SqliteLocalStore> logger)
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly SemaphoreSlim initializationGate = new(1, 1);
+    private volatile bool initialized;
+
+    public string DatabasePath { get; } = Path.GetFullPath(configuration["App:LocalDatabasePath"] ??
+        Path.Combine(environment.ContentRootPath, "data", "blazorstoc-local.db"));
+    public string ProductImagesPath { get; } = Path.GetFullPath(configuration["App:ProductImagesPath"] ??
+        Path.Combine(environment.ContentRootPath, "data", "product-images"));
+    public string ArchiveFilesPath { get; } = Path.GetFullPath(configuration["App:ArchiveFilesPath"] ??
+        Path.Combine(environment.ContentRootPath, "data", "archive", "files"));
+    private string LegacyAuditPath { get; } = Path.GetFullPath(configuration["App:AuditPath"] ??
+        Path.Combine(environment.ContentRootPath, "data", "audit-events.jsonl"));
+
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        if (initialized) return;
+        await initializationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (initialized) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(DatabasePath)!);
+            Directory.CreateDirectory(ProductImagesPath);
+            Directory.CreateDirectory(ArchiveFilesPath);
+            await using var connection = CreateConnection();
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await ConfigureConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
+            await ExecuteAsync(connection, null, SchemaSql, cancellationToken).ConfigureAwait(false);
+            await EnsureAuditArchiveOperationColumnAsync(connection, cancellationToken).ConfigureAwait(false);
+            await ExecuteAsync(connection, null, """
+                INSERT INTO app_metadata(key,value) VALUES('schema_version','4')
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value;
+                """, cancellationToken).ConfigureAwait(false);
+            await SeedIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
+            await ImportLegacyAuditIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
+            await ReconcileLegacyProductStateAsync(connection, cancellationToken).ConfigureAwait(false);
+            initialized = true;
+        }
+        finally { initializationGate.Release(); }
+    }
+
+    public async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await ConfigureConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
+        return connection;
+    }
+
+    internal static async Task InsertAuditAsync(SqliteConnection connection, SqliteTransaction? transaction,
+        AuditWrite entry, CancellationToken cancellationToken)
+    {
+        await using var command = Command(connection, transaction, """
+            INSERT INTO audit_events
+                (id,timestamp_utc,actor_username,actor_role,entity_type,action,target,details,motif,entity_id,archive_operation_id)
+            VALUES (@id,@timestamp,@actor,@role,@entity,@action,@target,@details,@motif,@entityId,@archiveOperationId)
+            """, ("@id", Guid.NewGuid().ToString("D")), ("@timestamp", DateTime.UtcNow.ToString("O")),
+            ("@actor", entry.ActorUsername), ("@role", entry.ActorRole), ("@entity", entry.EntityType),
+            ("@action", AuditActions.Normalize(entry.Action)), ("@target", entry.Target), ("@details", entry.Details),
+            ("@motif", entry.Motif ?? string.Empty), ("@entityId", entry.EntityId ?? string.Empty),
+            ("@archiveOperationId", entry.ArchiveOperationId?.ToString("D")));
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task EnsureAuditArchiveOperationColumnAsync(SqliteConnection connection, CancellationToken token)
+    {
+        var exists = false;
+        await using var columns = Command(connection, null, "PRAGMA table_info(audit_events)");
+        await using var reader = await columns.ExecuteReaderAsync(token).ConfigureAwait(false);
+        while (await reader.ReadAsync(token).ConfigureAwait(false))
+            if (string.Equals(reader.GetString(1), "archive_operation_id", StringComparison.OrdinalIgnoreCase)) exists = true;
+        await reader.DisposeAsync().ConfigureAwait(false);
+        if (!exists)
+            await ExecuteAsync(connection, null, "ALTER TABLE audit_events ADD COLUMN archive_operation_id TEXT NULL", token)
+                .ConfigureAwait(false);
+        await ExecuteAsync(connection, null,
+            "CREATE INDEX IF NOT EXISTS ix_audit_events_archive_operation ON audit_events(archive_operation_id)", token)
+            .ConfigureAwait(false);
+    }
+
+    internal static SqliteCommand Command(SqliteConnection connection, SqliteTransaction? transaction, string sql,
+        params (string Name, object? Value)[] parameters)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        return command;
+    }
+
+    private SqliteConnection CreateConnection() => new(new SqliteConnectionStringBuilder
+    {
+        DataSource = DatabasePath,
+        Mode = SqliteOpenMode.ReadWriteCreate,
+        Cache = SqliteCacheMode.Shared,
+        Pooling = true,
+        DefaultTimeout = 5
+    }.ToString());
+
+    private static async Task ConfigureConnectionAsync(SqliteConnection connection, CancellationToken token)
+    {
+        await ExecuteAsync(connection, null, "PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;", token).ConfigureAwait(false);
+    }
+
+    private static async Task ExecuteAsync(SqliteConnection connection, SqliteTransaction? transaction, string sql,
+        CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, sql);
+        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
+    private static async Task SeedIfNeededAsync(SqliteConnection connection, CancellationToken token)
+    {
+        await using (var check = Command(connection, null,
+            "SELECT value FROM app_metadata WHERE key='seed_version' LIMIT 1"))
+            if (await check.ExecuteScalarAsync(token).ConfigureAwait(false) is not null) return;
+
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
+        try
+        {
+            foreach (var product in DemoProductRepository.InitialProducts())
+            {
+                var categoryId = await EnsureCategoryAsync(connection, transaction, product.Category, token).ConfigureAwait(false);
+                var subcategoryId = await EnsureSubcategoryAsync(connection, transaction, categoryId, product.Subcategory, token).ConfigureAwait(false);
+                await using var insert = Command(connection, transaction, """
+                    INSERT INTO products(id,category_id,subcategory_id,name,normalized_name,description,quantity,version)
+                    VALUES(@id,@category,@subcategory,@name,@normalized,@description,@quantity,@version)
+                    """, ("@id", product.Id), ("@category", categoryId), ("@subcategory", subcategoryId),
+                    ("@name", product.Name), ("@normalized", TextNormalization.UniquenessKey(product.Name)),
+                    ("@description", product.Description), ("@quantity", product.Quantity), ("@version", product.Version));
+                await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            }
+
+            foreach (var beneficiary in new[]
+                     {
+                         new Beneficiary(1, "Construct Demo SRL", "RO10000001"),
+                         new Beneficiary(2, "Atelier Tehnic SRL", "RO10000002"),
+                         new Beneficiary(3, "Servicii Industriale SA", "10000003")
+                     })
+            {
+                await using var insert = Command(connection, transaction, """
+                    INSERT INTO beneficiaries(id,name,normalized_name,cui,normalized_cui,version)
+                    VALUES(@id,@name,@normalizedName,@cui,@normalizedCui,0)
+                    """, ("@id", beneficiary.Id), ("@name", beneficiary.Name),
+                    ("@normalizedName", TextNormalization.UniquenessKey(beneficiary.Name)), ("@cui", beneficiary.Cui),
+                    ("@normalizedCui", TextNormalization.UniquenessKey(beneficiary.Cui)));
+                await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            }
+
+            await InsertUserAsync(connection, transaction, 1, "administrator.demo", "Administrator demonstratie",
+                AccessRoles.Administrator, "admin-demo-123", token).ConfigureAwait(false);
+            await InsertUserAsync(connection, transaction, 2, "utilizator.demo", "Utilizator demonstratie",
+                AccessRoles.LimitedUser, "utilizator-demo-123", token).ConfigureAwait(false);
+            await using var marker = Command(connection, transaction,
+                "INSERT INTO app_metadata(key,value) VALUES('seed_version','1')");
+            await marker.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await transaction.CommitAsync(token).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private static async Task<int> EnsureCategoryAsync(SqliteConnection connection, SqliteTransaction transaction,
+        string name, CancellationToken token)
+    {
+        var normalized = TextNormalization.UniquenessKey(name);
+        await using (var select = Command(connection, transaction,
+            "SELECT id FROM categories WHERE normalized_name=@normalized", ("@normalized", normalized)))
+            if (await select.ExecuteScalarAsync(token).ConfigureAwait(false) is long existing) return checked((int)existing);
+        await using var insert = Command(connection, transaction,
+            "INSERT INTO categories(name,normalized_name) VALUES(@name,@normalized); SELECT last_insert_rowid();",
+            ("@name", name), ("@normalized", normalized));
+        return checked((int)(long)(await insert.ExecuteScalarAsync(token).ConfigureAwait(false))!);
+    }
+
+    private static async Task<int> EnsureSubcategoryAsync(SqliteConnection connection, SqliteTransaction transaction,
+        int categoryId, string name, CancellationToken token)
+    {
+        var normalized = TextNormalization.UniquenessKey(name);
+        await using (var select = Command(connection, transaction,
+            "SELECT id FROM subcategories WHERE normalized_name=@normalized", ("@normalized", normalized)))
+            if (await select.ExecuteScalarAsync(token).ConfigureAwait(false) is long existing) return checked((int)existing);
+        await using var insert = Command(connection, transaction,
+            "INSERT INTO subcategories(category_id,name,normalized_name) VALUES(@category,@name,@normalized); SELECT last_insert_rowid();",
+            ("@category", categoryId), ("@name", name), ("@normalized", normalized));
+        return checked((int)(long)(await insert.ExecuteScalarAsync(token).ConfigureAwait(false))!);
+    }
+
+    private static async Task InsertUserAsync(SqliteConnection connection, SqliteTransaction transaction, int id,
+        string username, string displayName, string role, string password, CancellationToken token)
+    {
+        await using var insert = Command(connection, transaction, """
+            INSERT INTO web_users(id,username,normalized_username,display_name,password_hash,role,is_active,version)
+            VALUES(@id,@username,@normalized,@displayName,@passwordHash,@role,1,0)
+            """, ("@id", id), ("@username", username), ("@normalized", TextNormalization.UniquenessKey(username)),
+            ("@displayName", displayName), ("@passwordHash", DemoUserRepository.HashPassword(password)), ("@role", role));
+        await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
+    private async Task ImportLegacyAuditIfNeededAsync(SqliteConnection connection, CancellationToken token)
+    {
+        await using (var marker = Command(connection, null,
+            "SELECT value FROM app_metadata WHERE key='legacy_audit_imported' LIMIT 1"))
+            if (await marker.ExecuteScalarAsync(token).ConfigureAwait(false) is not null) return;
+
+        var lines = File.Exists(LegacyAuditPath)
+            ? await File.ReadAllLinesAsync(LegacyAuditPath, token).ConfigureAwait(false)
+            : [];
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
+        try
+        {
+            foreach (var line in lines)
+            {
+                AuditEvent? entry;
+                try { entry = JsonSerializer.Deserialize<AuditEvent>(line, JsonOptions); }
+                catch (JsonException) { continue; }
+                if (entry is null) continue;
+                await using var insert = Command(connection, transaction, """
+                    INSERT OR IGNORE INTO audit_events
+                        (id,timestamp_utc,actor_username,actor_role,entity_type,action,target,details,motif,entity_id)
+                    VALUES(@id,@timestamp,@actor,@role,@entity,@action,@target,@details,@motif,@entityId)
+                    """, ("@id", entry.Id.ToString("D")), ("@timestamp", ToUtc(entry.TimestampUtc).ToString("O")),
+                    ("@actor", entry.ActorUsername), ("@role", entry.ActorRole), ("@entity", entry.EntityType),
+                    ("@action", AuditActions.Normalize(entry.Action)), ("@target", entry.Target), ("@details", entry.Details),
+                    ("@motif", entry.Motif ?? string.Empty), ("@entityId", entry.EntityId ?? string.Empty));
+                await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            }
+            await using var imported = Command(connection, transaction,
+                "INSERT INTO app_metadata(key,value) VALUES('legacy_audit_imported',@value)",
+                ("@value", DateTime.UtcNow.ToString("O")));
+            await imported.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await transaction.CommitAsync(token).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+
+        if (File.Exists(LegacyAuditPath))
+        {
+            var archive = LegacyAuditPath + $".migrated-{DateTime.UtcNow:yyyyMMddHHmmss}.bak";
+            try { File.Move(LegacyAuditPath, archive, false); }
+            catch (IOException exception) { logger.LogWarning("Legacy audit was imported but could not be archived ({ErrorType}).", exception.GetType().Name); }
+        }
+    }
+
+    private static async Task ReconcileLegacyProductStateAsync(SqliteConnection connection, CancellationToken token)
+    {
+        await using (var marker = Command(connection, null,
+            "SELECT value FROM app_metadata WHERE key='legacy_product_state_reconciled' LIMIT 1"))
+            if (await marker.ExecuteScalarAsync(token).ConfigureAwait(false) is not null) return;
+
+        var latest = new Dictionary<int, (string Action, string Target, string Details)>();
+        await using (var select = Command(connection, null, """
+            SELECT action,target,details,entity_id FROM audit_events
+            WHERE entity_type=@entity AND entity_id<>'' ORDER BY timestamp_utc DESC
+            """, ("@entity", AuditEntities.Product)))
+        await using (var reader = await select.ExecuteReaderAsync(token).ConfigureAwait(false))
+        {
+            while (await reader.ReadAsync(token).ConfigureAwait(false))
+            {
+                if (!int.TryParse(reader.GetString(3), out var id) || id <= 0 || latest.ContainsKey(id)) continue;
+                latest[id] = (AuditActions.Normalize(reader.GetString(0)), reader.GetString(1), reader.GetString(2));
+            }
+        }
+
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
+        try
+        {
+            foreach (var (id, entry) in latest)
+            {
+                if (entry.Action == AuditActions.Delete)
+                {
+                    await using var delete = Command(connection, transaction, "DELETE FROM products WHERE id=@id", ("@id", id));
+                    await delete.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                    continue;
+                }
+                if (entry.Action is not (AuditActions.Create or AuditActions.Edit)) continue;
+                var name = TargetName(entry.Target);
+                var category = DetailValue(entry.Details, "Categorie");
+                var subcategory = DetailValue(entry.Details, "Subcategorie");
+                var description = DetailValue(entry.Details, "Descriere");
+                var quantityText = DetailValue(entry.Details, "Cantitate");
+                await using var current = Command(connection, transaction, """
+                    SELECT p.description,p.quantity,c.name,s.name FROM products p
+                    INNER JOIN categories c ON c.id=p.category_id INNER JOIN subcategories s ON s.id=p.subcategory_id
+                    WHERE p.id=@id
+                    """, ("@id", id));
+                await using var currentReader = await current.ExecuteReaderAsync(token).ConfigureAwait(false);
+                if (!await currentReader.ReadAsync(token).ConfigureAwait(false)) continue;
+                var currentDescription = currentReader.GetString(0);
+                var currentQuantity = currentReader.GetInt32(1);
+                var currentCategory = currentReader.GetString(2);
+                var currentSubcategory = currentReader.GetString(3);
+                await currentReader.DisposeAsync().ConfigureAwait(false);
+                category = string.IsNullOrWhiteSpace(category) ? currentCategory : category;
+                subcategory = string.IsNullOrWhiteSpace(subcategory) ? currentSubcategory : subcategory;
+                description = string.IsNullOrWhiteSpace(description) ? currentDescription : description;
+                var quantity = int.TryParse(quantityText, out var parsedQuantity) ? parsedQuantity : currentQuantity;
+                var categoryId = await EnsureCategoryAsync(connection, transaction, category, token).ConfigureAwait(false);
+                var subcategoryId = await EnsureSubcategoryAsync(connection, transaction, categoryId, subcategory, token).ConfigureAwait(false);
+                await using var update = Command(connection, transaction, """
+                    UPDATE products SET category_id=@category,subcategory_id=@subcategory,name=@name,
+                        normalized_name=@normalized,description=@description,quantity=@quantity,version=version+1
+                    WHERE id=@id
+                    """, ("@category", categoryId), ("@subcategory", subcategoryId), ("@name", name),
+                    ("@normalized", TextNormalization.UniquenessKey(name)), ("@description", description),
+                    ("@quantity", quantity), ("@id", id));
+                await update.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            }
+            await using var marker = Command(connection, transaction,
+                "INSERT INTO app_metadata(key,value) VALUES('legacy_product_state_reconciled',@value)",
+                ("@value", DateTime.UtcNow.ToString("O")));
+            await marker.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await transaction.CommitAsync(token).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private static string TargetName(string target)
+    {
+        var separator = target.IndexOf('·');
+        return TextNormalization.ForStorage(separator >= 0 ? target[(separator + 1)..] : target);
+    }
+
+    private static string DetailValue(string details, string field)
+    {
+        var part = details.Split(';', StringSplitOptions.TrimEntries)
+            .LastOrDefault(item => item.StartsWith(field + ":", StringComparison.OrdinalIgnoreCase));
+        if (part is null) return string.Empty;
+        var value = part[(part.IndexOf(':') + 1)..].Trim();
+        var arrow = value.LastIndexOf('→');
+        return TextNormalization.ForStorage(arrow >= 0 ? value[(arrow + 1)..] : value);
+    }
+
+    private static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
+
+    private const string SchemaSql = """
+        PRAGMA journal_mode=WAL;
+        CREATE TABLE IF NOT EXISTS app_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL UNIQUE
+        );
+        CREATE TABLE IF NOT EXISTS subcategories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+            name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL UNIQUE
+        );
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+            subcategory_id INTEGER NOT NULL REFERENCES subcategories(id) ON DELETE RESTRICT,
+            name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL DEFAULT '',
+            quantity INTEGER NOT NULL DEFAULT 0,
+            version INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS beneficiaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            normalized_name TEXT NOT NULL UNIQUE,
+            cui TEXT NOT NULL,
+            normalized_cui TEXT NOT NULL UNIQUE,
+            version INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS web_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            normalized_username TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('Administrator','Utilizator')),
+            is_active INTEGER NOT NULL DEFAULT 1,
+            version INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS product_images (
+            product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+            relative_path TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            byte_length INTEGER NOT NULL,
+            updated_utc TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS stock_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+            beneficiary_id INTEGER REFERENCES beneficiaries(id) ON DELETE RESTRICT,
+            quantity INTEGER NOT NULL,
+            created_utc TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS audit_events (
+            id TEXT PRIMARY KEY,
+            timestamp_utc TEXT NOT NULL,
+            actor_username TEXT NOT NULL,
+            actor_role TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            action TEXT NOT NULL,
+            target TEXT NOT NULL,
+            details TEXT NOT NULL,
+            motif TEXT NOT NULL DEFAULT '',
+            entity_id TEXT NOT NULL DEFAULT '',
+            archive_operation_id TEXT NULL
+        );
+        CREATE TABLE IF NOT EXISTS archive_operations (
+            id TEXT PRIMARY KEY,
+            entity_type TEXT NOT NULL,
+            original_id TEXT NOT NULL,
+            original_version INTEGER NOT NULL CHECK(original_version >= 0),
+            deleted_utc TEXT NOT NULL,
+            actor_username TEXT NOT NULL,
+            actor_role TEXT NOT NULL,
+            motif TEXT NOT NULL,
+            target TEXT NOT NULL,
+            details TEXT NOT NULL,
+            data_json TEXT NOT NULL CHECK(json_valid(data_json)),
+            protected_data_json TEXT NULL CHECK(protected_data_json IS NULL OR json_valid(protected_data_json))
+        );
+        CREATE TABLE IF NOT EXISTS archive_products (
+            archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            original_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            subcategory TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
+            version INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS archive_beneficiaries (
+            archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            original_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            cui TEXT NOT NULL,
+            version INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS archive_web_users (
+            archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            original_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            is_active INTEGER NOT NULL,
+            version INTEGER NOT NULL,
+            password_hash TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS archive_relations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            archive_id TEXT NOT NULL REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            relation_type TEXT NOT NULL,
+            original_relation_id TEXT NOT NULL,
+            data_json TEXT NOT NULL CHECK(json_valid(data_json)),
+            UNIQUE(archive_id,relation_type,original_relation_id)
+        );
+        CREATE TABLE IF NOT EXISTS archive_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            archive_id TEXT NOT NULL REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            relation_type TEXT NOT NULL,
+            original_relation_id TEXT NOT NULL,
+            live_relative_path TEXT NOT NULL,
+            archive_relative_path TEXT NOT NULL,
+            content_type TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            byte_length INTEGER NOT NULL CHECK(byte_length >= 0),
+            content_hash TEXT NOT NULL,
+            archived_utc TEXT NOT NULL,
+            UNIQUE(archive_id,relation_type,original_relation_id)
+        );
+        CREATE INDEX IF NOT EXISTS ix_audit_events_timestamp ON audit_events(timestamp_utc DESC);
+        CREATE INDEX IF NOT EXISTS ix_products_group ON products(category_id,subcategory_id);
+        CREATE INDEX IF NOT EXISTS ix_stock_movements_beneficiary ON stock_movements(beneficiary_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_operations_object ON archive_operations(entity_type,original_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_operations_deleted ON archive_operations(deleted_utc DESC);
+        CREATE INDEX IF NOT EXISTS ix_archive_operations_actor ON archive_operations(actor_username,deleted_utc DESC);
+        CREATE INDEX IF NOT EXISTS ix_archive_products_original ON archive_products(original_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_beneficiaries_original ON archive_beneficiaries(original_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_web_users_original ON archive_web_users(original_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_relations_object ON archive_relations(relation_type,original_relation_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_files_object ON archive_files(relation_type,original_relation_id);
+        """;
+}
+
+internal static class SqliteRepositoryAudit
+{
+    public static async Task<(string Username, string Role)> ActorAsync(IAccessControl? access,
+        CancellationToken cancellationToken)
+    {
+        if (access is null) return ("sistem", AccessRoles.LimitedUser);
+        var username = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
+        var role = await access.IsAdministratorAsync(cancellationToken).ConfigureAwait(false)
+            ? AccessRoles.Administrator : AccessRoles.LimitedUser;
+        return (username, role);
+    }
+}
