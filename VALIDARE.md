@@ -208,3 +208,9 @@ Verificat la 25 septembrie 2026.
 - **Suita automată** (`BlazorStoc.Checks`, 329 verificări): rezumatul (`SaveSummary`) listează doar câmpurile modificate, arată „(gol)” și scurtează valorile lungi; regula de server care respinge schimbarea beneficiarului unui proiect (domeniu, SQLite cu proiectul și auditul neschimbate, feed fără eveniment).
 - **Browser** (`http://127.0.0.1:5082`, sesiune autentificată de utilizator, modul demonstrativ), pagina `/beneficiari/2`: „Editează” + modificarea numelui + motivare → popup „Salvezi modificările beneficiarului?” cu tabelul Câmp / Valoare actuală / Valoare nouă și motivarea; „Anulează” lasă formularul deschis cu valorile introduse și nu salvează; „Confirmă salvarea” salvează („Beneficiarul a fost actualizat.”). Numele a fost readus la valoarea inițială prin același flux (două evenimente „Editare” în jurnal).
 - **Neverificat manual**: popup-ul în editoarele de produs, proiect, observație, utilizator, categorie/subcategorie și mișcare (același component); tastatura (Escape) în browser; MariaDB pe un server real.
+
+## Data mișcării — interval explicit al calendarului (25 septembrie 2026)
+
+- Raportat de utilizator: calendarul nu ar permite date viitoare. În sursă nu exista nicio limită (`InputDate` fără `min`/`max`), iar serverul acceptă orice dată între 1990 și 2100 (`StockMovementRules`).
+- Verificat în browser (`http://127.0.0.1:5082`): o intrare cu data 31-12-2026 a fost salvată și afișată; a fost ștearsă apoi prin fluxul normal (stocul a revenit la 12). Popup-ul nativ al calendarului nu poate fi acționat prin clicuri automate în panoul Browser, deci limitarea din calendar nu a putut fi reprodusă.
+- Modificare: ambele câmpuri de dată (adăugare și editare) au acum `min="1990-01-01"` și `max="2100-12-31"`, luate din `StockMovementRules.EarliestDate`/`LatestDate` (făcute publice), aceleași limite ca pe server.

@@ -12,6 +12,10 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Data mișcării — interval explicit al calendarului
+
+- `ProductMovements.razor`: câmpurile de dată (adăugare, editare) au `min`/`max` din `StockMovementRules.EarliestDate`/`LatestDate` (1990-01-01 … 2100-12-31), aceleași limite ca pe server; date viitoare erau deja acceptate de server (verificat cu o intrare din 31-12-2026, ștearsă ulterior). Cauza limitării raportate în calendar nu a fost reprodusă în panoul Browser.
+
 ## Ultimele modificări funcționale (ciclul Claude — Task 5)
 
 Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 5”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`.

@@ -58,8 +58,8 @@ public static class StockMovementRules
     public const int MaxDescriptionLength = 500;
     public const string DescriptionRequiredMessage = "Completează câmpul «Descriere».";
     public const string StaleMessage = "Mișcarea a fost modificată sau ștearsă între timp. Actualizează pagina și reia operația.";
-    private static readonly DateOnly EarliestDate = new(1990, 1, 1);
-    private static readonly DateOnly LatestDate = new(2100, 12, 31);
+    public static readonly DateOnly EarliestDate = new(1990, 1, 1);
+    public static readonly DateOnly LatestDate = new(2100, 12, 31);
 
     public static int Effect(StockMovementKind kind, int quantity) => kind == StockMovementKind.Entry ? quantity : -quantity;
     public static string KindLabel(StockMovementKind kind) => kind == StockMovementKind.Entry ? "Intrare" : "Ieșire";

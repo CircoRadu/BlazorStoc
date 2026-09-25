@@ -430,3 +430,18 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 329 verificari trecute (5 noi fata de 324). Browser 5082 (sesiune autentificata de utilizator): pe /beneficiari/2 popup cu rezumat, Anuleaza pastreaza formularul, Confirma salveaza; numele readus prin acelasi flux. Neverificat manual: popup in celelalte editoare, Escape in browser, MariaDB pe server real.
 - **Commit:** `claude: finish Task 5 (save confirmation dialog for edits, server rule: project beneficiary is fixed)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T06:19:35.2719562Z â€” claude
+
+- **Task:** Data miscarii: interval explicit min/max pentru calendar
+- **Rezumat:** La cererea utilizatorului (calendarul ar limita data miscarii la azi): in sursa nu exista nicio limita, iar serverul accepta orice data 1990-2100; o intrare din 31-12-2026 a fost salvata prin interfata si apoi stearsa. Cele doua campuri de data (adaugare si editare) au acum min/max explicit din StockMovementRules.EarliestDate/LatestDate (facute publice). Cauza limitarii din calendarul utilizatorului nu a fost reprodusa: popup-ul nativ nu poate fi actionat prin clickuri in panoul Browser.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/ProductMovements.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Services/StockMovements.cs`
+  - `VALIDARE.md`
+- **Validare:** dotnet build Release proiect principal: 0 avertismente, 0 erori; BlazorStoc.Checks: 329 verificari trecute. Browser 5082: intrare cu data 31-12-2026 salvata si stearsa (stoc revenit la 12). Neverificat: comportamentul calendarului nativ in browserul utilizatorului.
+- **Commit:** `claude: explicit min/max on stock movement date inputs (future dates allowed)`
+- **Predat cÄƒtre:** codex

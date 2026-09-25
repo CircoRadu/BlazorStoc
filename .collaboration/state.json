@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 5 - Confirmarea salvarilor",
-    "startedAtUtc":  "2026-09-25T06:07:04.8473248Z",
-    "completedAtUtc":  "2026-09-25T06:14:02.1038445Z",
-    "lastSummary":  "Task 5 finalizat: componenta SaveConfirmationDialog (rezumat Camp / Valoare actuala / Valoare noua doar pentru campurile schimbate, motivare, Confirma salvarea / Anuleaza, Escape, focus) si SaveSummary. Confirmarea apare la editarea beneficiarului, produsului (inclusiv imagine), proiectului, observatiei, utilizatorului (parola nu apare), categoriei, subcategoriei si a miscarii de stoc; validarea ruleaza inainte de popup, refuzul pastreaza formularul si nu salveaza. Crearile (inclusiv produsul nou) se salveaza direct. La cererea utilizatorului, regula de server pentru proiecte: ProjectRules.CheckBeneficiaryUnchanged respinge orice UpdateAsync care schimba beneficiarul (SQLite si MariaDB), testele de mutare inlocuite cu teste de respingere. TODO.md: Task 5 mutat in arhiva, ordinea etapelor actualizata. Autentificarea si regulile de acces nu au fost modificate.",
-    "lastCommitSubject":  "claude: finish Task 5 (save confirmation dialog for edits, server rule: project beneficiary is fixed)",
+    "nextAgent":  "codex",
+    "currentTask":  "Data miscarii: interval explicit min/max pentru calendar",
+    "startedAtUtc":  "2026-09-25T06:19:16.8930045Z",
+    "completedAtUtc":  "2026-09-25T06:19:35.2719562Z",
+    "lastSummary":  "La cererea utilizatorului (calendarul ar limita data miscarii la azi): in sursa nu exista nicio limita, iar serverul accepta orice data 1990-2100; o intrare din 31-12-2026 a fost salvata prin interfata si apoi stearsa. Cele doua campuri de data (adaugare si editare) au acum min/max explicit din StockMovementRules.EarliestDate/LatestDate (facute publice). Cauza limitarii din calendarul utilizatorului nu a fost reprodusa: popup-ul nativ nu poate fi actionat prin clickuri in panoul Browser.",
+    "lastCommitSubject":  "claude: explicit min/max on stock movement date inputs (future dates allowed)",
     "claudeStatus":  "active"
 }
