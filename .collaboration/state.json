@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 2: iesire spre vehicul, vanzare generica si corectie de stoc",
     "startedAtUtc":  "2026-09-25T12:21:19.4100588Z",
     "completedAtUtc":  "2026-09-25T12:25:16.9139442Z",
