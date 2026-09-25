@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Noul mod de actualizare al TODO (arhiva cronologica, denumiri succinte, renumerotare)",
     "startedAtUtc":  "2026-09-25T07:51:31.9744042Z",
     "completedAtUtc":  "2026-09-25T07:53:03.3255763Z",
