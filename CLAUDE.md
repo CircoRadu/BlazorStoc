@@ -21,7 +21,7 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
 - Păstrează implementarea asincronă, fără Docker și fără integrare NAS în această etapă.
 - Nu genera fișiere SQL de upgrade separate; modificările de schemă sunt gestionate în proiect.
 - După modificări funcționale, actualizează preview-ul local la `http://127.0.0.1:5082/`.
-- Actualizează `TODO.md` când starea taskurilor se schimbă.
+- Actualizează `TODO.md` când starea taskurilor se schimbă, respectând „Regula de actualizare a TODO” din el (taskurile active se renumerotează; taskul finalizat se trece la sfârșitul fișierului cu data și ora implementării, detalii și o denumire succintă, fără „Task N”).
 - Când o verificare nu poate fi efectuată sau una din `docs/TESTE_RAMASE.md` este efectuată, actualizează `docs/TESTE_RAMASE.md` (motivul, pașii, rezultatul).
 
 ## Înainte de predare

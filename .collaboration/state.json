@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Filtrarea pe subcategorie din meniu ramane pe subcategorie",
-    "startedAtUtc":  "2026-09-25T07:45:14.5790739Z",
-    "completedAtUtc":  "2026-09-25T07:46:28.9217677Z",
-    "lastSummary":  "Defect raportat de utilizator: din Toate produsele, alegerea subcategoriei Protectie maini afisa si Protectie cap. Cauza: linkul de subcategorie schimba adresa, meniul redeschidea programatic categoria parinte, iar collapsible.js trata orice toggle de incredere ca actiune a utilizatorului si naviga la adresa categoriei, pierzand subcategoria. Corectie: navigare numai dupa o apasare reala pe antetul sectiunii (click/Enter/Space in ultima secunda; un click anulat, ca la protectia din Task 6, nu conteaza). Nu s-au modificat autentificarea sau regulile de acces.",
-    "lastCommitSubject":  "claude: fix subcategory filter dropped by programmatic category expansion",
+    "nextAgent":  "codex",
+    "currentTask":  "Noul mod de actualizare al TODO (arhiva cronologica, denumiri succinte, renumerotare)",
+    "startedAtUtc":  "2026-09-25T07:51:31.9744042Z",
+    "completedAtUtc":  "2026-09-25T07:53:03.3255763Z",
+    "lastSummary":  "La cererea utilizatorului, TODO.md foloseste un nou mod de actualizare, scris in sectiunea Regula de actualizare a TODO: taskurile active se numeroteaza de la 1 si se renumeroteaza cand un task se finalizeaza sau se introduce unul nou inaintea altora; un task finalizat se trece la sfarsitul fisierului cu data si ora implementarii (ora locala), detaliere si o denumire succinta, fara Task N. Arhiva existenta (26 de sectiuni) a fost rescrisa: ordine cronologica (cel mai vechi primul), date si ore din istoricul Git, lucrarile anterioare depozitului Git marcate inainte de 24.09.2026 13:44, trimiterile Task N din text inlocuite cu denumiri, subtaskurile arhivate fara numere. Taskul activ Situatia de inventar (fost Task 10) este acum Task 1 (subtaskuri 1.1-1.8). VALIDARE.md si docs/TESTE_RAMASE.md au nota cu corespondenta numerelor istorice; CLAUDE.md si AGENTS.md trimit la noua regula; PROJECT_STATE.md actualizat. Nu s-a modificat cod.",
+    "lastCommitSubject":  "claude: new TODO update mode (chronological archive, descriptive names, renumbering)",
     "claudeStatus":  "active"
 }

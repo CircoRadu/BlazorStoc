@@ -676,3 +676,20 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal: 0 avertismente, 0 erori (suita BlazorStoc.Checks neschimbata, 388 verificari la ultima rulare; JS fara teste automate). Browser 5082: din /produse linkul Protectie maini ramane pe ?categorie=..&subcategorie=.. cu 1 produs si categoria extinsa (inainte 2 produse); click real pe antetul unei categorii duce la categorie, al doilea click la /produse. Neverificat: Enter/Space pe antet, ecran tactil.
 - **Commit:** `claude: fix subcategory filter dropped by programmatic category expansion`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T07:53:03.3255763Z â€” claude
+
+- **Task:** Noul mod de actualizare al TODO (arhiva cronologica, denumiri succinte, renumerotare)
+- **Rezumat:** La cererea utilizatorului, TODO.md foloseste un nou mod de actualizare, scris in sectiunea Regula de actualizare a TODO: taskurile active se numeroteaza de la 1 si se renumeroteaza cand un task se finalizeaza sau se introduce unul nou inaintea altora; un task finalizat se trece la sfarsitul fisierului cu data si ora implementarii (ora locala), detaliere si o denumire succinta, fara Task N. Arhiva existenta (26 de sectiuni) a fost rescrisa: ordine cronologica (cel mai vechi primul), date si ore din istoricul Git, lucrarile anterioare depozitului Git marcate inainte de 24.09.2026 13:44, trimiterile Task N din text inlocuite cu denumiri, subtaskurile arhivate fara numere. Taskul activ Situatia de inventar (fost Task 10) este acum Task 1 (subtaskuri 1.1-1.8). VALIDARE.md si docs/TESTE_RAMASE.md au nota cu corespondenta numerelor istorice; CLAUDE.md si AGENTS.md trimit la noua regula; PROJECT_STATE.md actualizat. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `TODO.md`
+  - `VALIDARE.md`
+- **Validare:** Nu s-a modificat cod; TODO.md verificat programatic: 27 de sectiuni finalizate in ordine cronologica, nicio referinta Task N sau Subtask N.M ramasa in arhiva, un singur task activ (Task 1) cu subtaskurile 1.1-1.8; suita neschimbata.
+- **Commit:** `claude: new TODO update mode (chronological archive, descriptive names, renumbering)`
+- **Predat cÄƒtre:** codex
