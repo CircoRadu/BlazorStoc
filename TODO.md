@@ -11,33 +11,17 @@
 
 ## Ordinea de implementare optimizată
 
-Taskurile sunt grupate în patru etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
+Taskurile sunt grupate în două etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
 
-1. **Validare:** Task 4 uniformizează validarea beneficiarilor înaintea confirmării generice.
-2. **Dialoguri comune:** Task 4 → Task 5; Task 5 → Task 6; Task 5 → Task 7.
-3. **Colaborare în timp real:** Taskurile 4–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
+1. **Dialoguri comune:** Task 5 → Task 6; Task 5 → Task 7.
+2. **Colaborare în timp real:** Taskurile 5–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
 
-## Task 4 — Identificarea beneficiarului cu CUI duplicat
-
-Regula este deja acoperită în modul SQLite. Rămân de uniformizat mesajul, validarea și păstrarea formularului în toate modurile de stocare înainte de introducerea confirmării generice din Task 5.
-
-- [ ] La adăugarea sau editarea unui beneficiar, dacă CUI-ul există deja, include în mesajul de eroare numele beneficiarului care folosește acel CUI.
-- [ ] Folosește numele beneficiarului așa cum este salvat în baza de date.
-- [ ] Păstrează valorile introduse în formular după respingerea salvării.
-- [ ] Aplică aceeași regulă în modul demonstrativ și în modul conectat la baza de date.
-
-### Criterii de acceptare
-
-- Pentru un CUI duplicat, mesajul indică explicit atât existența duplicatului, cât și numele beneficiarului existent.
-- Salvarea este respinsă, iar formularul rămâne deschis cu datele introduse.
-- Mesajul nu identifică beneficiarul curent drept duplicat atunci când acesta este editat fără schimbarea CUI-ului.
-
 ## Task 5 — Confirmarea salvărilor
 
-Depinde de structura catalogului finalizată, de produsul („Cod produs”, finalizat), de proiectele din Task 2 și de beneficiarii din Task 4. Reutilizează infrastructura accesibilă a dialogului de ștergere deja finalizat.
+Depinde de structura catalogului finalizată, de produsul („Cod produs”, finalizat), de proiectele finalizate și de beneficiarii finalizați (Task 4). Reutilizează infrastructura accesibilă a dialogului de ștergere deja finalizat.
 
 - [ ] Afișează un popup de confirmare înaintea tuturor salvărilor care modifică date existente.
 - [ ] Prezintă în popup un rezumat clar al câmpurilor și valorilor care urmează să fie modificate.
@@ -138,6 +122,17 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Task 4: Identificarea beneficiarului cu CUI duplicat
+
+Implementat la 25 septembrie 2026 de Claude. `BeneficiaryRules.DuplicateCuiMessage` (`Services/Beneficiaries.cs`), `DemoBeneficiaryRepository`, `SqliteBeneficiaryRepository`, `MariaBeneficiaryRepository`; `BeneficiaryEditor.razor` nemodificat.
+
+- [x] La adăugarea sau editarea unui beneficiar, dacă CUI-ul există deja, mesajul de eroare include numele beneficiarului care folosește acel CUI: „Există deja un beneficiar cu acest CUI: «nume».”, același text în modul demonstrativ, SQLite și MariaDB.
+- [x] Mesajul folosește numele așa cum este salvat în baza de date, nu cel introdus în formular.
+- [x] Formularul rămâne deschis cu valorile introduse după respingerea salvării (comportament existent al `BeneficiaryEditor`, verificat în browser).
+- [x] MariaDB: eroarea 1062 a indexului `UX_beneficiar_cui`, produsă de o salvare concurentă, este tradusă după rollback în același mesaj, cu numele existent.
+- [x] Beneficiarul editat este exclus din verificare: salvarea fără schimbarea CUI-ului nu îl raportează ca duplicat.
+- Neverificat pe un server MariaDB real; editarea în browser nu a fost exersată manual (acoperită de verificările automate).
 
 ## Finalizat — Task 7 (parțial): jurnalizarea sesiunilor
 

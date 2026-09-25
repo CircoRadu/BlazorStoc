@@ -146,7 +146,7 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
             """, ("@normalized", TextNormalization.UniquenessKey(value.Cui)), ("@id", excludedId)))
         {
             if (await cui.ExecuteScalarAsync(token).ConfigureAwait(false) is string existingName)
-                throw new BeneficiaryOperationException($"Există deja un beneficiar cu acest CUI: «{existingName}».");
+                throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateCuiMessage(existingName));
         }
         await using var name = SqliteLocalStore.Command(connection, transaction, """
             SELECT name,cui FROM beneficiaries

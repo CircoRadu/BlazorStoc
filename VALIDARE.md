@@ -190,3 +190,9 @@ Verificat la 25 septembrie 2026.
   3. `/utilizatori` are linkuri către `/utilizatori/{id}`; pagina afișează datele contului, fără editor deschis; „Editează” deschide editorul, „Anulează” îl închide; `/utilizatori/99999` afișează „Utilizatorul nu mai există”.
   4. `/beneficiari/2` are „Editează” (editorul nu se deschide singur; se deschide și se închide la cerere, fără salvare).
 - **Neverificat manual**: paginarea și dimensiunea paginii prin adresă în browser, poziția de derulare a jurnalului, autorizarea utilizatorului limitat pe `/utilizatori/{id}` (rolul este verificat prin atributul de rută și în pagină, ca la `/utilizatori`), MariaDB pe un server real.
+
+## Task 4 — Identificarea beneficiarului cu CUI duplicat (25 septembrie 2026)
+
+- **Suita automată** (`BlazorStoc.Checks`, 324 verificări; 5 noi): mesajul exact `BeneficiaryRules.DuplicateCuiMessage` cu numele salvat (nu cel tastat) la creare în modul demonstrativ și SQLite; editarea către un CUI existent (numele proprietarului, valorile formularului păstrate, obiectul neschimbat); editarea fără schimbarea CUI-ului nu îl raportează pe beneficiarul curent ca duplicat; mesajul fără proprietar cunoscut.
+- **Browser** (`http://127.0.0.1:5082`, sesiune autentificată de utilizator, modul demonstrativ): „Adaugă beneficiar” cu numele „Firma Test Duplicat” și CUI `10000003` → „Există deja un beneficiar cu acest CUI: «Servicii Industriale SA».”; formularul rămâne deschis cu ambele valori; nu s-au salvat date.
+- **Neverificat manual**: editarea în browser, MariaDB pe un server real (inclusiv traducerea erorii 1062 la cereri concurente).

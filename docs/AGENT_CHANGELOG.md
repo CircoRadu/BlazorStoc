@@ -370,3 +370,21 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T06:03:21.4481497Z â€” claude
+
+- **Task:** Task 4 - Identificarea beneficiarului cu CUI duplicat
+- **Rezumat:** Task 4 finalizat: mesajul CUI duplicat este unic (BeneficiaryRules.DuplicateCuiMessage) si contine numele beneficiarului salvat in baza, in modul demonstrativ, SQLite si MariaDB, la creare si la editare. Beneficiarul editat este exclus din verificare. MariaDB: verificarea citeste numele proprietarului, iar eroarea 1062 a indexului UX_beneficiar_cui la salvari concurente este tradusa dupa rollback in acelasi mesaj. Formularul BeneficiaryEditor pastra deja valorile dupa respingere. TODO.md: Task 4 mutat in arhiva, ordinea etapelor actualizata. Autentificarea si regulile de acces nu au fost modificate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Services/Beneficiaries.cs`
+  - `Services/MariaBeneficiaryRepository.cs`
+  - `Services/SqliteBeneficiaryRepository.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 324 verificari trecute (5 noi). Browser 5082 (sesiune autentificata de utilizator, modul demonstrativ): CUI duplicat la Adauga beneficiar afiseaza numele existent si pastreaza formularul; nu s-au salvat date. Neverificat manual: editarea in browser, MariaDB pe server real.
+- **Commit:** `claude: finish Task 4 (duplicate beneficiary CUI message names the stored beneficiary)`
+- **Predat cÄƒtre:** codex

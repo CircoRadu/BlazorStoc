@@ -67,6 +67,12 @@ public static class BeneficiaryRules
             throw new BeneficiaryOperationException("Beneficiarul a fost modificat sau șters între timp. Actualizează lista și reia operația.");
     }
 
+    // Single wording for every storage mode; the name is the one stored in the database, not the one just typed.
+    public static string DuplicateCuiMessage(string? existingName) =>
+        string.IsNullOrWhiteSpace(existingName)
+            ? "Există deja un beneficiar cu acest CUI."
+            : $"Există deja un beneficiar cu acest CUI: «{existingName}».";
+
     public static void CheckDelete(bool hasStockMovements)
     {
         if (hasStockMovements)
@@ -173,7 +179,7 @@ public sealed class DemoBeneficiaryRepository(
         var duplicateCui = store.Beneficiaries.FirstOrDefault(beneficiary =>
             beneficiary.Id != excludedId && TextNormalization.SameUniqueValue(beneficiary.Cui, value.Cui));
         if (duplicateCui is not null)
-            throw new BeneficiaryOperationException("Există deja un beneficiar cu acest CUI.");
+            throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateCuiMessage(duplicateCui.Name));
         var duplicateName = store.Beneficiaries.FirstOrDefault(beneficiary =>
             beneficiary.Id != excludedId && TextNormalization.SameUniqueValue(beneficiary.Name, value.Name));
         if (duplicateName is not null)

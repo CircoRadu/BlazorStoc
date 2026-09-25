@@ -44,7 +44,7 @@ public sealed class MariaBeneficiaryRepository(
                 """, ("@user", userId), ("@name", value.Name), ("@cui", value.Cui));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return new Beneficiary(checked((int)command.LastInsertedId), value.Name, value.Cui);
-        }, cancellationToken).ConfigureAwait(false);
+        }, cancellationToken, value.Cui).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
             $"#{beneficiary.Id} · {beneficiary.Name}", AuditDetails.Identification(
                 ("Denumire", beneficiary.Name), ("CUI", beneficiary.Cui)), cancellationToken).ConfigureAwait(false);
@@ -70,7 +70,7 @@ public sealed class MariaBeneficiaryRepository(
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                 throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
             return new Beneficiary(original.Id, value.Name, value.Cui, version);
-        }, cancellationToken).ConfigureAwait(false);
+        }, cancellationToken, value.Cui, original.Id).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
             $"#{beneficiary.Id} · {beneficiary.Name}",
             [new("Denumire", original.Name, beneficiary.Name), new("CUI", original.Cui, beneficiary.Cui)],
@@ -114,7 +114,8 @@ public sealed class MariaBeneficiaryRepository(
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, int, Task<T>> action, CancellationToken token)
+    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, int, Task<T>> action, CancellationToken token,
+        string? savedCui = null, int? savedId = null)
     {
         if (!string.Equals(configuration["Database:Name"] ?? "BlazorStoc", "BlazorStoc", StringComparison.Ordinal))
             throw new BeneficiaryOperationException("Modificările sunt permise numai în baza BlazorStoc.");
@@ -134,9 +135,11 @@ public sealed class MariaBeneficiaryRepository(
             await transaction.CommitAsync(token).ConfigureAwait(false);
             return result;
         }
-        catch
+        catch (Exception exception)
         {
             if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            if (savedCui is not null && exception is MySqlException { Number: 1062 })
+                throw await ConcurrentDuplicateCuiAsync(savedCui, savedId, token).ConfigureAwait(false);
             throw;
         }
     }
@@ -189,11 +192,33 @@ public sealed class MariaBeneficiaryRepository(
 
     private static async Task EnsureUniqueCuiAsync(MySqlConnection connection, MySqlTransaction transaction, string cui, int? excludedId, CancellationToken token)
     {
-        await using var command = Command(connection, transaction,
-            "SELECT EXISTS(SELECT 1 FROM beneficiar WHERE UPPER(beneficiar_cui)=UPPER(@cui) AND (@id IS NULL OR id_beneficiar<>@id))",
-            ("@cui", cui), ("@id", excludedId is null ? DBNull.Value : excludedId.Value));
-        if (Convert.ToBoolean(await command.ExecuteScalarAsync(token).ConfigureAwait(false)))
-            throw new BeneficiaryOperationException("Există deja un beneficiar cu acest CUI.");
+        await using var command = Command(connection, transaction, """
+            SELECT COALESCE(beneficiar_denumire,'') FROM beneficiar
+            WHERE UPPER(beneficiar_cui)=UPPER(@cui) AND (@id IS NULL OR id_beneficiar<>@id)
+            ORDER BY id_beneficiar LIMIT 1
+            """, ("@cui", cui), ("@id", excludedId is null ? DBNull.Value : excludedId.Value));
+        if (await command.ExecuteScalarAsync(token).ConfigureAwait(false) is string existingName)
+            throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateCuiMessage(existingName));
+    }
+
+    // A concurrent save can pass the check above and still hit UX_beneficiar_cui; report the stored name after rollback.
+    private async Task<BeneficiaryOperationException> ConcurrentDuplicateCuiAsync(string cui, int? excludedId, CancellationToken token)
+    {
+        try
+        {
+            await using var connection = CreateConnection();
+            await connection.OpenAsync(token).ConfigureAwait(false);
+            await using var command = Command(connection, null,"""
+                SELECT COALESCE(beneficiar_denumire,'') FROM beneficiar
+                WHERE UPPER(beneficiar_cui)=UPPER(@cui) AND (@id IS NULL OR id_beneficiar<>@id)
+                ORDER BY id_beneficiar LIMIT 1
+                """, ("@cui", cui), ("@id", excludedId is null ? DBNull.Value : excludedId.Value));
+            return new(BeneficiaryRules.DuplicateCuiMessage(await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return new(BeneficiaryRules.DuplicateCuiMessage(null));
+        }
     }
 
     private static async Task EnsureUniqueNameAsync(MySqlConnection connection, MySqlTransaction transaction,
@@ -215,7 +240,7 @@ public sealed class MariaBeneficiaryRepository(
         }
     }
 
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction transaction, string sql, params (string Name, object Value)[] parameters)
+    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
     {
         var command = new MySqlCommand(sql, connection, transaction);
         foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);

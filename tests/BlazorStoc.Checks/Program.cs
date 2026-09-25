@@ -551,7 +551,27 @@ var beneficiary = await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Nam
 Check(beneficiary.Name == "Beneficiar nou SRL" && beneficiary.Cui == "ro12345678", "Beneficiary values keep letter case and remove diacritics");
 Check(BeneficiarySearch.Filter(await demoBeneficiaries.GetBeneficiariesAsync(), "12345678").Single().Id == beneficiary.Id, "Beneficiaries can be searched by CUI");
 try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Duplicat", Cui = "RO12345678" }); throw new Exception("Duplicate CUI accepted"); }
-catch (BeneficiaryOperationException) { Check(true, "Duplicate beneficiary CUI is rejected"); }
+catch (BeneficiaryOperationException exception)
+{
+    Check(exception.Message == BeneficiaryRules.DuplicateCuiMessage("Beneficiar nou SRL"),
+        "Duplicate beneficiary CUI is rejected and names the stored beneficiary, not the typed name");
+}
+var editedDemoBeneficiary = (await demoBeneficiaries.GetBeneficiariesAsync()).Single(item => item.Cui == "RO10000001");
+var duplicateCuiEdit = BeneficiaryEdit(editedDemoBeneficiary); duplicateCuiEdit.Cui = " ro12345678 ";
+try { await demoBeneficiaries.UpdateAsync(editedDemoBeneficiary, duplicateCuiEdit); throw new Exception("Duplicate CUI accepted on edit"); }
+catch (BeneficiaryOperationException exception)
+{
+    Check(exception.Message == BeneficiaryRules.DuplicateCuiMessage("Beneficiar nou SRL") && duplicateCuiEdit.Cui == " ro12345678 " &&
+          (await demoBeneficiaries.GetBeneficiariesAsync()).Single(item => item.Id == editedDemoBeneficiary.Id) == editedDemoBeneficiary,
+        "Editing a beneficiary to an existing CUI names the owner, keeps the form values and changes nothing");
+}
+var unchangedCuiEdit = BeneficiaryEdit(editedDemoBeneficiary); unchangedCuiEdit.Name = "Construct Demo Actualizat SRL";
+var unchangedCuiSaved = await demoBeneficiaries.UpdateAsync(editedDemoBeneficiary, unchangedCuiEdit);
+Check(unchangedCuiSaved.Cui == "RO10000001" && unchangedCuiSaved.Name == unchangedCuiEdit.Name,
+    "Editing a beneficiary without changing its CUI never reports itself as the duplicate");
+Check(BeneficiaryRules.DuplicateCuiMessage(null) == "Există deja un beneficiar cu acest CUI." &&
+      BeneficiaryRules.DuplicateCuiMessage("  ") == "Există deja un beneficiar cu acest CUI.",
+    "Duplicate CUI message without a known owner falls back to the plain wording");
 try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "BENEFICIÁR NOU SRL", Cui = "RO87654321" }); throw new Exception("Duplicate beneficiary name accepted"); }
 catch (BeneficiaryOperationException exception) { Check(exception.Message.Contains("ro12345678", StringComparison.Ordinal), "Duplicate beneficiary name is rejected and reports its CUI"); }
 try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "CUI invalid", Cui = "RO-ABC" }); throw new Exception("Invalid CUI accepted"); }
@@ -569,7 +589,7 @@ catch (BeneficiaryOperationException) { Check(true, "Beneficiary deletion requir
 Check((await demoBeneficiaries.GetBeneficiariesAsync()).Any(item => item.Id == updatedBeneficiary.Id), "Rejected beneficiary deletion preserves the object");
 await demoBeneficiaries.DeleteAsync(updatedBeneficiary, "Test automat");
 Check(!(await demoBeneficiaries.GetBeneficiariesAsync()).Any(item => item.Id == updatedBeneficiary.Id), "Beneficiary can be deleted");
-Check(auditTrail.Entries.Count(entry => entry.EntityType == AuditEntities.Beneficiary) == 3, "Beneficiary changes are written to the audit trail");
+Check(auditTrail.Entries.Count(entry => entry.EntityType == AuditEntities.Beneficiary) == 4, "Beneficiary changes are written to the audit trail");
 
 var sqliteTestRoot = Path.Combine(Path.GetTempPath(), $"blazorstoc-sqlite-{Guid.NewGuid():N}");
 Directory.CreateDirectory(sqliteTestRoot);
@@ -875,9 +895,27 @@ try
     }
     catch (BeneficiaryOperationException exception)
     {
-        Check(exception.Message.Contains(persistentBeneficiary.Name, StringComparison.Ordinal),
+        Check(exception.Message == BeneficiaryRules.DuplicateCuiMessage(persistentBeneficiary.Name),
             "SQLite duplicate CUI validation reports the existing beneficiary name");
     }
+
+    var otherPersistentBeneficiary = await firstBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar cu alt CUI", Cui = "RO55667788" });
+    var cuiTakenEdit = BeneficiaryEdit(otherPersistentBeneficiary); cuiTakenEdit.Cui = persistentBeneficiary.Cui.ToLowerInvariant();
+    try
+    {
+        await firstBeneficiaries.UpdateAsync(otherPersistentBeneficiary, cuiTakenEdit);
+        throw new Exception("SQLite duplicate CUI accepted on edit");
+    }
+    catch (BeneficiaryOperationException exception)
+    {
+        Check(exception.Message == BeneficiaryRules.DuplicateCuiMessage(persistentBeneficiary.Name) &&
+              cuiTakenEdit.Cui == persistentBeneficiary.Cui.ToLowerInvariant() &&
+              (await firstBeneficiaries.GetBeneficiariesAsync()).Single(item => item.Id == otherPersistentBeneficiary.Id) == otherPersistentBeneficiary,
+            "SQLite edit to an existing CUI names the owner, keeps the form values and changes nothing");
+    }
+    var sameCuiEdit = BeneficiaryEdit(otherPersistentBeneficiary); sameCuiEdit.Name = "Beneficiar cu alt CUI actualizat";
+    Check((await firstBeneficiaries.UpdateAsync(otherPersistentBeneficiary, sameCuiEdit)).Cui == otherPersistentBeneficiary.Cui,
+        "SQLite edit that keeps its own CUI is not reported as a duplicate");
 
     var secondBeneficiaries = new SqliteBeneficiaryRepository(secondStore, administrator);
     var reloadedBeneficiary = (await secondBeneficiaries.GetBeneficiariesAsync()).Single(item => item.Id == persistentBeneficiary.Id);
