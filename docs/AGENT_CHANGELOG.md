@@ -636,3 +636,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod; structura TODO.md verificata (Task 10 cu subtaskurile 10.1-10.7, criterii de acceptare si decizii de confirmat), suita neschimbata.
 - **Commit:** `claude: prepare TODO for inventory page and PDF (Task 10)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T07:39:27.5060485Z â€” claude
+
+- **Task:** Task 10 - decizii stabilite cu utilizatorul in TODO
+- **Rezumat:** Deciziile utilizatorului pentru Task 10 au fost trecute in TODO.md: Valoare reala goala; stoc negativ ramane cand stoc 0 e bifat si se scrie cu rosu; Generat la = momentul generarii in ora locala, zz/ll/aaaa oo:mm; font gratuit, nume de categorie/subcategorie bold 14, restul normal 12; generarea se jurnalizeaza cu utilizatorul (subtask nou 10.7, actiune Generare); meniul Inventar are Generare situatie inventar (/inventar) si Preluare inventar (pagina de rezerva, implementare ulterioara). Taskul are 8 subtaskuri, criterii de acceptare actualizate si detalii ramase de confirmat. PROJECT_STATE.md actualizat. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu s-a modificat cod; structura TODO.md verificata (subtaskuri 10.1-10.8, criterii de acceptare, detalii de confirmat); suita neschimbata.
+- **Commit:** `claude: record inventory decisions in Task 10`
+- **Predat cÄƒtre:** codex
