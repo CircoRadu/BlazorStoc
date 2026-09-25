@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Filtrarea pe subcategorie din meniu ramane pe subcategorie",
     "startedAtUtc":  "2026-09-25T07:45:14.5790739Z",
     "completedAtUtc":  "2026-09-25T07:46:28.9217677Z",
