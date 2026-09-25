@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 1: alinierea antetului Data in tabelul de intrari/iesiri",
     "startedAtUtc":  "2026-09-25T11:14:10.3368841Z",
     "completedAtUtc":  "2026-09-25T11:15:24.5362140Z",
