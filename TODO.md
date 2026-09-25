@@ -116,6 +116,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 
 - Alegerea concretă a familiei de font liberă (Noto Sans, Open Sans sau echivalent) și a versiunii bibliotecii PDF; se notează în `docs/PROJECT_STATE.md` împreună cu licențele.
 - Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 1.7); se documentează.
+- „Valoare stoc” din PDF: după introducerea ieșirilor spre vehicul (taskul „Ieșire spre vehicul…”), stocul total se defalcă în „în depozit” și „în vehicule”; se confirmă cu utilizatorul dacă PDF-ul (numărare fizică) folosește stocul din depozit, totalul sau ambele valori; până atunci se folosește stocul total (comportamentul curent).
 - Toate celelalte detalii au fost confirmate de utilizator și sunt descrise în „Decizii stabilite cu utilizatorul”.
 
 ## Task 2 — Ieșire spre vehicul, vânzare generică și corecție de stoc (formularul de ieșire)
@@ -137,18 +138,28 @@ Extinde formularul de ieșire din pagina intrărilor/ieșirilor unui produs cu o
 - [ ] Precompletarea nu suprascrie un text scris de utilizator: se aplică numai când câmpul este gol sau conține o precompletare anterioară neschimbată (la schimbarea vehiculului sau a opțiunii textul precompletat se actualizează); textul rămâne editabil, iar descrierea rămâne obligatorie. Opțiunile **Beneficiar** și **Vânzare generică** nu precompletează nimic; trecerea la ele elimină o precompletare neschimbată.
 - [ ] Data folosită este data de azi de pe server (ora locală), aceeași convenție ca restul aplicației.
 
-### Subtask 2.3 — Stocare, afișare și jurnal
+### Subtask 2.3 — Ieșirea spre vehicul mută produsul, nu îl scade din stoc
 
-- [ ] Mișcarea păstrează destinația ieșirii (beneficiar cu eventual proiect, autovehicul, vânzare generică sau corecție de stoc) într-un mod care permite rapoarte ulterioare (de exemplu un tip explicit al destinației și `VehicleId` pentru autovehicul); mișcările existente (cu sau fără beneficiar) rămân valide și sunt interpretate fără migrare a datelor, fără fișiere SQL de upgrade separate; stocul se calculează ca acum (intrări minus ieșiri), indiferent de destinație.
+Cerută de utilizator (25 septembrie 2026): produsul ieșit spre un autovehicul nu este consumat, ci mutat în vehicul.
+
+- [ ] O ieșire spre **Autovehicul nu scade produsul din stocul total**: produsul se mută practic în vehicul, fără a fi folosit. **Numărul total de produse rămâne neschimbat.** Ieșirile spre **Beneficiar**, **Vânzare generică** și **Corecție stoc** scad stocul ca până acum. Cantitatea ieșirii spre vehicul se păstrează în mișcare (câte bucăți au fost mutate), dar efectul ei asupra totalului este 0; regula se aplică uniform la creare, editare (inclusiv schimbarea destinației dintr-una în alta, care recalculează totalul), ștergere și în istoricul „[*]” al mișcării.
+- [ ] Oriunde se afișează stocul existent, acesta se descrie **defalcat**: **„N produse: X în depozit, Y în vehicule”**, unde N este stocul total, Y este suma cantităților ieșirilor spre autovehicul (calculată din mișcări, din același instantaneu coerent cu totalul) și X = N − Y. Locuri: „Total produse în stoc” din pagina intrărilor/ieșirilor, stocul din catalogul „Produse și stocuri” (rânduri și carduri de rezumat), precum și orice alt loc al aplicației care arată stocul unui produs (se caută în cod fiecare afișare a cantității). Textul respectă acordul de număr în română („1 produs”, „2 produse”).
+- [ ] Stocul din depozit poate deveni negativ, ca acum: o ieșire spre vehicul peste stocul din depozit nu este blocată (aceeași regulă ca pentru celelalte ieșiri) și se afișează cu semnul minus.
+- [ ] Ștergerea unui produs rămâne blocată de stocul total nenul, deci și de produsele aflate în vehicule (mesajul menționează vehiculele).
+- [ ] Implementare: stocul total rămâne valoarea existentă a produsului (`quantity`; `produs_cantitate` în MariaDB), actualizată atomic cu mișcarea (o ieșire spre vehicul nu o modifică); cantitatea din vehicule se derivă din mișcări sau se stochează în aceeași tranzacție, fără să poată deveni inconsistentă cu ele — se stabilește la implementare și se documentează, inclusiv compatibilitatea cu tabela `io` a aplicației vechi în modul MariaDB. Verificările „stoc = suma mișcărilor” existente se adaptează la „stoc total = suma efectelor”.
+
+### Subtask 2.4 — Stocare, afișare și jurnal
+
+- [ ] Mișcarea păstrează destinația ieșirii (beneficiar cu eventual proiect, autovehicul, vânzare generică sau corecție de stoc) într-un mod care permite rapoarte ulterioare (de exemplu un tip explicit al destinației și `VehicleId` pentru autovehicul); mișcările existente (cu sau fără beneficiar) rămân valide și sunt interpretate fără migrare a datelor, fără fișiere SQL de upgrade separate; stocul total se calculează din intrări și din ieșirile cu efect asupra lui (fără ieșirile spre autovehicul, vezi subtaskul 2.3).
 - [ ] Validare pe server: o ieșire spre autovehicul are un vehicul existent; celelalte destinații nu pot avea vehicul, beneficiar sau proiect; combinațiile incompatibile sunt respinse cu mesaje în română. Un vehicul șters/arhivat nu mai poate fi ales.
 - [ ] Tabelul intrărilor/ieșirilor primește o coloană separată cu antetul **„VEHICUL”**, care arată numărul de înmatriculare (link către vehicul) al ieșirilor spre autovehicul; coloana „BENEFICIAR/PROIECT” rămâne neschimbată. Pentru „Vânzare generică” și „Corecție stoc” se afișează o etichetă clară a destinației (locul ei se stabilește la implementare); mișcările vechi fără destinație afișează „—”.
 - [ ] Pagina „Vehicule” (finalizată) primește o coloană cu numărul mișcărilor asociate fiecărui vehicul, cu link către ele; un vehicul cu mișcări nu poate fi șters: regula `VehicleRules.CheckDelete` există și este testată, iar acest task o leagă de mișcări în SQLite și MariaDB (verificare în aceeași tranzacție cu arhivarea) și extinde `archive_stock_movements` cu destinația și vehiculul.
 - [ ] Jurnalul mișcărilor (creare, editare, ștergere, istoricul „[*]”) include destinația și vehiculul în `Details`/`Target`, cu valorile inițiale și finale la editare; funcționează în SQLite și MariaDB, prin infrastructura comună.
 
-### Subtask 2.4 — Verificări
+### Subtask 2.5 — Verificări
 
-- [ ] Teste automate: fiecare destinație se salvează corect; combinațiile incompatibile sunt respinse; precompletarea (text, data, nesuprascrierea unui text scris de utilizator, actualizarea la schimbarea vehiculului sau a opțiunii); mișcările existente rămân neschimbate; stocul nu depinde de destinație; jurnalul; două sesiuni concurente.
-- [ ] Verificare în browser (modul demonstrativ): grupul radio la Ieșire (adăugare și editare), lipsa lui la Intrare, precompletările pentru Autovehicul și Corecție stoc cu data de azi, salvarea și afișarea în tabel, avertizarea la părăsire; la 375 și 768 px fără depășire orizontală.
+- [ ] Teste automate: fiecare destinație se salvează corect; combinațiile incompatibile sunt respinse; precompletarea (text, data, nesuprascrierea unui text scris de utilizator, actualizarea la schimbarea vehiculului sau a opțiunii); mișcările existente rămân neschimbate; o ieșire spre vehicul lasă totalul neschimbat și crește „în vehicule” cu cantitatea ei, iar cele spre beneficiar, vânzare generică și corecție îl scad; editarea destinației (vehicul ↔ beneficiar etc.) și ștergerea unei mișcări recalculează corect totalul și defalcarea; „X în depozit, Y în vehicule” însumează N; depozitul negativ; ștergerea produsului blocată de stocul din vehicule; jurnalul; două sesiuni concurente.
+- [ ] Verificare în browser (modul demonstrativ): grupul radio la Ieșire (adăugare și editare), lipsa lui la Intrare, precompletările pentru Autovehicul și Corecție stoc cu data de azi, salvarea și afișarea în tabel, avertizarea la părăsire; o ieșire spre vehicul nu scade totalul, iar defalcarea „X în depozit, Y în vehicule” apare în pagina mișcărilor și în catalog; la 375 și 768 px fără depășire orizontală.
 - [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și `docs/TESTE_RAMASE.md` pentru ce nu se poate verifica.
 
 ### Criterii de acceptare
@@ -156,12 +167,16 @@ Extinde formularul de ieșire din pagina intrărilor/ieșirilor unui produs cu o
 - Formularul de ieșire are butoanele radio „Beneficiar”, „Autovehicul”, „Vânzare generică” și „Corecție stoc”; „Beneficiar” funcționează ca până acum.
 - „Autovehicul” permite alegerea unui vehicul din pagina „Vehicule”; descrierea este precompletată cu „Completare stoc mașină … <data de azi>”; pentru „Corecție stoc” este „Corecție stoc <data de azi>”; ambele texte pot fi modificate.
 - Nicio ieșire nu se salvează fără destinație aleasă din grupul radio.
-- Destinația se salvează, se afișează în tabel (vehiculul în coloana „VEHICUL”) și în jurnal; stocul rămâne calculat corect; mișcările existente nu sunt afectate.
+- Destinația se salvează, se afișează în tabel (vehiculul în coloana „VEHICUL”) și în jurnal; mișcările existente nu sunt afectate.
+- O ieșire spre autovehicul nu scade stocul total (produsul este mutat în vehicul); celelalte ieșiri îl scad ca până acum.
+- Oriunde apare stocul unui produs, este descris defalcat: „N produse: X în depozit, Y în vehicule”, cu X + Y = N.
 
 ### Detalii de stabilit la implementare
 
 - Textul exact al precompletărilor (majuscule, diacritice — care se elimină oricum la salvare, conform regulii existente) și formatul datei (`dd.mm.yyyy`).
 - Locul etichetei pentru „Vânzare generică” și „Corecție stoc” în tabel (decizii deja luate: destinația este obligatorie, coloana vehiculului se numește „VEHICUL”).
+- Cum ies produsele din vehicul (consum sau restituire în depozit): nu este cerut în acest task, deci cantitatea „în vehicule” crește numai prin ieșiri spre autovehicul și scade numai prin editarea sau ștergerea acelor mișcări; o operație de consum/restituire se stabilește separat cu utilizatorul.
+- Afișarea când nu există produse în vehicule (Y = 0): implicit se arată tot „N produse: N în depozit, 0 în vehicule”, pentru consecvență.
 
 ## Observații pentru etapa de implementare
 

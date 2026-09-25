@@ -1,14 +1,14 @@
-{
+﻿{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 2: administrarea vehiculelor (sectiunea Vehicule)",
-    "startedAtUtc":  "2026-09-25T11:41:22.7711285Z",
-    "completedAtUtc":  "2026-09-25T11:43:03.7758914Z",
-    "lastSummary":  "Task 2 implementat: administrarea vehiculelor. Pagina /vehicule (Administrare -\u003e Vehicule) cu adaugare, editare cu motivare si confirmare, stergere in doi pasi cu arhivare, cautare, sincronizare la 15s. Numar de inmatriculare unic cu masca AA-OOO-AAA extinsa la cererea utilizatorului la 1-2 litere, 2-3 cifre, 3 litere (B-123-ABC permis, HD-1-FDG respins), normalizat cu majuscule si cratime; descriere obligatorie max 100. Servicii: Vehicles.cs, SqliteVehicleRepository, MariaVehicleRepository (tabela vehicul creata la prima folosire), archive_vehicles (SQLite schema 9, Maria arhiva v5), tip de jurnal Vehicul cu filtru si link /vehicule?edit=id, DI in Program.cs. Legarea de miscari si blocarea stergerii cu miscari mutate in taskul de iesire spre vehicul (destinatie obligatorie, coloana VEHICUL). TODO: task arhivat, iesirea spre vehicul renumerotata 2. README, VALIDARE, PROJECT_STATE, TESTE_RAMASE (A9) actualizate.",
-    "lastCommitSubject":  "claude: vehicles administration page (Administrare \u003e Vehicule)",
+    "nextAgent":  "codex",
+    "currentTask":  "Adaugare in TODO a regulii: iesirea spre vehicul muta produsul, nu il scade din stoc",
+    "startedAtUtc":  "2026-09-25T11:45:03.8948517Z",
+    "completedAtUtc":  "2026-09-25T11:45:41.3112829Z",
+    "lastSummary":  "Adaugat in TODO.md, la Task 2 (iesire spre vehicul), noul subtask 2.3: iesirea spre autovehicul nu scade produsul din stoc, il muta in vehicul; stocul total ramane neschimbat, iar oriunde se afiseaza stocul apare defalcat N produse: X in depozit, Y in vehicule. Subtaskurile ulterioare renumerotate 2.4 si 2.5; actualizate testele, verificarea in browser, criteriile de acceptare si detaliile de stabilit; in Task 1 nota despre valoarea de stoc din PDF. PROJECT_STATE actualizat. Nu s-a modificat cod.",
+    "lastCommitSubject":  "claude: add vehicle stock-transfer rule to TODO",
     "claudeStatus":  "active"
 }

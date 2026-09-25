@@ -851,3 +851,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 464 PASS (51 noi), 0 FAIL; browser pe instanta de proba 5083 cu baza separata: meniu, stare goala, numar invalid respins, completare automata b123abc -> B-123-ABC, adaugare, editare cu confirmare, jurnal si link, stergere in doi pasi, 375/768 px fara depasire. Neverificat: MariaDB pe server real (TESTE_RAMASE A9); preview 5082 nu a putut fi repornit din sesiune si ruleaza codul vechi.
 - **Commit:** `claude: vehicles administration page (Administrare > Vehicule)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:45:41.3112829Z â€” claude
+
+- **Task:** Adaugare in TODO a regulii: iesirea spre vehicul muta produsul, nu il scade din stoc
+- **Rezumat:** Adaugat in TODO.md, la Task 2 (iesire spre vehicul), noul subtask 2.3: iesirea spre autovehicul nu scade produsul din stoc, il muta in vehicul; stocul total ramane neschimbat, iar oriunde se afiseaza stocul apare defalcat N produse: X in depozit, Y in vehicule. Subtaskurile ulterioare renumerotate 2.4 si 2.5; actualizate testele, verificarea in browser, criteriile de acceptare si detaliile de stabilit; in Task 1 nota despre valoarea de stoc din PDF. PROJECT_STATE actualizat. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu se aplica (numai documentatie); verificata numerotarea taskurilor si subtaskurilor.
+- **Commit:** `claude: add vehicle stock-transfer rule to TODO`
+- **Predat cÄƒtre:** codex

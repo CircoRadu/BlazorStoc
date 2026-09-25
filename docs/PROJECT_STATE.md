@@ -53,6 +53,7 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 - Validare: build Release 0 avertismente; `BlazorStoc.Checks` 464 trecute (51 noi); browser pe instanță de probă 5083 cu bază separată (adăugare, număr invalid, completare automată, editare cu confirmare, jurnal, ștergere în doi pași, 375/768 px). Neverificat: MariaDB pe server real (`docs/TESTE_RAMASE.md` A9).
 - Decizii pentru taskul următor („Ieșire spre vehicul…”), primite de la utilizator: o ieșire nu poate exista fără destinație aleasă din grupul radio; coloana vehiculului din tabelul mișcărilor are antetul „VEHICUL”. Blocarea ștergerii unui vehicul cu mișcări și numărul mișcărilor pe pagina Vehicule au fost mutate în acel task (mișcările nu au încă vehicul); `VehicleRules.CheckDelete` este pregătită și testată.
 - Următorul pas: Task 1 (situația de inventar) sau Task 2 (ieșire spre vehicul), în ordinea din `TODO.md`.
+- Regulă nouă cerută de utilizator (25 septembrie 2026), trecută în `TODO.md` (Task 2, subtaskul 2.3): o ieșire spre autovehicul **nu scade** produsul din stoc, ci îl mută în vehicul; stocul total rămâne neschimbat, iar oriunde se afișează stocul apare defalcat „N produse: X în depozit, Y în vehicule”. Detalii lăsate la confirmare: cum ies produsele din vehicul (consum/restituire, nu este cerut acum), afișarea când Y = 0 și ce valoare folosește PDF-ul de inventar (Task 1) — depozit, total sau ambele. Nu s-a modificat cod.
 
 ## Pregătire TODO — vehicule și ieșire spre vehicul
 
