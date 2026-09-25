@@ -21,6 +21,13 @@ public sealed class SqliteVehicleRepository(SqliteLocalStore store, IAccessContr
         return vehicles;
     }
 
+    public async Task<Vehicle?> GetAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        return await GetAsync(connection, null, id, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<Vehicle> CreateAsync(VehicleInput input, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
@@ -123,7 +130,7 @@ public sealed class SqliteVehicleRepository(SqliteLocalStore store, IAccessContr
 
     internal static string Target(Vehicle vehicle) => $"#{vehicle.Id} · {vehicle.PlateNumber}";
 
-    private static async Task<Vehicle?> GetAsync(SqliteConnection connection, SqliteTransaction transaction,
+    private static async Task<Vehicle?> GetAsync(SqliteConnection connection, SqliteTransaction? transaction,
         int id, CancellationToken token)
     {
         await using var command = SqliteLocalStore.Command(connection, transaction,

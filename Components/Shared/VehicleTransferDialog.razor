@@ -1,0 +1,75 @@
+@using BlazorStoc.Services
+
+@* Confirmation of returning products to the warehouse or moving them into another vehicle: the quantity (for one
+   product) and the target vehicle (for a move) are chosen here; the page performs the operation. *@
+<div class="delete-overlay" @onkeydown="KeyAsync">
+    <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="transfer-title">
+        <h2 id="transfer-title">@Title</h2>
+        @if (!string.IsNullOrWhiteSpace(Summary)) { <p class="muted">@Summary</p> }
+        <EditForm Model="this" OnSubmit="SubmitAsync" FormName="vehicle-transfer">
+            <fieldset disabled="@Busy">
+                <div class="editor-grid">
+                    @if (ShowQuantity)
+                    {
+                        <label for="transfer-quantity">Cantitate * (cel mult @MaxQuantity buc.)
+                            <InputNumber id="transfer-quantity" TValue="int?" @bind-Value="quantity" ParsingErrorMessage="Cantitatea trebuie să fie un număr întreg." min="1" max="@MaxQuantity" /></label>
+                    }
+                    @if (ShowTarget)
+                    {
+                        <label for="transfer-target">Mașina destinație *
+                            <select id="transfer-target" @onchange="args => targetId = int.TryParse(args.Value?.ToString(), out var id) ? id : null">
+                                <option value="" selected="@(targetId is null)">— alege mașina —</option>
+                                @foreach (var vehicle in Targets)
+                                {
+                                    <option value="@vehicle.Id" selected="@(targetId == vehicle.Id)">@vehicle.PlateNumber · @vehicle.Description</option>
+                                }
+                            </select></label>
+                    }
+                </div>
+                @if (localError is not null || Error is not null) { <div class="validation-message" role="alert">@(localError ?? Error)</div> }
+                <div class="editor-actions">
+                    <button class="primary" type="submit">@(Busy ? "Se salvează…" : ConfirmLabel)</button>
+                    <button type="button" class="danger" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
+                </div>
+            </fieldset>
+        </EditForm>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Summary { get; set; }
+    [Parameter] public string ConfirmLabel { get; set; } = "Confirmă";
+    [Parameter] public bool ShowQuantity { get; set; }
+    [Parameter] public int MaxQuantity { get; set; }
+    [Parameter] public bool ShowTarget { get; set; }
+    [Parameter] public IReadOnlyList<Vehicle> Targets { get; set; } = Array.Empty<Vehicle>();
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback<VehicleTransferChoice> Confirmed { get; set; }
+    [Parameter] public EventCallback Cancelled { get; set; }
+    private int? quantity, targetId;
+    private string? localError;
+    private bool initialized;
+
+    protected override void OnParametersSet()
+    {
+        // The whole quantity is proposed; the user can lower it.
+        if (!initialized) { quantity = ShowQuantity ? MaxQuantity : null; initialized = true; }
+    }
+
+    private Task KeyAsync(KeyboardEventArgs args) => args.Key == "Escape" && !Busy ? Cancelled.InvokeAsync() : Task.CompletedTask;
+
+    private async Task SubmitAsync()
+    {
+        if (Busy) return;
+        localError = null;
+        if (ShowQuantity && (quantity is null || quantity < 1 || quantity > MaxQuantity))
+        {
+            localError = $"Introdu o cantitate între 1 și {MaxQuantity}.";
+            return;
+        }
+        if (ShowTarget && targetId is null) { localError = "Alege mașina destinație."; return; }
+        await Confirmed.InvokeAsync(new VehicleTransferChoice(quantity ?? 0, targetId));
+    }
+}

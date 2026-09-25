@@ -1,0 +1,208 @@
+@page "/vehicule/{Id:int}/echipamente"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IVehicleRepository Vehicles
+@inject IStockMovementRepository Movements
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
+@inject ILogger<VehicleEquipmentPage> Logger
+@implements IDisposable
+
+<PageTitle>Materiale și echipamente @(vehicle?.PlateNumber is { } plate ? $"· {plate}" : "") · BlazorStoc</PageTitle>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă vehiculul</h3></div>
+}
+else if (error is not null && vehicle is null)
+{
+    <a class="nav-back" href="/vehicule"><span>←</span> Vehicule</a>
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+}
+else if (vehicle is not null)
+{
+    <a class="nav-back" href="@VehicleNavigation.PageUrl(Id)"><span>←</span> @vehicle.PlateNumber</a>
+    <div class="page-heading">
+        <div><p class="eyebrow">VEHICUL · @vehicle.PlateNumber</p><h1>Materiale și echipamente</h1><p class="muted">Materialele și echipamentele aflate în această mașină (@vehicle.Description).</p></div>
+        @if (items.Count > 0)
+        {
+            <div class="heading-actions">
+                <button class="primary" disabled="@(dialog is not null)" @onclick="() => Open(TransferKind.ReturnAll, null)">Restituie tot în depozit</button>
+                <button class="soft-success" disabled="@(dialog is not null)" @onclick="() => Open(TransferKind.MoveAll, null)">Mută tot în altă mașină</button>
+            </div>
+        }
+    </div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
+
+    <section class="catalog">
+        @if (items.Count == 0)
+        {
+            <div class="empty-state">
+                <span class="empty-icon">▦</span>
+                <h3>Nu există materiale sau echipamente în această mașină</h3>
+                <p>Produsele ajung aici prin ieșiri de stoc spre autovehicul, din pagina „Intrări/ieșiri” a produsului.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr>
+                <th>COD PRODUS</th><th class="number">CANTITATE</th><th><span class="sr-only">Acțiuni</span></th>
+            </tr></thead><tbody>
+            @foreach (var item in items)
+            {
+                <tr @key="item.ProductId">
+                    <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(item.ProductId)"><strong>@item.ProductCode</strong></a></td>
+                    <td class="number">@item.Quantity</td>
+                    <td class="movement-actions">
+                        <button class="row-action edit" disabled="@(dialog is not null)" aria-label="Restituie în depozit @item.ProductCode" @onclick="() => Open(TransferKind.Return, item)">Restituie în depozit</button>
+                        <button class="row-action" disabled="@(dialog is not null)" aria-label="Mută în altă mașină @item.ProductCode" @onclick="() => Open(TransferKind.Move, item)">Mută în altă mașină</button>
+                    </td>
+                </tr>
+            }
+            </tbody></table></div>
+            <div class="table-footer"><span>@(items.Count == 1 ? "1 reper" : $"{items.Count} repere") · @items.Sum(item => item.Quantity) buc.</span></div>
+        }
+    </section>
+}
+
+@if (dialog is { } current)
+{
+    <VehicleTransferDialog @key="dialogKey" Title="@DialogTitle(current)" Summary="@DialogSummary(current)"
+                           ConfirmLabel="@(current.Kind is TransferKind.Return or TransferKind.ReturnAll ? "Restituie în depozit" : "Mută")"
+                           ShowQuantity="@(current.Item is not null)" MaxQuantity="@(current.Item?.Quantity ?? 0)"
+                           ShowTarget="@(current.Kind is TransferKind.Move or TransferKind.MoveAll)" Targets="otherVehicles"
+                           Busy="@busy" Error="@dialogError" Confirmed="ConfirmAsync" Cancelled="Close" />
+}
+
+@code {
+    private enum TransferKind { Return, Move, ReturnAll, MoveAll }
+    private sealed record Pending(TransferKind Kind, VehicleEquipment? Item);
+
+    [Parameter] public int Id { get; set; }
+    private Vehicle? vehicle;
+    private IReadOnlyList<VehicleEquipment> items = Array.Empty<VehicleEquipment>();
+    private IReadOnlyList<Vehicle> otherVehicles = Array.Empty<Vehicle>();
+    private Pending? dialog;
+    private Guid dialogKey;
+    private bool loading = true, busy;
+    private string? error, notice, dialogError;
+    private LiveRefresh? live;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Stock movements of other sessions change what the vehicle holds; an open dialog is never replaced.
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Product,
+            () => InvokeAsync(async () => { if (!loading) { await RefreshAsync(); StateHasChanged(); } }),
+            () => dialog is not null, () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(15));
+        await LoadAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (vehicle is not null && vehicle.Id != Id) await LoadAsync();
+    }
+
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            vehicle = await Vehicles.GetAsync(Id, lifetime.Token);
+            if (vehicle is null) { error = "Vehiculul solicitat nu mai există."; items = Array.Empty<VehicleEquipment>(); return; }
+            await LoadItemsAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Vehicle equipment loading failed ({ErrorType}).", exception.GetType().Name); error = "Materialele și echipamentele nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private async Task LoadItemsAsync()
+    {
+        var all = await Vehicles.GetVehiclesAsync(lifetime.Token);
+        otherVehicles = all.Where(item => item.Id != Id).ToList();
+        items = await Movements.GetVehicleEquipmentAsync(Id, lifetime.Token);
+    }
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            var current = await Vehicles.GetAsync(Id, lifetime.Token);
+            if (current is null) { vehicle = null; error = "Vehiculul solicitat nu mai există."; return; }
+            vehicle = current;
+            await LoadItemsAsync();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Logger.LogWarning("Vehicle equipment refresh failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private void Open(TransferKind kind, VehicleEquipment? item)
+    {
+        notice = null; dialogError = null; error = null;
+        if (kind is TransferKind.Move or TransferKind.MoveAll && otherVehicles.Count == 0)
+        {
+            error = "Nu există o altă mașină în care să poți muta produsele. Adaugă un vehicul în pagina Vehicule.";
+            return;
+        }
+        dialog = new(kind, item); dialogKey = Guid.NewGuid();
+    }
+
+    private void Close() { if (!busy) { dialog = null; dialogError = null; } }
+
+    private string DialogTitle(Pending pending) => pending.Kind switch
+    {
+        TransferKind.Return => $"Restituie {pending.Item!.ProductCode} în depozit",
+        TransferKind.Move => $"Mută {pending.Item!.ProductCode} în altă mașină",
+        TransferKind.ReturnAll => "Restituie tot în depozit",
+        _ => "Mută tot în altă mașină"
+    };
+
+    private string DialogSummary(Pending pending) => pending.Item is { } item
+        ? $"În mașina {vehicle?.PlateNumber} există {item.Quantity} buc. din acest produs. Stocul total al produsului nu se schimbă."
+        : $"Se aplică tuturor reperelor din mașina {vehicle?.PlateNumber}: {(items.Count == 1 ? "1 reper" : $"{items.Count} repere")}, {items.Sum(entry => entry.Quantity)} buc., cu toată cantitatea fiecăruia. Operația se aplică pentru toate sau pentru niciunul.";
+
+    private async Task ConfirmAsync(VehicleTransferChoice choice)
+    {
+        if (busy || dialog is not { } pending || vehicle is null) return;
+        busy = true; dialogError = null;
+        var toWarehouse = pending.Kind is TransferKind.Return or TransferKind.ReturnAll;
+        try
+        {
+            IReadOnlyList<VehicleTransferLine>? lines = pending.Item is { } item ? [new(item.ProductId, choice.Quantity)] : null;
+            var created = await Movements.TransferFromVehicleAsync(new(vehicle.Id, toWarehouse ? null : choice.TargetVehicleId, lines), lifetime.Token);
+            var pieces = created.Sum(movement => movement.Quantity);
+            var targetPlate = toWarehouse ? null : otherVehicles.FirstOrDefault(other => other.Id == choice.TargetVehicleId)?.PlateNumber;
+            notice = (pending.Item, toWarehouse) switch
+            {
+                ({ } one, true) => $"{one.ProductCode}: {pieces} buc. restituite în depozit.",
+                ({ } one, false) => $"{one.ProductCode}: {pieces} buc. mutate în mașina {targetPlate}.",
+                (null, true) => $"Au fost restituite în depozit {(created.Count == 1 ? "1 reper" : $"{created.Count} repere")} ({pieces} buc.).",
+                _ => $"Au fost mutate în mașina {targetPlate} {(created.Count == 1 ? "1 reper" : $"{created.Count} repere")} ({pieces} buc.)."
+            };
+            dialog = null;
+            await LoadItemsAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is StockMovementOperationException or AccessDeniedException)
+        {
+            dialogError = exception.Message;
+            // Quantities may have changed in the meantime: the list is reloaded behind the dialog.
+            try { await LoadItemsAsync(); } catch (Exception reload) when (reload is not OperationCanceledException) { }
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError("Vehicle transfer failed ({ErrorType}).", exception.GetType().Name);
+            dialogError = "Operația nu a putut fi efectuată. Actualizează pagina și reîncearcă.";
+        }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
+}

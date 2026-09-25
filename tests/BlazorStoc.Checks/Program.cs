@@ -1830,6 +1830,144 @@ finally
     }
 }
 
+// Vehicle page: equipment held by a vehicle, returns to the warehouse and moves between vehicles.
+{
+    Check(VehicleNavigation.PageUrl(7) == "/vehicule/7" && VehicleNavigation.EquipmentUrl(7) == "/vehicule/7/echipamente",
+        "The vehicle page and its equipment page have stable routes");
+    Check(StockMovementRules.Effect(StockMovementKind.Exit, ExitDestination.WarehouseReturn, 5) == 0 &&
+          StockMovementRules.DestinationLabel(ExitDestination.WarehouseReturn) == "Restituire în depozit" &&
+          StockMovementRules.TransferDescription("HD-01-FDG", null, new DateOnly(2026, 9, 25)) == "Restituire în depozit din mașina HD-01-FDG 25.09.2026" &&
+          StockMovementRules.TransferDescription("HD-01-FDG", "B-123-ABC", new DateOnly(2026, 9, 25)) == "Mutare din mașina HD-01-FDG în mașina B-123-ABC 25.09.2026",
+        "A return to the warehouse leaves the total unchanged and both transfers have a dated description");
+    StockMovementOperationException? BadTransfer(VehicleTransfer transfer)
+    {
+        try { StockMovementRules.ValidateTransfer(transfer); return null; }
+        catch (StockMovementOperationException exception) { return exception; }
+    }
+    Check(BadTransfer(new(1, 1)) is { } sameVehicle && sameVehicle.Message == StockMovementRules.SameVehicleMessage &&
+          BadTransfer(new(1, 2)) is null && BadTransfer(new(1, null)) is null && BadTransfer(new(0, null)) is not null &&
+          BadTransfer(new(1, null, [])) is not null && BadTransfer(new(1, null, [new(5, 1), new(5, 2)])) is not null &&
+          BadTransfer(new(1, null, [new(5, 0)])) is not null && BadTransfer(new(1, null, [new(5, StockMovementRules.MaxQuantity + 1)])) is not null,
+        "A transfer needs a valid source, another target vehicle, distinct products and quantities in range");
+
+    var pageRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-vehicle-page-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(pageRoot);
+    try
+    {
+        var pgConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:LocalDatabasePath"] = Path.Combine(pageRoot, "page.db"),
+            ["App:ProductImagesPath"] = Path.Combine(pageRoot, "product-images"),
+            ["App:ArchiveFilesPath"] = Path.Combine(pageRoot, "archive-files"),
+            ["App:AuditPath"] = Path.Combine(pageRoot, "legacy-audit.jsonl")
+        }).Build();
+        var pgStore = new SqliteLocalStore(new TestWebHostEnvironment(pageRoot), pgConfiguration, NullLogger<SqliteLocalStore>.Instance);
+        var pgAccess = new TestAccessControl(true, "operator.pagina");
+        var pgProducts = new SqliteProductRepository(pgStore, pgAccess);
+        var pgVehicles = new SqliteVehicleRepository(pgStore, pgAccess);
+        var pgMovements = new SqliteStockMovementRepository(pgStore, pgAccess);
+        var pgAudit = new SqliteAuditTrail(pgStore);
+        var pgAll = new StockMovementQuery(null, false, 1, 0);
+        var productB = await CreateProductAsync(pgProducts, new ProductInput { Name = "B produs vehicul", Category = "Pagina", Subcategory = "Test" });
+        var productA = await CreateProductAsync(pgProducts, new ProductInput { Name = "a produs vehicul", Category = "Pagina", Subcategory = "Test" });
+        var carOne = await pgVehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-01-FDG", Description = "Prima masina" });
+        var carTwo = await pgVehicles.CreateAsync(new VehicleInput { PlateNumber = "B-123-ABC", Description = "A doua masina" });
+        StockMovementInput Entry(int quantity) => new() { Kind = StockMovementKind.Entry, Quantity = quantity, Description = "Test", Date = new DateOnly(2026, 9, 24) };
+        StockMovementInput ToVehicle(int quantity, int vehicleId) => new()
+            { Kind = StockMovementKind.Exit, Quantity = quantity, Description = "Completare", Date = new DateOnly(2026, 9, 24), Destination = ExitDestination.Vehicle, VehicleId = vehicleId };
+        async Task<StockMovementOperationException?> Failed(Func<Task> operation)
+        {
+            try { await operation(); }
+            catch (StockMovementOperationException exception) { return exception; }
+            return null;
+        }
+        async Task<int> Total(int productId) => (await pgProducts.GetProductAsync(productId))!.Quantity;
+        async Task<int> Held(int productId, int vehicleId) =>
+            (await pgMovements.GetVehicleStocksAsync(productId)).FirstOrDefault(item => item.VehicleId == vehicleId)?.Quantity ?? 0;
+        await pgMovements.CreateAsync(productA.Id, Entry(10));
+        await pgMovements.CreateAsync(productB.Id, Entry(5));
+        await pgMovements.CreateAsync(productA.Id, ToVehicle(4, carOne.Id));
+        await pgMovements.CreateAsync(productB.Id, ToVehicle(3, carOne.Id));
+
+        Check((await pgVehicles.GetAsync(carOne.Id))?.PlateNumber == "HD-01-FDG" && await pgVehicles.GetAsync(9999) is null, "A vehicle is read by its identifier");
+        var equipment = await pgMovements.GetVehicleEquipmentAsync(carOne.Id);
+        Check(equipment.Select(item => (item.ProductCode, item.Quantity)).SequenceEqual([("a produs vehicul", 4), ("B produs vehicul", 3)]) &&
+              (await pgMovements.GetVehicleEquipmentAsync(carTwo.Id)).Count == 0,
+            "The equipment page lists the products of the vehicle by code, with their quantities");
+
+        // Partial return to the warehouse.
+        var returned = await pgMovements.TransferFromVehicleAsync(new(carOne.Id, null, [new(productA.Id, 1)]));
+        var returnedMovement = returned.Single();
+        Check(returnedMovement.Destination == ExitDestination.WarehouseReturn && returnedMovement.SourceVehicleId == carOne.Id && returnedMovement.VehicleId is null &&
+              returnedMovement.Effect == 0 && returnedMovement.IsVehicleTransfer && returnedMovement.Quantity == 1 &&
+              returnedMovement.Description == "Restituire in depozit din masina HD-01-FDG " + StockMovementRules.DisplayDate(StockMovementRules.Today) &&
+              returnedMovement.Operator == "operator.pagina",
+            "Returning pieces to the warehouse records one movement with the vehicle as source");
+        Check(await Total(productA.Id) == 10 && await Held(productA.Id, carOne.Id) == 3 &&
+              (await pgMovements.GetPageAsync(productA.Id, pgAll)).InVehicles == 3,
+            "A return keeps the total stock and moves the pieces from the vehicle to the warehouse");
+        // Partial move into another vehicle.
+        var moved = (await pgMovements.TransferFromVehicleAsync(new(carOne.Id, carTwo.Id, [new(productA.Id, 2)]))).Single();
+        Check(moved.Destination == ExitDestination.Vehicle && moved.VehicleId == carTwo.Id && moved.SourceVehicleId == carOne.Id && moved.Effect == 0 &&
+              moved.Description == "Mutare din masina HD-01-FDG in masina B-123-ABC " + StockMovementRules.DisplayDate(StockMovementRules.Today) &&
+              await Held(productA.Id, carOne.Id) == 1 && await Held(productA.Id, carTwo.Id) == 2 && await Total(productA.Id) == 10 &&
+              (await pgMovements.GetPageAsync(productA.Id, pgAll)).InVehicles == 3,
+            "Moving pieces changes the vehicles and leaves the total and the sum held by vehicles unchanged");
+        // Refusals change nothing.
+        var movementCount = (await pgMovements.GetPageAsync(productA.Id, pgAll)).TotalCount + (await pgMovements.GetPageAsync(productB.Id, pgAll)).TotalCount;
+        var tooMany = await Failed(() => pgMovements.TransferFromVehicleAsync(new(carOne.Id, null, [new(productA.Id, 5)])));
+        Check(tooMany?.Message == "a produs vehicul: " + StockMovementRules.NotEnoughInVehicleMessage("HD-01-FDG", 1), "A quantity above what the vehicle holds is refused");
+        Check((await Failed(() => pgMovements.TransferFromVehicleAsync(new(carOne.Id, carOne.Id))))?.Message == StockMovementRules.SameVehicleMessage &&
+              (await Failed(() => pgMovements.TransferFromVehicleAsync(new(carOne.Id, 9999))))?.Message == StockMovementRules.VehicleMissingMessage &&
+              (await Failed(() => pgMovements.TransferFromVehicleAsync(new(9999, null))))?.Message == StockMovementRules.VehicleMissingMessage &&
+              (await Failed(() => pgMovements.TransferFromVehicleAsync(new(carOne.Id, null, [new(9999, 1)])))) is not null,
+            "Moving to the same vehicle, from or to a missing vehicle, or a missing product is refused");
+        var atomic = await Failed(() => pgMovements.TransferFromVehicleAsync(new(carOne.Id, null, [new(productA.Id, 1), new(productB.Id, 99)])));
+        Check(atomic is not null && (await pgMovements.GetPageAsync(productA.Id, pgAll)).TotalCount + (await pgMovements.GetPageAsync(productB.Id, pgAll)).TotalCount == movementCount &&
+              await Held(productA.Id, carOne.Id) == 1 && await Held(productB.Id, carOne.Id) == 3,
+            "A transfer with one impossible line is refused as a whole and nothing changes");
+
+        // Everything back to the warehouse, atomically.
+        var everything = await pgMovements.TransferFromVehicleAsync(new(carOne.Id, null));
+        Check(everything.Count == 2 && everything.All(movement => movement.Destination == ExitDestination.WarehouseReturn) &&
+              (await pgMovements.GetVehicleEquipmentAsync(carOne.Id)).Count == 0 && await Total(productA.Id) == 10 && await Total(productB.Id) == 5 &&
+              (await Failed(() => pgMovements.TransferFromVehicleAsync(new(carOne.Id, null))))?.Message == StockMovementRules.NothingToTransferMessage,
+            "Returning everything empties the vehicle, keeps the totals and an empty vehicle has nothing to transfer");
+        // Everything into another vehicle.
+        var allMoved = await pgMovements.TransferFromVehicleAsync(new(carTwo.Id, carOne.Id));
+        Check(allMoved.Count == 1 && allMoved[0].VehicleId == carOne.Id && (await pgMovements.GetVehicleEquipmentAsync(carTwo.Id)).Count == 0 &&
+              (await pgMovements.GetVehicleEquipmentAsync(carOne.Id)).Single().Quantity == 2, "Moving everything into another vehicle transfers every product");
+
+        // Editing and deleting these movements keeps the vehicles non-negative.
+        var editMove = StockMovementInput.From(allMoved[0]); editMove.Quantity = 1; editMove.Reason = "Corectie cantitate";
+        var edited = await pgMovements.UpdateAsync(allMoved[0], editMove);
+        Check(edited.Movement.Quantity == 1 && edited.Movement.IsVehicleTransfer && edited.Stock == await Total(productA.Id) &&
+              await Held(productA.Id, carOne.Id) == 1 && await Held(productA.Id, carTwo.Id) == 1,
+            "A move between vehicles can be edited from the movements page (destination and source stay, quantity changes)");
+        Check((await Failed(() => pgMovements.DeleteAsync(returnedMovement, "Motiv"))) is null && await Total(productA.Id) == 10,
+            "A return can be deleted; the total stock does not change");
+        // Concurrent whole-vehicle moves: the second one finds nothing left.
+        var raced = await Task.WhenAll(Enumerable.Range(0, 3).Select(async _ =>
+        {
+            try { await new SqliteStockMovementRepository(pgStore, pgAccess).TransferFromVehicleAsync(new(carOne.Id, carTwo.Id)); return true; }
+            catch (Exception exception) when (exception is StockMovementOperationException or Microsoft.Data.Sqlite.SqliteException) { return false; }
+        }));
+        Check(raced.Count(done => done) == 1, "Two sessions cannot move the same equipment twice");
+
+        var events = (await pgAudit.GetEventsAsync()).Where(entry => entry.EntityType == AuditEntities.StockMovement && entry.Action == AuditActions.Create).ToArray();
+        Check(events.Any(entry => entry.EntityId == returnedMovement.Id.ToString() && entry.Details.Contains("Destinație: Restituire în depozit") &&
+                                  entry.Details.Contains("Sursă: Mașina HD-01-FDG") && entry.ActorUsername == "operator.pagina") &&
+              events.Any(entry => entry.EntityId == moved.Id.ToString() && entry.Details.Contains("Vehicul: B-123-ABC")),
+            "Each return and move is journalled with the operator, the destination, the vehicle and the source");
+        try { await pgVehicles.DeleteAsync(carOne, "Motiv"); throw new Exception("Vehicle with transfers deleted"); }
+        catch (VehicleOperationException) { Check(true, "A vehicle with transfer movements cannot be deleted"); }
+    }
+    finally
+    {
+        try { Directory.Delete(pageRoot, true); } catch (IOException) { }
+    }
+}
+
 // Databases created before this module keep their stock_movements rows and receive the new columns.
 var legacyMovementRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-legacy-movements-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(legacyMovementRoot);
@@ -2531,7 +2669,7 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
         Check(editEvent.Details == "Descriere: Dacia Dokker alba → Dacia Dokker gri" && editEvent.Motif == "Culoare corectata" &&
               editEvent.EntityId == dokker.Id.ToString() && editEvent.Target == $"#{dokker.Id} · HD-01-FDG",
             "A vehicle edit journals the changed fields (before → after), the reason and the vehicle as target");
-        Check(AuditNavigation.TargetUrl(editEvent) == $"/vehicule?edit={dokker.Id}", "The journal links a vehicle event to its editor");
+        Check(AuditNavigation.TargetUrl(editEvent) == $"/vehicule/{dokker.Id}", "The journal links a vehicle event to its page");
 
         // Concurrent creations of the same number: exactly one succeeds.
         var racing = await Task.WhenAll(Enumerable.Range(0, 4).Select(async index =>

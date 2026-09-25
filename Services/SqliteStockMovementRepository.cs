@@ -74,6 +74,84 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
         return result;
     }
 
+    public async Task<IReadOnlyList<VehicleEquipment>> GetVehicleEquipmentAsync(int vehicleId, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        var held = (await VehicleQuantitiesAsync(connection, null, null, cancellationToken).ConfigureAwait(false))
+            .Where(entry => entry.VehicleId == vehicleId && entry.Quantity > 0).ToList();
+        var result = new List<VehicleEquipment>();
+        foreach (var entry in held)
+            result.Add(new(entry.ProductId,
+                await GetProductCodeAsync(connection, null, entry.ProductId, cancellationToken).ConfigureAwait(false) ?? $"#{entry.ProductId}",
+                entry.Quantity));
+        return result.OrderBy(item => item.ProductCode, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.ProductId).ToList();
+    }
+
+    public async Task<IReadOnlyList<StockMovement>> TransferFromVehicleAsync(VehicleTransfer transfer, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        StockMovementRules.ValidateTransfer(transfer);
+        var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
+        var now = DateTime.UtcNow;
+        var day = StockMovementRules.Today;
+        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            async Task<string> PlateAsync(int id)
+            {
+                await using var command = SqliteLocalStore.Command(connection, transaction,
+                    "SELECT plate_number FROM vehicles WHERE id=@id", ("@id", id));
+                return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
+                       ?? throw new StockMovementOperationException(StockMovementRules.VehicleMissingMessage);
+            }
+            var sourcePlate = await PlateAsync(transfer.SourceVehicleId).ConfigureAwait(false);
+            var targetPlate = transfer.TargetVehicleId is { } targetId ? await PlateAsync(targetId).ConfigureAwait(false) : null;
+            var held = (await VehicleQuantitiesAsync(connection, transaction, null, cancellationToken).ConfigureAwait(false))
+                .Where(entry => entry.VehicleId == transfer.SourceVehicleId && entry.Quantity > 0)
+                .ToDictionary(entry => entry.ProductId, entry => entry.Quantity);
+            var plan = (transfer.Lines ?? held.Select(entry => new VehicleTransferLine(entry.Key, entry.Value)).ToList())
+                .OrderBy(line => line.ProductId).ToList();
+            if (plan.Count == 0) throw new StockMovementOperationException(StockMovementRules.NothingToTransferMessage);
+            var description = TextNormalization.ForStorage(StockMovementRules.TransferDescription(sourcePlate, targetPlate, day));
+            var destination = transfer.TargetVehicleId is null ? ExitDestination.WarehouseReturn : ExitDestination.Vehicle;
+            var created = new List<StockMovement>();
+            foreach (var line in plan)
+            {
+                var productCode = await GetProductCodeAsync(connection, transaction, line.ProductId, cancellationToken).ConfigureAwait(false)
+                                  ?? throw new StockMovementOperationException(ProductMissingMessage);
+                var available = held.GetValueOrDefault(line.ProductId);
+                if (line.Quantity > available)
+                    throw new StockMovementOperationException($"{productCode}: {StockMovementRules.NotEnoughInVehicleMessage(sourcePlate, available)}");
+                await using var insert = SqliteLocalStore.Command(connection, transaction, """
+                    INSERT INTO stock_movements
+                        (product_id,beneficiary_id,project_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc,
+                         destination,vehicle_id,source_vehicle_id)
+                    VALUES(@product,NULL,NULL,@quantity,@created,0,@date,@description,@operator,0,@created,@destination,@vehicle,@sourceVehicle);
+                    SELECT last_insert_rowid();
+                    """, ("@product", line.ProductId), ("@quantity", line.Quantity), ("@created", now.ToString("O")),
+                    ("@date", StockMovementRules.StorageDate(day)), ("@description", description), ("@operator", actor.Username),
+                    ("@destination", (int)destination), ("@vehicle", transfer.TargetVehicleId), ("@sourceVehicle", transfer.SourceVehicleId));
+                var id = checked((int)(long)(await insert.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!);
+                var movement = new StockMovement(id, line.ProductId, StockMovementKind.Exit, line.Quantity, day, description, null, null, null, null,
+                    actor.Username, 0, now, now, false, destination, transfer.TargetVehicleId, targetPlate, transfer.SourceVehicleId, sourcePlate);
+                await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
+                    AuditEntities.StockMovement, AuditActions.Create, StockMovementRules.Target(productCode),
+                    StockMovementRules.AuditIdentification(movement, productCode), string.Empty, id.ToString()), cancellationToken).ConfigureAwait(false);
+                await EnsureVehicleStocksNotNegativeAsync(connection, transaction, line.ProductId, cancellationToken).ConfigureAwait(false);
+                created.Add(movement);
+            }
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            return created;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+    }
+
     public async Task<IReadOnlyDictionary<int, int>> GetQuantitiesInVehiclesAsync(CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
@@ -186,7 +264,7 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
     public async Task<StockMovementResult> UpdateAsync(StockMovement original, StockMovementInput input, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        var value = StockMovementRules.Validated(input, original.Kind, true);
+        var value = StockMovementRules.Validated(input, original.Kind, true, allowVehicleTransfer: original.IsVehicleTransfer);
         var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);

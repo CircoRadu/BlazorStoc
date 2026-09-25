@@ -70,9 +70,13 @@ public sealed class VehicleInput
 
 public sealed class VehicleOperationException(string message) : Exception(message);
 
+// The choice made in the transfer dialog of the vehicle page: quantity (0 for whole-vehicle operations) and target vehicle.
+public sealed record VehicleTransferChoice(int Quantity, int? TargetVehicleId);
+
 public interface IVehicleRepository
 {
     Task<IReadOnlyList<Vehicle>> GetVehiclesAsync(CancellationToken cancellationToken = default);
+    Task<Vehicle?> GetAsync(int id, CancellationToken cancellationToken = default);
     Task<Vehicle> CreateAsync(VehicleInput input, CancellationToken cancellationToken = default);
     Task<Vehicle> UpdateAsync(Vehicle original, VehicleInput input, CancellationToken cancellationToken = default);
     Task DeleteAsync(Vehicle original, string reason, CancellationToken cancellationToken = default);
@@ -96,8 +100,9 @@ public static class VehicleNavigation
 {
     // The event stores the vehicle id; the administration page opens the editor of that vehicle.
     public static string EditUrl(int vehicleId) => $"/vehicule?edit={vehicleId}";
-    // Where links to a vehicle point (the movements table); it moves to the vehicle page when that page exists.
-    public static string PageUrl(int vehicleId) => EditUrl(vehicleId);
+    // The vehicle page (its equipment); links from lists, the movements table and the journal point here.
+    public static string PageUrl(int vehicleId) => $"/vehicule/{vehicleId}";
+    public static string EquipmentUrl(int vehicleId) => $"/vehicule/{vehicleId}/echipamente";
 }
 
 public static class VehicleRules

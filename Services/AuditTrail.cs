@@ -74,8 +74,8 @@ public static class AuditNavigation
         [AuditEntities.ProjectObservation] = ProjectNavigation.ObservationUrl,
         // The event stores the movement id; /miscari/{id} resolves it to the product's movements page.
         [AuditEntities.StockMovement] = StockMovementNavigation.MovementUrl,
-        // The vehicles page opens the editor of the vehicle named by the identifier.
-        [AuditEntities.Vehicle] = VehicleNavigation.EditUrl
+        // The vehicle page (its equipment, edit and delete actions).
+        [AuditEntities.Vehicle] = VehicleNavigation.PageUrl
     };
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)

@@ -14,7 +14,7 @@
 
 ## Ordinea de implementare optimizată
 
-Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskurile active (1–2) se bazează pe lucrări finalizate (inclusiv administrarea vehiculelor și ieșirea spre vehicul, cu stocul aflat în mașini) și se implementează în ordinea numerelor, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan. Taskul 1 (inventarul) este independent de taskul 2.
+Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskul activ (1) se bazeaza pe lucrari finalizate (inclusiv administrarea vehiculelor, iesirea spre vehicul si pagina vehiculului) si se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex).
 
 ## Task 1 — Situația de inventar (pagina „Inventar” și fișierul PDF)
 
@@ -119,59 +119,6 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 1.7); se documentează.
 - Valoarea „în depozit” este disponibilă: stocul total al produsului minus cantitatea din mașini (`StockMovementRules.WarehouseStock(total, inVehicles)`, cu `IStockMovementRepository.GetQuantitiesInVehiclesAsync`); inventarul o folosește în locul stocului total.
 - Toate celelalte detalii au fost confirmate de utilizator și sunt descrise în „Decizii stabilite cu utilizatorul”.
-
-## Task 2 — Pagina vehiculului: materiale și echipamente, restituire în depozit și mutare între mașini
-
-Cerută de utilizator (25 septembrie 2026). Pagina de administrare a unui vehicul urmează **aceeași logică** ca pagina unui proiect (`/proiecte/{id}`), dar **fără observații și fără fișiere atașate**: conține numai intrarea către materialele și echipamentele aflate în mașină. Depinde de lucrarea finalizată „Ieșire spre vehicul, vânzare generică și corecție de stoc”, care introduce stocul aflat în mașini, sursa ieșirii și defalcarea depozit/vehicule, și de administrarea vehiculelor (finalizată).
-
-### Subtask 2.1 — Pagina vehiculului `/vehicule/{id}`
-
-- [ ] În lista din pagina „Vehicule”, numărul de înmatriculare devine link către pagina vehiculului (ca numele proiectului din lista beneficiarului); butoanele de editare și ștergere din listă rămân. Linkurile către un vehicul din tabelul „Intrări/ieșiri” și din jurnal (acum `VehicleNavigation.PageUrl`/`EditUrl`, care duc la editorul din listă) sunt mutate pe pagina vehiculului; coloana „MIȘCĂRI” din lista „Vehicule” (numărul mișcărilor, existent) devine link către mișcările vehiculului.
-- [ ] Pagina are structura paginii proiectului: link de întoarcere „← Vehicule”, antet cu eticheta „VEHICUL”, numărul de înmatriculare ca titlu și descrierea ca text secundar, butoanele „Editează” (același formular ca în listă, cu motivare și confirmare) și „Șterge vehiculul” (același flux în doi pași; regulile de blocare existente), apoi o secțiune „Conținutul vehiculului” cu un tabel ELEMENT / DETALII.
-- [ ] **Prima intrare** (și singura) a tabelului este link-ul **„Materiale și echipamente”** către `/vehicule/{id}/echipamente`, cu detaliul „Materiale și echipamente aflate în această mașină”. Pagina **nu** permite introducerea de observații și nu atașează fișiere: nu există „+ Adaugă observație”, câmp de fișiere sau alte intrări adăugate de utilizator.
-- [ ] Stări clare: încărcare, vehicul inexistent („Vehiculul solicitat nu mai există.”) și eroare cu „Reîncearcă”; dacă un alt utilizator modifică sau șterge vehiculul, pagina se reîmprospătează sau afișează o notificare, ca la proiecte (mecanismul comun de sincronizare); accesibilă utilizatorilor autentificați.
-- [ ] Linkul „Ținta” din Jurnal pentru un vehicul adăugat sau editat duce la pagina vehiculului (în locul editorului din listă).
-
-### Subtask 2.2 — Pagina „Materiale și echipamente” `/vehicule/{id}/echipamente`
-
-- [ ] Pagina (cu link de întoarcere către vehicul și antet „VEHICUL · <număr>”) afișează **tabelar** produsele aflate în mașină: **COD PRODUS** (link către pagina produsului), **CANTITATE** (cantitatea din mașină, calculată din mișcări, cu `IStockMovementRepository.GetVehicleStocksAsync`, doar valori mai mari ca 0) și coloana de acțiuni de mai jos; ordonate după cod (insensibil la majuscule); subsol cu numărul de repere și totalul de bucăți.
-- [ ] Stare goală clară („Nu există materiale sau echipamente în această mașină”, cu explicația că ele ajung aici prin ieșiri de stoc spre autovehicul); încărcare, eroare cu „Reîncearcă” și reîmprospătare la modificările făcute de alte sesiuni.
-
-### Subtask 2.3 — Acțiuni pentru fiecare reper
-
-- [ ] Decizie confirmată de utilizator (25 septembrie 2026): restituirea și mutarea unui reper pot fi făcute cu o **cantitate parțială** (implicit toată cantitatea din mașină); transferul dintr-o mașină în alta se face numai de pe această pagină, nu din formularul de ieșire.
-- [ ] Fiecare rând are două acțiuni: **„Restituie în depozit”** și **„Mută în altă mașină”**.
-- [ ] Ambele deschid un dialog cu cantitatea (implicit **toată** cantitatea din mașină, editabilă între 1 și cantitatea disponibilă) și, pentru mutare, lista celorlalte vehicule existente (fără cel curent; dacă nu există altul, acțiunea explică acest lucru și rămâne dezactivată). Confirmarea aplică operația; „Anulează” (roșu, ca restul dialogurilor) nu modifică nimic.
-- [ ] Efectul: **restituirea** crește stocul din depozit și scade cantitatea din mașină; **mutarea** scade cantitatea din mașina curentă și o crește în mașina aleasă; în ambele cazuri **stocul total al produsului rămâne neschimbat**. O cantitate mai mare decât cea existentă în mașină este respinsă cu mesaj în română.
-
-### Subtask 2.4 — Acțiuni pentru toate reperele
-
-- [ ] Deasupra tabelului există două acțiuni: **„Restituie tot în depozit”** și **„Mută tot în altă mașină”** (aceasta cu lista celorlalte vehicule existente). Se aplică tuturor reperelor din mașină, cu **toată** cantitatea fiecăruia, după o confirmare care arată numărul de repere și de bucăți.
-- [ ] Operația în bloc este **atomică**: fie se aplică pentru toate reperele, fie pentru niciunul (dacă între timp cantitățile s-au schimbat sau o mișcare eșuează, utilizatorul primește un mesaj și lista se reîncarcă). Acțiunile sunt dezactivate când mașina nu are repere.
-
-### Subtask 2.5 — Înregistrare, jurnal, arhivă și concurență
-
-- [ ] Fiecare restituire sau mutare se înregistrează ca **mișcare de stoc** a produsului (una pentru fiecare reper, în aceeași tranzacție la operațiile în bloc), vizibilă în tabelul „Intrări/ieșiri” al produsului, cu data de azi, operatorul și o descriere precompletată („Restituire în depozit din mașina HD-01-FDG <zz.ll.aaaa>”, respectiv „Mutare din mașina HD-01-FDG în mașina B-123-ABC <zz.ll.aaaa>”). Modelul destinației mișcării (`ExitDestination`) se extinde cu **restituire în depozit** (destinație internă, fără butoane radio în formularul de ieșire; sursa este mașina); mutarea folosește destinația „autovehicul” cu sursa „mașină”. Efectul asupra totalului este 0 (regula `StockMovementRules.Effect`), iar cantitatea din mașină nu poate deveni negativă.
-- [ ] Jurnalul (fiecare mișcare are evenimentul ei, cu utilizatorul), arhivarea mișcărilor și verificarea versiunii urmează regulile existente ale mișcărilor; editarea sau ștergerea ulterioară a acestor mișcări respectă regula existentă (cantitățile din mașini nu devin negative).
-- [ ] Verificările de cantitate se fac pe server, în aceeași tranzacție cu scrierea (două sesiuni nu pot restitui sau muta aceeași cantitate de două ori); funcționează în SQLite și MariaDB, prin infrastructura comună, fără fișiere SQL de upgrade separate, complet asincron.
-
-### Subtask 2.6 — Verificări
-
-- [ ] Teste automate: cantitatea din mașină după transferuri, restituiri și mutări; restituire și mutare parțială și totală; respingerea peste cantitate; mutarea către aceeași mașină sau către o mașină inexistentă respinsă; operația în bloc atomică (eșec la un reper → nimic aplicat); totalul produsului neschimbat, depozitul și mașinile actualizate corect; jurnalul (un eveniment pe mișcare); două sesiuni concurente pe aceeași cantitate.
-- [ ] Verificare în browser (modul demonstrativ): linkul din listă, pagina vehiculului fără observații și fișiere, intrarea „Materiale și echipamente”, tabelul COD PRODUS / CANTITATE, restituirea și mutarea unui reper, „Restituie tot” și „Mută tot”, starea goală, defalcarea depozit/vehicule actualizată în catalog și în pagina produsului; la 375 și 768 px fără depășire orizontală.
-- [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și `docs/TESTE_RAMASE.md` pentru ce nu se poate verifica.
-
-### Criterii de acceptare
-
-- Numărul de înmatriculare din lista „Vehicule” duce la pagina vehiculului, iar aceasta are aceeași structură ca pagina proiectului, dar numai cu intrarea „Materiale și echipamente”: nu se introduc observații și nu se atașează fișiere.
-- „Materiale și echipamente” afișează tabelar codul produsului și cantitatea din mașină; fiecare reper poate fi restituit în depozit sau mutat în altă mașină existentă, iar toate reperele pot fi restituite sau mutate deodată.
-- Stocul total al produsului nu se schimbă la restituire sau mutare; depozitul și mașinile se actualizează, iar defalcarea „în depozit / în vehicule” din aplicație rămâne corectă.
-- Fiecare operație este o mișcare de stoc jurnalizată; cantitatea dintr-o mașină nu poate deveni negativă.
-
-### Detalii de stabilit la implementare
-
-- Textele exacte ale mesajelor și ale precompletărilor descrierii (formatul datei `dd.mm.yyyy`).
-- Locul mișcărilor de restituire și de mutare în tabelul „Intrări/ieșiri” (etichetă a destinației, în stilul etichetei „Vânzare generică”/„Corecție stoc” din tabel).
 
 ## Observații pentru etapa de implementare
 
@@ -1136,3 +1083,18 @@ Implementat la 25 septembrie 2026 de Claude. `Services/StockMovements.cs`, `Serv
 - [x] **Browser** (instanță de probă pe 5084, bază separată, sesiune autentificată): radio-urile și lipsa preselecției, mesajul fără destinație, precompletările cu data de azi, transfer de 4 buc. (totalul rămâne 12, „8 în depozit, 4 în vehicule”), folosire din mașină (mesajul peste cantitate, apoi 3 buc.), editarea unui transfer refuzată de server, catalogul cu defalcare numai pentru produsul cu piese în mașini, lista „Vehicule” cu numărul mișcărilor; la 375 și 768 px fără depășire orizontală a paginii.
 - [x] **Abateri față de descriere**: linkul către vehicul din tabelul mișcărilor duce deocamdată la editorul din listă (pagina vehiculului vine în taskul următor); coloana „MIȘCĂRI” arată numărul, fără link, până la pagina vehiculului.
 - Neverificat: MariaDB pe un server real (coloanele noi din `io`, interogările cu `vehicul`, arhiva), ecran tactil, tastatură.
+
+## Finalizat la 25.09.2026 15:41 - Pagina vehiculului: materiale si echipamente, restituire si mutare
+
+**Data si ora implementarii:** 25.09.2026 15:41 (ora locala).
+
+Implementat la 25 septembrie 2026 de Claude. `Components/Pages/VehiclePage.razor` (nou), `Components/Pages/VehicleEquipmentPage.razor` (nou), `Components/Shared/VehicleTransferDialog.razor` (nou), `Components/Pages/Vehicles.razor`, `Components/Pages/ProductMovements.razor`, `Services/StockMovements.cs`, `Services/SqliteStockMovementRepository.cs`, `Services/MariaStockMovementRepository.cs`, `Services/Vehicles.cs`, `Services/SqliteVehicleRepository.cs`, `Services/MariaVehicleRepository.cs`, `Services/AuditTrail.cs`, `tests/BlazorStoc.Checks/Program.cs`.
+
+- [x] Pagina `/vehicule/{id}` urmeaza logica paginii proiectului, fara observatii si fara fisiere: link "Vehicule", antet cu numarul si descrierea, butoanele "Editeaza" (acelasi formular, cu motivare si confirmare) si "Sterge vehiculul" (fluxul in doi pasi; blocat cat timp exista miscari), sectiunea "Continutul vehiculului" cu o singura intrare, "Materiale si echipamente" (cu sumarul "N repere, M buc."). Stari de incarcare, vehicul inexistent si eroare cu "Reincearca"; reimprospatare la miscarile altor sesiuni (evenimentele de produs) si periodica la 15 secunde; un formular sau dialog deschis nu este inlocuit.
+- [x] Numarul de inmatriculare din lista "Vehicule" este link catre pagina; coloana "MISCARI" este link (cand are miscari); linkurile din tabelul "Intrari/iesiri" si din Jurnal (`VehicleNavigation.PageUrl`) duc acum la pagina vehiculului.
+- [x] Pagina `/vehicule/{id}/echipamente`: tabel COD PRODUS / CANTITATE (cod ca link catre produs, doar cantitati mai mari ca 0, ordonate dupa cod), subsol cu numarul de repere si de bucati, stare goala, actiuni pe fiecare reper: "Restituie in depozit" si "Muta in alta masina" (dialog cu cantitatea, implicit toata, editabila intre 1 si cantitatea din masina, si lista celorlalte vehicule; fara alta masina actiunea explica situatia).
+- [x] "Restituie tot in depozit" si "Muta tot in alta masina": se aplica tuturor reperelor cu toata cantitatea, dupa o confirmare cu numarul de repere si de bucati; operatia este atomica (`TransferFromVehicleAsync`, una sau nici o miscare), iar cantitatile se verifica in aceeasi tranzactie.
+- [x] Fiecare restituire sau mutare este o miscare de stoc a produsului (data de azi, operatorul, descriere "Restituire in depozit din masina X <data>" / "Mutare din masina X in masina Y <data>"), jurnalizata si arhivabila; destinatie noua `ExitDestination.WarehouseReturn` (efect 0 asupra totalului), mutarea foloseste destinatia autovehicul cu sursa masina. Stocul total ramane neschimbat; depozitul si masinile se actualizeaza; cantitatea dintr-o masina nu poate deveni negativa. Mutarile si restituirile se pot edita din pagina produsului (destinatia si sursa raman, cantitatea, data si descrierea se pot schimba) si sterge, cu aceeasi regula.
+- [x] Teste automate (`BlazorStoc.Checks`, 523 trecute, 18 noi): restituire si mutare partiala si totala, respingerea peste cantitate, aceeasi masina, masina sau produs inexistente, operatie atomica cu o linie imposibila, masina goala, editarea si stergerea miscarilor, doua sesiuni concurente, jurnalul, ruta paginii.
+- [x] Verificat in browser (instanta de proba, baza separata, sesiune autentificata): pagina vehiculului cu o singura intrare, tabelul de echipamente, restituire partiala (1 din 4), mutare de 2 buc. cu alegerea masinii si mesajele fara masina, "Muta tot" si "Restituie tot", starea goala, coloana VEHICUL si etichetele in tabelul miscarilor, editarea unei mutari (dialog fara alegerea destinatiei), stergerea vehiculului blocata; la 375 si 768 px fara depasire orizontala a paginii.
+- Neverificat: MariaDB pe un server real (vezi `docs/TESTE_RAMASE.md`, A11); tastatura; ecran tactil.

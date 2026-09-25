@@ -41,6 +41,20 @@ public sealed class MariaVehicleRepository(
         return result;
     }
 
+    public async Task<Vehicle?> GetAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, null, """
+            SELECT id_vehicul, vehicul_numar, vehicul_descriere, vehicul_versiune FROM vehicul WHERE id_vehicul=@id
+            """, ("@id", id));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ? new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3)) : null;
+    }
+
     public async Task<Vehicle> CreateAsync(VehicleInput input, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);

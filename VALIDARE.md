@@ -286,6 +286,12 @@ Verificat la 25 septembrie 2026.
 - `BlazorStoc.Checks` 413 (verificarea literalelor de mesaj); browser pe 5082: −5, 0, valoare prea mare, câmp gol, 404 și dialogul de reconectare cu serverul oprit.
 - Neverificat: ferestrele native (calendar, selector de fișiere).
 
+## Pagina vehiculului, restituire si mutare (25 septembrie 2026)
+
+- Pagina `/vehicule/{id}` (fara observatii si fisiere) si `/vehicule/{id}/echipamente` (tabel COD PRODUS / CANTITATE, restituire in depozit si mutare in alta masina pe reper, cantitate partiala permisa, si pentru toate reperele, atomic). Fiecare operatie este o miscare de stoc jurnalizata; totalul ramane neschimbat.
+- `BlazorStoc.Checks` 523 trecute (18 noi); browser pe instanta de proba: pagina cu o singura intrare, restituire partiala, mutare cu alegerea masinii, muta tot / restituie tot, stare goala, tabelul miscarilor (VEHICUL, etichete), editarea unei mutari, stergerea vehiculului blocata, 375/768 px fara depasire orizontala.
+- **Neverificat**: MariaDB pe server real (`docs/TESTE_RAMASE.md`, A11).
+
 ## Ieșire spre vehicul, vânzare generică și corecție de stoc (25 septembrie 2026)
 
 - Formularul de ieșire: destinație obligatorie (Beneficiar / Autovehicul / Vânzare generică / Corecție stoc), sursă Depozit/Mașină, descriere precompletată cu data de azi. O ieșire spre autovehicul nu scade stocul total; din mașină nu se poate scoate mai mult decât conține; editările și ștergerile nu pot lăsa o mașină cu cantitate negativă. Defalcarea „X în depozit, Y în vehicule” apare numai când există produse în mașini.

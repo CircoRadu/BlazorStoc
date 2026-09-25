@@ -86,6 +86,85 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         return result;
     }
 
+    public async Task<IReadOnlyList<VehicleEquipment>> GetVehicleEquipmentAsync(int vehicleId, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var held = (await VehicleQuantitiesAsync(connection, null, null, cancellationToken).ConfigureAwait(false))
+            .Where(entry => entry.VehicleId == vehicleId && entry.Quantity > 0).ToList();
+        var result = new List<VehicleEquipment>();
+        foreach (var entry in held)
+        {
+            await using var codeCommand = Command(connection, null, "SELECT produs_denumire FROM produs WHERE id_produs=@id", ("@id", entry.ProductId));
+            result.Add(new(entry.ProductId, await codeCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string ?? $"#{entry.ProductId}", entry.Quantity));
+        }
+        return result.OrderBy(item => item.ProductCode, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.ProductId).ToList();
+    }
+
+    public async Task<IReadOnlyList<StockMovement>> TransferFromVehicleAsync(VehicleTransfer transfer, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        StockMovementRules.ValidateTransfer(transfer);
+        var now = DateTime.UtcNow;
+        var day = StockMovementRules.Today;
+        var (created, codes) = await WriteAsync(async (connection, transaction, userId) =>
+        {
+            async Task<string> PlateAsync(int id)
+            {
+                await using var command = Command(connection, transaction, "SELECT vehicul_numar FROM vehicul WHERE id_vehicul=@id", ("@id", id));
+                return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
+                       ?? throw new StockMovementOperationException(StockMovementRules.VehicleMissingMessage);
+            }
+            var sourcePlate = await PlateAsync(transfer.SourceVehicleId).ConfigureAwait(false);
+            var targetPlate = transfer.TargetVehicleId is { } targetId ? await PlateAsync(targetId).ConfigureAwait(false) : null;
+            // Products are locked in identifier order, so two transfers cannot deadlock each other.
+            var candidates = (await VehicleQuantitiesAsync(connection, transaction, null, cancellationToken).ConfigureAwait(false))
+                .Where(entry => entry.VehicleId == transfer.SourceVehicleId && entry.Quantity > 0).Select(entry => entry.ProductId);
+            var productIds = (transfer.Lines?.Select(line => line.ProductId) ?? candidates).Distinct().Order().ToList();
+            var productCodes = new Dictionary<int, string>();
+            foreach (var productId in productIds)
+                productCodes[productId] = await LockProductAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
+            var held = (await VehicleQuantitiesAsync(connection, transaction, null, cancellationToken).ConfigureAwait(false))
+                .Where(entry => entry.VehicleId == transfer.SourceVehicleId && entry.Quantity > 0)
+                .ToDictionary(entry => entry.ProductId, entry => entry.Quantity);
+            var plan = (transfer.Lines ?? held.Select(entry => new VehicleTransferLine(entry.Key, entry.Value)).ToList())
+                .OrderBy(line => line.ProductId).ToList();
+            if (plan.Count == 0) throw new StockMovementOperationException(StockMovementRules.NothingToTransferMessage);
+            var description = TextNormalization.ForStorage(StockMovementRules.TransferDescription(sourcePlate, targetPlate, day));
+            var destination = transfer.TargetVehicleId is null ? ExitDestination.WarehouseReturn : ExitDestination.Vehicle;
+            var operatorName = await UsernameAsync(connection, transaction, userId, cancellationToken).ConfigureAwait(false);
+            var movements = new List<StockMovement>();
+            foreach (var line in plan)
+            {
+                var productCode = productCodes.TryGetValue(line.ProductId, out var known) ? known
+                    : await LockProductAsync(connection, transaction, line.ProductId, cancellationToken).ConfigureAwait(false);
+                var available = held.GetValueOrDefault(line.ProductId);
+                if (line.Quantity > available)
+                    throw new StockMovementOperationException($"{productCode}: {StockMovementRules.NotEnoughInVehicleMessage(sourcePlate, available)}");
+                await using var insert = Command(connection, transaction, """
+                    INSERT INTO io(id_user,id_produs,id_beneficiar,id_project,io_tip_actiune,io_numar_bucati,io_descriere,io_data,
+                                   io_versiune,io_created_utc,io_updated_utc,io_destinatie,id_vehicul,id_vehicul_sursa)
+                    VALUES(@user,@product,0,NULL,0,@quantity,@description,@date,0,@created,@created,@destination,@vehicle,@sourceVehicle)
+                    """, ("@user", userId), ("@product", line.ProductId), ("@quantity", line.Quantity), ("@description", description),
+                    ("@date", StockMovementRules.LegacyDate(day)), ("@created", now), ("@destination", (int)destination),
+                    ("@vehicle", transfer.TargetVehicleId), ("@sourceVehicle", transfer.SourceVehicleId));
+                await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                var movement = new StockMovement(checked((int)insert.LastInsertedId), line.ProductId, StockMovementKind.Exit, line.Quantity, day,
+                    description, null, null, null, null, operatorName, 0, now, now, false, destination, transfer.TargetVehicleId, targetPlate,
+                    transfer.SourceVehicleId, sourcePlate);
+                await LogAsync(connection, transaction, userId, "create", null, movement, string.Empty, cancellationToken).ConfigureAwait(false);
+                await EnsureVehicleStocksNotNegativeAsync(connection, transaction, line.ProductId, cancellationToken).ConfigureAwait(false);
+                movements.Add(movement);
+            }
+            return (movements, productCodes);
+        }, cancellationToken).ConfigureAwait(false);
+        foreach (var movement in created)
+            await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.StockMovement, movement.Id.ToString(),
+                StockMovementRules.Target(codes[movement.ProductId]), StockMovementRules.AuditIdentification(movement, codes[movement.ProductId]),
+                cancellationToken).ConfigureAwait(false);
+        return created;
+    }
+
     public async Task<IReadOnlyDictionary<int, int>> GetQuantitiesInVehiclesAsync(CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
@@ -186,7 +265,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     public async Task<StockMovementResult> UpdateAsync(StockMovement original, StockMovementInput input, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        var value = StockMovementRules.Validated(input, original.Kind, true);
+        var value = StockMovementRules.Validated(input, original.Kind, true, allowVehicleTransfer: original.IsVehicleTransfer);
         var now = DateTime.UtcNow;
         var (current, updated, stock, productCode) = await WriteAsync(async (connection, transaction, userId) =>
         {

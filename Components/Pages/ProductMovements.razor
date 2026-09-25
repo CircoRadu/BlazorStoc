@@ -161,7 +161,7 @@ else
                                         <a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a>
                                         @if (m.ProjectName is not null) { <span class="movement-project"> · <a class="category-table-link" href="@($"/proiecte/{m.ProjectId}")">@m.ProjectName</a></span> }
                                     }
-                                    else if (m.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection)
+                                    else if (m.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection or ExitDestination.WarehouseReturn)
                                     {
                                         <span class="destination-label">@StockMovementRules.DestinationLabel(m.Destination.Value)</span>
                                     }
@@ -216,6 +216,12 @@ else
                         <label for="edit-quantity">Cantitate *<InputNumber id="edit-quantity" TValue="int?" @bind-Value="editForm.Quantity" ParsingErrorMessage="Cantitatea trebuie să fie un număr întreg." min="1" max="@StockMovementRules.MaxQuantity" /></label>
                         @if (editing.Kind == StockMovementKind.Exit)
                         {
+                            @if (editing.IsVehicleTransfer)
+                            {
+                                <p class="form-note full-width" role="status">@TransferText(editing) Destinația și sursa nu se schimbă aici; cantitatea, data și descrierea pot fi editate.</p>
+                            }
+                            else
+                            {
                             <div class="full-width">
                                 <ExitDestinationPicker @ref="editPicker" Prefix="edit" Model="editForm" Beneficiaries="beneficiaries" Projects="editProjects"
                                                        Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="editSaving" UseProject="editUseProject"
@@ -226,6 +232,7 @@ else
                                                        ProjectToggled="v => ToggleProject(editForm, v, true)"
                                                        ProjectChanged="id => SetProject(editForm, id)" />
                             </div>
+                            }
                         }
                         <label class="full-width" for="edit-description">Descriere *<InputTextArea id="edit-description" @bind-Value="editForm.Description" rows="3" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
                         <ChangeReasonField Id="movement-edit-reason" @bind-Value="editForm.Reason" Disabled="editSaving" />
@@ -329,6 +336,9 @@ else
             return correction > 0 ? $"+{correction}" : correction.ToString();
         }
     }
+    private static string TransferText(StockMovement movement) => movement.Destination == ExitDestination.WarehouseReturn
+        ? $"Restituire în depozit din mașina {movement.SourceVehiclePlate}."
+        : $"Mutare din mașina {movement.SourceVehiclePlate} în mașina {movement.VehiclePlate}.";
     private string DeleteDescription => deleting is null ? string.Empty
         : deleting.Effect == 0
             ? "Stocul total al produsului nu se schimbă (produsul mutat în vehicul nu mai apare acolo). Mișcarea și istoricul ei vor fi mutate în arhivă."
@@ -549,11 +559,11 @@ else
     private Task SaveEditAsync()
     {
         if (editSaving || editing is null) return Task.CompletedTask;
-        editError = editing.Kind == StockMovementKind.Exit ? editPicker?.ValidationError() : null;
+        editError = editing.Kind == StockMovementKind.Exit && !editing.IsVehicleTransfer ? editPicker?.ValidationError() : null;
         if (editError is not null) return Task.CompletedTask;
         try
         {
-            var value = StockMovementRules.Validated(editForm, editing.Kind, true);
+            var value = StockMovementRules.Validated(editForm, editing.Kind, true, allowVehicleTransfer: editing.IsVehicleTransfer);
             string? BeneficiaryName(int? id) => value.Destination == ExitDestination.Beneficiary ? beneficiaries.FirstOrDefault(item => item.Id == id)?.Name : null;
             string? ProjectName(int? id) => editUseProject ? editProjects.FirstOrDefault(item => item.Id == id)?.Name : null;
             string? VehiclePlate(int? id) => vehicles.FirstOrDefault(item => item.Id == id)?.PlateNumber;

@@ -39,6 +39,8 @@ Administratorii și utilizatorii cu acces limitat pot lista, căuta, adăuga, ed
 
 ## Vehicule
 
+Nota (pagina vehiculului): numarul de inmatriculare din lista duce la pagina `/vehicule/{id}`, care are o singura intrare, "Materiale si echipamente" (`/vehicule/{id}/echipamente`): tabel cu codul produsului si cantitatea din masina, cu "Restituie in depozit" si "Muta in alta masina" pentru fiecare reper (cantitate partiala permisa) si "Restituie tot in depozit" / "Muta tot in alta masina" pentru toate reperele. Pagina nu are observatii si nu primeste fisiere. Fiecare operatie este o miscare de stoc jurnalizata; stocul total nu se schimba.
+
 Meniul **Administrare → Vehicule** (`/vehicule`) administrează autovehiculele firmei, pentru toți utilizatorii autentificați. Fiecare vehicul are un **număr de înmatriculare** obligatoriu și unic și o **descriere** scurtă obligatorie (cel mult 100 de caractere, de exemplu „Dacia Dokker alba”). Numărul respectă masca `AA-OOO-AAA`: 1–2 litere, 2–3 cifre (două sau trei, deci `01`, nu `1`), 3 litere — `HD-01-FDG`, `HD-233-VDG`, `B-123-ABC`. Se poate tasta cu litere mici, cu spații sau fără cratime; se salvează cu majuscule și cratime. Editarea cere motivare și confirmarea salvării, ștergerea se face în doi pași (motiv, apoi `sterge`) și arhivează vehiculul; adăugările, editările și ștergerile apar în Jurnal (tip „Vehicul”). Un vehicul folosit de o mișcare de stoc (destinație sau sursă) nu poate fi șters; lista arată numărul mișcărilor fiecărui vehicul.
 
 În modul MariaDB tabela `vehicul` este creată la prima accesare a secțiunii, numai în baza `BlazorStoc`; nu este generat un fișier SQL de upgrade.

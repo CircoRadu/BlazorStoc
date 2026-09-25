@@ -969,3 +969,33 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu se aplica (proces si documentatie); start si finish rulate in modul claude_only.
 - **Commit:** `claude: sole agent, no handoff to codex`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-25T12:41:54.7992879Z â€” claude
+
+- **Task:** Task 2: pagina vehiculului, materiale si echipamente, restituire si mutare
+- **Rezumat:** Task 2 implementat: pagina vehiculului. Pagina /vehicule/{id} (fara observatii si fisiere; Editeaza, Sterge, intrarea Materiale si echipamente) si /vehicule/{id}/echipamente (tabel COD PRODUS / CANTITATE, restituire in depozit si mutare in alta masina pe reper cu cantitate partiala, si pentru toate reperele, atomic). Fiecare operatie este o miscare de stoc jurnalizata (ExitDestination.WarehouseReturn cu efect 0; mutarea foloseste destinatia autovehicul cu sursa masina); stocul total ramane neschimbat, iar cantitatea dintr-o masina nu poate deveni negativa. Miscarile de transfer se pot edita din pagina produsului fara a schimba destinatia si sursa. Linkurile catre vehicul (lista, miscari, jurnal) duc la pagina. Noi: VehiclePage, VehicleEquipmentPage, VehicleTransferDialog, GetVehicleEquipmentAsync, TransferFromVehicleAsync, IVehicleRepository.GetAsync. TODO: task arhivat, ramane Task 1 (inventar). Documentatie actualizata. Preview 5082 pornit.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Pages/VehicleEquipmentPage.razor`
+  - `Components/Pages/VehiclePage.razor`
+  - `Components/Pages/Vehicles.razor`
+  - `Components/Shared/VehicleTransferDialog.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `README.md`
+  - `Services/AuditTrail.cs`
+  - `Services/MariaStockMovementRepository.cs`
+  - `Services/MariaVehicleRepository.cs`
+  - `Services/SqliteStockMovementRepository.cs`
+  - `Services/SqliteVehicleRepository.cs`
+  - `Services/StockMovements.cs`
+  - `Services/Vehicles.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+- **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 523 PASS (18 noi), 0 FAIL; browser pe instanta de proba (pagina vehiculului, echipamente, restituire partiala, mutare, muta tot, restituie tot, stare goala, tabelul miscarilor, editare mutare, stergere blocata, 375/768 px). Neverificat: MariaDB pe server real (TESTE_RAMASE A11).
+- **Commit:** `claude: vehicle page with equipment, return to warehouse and move between vehicles`
+- **Predat cÄƒtre:** claude

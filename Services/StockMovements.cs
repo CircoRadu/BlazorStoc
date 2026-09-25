@@ -8,10 +8,18 @@ public enum StockMovementKind { Exit = 0, Entry = 1 }
 
 // Where an exit goes (required for every new exit). Exits recorded before this field existed have no destination.
 // Vehicle is a transfer into a vehicle: the product is moved, not used, so the total stock does not change.
-public enum ExitDestination { Beneficiary = 1, Vehicle = 2, GenericSale = 3, StockCorrection = 4 }
+// WarehouseReturn brings pieces back from a vehicle into the warehouse (made from the vehicle page, never from the exit form).
+public enum ExitDestination { Beneficiary = 1, Vehicle = 2, GenericSale = 3, StockCorrection = 4, WarehouseReturn = 5 }
 
 // Quantity of a product held by one vehicle (transfers into it minus what was used from it).
 public sealed record VehicleStock(int VehicleId, string PlateNumber, string Description, int Quantity);
+
+// One product held by a vehicle (the "Materiale si echipamente" page).
+public sealed record VehicleEquipment(int ProductId, string ProductCode, int Quantity);
+public sealed record VehicleTransferLine(int ProductId, int Quantity);
+// Moves products out of a vehicle: into another vehicle, or back into the warehouse when TargetVehicleId is null.
+// Lines null means every product the vehicle holds at the moment of the operation, with its whole quantity.
+public sealed record VehicleTransfer(int SourceVehicleId, int? TargetVehicleId, IReadOnlyList<VehicleTransferLine>? Lines = null);
 
 public sealed record StockMovement(int Id, int ProductId, StockMovementKind Kind, int Quantity, DateOnly Date,
     string Description, int? BeneficiaryId, string? BeneficiaryName, int? ProjectId, string? ProjectName,
@@ -21,6 +29,9 @@ public sealed record StockMovement(int Id, int ProductId, StockMovementKind Kind
 {
     // Signed effect on the total product stock: entries add, exits subtract, except a transfer into a vehicle (0).
     [JsonIgnore] public int Effect => StockMovementRules.Effect(Kind, Destination, Quantity);
+    // A move between vehicles or a return to the warehouse (made from the vehicle page); edited without the destination picker.
+    [JsonIgnore] public bool IsVehicleTransfer => Kind == StockMovementKind.Exit && SourceVehicleId is not null &&
+        Destination is ExitDestination.Vehicle or ExitDestination.WarehouseReturn;
 }
 
 public sealed class StockMovementInput
@@ -69,6 +80,10 @@ public interface IStockMovementRepository
     Task<IReadOnlyList<ProjectStockMovement>> GetForProjectAsync(int projectId, CancellationToken cancellationToken = default);
     // Vehicles holding the product (quantity greater than zero), ordered by registration number.
     Task<IReadOnlyList<VehicleStock>> GetVehicleStocksAsync(int productId, CancellationToken cancellationToken = default);
+    // Products held by one vehicle (quantity greater than zero), ordered by product code.
+    Task<IReadOnlyList<VehicleEquipment>> GetVehicleEquipmentAsync(int vehicleId, CancellationToken cancellationToken = default);
+    // Returns pieces to the warehouse or moves them to another vehicle, one stock movement per product, all or nothing.
+    Task<IReadOnlyList<StockMovement>> TransferFromVehicleAsync(VehicleTransfer transfer, CancellationToken cancellationToken = default);
     // Product id -> quantity held by vehicles, only for products with a quantity greater than zero in vehicles.
     Task<IReadOnlyDictionary<int, int>> GetQuantitiesInVehiclesAsync(CancellationToken cancellationToken = default);
     // Vehicle id -> number of live movements that use the vehicle as source or destination.
@@ -95,7 +110,7 @@ public static class StockMovementRules
         "Transferul dintr-o mașină în alta nu se face din formularul de ieșire; se face din pagina vehiculului.";
 
     public static int Effect(StockMovementKind kind, ExitDestination? destination, int quantity) =>
-        kind == StockMovementKind.Entry ? quantity : destination == ExitDestination.Vehicle ? 0 : -quantity;
+        kind == StockMovementKind.Entry ? quantity : destination is ExitDestination.Vehicle or ExitDestination.WarehouseReturn ? 0 : -quantity;
     public static int Effect(StockMovementKind kind, int quantity) => Effect(kind, null, quantity);
     public static string KindLabel(StockMovementKind kind) => kind == StockMovementKind.Entry ? "Intrare" : "Ieșire";
     public static string DestinationLabel(ExitDestination destination) => destination switch
@@ -103,6 +118,7 @@ public static class StockMovementRules
         ExitDestination.Beneficiary => "Beneficiar",
         ExitDestination.Vehicle => "Autovehicul",
         ExitDestination.GenericSale => "Vânzare generică",
+        ExitDestination.WarehouseReturn => "Restituire în depozit",
         _ => "Corecție stoc"
     };
 
@@ -129,6 +145,30 @@ public static class StockMovementRules
         : $"În mașina {plate} există numai {held} {(held == 1 ? "bucată" : "bucăți")} din acest produs.";
     public static string NegativeVehicleStockMessage(string plate) =>
         $"Operația ar lăsa în mașina {plate} o cantitate negativă din acest produs: bucăți din ea au fost deja folosite sau mutate.";
+    public const string NothingToTransferMessage = "Mașina nu conține materiale sau echipamente.";
+    public const string SameVehicleMessage = "Alege o altă mașină decât cea din care se scot produsele.";
+    public static string TransferDescription(string sourcePlate, string? targetPlate, DateOnly day) => targetPlate is null
+        ? $"Restituire în depozit din mașina {sourcePlate} {DisplayDate(day)}"
+        : $"Mutare din mașina {sourcePlate} în mașina {targetPlate} {DisplayDate(day)}";
+
+    // Checks a transfer request before it reaches the database (identifiers, quantities, no repeated product).
+    public static void ValidateTransfer(VehicleTransfer transfer)
+    {
+        if (transfer.SourceVehicleId <= 0) throw new StockMovementOperationException(VehicleMissingMessage);
+        if (transfer.TargetVehicleId is { } target && (target <= 0 || target == transfer.SourceVehicleId))
+            throw new StockMovementOperationException(target == transfer.SourceVehicleId ? SameVehicleMessage : VehicleMissingMessage);
+        if (transfer.Lines is null) return;
+        if (transfer.Lines.Count == 0) throw new StockMovementOperationException(NothingToTransferMessage);
+        if (transfer.Lines.Select(line => line.ProductId).Distinct().Count() != transfer.Lines.Count)
+            throw new StockMovementOperationException("Același produs apare de două ori în operație.");
+        foreach (var line in transfer.Lines)
+        {
+            if (line.ProductId <= 0) throw new StockMovementOperationException("Produsul selectat nu este valid.");
+            if (line.Quantity < 1) throw new StockMovementOperationException("Introdu o cantitate întreagă mai mare decât zero.");
+            if (line.Quantity > MaxQuantity) throw new StockMovementOperationException($"Cantitatea poate fi cel mult {MaxQuantity:N0}.");
+        }
+    }
+
     public const string VehicleMissingMessage = "Vehiculul selectat nu mai există. Actualizează lista și reia operația.";
 
     public static string ProductsLabel(int quantity) => $"{quantity} {(quantity == 1 ? "produs" : "produse")}";
@@ -158,7 +198,9 @@ public static class StockMovementRules
     public static DateOnly ParseStorageDate(string value) => DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture);
     public static DateOnly ParseLegacyDate(string value) => DateOnly.ParseExact(value.Trim(), "dd-MM-yyyy", CultureInfo.InvariantCulture);
 
-    public static StockMovementInput Validated(StockMovementInput input, StockMovementKind kind, bool isEdit, DateOnly? today = null)
+    // allowVehicleTransfer: the movement being edited is an existing move between vehicles (made from the vehicle page).
+    public static StockMovementInput Validated(StockMovementInput input, StockMovementKind kind, bool isEdit, DateOnly? today = null,
+        bool allowVehicleTransfer = false)
     {
         var errors = new List<string>();
         var description = TextNormalization.ForStorage(input.Description ?? string.Empty);
@@ -195,7 +237,13 @@ public static class StockMovementRules
                 if (vehicleId is null or <= 0) errors.Add("Alege vehiculul spre care se face ieșirea.");
                 if (beneficiaryId is not null || projectId is not null)
                     errors.Add("Beneficiarul și proiectul se pot alege numai pentru ieșirile spre beneficiar.");
-                if (sourceVehicleId is not null) errors.Add(TransferBetweenVehiclesMessage);
+                if (sourceVehicleId is not null && !allowVehicleTransfer) errors.Add(TransferBetweenVehiclesMessage);
+            }
+            else if (chosen == ExitDestination.WarehouseReturn)
+            {
+                if (sourceVehicleId is null or <= 0) errors.Add("Restituirea în depozit cere mașina din care se scot produsele.");
+                if (beneficiaryId is not null || projectId is not null || vehicleId is not null)
+                    errors.Add("Restituirea în depozit nu are beneficiar, proiect sau vehicul destinație.");
             }
             else if (beneficiaryId is not null || projectId is not null || vehicleId is not null)
                 errors.Add("Vânzarea generică și corecția de stoc nu au beneficiar, proiect sau vehicul.");
