@@ -14,7 +14,7 @@
 
 ## Ordinea de implementare optimizată
 
-Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskurile active (1–2) se bazează pe lucrări finalizate (inclusiv administrarea vehiculelor) și se implementează în ordinea numerelor, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan. Taskul 1 (inventarul) este independent de taskul 2.
+Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskurile active (1–3) se bazează pe lucrări finalizate (inclusiv administrarea vehiculelor) și se implementează în ordinea numerelor, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan. Taskul 1 (inventarul) este independent de celelalte; taskul 3 (pagina vehiculului) depinde de taskul 2 (stocul aflat în mașini).
 
 ## Task 1 — Situația de inventar (pagina „Inventar” și fișierul PDF)
 
@@ -188,8 +188,60 @@ Cerută de utilizator (25 septembrie 2026): produsul ieșit spre un autovehicul 
 
 - Textul exact al precompletărilor (majuscule, diacritice — care se elimină oricum la salvare, conform regulii existente) și formatul datei (`dd.mm.yyyy`).
 - Locul etichetei pentru „Vânzare generică” și „Corecție stoc” în tabel (decizii deja luate: destinația este obligatorie, coloana vehiculului se numește „VEHICUL”).
-- Transferul dintr-o mașină în alta nu este cerut; implicit nu este permis. Restituirea produselor din mașină în depozit nu are operație proprie (nu este cerută) și se stabilește separat dacă apare nevoia.
+- Restituirea produselor din mașină în depozit și mutarea lor în altă mașină se fac din pagina vehiculului (taskul „Pagina vehiculului…”, Task 3), nu din formularul de ieșire; în formularul de ieșire transferul mașină → mașină rămâne nepermis (se confirmă).
 - Cum apare sursa (mașina din care s-a scos produsul) în tabel: implicit în coloana „VEHICUL”, cu prefixul „din” pentru sursă și „în” pentru destinația transferului.
+
+## Task 3 — Pagina vehiculului: materiale și echipamente, restituire în depozit și mutare între mașini
+
+Cerută de utilizator (25 septembrie 2026). Pagina de administrare a unui vehicul urmează **aceeași logică** ca pagina unui proiect (`/proiecte/{id}`), dar **fără observații și fără fișiere atașate**: conține numai intrarea către materialele și echipamentele aflate în mașină. Depinde de taskul „Ieșire spre vehicul, vânzare generică și corecție de stoc” (Task 2), care introduce stocul aflat în mașini, sursa ieșirii și defalcarea depozit/vehicule, și de administrarea vehiculelor (finalizată).
+
+### Subtask 3.1 — Pagina vehiculului `/vehicule/{id}`
+
+- [ ] În lista din pagina „Vehicule”, numărul de înmatriculare devine link către pagina vehiculului (ca numele proiectului din lista beneficiarului); butoanele de editare și ștergere din listă rămân.
+- [ ] Pagina are structura paginii proiectului: link de întoarcere „← Vehicule”, antet cu eticheta „VEHICUL”, numărul de înmatriculare ca titlu și descrierea ca text secundar, butoanele „Editează” (același formular ca în listă, cu motivare și confirmare) și „Șterge vehiculul” (același flux în doi pași; regulile de blocare din Task 2), apoi o secțiune „Conținutul vehiculului” cu un tabel ELEMENT / DETALII.
+- [ ] **Prima intrare** (și singura) a tabelului este link-ul **„Materiale și echipamente”** către `/vehicule/{id}/echipamente`, cu detaliul „Materiale și echipamente aflate în această mașină”. Pagina **nu** permite introducerea de observații și nu atașează fișiere: nu există „+ Adaugă observație”, câmp de fișiere sau alte intrări adăugate de utilizator.
+- [ ] Stări clare: încărcare, vehicul inexistent („Vehiculul solicitat nu mai există.”) și eroare cu „Reîncearcă”; dacă un alt utilizator modifică sau șterge vehiculul, pagina se reîmprospătează sau afișează o notificare, ca la proiecte (mecanismul comun de sincronizare); accesibilă utilizatorilor autentificați.
+- [ ] Linkul „Ținta” din Jurnal pentru un vehicul adăugat sau editat duce la pagina vehiculului (în locul editorului din listă).
+
+### Subtask 3.2 — Pagina „Materiale și echipamente” `/vehicule/{id}/echipamente`
+
+- [ ] Pagina (cu link de întoarcere către vehicul și antet „VEHICUL · <număr>”) afișează **tabelar** produsele aflate în mașină: **COD PRODUS** (link către pagina produsului), **CANTITATE** (cantitatea din mașină, calculată din mișcări ca în Task 2, doar valori mai mari ca 0) și coloana de acțiuni de mai jos; ordonate după cod (insensibil la majuscule); subsol cu numărul de repere și totalul de bucăți.
+- [ ] Stare goală clară („Nu există materiale sau echipamente în această mașină”, cu explicația că ele ajung aici prin ieșiri de stoc spre autovehicul); încărcare, eroare cu „Reîncearcă” și reîmprospătare la modificările făcute de alte sesiuni.
+
+### Subtask 3.3 — Acțiuni pentru fiecare reper
+
+- [ ] Fiecare rând are două acțiuni: **„Restituie în depozit”** și **„Mută în altă mașină”**.
+- [ ] Ambele deschid un dialog cu cantitatea (implicit **toată** cantitatea din mașină, editabilă între 1 și cantitatea disponibilă) și, pentru mutare, lista celorlalte vehicule existente (fără cel curent; dacă nu există altul, acțiunea explică acest lucru și rămâne dezactivată). Confirmarea aplică operația; „Anulează” (roșu, ca restul dialogurilor) nu modifică nimic.
+- [ ] Efectul: **restituirea** crește stocul din depozit și scade cantitatea din mașină; **mutarea** scade cantitatea din mașina curentă și o crește în mașina aleasă; în ambele cazuri **stocul total al produsului rămâne neschimbat**. O cantitate mai mare decât cea existentă în mașină este respinsă cu mesaj în română.
+
+### Subtask 3.4 — Acțiuni pentru toate reperele
+
+- [ ] Deasupra tabelului există două acțiuni: **„Restituie tot în depozit”** și **„Mută tot în altă mașină”** (aceasta cu lista celorlalte vehicule existente). Se aplică tuturor reperelor din mașină, cu **toată** cantitatea fiecăruia, după o confirmare care arată numărul de repere și de bucăți.
+- [ ] Operația în bloc este **atomică**: fie se aplică pentru toate reperele, fie pentru niciunul (dacă între timp cantitățile s-au schimbat sau o mișcare eșuează, utilizatorul primește un mesaj și lista se reîncarcă). Acțiunile sunt dezactivate când mașina nu are repere.
+
+### Subtask 3.5 — Înregistrare, jurnal, arhivă și concurență
+
+- [ ] Fiecare restituire sau mutare se înregistrează ca **mișcare de stoc** a produsului (una pentru fiecare reper, în aceeași tranzacție la operațiile în bloc), vizibilă în tabelul „Intrări/ieșiri” al produsului, cu data de azi, operatorul și o descriere precompletată („Restituire în depozit din mașina HD-01-FDG <zz.ll.aaaa>”, respectiv „Mutare din mașina HD-01-FDG în mașina B-123-ABC <zz.ll.aaaa>”). Modelul destinației mișcării din Task 2 se extinde cu **restituire în depozit** (destinație internă, fără butoane radio în formularul de ieșire; sursa este mașina); mutarea folosește destinația „autovehicul” cu sursa „mașină”. Efectul asupra totalului este 0 (regula din Task 2), iar cantitatea din mașină nu poate deveni negativă.
+- [ ] Jurnalul (fiecare mișcare are evenimentul ei, cu utilizatorul), arhivarea mișcărilor și verificarea versiunii urmează regulile existente ale mișcărilor; editarea sau ștergerea ulterioară a acestor mișcări respectă regula din Task 2 (cantitățile din mașini nu devin negative).
+- [ ] Verificările de cantitate se fac pe server, în aceeași tranzacție cu scrierea (două sesiuni nu pot restitui sau muta aceeași cantitate de două ori); funcționează în SQLite și MariaDB, prin infrastructura comună, fără fișiere SQL de upgrade separate, complet asincron.
+
+### Subtask 3.6 — Verificări
+
+- [ ] Teste automate: cantitatea din mașină după transferuri, restituiri și mutări; restituire și mutare parțială și totală; respingerea peste cantitate; mutarea către aceeași mașină sau către o mașină inexistentă respinsă; operația în bloc atomică (eșec la un reper → nimic aplicat); totalul produsului neschimbat, depozitul și mașinile actualizate corect; jurnalul (un eveniment pe mișcare); două sesiuni concurente pe aceeași cantitate.
+- [ ] Verificare în browser (modul demonstrativ): linkul din listă, pagina vehiculului fără observații și fișiere, intrarea „Materiale și echipamente”, tabelul COD PRODUS / CANTITATE, restituirea și mutarea unui reper, „Restituie tot” și „Mută tot”, starea goală, defalcarea depozit/vehicule actualizată în catalog și în pagina produsului; la 375 și 768 px fără depășire orizontală.
+- [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și `docs/TESTE_RAMASE.md` pentru ce nu se poate verifica.
+
+### Criterii de acceptare
+
+- Numărul de înmatriculare din lista „Vehicule” duce la pagina vehiculului, iar aceasta are aceeași structură ca pagina proiectului, dar numai cu intrarea „Materiale și echipamente”: nu se introduc observații și nu se atașează fișiere.
+- „Materiale și echipamente” afișează tabelar codul produsului și cantitatea din mașină; fiecare reper poate fi restituit în depozit sau mutat în altă mașină existentă, iar toate reperele pot fi restituite sau mutate deodată.
+- Stocul total al produsului nu se schimbă la restituire sau mutare; depozitul și mașinile se actualizează, iar defalcarea „în depozit / în vehicule” din aplicație rămâne corectă.
+- Fiecare operație este o mișcare de stoc jurnalizată; cantitatea dintr-o mașină nu poate deveni negativă.
+
+### Detalii de stabilit la implementare
+
+- Textele exacte ale mesajelor și ale precompletărilor descrierii (formatul datei `dd.mm.yyyy`); dacă mutarea unui reper permite alegerea unei cantități parțiale (propus: da, implicit toată cantitatea).
+- Locul mișcărilor de restituire și de mutare în tabelul „Intrări/ieșiri” (etichetă a destinației, în stilul stabilit în Task 2).
 
 ## Observații pentru etapa de implementare
 

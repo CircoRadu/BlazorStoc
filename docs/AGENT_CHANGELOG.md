@@ -879,3 +879,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu se aplica (documentatie); verificata numerotarea taskurilor; build Release 0 avertismente si preview 5082 health 200.
 - **Commit:** `claude: add stock source rules and preview-left-running rule`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:59:49.7127643Z â€” claude
+
+- **Task:** Adaugare in TODO: pagina vehiculului, materiale si echipamente, restituire si mutare
+- **Rezumat:** TODO: Task 3 nou - pagina vehiculului /vehicule/{id} dupa logica paginii proiectului, fara observatii si fisiere, cu intrarea Materiale si echipamente (/vehicule/{id}/echipamente): tabel COD PRODUS / CANTITATE, restituire in depozit sau mutare in alta masina pentru fiecare reper, plus restituire/mutare a tuturor reperelor (atomic); fiecare operatie este miscare de stoc jurnalizata, totalul produsului neschimbat. Task 2: punctul deschis despre transfer masina-masina si restituire rezolvat prin Task 3. PROJECT_STATE actualizat. Nu s-a modificat cod. Preview-ul de pe 5082 ramane pornit.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu se aplica (documentatie); verificata numerotarea taskurilor si subtaskurilor.
+- **Commit:** `claude: add vehicle page (equipment, return, move) task to TODO`
+- **Predat cÄƒtre:** codex

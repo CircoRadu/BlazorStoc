@@ -1,14 +1,14 @@
-{
+﻿{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Adaugare in TODO: sursa iesirii (depozit sau masina) si inventar numai din depozit",
-    "startedAtUtc":  "2026-09-25T11:49:25.4729626Z",
-    "completedAtUtc":  "2026-09-25T11:51:43.4544616Z",
-    "lastSummary":  "TODO: la Task 2 (iesire spre vehicul) subtask nou 2.2 - sursa iesirii (depozit sau masina), din masina nu se poate scoate mai mult decat exista, defalcarea N produse: X in depozit, Y in vehicule numai cand exista produse in masini; subtaskurile renumerotate 2.1-2.6; Task 1 (inventar) foloseste numai valoarea din depozitul fizic. CLAUDE.md si AGENTS.md: regula ca la terminarea fiecarui task ramane un preview in functiune (utilizatorul il inchide manual). Preview pornit pe 5082 cu build-ul curent (vehicule). PROJECT_STATE actualizat. Nu s-a modificat cod de aplicatie.",
-    "lastCommitSubject":  "claude: add stock source rules and preview-left-running rule",
+    "nextAgent":  "codex",
+    "currentTask":  "Adaugare in TODO: pagina vehiculului, materiale si echipamente, restituire si mutare",
+    "startedAtUtc":  "2026-09-25T11:58:56.3278852Z",
+    "completedAtUtc":  "2026-09-25T11:59:49.7127643Z",
+    "lastSummary":  "TODO: Task 3 nou - pagina vehiculului /vehicule/{id} dupa logica paginii proiectului, fara observatii si fisiere, cu intrarea Materiale si echipamente (/vehicule/{id}/echipamente): tabel COD PRODUS / CANTITATE, restituire in depozit sau mutare in alta masina pentru fiecare reper, plus restituire/mutare a tuturor reperelor (atomic); fiecare operatie este miscare de stoc jurnalizata, totalul produsului neschimbat. Task 2: punctul deschis despre transfer masina-masina si restituire rezolvat prin Task 3. PROJECT_STATE actualizat. Nu s-a modificat cod. Preview-ul de pe 5082 ramane pornit.",
+    "lastCommitSubject":  "claude: add vehicle page (equipment, return, move) task to TODO",
     "claudeStatus":  "active"
 }
