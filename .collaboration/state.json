@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Adaugare in TODO a regulii: iesirea spre vehicul muta produsul, nu il scade din stoc",
     "startedAtUtc":  "2026-09-25T11:45:03.8948517Z",
     "completedAtUtc":  "2026-09-25T11:45:41.3112829Z",
