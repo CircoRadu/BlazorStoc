@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Adaugare in TODO a taskurilor Vehicule si Iesire spre vehicul",
     "startedAtUtc":  "2026-09-25T11:30:11.2396193Z",
     "completedAtUtc":  "2026-09-25T11:31:16.6872683Z",
