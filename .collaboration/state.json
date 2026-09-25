@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 2: administrarea vehiculelor (sectiunea Vehicule)",
     "startedAtUtc":  "2026-09-25T11:41:22.7711285Z",
     "completedAtUtc":  "2026-09-25T11:43:03.7758914Z",
