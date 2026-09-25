@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 7 - Confirmarea deconectarii",
     "startedAtUtc":  "2026-09-25T06:35:58.5473936Z",
     "completedAtUtc":  "2026-09-25T06:37:30.3833204Z",
