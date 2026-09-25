@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Editarea si stergerea produsului initiate din pagina produsului revin in pagina de origine",
     "startedAtUtc":  "2026-09-25T06:33:04.6044062Z",
     "completedAtUtc":  "2026-09-25T06:34:38.1819615Z",
