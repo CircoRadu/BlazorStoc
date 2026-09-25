@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Fisier cu testele ramase de efectuat",
     "startedAtUtc":  "2026-09-25T07:11:06.5062550Z",
     "completedAtUtc":  "2026-09-25T07:13:28.8261599Z",
