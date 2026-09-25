@@ -15,7 +15,7 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 ## Data mișcării — calendar numai pentru selectare, fără date viitoare
 
 - La cererea utilizatorului: „Data mișcării” se alege numai din calendar (fără tastare), ultima zi este azi, iar serverul respinge date viitoare. Un ciclu anterior a înțeles greșit cerința și a ridicat limita la 2100; a fost anulat.
-- `StockMovementRules.Today`, `FutureDateMessage` și parametrul opțional `today` la `Validated` (`Services/StockMovements.cs`); câmpurile de dată din `ProductMovements.razor` au `max` = azi și `data-pick-only`; `wwwroot/date-pick-only.js` (încărcat din `App.razor`) blochează tastarea și deschide calendarul la clic/Enter/Spațiu/F4.
+- `StockMovementRules.Today`, `FutureDateMessage` și parametrul opțional `today` la `Validated` (`Services/StockMovements.cs`); `Components/Shared/PickOnlyDate.razor` (text `readonly` + `input type=date` nativ ascuns pentru calendar; ambele câmpuri de dată din `ProductMovements.razor`) și `wwwroot/date-pick-only.js` (deschide calendarul la clic/Enter/Spațiu/F4).
 - Mișcările deja existente cu dată viitoare (dacă există) nu pot fi editate fără a schimba data, deoarece regula se aplică și la editare. Testele cu 2099 au fost mutate pe ziua curentă; 335 de verificări trec.
 
 ## Ultimele modificări funcționale (ciclul Claude — Task 5)

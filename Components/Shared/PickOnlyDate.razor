@@ -1,0 +1,36 @@
+@using System.Globalization
+@using BlazorStoc.Services
+
+@* Read-only date field: the visible text box can never be typed into; the value is chosen only from the
+   browser's calendar, opened by a hidden native date input (see wwwroot/date-pick-only.js). *@
+<div class="pick-date">
+    <input id="@Id" type="text" readonly class="pick-date-text" data-pick-date value="@Display"
+           placeholder="zz-ll-aaaa" autocomplete="off" aria-haspopup="dialog"
+           aria-describedby="@(Id)-hint" disabled="@Disabled" />
+    <input type="date" class="pick-date-native" tabindex="-1" aria-hidden="true" disabled="@Disabled"
+           min="@Min" max="@Max" value="@Iso" @onchange="OnPickedAsync" />
+    <span id="@(Id)-hint" class="sr-only">Câmp doar pentru citire. Apasă Enter sau Spațiu pentru a deschide calendarul.</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+    [Parameter] public DateOnly? Value { get; set; }
+    [Parameter] public EventCallback<DateOnly?> ValueChanged { get; set; }
+    [Parameter] public string? Min { get; set; }
+    [Parameter] public string? Max { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    private string Display => Value is { } date ? date.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture) : string.Empty;
+    private string Iso => Value is { } date ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : string.Empty;
+
+    private async Task OnPickedAsync(ChangeEventArgs args)
+    {
+        var text = args.Value?.ToString();
+        DateOnly? picked = DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? parsed : null;
+        // Clearing the picker keeps the previous date: the field is never left empty by a stray gesture.
+        if (picked is null) return;
+        Value = picked;
+        await ValueChanged.InvokeAsync(picked);
+    }
+}

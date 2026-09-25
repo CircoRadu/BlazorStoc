@@ -465,3 +465,21 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 335 verificari trecute. Browser 5082: calendarul se deschide la click, zilele dupa azi sunt dezactivate, luna urmatoare inactiva, tastarea nu schimba valoarea, data viitoare fortata este oprita de validarea browserului; nimic salvat. Neverificat manual: selectarea cu tastatura, validarea de server direct din browser (acoperita de teste).
 - **Commit:** `claude: movement date is calendar pick-only and cannot be in the future`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T06:27:25.7603499Z â€” claude
+
+- **Task:** Data miscarii: camp read-only cu calendar
+- **Rezumat:** La cererea utilizatorului, campul Data miscarii este read-only: componenta noua PickOnlyDate (camp text readonly cu format zz-ll-aaaa si pictograma de calendar, care nu poate fi tastat, peste un input type=date nativ ascuns cu min 1990 si max azi care ofera calendarul). Un input date cu atributul readonly nu poate deschide calendarul, de aceea sunt doua campuri. date-pick-only.js redus la deschiderea calendarului (click, Enter, Space, F4, Alt+Jos). Folosit la adaugarea si editarea miscarii. Regula de server (fara date viitoare) neschimbata.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Shared/PickOnlyDate.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `README.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+  - `wwwroot/date-pick-only.js`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 335 verificari trecute. Browser 5082: campul afiseaza 25-09-2026 doar pentru citire, click deschide calendarul cu zilele viitoare dezactivate, alegerea din calendar schimba valoarea (24-09-2026), tastarea nu schimba nimic, acelasi camp in dialogul de editare. Neverificat: click direct pe o zi din popup (popup-ul nativ nu primeste click-uri automate), Safari/Firefox.
+- **Commit:** `claude: movement date field is read-only and filled only from the calendar`
+- **Predat cÄƒtre:** codex
