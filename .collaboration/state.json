@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 4 - Identificarea beneficiarului cu CUI duplicat",
     "startedAtUtc":  "2026-09-25T05:59:49.7072245Z",
     "completedAtUtc":  "2026-09-25T06:03:21.4481497Z",
