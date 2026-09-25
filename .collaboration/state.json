@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Adaugare in TODO: pagina vehiculului, materiale si echipamente, restituire si mutare",
     "startedAtUtc":  "2026-09-25T11:58:56.3278852Z",
     "completedAtUtc":  "2026-09-25T11:59:49.7127643Z",
