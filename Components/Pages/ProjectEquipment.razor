@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProjectRepository Repository
+@inject IStockMovementRepository Movements
 @inject ILogger<ProjectEquipment> Logger
 @implements IDisposable
 
@@ -14,36 +15,73 @@
 }
 else if (error is not null)
 {
-    <div class="error-banner" role="alert">@error</div>
+    <div class="error-banner" role="alert">@error @if (project is not null) { <button class="primary" @onclick="LoadAsync">Reîncearcă</button> }</div>
 }
 else if (project is not null)
 {
     <a class="nav-back" href="@($"/proiecte/{Id}")"><span>←</span> @project.Name</a>
     <div class="page-heading"><div><p class="eyebrow">PROIECT · @project.Name</p><h1>Echipamente</h1><p class="muted">Materiale și echipamente scoase din inventar pentru acest proiect.</p></div></div>
     <section class="catalog">
-        <div class="empty-state">
-            <span class="empty-icon">▦</span>
-            <h3>Nu există încă mișcări de ieșire asociate</h3>
-            <p>Pagina va afișa aici codul produsului, cantitatea, data, operatorul și referința mișcării, imediat ce modulul de mișcări de stoc va fi implementat.</p>
-        </div>
+        @if (movements.Count == 0)
+        {
+            <div class="empty-state">
+                <span class="empty-icon">▦</span>
+                <h3>Nu există încă mișcări de ieșire asociate</h3>
+                <p>Ieșirile de stoc înregistrate cu acest proiect apar aici. Proiectul se alege din formularul de mișcare al unui produs, după selectarea beneficiarului.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr>
+                <th>COD PRODUS</th><th class="number">CANTITATE</th><th>DATA</th><th>OPERATOR</th><th>REFERINȚĂ</th>
+            </tr></thead><tbody>
+            @foreach (var movement in movements)
+            {
+                <tr @key="movement.Id">
+                    <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(movement.ProductId)"><strong>@movement.ProductCode</strong></a></td>
+                    <td class="number">@movement.Quantity</td>
+                    <td>@StockMovementRules.DisplayDate(movement.Date)</td>
+                    <td>@movement.Operator</td>
+                    <td><a class="category-table-link" href="@StockMovementNavigation.MovementUrl(movement.Id)">Mișcarea nr. @movement.Id</a></td>
+                </tr>
+            }
+            </tbody></table></div>
+            <div class="table-footer"><span>@(movements.Count == 1 ? "1 ieșire asociată" : $"{movements.Count} ieșiri asociate") proiectului</span></div>
+        }
     </section>
 }
 
 @code {
     [Parameter] public int Id { get; set; }
     private Project? project;
+    private IReadOnlyList<ProjectStockMovement> movements = Array.Empty<ProjectStockMovement>();
     private bool loading = true;
     private string? error;
     private readonly CancellationTokenSource lifetime = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnParametersSetAsync()
     {
-        try { project = await Repository.GetAsync(Id, lifetime.Token); if (project is null) error = "Proiectul solicitat nu mai există."; }
+        if (project is not null && project.Id != Id) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            project = await Repository.GetAsync(Id, lifetime.Token);
+            if (project is null) { error = "Proiectul solicitat nu mai există."; movements = Array.Empty<ProjectStockMovement>(); return; }
+            movements = await Movements.GetForProjectAsync(Id, lifetime.Token);
+        }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
         catch (Exception exception)
         {
             Logger.LogError("Project equipment page loading failed ({ErrorType}).", exception.GetType().Name);
-            error = "Proiectul nu a putut fi încărcat.";
+            error = "Echipamentele proiectului nu au putut fi încărcate.";
         }
         finally { loading = false; }
     }

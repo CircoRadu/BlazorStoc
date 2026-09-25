@@ -66,7 +66,9 @@ public static class AuditNavigation
             return null;
 
         // Project already has a stable read-only page; the other types still route through the editor's query trigger.
-        if (entry.EntityType == AuditEntities.Project) return $"/proiecte/{entityId}";
+        if (entry.EntityType == AuditEntities.Project) return ProjectNavigation.ProjectUrl(entityId);
+        // The event stores the observation id; /observatii/{id} resolves it to the page under its project.
+        if (entry.EntityType == AuditEntities.ProjectObservation) return ProjectNavigation.ObservationUrl(entityId);
         // The event stores the movement id; /miscari/{id} resolves it to the product's movements page.
         if (entry.EntityType == AuditEntities.StockMovement) return StockMovementNavigation.MovementUrl(entityId);
         var path = entry.EntityType switch

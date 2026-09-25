@@ -6,6 +6,9 @@
 @inject IProjectFileStore FileStore
 @inject IBeneficiaryRepository Beneficiaries
 @inject NavigationManager Navigation
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
+@inject ListNavigationContext ListContext
 @inject ILogger<Project> Logger
 @implements IDisposable
 
@@ -21,7 +24,7 @@ else if (error is not null)
 }
 else if (project is not null)
 {
-    <a class="nav-back" href="@($"/beneficiari/{project.BeneficiaryId}")"><span>←</span> @beneficiaryName</a>
+    <a class="nav-back" href="@ListContext.BeneficiaryUrl(project.BeneficiaryId)"><span>←</span> @beneficiaryName</a>
     <div class="page-heading">
         <div><p class="eyebrow">PROIECT</p><h1>@project.Name</h1><p class="muted">Beneficiar: <a class="category-table-link" href="@($"/beneficiari/{project.BeneficiaryId}")">@beneficiaryName</a></p></div>
         <div class="heading-actions">
@@ -30,6 +33,7 @@ else if (project is not null)
         </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (remoteNotice is not null) { <div class="info-banner" role="status">@remoteNotice</div> }
 
     @if (editing)
     {
@@ -84,14 +88,60 @@ else if (project is not null)
     private IReadOnlyList<ProjectObservation> observations = Array.Empty<ProjectObservation>();
     private readonly Dictionary<int, int> fileCounts = new();
     private bool loading = true, observationsLoading, editing, addingObservation, deleting, deleteBusy;
-    private string? error, notice, deleteError;
+    private string? error, notice, remoteNotice, deleteError;
     private Guid editorKey, observationEditorKey;
+    private IDisposable? changeSubscription;
     private readonly CancellationTokenSource lifetime = new();
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        changeSubscription = ChangeFeed.Subscribe(OnChangeAsync);
+        await LoadAsync();
+    }
     protected override async Task OnParametersSetAsync()
     {
         if (project is not null && project.Id != Id) await LoadAsync();
+    }
+
+    // Another session changed this project, its observations or their files. The lists are refreshed in place;
+    // an open form or dialog is never replaced: it only gets a notice, and the version check still guards the save.
+    private Task OnChangeAsync(ChangeEvent change)
+    {
+        if (change.Origin == Origin.Id) return Task.CompletedTask;
+        return InvokeAsync(async () =>
+        {
+            if (project is null || deleteBusy || !ProjectChanges.AffectsProject(change, Id, fileCounts.Keys)) return;
+            await RefreshAsync(change);
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshAsync(ChangeEvent change)
+    {
+        var formOpen = editing || addingObservation || deleting;
+        try
+        {
+            if (change.EntityType == AuditEntities.Project)
+            {
+                var current = await Repository.GetAsync(Id, lifetime.Token);
+                if (current is null)
+                {
+                    if (formOpen) remoteNotice = "Proiectul a fost șters de alt utilizator. Formularele deschise nu au fost modificate; salvarea va fi respinsă.";
+                    else { project = null; error = "Proiectul solicitat nu mai există."; }
+                    return;
+                }
+                if (formOpen) remoteNotice = "Proiectul a fost modificat de alt utilizator. Formularul deschis nu a fost schimbat; la salvare se verifică versiunea proiectului.";
+                else
+                {
+                    project = current;
+                    var beneficiary = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).FirstOrDefault(item => item.Id == current.BeneficiaryId);
+                    beneficiaryName = beneficiary?.Name ?? "Beneficiar necunoscut";
+                }
+            }
+            await LoadObservationsAsync(quiet: true);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Logger.LogWarning("Project refresh failed ({ErrorType}).", exception.GetType().Name); }
     }
 
     private int FileCount(int observationId) => fileCounts.GetValueOrDefault(observationId);
@@ -100,6 +150,7 @@ else if (project is not null)
     {
         loading = true;
         error = null;
+        remoteNotice = null;
         try
         {
             project = await Repository.GetAsync(Id, lifetime.Token);
@@ -118,21 +169,25 @@ else if (project is not null)
         finally { loading = false; }
     }
 
-    private async Task LoadObservationsAsync()
+    // A quiet reload (remote change) keeps the current rows visible instead of showing the loading row.
+    private async Task LoadObservationsAsync(bool quiet = false)
     {
-        observationsLoading = true;
+        if (!quiet) observationsLoading = true;
         try
         {
-            observations = await Repository.GetObservationsAsync(Id, lifetime.Token);
+            var loaded = await Repository.GetObservationsAsync(Id, lifetime.Token);
+            var counts = new Dictionary<int, int>();
+            foreach (var observation in loaded)
+                counts[observation.Id] = (await FileStore.GetFilesAsync(observation.Id, lifetime.Token)).Count;
+            observations = loaded;
             fileCounts.Clear();
-            foreach (var observation in observations)
-                fileCounts[observation.Id] = (await FileStore.GetFilesAsync(observation.Id, lifetime.Token)).Count;
+            foreach (var (observationId, count) in counts) fileCounts[observationId] = count;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         finally { observationsLoading = false; }
     }
 
-    private Task OpenEditAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
+    private Task OpenEditAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; remoteNotice = null; return Task.CompletedTask; }
     private Task OpenAddObservationAsync() { addingObservation = true; observationEditorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
     private async Task ObservationSavedAsync(ProjectObservation observation)
     {
@@ -145,6 +200,7 @@ else if (project is not null)
     {
         project = updated;
         editing = false;
+        remoteNotice = null;
         notice = "Proiectul a fost actualizat.";
         var beneficiary = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).FirstOrDefault(item => item.Id == updated.BeneficiaryId);
         beneficiaryName = beneficiary?.Name ?? "Beneficiar necunoscut";
@@ -160,7 +216,7 @@ else if (project is not null)
         try
         {
             await Repository.DeleteAsync(project, reason, lifetime.Token);
-            Navigation.NavigateTo($"/beneficiari/{project.BeneficiaryId}");
+            Navigation.NavigateTo(ListContext.BeneficiaryUrl(project.BeneficiaryId));
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (ProjectOperationException exception) { deleteError = exception.Message; }
@@ -173,5 +229,5 @@ else if (project is not null)
         finally { deleteBusy = false; }
     }
 
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { changeSubscription?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
 }

@@ -52,19 +52,39 @@ public sealed class SqliteProjectFileStore(SqliteLocalStore store, IAccessContro
                 "SELECT COUNT(*) FROM project_observation_files WHERE observation_id=@observation", ("@observation", observationId)))
                 if (Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) >= ProjectFileRules.MaximumFilesPerObservation)
                     throw new ProjectOperationException($"O observație poate avea cel mult {ProjectFileRules.MaximumFilesPerObservation} de fișiere.");
+            var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
             await File.WriteAllBytesAsync(destination, content, cancellationToken).ConfigureAwait(false);
             try
             {
-                await using var insert = SqliteLocalStore.Command(connection, null, """
-                    INSERT INTO project_observation_files
-                        (observation_id,relative_path,original_name,content_type,byte_length,sha256,author,uploaded_utc)
-                    VALUES(@observation,@path,@name,@contentType,@length,@hash,@author,@uploaded);
-                    SELECT last_insert_rowid();
-                    """, ("@observation", observationId), ("@path", prepared.StoredName), ("@name", prepared.OriginalName),
-                    ("@contentType", contentType), ("@length", prepared.SizeBytes), ("@hash", hash), ("@author", prepared.Author),
-                    ("@uploaded", prepared.UploadedAtUtc.ToString("O")));
-                var id = checked((int)(long)(await insert.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!);
-                return prepared with { Id = id };
+                await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await using var lookup = SqliteLocalStore.Command(connection, transaction,
+                        "SELECT name FROM project_observations WHERE id=@observation", ("@observation", observationId));
+                    var observationName = await lookup.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
+                        ?? throw new ProjectOperationException("Observația nu mai există. Actualizează pagina înainte să reîncerci încărcarea.");
+                    await using var insert = SqliteLocalStore.Command(connection, transaction, """
+                        INSERT INTO project_observation_files
+                            (observation_id,relative_path,original_name,content_type,byte_length,sha256,author,uploaded_utc)
+                        VALUES(@observation,@path,@name,@contentType,@length,@hash,@author,@uploaded);
+                        SELECT last_insert_rowid();
+                        """, ("@observation", observationId), ("@path", prepared.StoredName), ("@name", prepared.OriginalName),
+                        ("@contentType", contentType), ("@length", prepared.SizeBytes), ("@hash", hash), ("@author", prepared.Author),
+                        ("@uploaded", prepared.UploadedAtUtc.ToString("O")));
+                    var id = checked((int)(long)(await insert.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!);
+                    await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
+                        AuditEntities.ProjectObservationFile, AuditActions.Create, prepared.OriginalName,
+                        AuditDetails.Identification(("Nume fișier", prepared.OriginalName), ("Observație", observationName),
+                            ("Tip", contentType), ("Dimensiune (octeți)", prepared.SizeBytes.ToString()), ("Autor", prepared.Author)),
+                        string.Empty, id.ToString()), cancellationToken).ConfigureAwait(false);
+                    await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                    return prepared with { Id = id };
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                    throw;
+                }
             }
             catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
             {

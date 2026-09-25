@@ -70,16 +70,21 @@ builder.Services.AddScoped<IBeneficiaryRepository>(services => demo
 builder.Services.AddSingleton<IProductImageStore>(services => demo
     ? new SqliteProductImageStore(services.GetRequiredService<SqliteLocalStore>())
     : new FileProductImageStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>()));
-builder.Services.AddScoped<IProjectFileStore>(services => demo
+builder.Services.AddSingleton<IChangeFeed, InProcessChangeFeed>();
+builder.Services.AddScoped<ChangeOrigin>();
+builder.Services.AddScoped<ListNavigationContext>();
+builder.Services.AddScoped<IProjectFileStore>(services => new ChangeNotifyingProjectFileStore(demo
     ? new SqliteProjectFileStore(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
     : new MariaProjectFileStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>(),
-        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>()));
-builder.Services.AddScoped<IProjectRepository>(services => demo
+        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IAuditTrail>()),
+    services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
+builder.Services.AddScoped<IProjectRepository>(services => new ChangeNotifyingProjectRepository(demo
     ? new SqliteProjectRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProjectFileStore>())
     : new MariaProjectRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IWebHostEnvironment>(),
         services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(),
-        services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProjectFileStore>()));
+        services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProjectFileStore>()),
+    services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
 var app = builder.Build();
 if (demo) await app.Services.GetRequiredService<SqliteLocalStore>().InitializeAsync();
 else await MariaArchiveSchema.InitializeAsync(app.Configuration);

@@ -314,3 +314,34 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T05:40:35.2485317Z â€” claude
+
+- **Task:** Task 2 - subtaskurile ramase 2.3 (context de navigare, ruta observatiei in jurnal), 2.4 (pagina Echipamente citeste miscarile de stoc), 2.5 (evenimente de modificare, refresh fara pierderea formularelor)
+- **Rezumat:** Task 2 finalizat: subtaskurile 2.3, 2.4 si 2.5. Pagina Echipamente citeste iesirile de stoc ale proiectului (cod produs, cantitate, data, operator, referinta). Filtrul si pagina listei de proiecte sunt in adresa beneficiarului, linkul inapoi din proiect le restaureaza, iar pozitia de derulare se salveaza in sessionStorage. Observatiile sunt in registrul rutelor din jurnal prin /observatii/{id}. Contract de evenimente de modificare (ChangeEvent, IChangeFeed, decoratori peste repository-ul proiectelor si magazinul de fisiere) publicat dupa commit; paginile beneficiarului, proiectului si observatiei se reimprospateaza pe loc fara sa inlocuiasca formularele deschise (doar notificare). Lacuna reparata: incarcarea unui fisier in observatie nu era jurnalizata, acum scrie evenimentul Adaugare fara continut. TODO.md: Task 2 mutat in arhiva.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/App.razor`
+  - `Components/Pages/BeneficiaryDetail.razor`
+  - `Components/Pages/ProjectEquipment.razor`
+  - `Components/Pages/ProjectObservationPage.razor`
+  - `Components/Pages/ProjectObservationRedirect.razor`
+  - `Components/Pages/ProjectPage.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Program.cs`
+  - `README.md`
+  - `Services/AuditTrail.cs`
+  - `Services/ChangeFeed.cs`
+  - `Services/ListNavigationContext.cs`
+  - `Services/MariaProjectFileStore.cs`
+  - `Services/Projects.cs`
+  - `Services/SqliteProjectFileStore.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+  - `wwwroot/navigation-context.js`
+- **Validare:** dotnet build Release proiect principal: 0 avertismente, 0 erori. BlazorStoc.Checks: 312 verificari trecute (27 noi). Browser 5082, doua tab-uri, sesiune autentificata de utilizator: filtru in adresa, link inapoi si Inapoi din browser cu filtru si pozitie de derulare, Echipamente goala si cu iesire asociata, link observatie din jurnal si observatie inexistenta, refresh live intre sesiuni, notificare peste formular deschis; datele de test sterse. Neverificat: paginare peste 10 proiecte, MariaDB pe server real.
+- **Commit:** `claude: finish Task 2 (equipment page, navigation context, observation route, change events)`
+- **Predat cÄƒtre:** codex

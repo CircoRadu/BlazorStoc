@@ -298,3 +298,11 @@ public interface IProjectFileStore
         byte[] content, string author, CancellationToken cancellationToken = default);
     Task DeleteAsync(int fileId, string reason, CancellationToken cancellationToken = default);
 }
+
+public static class ProjectNavigation
+{
+    public static string ProjectUrl(int projectId) => $"/proiecte/{projectId}";
+    public static string ObservationPageUrl(int projectId, int observationId) => $"/proiecte/{projectId}/observatii/{observationId}";
+    // Audit events store only the observation id; /observatii/{id} resolves it to the page under its project.
+    public static string ObservationUrl(int observationId) => $"/observatii/{observationId}";
+}

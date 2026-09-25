@@ -5,6 +5,10 @@
 @inject IBeneficiaryRepository Beneficiaries
 @inject IProjectRepository Projects
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
+@inject ListNavigationContext ListContext
 @inject ILogger<BeneficiaryDetail> Logger
 @implements IDisposable
 
@@ -35,7 +39,7 @@ else if (beneficiary is not null)
 
     <section class="catalog">
         <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
-        <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută proiecte" placeholder="Caută după denumire…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label></div>
+        <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută proiecte" placeholder="Caută după denumire…" @bind="query" @bind:event="oninput" @bind:after="QueryChanged" /></label></div>
         @if (projectsLoading)
         {
             <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă proiectele</h3></div>
@@ -49,7 +53,7 @@ else if (beneficiary is not null)
             <div class="table-scroll"><table><thead><tr><th>PROIECT</th><th>ULTIMA MODIFICARE</th></tr></thead><tbody>
             @foreach (var project in PagedProjects)
             {
-                <tr @key="project.Id"><td><a class="category-table-link" href="@($"/proiecte/{project.Id}")"><strong>@project.Name</strong></a></td><td>@project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td></tr>
+                <tr @key="project.Id"><td><a class="category-table-link" data-restore-scroll href="@($"/proiecte/{project.Id}")"><strong>@project.Name</strong></a></td><td>@project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td></tr>
             }
             </tbody></table></div>
             <div class="table-footer">
@@ -57,9 +61,9 @@ else if (beneficiary is not null)
                 @if (TotalPages > 1)
                 {
                     <nav class="pagination" aria-label="Paginare proiecte">
-                        <button type="button" aria-label="Pagina anterioară" disabled="@(pageNumber <= 1)" @onclick="() => pageNumber--">‹</button>
+                        <button type="button" aria-label="Pagina anterioară" disabled="@(pageNumber <= 1)" @onclick="() => GoToPage(pageNumber - 1)">‹</button>
                         <span>Pagina <strong>@pageNumber</strong> din <strong>@TotalPages</strong></span>
-                        <button type="button" aria-label="Pagina următoare" disabled="@(pageNumber >= TotalPages)" @onclick="() => pageNumber++">›</button>
+                        <button type="button" aria-label="Pagina următoare" disabled="@(pageNumber >= TotalPages)" @onclick="() => GoToPage(pageNumber + 1)">›</button>
                     </nav>
                 }
             </div>
@@ -69,6 +73,8 @@ else if (beneficiary is not null)
 
 @code {
     [Parameter] public int Id { get; set; }
+    [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.QueryParameter)] public string? QueryText { get; set; }
+    [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
     private Beneficiary? beneficiary;
     private IReadOnlyList<Project> projects = Array.Empty<Project>();
     private bool loading = true, projectsLoading, addingProject;
@@ -90,13 +96,80 @@ else if (beneficiary is not null)
     }
     private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredProjects.Count / (double)PageSize));
     private IEnumerable<Project> PagedProjects => FilteredProjects.Skip((pageNumber - 1) * PageSize).Take(PageSize);
-    private void ResetPage() => pageNumber = 1;
+    private IDisposable? changeSubscription;
+    private bool scrollRestorePending = true;
+    private string? syncedUrl;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    // The filter text and page live in the address (replaced in place, so Back restores them) and are remembered
+    // for the "back" links of the project pages; they are read from the address only when the page is opened.
+    private void ApplyStateFromAddress()
+    {
+        var state = BeneficiaryProjectListState.From(QueryText, PageParameter);
+        query = state.Query;
+        pageNumber = state.Page;
+        syncedUrl = state.Url(Id);
+        ListContext.RememberBeneficiaryProjects(Id, state);
+    }
+
+    private void SyncState()
+    {
+        var state = BeneficiaryProjectListState.From(query, pageNumber);
+        ListContext.RememberBeneficiaryProjects(Id, state);
+        var url = state.Url(Id);
+        if (url == syncedUrl) return;
+        syncedUrl = url;
+        Navigation.NavigateTo(url, replace: true);
+    }
+
+    private void QueryChanged() { pageNumber = 1; SyncState(); }
+    private void GoToPage(int page) { pageNumber = Math.Clamp(page, 1, TotalPages); SyncState(); }
+
+    protected override async Task OnInitializedAsync()
+    {
+        changeSubscription = ChangeFeed.Subscribe(OnChangeAsync);
+        ApplyStateFromAddress();
+        await LoadAsync();
+    }
 
     protected override async Task OnParametersSetAsync()
     {
-        if (beneficiary is not null && beneficiary.Id != Id) await LoadAsync();
+        if (beneficiary is not null && beneficiary.Id != Id)
+        {
+            ApplyStateFromAddress();
+            scrollRestorePending = true;
+            await LoadAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!scrollRestorePending || loading || projectsLoading || beneficiary is null) return;
+        scrollRestorePending = false;
+        try { await JS.InvokeVoidAsync("blazorStocNavigationContext.restoreScroll"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
+    }
+
+    // Another session changed one of this beneficiary's projects: refresh the list in place. The open project form
+    // is a separate component with its own state, so it is left untouched.
+    private Task OnChangeAsync(ChangeEvent change)
+    {
+        if (change.Origin == Origin.Id || !ProjectChanges.AffectsBeneficiary(change, Id)) return Task.CompletedTask;
+        return InvokeAsync(async () =>
+        {
+            await RefreshProjectsAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshProjectsAsync()
+    {
+        try
+        {
+            projects = await Projects.GetForBeneficiaryAsync(Id, lifetime.Token);
+            if (pageNumber > TotalPages) { pageNumber = TotalPages; SyncState(); }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Logger.LogWarning("Project list refresh failed ({ErrorType}).", exception.GetType().Name); }
     }
 
     private async Task LoadAsync()
@@ -123,7 +196,11 @@ else if (beneficiary is not null)
     private async Task LoadProjectsAsync()
     {
         projectsLoading = true;
-        try { projects = await Projects.GetForBeneficiaryAsync(Id, lifetime.Token); }
+        try
+        {
+            projects = await Projects.GetForBeneficiaryAsync(Id, lifetime.Token);
+            if (pageNumber > TotalPages) { pageNumber = TotalPages; SyncState(); }
+        }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         finally { projectsLoading = false; }
     }
@@ -137,5 +214,5 @@ else if (beneficiary is not null)
         await LoadProjectsAsync();
     }
 
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { changeSubscription?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
 }

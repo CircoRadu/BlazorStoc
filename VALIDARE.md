@@ -164,3 +164,19 @@ Implementat de Claude la 24 septembrie 2026, peste modelul de domeniu de mai sus
 6. Jurnalul de activitate afișează evenimentele „Adăugare”/„Ștergere” pentru „Proiect” și „Observatie”, cu `Details` (valori inițiale/finale), `Motif` (fără diacritice, conform regulii generale de stocare) și fără conținut de fișier.
 
 Suita automată (`BlazorStoc.Checks`, 229 verificări) acoperă, pe lângă modelul de domeniu: persistența proiectelor/observațiilor/fișierelor după repornire, unicitatea per beneficiar (inclusiv mesajul de duplicat cu numele beneficiarului), reutilizarea denumirii la alt beneficiar, două sesiuni SQLite concurente care încearcă același proiect pentru același beneficiar (una singură reușește), concurența optimistă la editare, ștergerea individuală a unui fișier (arhivare + indisponibilitate ulterioară), blocarea ștergerii beneficiarului cu proiect live, ștergerea proiectului cu arhivarea observației/fișierului rămas, evenimentele de audit pentru proiect/observație/fișier și rândurile scrise în `archive_projects`/`archive_project_observation_files`.
+
+## Proiecte — context de navigare, „Echipamente”, ruta observației și evenimente de modificare (Task 2, subtaskurile 2.3–2.5)
+
+Verificat la 25 septembrie 2026.
+
+- **Suita automată** (`BlazorStoc.Checks`, 312 verificări; 27 noi): un eveniment pentru fiecare operație asupra proiectelor, observațiilor și fișierelor (cu proiect, observație, beneficiar, sesiune de origine și moment UTC), niciun eveniment pentru operații respinse, notificarea ambilor beneficiari la mutarea unui proiect, evenimente fără nume, texte sau conținut de fișiere, izolarea abonaților care eșuează, dezabonarea, filtrarea evenimentelor pe pagini, auditul încărcării unui fișier (fără conținut) și respingerea unui fișier pentru o observație inexistentă fără fișier rămas pe disc, ruta `/observatii/{id}` din jurnal, memorarea filtrului și a paginii listei de proiecte.
+- **Browser** (`http://127.0.0.1:5082`, sesiune autentificată de utilizator, două tab-uri):
+  1. Filtrul din lista de proiecte apare în adresă (`?q=hala`) fără pierderea caracterelor tastate.
+  2. Linkul „înapoi” din pagina proiectului duce la `/beneficiari/{id}?q=hala`, cu filtrul restaurat.
+  3. Butonul Înapoi al browserului restaurează filtrul și poziția de derulare (salvată la clic pe proiect), o singură dată.
+  4. „Echipamente” fără ieșiri afișează starea goală; după o ieșire cu proiect afișează codul produsului, cantitatea, data, operatorul și „Mișcarea nr. N” (linkuri către produs și mișcare).
+  5. Linkul observației din jurnal (`/observatii/3`) deschide pagina din proiect; `/observatii/99999` afișează „Observația nu mai există”.
+  6. O observație adăugată în alt tab apare live în lista proiectului, fără a schimba formularul de editare deschis (textul local a rămas).
+  7. O editare a proiectului din alt tab afișează notificarea „…modificat de alt utilizator…” peste formularul deschis; lista proiectelor din pagina beneficiarului se actualizează live.
+  8. Datele de test au fost șterse prin fluxul normal (mișcarea arhivată, stocul revenit la 12, proiectul și observațiile arhivate).
+- **Neverificat manual**: paginarea listei peste 10 proiecte, reîmprospătarea paginii observației la ștergerea proiectului de altă sesiune, MariaDB pe un server real.

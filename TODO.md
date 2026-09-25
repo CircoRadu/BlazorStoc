@@ -14,32 +14,193 @@
 Taskurile sunt grupate în patru etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
 
 1. **Interacțiuni comune finalizate:** componenta comună de extindere și restrângere este implementată și devine contract obligatoriu pentru structurile ierarhice actuale și viitoare.
-2. **Stabilizarea entităților și formularelor:** identificarea produsului prin „Cod produs” este finalizată, stocul introdus manual a fost eliminat (fostul Task 0 finalizat: stoc 0 la creare, fără editarea cantității), Task 1 (finalizat) a introdus pagina de intrări/ieșiri a produsului (mișcările de stoc), Task 2 introduce proiectele și relațiile lor folosind componenta comună de collapse finalizată, iar Task 4 uniformizează validarea beneficiarilor.
+2. **Stabilizarea entităților și formularelor:** identificarea produsului prin „Cod produs” este finalizată, stocul introdus manual a fost eliminat (fostul Task 0 finalizat: stoc 0 la creare, fără editarea cantității), Task 1 (finalizat) a introdus pagina de intrări/ieșiri a produsului (mișcările de stoc), Task 2 (finalizat) a introdus proiectele și relațiile lor folosind componenta comună de collapse finalizată, iar Task 4 uniformizează validarea beneficiarilor.
 3. **Navigare și dialoguri comune:** Taskurile 1 și 2 → Task 3; Taskurile 1, 2 și 4 → Task 5; Taskurile 1 și 5 → Task 6; Task 5 și dialogurile comune finalizate → Task 7.
-4. **Colaborare în timp real:** Taskurile 2–7 (Taskurile 0 și 1 sunt finalizate), împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
+4. **Colaborare în timp real:** Taskurile 3–7 (Taskurile 0, 1 și 2 sunt finalizate), împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
 
-## Task 2 — Proiecte asociate beneficiarilor
+## Task 3 — Navigarea din jurnal către pagina obiectului
 
-Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul de legătură dintre beneficiar, observațiile de lucru, fișierele atașate și viitoarele mișcări de ieșire din inventar. Implementarea păstrează separat câmpul general „Observații” al proiectului și lista de observații individuale, fiecare cu propria denumire, descriere și fișiere.
+Depinde de pagina de administrare finalizată, de modelul produsului („Cod produs”, finalizat) și de rutele proiectelor din Task 2 (finalizat: proiectele `/proiecte/{id}` și observațiile `/observatii/{id}` sunt deja în registrul `AuditNavigation.EditUrl`). Înlocuiește comportamentul actual prin care linkul din coloana „Țintă” deschide direct formularul de editare.
 
-### Subtask 2.3 — Restaurarea contextului de navigare și registrul jurnalului
+- [ ] Definește pentru fiecare tip de obiect o rută stabilă de consultare bazată pe tipul entității și identificatorul său, de exemplu `/produse/{id}`, `/beneficiari/{id}`, `/utilizatori/{id}` și `/proiecte/{id}`.
+- [ ] Modifică linkul din coloana „Țintă” astfel încât să deschidă pagina obiectului în mod de consultare, nu formularul de editare.
+- [ ] Afișează în pagina obiectului datele actuale și acțiunile permise utilizatorului, inclusiv un buton separat „Editează” atunci când acesta are dreptul necesar.
+- [ ] Nu activa modul de editare și nu obține viitorul lock de editare doar prin deschiderea linkului din jurnal.
+- [ ] Construiește ruta exclusiv din tipul și identificatorul stabil al obiectului, fără extragerea identificatorului din textul `Target`.
+- [ ] Aplică regulile de autorizare ale obiectului: pagina utilizatorului rămâne disponibilă numai administratorilor, iar produsele și beneficiarii respectă permisiunile lor existente.
+- [ ] Pentru un obiect șters, arhivat sau inaccesibil, nu genera un link către o pagină live inexistentă; afișează ținta ca text până la implementarea unei pagini dedicate arhivei.
+- [ ] Definește un registru extensibil de rute pentru proiecte și toate tipurile de obiecte adăugate ulterior, evitând ramificații dispersate în componenta jurnalului.
+- [ ] Păstrează filtrele și pagina curentă a jurnalului în istoricul de navigare, astfel încât revenirea în browser să restaureze contextul anterior.
+- [ ] Adaugă verificări automate pentru rutele produselor, beneficiarilor, utilizatorilor, proiectelor, observațiilor, obiectelor fără pagină și obiectelor eliminate.
 
-- [ ] La revenirea din pagina proiectului, restaurează pagina, filtrul și poziția anterioară din lista proiectelor beneficiarului.
-- [ ] Adaugă și observațiile în registrul comun al rutelor jurnalului (proiectul este deja înregistrat), folosind un identificator stabil pentru pagina de consultare a observației.
+### Criterii de acceptare
 
-### Subtask 2.4 — Pagina „Echipamente” citește mișcările de stoc
+- Apăsarea unei ținte pentru un obiect existent deschide pagina sa de consultare.
+- Deschiderea paginii nu pornește editarea și nu creează un lock de editare.
+- Editarea poate fi inițiată numai prin acțiunea explicită „Editează” și numai de un utilizator autorizat.
+- Revenirea la jurnal păstrează filtrele și pagina selectată anterior.
+- Obiectele șterse, arhivate, inexistente sau fără pagină de consultare nu produc linkuri invalide.
+- Entitățile noi cu pagină proprie sunt adăugate prin registrul comun de rute.
 
-- [ ] Task 1 (intrări și ieșiri) este finalizat și `IStockMovementRepository.GetForProjectAsync` expune deja ieșirile proiectului. Pagina „Echipamente” citește exclusiv mișcările asociate proiectului (`stock_movements.project_id`, deja pregătit în schema SQLite) și afișează codul produsului, cantitatea, data, operatorul și referința mișcării.
+## Task 4 — Identificarea beneficiarului cu CUI duplicat
 
-### Subtask 2.5 — Sincronizare cu Task 8
+Regula este deja acoperită în modul SQLite. Rămân de uniformizat mesajul, validarea și păstrarea formularului în toate modurile de stocare înainte de introducerea confirmării generice din Task 5.
 
-- [ ] Publică evenimente de modificare pentru proiecte, observații și fișiere prin contractul ce va fi consumat de Task 8.
-- [ ] Actualizează lista proiectelor din pagina beneficiarului și pagina proiectului fără pierderea formularelor deschise atunci când Task 8 implementează sincronizarea între utilizatori.
+- [ ] La adăugarea sau editarea unui beneficiar, dacă CUI-ul există deja, include în mesajul de eroare numele beneficiarului care folosește acel CUI.
+- [ ] Folosește numele beneficiarului așa cum este salvat în baza de date.
+- [ ] Păstrează valorile introduse în formular după respingerea salvării.
+- [ ] Aplică aceeași regulă în modul demonstrativ și în modul conectat la baza de date.
 
-### Subtaskuri finalizate
+### Criterii de acceptare
+
+- Pentru un CUI duplicat, mesajul indică explicit atât existența duplicatului, cât și numele beneficiarului existent.
+- Salvarea este respinsă, iar formularul rămâne deschis cu datele introduse.
+- Mesajul nu identifică beneficiarul curent drept duplicat atunci când acesta este editat fără schimbarea CUI-ului.
+
+## Task 5 — Confirmarea salvărilor
+
+Depinde de structura catalogului finalizată, de produsul („Cod produs”, finalizat), de proiectele din Task 2 și de beneficiarii din Task 4. Reutilizează infrastructura accesibilă a dialogului de ștergere deja finalizat.
+
+- [ ] Afișează un popup de confirmare înaintea tuturor salvărilor care modifică date existente.
+- [ ] Prezintă în popup un rezumat clar al câmpurilor și valorilor care urmează să fie modificate.
+- [ ] Execută salvarea numai dacă utilizatorul confirmă modificările.
+- [ ] Dacă utilizatorul refuză confirmarea, nu salva și păstrează formularul deschis cu valorile curente.
+- [ ] Exceptează crearea unui produs nou: salvarea produsului nou se execută direct, fără popup de confirmare.
+
+### Criterii de acceptare
+
+- Salvările care modifică date existente afișează înainte de execuție un rezumat al modificărilor.
+- Confirmarea aplică modificările, iar refuzul păstrează datele nesalvate în formular.
+- Crearea unui produs nou nu afișează dialogul de confirmare a salvării.
+
+## Task 6 — Confirmare la părăsirea formularului de adăugare
+
+Depinde de forma finală a produsului („Cod produs”, finalizat; stoc doar prin mișcări, Task 0) și reutilizează componenta de confirmare stabilizată în Task 5.
+
+- [ ] Detectează selectarea unei alte categorii, subcategorii sau a opțiunii „Toate produsele” cât timp formularul „Adaugă produs” este deschis.
+- [ ] Afișează un popup de avertizare înainte de schimbarea selecției din meniul produselor.
+- [ ] Informează clar utilizatorul că formularul de adăugare va fi închis și datele nesalvate vor fi pierdute.
+- [ ] Dacă utilizatorul confirmă părăsirea, închide formularul și execută navigarea selectată din meniu.
+- [ ] Dacă utilizatorul refuză, anulează navigarea, păstrează meniul la poziția anterioară și menține formularul deschis cu toate valorile și imaginea deja introduse.
+- [ ] Folosește un dialog accesibil, cu acțiuni explicite „Părăsește adăugarea” și „Continuă adăugarea”.
+
+### Criterii de acceptare
+
+- Schimbarea categoriei sau subcategoriei nu poate închide accidental un formular de adăugare activ.
+- Confirmarea execută exact navigarea solicitată și închide formularul.
+- Anularea păstrează categoria și subcategoria curente, toate câmpurile completate și imaginea selectată.
+- Mesajul nu este afișat dacă formularul de adăugare nu este deschis.
+
+## Task 7 — Confirmarea deconectării și jurnalizarea sesiunilor
+
+Reutilizează infrastructura dialogului de ștergere finalizat și confirmarea comună din Task 5. Jurnalizarea sesiunilor este deja implementată și verificată; rămâne fluxul popup de confirmare.
+
+- [ ] La apăsarea acțiunii „Deconectare”, afișează un popup de confirmare în locul paginii actuale de deconectare.
+- [ ] Afișează în popup butonul roșu „Deconectare” și butonul verde „Anulează deconectarea”.
+- [ ] Execută deconectarea numai după confirmarea explicită a utilizatorului.
+- [ ] La anulare, închide popup-ul și păstrează utilizatorul în pagina curentă, fără pierderea stării acesteia.
+
+### Elemente deja finalizate
+
+- [x] Jurnalizează fiecare conectare reușită și fiecare deconectare efectuată de utilizator.
+- [x] Înregistrează în jurnal utilizatorul, tipul operației și timestampul UTC.
+
+### Criterii de acceptare
+
+- Apăsarea opțiunii „Deconectare” nu mai deschide pagina actuală de deconectare.
+- Confirmarea roșie încheie sesiunea și conduce utilizatorul la pagina de autentificare.
+- Anularea verde păstrează sesiunea și pagina curentă.
+- Conectările reușite și deconectările confirmate sunt vizibile în jurnalul de activitate.
+
+## Task 8 — Sincronizare între utilizatori
+
+Se implementează după stabilizarea operațiilor și contractelor de date din Taskurile 1–7. Furnizează canalul de notificare folosit ulterior de mecanismul de lock din Task 9. Contractul de evenimente pentru proiecte, observații și fișiere există deja (`IChangeFeed` și `ChangeEvent`, Task 2, publicat în proces după commit); Task 8 adaugă sursele externe (trigger-e) și transportul SignalR către același feed, iar paginile beneficiarului, proiectului și observației se abonează deja și se reîmprospătează fără a înlocui formularele deschise.
+
+- [ ] Adaugă un mecanism de înregistrare a modificărilor din baza de date pentru produse, utilizatori, proiecte, observații și fișierele asociate.
+- [ ] Folosește trigger-ele bazei de date numai pentru a scrie evenimente într-un tabel dedicat, astfel încât să fie detectate și modificările făcute de aplicații externe.
+- [ ] Adaugă un serviciu asincron care citește evenimentele noi și le publică prin SignalR către sesiunile conectate.
+- [ ] Reîncarcă în browser numai datele afectate de eveniment.
+- [ ] Păstrează sincronizarea periodică drept mecanism de rezervă dacă o notificare este pierdută.
+- [ ] Păstrează verificarea versiunii înregistrării pentru prevenirea suprascrierilor concurente.
+- [ ] Nu întrerupe un formular sau un dialog deschis; afișează o notificare că datele s-au modificat și permite reîncărcarea controlată.
+- [ ] Testează sincronizarea cu doi utilizatori autentificați, pe două calculatoare sau în două sesiuni independente.
+
+### Criterii de acceptare
+
+- O modificare salvată de utilizatorul A apare automat în pagina utilizatorului B.
+- Modificările făcute printr-o aplicație externă sunt detectate prin evenimentele înregistrate de trigger.
+- Evenimentele sunt procesate o singură dată sau idempotent și nu expun parole ori alte date sensibile.
+- O întrerupere temporară SignalR este recuperată prin sincronizarea periodică.
+
+## Task 9 — Blocarea temporară a editării unui produs
+
+Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recuperarea stării în sesiunile conectate.
+
+- [ ] Creează un lock de tip lease la intrarea în modul de editare, nu la simpla consultare a produsului.
+- [ ] Identifică lock-ul prin produs, utilizator, sesiune, momentul obținerii, ultima reînnoire și momentul expirării.
+- [ ] Permite un singur editor activ pentru fiecare produs, folosind o operație atomică în baza de date.
+- [ ] Reînnoiește lock-ul periodic prin heartbeat cât timp formularul de editare este activ.
+- [ ] Eliberează lock-ul la salvare, anulare, navigare sau închiderea normală a formularului.
+- [ ] Expiră automat lock-ul după 1–2 minute dacă browserul, conexiunea sau aplicația se închide neașteptat.
+- [ ] Pentru al doilea utilizator, păstrează produsul disponibil în mod read-only și afișează cine îl editează și de când.
+- [ ] Notifică automat utilizatorul care așteaptă imediat ce lock-ul este eliberat sau expiră.
+- [ ] Oferă administratorului deblocare forțată, cu motiv obligatoriu și jurnalizare.
+- [ ] Folosește timpul UTC furnizat de baza de date pentru expirări.
+- [ ] Nu păstra o tranzacție SQL sau un row lock deschis pe durata editării din interfață.
+- [ ] Păstrează verificarea versiunii produsului ca protecție finală, inclusiv după expirarea sau preluarea lock-ului.
+
+### Criterii de acceptare
+
+- Dacă utilizatorul A editează un produs, utilizatorul B nu poate porni editarea aceluiași produs.
+- Utilizatorul B poate consulta produsul și primește o explicație clară despre blocare.
+- După salvare, anulare sau expirare, produsul devine automat disponibil pentru editare.
+- Închiderea forțată a browserului nu poate lăsa produsul blocat permanent.
+- Două cereri simultane de lock nu pot obține ambele dreptul de editare.
+- Orice deblocare administrativă este înregistrată în jurnal.
+
+## Observații pentru etapa de implementare
+
+- Schema bazei de date și scripturile aferente se stabilesc în etapa dedicată integrării MariaDB.
+- Implementarea trebuie să rămână complet asincronă.
+- Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
+
+# Taskuri finalizate
+
+## Finalizat — Proiecte asociate beneficiarilor
+
+Proiectele reprezintă lucrări realizate pentru beneficiari și devin punctul de legătură dintre beneficiar, observațiile de lucru, fișierele atașate și viitoarele mișcări de ieșire din inventar. Implementarea păstrează separat câmpul general „Observații” al proiectului și lista de observații individuale, fiecare cu propria denumire, descriere și fișiere. Finalizat la 25 septembrie 2026 de Claude.
+
+### Finalizat — Restaurarea contextului de navigare și registrul jurnalului
+
+Implementat la 25 septembrie 2026 de Claude. `Services/ListNavigationContext.cs`, `wwwroot/navigation-context.js`, `Components/Pages/BeneficiaryDetail.razor`, `Components/Pages/ProjectObservationRedirect.razor`, `AuditNavigation.EditUrl`.
+
+- [x] Filtrul și pagina listei de proiecte sunt păstrate în adresa paginii beneficiarului (`?q=…&pagina=…`, înlocuită pe loc, fără intrări noi în istoric) și memorate pe sesiune; linkul „înapoi” din pagina proiectului și redirecționarea după ștergerea proiectului revin la aceeași vedere, iar butonul Înapoi al browserului o restaurează prin adresă.
+- [x] Poziția de derulare este salvată în `sessionStorage` la apăsarea unui link de proiect și restaurată o singură dată (cel mult 30 de minute) la revenirea la aceeași adresă; dacă stocarea nu este disponibilă, pagina funcționează fără restaurarea poziției.
+- [x] Observațiile sunt în registrul comun al rutelor jurnalului: `AuditNavigation.EditUrl` → `/observatii/{id}` (identificatorul stabil al observației, cel salvat în `EntityId`), o pagină care rezolvă observația și redirecționează către `/proiecte/{projectId}/observatii/{id}`; observațiile șterse afișează „Observația nu mai există”, iar evenimentele de ștergere rămân fără link.
+
+### Finalizat — Pagina „Echipamente” citește mișcările de stoc
+
+Implementat la 25 septembrie 2026 de Claude. `Components/Pages/ProjectEquipment.razor`.
+
+- [x] `/proiecte/{id}/echipamente` citește exclusiv `IStockMovementRepository.GetForProjectAsync` (ieșirile cu `stock_movements.project_id`) și afișează codul produsului (link către pagina produsului), cantitatea, data (`zz-LL-aaaa`), operatorul și referința mișcării („Mișcarea nr. N”, link `/miscari/{id}`).
+- [x] Stare goală explicită și stare de eroare cu „Reîncearcă”; nu se afișează date simulate.
+
+### Finalizat — Sincronizare cu Task 8
+
+Implementat la 25 septembrie 2026 de Claude. `Services/ChangeFeed.cs`, `Components/Pages/BeneficiaryDetail.razor`, `ProjectPage.razor`, `ProjectObservationPage.razor`, `Program.cs`.
+
+- [x] Contract de evenimente: `ChangeEvent` și `IChangeFeed`, publicate după commit de decoratorii `ChangeNotifyingProjectRepository` și `ChangeNotifyingProjectFileStore`, identic pentru SQLite și MariaDB. Evenimentele conțin doar identificatori (tip, acțiune, id, proiect, observație, beneficiar, sesiunea de origine, moment UTC), niciodată denumiri, texte sau conținut de fișiere.
+- [x] Lista proiectelor din pagina beneficiarului și paginile proiectului și observației se abonează la feed și se reîmprospătează pe loc pentru modificările altor sesiuni (evenimentele propriei sesiuni sunt ignorate). Formularele și dialogurile deschise nu sunt înlocuite: primesc doar o notificare, iar verificarea versiunii rămâne protecția finală.
+- [x] Încărcarea unui fișier într-o observație scrie acum evenimentul de audit „Adăugare” (SQLite: în aceeași tranzacție; MariaDB: după inserare). Evenimentul lipsea, deși taskul îl dădea drept finalizat; conținutul fișierului nu intră în jurnal.
+- Task 8 conectează feed-ul la surse externe (trigger-e, SignalR); paginile nu mai necesită modificări.
+
+### Finalizat — Verificări ale ultimelor subtaskuri
+
+- [x] 27 de verificări automate noi în `BlazorStoc.Checks` (312 în total): evenimentele de modificare pentru fiecare operație, nicio publicare pentru operații respinse, izolarea abonaților care eșuează, filtrarea evenimentelor pe pagini, auditul încărcării fișierelor, ruta observației în jurnal și memorarea stării listei.
+- [x] Verificat în browser (`http://127.0.0.1:5082`, două sesiuni): filtrul în adresă, întoarcerea din proiect cu filtrul și poziția de derulare, pagina „Echipamente” goală și cu o ieșire asociată, linkul observației din jurnal și `/observatii/{id}` inexistent, reîmprospătarea live a listelor și notificarea peste un formular deschis. Datele de test au fost șterse.
 
 ### Finalizat — Persistența și repository-urile asincrone
 
@@ -153,156 +314,8 @@ Implementat la 24 septembrie 2026 de Claude în `Services/Projects.cs`. Persiste
 - Pagina proiectului afișează primul linkul „Echipamente”, apoi observațiile ordonate după data și ora introducerii.
 - Un proiect poate conține mai multe observații, iar fiecare observație are pagină proprie și poate fi editată.
 - Fișierele sunt stocate pe server, legate de observația corectă și pot fi descărcate sau eliminate numai de utilizatori autorizați.
-- Pagina „Echipamente” reflectă exclusiv viitoarele mișcări de ieșire asociate proiectului.
+- Pagina „Echipamente” reflectă exclusiv mișcările de ieșire asociate proiectului.
 - Toate modificările sunt validate, versionate, jurnalizate și arhivate conform regulilor comune ale aplicației.
-
-## Task 3 — Navigarea din jurnal către pagina obiectului
-
-Depinde de pagina de administrare finalizată, de modelul produsului („Cod produs”, finalizat) și de rutele proiectelor din Task 2. Înlocuiește comportamentul actual prin care linkul din coloana „Țintă” deschide direct formularul de editare.
-
-- [ ] Definește pentru fiecare tip de obiect o rută stabilă de consultare bazată pe tipul entității și identificatorul său, de exemplu `/produse/{id}`, `/beneficiari/{id}`, `/utilizatori/{id}` și `/proiecte/{id}`.
-- [ ] Modifică linkul din coloana „Țintă” astfel încât să deschidă pagina obiectului în mod de consultare, nu formularul de editare.
-- [ ] Afișează în pagina obiectului datele actuale și acțiunile permise utilizatorului, inclusiv un buton separat „Editează” atunci când acesta are dreptul necesar.
-- [ ] Nu activa modul de editare și nu obține viitorul lock de editare doar prin deschiderea linkului din jurnal.
-- [ ] Construiește ruta exclusiv din tipul și identificatorul stabil al obiectului, fără extragerea identificatorului din textul `Target`.
-- [ ] Aplică regulile de autorizare ale obiectului: pagina utilizatorului rămâne disponibilă numai administratorilor, iar produsele și beneficiarii respectă permisiunile lor existente.
-- [ ] Pentru un obiect șters, arhivat sau inaccesibil, nu genera un link către o pagină live inexistentă; afișează ținta ca text până la implementarea unei pagini dedicate arhivei.
-- [ ] Definește un registru extensibil de rute pentru proiecte și toate tipurile de obiecte adăugate ulterior, evitând ramificații dispersate în componenta jurnalului.
-- [ ] Păstrează filtrele și pagina curentă a jurnalului în istoricul de navigare, astfel încât revenirea în browser să restaureze contextul anterior.
-- [ ] Adaugă verificări automate pentru rutele produselor, beneficiarilor, utilizatorilor, proiectelor, observațiilor, obiectelor fără pagină și obiectelor eliminate.
-
-### Criterii de acceptare
-
-- Apăsarea unei ținte pentru un obiect existent deschide pagina sa de consultare.
-- Deschiderea paginii nu pornește editarea și nu creează un lock de editare.
-- Editarea poate fi inițiată numai prin acțiunea explicită „Editează” și numai de un utilizator autorizat.
-- Revenirea la jurnal păstrează filtrele și pagina selectată anterior.
-- Obiectele șterse, arhivate, inexistente sau fără pagină de consultare nu produc linkuri invalide.
-- Entitățile noi cu pagină proprie sunt adăugate prin registrul comun de rute.
-
-## Task 4 — Identificarea beneficiarului cu CUI duplicat
-
-Regula este deja acoperită în modul SQLite. Rămân de uniformizat mesajul, validarea și păstrarea formularului în toate modurile de stocare înainte de introducerea confirmării generice din Task 5.
-
-- [ ] La adăugarea sau editarea unui beneficiar, dacă CUI-ul există deja, include în mesajul de eroare numele beneficiarului care folosește acel CUI.
-- [ ] Folosește numele beneficiarului așa cum este salvat în baza de date.
-- [ ] Păstrează valorile introduse în formular după respingerea salvării.
-- [ ] Aplică aceeași regulă în modul demonstrativ și în modul conectat la baza de date.
-
-### Criterii de acceptare
-
-- Pentru un CUI duplicat, mesajul indică explicit atât existența duplicatului, cât și numele beneficiarului existent.
-- Salvarea este respinsă, iar formularul rămâne deschis cu datele introduse.
-- Mesajul nu identifică beneficiarul curent drept duplicat atunci când acesta este editat fără schimbarea CUI-ului.
-
-## Task 5 — Confirmarea salvărilor
-
-Depinde de structura catalogului finalizată, de produsul („Cod produs”, finalizat), de proiectele din Task 2 și de beneficiarii din Task 4. Reutilizează infrastructura accesibilă a dialogului de ștergere deja finalizat.
-
-- [ ] Afișează un popup de confirmare înaintea tuturor salvărilor care modifică date existente.
-- [ ] Prezintă în popup un rezumat clar al câmpurilor și valorilor care urmează să fie modificate.
-- [ ] Execută salvarea numai dacă utilizatorul confirmă modificările.
-- [ ] Dacă utilizatorul refuză confirmarea, nu salva și păstrează formularul deschis cu valorile curente.
-- [ ] Exceptează crearea unui produs nou: salvarea produsului nou se execută direct, fără popup de confirmare.
-
-### Criterii de acceptare
-
-- Salvările care modifică date existente afișează înainte de execuție un rezumat al modificărilor.
-- Confirmarea aplică modificările, iar refuzul păstrează datele nesalvate în formular.
-- Crearea unui produs nou nu afișează dialogul de confirmare a salvării.
-
-## Task 6 — Confirmare la părăsirea formularului de adăugare
-
-Depinde de forma finală a produsului („Cod produs”, finalizat; stoc doar prin mișcări, Task 0) și reutilizează componenta de confirmare stabilizată în Task 5.
-
-- [ ] Detectează selectarea unei alte categorii, subcategorii sau a opțiunii „Toate produsele” cât timp formularul „Adaugă produs” este deschis.
-- [ ] Afișează un popup de avertizare înainte de schimbarea selecției din meniul produselor.
-- [ ] Informează clar utilizatorul că formularul de adăugare va fi închis și datele nesalvate vor fi pierdute.
-- [ ] Dacă utilizatorul confirmă părăsirea, închide formularul și execută navigarea selectată din meniu.
-- [ ] Dacă utilizatorul refuză, anulează navigarea, păstrează meniul la poziția anterioară și menține formularul deschis cu toate valorile și imaginea deja introduse.
-- [ ] Folosește un dialog accesibil, cu acțiuni explicite „Părăsește adăugarea” și „Continuă adăugarea”.
-
-### Criterii de acceptare
-
-- Schimbarea categoriei sau subcategoriei nu poate închide accidental un formular de adăugare activ.
-- Confirmarea execută exact navigarea solicitată și închide formularul.
-- Anularea păstrează categoria și subcategoria curente, toate câmpurile completate și imaginea selectată.
-- Mesajul nu este afișat dacă formularul de adăugare nu este deschis.
-
-## Task 7 — Confirmarea deconectării și jurnalizarea sesiunilor
-
-Reutilizează infrastructura dialogului de ștergere finalizat și confirmarea comună din Task 5. Jurnalizarea sesiunilor este deja implementată și verificată; rămâne fluxul popup de confirmare.
-
-- [ ] La apăsarea acțiunii „Deconectare”, afișează un popup de confirmare în locul paginii actuale de deconectare.
-- [ ] Afișează în popup butonul roșu „Deconectare” și butonul verde „Anulează deconectarea”.
-- [ ] Execută deconectarea numai după confirmarea explicită a utilizatorului.
-- [ ] La anulare, închide popup-ul și păstrează utilizatorul în pagina curentă, fără pierderea stării acesteia.
-
-### Elemente deja finalizate
-
-- [x] Jurnalizează fiecare conectare reușită și fiecare deconectare efectuată de utilizator.
-- [x] Înregistrează în jurnal utilizatorul, tipul operației și timestampul UTC.
-
-### Criterii de acceptare
-
-- Apăsarea opțiunii „Deconectare” nu mai deschide pagina actuală de deconectare.
-- Confirmarea roșie încheie sesiunea și conduce utilizatorul la pagina de autentificare.
-- Anularea verde păstrează sesiunea și pagina curentă.
-- Conectările reușite și deconectările confirmate sunt vizibile în jurnalul de activitate.
-
-## Task 8 — Sincronizare între utilizatori
-
-Se implementează după stabilizarea operațiilor și contractelor de date din Taskurile 1–7. Furnizează canalul de notificare folosit ulterior de mecanismul de lock din Task 9.
-
-- [ ] Adaugă un mecanism de înregistrare a modificărilor din baza de date pentru produse, utilizatori, proiecte, observații și fișierele asociate.
-- [ ] Folosește trigger-ele bazei de date numai pentru a scrie evenimente într-un tabel dedicat, astfel încât să fie detectate și modificările făcute de aplicații externe.
-- [ ] Adaugă un serviciu asincron care citește evenimentele noi și le publică prin SignalR către sesiunile conectate.
-- [ ] Reîncarcă în browser numai datele afectate de eveniment.
-- [ ] Păstrează sincronizarea periodică drept mecanism de rezervă dacă o notificare este pierdută.
-- [ ] Păstrează verificarea versiunii înregistrării pentru prevenirea suprascrierilor concurente.
-- [ ] Nu întrerupe un formular sau un dialog deschis; afișează o notificare că datele s-au modificat și permite reîncărcarea controlată.
-- [ ] Testează sincronizarea cu doi utilizatori autentificați, pe două calculatoare sau în două sesiuni independente.
-
-### Criterii de acceptare
-
-- O modificare salvată de utilizatorul A apare automat în pagina utilizatorului B.
-- Modificările făcute printr-o aplicație externă sunt detectate prin evenimentele înregistrate de trigger.
-- Evenimentele sunt procesate o singură dată sau idempotent și nu expun parole ori alte date sensibile.
-- O întrerupere temporară SignalR este recuperată prin sincronizarea periodică.
-
-## Task 9 — Blocarea temporară a editării unui produs
-
-Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recuperarea stării în sesiunile conectate.
-
-- [ ] Creează un lock de tip lease la intrarea în modul de editare, nu la simpla consultare a produsului.
-- [ ] Identifică lock-ul prin produs, utilizator, sesiune, momentul obținerii, ultima reînnoire și momentul expirării.
-- [ ] Permite un singur editor activ pentru fiecare produs, folosind o operație atomică în baza de date.
-- [ ] Reînnoiește lock-ul periodic prin heartbeat cât timp formularul de editare este activ.
-- [ ] Eliberează lock-ul la salvare, anulare, navigare sau închiderea normală a formularului.
-- [ ] Expiră automat lock-ul după 1–2 minute dacă browserul, conexiunea sau aplicația se închide neașteptat.
-- [ ] Pentru al doilea utilizator, păstrează produsul disponibil în mod read-only și afișează cine îl editează și de când.
-- [ ] Notifică automat utilizatorul care așteaptă imediat ce lock-ul este eliberat sau expiră.
-- [ ] Oferă administratorului deblocare forțată, cu motiv obligatoriu și jurnalizare.
-- [ ] Folosește timpul UTC furnizat de baza de date pentru expirări.
-- [ ] Nu păstra o tranzacție SQL sau un row lock deschis pe durata editării din interfață.
-- [ ] Păstrează verificarea versiunii produsului ca protecție finală, inclusiv după expirarea sau preluarea lock-ului.
-
-### Criterii de acceptare
-
-- Dacă utilizatorul A editează un produs, utilizatorul B nu poate porni editarea aceluiași produs.
-- Utilizatorul B poate consulta produsul și primește o explicație clară despre blocare.
-- După salvare, anulare sau expirare, produsul devine automat disponibil pentru editare.
-- Închiderea forțată a browserului nu poate lăsa produsul blocat permanent.
-- Două cereri simultane de lock nu pot obține ambele dreptul de editare.
-- Orice deblocare administrativă este înregistrată în jurnal.
-
-## Observații pentru etapa de implementare
-
-- Schema bazei de date și scripturile aferente se stabilesc în etapa dedicată integrării MariaDB.
-- Implementarea trebuie să rămână complet asincronă.
-- Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
-
-# Taskuri finalizate
 
 ## Finalizat — Intrări și ieșiri pentru un produs existent
 

@@ -1508,6 +1508,157 @@ finally
     try { Directory.Delete(legacyMovementRoot, true); } catch (IOException) { }
 }
 
+// Task 2 / Subtasks 2.3-2.5: change events, file audit, observation route and navigation context.
+var feedRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-feed-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(feedRoot);
+try
+{
+    var feedConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["App:LocalDatabasePath"] = Path.Combine(feedRoot, "feed.db"),
+        ["App:ProductImagesPath"] = Path.Combine(feedRoot, "product-images"),
+        ["App:ArchiveFilesPath"] = Path.Combine(feedRoot, "archive-files"),
+        ["App:AuditPath"] = Path.Combine(feedRoot, "legacy-audit.jsonl")
+    }).Build();
+    var feedStore = new SqliteLocalStore(new TestWebHostEnvironment(feedRoot), feedConfiguration, NullLogger<SqliteLocalStore>.Instance);
+    var feedAccess = new TestAccessControl(true, "operator.feed");
+    var feed = new InProcessChangeFeed();
+    var feedOrigin = new ChangeOrigin();
+    var otherOrigin = new ChangeOrigin();
+    var feedFiles = new ChangeNotifyingProjectFileStore(new SqliteProjectFileStore(feedStore, feedAccess), feed, feedOrigin);
+    var feedProjects = new ChangeNotifyingProjectRepository(new SqliteProjectRepository(feedStore, feedAccess, null, feedFiles), feed, feedOrigin);
+    var feedBeneficiaries = new SqliteBeneficiaryRepository(feedStore, feedAccess);
+    var received = new List<ChangeEvent>();
+    using var subscription = feed.Subscribe(change => { received.Add(change); return Task.CompletedTask; });
+
+    var feedBeneficiary = await feedBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar feed", Cui = "RO18777771" });
+    var feedOtherBeneficiary = await feedBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar feed doi", Cui = "RO18777772" });
+    var feedProject = await feedProjects.CreateAsync(new ProjectInput { BeneficiaryId = feedBeneficiary.Id, Name = "Proiect feed", Observations = "" });
+    Check(received.Count == 1 && received[0].EntityType == AuditEntities.Project && received[0].Action == AuditActions.Create &&
+          received[0].EntityId == feedProject.Id.ToString() && received[0].ProjectId == feedProject.Id &&
+          received[0].BeneficiaryId == feedBeneficiary.Id && received[0].Origin == feedOrigin.Id && received[0].OccurredUtc.Kind == DateTimeKind.Utc,
+        "Creating a project publishes a change event with identifiers, origin and UTC time");
+
+    try { await feedProjects.CreateAsync(new ProjectInput { BeneficiaryId = feedBeneficiary.Id, Name = "  PROIECT   feed ", Observations = "" }); throw new Exception("Duplicate project accepted"); }
+    catch (ProjectOperationException) { Check(received.Count == 1, "A rejected project operation publishes no event"); }
+
+    var feedObservation = await feedProjects.CreateObservationAsync(feedProject.Id, new ProjectObservationInput { Name = "Observatie feed", Content = "Text" }, "operator.feed");
+    Check(received.Count == 2 && received[1].EntityType == AuditEntities.ProjectObservation && received[1].Action == AuditActions.Create &&
+          received[1].ProjectId == feedProject.Id && received[1].ObservationId == feedObservation.Id, "Creating an observation publishes its project and observation ids");
+
+    var feedFile = await feedFiles.SaveAsync(feedObservation.Id, "nota.txt", "text/plain", "Continut secret de fisier"u8.ToArray(), "operator.feed");
+    Check(received.Count == 3 && received[2].EntityType == AuditEntities.ProjectObservationFile && received[2].Action == AuditActions.Create &&
+          received[2].EntityId == feedFile.Id.ToString() && received[2].ObservationId == feedObservation.Id, "Saving a file publishes the file and its observation");
+
+    var feedObservationEdit = ProjectObservationInput.From(feedObservation); feedObservationEdit.Content = "Text nou"; feedObservationEdit.Reason = "Corectie";
+    var editedFeedObservation = await feedProjects.UpdateObservationAsync(feedObservation, feedObservationEdit);
+    Check(received.Count == 4 && received[3].Action == AuditActions.Edit && received[3].ObservationId == feedObservation.Id, "Editing an observation publishes an edit event");
+
+    var projectMove = ProjectInput.From(feedProject); projectMove.BeneficiaryId = feedOtherBeneficiary.Id; projectMove.Reason = "Mutare";
+    var movedProject = await feedProjects.UpdateAsync(feedProject, projectMove);
+    var moveEvents = received.Skip(4).ToList();
+    Check(moveEvents.Count == 2 && moveEvents.All(change => change.Action == AuditActions.Edit && change.ProjectId == feedProject.Id) &&
+          moveEvents.Select(change => change.BeneficiaryId).Order().SequenceEqual(new int?[] { feedBeneficiary.Id, feedOtherBeneficiary.Id }.Order()),
+        "Moving a project notifies both the previous and the new beneficiary");
+    Check(ProjectChanges.AffectsBeneficiary(moveEvents[0], moveEvents[0].BeneficiaryId!.Value) && !ProjectChanges.AffectsBeneficiary(received[1], feedBeneficiary.Id),
+        "Only project events concern a beneficiary page");
+
+    await feedFiles.DeleteAsync(feedFile.Id, "Fisier inlocuit");
+    Check(received.Count == 7 && received[6].EntityType == AuditEntities.ProjectObservationFile && received[6].Action == AuditActions.Delete &&
+          received[6].EntityId == feedFile.Id.ToString() && received[6].ObservationId is null, "Removing a file publishes a deletion whose observation is unknown");
+    await feedProjects.DeleteObservationAsync(editedFeedObservation, "Observatie stearsa");
+    Check(received.Count == 8 && received[7].EntityType == AuditEntities.ProjectObservation && received[7].Action == AuditActions.Delete &&
+          received[7].ObservationId == feedObservation.Id, "Deleting an observation publishes a deletion");
+    await feedProjects.DeleteAsync(movedProject, "Proiect sters");
+    Check(received.Count == 9 && received[8].EntityType == AuditEntities.Project && received[8].Action == AuditActions.Delete &&
+          received[8].BeneficiaryId == feedOtherBeneficiary.Id && ProjectChanges.IsDeletionOf(received[8], AuditEntities.Project, feedProject.Id),
+        "Deleting a project publishes a deletion for its current beneficiary");
+
+    var serialized = string.Join('|', received.Select(change => System.Text.Json.JsonSerializer.Serialize(change)));
+    Check(!serialized.Contains("Continut secret") && !serialized.Contains("nota.txt") && !serialized.Contains("Proiect feed") && !serialized.Contains("Observatie feed"),
+        "Change events carry identifiers only, never names, texts or file contents");
+
+    // Subscriptions: isolation of failing subscribers and unsubscribing.
+    var stable = new List<ChangeEvent>();
+    var failingFeed = new InProcessChangeFeed();
+    using (failingFeed.Subscribe(_ => throw new InvalidOperationException("Subscriber failure")))
+    using (failingFeed.Subscribe(_ => Task.FromException(new InvalidOperationException("Async subscriber failure"))))
+    using (failingFeed.Subscribe(change => { stable.Add(change); return Task.CompletedTask; }))
+        failingFeed.Publish(new(AuditEntities.Project, AuditActions.Create, "1", Guid.NewGuid(), DateTime.UtcNow, ProjectId: 1));
+    Check(stable.Count == 1, "A failing subscriber affects neither the publisher nor the other subscribers");
+    failingFeed.Publish(new(AuditEntities.Project, AuditActions.Create, "2", Guid.NewGuid(), DateTime.UtcNow, ProjectId: 2));
+    Check(stable.Count == 1, "A disposed subscription no longer receives events");
+    var doubleDisposed = feed.Subscribe(_ => Task.CompletedTask);
+    doubleDisposed.Dispose(); doubleDisposed.Dispose();
+    Check(true, "Disposing a subscription twice is harmless");
+
+    // Which pages an event concerns.
+    var observationFileEvent = new ChangeEvent(AuditEntities.ProjectObservationFile, AuditActions.Create, "5", otherOrigin.Id, DateTime.UtcNow, ObservationId: 7);
+    var unknownFileEvent = observationFileEvent with { ObservationId = null };
+    var observationEvent = new ChangeEvent(AuditEntities.ProjectObservation, AuditActions.Edit, "7", otherOrigin.Id, DateTime.UtcNow, ProjectId: 3, ObservationId: 7);
+    var projectEvent = new ChangeEvent(AuditEntities.Project, AuditActions.Delete, "3", otherOrigin.Id, DateTime.UtcNow, ProjectId: 3, BeneficiaryId: 2);
+    Check(ProjectChanges.AffectsProject(observationFileEvent, 3, new[] { 7 }) && !ProjectChanges.AffectsProject(observationFileEvent, 3, new[] { 8 }) &&
+          ProjectChanges.AffectsProject(unknownFileEvent, 3, Array.Empty<int>()), "The project page refreshes for its own observations' files and for unattributed file removals");
+    Check(ProjectChanges.AffectsProject(observationEvent, 3, Array.Empty<int>()) && !ProjectChanges.AffectsProject(observationEvent, 4, Array.Empty<int>()) &&
+          ProjectChanges.AffectsProject(projectEvent, 3, Array.Empty<int>()) && !ProjectChanges.AffectsProject(projectEvent, 4, Array.Empty<int>()),
+        "The project page refreshes only for its own project and observations");
+    Check(ProjectChanges.AffectsObservation(observationEvent, 3, 7) && !ProjectChanges.AffectsObservation(observationEvent, 3, 8) &&
+          ProjectChanges.AffectsObservation(projectEvent, 3, 7) && !ProjectChanges.AffectsObservation(projectEvent with { Action = AuditActions.Edit }, 3, 7) &&
+          ProjectChanges.AffectsObservation(observationFileEvent, 3, 7) && !ProjectChanges.AffectsObservation(observationFileEvent, 3, 8),
+        "The observation page refreshes for its own changes and when its project is deleted");
+    Check(!ProjectChanges.AffectsBeneficiary(new ChangeEvent(AuditEntities.StockMovement, AuditActions.Create, "1", otherOrigin.Id, DateTime.UtcNow, BeneficiaryId: 2), 2),
+        "Events of other entity types never refresh a beneficiary page");
+
+    // File uploads are audited (creation) without exposing the content.
+    var auditedFile = await new SqliteProjectFileStore(feedStore, feedAccess).SaveAsync(
+        (await new SqliteProjectRepository(feedStore, feedAccess).CreateObservationAsync(
+            (await new SqliteProjectRepository(feedStore, feedAccess).CreateAsync(new ProjectInput { BeneficiaryId = feedBeneficiary.Id, Name = "Proiect audit fisier" })).Id,
+            new ProjectObservationInput { Name = "Observatie audit fisier" }, "operator.feed")).Id,
+        "plan.pdf", "application/pdf", "%PDF-1.4\n%continut\n"u8.ToArray(), "operator.feed");
+    await using (var feedConnection = await feedStore.OpenConnectionAsync())
+    {
+        await using var fileAudit = TestSqliteCommand(feedConnection, """
+            SELECT COUNT(*) FROM audit_events WHERE entity_type='FisierObservatie' AND action='Adăugare' AND target='plan.pdf' AND entity_id=@id
+              AND details LIKE '%Nume fișier: plan.pdf%' AND details LIKE '%Observație: Observatie audit fisier%' AND details NOT LIKE '%continut%'
+            """, ("@id", auditedFile.Id.ToString()));
+        Check(Convert.ToInt32(await fileAudit.ExecuteScalarAsync()) == 1, "Uploading an observation file is audited with name, observation and type, without its content");
+    }
+    try { await new SqliteProjectFileStore(feedStore, feedAccess).SaveAsync(987654, "orfan.txt", "text/plain", "x"u8.ToArray(), "operator.feed"); throw new Exception("File for a missing observation saved"); }
+    catch (ProjectOperationException) { Check(Directory.Exists(feedStore.ProjectFilesPath) && Directory.GetFiles(feedStore.ProjectFilesPath).Length == 1, "A file for a missing observation is rejected and leaves no file behind"); }
+
+    // Observation route in the journal registry (Subtask 2.3).
+    AuditEvent ObservationAudit(string action, string entityId) =>
+        new(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.ProjectObservation, action, "t", "d", "", entityId);
+    Check(AuditNavigation.EditUrl(ObservationAudit(AuditActions.Create, "12")) == "/observatii/12" &&
+          AuditNavigation.EditUrl(ObservationAudit(AuditActions.Edit, "12")) == "/observatii/12" &&
+          AuditNavigation.EditUrl(ObservationAudit(AuditActions.Delete, "12")) is null &&
+          AuditNavigation.EditUrl(ObservationAudit(AuditActions.Create, "abc")) is null &&
+          AuditNavigation.EditUrl(ObservationAudit(AuditActions.Create, "0")) is null,
+        "Observation events link to the stable /observatii/{id} route; deleted or invalid ones do not");
+    Check(ProjectNavigation.ObservationPageUrl(3, 12) == "/proiecte/3/observatii/12" && ProjectNavigation.ProjectUrl(3) == "/proiecte/3" &&
+          AuditNavigation.EditUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.ProjectObservationFile, AuditActions.Create, "t", "d", "", "4")) is null,
+        "The observation route resolves under its project; files have no page of their own");
+
+    // Return to the project list of a beneficiary (Subtask 2.3).
+    var listContext = new ListNavigationContext();
+    Check(listContext.BeneficiaryUrl(5) == "/beneficiari/5", "A beneficiary with no remembered list state links to the plain page");
+    listContext.RememberBeneficiaryProjects(5, BeneficiaryProjectListState.From("  hala nord ", 3));
+    Check(listContext.BeneficiaryUrl(5) == "/beneficiari/5?q=hala%20nord&pagina=3" && listContext.BeneficiaryUrl(6) == "/beneficiari/6",
+        "The remembered filter and page are restored per beneficiary");
+    listContext.RememberBeneficiaryProjects(5, BeneficiaryProjectListState.From("hala", 1));
+    Check(listContext.BeneficiaryUrl(5) == "/beneficiari/5?q=hala", "The first page is not written to the address");
+    listContext.RememberBeneficiaryProjects(5, BeneficiaryProjectListState.From("", null));
+    Check(listContext.BeneficiaryUrl(5) == "/beneficiari/5", "Clearing the filter and returning to the first page forgets the state");
+    var special = BeneficiaryProjectListState.From("șantier & hală=1?", 0);
+    Check(special.Page == 1 && special.Url(9).StartsWith("/beneficiari/9?q=") && !special.Url(9).Contains("&hală") && !special.Url(9).Contains(' ') && !special.Url(9).Contains("pagina"),
+        "Special characters are escaped and an invalid page falls back to the first");
+}
+finally
+{
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    try { Directory.Delete(feedRoot, true); } catch (IOException) { }
+}
+
 sealed class TestAccessControl(bool administrator, string username) : IAccessControl
 {
     public Task<bool> IsAdministratorAsync(CancellationToken cancellationToken = default) => Task.FromResult(administrator);

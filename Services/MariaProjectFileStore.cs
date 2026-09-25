@@ -4,7 +4,7 @@ using MySqlConnector;
 namespace BlazorStoc.Services;
 
 public sealed class MariaProjectFileStore(IWebHostEnvironment environment, IConfiguration configuration,
-    IAccessControl? accessControl = null, IArchiveService? archiveService = null) : IProjectFileStore
+    IAccessControl? accessControl = null, IArchiveService? archiveService = null, IAuditTrail? auditTrail = null) : IProjectFileStore
 {
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
     private readonly SemaphoreSlim gate = new(1, 1);
@@ -84,7 +84,15 @@ public sealed class MariaProjectFileStore(IWebHostEnvironment environment, IConf
                 insert.Parameters.AddWithValue("@author", prepared.Author);
                 insert.Parameters.AddWithValue("@uploaded", prepared.UploadedAtUtc);
                 await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                return prepared with { Id = checked((int)insert.LastInsertedId) };
+                var saved = prepared with { Id = checked((int)insert.LastInsertedId) };
+                await using var lookup = new MySqlCommand("SELECT name FROM project_observation WHERE id_observation=@observation", connection);
+                lookup.Parameters.AddWithValue("@observation", observationId);
+                var observationName = await lookup.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string ?? "";
+                await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.ProjectObservationFile, saved.Id.ToString(),
+                    saved.OriginalName, AuditDetails.Identification(("Nume fișier", saved.OriginalName), ("Observație", observationName),
+                        ("Tip", contentType), ("Dimensiune (octeți)", saved.SizeBytes.ToString()), ("Autor", saved.Author)),
+                    cancellationToken).ConfigureAwait(false);
+                return saved;
             }
             catch
             {

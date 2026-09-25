@@ -6,6 +6,8 @@
 @inject IProjectFileStore FileStore
 @inject IAccessControl AccessControl
 @inject NavigationManager Navigation
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
 @inject ILogger<ProjectObservation> Logger
 @implements IDisposable
 
@@ -30,6 +32,7 @@ else if (observation is not null && project is not null)
         </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (remoteNotice is not null) { <div class="info-banner" role="status">@remoteNotice</div> }
 
     @if (editing)
     {
@@ -89,12 +92,54 @@ else if (observation is not null && project is not null)
     private ProjectObservation? observation;
     private IReadOnlyList<ProjectObservationFile> files = Array.Empty<ProjectObservationFile>();
     private bool loading = true, editing, uploading, deleting, deleteBusy, removeFileBusy;
-    private string? error, notice, uploadError, deleteError, removeFileError;
+    private string? error, notice, remoteNotice, uploadError, deleteError, removeFileError;
     private ProjectObservationFile? removingFile;
     private Guid editorKey;
+    private IDisposable? changeSubscription;
     private readonly CancellationTokenSource lifetime = new();
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        changeSubscription = ChangeFeed.Subscribe(OnChangeAsync);
+        await LoadAsync();
+    }
+
+    // Another session changed this observation, its files or the project. The page is refreshed in place; an open
+    // form or dialog is never replaced: it only gets a notice, and the version check still guards the save.
+    private Task OnChangeAsync(ChangeEvent change)
+    {
+        if (change.Origin == Origin.Id) return Task.CompletedTask;
+        return InvokeAsync(async () =>
+        {
+            if (observation is null || project is null || deleteBusy || uploading || removeFileBusy ||
+                !ProjectChanges.AffectsObservation(change, ProjectId, Id)) return;
+            await RefreshAsync(change);
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshAsync(ChangeEvent change)
+    {
+        var formOpen = editing || deleting || removingFile is not null;
+        try
+        {
+            var current = await Repository.GetObservationAsync(Id, lifetime.Token);
+            if (current is null || current.ProjectId != ProjectId)
+            {
+                if (formOpen) remoteNotice = "Observația a fost ștearsă de alt utilizator. Formularele deschise nu au fost modificate; acțiunile vor fi respinse.";
+                else { observation = null; error = "Observația solicitată nu mai există."; }
+                return;
+            }
+            if (change.EntityType == AuditEntities.ProjectObservation)
+            {
+                if (editing) remoteNotice = "Observația a fost modificată de alt utilizator. Formularul deschis nu a fost schimbat; la salvare se verifică versiunea observației.";
+                else observation = current;
+            }
+            files = await FileStore.GetFilesAsync(Id, lifetime.Token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Logger.LogWarning("Observation refresh failed ({ErrorType}).", exception.GetType().Name); }
+    }
     protected override async Task OnParametersSetAsync()
     {
         if (observation is not null && observation.Id != Id) await LoadAsync();
@@ -104,6 +149,7 @@ else if (observation is not null && project is not null)
     {
         loading = true;
         error = null;
+        remoteNotice = null;
         try
         {
             observation = await Repository.GetObservationAsync(Id, lifetime.Token);
@@ -126,6 +172,7 @@ else if (observation is not null && project is not null)
     {
         observation = updated;
         editing = false;
+        remoteNotice = null;
         notice = "Observația a fost actualizată.";
         return Task.CompletedTask;
     }
@@ -157,7 +204,7 @@ else if (observation is not null && project is not null)
         finally { uploading = false; }
     }
 
-    private void OpenEditAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; }
+    private void OpenEditAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; remoteNotice = null; }
     private void RequestRemoveFileAsync(ProjectObservationFile file) { removingFile = file; removeFileError = null; }
 
     private async Task RemoveFileAsync(string reason)
@@ -211,5 +258,5 @@ else if (observation is not null && project is not null)
         return $"{bytes / (1024.0 * 1024.0):0.#} MB";
     }
 
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { changeSubscription?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
 }

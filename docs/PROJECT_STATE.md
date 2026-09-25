@@ -1,8 +1,8 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **24 septembrie 2026**
-Stare ciclu: **Task 1 („Intrări și ieșiri pentru un produs existent”) și Task 0 finalizate; Task 2 finalizat aproape integral; pregătit pentru predarea către Codex după commitul curent**
+Data: **25 septembrie 2026**
+Stare ciclu: **Taskurile 0, 1 și 2 finalizate (Task 2 complet: subtaskurile 2.3–2.5 livrate în ciclul curent); pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -11,6 +11,18 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs”, stocul modificabil exclusiv prin mișcări de intrare/ieșire (pagina `/produse/{id}/miscari`) și istoricul mișcărilor.
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Ultimele modificări funcționale (ciclul Claude — Task 2, subtaskurile 2.3–2.5)
+
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează ce a mai rămas din task 2”), deși `nextAgent` era `codex`; working tree-ul era curat și nu exista un ciclu Codex deschis. Ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json` (`nextAgent: claude`), apoi `start` normal.
+
+- **2.4 — „Echipamente”** (`Components/Pages/ProjectEquipment.razor`): citește `IStockMovementRepository.GetForProjectAsync` și afișează codul produsului (link către `/produse/{id}/miscari`), cantitatea, data, operatorul și referința („Mișcarea nr. N”, link `/miscari/{id}`); stare goală și eroare cu „Reîncearcă”.
+- **2.3 — Context de navigare**: `Services/ListNavigationContext.cs` (`BeneficiaryProjectListState`, `ListNavigationContext`, scoped) și `wwwroot/navigation-context.js`. Filtrul și pagina listei de proiecte sunt în adresa `/beneficiari/{id}?q=…&pagina=…` (înlocuită cu `replace: true`, deci Înapoi din browser le restaurează), iar linkul „înapoi” din `ProjectPage` și redirecționarea după ștergerea proiectului folosesc ultima stare memorată pe sesiune. Poziția de derulare se salvează în `sessionStorage` la clic pe un link `a[data-restore-scroll]` și se restaurează o singură dată (cel mult 30 de minute). Starea din adresă se citește doar la deschiderea paginii, ca să nu suprascrie textul tastat.
+- **2.3 — Registrul jurnalului**: `AuditNavigation.EditUrl` leagă observațiile (adăugare/editare) de `/observatii/{id}`; `ProjectObservationRedirect.razor` rezolvă observația și redirecționează către `/proiecte/{projectId}/observatii/{id}`. `ProjectNavigation` (în `Services/Projects.cs`) centralizează rutele.
+- **2.5 — Evenimente de modificare** (`Services/ChangeFeed.cs`): `ChangeEvent` (tip, acțiune, id, proiect/observație/beneficiar, `Origin`, moment UTC), `IChangeFeed`/`InProcessChangeFeed` (singleton, abonați izolați: o eroare într-un abonat nu afectează publicarea), `ChangeOrigin` (scoped, identifică sesiunea) și decoratorii `ChangeNotifyingProjectRepository` / `ChangeNotifyingProjectFileStore`, înregistrați în `Program.cs` peste implementările SQLite/MariaDB. Publicarea se face după commit, nu la operații respinse; mutarea unui proiect notifică ambii beneficiari; ștergerea unui fișier nu cunoaște observația (se adresează după id), deci paginile o tratează ca relevantă. `ProjectChanges` decide ce pagină este afectată.
+- **Pagini abonate**: `BeneficiaryDetail`, `ProjectPage`, `ProjectObservationPage` reîmprospătează pe loc pentru modificările altor sesiuni (evenimentele propriei sesiuni sunt ignorate). Un formular sau dialog deschis nu este înlocuit: pagina afișează un `info-banner` („…modificat/șters de alt utilizator…”), iar verificarea versiunii rămâne protecția finală. Task 8 trebuie doar să publice în același feed.
+- **Lacună reparată**: încărcarea unui fișier într-o observație nu scria nimic în jurnal, deși TODO-ul o dădea drept finalizată. `SqliteProjectFileStore.SaveAsync` scrie acum evenimentul „Adăugare” (`FisierObservatie`) în aceeași tranzacție cu inserarea; `MariaProjectFileStore` (parametru nou `IAuditTrail`) îl scrie după inserare. Detaliile conțin numele fișierului, observația, tipul, dimensiunea și autorul, nu conținutul.
+- **Documentație**: `TODO.md` (Task 2 mutat în „Taskuri finalizate”, dependențele actualizate, notă în Task 3 și Task 8), `VALIDARE.md`, `docs/PROJECT_STATE.md`.
 
 ## Ultimele modificări funcționale (ciclul Claude — Task 1)
 
@@ -51,15 +63,16 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 ## Decizii și limitări
 
 - Nivelul de autorizare pentru proiecte/observații/fișiere reutilizează `EnsureBeneficiaryOperatorAsync`, consecvent cu regula existentă pentru beneficiari.
-- Registrul de rute al jurnalului (`AuditNavigation.EditUrl`) leagă doar proiectele de pagina lor; observațiile rămân cu țintă text (necesită un identificator compus proiect+observație, netratat încă generic).
-- Restaurarea paginii/filtrului/poziției la revenirea din pagina proiectului nu este implementată.
-- Pagina „Echipamente” este doar stare goală; citirea efectivă a mișcărilor de stoc așteaptă modulul de intrări/ieșiri.
-- MariaDB: tabelele proiectelor nu au fost testate pe un server real. Coloana `io.id_project` (contractul mișcare–proiect) este amânată până la implementarea modulului de stoc; până atunci, ștergerea unui proiect pe MariaDB nu verifică mișcări de stoc asociate (SQLite o face, prin `stock_movements.project_id`).
-- Sincronizarea cu Task 8 (evenimente de modificare, păstrarea formularelor deschise) este explicit amânată, conform TODO.
+- Registrul de rute al jurnalului (`AuditNavigation.EditUrl`) leagă proiectele (`/proiecte/{id}`), observațiile (`/observatii/{id}`, redirecționare către pagina din proiect) și mișcările de stoc (`/miscari/{id}`); fișierele nu au pagină proprie. Task 3 va generaliza registrul pentru produse, beneficiari și utilizatori.
+- Restaurarea contextului listei de proiecte depinde de adresă (filtru, pagină) și de `sessionStorage` (poziția de derulare); la o reîncărcare completă a aplicației, linkul „înapoi” al proiectului revine la lista neafiltrată (starea per sesiune se pierde), dar Înapoi din browser păstrează adresa cu filtrul.
+- MariaDB: tabelele proiectelor și ale mișcărilor nu au fost testate pe un server real; ștergerea unui proiect verifică `io.id_project` (Task 1).
+- Feed-ul de modificări este în proces (un singur server); notificările între servere diferite sau modificările făcute direct în baza de date vin odată cu Task 8. Ștergerea unui fișier publică un eveniment fără observație (adresare după id), deci paginile de proiect/observație se reîmprospătează la orice ștergere de fișier.
+- Încărcarea fișierelor din interfață apelează `IProjectFileStore.SaveAsync` fără verificare de autorizare în magazinul de fișiere (pagina cere autentificare); de verificat la Task 3/8 dacă se dorește aceeași protecție ca la ștergere.
 - Fișierele acceptate: imagini, PDF, Office, text/CSV, verificate prin semnătura conținutului unde există una binară fiabilă; tipurile fără semnătură (Office/CSV/text) cad pe verificarea tipului declarat, dacă acesta e deja pe lista acceptată.
 
 ## Validare
 
+- Ciclul curent (Task 2 / 2.3–2.5): build Release 0 avertismente, 0 erori; `BlazorStoc.Checks` — 312 verificări trecute (285 dinainte + 27 noi: evenimente pentru fiecare operație și niciunul pentru operații respinse, identificatori fără date sensibile, abonați care eșuează, filtrarea pe pagini, auditul încărcării fișierelor, rutele observațiilor, starea listei de proiecte). Browser, `http://127.0.0.1:5082`, două tab-uri, sesiune autentificată de utilizator: filtrul în adresă fără pierderea caracterelor tastate, linkul „înapoi” cu filtrul, Înapoi din browser cu filtrul și poziția de derulare (y=120) restaurate o singură dată, „Echipamente” goală și cu o ieșire asociată, ieșire cu proiect din formularul mișcărilor, linkul observației din jurnal (`/observatii/3` → pagina proiectului) și `/observatii/99999` („Observația nu mai există”), reîmprospătarea live a listei de proiecte și a observațiilor din alt tab, notificarea peste un formular de editare deschis (textul local a rămas). Datele de test (proiect, observații, ieșirea de stoc) au fost șterse prin fluxul normal (arhivate); stocul produsului 1 a revenit la 12. Neverificat manual: paginarea listei de proiecte (peste 10) și reîmprospătarea paginii observației la ștergerea proiectului de către altă sesiune (acoperite de verificările de filtrare); MariaDB neverificat pe server real. Preview repornit din contul `Alex`.
 - Build Release: 0 avertismente, 0 erori (proiect principal și `BlazorStoc.Checks`).
 - Task 1: `BlazorStoc.Checks` — 285 de verificări trecute (234 dinainte; 51 noi: domeniu, stoc atomic cu 8 adăugări simultane, editare/ștergere/istoric, arhivare, audit, ordonare/filtrare/paginare, `GetForProject`, migrarea SQLite, baseline). Browser (5082, desktop, 375 și 768 px): adăugare, ieșire cu beneficiar, editare cu motiv, `[*]`, istoric prin click dreapta, ștergere în doi pași, jurnal, `/miscari/<id>`, `/produse?sterge=<id>`. Neexersate manual: ieșire cu proiect, filtru/sortare/paginare în browser. MariaDB neverificat pe un server real. Preview-ul a fost oprit și repornit de mine (cont `Alex`) pentru fiecare build; datele demo au primit mișcări (baseline „Stoc initial” pentru produsele cu stoc; o mișcare de test a fost adăugată și ștearsă în arhivă).
 - `BlazorStoc.Checks`: 234 de verificări trecute (229 dinainte de Task 0; +5 net: produs nou cu stoc 0, editare care păstrează stocul, diferență de stoc în instantaneu, `CheckCurrent`, comportamentul SQLite; eliminată verificarea „stoc inițial negativ”).
@@ -80,7 +93,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este Task 2 / **Subtask 2.4 — Pagina „Echipamente” citește mișcările de stoc** din `TODO.md` (deblocat: `IStockMovementRepository.GetForProjectAsync` există). Alternativ: Task 2 / **Subtask 2.3 — Restaurarea contextului de navigare și registrul jurnalului** din `TODO.md` (cele mai mici bucăți rămase din Task 2), sau Task 4 („Identificarea beneficiarului cu CUI duplicat”), care nu mai depinde de nimic neterminat.
+Următorul agent este **Codex**. Task 2 este complet. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este **Task 4 — Identificarea beneficiarului cu CUI duplicat** (nu depinde de nimic neterminat), apoi **Task 3 — Navigarea din jurnal către pagina obiectului** (proiectele, observațiile și mișcările sunt deja în registrul de rute) și **Task 5** (confirmarea salvărilor).
 
 ## Fișiere de orientare
 

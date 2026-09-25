@@ -1,0 +1,46 @@
+@page "/observatii/{Id:int}"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProjectRepository Repository
+@inject NavigationManager Navigation
+@inject ILogger<ProjectObservationRedirect> Logger
+
+<PageTitle>Observație · BlazorStoc</PageTitle>
+<a class="nav-back" href="/beneficiari"><span>←</span> Beneficiari</a>
+@if (missing)
+{
+    <div class="empty-state"><span class="empty-icon">▦</span><h3>Observația nu mai există</h3><p>Observația a fost ștearsă (mutată în arhivă) sau linkul nu este valid.</p><a class="refresh" href="/beneficiari">Înapoi la beneficiari</a></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error</div>
+}
+else
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se deschide pagina observației</h3></div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private bool missing;
+    private string? error;
+
+    // Audit events store the observation id; resolve it to the project page that owns the observation.
+    protected override async Task OnParametersSetAsync()
+    {
+        missing = false; error = null;
+        try
+        {
+            var observation = await Repository.GetObservationAsync(Id);
+            if (observation is null) missing = true;
+            else Navigation.NavigateTo(ProjectNavigation.ObservationPageUrl(observation.ProjectId, observation.Id), replace: true);
+        }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Observation lookup failed ({ErrorType}).", exception.GetType().Name);
+            error = "Observația nu a putut fi deschisă. Verifică serverul și reîncearcă.";
+        }
+    }
+}

@@ -242,3 +242,4 @@
 .movement-history-list { list-style:none; margin:0 0 12px; padding:0; display:grid; gap:12px; font-size:13px; }
 .movement-history-list li { border-left:3px solid var(--line); padding-left:12px; overflow-wrap:anywhere; }
 @media (max-width:900px) { .movement-layout { grid-template-columns:1fr; } .movement-date { flex:1 1 100%; } }
+.info-banner { background:#eef4f8; color:#2c5673; border:1px solid #c6d9e6; border-radius:8px; padding:15px 18px; margin-bottom:20px; }
