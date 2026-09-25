@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Confirmare decizii: cantitate partiala si transfer masina-masina doar din pagina vehiculului",
     "startedAtUtc":  "2026-09-25T12:01:54.2181043Z",
     "completedAtUtc":  "2026-09-25T12:01:54.5125492Z",
