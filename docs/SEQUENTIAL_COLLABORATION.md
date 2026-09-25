@@ -1,5 +1,7 @@
 # Colaborare secvențială Codex–Claude
 
+> **Actualizare 25 septembrie 2026:** protocolul secvential nu mai este activ. Claude conduce proiectul singur (`mode: claude_only`); scriptul `tools/agent-cycle.ps1` ramane pentru delimitarea taskurilor, jurnal si commit, fara predare catre alt agent. Restul documentului descrie protocolul anterior, pastrat ca istoric si pentru o eventuala revenire.
+
 ## Stare operațională curentă
 
 Colaborarea secvențială Codex–Claude este activă. Următorul ciclu este predat lui Claude după commitul de handoff curent; agenții continuă apoi să alterneze, fără lucru simultan.

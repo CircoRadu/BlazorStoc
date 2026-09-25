@@ -2,6 +2,8 @@
 
 Acest proiect folosește colaborare strict secvențială între Claude și Codex. Claude nu lucrează niciodată simultan cu Codex.
 
+> **Actualizare 25 septembrie 2026 (prevaleaza asupra restului acestui fisier):** Claude este agentul principal si singurul agent activ al proiectului; predarea catre Codex a fost eliminata. `.collaboration/state.json` are `mode: claude_only`, deci `nextAgent` ramane `claude`, iar `agent-cycle.ps1 finish` nu mai preda catre alt agent (nu mai sunt necesare commituri de schimbare a ordinii). Un task ramane un ciclu (`start` ... `finish`) care se incheie cu un commit. Referirile de mai jos la Codex, la predare si la `nextAgent: codex` sunt istorice.
+
 ## Înainte de orice modificare
 
 1. Citește `docs/SEQUENTIAL_COLLABORATION.md`, `docs/PROJECT_STATE.md`, `TODO.md` și ultimele intrări din `docs/AGENT_CHANGELOG.md`.

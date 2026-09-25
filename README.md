@@ -4,6 +4,8 @@
 
 Dezvoltarea folosește cicluri strict secvențiale Codex–Claude: agentul activ modifică proiectul, verifică, documentează, face commit și se oprește înainte ca celălalt agent să preia lucrul. Protocolul complet este în [`docs/SEQUENTIAL_COLLABORATION.md`](docs/SEQUENTIAL_COLLABORATION.md), iar starea curentă este în [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md).
 
+> Din 25 septembrie 2026 dezvoltarea este condusa de Claude, fara predare catre Codex (`mode: claude_only` in `.collaboration/state.json`); textul de mai sus descrie protocolul anterior.
+
 Migrarea ESP_Stoc: CRUD produse, beneficiari și utilizatori web, două niveluri de acces, catalog, căutare, filtre, paginare și detalii. Interfața este în română, exclusiv pentru browser pe calculator (lățime recomandată minimum 1100 px). Versiunea mobilă nu face parte din această etapă.
 
 Blazor Web App / Interactive Server, .NET 9, MySqlConnector 2.6.2. Aplicația rulează direct cu .NET, fără Docker. Conexiunea interactivă necesită WebSockets sau fallback SignalR și conectivitate continuă.

@@ -2,6 +2,8 @@
 
 Acest proiect folosește colaborare strict secvențială între Codex și Claude. Codex nu lucrează niciodată simultan cu Claude.
 
+> **Actualizare 25 septembrie 2026:** Claude este acum agentul principal si singurul activ (`mode: claude_only` in `.collaboration/state.json`). Codex nu preia cicluri decat la cererea explicita a utilizatorului, care schimba atunci `mode` si `nextAgent` in `.collaboration/state.json`.
+
 ## Înainte de orice modificare
 
 1. Citește `docs/SEQUENTIAL_COLLABORATION.md`, `docs/PROJECT_STATE.md`, `TODO.md` și ultimele intrări din `docs/AGENT_CHANGELOG.md`.
