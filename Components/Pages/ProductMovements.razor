@@ -262,8 +262,8 @@ else
                 <ol class="movement-history-list">
                     @foreach (var entry in history)
                     {
-                        <li><strong>@entry.TimestampUtc.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</strong> · @entry.Actor
-                            <div>@entry.Changes</div>
+                        <li><strong>@entry.TimestampUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</strong> · @entry.Actor
+                            <div>@StockMovementRules.NormalizeDisplayDates(entry.Changes)</div>
                             <div class="muted">Motiv: @entry.Reason</div></li>
                     }
                 </ol>

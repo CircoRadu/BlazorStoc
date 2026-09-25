@@ -267,3 +267,10 @@ Verificat la 25 septembrie 2026.
 - Browser pe 5082 (SQLite, administrator): părăsire fără modificări = fără popup; cu modificări, popup pentru link din meniu, antet de categorie, „Închide”/„Anulează”, „Deconectare”, `history.back()` și formularul de mișcare; „Înapoi la editare” păstrează valorile și focusul; „Părăsește” navighează, revine în istoric sau deschide dialogul de deconectare; `product_locks` gol după părăsire; texte diferite la adăugare (beneficiar) și editare (produs).
 - Defect găsit prin verificare: routerul aplicației nu raportează Înapoi către `NavigationLock`, deci intercepția Înapoi/Înainte este făcută în `leave-guard.js` (intrări de istoric etichetate, mutarea anulată și repetată după răspuns).
 - Neverificat: vezi `docs/TESTE_RAMASE.md` (C10).
+
+## Datele afișate ca dd.mm.yyyy (25 septembrie 2026)
+
+- Regulă de dezvoltare nouă (`CLAUDE.md`, `AGENTS.md`, `TODO.md`, `README.md`): orice dată afișată este `dd.mm.yyyy`. Corectate: câmpul „Data mișcării” (text și indiciu `zz.ll.aaaa`), tabelul, dialogurile și istoricul mișcărilor, jurnalul (texte vechi normalizate la afișare).
+- `io_data` (MariaDB) păstrează `dd-MM-yyyy` prin `StockMovementRules.LegacyDate`; SQLite păstrează `yyyy-MM-dd`.
+- `BlazorStoc.Checks` 410 verificări; browser pe 5082: câmpul de dată `25.09.2026`, tabelul `24.09.2026`, jurnalul fără date în alt format.
+- Neverificat: calendarul nativ al browserului (limba browserului).

@@ -5,7 +5,7 @@
    browser's calendar, opened by a hidden native date input (see wwwroot/date-pick-only.js). *@
 <div class="pick-date">
     <input id="@Id" type="text" readonly class="pick-date-text" data-pick-date value="@Display"
-           placeholder="zz-ll-aaaa" autocomplete="off" aria-haspopup="dialog"
+           placeholder="zz.ll.aaaa" autocomplete="off" aria-haspopup="dialog"
            aria-describedby="@(Id)-hint" disabled="@Disabled" />
     <input type="date" class="pick-date-native" tabindex="-1" aria-hidden="true" disabled="@Disabled"
            min="@Min" max="@Max" value="@Iso" @onchange="OnPickedAsync" />
@@ -20,7 +20,7 @@
     [Parameter] public string? Max { get; set; }
     [Parameter] public bool Disabled { get; set; }
 
-    private string Display => Value is { } date ? date.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture) : string.Empty;
+    private string Display => Value is { } date ? date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) : string.Empty;
     private string Iso => Value is { } date ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : string.Empty;
 
     private async Task OnPickedAsync(ChangeEventArgs args)

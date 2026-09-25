@@ -66,7 +66,17 @@ public static class StockMovementRules
 
     public static int Effect(StockMovementKind kind, int quantity) => kind == StockMovementKind.Entry ? quantity : -quantity;
     public static string KindLabel(StockMovementKind kind) => kind == StockMovementKind.Entry ? "Intrare" : "Ieșire";
-    public static string DisplayDate(DateOnly date) => date.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+    // Every date shown to the user is dd.MM.yyyy (development rule). The legacy database column io_data keeps its own
+    // dd-MM-yyyy text (LegacyDate); it is never shown.
+    public static string DisplayDate(DateOnly date) => date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
+    public static string LegacyDate(DateOnly date) => date.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+
+    // Journal and history texts written before the rule hold movement dates as dd-MM-yyyy; they are shown as dd.MM.yyyy.
+    // Only real calendar dates are rewritten (a code such as 99-99-2020 stays as it is).
+    public static string NormalizeDisplayDates(string? text) => string.IsNullOrEmpty(text) ? text ?? string.Empty
+        : System.Text.RegularExpressions.Regex.Replace(text, @"(?<!\d)(\d{2})-(\d{2})-(\d{4})(?!\d)", match =>
+            DateOnly.TryParseExact(match.Value, "dd-MM-yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                ? DisplayDate(date) : match.Value);
     public static string StorageDate(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     public static DateOnly ParseStorageDate(string value) => DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture);
     public static DateOnly ParseLegacyDate(string value) => DateOnly.ParseExact(value.Trim(), "dd-MM-yyyy", CultureInfo.InvariantCulture);

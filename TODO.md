@@ -44,7 +44,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 
 - „Valoare reală” rămâne **goală** (se completează manual la numărare).
 - Produsele cu **stoc negativ rămân** în situație și când opțiunea „stoc 0” este bifată; textul lor din tabelul generat este scris cu **roșu**.
-- „Generat la” folosește momentul (timestamp-ul) în care se generează formularul, convertit la **ora locală**, în forma `dd/mm/aaaa` și ora (`oo:mm`).
+- „Generat la” folosește momentul (timestamp-ul) în care se generează formularul, convertit la **ora locală**, în forma `dd.mm.aaaa` și ora (`oo:mm`).
 - Fontul este **gratuit** (licență liberă de redistribuire, cu diacritice românești). Numele categoriilor și ale subcategoriilor sunt **bold, mărime 14**; restul textului este normal, **mărime 12**.
 - Generarea situației se **jurnalizează**, cu utilizatorul care a generat-o.
 - Meniul principal: sub „Inventar” există intrarea **„Generare situație inventar”** (duce la pagina descrisă aici) și intrarea **„Preluare inventar”** (funcționalitate care se implementează ulterior; aici există doar intrarea, cu **pagină de rezervă**).
@@ -87,7 +87,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 
 ### Subtask 4.5 — Conținutul și aspectul fișierului PDF
 
-- [ ] Prima pagină are titlul „Inventar” și, sub el, „Generat la: zz/ll/aaaa oo:mm”, calculat din momentul generării (UTC) convertit la ora locală (aceeași convenție de timp local ca în restul aplicației, adică ora serverului).
+- [ ] Prima pagină are titlul „Inventar” și, sub el, „Generat la: zz.ll.aaaa oo:mm”, calculat din momentul generării (UTC) convertit la ora locală (aceeași convenție de timp local ca în restul aplicației, adică ora serverului).
 - [ ] Pentru fiecare categorie selectată (integral sau parțial): o etichetă cu numele categoriei; sub ea, pentru fiecare subcategorie selectată a categoriei: o etichetă cu numele subcategoriei și un tabel cu antetul **Cod produs | Valoare stoc | Valoare reală**. Secțiunile și tabelele sunt generate numai din opțiunile selectate: categoriile fără nicio subcategorie selectată nu apar, subcategoriile fără produse rămase (inclusiv după eliminarea stocului 0) sunt omise împreună cu tabelul lor, iar o categorie fără nicio subcategorie rămasă este omisă.
 - [ ] „Cod produs” conține codul produsului (fără identificatorul tehnic `#<id>`); „Valoare stoc” conține cantitatea din stocul calculat din mișcări la momentul generării (număr întreg, valorile negative afișate ca atare); „Valoare reală” este **goală**, cu spațiu suficient pentru scrierea de mână.
 - [ ] Un produs cu **stoc negativ** are **întregul rând** scris cu **roșu** (codul, valoarea stocului și celula „Valoare reală”, care rămâne goală); celelalte rânduri sunt negre. Culoarea nu este singurul indicator: valoarea negativă se recunoaște și după semnul minus.
@@ -112,7 +112,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 ### Subtask 4.8 — Verificări
 
 - [ ] Teste automate pentru logica selecției: selectare/deselectare categorie ↔ subcategorii, stare nedeterminată, „toate categoriile”, apăsare pe caseta nedeterminată, categorii fără subcategorii.
-- [ ] Teste automate pentru construirea situației: doar selecția făcută, eliminarea stocului 0 (stocul negativ rămâne și este marcat pentru roșu), omiterea secțiunilor goale, ordinea categoriilor/subcategoriilor/produselor, stoc calculat din mișcări (inclusiv un produs cu mișcări), respingerea identificatorilor inexistenți, selecție goală, formatul „zz/ll/aaaa oo:mm” al momentului generării (conversie din UTC la ora locală, inclusiv schimbarea orei de vară).
+- [ ] Teste automate pentru construirea situației: doar selecția făcută, eliminarea stocului 0 (stocul negativ rămâne și este marcat pentru roșu), omiterea secțiunilor goale, ordinea categoriilor/subcategoriilor/produselor, stoc calculat din mișcări (inclusiv un produs cu mișcări), respingerea identificatorilor inexistenți, selecție goală, formatul „zz.ll.aaaa oo:mm” al momentului generării (conversie din UTC la ora locală, inclusiv schimbarea orei de vară).
 - [ ] Test de generare PDF: fișierul începe cu `%PDF`, are cel puțin o pagină, conține textele „Inventar”, „Generat la:”, numele categoriei și subcategoriei, antetul „Cod produs / Valoare stoc / Valoare reală” și un cod cu diacritice (extragere de text din PDF în test); numele de categorie/subcategorie folosesc fontul bold de 14, restul fontul normal de 12 (verificat din structura documentului generat); un catalog mare (de exemplu 300 de produse) produce mai multe pagini cu antet repetat; un rând cu stoc negativ este scris cu roșu.
 - [ ] Test pentru jurnalizare: o generare reușită scrie exact un eveniment cu utilizatorul, rezumatul cererii și numele fișierului, fără date de produse; o cerere respinsă sau fără produse nu scrie nimic.
 - [ ] Verificare în browser (mod demonstrativ): meniul „Inventar” extins cu cele două intrări și evidențierea corectă; selectarea unei categorii, a unei subcategorii, a tuturor, starea nedeterminată, opțiunea „stoc 0”, dezactivarea butonului fără selecție; descărcarea fișierului și deschiderea lui într-un cititor PDF (conținutul comparat cu pagina și cu stocul din „Produse și stocuri”, inclusiv un produs cu stoc negativ în roșu); evenimentul apare în Jurnal cu utilizatorul; „Preluare inventar” afișează pagina de „va fi implementată ulterior”; la 375 și 768 px fără depășire orizontală.
@@ -125,7 +125,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - Fiecare categorie și subcategorie are o casetă de selectare; categoria se propagă la subcategorii, iar starea parțială este nedeterminată; „Selectează toate categoriile” selectează sau deselectează tot.
 - „Elimină din situația de inventar produsele cu stoc 0” exclude din PDF produsele cu stoc zero; produsele cu stoc negativ rămân și sunt scrise cu roșu.
 - „Generează situația de inventar” este dezactivat fără selecție și generează un PDF pentru selecția făcută.
-- PDF-ul are pe prima pagină „Inventar” și „Generat la: zz/ll/aaaa oo:mm” (ora locală a momentului generării), apoi, pentru fiecare categorie selectată, eticheta categoriei, eticheta fiecărei subcategorii selectate și un tabel „Cod produs | Valoare stoc | Valoare reală”, numai cu produsele rezultate din opțiunile alese; „Valoare reală” este goală.
+- PDF-ul are pe prima pagină „Inventar” și „Generat la: zz.ll.aaaa oo:mm” (ora locală a momentului generării), apoi, pentru fiecare categorie selectată, eticheta categoriei, eticheta fiecărei subcategorii selectate și un tabel „Cod produs | Valoare stoc | Valoare reală”, numai cu produsele rezultate din opțiunile alese; „Valoare reală” este goală.
 - Numele categoriilor și subcategoriilor sunt bold de 14; restul textului este normal de 12; fontul este gratuit și include diacriticele românești, care se văd corect.
 - Tabelele continuă pe pagini cu antet repetat; nu rămân etichete singure la sfârșit de pagină.
 - Stocul din PDF coincide cu stocul afișat în „Produse și stocuri” la momentul generării.
@@ -143,6 +143,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - Schema bazei de date și scripturile aferente se stabilesc în etapa dedicată integrării MariaDB.
 - Implementarea trebuie să rămână complet asincronă.
 - Toate mesajele afișate utilizatorului sunt în limba română (regula din Task 2).
+- Toate datele calendaristice afișate utilizatorului au forma `dd.mm.yyyy` (de exemplu `25.09.2026`; cu oră: `25.09.2026 14:08`), în orice pagină, dialog, jurnal, mesaj sau document generat. Formatele interne (`yyyy-MM-dd` în SQLite, `dd-MM-yyyy` în coloana existentă `io_data` din MariaDB, adresele URL) nu se afișează; se folosesc `StockMovementRules.DisplayDate` și formatul `dd.MM.yyyy`.
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
@@ -1019,3 +1020,15 @@ Implementat la 25 septembrie 2026 de Claude. `Services/UnsavedChanges.cs` (`Unsa
 - [x] Teste automate: 21 de verificări noi (nemodificat, modificat, revenire, „Înapoi”, „Părăsește” doar pentru formularele modificate, `Rebase`, dispariția trackerului, motivarea ignorată, imagine și parolă, textul de adăugare/editare).
 - [x] Verificat în browser (modul demonstrativ, contul administrator, `http://127.0.0.1:5082`): formular nemodificat părăsit fără întrebare; formular modificat + link din meniu, antet de categorie, „Închide”/„Anulează”, „Deconectare”, Înapoi al browserului și mișcare de stoc (formularul de adăugare); „Înapoi la editare” păstrează valorile; „Părăsește” navighează (cu reîncărcare pentru antetul de categorie), deschide dialogul de deconectare sau revine la pagina anterioară; lock-ul produsului editat este eliberat; textele diferă între adăugare (beneficiar) și editare (produs).
 - Neverificat (trecut în `docs/TESTE_RAMASE.md`): dialogul nativ la închiderea/reîncărcarea tabului cu un formular modificat, dialogul de editare a mișcării și formularele din pagina proiectului și a observației în browser, tastatura și cititorul de ecran, Înainte al browserului, mutări de mai mulți pași în istoric.
+
+## Finalizat la 25.09.2026 14:13 — Datele calendaristice afișate ca dd.mm.yyyy
+
+**Data și ora implementării:** 25.09.2026 14:13 (ora locală).
+
+Cerere a utilizatorului: regulă de dezvoltare și corectarea interfeței. Regula este scrisă în `CLAUDE.md`, `AGENTS.md`, în „Observații pentru etapa de implementare” și în `README.md`. `Services/StockMovements.cs` (`DisplayDate` = `dd.MM.yyyy`, `LegacyDate` = `dd-MM-yyyy` numai pentru coloana `io_data`, `NormalizeDisplayDates`), `Services/MariaStockMovementRepository.cs`, `Services/ProductLocks.cs`, `Components/Shared/PickOnlyDate.razor` (text și indiciu `zz.ll.aaaa`), `Components/Pages/ProductMovements.razor`, `Components/Pages/Audit.razor`.
+
+- [x] Câmpul „Data mișcării”, tabelul intrărilor/ieșirilor, titlurile și dialogurile mișcărilor, rezumatele de salvare, istoricul unei mișcări și textele din jurnal arată `dd.mm.yyyy` (cu oră: `dd.mm.yyyy hh:mm`); paginile care aveau deja `dd.MM.yyyy` (jurnal, proiecte, observații) au rămas neschimbate.
+- [x] Scrierea în MariaDB rămâne compatibilă cu aplicația existentă: `io_data` păstrează textul `dd-MM-yyyy`; SQLite păstrează `yyyy-MM-dd`.
+- [x] Textele din jurnal și din istoricul mișcărilor scrise înainte de regulă (`dd-MM-yyyy`) sunt afișate `dd.MM.yyyy` (doar date calendaristice reale; restul textului rămâne neschimbat).
+- [x] Testat: `BlazorStoc.Checks` 410 (formatul, formatul legacy și normalizarea textelor vechi); browser pe 5082: câmpul de dată, tabelul mișcărilor și jurnalul fără date în alt format.
+- Neverificat: calendarul nativ al browserului (fereastra de alegere) folosește formatul limbii browserului, care nu poate fi controlat din aplicație; documentul PDF al inventarului urmează aceeași regulă (`zz.ll.aaaa`, trecută în taskul activ).

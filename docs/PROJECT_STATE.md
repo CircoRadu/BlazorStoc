@@ -32,6 +32,11 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 
 - La cererea utilizatorului s-a creat `docs/TESTE_RAMASE.md`: fiecare verificare neefectuată până acum (MariaDB pe un server real, mai multe calculatoare și conturi, editoarele neexersate în browser, tastatură/cititor de ecran, alte browsere și dispozitive tactile, funcționare îndelungată) cu motivul (M1–M6), pașii, rezultatul așteptat și sursa. Testele efectuate se mută în secțiunea „Teste efectuate” a aceluiași fișier. `CLAUDE.md` și `AGENTS.md` cer acum explicit actualizarea acestui fișier când o verificare nu poate fi efectuată sau una din listă este efectuată.
 
+## Regula datelor `dd.mm.yyyy`
+
+- La cererea utilizatorului: regulă de dezvoltare (în `CLAUDE.md`, `AGENTS.md`, `TODO.md`, `README.md`) — toate datele afișate au forma `dd.mm.yyyy`. `StockMovementRules.DisplayDate` este acum `dd.MM.yyyy`; scrierea în `io_data` (MariaDB) folosește `LegacyDate` (`dd-MM-yyyy`), deci compatibilitatea cu aplicația veche rămâne. `PickOnlyDate`, istoricul mișcărilor și jurnalul (texte vechi normalizate prin `NormalizeDisplayDates`) au fost corectate. Task PDF-ul de inventar folosește `zz.ll.aaaa`.
+- Validare: build Release 0 avertismente; `BlazorStoc.Checks` 410; browser pe 5082. Neverificat: calendarul nativ al browserului.
+
 ## Ultimele modificări funcționale (ciclul Claude — avertizarea la părăsirea editării)
 
 Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 1”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`. La cererea utilizatorului, Task 1 a fost redus la avertizarea la părăsirea unei editări nesalvate (blocarea generalizată și deblocarea cu ieșire din pagină au fost scoase din TODO; problema raportată cu lock-ul produsului nu s-a mai manifestat).

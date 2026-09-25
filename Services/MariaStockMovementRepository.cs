@@ -110,7 +110,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                 VALUES(@user,@product,@beneficiary,@project,@kind,@quantity,@description,@date,0,@created,@created)
                 """, ("@user", userId), ("@product", productId), ("@beneficiary", value.BeneficiaryId ?? 0),
                 ("@project", value.ProjectId), ("@kind", (int)value.Kind), ("@quantity", value.Quantity),
-                ("@description", value.Description), ("@date", StockMovementRules.DisplayDate(value.Date!.Value)), ("@created", now));
+                ("@description", value.Description), ("@date", StockMovementRules.LegacyDate(value.Date!.Value)), ("@created", now));
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var id = checked((int)insert.LastInsertedId);
             var movement = new StockMovement(id, productId, value.Kind, value.Quantity!.Value, value.Date.Value, value.Description,
@@ -149,7 +149,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                 UPDATE io SET io_numar_bucati=@quantity,io_data=@date,io_descriere=@description,id_beneficiar=@beneficiary,
                     id_project=@project,io_versiune=@version,io_updated_utc=@updated
                 WHERE id_io=@id AND io_versiune=@oldVersion
-                """, ("@quantity", updated.Quantity), ("@date", StockMovementRules.DisplayDate(updated.Date)),
+                """, ("@quantity", updated.Quantity), ("@date", StockMovementRules.LegacyDate(updated.Date)),
                 ("@description", updated.Description), ("@beneficiary", updated.BeneficiaryId ?? 0), ("@project", updated.ProjectId),
                 ("@version", updated.Version), ("@updated", now), ("@id", current.Id), ("@oldVersion", current.Version)))
                 if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
@@ -159,7 +159,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                 VALUES(@user,@movement,@product,@changes,@date,@reason,@timestamp)
                 """, ("@user", userId), ("@movement", current.Id), ("@product", productCode),
                 ("@changes", StockMovementRules.HistorySummary(current, updated, correction)),
-                ("@date", StockMovementRules.DisplayDate(DateOnly.FromDateTime(now))), ("@reason", value.Reason),
+                ("@date", StockMovementRules.LegacyDate(DateOnly.FromDateTime(now))), ("@reason", value.Reason),
                 ("@timestamp", now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))))
                 await history.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var stock = await ApplyStockAsync(connection, transaction, current.ProductId, correction, cancellationToken).ConfigureAwait(false);

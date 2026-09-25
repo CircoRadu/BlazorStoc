@@ -58,7 +58,7 @@
                     {
                         <strong>@target</strong>
                     }
-                </td><td class="audit-details"><span>Descriere modificare: <em>@entry.Details</em></span><span>Motiv: <em>@(string.IsNullOrWhiteSpace(entry.Motif) ? "—" : entry.Motif)</em></span></td>
+                </td><td class="audit-details"><span>Descriere modificare: <em>@(entry.EntityType == AuditEntities.StockMovement ? StockMovementRules.NormalizeDisplayDates(entry.Details) : entry.Details)</em></span><span>Motiv: <em>@(string.IsNullOrWhiteSpace(entry.Motif) ? "—" : entry.Motif)</em></span></td>
             </tr>
         }
         </tbody></table></div>

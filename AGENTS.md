@@ -20,6 +20,7 @@ Acest proiect folosește colaborare strict secvențială între Codex și Claude
 - Nu rescrie și nu anula modificările lui Claude fără o cerere explicită.
 - Păstrează implementarea asincronă, fără Docker și fără integrare NAS în această etapă.
 - Nu genera fișiere SQL de upgrade separate; modificările de schemă sunt gestionate în proiect.
+- Toate datele calendaristice afișate utilizatorului au forma `dd.mm.yyyy` (de exemplu `25.09.2026`; cu oră: `25.09.2026 14:08`), în orice pagină, dialog, jurnal, mesaj sau document generat. Formatele interne (`yyyy-MM-dd` în SQLite, `dd-MM-yyyy` în coloana existentă `io_data` din MariaDB, adresele URL) nu se afișează; se folosesc `StockMovementRules.DisplayDate` și formatul `dd.MM.yyyy`.
 - După modificări funcționale, actualizează preview-ul local la `http://127.0.0.1:5082/`.
 - Actualizează `TODO.md` când starea taskurilor se schimbă, respectând „Regula de actualizare a TODO” din el (taskurile active se renumerotează; taskul finalizat se trece la sfârșitul fișierului cu data și ora implementării, detalii și o denumire succintă, fără „Task N”).
 - Când o verificare nu poate fi efectuată sau una din `docs/TESTE_RAMASE.md` este efectuată, actualizează `docs/TESTE_RAMASE.md` (motivul, pașii, rezultatul).

@@ -55,7 +55,7 @@ internal static class ProductLockAudit
     public static Task RecordForcedReleaseAsync(IAuditTrail? trail, IAccessControl? access, ProductLock removed, string productCode,
         string reason, CancellationToken cancellationToken) => AuditRecorder.RecordUnlockAsync(trail, access,
         removed.ProductId.ToString(CultureInfo.InvariantCulture), productCode,
-        $"Blocare eliberată forțat; editor: {removed.Owner}, din {removed.AcquiredUtc.ToLocalTime():dd-MM-yyyy HH:mm}", reason, cancellationToken);
+        $"Blocare eliberată forțat; editor: {removed.Owner}, din {removed.AcquiredUtc.ToLocalTime():dd.MM.yyyy HH:mm}", reason, cancellationToken);
 }
 
 public sealed class SqliteProductLockRepository(SqliteLocalStore store, IAccessControl? accessControl = null,

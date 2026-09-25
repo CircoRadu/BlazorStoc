@@ -730,3 +730,27 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 409 PASS (21 noi); browser pe 5082 (SQLite, administrator): fara modificari = fara popup; cu modificari popup la link, antet categorie, Inchide/Anuleaza, Deconectare, history.back, formular miscare; Inapoi pastreaza valorile si focusul; Paraseste navigheaza/revine/deschide dialogul de deconectare si elibereaza lock-ul produsului; texte diferite la adaugare si editare. Neverificat: dialog nativ la inchiderea tabului, dialogul de editare miscare si editorii din pagina proiectului in browser, tastatura, Inainte, mutari multi-pas (TESTE_RAMASE C10).
 - **Commit:** `claude: warn before leaving an edit form with unsaved changes (add/edit wording)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:13:42.1314625Z â€” claude
+
+- **Task:** Regula datelor dd.mm.yyyy si corectarea UI
+- **Rezumat:** La cererea utilizatorului: regula de dezvoltare Toate datele calendaristice afisate sunt dd.mm.yyyy, scrisa in CLAUDE.md, AGENTS.md, TODO.md (Observatii), README.md; TODO: taskul PDF inventar foloseste zz.ll.aaaa. UI corectat: StockMovementRules.DisplayDate = dd.MM.yyyy (campul Data miscarii si indiciul zz.ll.aaaa, tabelul, dialogurile, rezumatele de salvare, istoricul miscarilor, jurnalul), LegacyDate (dd-MM-yyyy) pastrat numai pentru coloana io_data din MariaDB (compatibilitate cu aplicatia veche), ProductLocks fara dd-MM-yyyy, texte vechi din jurnal si istoric normalizate la afisare (NormalizeDisplayDates, doar date reale). Intrare finalizata adaugata in TODO.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `Components/Pages/Audit.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Shared/PickOnlyDate.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `README.md`
+  - `Services/MariaStockMovementRepository.cs`
+  - `Services/ProductLocks.cs`
+  - `Services/StockMovements.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+- **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 410 PASS (formatul, formatul legacy, normalizarea); browser pe 5082: camp data 25.09.2026 cu indiciu zz.ll.aaaa, tabel 24.09.2026, jurnal fara date in alt format; pagini beneficiar, proiect, utilizatori fara date de afisat. Neverificat: calendarul nativ al browserului (limba browserului).
+- **Commit:** `claude: dates displayed as dd.mm.yyyy (development rule and UI fixes)`
+- **Predat cÄƒtre:** codex

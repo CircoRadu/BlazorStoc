@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 1: avertizare la parasirea unei pagini de editare cu modificari nesalvate",
-    "startedAtUtc":  "2026-09-25T10:50:28.7806442Z",
-    "completedAtUtc":  "2026-09-25T11:10:03.2097831Z",
-    "lastSummary":  "La cererea utilizatorului Task 1 a fost redus la avertizarea la parasirea unei pagini de editare cu modificari nesalvate (blocarea generalizata si deblocarea cu iesire din pagina au fost scoase din TODO). Serviciul UnsavedChanges (EditTracker per editor, instantaneu hash, Rebase dupa salvare, FormSnapshot fara motivare), componentele UnsavedChangesTracker/Host/Dialog, leave-guard.js rescris (linkuri, antete meniu, Deconectare, Inapoi/Inainte cu intrari de istoric etichetate) si NavigationLock pentru navigari din cod si dialogul nativ la inchiderea tabului. Popup verde Inapoi la editare / rosu Paraseste editarea, text diferit pentru adaugare si editare (cerere ulterioara), Escape = inapoi, focus restaurat. Aplicat editorilor produs, beneficiar, proiect, observatie, utilizator, categorii/subcategorii si formularelor din pagina produsului. Home nu mai are protectia veche. TODO: taskul finalizat mutat la sfarsit, restul renumerotat 1-4. README, VALIDARE, PROJECT_STATE, TESTE_RAMASE (C10) actualizate.",
-    "lastCommitSubject":  "claude: warn before leaving an edit form with unsaved changes (add/edit wording)",
+    "nextAgent":  "codex",
+    "currentTask":  "Regula datelor dd.mm.yyyy si corectarea UI",
+    "startedAtUtc":  "2026-09-25T11:11:20.0104737Z",
+    "completedAtUtc":  "2026-09-25T11:13:42.1314625Z",
+    "lastSummary":  "La cererea utilizatorului: regula de dezvoltare Toate datele calendaristice afisate sunt dd.mm.yyyy, scrisa in CLAUDE.md, AGENTS.md, TODO.md (Observatii), README.md; TODO: taskul PDF inventar foloseste zz.ll.aaaa. UI corectat: StockMovementRules.DisplayDate = dd.MM.yyyy (campul Data miscarii si indiciul zz.ll.aaaa, tabelul, dialogurile, rezumatele de salvare, istoricul miscarilor, jurnalul), LegacyDate (dd-MM-yyyy) pastrat numai pentru coloana io_data din MariaDB (compatibilitate cu aplicatia veche), ProductLocks fara dd-MM-yyyy, texte vechi din jurnal si istoric normalizate la afisare (NormalizeDisplayDates, doar date reale). Intrare finalizata adaugata in TODO.",
+    "lastCommitSubject":  "claude: dates displayed as dd.mm.yyyy (development rule and UI fixes)",
     "claudeStatus":  "active"
 }

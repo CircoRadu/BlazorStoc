@@ -138,3 +138,7 @@ Lucrul pentru NAS/QNAP, Docker și publicarea în containere rămân explicit î
 - Dacă ai modificat valori într-un formular de adăugare sau de editare (produs, beneficiar, proiect, observație, utilizator, categorie, subcategorie, mișcare de stoc) și pleci fără să salvezi, aplicația afișează un popup: „Editarea nu a fost finalizată” (sau „Adăugarea nu a fost finalizată”). „Înapoi la editare” (verde) păstrează formularul și valorile; „Părăsește editarea fără salvarea modificărilor” (roșu) renunță la modificări și execută acțiunea aleasă (link, meniu, „Înapoi” al browserului, „Deconectare”, „Anulează”/„Închide”).
 - Un formular nemodificat se părăsește fără întrebare. Închiderea sau reîncărcarea tabului folosește dialogul nativ al browserului.
 - Mecanismul este comun (`Services/UnsavedChanges.cs`, `UnsavedChangesTracker`/`UnsavedChangesHost`, `wwwroot/leave-guard.js`): un editor nou primește avertizarea prin `<UnsavedChangesTracker …>` în formular și `<UnsavedChangesHost />` în pagină.
+
+## Formatul datelor
+
+- Toate datele calendaristice afișate sunt `dd.mm.yyyy` (cu oră: `dd.mm.yyyy hh:mm`). Formatele interne (`yyyy-MM-dd` în SQLite, `dd-MM-yyyy` în coloana `io_data` din MariaDB) nu se afișează.
