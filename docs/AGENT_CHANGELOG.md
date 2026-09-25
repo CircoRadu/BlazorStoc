@@ -769,3 +769,26 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release 0 avertismente; browser pe 5082: inceputul antetului DATA coincide cu inceputul datelor la desktop, 375 si 768 px, celelalte antete aliniate cu continutul lor, fara depasire orizontala. Suita BlazorStoc.Checks neschimbata (410). Neverificat: tema inchisa (exista o singura tema).
 - **Commit:** `claude: align the Data header of the movements table`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:23:19.5525732Z â€” claude
+
+- **Task:** Task 1: mesaje exclusiv in limba romana
+- **Rezumat:** Mesaje exclusiv in limba romana. Mesajul in engleza la valoare negativa venea din validarea nativa a browserului: wwwroot/romanian-ui.js (App.razor si pagina de autentificare) o inlocuieste prin setCustomValidity cu mesaje romanesti si traduce dialogul implicit de reconectare Blazor (shadow DOM). Program.cs: UseRequestLocalization ro-RO, UseStatusCodePages romanesc (404/403/401/altele), mesaj romanesc la limitarea cererilor; Routes.razor cu NotFound in romana; ParsingErrorMessage la campurile de cantitate. Verificare automata in BlazorStoc.Checks care scaneaza literalele de mesaj pentru cuvinte englezesti. TODO: taskul mutat in arhiva, restul renumerotat 1-2. README, VALIDARE, PROJECT_STATE, TESTE_RAMASE (C11) actualizate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/App.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Routes.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `Pages/Account/Login.cshtml`
+  - `Program.cs`
+  - `README.md`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/romanian-ui.js`
+- **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 413 PASS; browser pe 5082: -5 si 0 -> mesaj romanesc, valoare prea mare, camp gol (mesaj server romanesc), 404 romanesc, dialog de reconectare tradus cu serverul oprit, functia de traducere pentru starea finala. Neverificat: ferestrele native (calendar, selector fisiere), starea finala a reconectarii in browser.
+- **Commit:** `claude: all user-visible messages in Romanian (native validation, reconnect dialog, status pages, ro-RO)`
+- **Predat cÄƒtre:** codex

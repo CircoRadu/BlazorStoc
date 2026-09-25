@@ -279,3 +279,9 @@ Verificat la 25 septembrie 2026.
 
 - Butonul de sortare al antetului folosea `.sort-header` cu `justify-content:flex-end`; în tabelul mișcărilor începe acum unde încep datele (`wwwroot/app.css`).
 - Browser pe 5082: începutul antetului coincide cu începutul datelor la desktop, 375 și 768 px; celelalte antete sunt aliniate cu conținutul lor; fără depășire orizontală.
+
+## Mesaje exclusiv în limba română (25.09.2026)
+
+- Mesajul în engleză la o intrare cu valoare negativă venea din validarea nativă a browserului; `wwwroot/romanian-ui.js` o înlocuiește cu mesaje românești (și pentru celelalte câmpuri, inclusiv paginile de autentificare). Dialogul de reconectare Blazor, paginile de eroare HTTP, limitarea cererilor și cultura `ro-RO` sunt în română.
+- `BlazorStoc.Checks` 413 (verificarea literalelor de mesaj); browser pe 5082: −5, 0, valoare prea mare, câmp gol, 404 și dialogul de reconectare cu serverul oprit.
+- Neverificat: ferestrele native (calendar, selector de fișiere).

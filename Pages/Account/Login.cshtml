@@ -8,4 +8,4 @@
 @if (Model.IsDemo) { <section class="demo-credentials"><strong>Conturi pentru testare</strong><span>Administrator: <code>administrator.demo</code> / <code>admin-demo-123</code></span><span>Utilizator: <code>utilizator.demo</code> / <code>utilizator-demo-123</code></span></section> }
 <form method="post"><input asp-for="ReturnUrl" type="hidden" /><label>Utilizator<input asp-for="Username" autocomplete="username" required autofocus /></label><label>Parolă<input asp-for="Password" type="password" autocomplete="current-password" required /></label>
 @if (Model.Error is not null) { <p role="alert" class="error-text">@Model.Error</p> }
-<button class="primary" type="submit">Intră în aplicație →</button></form><p class="muted small">BlazorStoc · versiunea 0.3</p></main></body></html>
+<button class="primary" type="submit">Intră în aplicație →</button></form><p class="muted small">BlazorStoc · versiunea 0.3</p></main><script src="/romanian-ui.js"></script></body></html>

@@ -1,4 +1,11 @@
 ﻿<Router AppAssembly="typeof(Program).Assembly">
+    <NotFound>
+        <LayoutView Layout="typeof(Layout.MainLayout)">
+            <h1>Pagina nu a fost găsită.</h1>
+            <p class="muted">Adresa deschisă nu există sau a fost mutată.</p>
+            <a class="refresh" href="/">Înapoi la pagina principală</a>
+        </LayoutView>
+    </NotFound>
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized><p class="error-banner">Nu ai acces la această pagină. <a href="/Account/Login">Autentifică-te</a>.</p></NotAuthorized>

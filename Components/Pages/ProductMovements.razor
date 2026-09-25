@@ -100,7 +100,7 @@ else
                             <InputTextArea id="movement-description" @bind-Value="form.Description" rows="3" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
                         <div class="movement-form-bottom">
                             <label for="movement-quantity">Cantitate *
-                                <InputNumber id="movement-quantity" TValue="int?" @bind-Value="form.Quantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
+                                <InputNumber id="movement-quantity" TValue="int?" @bind-Value="form.Quantity" ParsingErrorMessage="Cantitatea trebuie să fie un număr întreg." min="1" max="@StockMovementRules.MaxQuantity" /></label>
                             <button class="primary" type="submit">@(saving ? "Se salvează…" : "Adaugă")</button>
                         </div>
                         @if (formError is not null) { <div class="validation-message" role="alert">@formError</div> }
@@ -203,7 +203,7 @@ else
                 <fieldset disabled="@editSaving">
                     <div class="editor-grid">
                         <label for="edit-date">Data mișcării *<PickOnlyDate Id="edit-date" @bind-Value="editForm.Date" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
-                        <label for="edit-quantity">Cantitate *<InputNumber id="edit-quantity" TValue="int?" @bind-Value="editForm.Quantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
+                        <label for="edit-quantity">Cantitate *<InputNumber id="edit-quantity" TValue="int?" @bind-Value="editForm.Quantity" ParsingErrorMessage="Cantitatea trebuie să fie un număr întreg." min="1" max="@StockMovementRules.MaxQuantity" /></label>
                         @if (editing.Kind == StockMovementKind.Exit)
                         {
                             <div class="full-width">

@@ -179,6 +179,11 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 - **Așteptat**: dialogul nativ la (1); popup „Editarea nu a fost finalizată” la (2)–(5); la (5) mutarea se repetă corect după „Părăsește” sau este anulată la „Înapoi la editare”; Escape = „Înapoi la editare”.
 - **De ce nu s-a făcut**: dialogul nativ al tabului și tastatura/cititorul de ecran nu pot fi acționate din panoul Browser; restul nu a fost exersat în ciclu.
 
+### C11. Mesaje românești: cazuri neexersate (mesaje exclusiv în limba română)
+- **Pași**: (1) cu serverul oprit, așteaptă până apare starea finală a dialogului de reconectare și verifică textele „Reconectarea a eșuat…” și butonul „Reîncearcă”; (2) deschide calendarul „Data mișcării” și selectorul de fișiere (imagine produs, fișier observație) într-un browser cu interfața în engleză și notează limba ferestrelor native; (3) trimite formularul de autentificare gol.
+- **Așteptat**: (1) și (3) în română; (2) ferestrele native folosesc limba browserului (nu pot fi schimbate din aplicație).
+- **De ce nu s-a făcut**: ferestrele native nu pot fi acționate din panoul Browser; starea finală a reconectării a fost verificată doar prin funcția de traducere.
+
 ---
 
 ## D. Tastatură și accesibilitate (motiv: M3)

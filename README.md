@@ -142,3 +142,8 @@ Lucrul pentru NAS/QNAP, Docker și publicarea în containere rămân explicit î
 ## Formatul datelor
 
 - Toate datele calendaristice afișate sunt `dd.mm.yyyy` (cu oră: `dd.mm.yyyy hh:mm`). Formatele interne (`yyyy-MM-dd` în SQLite, `dd-MM-yyyy` în coloana `io_data` din MariaDB) nu se afișează.
+
+## Limba mesajelor
+
+- Toate mesajele afișate utilizatorului sunt în limba română: validări, erori, dialoguri, texte de stare, dialogul de reconectare, paginile de eroare HTTP și mesajele native ale browserului pentru câmpurile de formular (`wwwroot/romanian-ui.js`). Mesajele tehnice din jurnalul serverului pot rămâne în engleză. Cultura aplicației este `ro-RO`.
+- Un mesaj nou se scrie direct în română (`ErrorMessage`, excepții de operare, câmpuri `error`/`notice`); `BlazorStoc.Checks` verifică automat că literalele acestea nu conțin cuvinte englezești frecvente.

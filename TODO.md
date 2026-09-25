@@ -14,24 +14,15 @@
 
 ## Ordinea de implementare optimizată
 
-Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskurile active (1–3) se bazează pe lucrări finalizate și se implementează în ordinea numerelor, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan. Taskurile 1–2 sunt corecturi mici ale mesajelor și ale tabelului de intrări/ieșiri și pot fi grupate într-un singur ciclu.
+Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskurile active (1–2) se bazează pe lucrări finalizate și se implementează în ordinea numerelor, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan. Taskul 1 este o corectură mică a tabelului de intrări/ieșiri.
 
-## Task 1 — Mesaje exclusiv în limba română
-
-- [ ] Mesajul de eroare generat la adăugarea unei intrări cu valoare **negativă** (număr de bucăți) trebuie să fie în limba română, cu formulare clară (de exemplu „Numărul de bucăți trebuie să fie un număr întreg pozitiv.”); același lucru pentru zero, valori necompletate sau non-numerice, la intrări, ieșiri și editarea mișcărilor.
-- [ ] Regulă unitară generală: **toate mesajele afișate utilizatorului sunt în limba română** — validări de formular și de server, erori de repository și de reguli de business, mesajele din popup-uri și dialoguri, notificări, texte de stare (încărcare, eroare, gol), mesaje ale verificărilor HTML5/DataAnnotations/Blazor (de exemplu culturi și mesaje implicite ale framework-ului), eventualele excepții afișate direct utilizatorului. Fără mesaje în engleză sau amestecate.
-- [ ] Inventariază toate locurile care produc text vizibil (grep pe `Message`, `throw`, `ErrorMessage`, `Validation`, `alert`, componentele Razor și scripturile din `wwwroot`) și corectează-le; mesajele tehnice pentru jurnalul serverului (log) pot rămâne în engleză, dar nu sunt afișate utilizatorului.
-- [ ] Configurează cultura aplicației (`ro-RO`) și `lang="ro"` astfel încât mesajele implicite ale framework-ului și validarea browserului să fie în română; păstrează formatele de dată și număr stabilite ale aplicației.
-- [ ] Introdu o verificare automată care împiedică reapariția regulii încălcate (de exemplu un test care scanează mesajele de eroare/validare definite în cod pentru cuvinte englezești frecvente, sau o listă centralizată de mesaje) și documentează regula în `README.md` și `docs/PROJECT_STATE.md`, ca să fie respectată de toate taskurile viitoare.
-- [ ] Verificare în browser: introducerea unei intrări cu valoare negativă, zero, text și câmp gol; o eroare de server (de exemplu duplicat) și o validare de formular din alte pagini; toate mesajele apar în română.
-
-## Task 2 — Eticheta „Beneficiar/Proiect” în tabelul de intrări/ieșiri
+## Task 1 — Eticheta „Beneficiar/Proiect” în tabelul de intrări/ieșiri
 
 - [ ] În tabelul de intrări/ieșiri al unui produs, antetul coloanei „Beneficiar” se schimbă în **„Beneficiar/Proiect”** (coloana afișează și proiectul mișcării, alături de beneficiar). Conținutul coloanei și linkurile către beneficiar și proiect rămân neschimbate.
 - [ ] Actualizează consecvent orice loc care folosește vechea etichetă pentru aceeași coloană (antet, etichete accesibile, exportul sau textele de ajutor, dacă există) și testele care o verifică; nu modifică eticheta „Beneficiar” din formularul de ieșire, unde câmpul este distinct de „Proiect”.
 - [ ] Verifică că noul antet nu produce depășiri sau împărțire pe rânduri deranjantă la 375 și 768 px.
 
-## Task 3 — Situația de inventar (pagina „Inventar” și fișierul PDF)
+## Task 2 — Situația de inventar (pagina „Inventar” și fișierul PDF)
 
 Adaugă în meniul principal secțiunea „Inventar” și o pagină din care utilizatorul alege categoriile și subcategoriile pentru care se generează o situație de inventar în format PDF, folosită la numărarea fizică a stocului. Pagina reutilizează structura vizuală și mecanismul collapse din „Categorii și subcategorii”, dar este numai pentru consultare și selectare. Depinde de structura catalogului, de „Cod produs”, de stocul calculat din mișcări („Stoc exclusiv prin mișcări de intrare și ieșire” și „Intrări și ieșiri pentru un produs existent”) și de jurnalul de activitate (finalizate); nu depinde de alte taskuri active.
 
@@ -48,7 +39,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - Fontul este orice font gratuit, de tip normal, care nu necesită licențiere (licență liberă de redistribuire, de exemplu o familie sub SIL Open Font License); nu se folosesc fonturi comerciale sau instalate doar pe anumite calculatoare.
 - Biblioteca PDF ramane la alegerea implementării, cu condiția unei licențe permisive fără costuri (implicit se folosește PDFsharp/MigraDoc, licență MIT).
 
-### Subtask 3.1 — Pagina, ruta, meniul și dashboard-ul
+### Subtask 2.1 — Pagina, ruta, meniul și dashboard-ul
 
 - [ ] Creează pagina la ruta stabilă `/inventar`, cu titlul „Inventar” (`<h1>` și titlul paginii), accesibilă utilizatorilor autentificați care pot consulta produsele (aceleași drepturi ca pentru catalog); nu cere rol de administrator.
 - [ ] Adaugă în meniul principal (bara laterală, secțiunea „Spațiu de lucru”, între „Produse și stocuri” și „Administrare”) elementul extensibil „Inventar” (aceeași componentă `CollapsibleSection` ca „Administrare”, cu pictogramă proprie), cu două intrări: **„Generare situație inventar”** → `/inventar` și **„Preluare inventar”** → `/inventar/preluare`. Elementul „Inventar” este evidențiat și rămâne extins când pagina activă este oricare dintre cele două rute.
@@ -56,13 +47,13 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Adaugă „Inventar” în dashboard (pagina principală), ca element de același tip cu cele existente, cu descriere scurtă (de exemplu „Generează situația de inventar pentru numărarea stocului.”), cu link către `/inventar`.
 - [ ] Pagina afișează stări clare: încărcare, catalog gol („Nu există categorii sau produse pentru inventar”) și eroare de încărcare cu „Reîncearcă”; nu afișează date simulate.
 
-### Subtask 3.2 — Afișarea categoriilor și subcategoriilor
+### Subtask 2.2 — Afișarea categoriilor și subcategoriilor
 
 - [ ] Afișează categoriile și subcategoriile în același stil ca în „Categorii și subcategorii” (carduri extensibile cu `CollapsibleSection`, denumirea categoriei, numărul de subcategorii și de produse asociate, lista subcategoriilor cu numărul de produse), **fără** butoanele „Adaugă categorie”, „Adaugă subcategorie”, „Editează categoria” și „Editează / Mută”.
 - [ ] Categoriile pornesc restrânse, ca în pagina de administrare; starea extinsă/restrânsă a unui card nu se pierde la reîmprospătări ale datelor și nu modifică selecția.
 - [ ] Ordinea categoriilor și a subcategoriilor este aceeași ca în pagina de administrare (alfabetică, după regulile de comparație existente). Categoriile sau subcategoriile fără produse sunt afișate și selectabile, dar sunt omise din PDF (subtaskul 5.5).
 
-### Subtask 3.3 — Selectarea
+### Subtask 2.3 — Selectarea
 
 - [ ] Fiecare categorie și fiecare subcategorie are o casetă de selectare (`<input type="checkbox">` cu etichetă accesibilă, de exemplu „Selectează categoria Scule electrice”); selectarea unei subcategorii marchează pentru inventar toate produsele ei, iar selectarea unei categorii marchează toate produsele categoriei.
 - [ ] Selectarea sau deselectarea unei categorii se propagă asupra tuturor subcategoriilor ei. Când doar o parte din subcategoriile unei categorii sunt selectate, caseta categoriei este în stare **nedeterminată** (`indeterminate`, expusă corect accesibilității); când toate sunt selectate devine bifată, iar când niciuna nu este selectată devine debifată. Apăsarea pe o casetă nedeterminată selectează toate subcategoriile.
@@ -70,9 +61,9 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Sub caseta „Selectează toate categoriile” există caseta „Elimină din situația de inventar produsele cu stoc 0”. Când este bifată, produsele cu stoc **exact 0** nu apar în PDF; produsele cu stoc negativ **rămân** (decizie stabilită). Starea implicită este debifată.
 - [ ] Caseta din antetul cardului unei categorii și apăsarea antetului sunt acțiuni independente: bifarea nu extinde/restrânge cardul, iar extinderea nu schimbă selecția (regula din „Collapse unitar pentru elementele cu structură subordonată” pentru acțiunile din antet).
 - [ ] Toate casetele se pot folosi cu mouse, touch și tastatură (Tab, Spațiu); starea selecției este afișată și ca text pentru cititoare de ecran (de exemplu „3 din 5 subcategorii selectate”). Selecția și opțiunea „stoc 0” se păstrează pe durata sesiunii paginii, nu în baza de date.
-- [ ] Logica selecției (categorie ↔ subcategorii ↔ „toate”) este o clasă independentă de interfață, acoperită de teste (Subtask 3.8).
+- [ ] Logica selecției (categorie ↔ subcategorii ↔ „toate”) este o clasă independentă de interfață, acoperită de teste (Subtask 2.8).
 
-### Subtask 3.4 — Butonul „Generează situația de inventar”
+### Subtask 2.4 — Butonul „Generează situația de inventar”
 
 - [ ] În partea de sus a paginii, în locul butonului „Adaugă categorie” din pagina de administrare, există butonul „Generează situația de inventar”.
 - [ ] Butonul este dezactivat, cu explicație („Selectează cel puțin o categorie sau subcategorie”), cât timp nu este selectat nimic; pe durata generării este dezactivat și afișează „Se generează…” pentru a preveni dubla trimitere.
@@ -80,7 +71,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Selecția trimisă la server este validată pe server: numai identificatori valizi de categorii/subcategorii existente, fără date de produse primite de la client; o selecție care nu mai corespunde catalogului (structură modificată între timp) este semnalată clar, iar PDF-ul nu se generează parțial. Cererea este autorizată și protejată împotriva CSRF, ca celelalte operații.
 - [ ] Dacă după aplicarea opțiunii „stoc 0” nu rămâne niciun produs, utilizatorul primește un mesaj („Nu există produse de inventariat pentru selecția făcută”), nu se generează un PDF gol și nu se scrie nimic în jurnal.
 
-### Subtask 3.5 — Conținutul și aspectul fișierului PDF
+### Subtask 2.5 — Conținutul și aspectul fișierului PDF
 
 - [ ] Prima pagină are titlul „Inventar” și, sub el, „Generat la: zz.ll.aaaa oo:mm”, calculat din momentul generării (UTC) convertit la ora locală (aceeași convenție de timp local ca în restul aplicației, adică ora serverului).
 - [ ] Pentru fiecare categorie selectată (integral sau parțial): o etichetă cu numele categoriei; sub ea, pentru fiecare subcategorie selectată a categoriei: o etichetă cu numele subcategoriei și un tabel cu antetul **Cod produs | Valoare stoc | Valoare reală**. Secțiunile și tabelele sunt generate numai din opțiunile selectate: categoriile fără nicio subcategorie selectată nu apar, subcategoriile fără produse rămase (inclusiv după eliminarea stocului 0) sunt omise împreună cu tabelul lor, iar o categorie fără nicio subcategorie rămasă este omisă.
@@ -91,20 +82,20 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Aspect: format A4, orientare portret; antetul fiecărui tabel se repetă pe paginile următoare când tabelul continuă; o etichetă de categorie sau de subcategorie nu rămâne singură la finalul unei pagini (fără tabel sub ea); coduri lungi se împart pe mai multe rânduri fără să depășească marginile; număr de pagină („Pagina x din y”) în subsol; coloanele „Valoare stoc” și „Valoare reală” au lățime suficientă pentru cel puțin 6 cifre.
 - [ ] Datele sunt citite într-un singur instantaneu coerent al catalogului la momentul generării, astfel încât stocul dintr-o secțiune să nu provină din momente diferite; generarea este complet asincronă și nu blochează alte sesiuni.
 
-### Subtask 3.6 — Bibliotecă PDF și font
+### Subtask 2.6 — Bibliotecă PDF și font
 
 - [ ] Folosește o bibliotecă de generare PDF fără Docker, fără servicii externe și fără costuri de licențiere: implicit PDFsharp/MigraDoc (licență MIT); QuestPDF nu se adoptă fără verificarea condițiilor lui de licență. Decizia și motivul se notează în `docs/PROJECT_STATE.md`.
 - [ ] Fontul este **gratuit**, de tip normal (fără caracter decorativ), care nu necesită licențiere: licență care permite redistribuirea și încorporarea în PDF (de exemplu o familie sub SIL Open Font License, ca Noto Sans sau Open Sans, în variantele normal și bold), conține diacriticele românești (ă, â, î, ș, ț — atenție la variantele cu virgulă, nu cu sedilă) și este inclus în aplicație; nu depinde de fonturile instalate pe server și nu are nevoie de internet la generare. Licența fontului se păstrează în proiect.
 - [ ] Generatorul este un serviciu separat (de exemplu `IInventoryReportBuilder` → model `InventoryReport` → `IInventoryPdfWriter`), astfel încât construirea datelor (selecție, filtrare, ordonare, marcarea stocului negativ) să poată fi testată fără PDF.
 
-### Subtask 3.7 — Jurnalizarea generării
+### Subtask 2.7 — Jurnalizarea generării
 
 - [ ] Fiecare generare reușită scrie un eveniment în jurnalul de activitate cu **utilizatorul** care a generat situația (și rolul lui), tipul de obiect „Inventar”, acțiunea nouă „Generare” (adăugată și în filtrele de tip și de operație ale paginii Jurnal) și momentul UTC.
 - [ ] Detaliile evenimentului conțin doar rezumatul cererii: numărul de categorii și de subcategorii selectate, dacă a fost bifată eliminarea stocului 0, numărul de produse din situație (din care cu stoc negativ) și numele fișierului; **nu** conțin lista produselor sau valorile stocului. Evenimentul nu are identificator de obiect și nu primește link către o pagină.
 - [ ] Nu se jurnalizează cererile respinse, cele fără produse sau cele eșuate; evenimentul se scrie după ce PDF-ul a fost construit cu succes, astfel încât un eșec de jurnalizare să nu producă un fișier nejurnalizat (comportamentul la eroarea de jurnalizare se stabilește la implementare și se documentează).
 - [ ] Funcționează în modul demonstrativ (SQLite) și în modul MariaDB, prin infrastructura comună de audit; nu se adaugă fișiere SQL de upgrade separate.
 
-### Subtask 3.8 — Verificări
+### Subtask 2.8 — Verificări
 
 - [ ] Teste automate pentru logica selecției: selectare/deselectare categorie ↔ subcategorii, stare nedeterminată, „toate categoriile”, apăsare pe caseta nedeterminată, categorii fără subcategorii.
 - [ ] Teste automate pentru construirea situației: doar selecția făcută, eliminarea stocului 0 (stocul negativ rămâne și este marcat pentru roșu), omiterea secțiunilor goale, ordinea categoriilor/subcategoriilor/produselor, stoc calculat din mișcări (inclusiv un produs cu mișcări), respingerea identificatorilor inexistenți, selecție goală, formatul „zz.ll.aaaa oo:mm” al momentului generării (conversie din UTC la ora locală, inclusiv schimbarea orei de vară).
@@ -130,14 +121,14 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 ### Detalii de stabilit la implementare
 
 - Alegerea concretă a familiei de font liberă (Noto Sans, Open Sans sau echivalent) și a versiunii bibliotecii PDF; se notează în `docs/PROJECT_STATE.md` împreună cu licențele.
-- Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 3.7); se documentează.
+- Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 2.7); se documentează.
 - Toate celelalte detalii au fost confirmate de utilizator și sunt descrise în „Decizii stabilite cu utilizatorul”.
 
 ## Observații pentru etapa de implementare
 
 - Schema bazei de date și scripturile aferente se stabilesc în etapa dedicată integrării MariaDB.
 - Implementarea trebuie să rămână complet asincronă.
-- Toate mesajele afișate utilizatorului sunt în limba română (regula din Task 1).
+- Toate mesajele afișate utilizatorului sunt în limba română (regula finalizată „Mesaje exclusiv în limba română”).
 - Toate datele calendaristice afișate utilizatorului au forma `dd.mm.yyyy` (de exemplu `25.09.2026`; cu oră: `25.09.2026 14:08`), în orice pagină, dialog, jurnal, mesaj sau document generat. Formatele interne (`yyyy-MM-dd` în SQLite, `dd-MM-yyyy` în coloana existentă `io_data` din MariaDB, adresele URL) nu se afișează; se folosesc `StockMovementRules.DisplayDate` și formatul `dd.MM.yyyy`.
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
@@ -1037,3 +1028,17 @@ Implementat la 25 septembrie 2026 de Claude. `wwwroot/app.css` (regula `.movemen
 - [x] Cauza: butonul de sortare al antetului „DATA” folosea stilul comun `.sort-header` (`justify-content:flex-end`, lățime 100%), gândit pentru coloana numerică din catalog, deci textul antetului era împins spre marginea dreaptă a coloanei, nealiniat cu datele. Pentru tabelul mișcărilor butonul începe acum unde încep datele (`justify-content:flex-start; width:auto`); catalogul nu este afectat.
 - [x] Măsurat în browser (5082): la desktop, 375 și 768 px începutul textului „DATA ▲” coincide cu începutul datelor (323 / 71 / 71 px); antetele „INTRARE/IEȘIRE” și „DESCRIERE” încep la aceeași margine stângă cu celulele, „NUMĂR BUCĂȚI” are marginea dreaptă comună cu numerele; nicio depășire orizontală a paginii.
 - Neverificat: temă închisă (aplicația are o singură temă); antetul „Beneficiar/Proiect” este tratat în taskul lui.
+
+## Finalizat la 25.09.2026 14:23 — Mesaje exclusiv în limba română
+
+**Data și ora implementării:** 25.09.2026 14:23 (ora locală).
+
+Implementat la 25 septembrie 2026 de Claude. `wwwroot/romanian-ui.js` (nou), `Components/App.razor`, `Pages/Account/Login.cshtml`, `Components/Routes.razor`, `Components/Pages/ProductMovements.razor`, `Program.cs` (cultura `ro-RO`, pagini de stare, mesaj la limitarea cererilor), `tests/BlazorStoc.Checks/Program.cs`.
+
+- [x] Cauza mesajului în engleză de la o intrare cu valoare negativă: validarea nativă a browserului („Value must be greater than or equal to 1.”, în limba interfeței browserului, nu în `lang="ro"`). `romanian-ui.js` înlocuiește, prin `setCustomValidity` în evenimentul `invalid`, toate mesajele native (câmp lipsă, valoare prea mică/mare, număr invalid, lungime, format, dată cu `dd.mm.yyyy`) cu mesaje românești; mesajul personalizat se șterge la prima modificare a câmpului. Se încarcă și în pagina de autentificare. Rezultat în browser: −5 și 0 → „Valoarea trebuie să fie cel puțin 1.”, prea mare → „Valoarea poate fi cel mult 100000.”; câmp gol → mesajul serverului „Introdu o cantitate întreagă mai mare decât zero.”.
+- [x] Dialogul implicit de reconectare al Blazor (texte scrise în `blazor.web.js`, în engleză) este tradus prin observarea shadow DOM-ului lui: „Reconectare la server…”, „Reconectarea a eșuat… se reîncearcă în N secunde”, „Reconectarea a eșuat. Reîncearcă sau reîncarcă pagina.”, „Reîncearcă”. Verificat cu serverul oprit.
+- [x] Erorile HTTP fără pagină proprie (404, 403, 401, altele) afișează pagini românești (`UseStatusCodePages`), `Routes.razor` are `NotFound` în română, iar limitarea cererilor de autentificare (429) răspunde „Prea multe încercări. Așteaptă un minut și încearcă din nou.”. `ParsingErrorMessage` în română la câmpurile de cantitate.
+- [x] Cultura aplicației este `ro-RO` pentru toate cererile și circuitele (`UseRequestLocalization`); formatele de dată rămân `dd.mm.yyyy`, iar formatele interne folosesc explicit cultura invariantă.
+- [x] Inventar al textelor vizibile: validările `DataAnnotations`, excepțiile de operare, mesajele de repository, popup-urile, dialogurile și stările paginilor erau deja în română (verificat prin căutare în `Services`, `Components`, `Pages`); mesajele tehnice din jurnalul serverului rămân în engleză.
+- [x] Verificare automată: `BlazorStoc.Checks` (413) scanează literalele care devin mesaje vizibile (`ErrorMessage`, `*Exception("…")`, câmpurile `error`/`notice`/…, constantele `…Message`, `errors.Add`) și eșuează dacă găsesc cuvinte englezești frecvente.
+- Neverificat: mesajele native ale ferestrei calendarului și ale selectorului de fișiere (limba browserului, nu pot fi schimbate din aplicație); starea finală „Reconectarea a eșuat…” cu butonul „Reîncearcă” (testată doar funcția de traducere); lista `english` din scanare acoperă doar cuvinte frecvente.

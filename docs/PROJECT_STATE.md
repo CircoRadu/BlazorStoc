@@ -32,6 +32,11 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 
 - La cererea utilizatorului s-a creat `docs/TESTE_RAMASE.md`: fiecare verificare neefectuată până acum (MariaDB pe un server real, mai multe calculatoare și conturi, editoarele neexersate în browser, tastatură/cititor de ecran, alte browsere și dispozitive tactile, funcționare îndelungată) cu motivul (M1–M6), pașii, rezultatul așteptat și sursa. Testele efectuate se mută în secțiunea „Teste efectuate” a aceluiași fișier. `CLAUDE.md` și `AGENTS.md` cer acum explicit actualizarea acestui fișier când o verificare nu poate fi efectuată sau una din listă este efectuată.
 
+## Mesaje exclusiv în limba română
+
+- La cererea utilizatorului („implementează task 1”, ordinea agenților schimbată printr-un commit separat): regula „toate mesajele afișate sunt în română” este în `README.md` și verificată automat (`BlazorStoc.Checks` 413 scanează literalele de mesaj). Sursa mesajului în engleză de la valoarea negativă era validarea nativă a browserului; `wwwroot/romanian-ui.js` (în `App.razor` și pagina de autentificare) o înlocuiește și traduce dialogul de reconectare Blazor. `Program.cs`: `UseRequestLocalization` (`ro-RO`), `UseStatusCodePages` românesc, mesaj pentru limitarea cererilor. `Routes.razor` are `NotFound` în română.
+- Validare: build Release 0 avertismente; browser pe 5082. Neverificat: ferestrele native ale browserului (calendar, selector de fișiere). Taskuri active rămase: 1 („Beneficiar/Proiect”), 2 (inventar).
+
 ## Antetul „Data” din tabelul mișcărilor
 
 - La cererea utilizatorului („implementează task 1”, ordinea agenților schimbată printr-un commit separat): `.movement-table .sort-header` aliniază antetul „Data” la începutul datelor (fusese împins la dreapta de stilul comun al catalogului). Doar CSS; verificat în browser la desktop, 375 și 768 px. Taskuri active rămase: 1 (mesaje în română), 2 („Beneficiar/Proiect”), 3 (inventar).

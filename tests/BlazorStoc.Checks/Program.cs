@@ -2225,6 +2225,45 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
     Check(FormSnapshot.Of(user) != userBefore, "A typed password counts as a change (compared only through a hash)");
 }
 
+// Task 1: every message shown to the user is in Romanian. The literals that become user-visible messages (validation
+// attributes, operation exceptions, error/notice fields, ...Message constants) must not contain common English words.
+{
+    var projectRoot = AppContext.BaseDirectory;
+    while (projectRoot is not null && !File.Exists(Path.Combine(projectRoot, "BlazorStoc.csproj"))) projectRoot = Path.GetDirectoryName(projectRoot.TrimEnd(Path.DirectorySeparatorChar));
+    Check(projectRoot is not null, "The project folder was found for the message scan");
+    var files = new[] { "Services", "Components", "Pages" }
+        .SelectMany(folder => Directory.EnumerateFiles(Path.Combine(projectRoot!, folder), "*.*", SearchOption.AllDirectories))
+        .Where(file => file.EndsWith(".cs") || file.EndsWith(".razor") || file.EndsWith(".cshtml"))
+        .Append(Path.Combine(projectRoot!, "Program.cs")).ToArray();
+    var patterns = new[]
+    {
+        @"(?:ErrorMessage|ParsingErrorMessage)\s*=\s*""([^""]*)""",
+        @"\w+Exception\(\s*\$?""([^""]*)""",
+        @"\b(?:error|Error|formError|editError|deleteError|historyError|notice|lockMessage|unlockError|reasonError|imageError|filesError|message|Message)\s*=\s*\$?""([^""]*)""",
+        @"\b\w*Message\s*(?:=|=>)\s*\$?""([^""]*)""",
+        @"\b[eE]rrors\.Add\(\s*\$?""([^""]*)""",
+    };
+    var english = new HashSet<string>(["the", "is", "must", "cannot", "failed", "invalid", "required", "please", "error", "already",
+        "exists", "found", "unable", "could", "should", "will", "your", "been", "denied", "missing", "expected", "value", "field", "not"],
+        StringComparer.OrdinalIgnoreCase);
+    var scanned = 0; var offenders = new List<string>();
+    foreach (var file in files)
+    {
+        var text = File.ReadAllText(file);
+        foreach (var pattern in patterns)
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(text, pattern))
+            {
+                var literal = match.Groups[1].Value;
+                scanned++;
+                var words = System.Text.RegularExpressions.Regex.Matches(literal, @"[A-Za-z']+").Select(word => word.Value);
+                var found = words.Where(english.Contains).ToArray();
+                if (found.Length > 0) offenders.Add($"{Path.GetFileName(file)}: \"{literal}\" ({string.Join(", ", found)})");
+            }
+    }
+    Check(scanned > 100, $"The message scan reads the message literals ({scanned} found)");
+    Check(offenders.Count == 0, "Message literals shown to users contain no English words" + (offenders.Count == 0 ? "" : ": " + string.Join(" | ", offenders.Take(5))));
+}
+
 sealed class ManualTimeProvider : TimeProvider
 {
     private DateTimeOffset now = new(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);

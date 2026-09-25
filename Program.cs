@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
+using System.Globalization;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
@@ -45,6 +47,11 @@ builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(k
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = 429;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
+        await context.HttpContext.Response.WriteAsync("Prea multe încercări. Așteaptă un minut și încearcă din nou.", token);
+    };
     options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -103,6 +110,28 @@ var app = builder.Build();
 if (demo) await app.Services.GetRequiredService<SqliteLocalStore>().InitializeAsync();
 else await MariaArchiveSchema.InitializeAsync(app.Configuration);
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/Error", createScopeForErrors: true);
+// Romanian culture for every request and circuit: framework texts and number formats follow it (Task 1).
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture(new CultureInfo("ro-RO")),
+    SupportedCultures = [new CultureInfo("ro-RO")],
+    SupportedUICultures = [new CultureInfo("ro-RO")],
+    RequestCultureProviders = []
+});
+// Error status codes without a page of their own get a Romanian page instead of an empty response (Task 1).
+app.UseStatusCodePages(async context =>
+{
+    var response = context.HttpContext.Response;
+    var (title, text) = response.StatusCode switch
+    {
+        404 => ("Pagina nu a fost găsită.", "Adresa deschisă nu există sau a fost mutată."),
+        403 => ("Acces interzis.", "Nu ai dreptul să deschizi această pagină."),
+        401 => ("Autentificare necesară.", "Autentifică-te pentru a continua."),
+        _ => ("Cererea nu a putut fi procesată.", "Încearcă din nou. Dacă problema persistă, contactează administratorul.")
+    };
+    response.ContentType = "text/html; charset=utf-8";
+    await response.WriteAsync($"<!DOCTYPE html><html lang=\"ro\"><head><meta charset=\"utf-8\" /><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /><title>{title} · BlazorStoc</title><link rel=\"stylesheet\" href=\"/app.css\" /></head><body class=\"login-body\"><main class=\"login-card\"><h1>{title}</h1><p class=\"muted\">{text}</p><a class=\"refresh\" href=\"/\">Înapoi la pagina principală</a></main></body></html>");
+});
 app.UseStaticFiles();
 app.UseRouting();
 app.UseRateLimiter();

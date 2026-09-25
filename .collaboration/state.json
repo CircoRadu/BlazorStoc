@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 1: alinierea antetului Data in tabelul de intrari/iesiri",
-    "startedAtUtc":  "2026-09-25T11:14:10.3368841Z",
-    "completedAtUtc":  "2026-09-25T11:15:24.5362140Z",
-    "lastSummary":  "Antetul Data din tabelul de intrari/iesiri era impins la dreapta de stilul comun .sort-header (justify-content:flex-end, gandit pentru coloana numerica din catalog). Regula noua .movement-table .sort-header (flex-start, width auto) in wwwroot/app.css aliniaza antetul cu inceputul datelor; catalogul neafectat. TODO: taskul mutat in arhiva cu data si ora, taskurile ramase renumerotate 1-3. VALIDARE si PROJECT_STATE actualizate.",
-    "lastCommitSubject":  "claude: align the Data header of the movements table",
+    "nextAgent":  "codex",
+    "currentTask":  "Task 1: mesaje exclusiv in limba romana",
+    "startedAtUtc":  "2026-09-25T11:16:11.9910524Z",
+    "completedAtUtc":  "2026-09-25T11:23:19.5525732Z",
+    "lastSummary":  "Mesaje exclusiv in limba romana. Mesajul in engleza la valoare negativa venea din validarea nativa a browserului: wwwroot/romanian-ui.js (App.razor si pagina de autentificare) o inlocuieste prin setCustomValidity cu mesaje romanesti si traduce dialogul implicit de reconectare Blazor (shadow DOM). Program.cs: UseRequestLocalization ro-RO, UseStatusCodePages romanesc (404/403/401/altele), mesaj romanesc la limitarea cererilor; Routes.razor cu NotFound in romana; ParsingErrorMessage la campurile de cantitate. Verificare automata in BlazorStoc.Checks care scaneaza literalele de mesaj pentru cuvinte englezesti. TODO: taskul mutat in arhiva, restul renumerotat 1-2. README, VALIDARE, PROJECT_STATE, TESTE_RAMASE (C11) actualizate.",
+    "lastCommitSubject":  "claude: all user-visible messages in Romanian (native validation, reconnect dialog, status pages, ro-RO)",
     "claudeStatus":  "active"
 }
