@@ -808,3 +808,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 413 PASS, 0 FAIL; browser pe instanta de proba 5083 (demonstrativ, /produse/1): antet pe un rand, fara depasire a paginii la 768 si 375 px. Neverificat: preview-ul 5082 (proces al altui cont, nu a putut fi repornit) arata antetul vechi pana la repornire.
 - **Commit:** `claude: Beneficiar/Proiect header in the movements table`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:31:16.6872683Z â€” claude
+
+- **Task:** Adaugare in TODO a taskurilor Vehicule si Iesire spre vehicul
+- **Rezumat:** Adaugate in TODO.md doua taskuri active noi, la cererea utilizatorului: Task 2 Administrarea vehiculelor (sectiunea Vehicule in Administrare, numar de inmatriculare unic cu masca AA-OOO-AAA, descriere obligatorie, arhivare, jurnal) si Task 3 Iesire spre vehicul, vanzare generica si corectie de stoc (butoane radio in formularul de iesire, precompletarea descrierii cu data de azi). Task 1 (inventar) neschimbat. PROJECT_STATE actualizat. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu se aplica (numai documentatie); verificata numerotarea taskurilor active 1-3.
+- **Commit:** `claude: add vehicles and vehicle-exit tasks to TODO`
+- **Predat cÄƒtre:** codex

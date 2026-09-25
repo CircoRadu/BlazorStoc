@@ -1,14 +1,14 @@
-{
+﻿{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 1: eticheta Beneficiar/Proiect in tabelul de intrari/iesiri",
-    "startedAtUtc":  "2026-09-25T11:25:12.6244835Z",
-    "completedAtUtc":  "2026-09-25T11:29:40.8609976Z",
-    "lastSummary":  "Eticheta coloanei din tabelul de intrari/iesiri al produsului este acum BENEFICIAR/PROIECT (ProductMovements.razor); README si VALIDARE actualizate; nu exista alte texte, teste sau exporturi care sa foloseasca vechea eticheta pentru coloana; formularele si celelalte pagini neschimbate. TODO: taskul mutat in arhiva cu data si ora, taskul de inventar renumerotat 1. PROJECT_STATE actualizat.",
-    "lastCommitSubject":  "claude: Beneficiar/Proiect header in the movements table",
+    "nextAgent":  "codex",
+    "currentTask":  "Adaugare in TODO a taskurilor Vehicule si Iesire spre vehicul",
+    "startedAtUtc":  "2026-09-25T11:30:11.2396193Z",
+    "completedAtUtc":  "2026-09-25T11:31:16.6872683Z",
+    "lastSummary":  "Adaugate in TODO.md doua taskuri active noi, la cererea utilizatorului: Task 2 Administrarea vehiculelor (sectiunea Vehicule in Administrare, numar de inmatriculare unic cu masca AA-OOO-AAA, descriere obligatorie, arhivare, jurnal) si Task 3 Iesire spre vehicul, vanzare generica si corectie de stoc (butoane radio in formularul de iesire, precompletarea descrierii cu data de azi). Task 1 (inventar) neschimbat. PROJECT_STATE actualizat. Nu s-a modificat cod.",
+    "lastCommitSubject":  "claude: add vehicles and vehicle-exit tasks to TODO",
     "claudeStatus":  "active"
 }

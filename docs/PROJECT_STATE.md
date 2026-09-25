@@ -47,6 +47,11 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 - Validare: build Release 0 avertismente; `BlazorStoc.Checks` 413 trecute, 0 eșuate; browser (instanță de probă pe 5083, modul demonstrativ, `/produse/1`): antetul pe un rând, fără depășire orizontală a paginii la 768 și 375 px (tabelul defilează în propriul container la 375 px, ca înainte). Neverificat: preview-ul de pe 5082 (proces pornit de alt cont, nu a putut fi oprit din sesiune) arată antetul vechi până la repornirea lui din `bin\Release\net9.0\BlazorStoc.exe --urls http://127.0.0.1:5082`.
 - Taskuri active rămase: 1 (situația de inventar) — următorul pas.
 
+## Pregătire TODO — vehicule și ieșire spre vehicul
+
+- La cererea utilizatorului (25 septembrie 2026) s-au adăugat în `TODO.md`, după situația de inventar (Task 1): **Task 2 — Administrarea vehiculelor** (secțiunea „Vehicule” în „Administrare”, pagină ca „Categorii și subcategorii”, număr de înmatriculare obligatoriu și unic cu masca `AA-OOO-AAA`, descriere scurtă obligatorie, arhivare, jurnal, blocarea ștergerii la vehicule cu mișcări) și **Task 3 — Ieșire spre vehicul, vânzare generică și corecție de stoc** (butoane radio Beneficiar / Autovehicul / Vânzare generică / Corecție stoc în formularul de ieșire; precompletarea descrierii cu „Completare stoc mașină … + data de azi” sau „Corecție stoc + data de azi”; destinația stocată, afișată și jurnalizată). Task 3 depinde de Task 2. Nu s-a modificat cod.
+- Detalii lăsate la confirmare: numerele cu o literă (București, `B-123-ABC`) nu intră în masca cerută; opțiunea implicită la Ieșire; eticheta antetului coloanei de relații după introducerea vehiculului. Ordinea (după inventar) poate fi schimbată la cerere, cu renumerotare.
+
 ## Regula datelor `dd.mm.yyyy`
 
 - La cererea utilizatorului: regulă de dezvoltare (în `CLAUDE.md`, `AGENTS.md`, `TODO.md`, `README.md`) — toate datele afișate au forma `dd.mm.yyyy`. `StockMovementRules.DisplayDate` este acum `dd.MM.yyyy`; scrierea în `io_data` (MariaDB) folosește `LegacyDate` (`dd-MM-yyyy`), deci compatibilitatea cu aplicația veche rămâne. `PickOnlyDate`, istoricul mișcărilor și jurnalul (texte vechi normalizate prin `NormalizeDisplayDates`) au fost corectate. Task PDF-ul de inventar folosește `zz.ll.aaaa`.

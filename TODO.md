@@ -14,7 +14,7 @@
 
 ## Ordinea de implementare optimizată
 
-Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskul activ (1) se bazează pe lucrări finalizate și se implementează în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
+Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskurile active (1–3) se bazează pe lucrări finalizate și se implementează în ordinea numerelor, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan. Taskul 3 depinde de taskul 2 (vehiculele); taskul 1 (inventarul) este independent de ele.
 
 ## Task 1 — Situația de inventar (pagina „Inventar” și fișierul PDF)
 
@@ -117,6 +117,93 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - Alegerea concretă a familiei de font liberă (Noto Sans, Open Sans sau echivalent) și a versiunii bibliotecii PDF; se notează în `docs/PROJECT_STATE.md` împreună cu licențele.
 - Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 1.7); se documentează.
 - Toate celelalte detalii au fost confirmate de utilizator și sunt descrise în „Decizii stabilite cu utilizatorul”.
+
+## Task 2 — Administrarea vehiculelor (secțiunea „Vehicule” din meniul „Administrare”)
+
+Adaugă în meniul „Administrare” secțiunea „Vehicule”, cu o pagină de administrare a autovehiculelor firmei, asemănătoare paginii „Categorii și subcategorii” (aceeași structură vizuală, aceleași butoane, aceleași stări). Cerută de utilizator (25 septembrie 2026). Vehiculele se relaționează cu tabelul de intrări/ieșiri prin taskul „Ieșire spre vehicul, vânzare generică și corecție de stoc” (Task 3).
+
+### Subtask 2.1 — Pagina și meniul
+
+- [ ] Adaugă în meniul principal, în secțiunea extensibilă „Administrare”, intrarea **„Vehicule”** → `/vehicule`, evidențiată când pagina este activă; pagina are titlul „Vehicule” (`<h1>` și titlul paginii). Accesul urmează regula paginii „Categorii și subcategorii” (drepturile de administrare existente); autorizarea se verifică și pe server.
+- [ ] Pagina afișează lista vehiculelor în stilul „Categorii și subcategorii” (tabel/carduri cu aceleași componente și aceeași dispunere), cu butonul „Adaugă vehicul”, „Editează” și „Șterge” pe fiecare rând, căutare după număr de înmatriculare sau descriere și ordine alfabetică după numărul de înmatriculare. Stări clare: încărcare, listă goală („Nu există vehicule”) și eroare de încărcare cu „Reîncearcă”; nu afișează date simulate.
+- [ ] Fiecare vehicul afișează numărul de mișcări de ieșire asociate (0 când nu are) și, când există, un link către mișcările lui (definit în Task 3).
+
+### Subtask 2.2 — Adăugarea și editarea unui vehicul
+
+- [ ] Formularul (același tip de formular ca „Adaugă categorie”, cu același mecanism de avertizare la părăsire, confirmare a salvării și motivare la editare) are două câmpuri **obligatorii**:
+  - **Număr de înmatriculare**, cu masca `AA-OOO-AAA`: două litere, cratimă, două sau trei cifre, cratimă, trei litere (de exemplu `HD-01-FDG`, `HD-233-VDG`). Comparația și salvarea folosesc forma normalizată cu majuscule; utilizatorul poate tasta și cu litere mici, iar aplicația completează cratimele și majusculele.
+  - **Descriere**, text scurt (de exemplu „Dacia Dokker albă”), cu lungime maximă rezonabilă (de exemplu 100 de caractere), fără spații exterioare.
+- [ ] Validare pe server și pe client, cu mesaje în română: număr lipsit, format nevalid (mesaj cu exemplele `HD-01-FDG` și `HD-233-VDG`), descriere lipsă sau prea lungă. Numărul de înmatriculare este **unic** (cheia de unicitate insensibilă la majuscule, cu regulile existente de normalizare); un duplicat este respins cu numele vehiculului existent în mesaj.
+- [ ] Se aplică regulile existente pentru texte (eliminarea diacriticelor la salvare, păstrarea formei literelor pentru descriere) și verificarea versiunii la editare (protecție împotriva editărilor concurente).
+
+### Subtask 2.3 — Ștergerea, arhivarea și jurnalul
+
+- [ ] Ștergerea folosește fluxul existent în doi pași (motiv, apoi confirmarea `sterge`) și arhivarea (`archive_vehicles`, integrare cu serviciul comun de arhivare, aceeași tranzacție cu evenimentul de audit). Un vehicul cu mișcări de stoc asociate **nu se șterge** (mesaj explicativ, ca la beneficiarii cu mișcări).
+- [ ] Adăugarea, editarea (cu „Motivare modificare”, valori inițiale și finale în `Details`) și ștergerea sunt jurnalizate cu tipul de obiect nou „Vehicul” (adăugat în filtrele paginii Jurnal); „Ținta” unui vehicul adăugat sau editat este link către pagina de editare.
+- [ ] Funcționează în modul demonstrativ (SQLite) și în modul MariaDB, prin infrastructura comună; fără fișiere SQL de upgrade separate; complet asincron; două sesiuni concurente nu pot crea duplicate.
+
+### Subtask 2.4 — Verificări
+
+- [ ] Teste automate: validarea și normalizarea numărului (`HD-01-FDG` și `HD-233-VDG` acceptate; lipsa cratimelor tastate acceptată dacă se decide astfel; `H-01-FDG`, `HDD-01-FDG`, `HD-1-FDG`, `HD-2334-FDG`, `HD-01-FD`, litere cu diacritice respinse), unicitatea, descrierea obligatorie, ștergerea blocată la vehicul cu mișcări, arhivarea, jurnalul (un singur eveniment) și două cereri concurente.
+- [ ] Verificare în browser: meniul „Administrare” → „Vehicule”, adăugare, editare, duplicat, ștergere în doi pași, aspect identic cu „Categorii și subcategorii”, la 375 și 768 px fără depășire orizontală.
+- [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și, pentru ce nu se poate verifica, `docs/TESTE_RAMASE.md`.
+
+### Criterii de acceptare
+
+- „Administrare” conține „Vehicule”, iar pagina `/vehicule` arată ca „Categorii și subcategorii”.
+- Un vehicul se poate adăuga numai cu număr de înmatriculare valid (`AA-OOO-AAA`, de exemplu `HD-01-FDG` sau `HD-233-VDG`) și descriere; numărul este unic.
+- Adăugarea, editarea și ștergerea sunt jurnalizate; ștergerea arhivează vehiculul și este blocată când există mișcări asociate.
+
+### Detalii de stabilit la implementare
+
+- Numerele din București (o singură literă, de exemplu `B-123-ABC`) nu intră în masca `AA-OOO-AAA` cerută; se confirmă cu utilizatorul dacă masca acceptă și 1 literă în prima grupă (implicit: exact două litere, cum a fost cerut).
+- Dacă utilizatorul poate tasta numărul fără cratime (`HD01FDG`) și aplicația le inserează, sau cratimele sunt obligatorii (implicit: se acceptă ambele forme, salvarea fiind în forma cu cratime).
+- Lungimea maximă exactă a descrierii.
+
+## Task 3 — Ieșire spre vehicul, vânzare generică și corecție de stoc (formularul de ieșire)
+
+Extinde formularul de ieșire din pagina intrărilor/ieșirilor unui produs cu o alegere prin butoane radio a **destinației ieșirii**. Cerută de utilizator (25 septembrie 2026). Depinde de taskul „Administrarea vehiculelor” (Task 2), care furnizează lista de vehicule.
+
+### Subtask 3.1 — Grupul de butoane radio „Destinație”
+
+- [ ] La o **Ieșire**, formularul (adăugare și editare) are un grup de butoane radio (`<input type="radio">` cu etichete accesibile, utilizabil cu mouse, touch și tastatură) cu patru opțiuni: **Beneficiar**, **Autovehicul**, **Vânzare generică** și **Corecție stoc**. La **Intrare** grupul nu apare.
+- [ ] **Beneficiar** păstrează funcționalitatea existentă: alegerea beneficiarului și, după aceea, a proiectului (proiectele beneficiarului), cu aceleași validări și aceleași mesaje ca acum.
+- [ ] **Autovehicul** afișează o listă de selectare cu vehiculele introduse prin pagina „Vehicule” (număr de înmatriculare și descriere, ordonate după număr); alegerea unui vehicul este obligatorie când opțiunea este selectată, cu mesaj în română. Dacă nu există vehicule, opțiunea explică acest lucru și trimite la pagina „Vehicule” (fără a bloca celelalte opțiuni).
+- [ ] **Vânzare generică** și **Corecție stoc** nu au câmpuri suplimentare de relație.
+- [ ] Trecerea de la o opțiune la alta golește câmpurile celorlalte (beneficiar, proiect, vehicul) și nu lasă relații reziduale; schimbarea între opțiuni este tratată ca modificare pentru avertizarea la părăsirea formularului.
+
+### Subtask 3.2 — Precompletarea descrierii
+
+- [ ] Când se alege **Autovehicul** și un vehicul, câmpul de descriere/motivare al mișcării se precompletează cu textul **„Completare stoc mașină <număr de înmatriculare> <zz.ll.aaaa>”**, unde data este data de azi (formatul `dd.mm.yyyy`, regula generală a datelor); forma exactă a textului cerut de utilizator este „completare stoc mașină + data de azi”.
+- [ ] Când se alege **Corecție stoc**, câmpul se precompletează cu **„Corecție stoc <zz.ll.aaaa>”**, cu data de azi.
+- [ ] Precompletarea nu suprascrie un text scris de utilizator: se aplică numai când câmpul este gol sau conține o precompletare anterioară neschimbată (la schimbarea vehiculului sau a opțiunii textul precompletat se actualizează); textul rămâne editabil, iar descrierea rămâne obligatorie. Opțiunile **Beneficiar** și **Vânzare generică** nu precompletează nimic; trecerea la ele elimină o precompletare neschimbată.
+- [ ] Data folosită este data de azi de pe server (ora locală), aceeași convenție ca restul aplicației.
+
+### Subtask 3.3 — Stocare, afișare și jurnal
+
+- [ ] Mișcarea păstrează destinația ieșirii (beneficiar cu eventual proiect, autovehicul, vânzare generică sau corecție de stoc) într-un mod care permite rapoarte ulterioare (de exemplu un tip explicit al destinației și `VehicleId` pentru autovehicul); mișcările existente (cu sau fără beneficiar) rămân valide și sunt interpretate fără migrare a datelor, fără fișiere SQL de upgrade separate; stocul se calculează ca acum (intrări minus ieșiri), indiferent de destinație.
+- [ ] Validare pe server: o ieșire spre autovehicul are un vehicul existent; celelalte destinații nu pot avea vehicul, beneficiar sau proiect; combinațiile incompatibile sunt respinse cu mesaje în română. Un vehicul șters/arhivat nu mai poate fi ales.
+- [ ] Tabelul intrărilor/ieșirilor afișează destinația: vehiculul (număr de înmatriculare, ca link către vehicul) în coloana relațiilor, iar pentru „Vânzare generică” și „Corecție stoc” o etichetă clară; se stabilește la implementare dacă antetul „BENEFICIAR/PROIECT” devine „BENEFICIAR/PROIECT/VEHICUL” sau o etichetă comună („DESTINAȚIE”).
+- [ ] Pagina „Vehicule” arată numărul mișcărilor asociate fiecărui vehicul; un vehicul cu mișcări nu poate fi șters (Task 2).
+- [ ] Jurnalul mișcărilor (creare, editare, ștergere, istoricul „[*]”) include destinația și vehiculul în `Details`/`Target`, cu valorile inițiale și finale la editare; funcționează în SQLite și MariaDB, prin infrastructura comună.
+
+### Subtask 3.4 — Verificări
+
+- [ ] Teste automate: fiecare destinație se salvează corect; combinațiile incompatibile sunt respinse; precompletarea (text, data, nesuprascrierea unui text scris de utilizator, actualizarea la schimbarea vehiculului sau a opțiunii); mișcările existente rămân neschimbate; stocul nu depinde de destinație; jurnalul; două sesiuni concurente.
+- [ ] Verificare în browser (modul demonstrativ): grupul radio la Ieșire (adăugare și editare), lipsa lui la Intrare, precompletările pentru Autovehicul și Corecție stoc cu data de azi, salvarea și afișarea în tabel, avertizarea la părăsire; la 375 și 768 px fără depășire orizontală.
+- [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și `docs/TESTE_RAMASE.md` pentru ce nu se poate verifica.
+
+### Criterii de acceptare
+
+- Formularul de ieșire are butoanele radio „Beneficiar”, „Autovehicul”, „Vânzare generică” și „Corecție stoc”; „Beneficiar” funcționează ca până acum.
+- „Autovehicul” permite alegerea unui vehicul din pagina „Vehicule”; descrierea este precompletată cu „Completare stoc mașină … <data de azi>”; pentru „Corecție stoc” este „Corecție stoc <data de azi>”; ambele texte pot fi modificate.
+- Destinația se salvează, se afișează în tabel și în jurnal; stocul rămâne calculat corect; mișcările existente nu sunt afectate.
+
+### Detalii de stabilit la implementare
+
+- Opțiunea inițială la Ieșire: implicit „Beneficiar” cu beneficiarul rămas facultativ, ca acum, astfel încât o ieșire fără relații să rămână posibilă; sau, alternativ, „Vânzare generică” pentru ieșirile fără destinație (se confirmă cu utilizatorul).
+- Textul exact al precompletărilor (majuscule, diacritice — care se elimină oricum la salvare, conform regulii existente) și formatul datei (`dd.mm.yyyy`).
+- Eticheta antetului coloanei de relații după introducerea vehiculului.
 
 ## Observații pentru etapa de implementare
 
