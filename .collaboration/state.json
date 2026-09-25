@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 8 - Sincronizare intre utilizatori",
     "startedAtUtc":  "2026-09-25T06:41:11.7059550Z",
     "completedAtUtc":  "2026-09-25T06:51:58.4663457Z",
