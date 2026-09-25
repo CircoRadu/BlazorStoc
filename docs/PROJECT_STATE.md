@@ -77,6 +77,10 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 - La cererea utilizatorului (25 septembrie 2026) s-au adăugat în `TODO.md`, după situația de inventar (Task 1): **Task 2 — Administrarea vehiculelor** (secțiunea „Vehicule” în „Administrare”, pagină ca „Categorii și subcategorii”, număr de înmatriculare obligatoriu și unic cu masca `AA-OOO-AAA`, descriere scurtă obligatorie, arhivare, jurnal, blocarea ștergerii la vehicule cu mișcări) și **Task 3 — Ieșire spre vehicul, vânzare generică și corecție de stoc** (butoane radio Beneficiar / Autovehicul / Vânzare generică / Corecție stoc în formularul de ieșire; precompletarea descrierii cu „Completare stoc mașină … + data de azi” sau „Corecție stoc + data de azi”; destinația stocată, afișată și jurnalizată). Task 3 depinde de Task 2. Nu s-a modificat cod.
 - Detalii lăsate la confirmare: numerele cu o literă (București, `B-123-ABC`) nu intră în masca cerută; opțiunea implicită la Ieșire; eticheta antetului coloanei de relații după introducerea vehiculului. Ordinea (după inventar) poate fi schimbată la cerere, cu renumerotare.
 
+## Regula: fisiere .md fara diacritice
+
+- La cererea utilizatorului (25 septembrie 2026): textele noi sau modificate din fisierele `.md` (`TODO.md`, `README.md`, `VALIDARE.md`, `docs/*.md`, `CLAUDE.md`, `AGENTS.md`) se scriu fara diacritice; textele afisate de aplicatie in cod pastreaza diacriticele. Regula este in `CLAUDE.md` si `AGENTS.md`. Textul existent nu a fost convertit (se face numai la cererea utilizatorului). Nu s-a modificat cod.
+
 ## Regula datelor `dd.mm.yyyy`
 
 - La cererea utilizatorului: regulă de dezvoltare (în `CLAUDE.md`, `AGENTS.md`, `TODO.md`, `README.md`) — toate datele afișate au forma `dd.mm.yyyy`. `StockMovementRules.DisplayDate` este acum `dd.MM.yyyy`; scrierea în `io_data` (MariaDB) folosește `LegacyDate` (`dd-MM-yyyy`), deci compatibilitatea cu aplicația veche rămâne. `PickOnlyDate`, istoricul mișcărilor și jurnalul (texte vechi normalizate prin `NormalizeDisplayDates`) au fost corectate. Task PDF-ul de inventar folosește `zz.ll.aaaa`.

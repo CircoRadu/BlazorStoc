@@ -939,3 +939,17 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 505 PASS (41 noi), 0 FAIL; browser pe instanta de proba 5084 (radio, mesaje, precompletari, transfer 4 buc, folosire din masina, editare refuzata, catalog, Vehicule, 375/768 px). Neverificat: MariaDB pe server real (TESTE_RAMASE A10). Preview pornit pe 5082.
 - **Commit:** `claude: exit destinations, vehicle source and stock held by vehicles`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T12:26:06.5922812Z â€” claude
+
+- **Task:** Regula: fara diacritice in fisierele md
+- **Rezumat:** Regula noua data de utilizator: fisierele md se scriu fara diacritice (text nou sau modificat); adaugata in CLAUDE.md si AGENTS.md, notata in PROJECT_STATE; textul existent neconvertit. Nu s-a modificat cod. Preview 5082 ramane pornit.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+- **Validare:** Nu se aplica (documentatie).
+- **Commit:** `claude: rule - markdown files without diacritics`
+- **Predat cÄƒtre:** codex

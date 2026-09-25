@@ -1,14 +1,14 @@
-{
+﻿{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 2: iesire spre vehicul, vanzare generica si corectie de stoc",
-    "startedAtUtc":  "2026-09-25T12:21:19.4100588Z",
-    "completedAtUtc":  "2026-09-25T12:25:16.9139442Z",
-    "lastSummary":  "Task 2 implementat: iesire spre vehicul, vanzare generica si corectie de stoc. Formularul de iesire are destinatie obligatorie (Beneficiar / Autovehicul / Vanzare generica / Corectie stoc, fara preselectie, validata si pe server) si sursa Depozit/Masina; din masina nu se poate scoate mai mult decat contine (verificat in tranzactie, editarile si stergerile nu pot lasa o masina negativa). Iesirea spre autovehicul nu scade stocul total (efect 0); cantitatea din masini este derivata din miscari; defalcarea X in depozit, Y in vehicule apare doar cand exista produse in masini (pagina miscarilor, catalog, editor produs). Descriere precompletata cu data de azi, coloana VEHICUL, jurnal si arhiva cu destinatie/vehicul/sursa, coloana MISCARI si stergere blocata la vehicule cu miscari. SQLite schema 10, MariaDB coloane noi in io si arhiva v6. Componenta noua ExitDestinationPicker inlocuieste RelationPicker. TODO: task arhivat, pagina vehiculului renumerotata 2, inventarul poate folosi WarehouseStock. Documentatie actualizata; corectate doua corupții din documente (antetul din VALIDARE si linia Stare ciclu din PROJECT_STATE).",
-    "lastCommitSubject":  "claude: exit destinations, vehicle source and stock held by vehicles",
+    "nextAgent":  "codex",
+    "currentTask":  "Regula: fara diacritice in fisierele md",
+    "startedAtUtc":  "2026-09-25T12:25:38.0012601Z",
+    "completedAtUtc":  "2026-09-25T12:26:06.5922812Z",
+    "lastSummary":  "Regula noua data de utilizator: fisierele md se scriu fara diacritice (text nou sau modificat); adaugata in CLAUDE.md si AGENTS.md, notata in PROJECT_STATE; textul existent neconvertit. Nu s-a modificat cod. Preview 5082 ramane pornit.",
+    "lastCommitSubject":  "claude: rule - markdown files without diacritics",
     "claudeStatus":  "active"
 }
