@@ -24,13 +24,17 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - „Generat la” folosește momentul (timestamp-ul) în care se generează formularul, convertit la **ora locală**, în forma `dd/mm/aaaa` și ora (`oo:mm`).
 - Fontul este **gratuit** (licență liberă de redistribuire, cu diacritice românești). Numele categoriilor și ale subcategoriilor sunt **bold, mărime 14**; restul textului este normal, **mărime 12**.
 - Generarea situației se **jurnalizează**, cu utilizatorul care a generat-o.
-- Meniul principal: sub „Inventar” există intrarea **„Generare situație inventar”** (duce la pagina descrisă aici) și intrarea **„Preluare inventar”** (funcționalitate care se implementează ulterior; aici există doar intrarea).
+- Meniul principal: sub „Inventar” există intrarea **„Generare situație inventar”** (duce la pagina descrisă aici) și intrarea **„Preluare inventar”** (funcționalitate care se implementează ulterior; aici există doar intrarea, cu **pagină de rezervă**).
+- Stocul negativ se scrie cu roșu pe **întregul rând** al produsului (cod, valoare stoc și celula „Valoare reală”, care rămâne goală).
+- Titlul „Inventar” și textul „Generat la” urmează regula generală: normal, mărime 12.
+- Fontul este orice font gratuit, de tip normal, care nu necesită licențiere (licență liberă de redistribuire, de exemplu o familie sub SIL Open Font License); nu se folosesc fonturi comerciale sau instalate doar pe anumite calculatoare.
+- Biblioteca PDF ramane la alegerea implementării, cu condiția unei licențe permisive fără costuri (implicit se folosește PDFsharp/MigraDoc, licență MIT).
 
 ### Subtask 10.1 — Pagina, ruta, meniul și dashboard-ul
 
 - [ ] Creează pagina la ruta stabilă `/inventar`, cu titlul „Inventar” (`<h1>` și titlul paginii), accesibilă utilizatorilor autentificați care pot consulta produsele (aceleași drepturi ca pentru catalog); nu cere rol de administrator.
 - [ ] Adaugă în meniul principal (bara laterală, secțiunea „Spațiu de lucru”, între „Produse și stocuri” și „Administrare”) elementul extensibil „Inventar” (aceeași componentă `CollapsibleSection` ca „Administrare”, cu pictogramă proprie), cu două intrări: **„Generare situație inventar”** → `/inventar` și **„Preluare inventar”** → `/inventar/preluare`. Elementul „Inventar” este evidențiat și rămâne extins când pagina activă este oricare dintre cele două rute.
-- [ ] „Preluare inventar” este doar o intrare de meniu: ruta `/inventar/preluare` afișează o pagină scurtă „Preluare inventar” cu mesajul că funcționalitatea va fi implementată ulterior (fără formulare sau operații); același drept de acces ca la „Generare situație inventar”. Implementarea reală este în afara acestui task.
+- [ ] „Preluare inventar” este doar o intrare de meniu cu **pagină de rezervă**: ruta `/inventar/preluare` afișează o pagină scurtă „Preluare inventar” cu mesajul că funcționalitatea va fi implementată ulterior (fără formulare sau operații); același drept de acces ca la „Generare situație inventar”. Implementarea reală este în afara acestui task.
 - [ ] Adaugă „Inventar” în dashboard (pagina principală), ca element de același tip cu cele existente, cu descriere scurtă (de exemplu „Generează situația de inventar pentru numărarea stocului.”), cu link către `/inventar`.
 - [ ] Pagina afișează stări clare: încărcare, catalog gol („Nu există categorii sau produse pentru inventar”) și eroare de încărcare cu „Reîncearcă”; nu afișează date simulate.
 
@@ -63,7 +67,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Prima pagină are titlul „Inventar” și, sub el, „Generat la: zz/ll/aaaa oo:mm”, calculat din momentul generării (UTC) convertit la ora locală (aceeași convenție de timp local ca în restul aplicației, adică ora serverului).
 - [ ] Pentru fiecare categorie selectată (integral sau parțial): o etichetă cu numele categoriei; sub ea, pentru fiecare subcategorie selectată a categoriei: o etichetă cu numele subcategoriei și un tabel cu antetul **Cod produs | Valoare stoc | Valoare reală**. Secțiunile și tabelele sunt generate numai din opțiunile selectate: categoriile fără nicio subcategorie selectată nu apar, subcategoriile fără produse rămase (inclusiv după eliminarea stocului 0) sunt omise împreună cu tabelul lor, iar o categorie fără nicio subcategorie rămasă este omisă.
 - [ ] „Cod produs” conține codul produsului (fără identificatorul tehnic `#<id>`); „Valoare stoc” conține cantitatea din stocul calculat din mișcări la momentul generării (număr întreg, valorile negative afișate ca atare); „Valoare reală” este **goală**, cu spațiu suficient pentru scrierea de mână.
-- [ ] Un produs cu **stoc negativ** are textul rândului scris cu **roșu** (codul și valoarea stocului); celelalte rânduri sunt negre. Culoarea nu este singurul indicator: valoarea negativă se recunoaște și după semnul minus.
+- [ ] Un produs cu **stoc negativ** are **întregul rând** scris cu **roșu** (codul, valoarea stocului și celula „Valoare reală”, care rămâne goală); celelalte rânduri sunt negre. Culoarea nu este singurul indicator: valoarea negativă se recunoaște și după semnul minus.
 - [ ] Fonturi: numele categoriilor și ale subcategoriilor **bold, mărime 14**; tot restul textului (titlul, „Generat la”, antetele și celulele tabelelor, subsolul) **normal, mărime 12**.
 - [ ] Ordinea: categoriile și subcategoriile ca în pagină (alfabetic); produsele fiecărui tabel sunt ordonate după codul produsului (comparație insensibilă la majuscule), cu ordine stabilă la coduri egale.
 - [ ] Aspect: format A4, orientare portret; antetul fiecărui tabel se repetă pe paginile următoare când tabelul continuă; o etichetă de categorie sau de subcategorie nu rămâne singură la finalul unei pagini (fără tabel sub ea); coduri lungi se împart pe mai multe rânduri fără să depășească marginile; număr de pagină („Pagina x din y”) în subsol; coloanele „Valoare stoc” și „Valoare reală” au lățime suficientă pentru cel puțin 6 cifre.
@@ -71,8 +75,8 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 
 ### Subtask 10.6 — Bibliotecă PDF și font
 
-- [ ] Alege o bibliotecă de generare PDF fără Docker, fără servicii externe și cu licență compatibilă cu folosirea internă (propunere de evaluat: PDFsharp/MigraDoc, licență MIT; QuestPDF are condiții de licență de verificat înainte de adoptare). Decizia și motivul se notează în `docs/PROJECT_STATE.md`.
-- [ ] Fontul este **gratuit**, cu licență care permite redistribuirea și încorporarea în PDF (de exemplu o familie sub SIL Open Font License, ca Noto Sans sau Open Sans, în variantele normal și bold), conține diacriticele românești (ă, â, î, ș, ț — atenție la variantele cu virgulă, nu cu sedilă) și este inclus în aplicație; nu depinde de fonturile instalate pe server și nu are nevoie de internet la generare. Licența fontului se păstrează în proiect.
+- [ ] Folosește o bibliotecă de generare PDF fără Docker, fără servicii externe și fără costuri de licențiere: implicit PDFsharp/MigraDoc (licență MIT); QuestPDF nu se adoptă fără verificarea condițiilor lui de licență. Decizia și motivul se notează în `docs/PROJECT_STATE.md`.
+- [ ] Fontul este **gratuit**, de tip normal (fără caracter decorativ), care nu necesită licențiere: licență care permite redistribuirea și încorporarea în PDF (de exemplu o familie sub SIL Open Font License, ca Noto Sans sau Open Sans, în variantele normal și bold), conține diacriticele românești (ă, â, î, ș, ț — atenție la variantele cu virgulă, nu cu sedilă) și este inclus în aplicație; nu depinde de fonturile instalate pe server și nu are nevoie de internet la generare. Licența fontului se păstrează în proiect.
 - [ ] Generatorul este un serviciu separat (de exemplu `IInventoryReportBuilder` → model `InventoryReport` → `IInventoryPdfWriter`), astfel încât construirea datelor (selecție, filtrare, ordonare, marcarea stocului negativ) să poată fi testată fără PDF.
 
 ### Subtask 10.7 — Jurnalizarea generării
@@ -105,13 +109,11 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - Fiecare generare reușită este jurnalizată cu utilizatorul care a făcut-o; cererile respinse nu sunt jurnalizate.
 - Funcționalitatea este asincronă, fără Docker, fără fișiere SQL de upgrade separate și nu modifică date de inventar (numai citire, în afara evenimentului de jurnal).
 
-### Detalii de confirmat la implementare
+### Detalii de stabilit la implementare
 
-- „Textul din tabel scris cu roșu” pentru stocul negativ: se aplică **întregului rând** (cod și valoare), așa cum este descris mai sus, sau numai valorii stocului?
-- Titlul „Inventar” și textul „Generat la” urmează regula generală (normal, 12), fiindcă nu s-a specificat altfel; se poate mări la cerere.
-- „Generat la”: `zz/ll/aaaa oo:mm` (fără secunde), cu separatorul `/`.
-- Alegerea concretă a bibliotecii PDF (MIT vs. licența QuestPDF) și a familiei de font liberă.
-- „Preluare inventar”: pagină de rezervă cu mesaj (propunerea de aici) sau intrare dezactivată în meniu, fără rută.
+- Alegerea concretă a familiei de font liberă (Noto Sans, Open Sans sau echivalent) și a versiunii bibliotecii PDF; se notează în `docs/PROJECT_STATE.md` împreună cu licențele.
+- Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 10.7); se documentează.
+- Toate celelalte detalii au fost confirmate de utilizator și sunt descrise în „Decizii stabilite cu utilizatorul”.
 
 ## Observații pentru etapa de implementare
 
