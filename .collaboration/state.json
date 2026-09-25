@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Data miscarii: calendar doar pentru selectare, fara date viitoare",
     "startedAtUtc":  "2026-09-25T06:23:14.3355511Z",
     "completedAtUtc":  "2026-09-25T06:25:25.8250758Z",
