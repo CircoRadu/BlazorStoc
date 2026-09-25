@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Data miscarii: interval explicit min/max pentru calendar",
     "startedAtUtc":  "2026-09-25T06:19:16.8930045Z",
     "completedAtUtc":  "2026-09-25T06:19:35.2719562Z",
