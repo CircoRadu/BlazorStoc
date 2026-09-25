@@ -58,8 +58,11 @@ public static class StockMovementRules
     public const int MaxDescriptionLength = 500;
     public const string DescriptionRequiredMessage = "Completează câmpul «Descriere».";
     public const string StaleMessage = "Mișcarea a fost modificată sau ștearsă între timp. Actualizează pagina și reia operația.";
+    public const string FutureDateMessage = "Data mișcării nu poate fi în viitor. Alege azi sau o zi anterioară.";
     public static readonly DateOnly EarliestDate = new(1990, 1, 1);
-    public static readonly DateOnly LatestDate = new(2100, 12, 31);
+
+    // The latest selectable day: movements record what already happened, so the calendar stops at today.
+    public static DateOnly Today => DateOnly.FromDateTime(DateTime.Now);
 
     public static int Effect(StockMovementKind kind, int quantity) => kind == StockMovementKind.Entry ? quantity : -quantity;
     public static string KindLabel(StockMovementKind kind) => kind == StockMovementKind.Entry ? "Intrare" : "Ieșire";
@@ -68,11 +71,12 @@ public static class StockMovementRules
     public static DateOnly ParseStorageDate(string value) => DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture);
     public static DateOnly ParseLegacyDate(string value) => DateOnly.ParseExact(value.Trim(), "dd-MM-yyyy", CultureInfo.InvariantCulture);
 
-    public static StockMovementInput Validated(StockMovementInput input, StockMovementKind kind, bool isEdit)
+    public static StockMovementInput Validated(StockMovementInput input, StockMovementKind kind, bool isEdit, DateOnly? today = null)
     {
         var errors = new List<string>();
         var description = TextNormalization.ForStorage(input.Description ?? string.Empty);
-        if (input.Date is not { } date || date < EarliestDate || date > LatestDate) errors.Add("Alege o dată validă pentru mișcare.");
+        if (input.Date is not { } date || date < EarliestDate) errors.Add("Alege o dată validă pentru mișcare.");
+        else if (date > (today ?? Today)) errors.Add(FutureDateMessage);
         if (input.Quantity is not { } quantity || quantity < 1) errors.Add("Introdu o cantitate întreagă mai mare decât zero.");
         else if (quantity > MaxQuantity) errors.Add($"Cantitatea poate fi cel mult {MaxQuantity:N0}.");
         if (description.Length == 0) errors.Add(DescriptionRequiredMessage);

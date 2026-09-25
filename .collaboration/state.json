@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Data miscarii: interval explicit min/max pentru calendar",
-    "startedAtUtc":  "2026-09-25T06:19:16.8930045Z",
-    "completedAtUtc":  "2026-09-25T06:19:35.2719562Z",
-    "lastSummary":  "La cererea utilizatorului (calendarul ar limita data miscarii la azi): in sursa nu exista nicio limita, iar serverul accepta orice data 1990-2100; o intrare din 31-12-2026 a fost salvata prin interfata si apoi stearsa. Cele doua campuri de data (adaugare si editare) au acum min/max explicit din StockMovementRules.EarliestDate/LatestDate (facute publice). Cauza limitarii din calendarul utilizatorului nu a fost reprodusa: popup-ul nativ nu poate fi actionat prin clickuri in panoul Browser.",
-    "lastCommitSubject":  "claude: explicit min/max on stock movement date inputs (future dates allowed)",
+    "nextAgent":  "codex",
+    "currentTask":  "Data miscarii: calendar doar pentru selectare, fara date viitoare",
+    "startedAtUtc":  "2026-09-25T06:23:14.3355511Z",
+    "completedAtUtc":  "2026-09-25T06:25:25.8250758Z",
+    "lastSummary":  "La cererea utilizatorului: Data miscarii este calendar numai pentru selectare (fara tastare), ultima zi este azi, iar o miscare nu poate avea data viitoare. Ciclul anterior intelesese gresit cerinta (ridicase limita la 2100); a fost anulat. Server: StockMovementRules.Validated respinge date dupa ziua curenta (FutureDateMessage) la creare si editare, SQLite si MariaDB; parametru optional today pentru teste. UI: campurile de data au max = azi si data-pick-only, iar wwwroot/date-pick-only.js blocheaza tastarea, lipirea si tragerea de text, pastreaza Tab/Escape si deschide calendarul la click, Enter, Spatiu, F4. Testele cu 2099 mutate pe ziua curenta; TODO.md si README actualizate (decizia din Task 1 inlocuita).",
+    "lastCommitSubject":  "claude: movement date is calendar pick-only and cannot be in the future",
     "claudeStatus":  "active"
 }

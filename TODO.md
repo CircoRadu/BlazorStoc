@@ -313,7 +313,7 @@ Decizii stabilite cu utilizatorul (24 septembrie 2026):
 - Task 1 include adăugarea, listarea, editarea, ștergerea și istoricul modificărilor.
 - „Beneficiar” și „Proiect” sunt două căsuțe independente, vizibile numai la ieșire; proiectul poate fi activat numai după beneficiar, este opțional și este limitat la proiectele beneficiarului ales.
 - Stocul este calculat din mișcări și poate deveni negativ; o ieșire care depășește stocul nu este blocată și nu cere avertisment.
-- Descrierea este obligatorie la intrare și la ieșire; data mișcării este independentă de data și ora curentă și poate fi oricând, inclusiv în viitor.
+- Descrierea este obligatorie la intrare și la ieșire; data mișcării este aleasă din calendar și nu poate depăși ziua curentă. **Înlocuit ulterior (25 septembrie 2026, la cererea utilizatorului):** inițial putea fi oricând, inclusiv în viitor; acum calendarul este numai pentru selectare (fără tastare), ultima zi afișată este azi, iar serverul respinge date viitoare.
 - Stocul se modifică exclusiv prin mișcările acestui task: taskul finalizat „Stoc exclusiv prin mișcări” a eliminat „Stoc inițial” din crearea produsului (orice produs nou are stoc 0) și editarea manuală a cantității din editorul de produs.
 
 ### Subtask 1.1 — Acces și pagina produsului
@@ -331,7 +331,7 @@ Decizii stabilite cu utilizatorul (24 septembrie 2026):
 - [x] Creează `StockMovementRules` (în stilul `ProjectRules`/`ProductInput`): cantitate întreagă ≥ 1 și limită superioară fixată într-o constantă (propunere: 100.000; se confirmă la implementare), dată validă, descriere obligatorie (după normalizarea existentă `TextNormalization.ForStorage`, inclusiv eliminarea diacriticelor) cu lungime maximă, mesaje clare în română.
 - [x] Beneficiarul și proiectul sunt permise numai la ieșire; la intrare serverul le respinge sau le ignoră explicit, nu le salvează. Proiectul trebuie să aparțină beneficiarului ales, altfel cererea este respinsă.
 - [x] Regula stocului: stoc = total intrări − total ieșiri, valoare care poate fi negativă; nu se adaugă nicio validare de blocare sau avertisment pentru stoc insuficient.
-- [x] Data se acceptă oricând (trecut sau viitor); nu se folosește ora curentă pentru ordonare, ci data mișcării, apoi identificatorul.
+- [x] Data se acceptă între 1990 și azi (regulă modificată la 25 septembrie 2026: nu poate fi în viitor); nu se folosește ora curentă pentru ordonare, ci data mișcării, apoi identificatorul.
 - [x] Verifică regulile prin teste de domeniu (fără interfață), incluzând valori limită și texte doar cu spații.
 
 ### Subtask 1.3 — Persistență și stoc atomic
@@ -401,7 +401,7 @@ Decizii stabilite cu utilizatorul (24 septembrie 2026):
 
 - Selectarea unui produs din catalog deschide pagina sa de intrări/ieșiri, cu datele produsului, formularul de operare, tabelul mișcărilor și „Total produse în stoc”.
 - La intrare, Beneficiar și Proiect nu sunt vizibile; la ieșire pot fi activate independent (proiectul numai după beneficiar), iar fără ele se culeg doar cantitatea, data și descrierea.
-- Descrierea este obligatorie la intrare și la ieșire; data mișcării este aleasă de utilizator și este independentă de data și ora curentă (inclusiv în viitor).
+- Descrierea este obligatorie la intrare și la ieșire; data mișcării este aleasă din calendar (fără tastare) și nu poate fi în viitor (regulă modificată la 25 septembrie 2026).
 - Coloana „Beneficiar” afișează beneficiarul și proiectul mișcării când există.
 - O ieșire poate duce stocul sub zero; stocul negativ este afișat corect, fără blocare sau avertisment.
 - Stocul se actualizează atomic împreună cu mișcarea; două operații simultane nu pierd nicio modificare.

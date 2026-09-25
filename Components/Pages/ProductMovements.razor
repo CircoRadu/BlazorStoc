@@ -63,7 +63,7 @@ else
                     <fieldset disabled="@saving">
                         <div class="movement-form-top">
                             <label class="movement-date" for="movement-date">Data mișcării *
-                                <InputDate id="movement-date" TValue="DateOnly?" @bind-Value="form.Date" min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" max="@StockMovementRules.StorageDate(StockMovementRules.LatestDate)" /></label>
+                                <InputDate id="movement-date" TValue="DateOnly?" @bind-Value="form.Date" min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" max="@StockMovementRules.StorageDate(StockMovementRules.Today)" data-pick-only="true" /></label>
                             <div class="movement-kind" role="group" aria-label="Tipul mișcării">
                                 <button type="button" class="kind-button kind-in @(form.Kind == StockMovementKind.Entry ? "selected" : "")" aria-pressed="@(form.Kind == StockMovementKind.Entry)" @onclick="() => SetKindAsync(StockMovementKind.Entry)">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v13m0 0-5-5m5 5 5-5M5 20h14" /></svg> Intrare</button>
@@ -186,7 +186,7 @@ else
             <EditForm Model="editForm" OnSubmit="SaveEditAsync" FormName="stock-movement-edit">
                 <fieldset disabled="@editSaving">
                     <div class="editor-grid">
-                        <label for="edit-date">Data mișcării *<InputDate id="edit-date" TValue="DateOnly?" @bind-Value="editForm.Date" min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" max="@StockMovementRules.StorageDate(StockMovementRules.LatestDate)" /></label>
+                        <label for="edit-date">Data mișcării *<InputDate id="edit-date" TValue="DateOnly?" @bind-Value="editForm.Date" min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" max="@StockMovementRules.StorageDate(StockMovementRules.Today)" data-pick-only="true" /></label>
                         <label for="edit-quantity">Cantitate *<InputNumber id="edit-quantity" TValue="int?" @bind-Value="editForm.Quantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
                         @if (editing.Kind == StockMovementKind.Exit)
                         {

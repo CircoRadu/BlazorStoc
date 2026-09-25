@@ -445,3 +445,23 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal: 0 avertismente, 0 erori; BlazorStoc.Checks: 329 verificari trecute. Browser 5082: intrare cu data 31-12-2026 salvata si stearsa (stoc revenit la 12). Neverificat: comportamentul calendarului nativ in browserul utilizatorului.
 - **Commit:** `claude: explicit min/max on stock movement date inputs (future dates allowed)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T06:25:25.8250758Z â€” claude
+
+- **Task:** Data miscarii: calendar doar pentru selectare, fara date viitoare
+- **Rezumat:** La cererea utilizatorului: Data miscarii este calendar numai pentru selectare (fara tastare), ultima zi este azi, iar o miscare nu poate avea data viitoare. Ciclul anterior intelesese gresit cerinta (ridicase limita la 2100); a fost anulat. Server: StockMovementRules.Validated respinge date dupa ziua curenta (FutureDateMessage) la creare si editare, SQLite si MariaDB; parametru optional today pentru teste. UI: campurile de data au max = azi si data-pick-only, iar wwwroot/date-pick-only.js blocheaza tastarea, lipirea si tragerea de text, pastreaza Tab/Escape si deschide calendarul la click, Enter, Spatiu, F4. Testele cu 2099 mutate pe ziua curenta; TODO.md si README actualizate (decizia din Task 1 inlocuita).
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/App.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `README.md`
+  - `Services/StockMovements.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/date-pick-only.js`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 335 verificari trecute. Browser 5082: calendarul se deschide la click, zilele dupa azi sunt dezactivate, luna urmatoare inactiva, tastarea nu schimba valoarea, data viitoare fortata este oprita de validarea browserului; nimic salvat. Neverificat manual: selectarea cu tastatura, validarea de server direct din browser (acoperita de teste).
+- **Commit:** `claude: movement date is calendar pick-only and cannot be in the future`
+- **Predat cÄƒtre:** codex

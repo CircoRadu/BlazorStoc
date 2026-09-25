@@ -86,7 +86,7 @@ Sistemul refuză eliminarea ultimului administrator activ. Un administrator nu �
 - Identificatorul numeric intern al produsului rămâne folosit pentru persistență, rute, relații și jurnalizare tehnică (`EntityId`), dar nu mai este afișat în interfață în forma `#<număr>`.
 - Apasă pe codul unui produs (sau pe „↗”) pentru a deschide pagina **Intrări/ieșiri** a produsului (`/produse/<id>/miscari`). De acolo folosești **Editare produs** sau **Șterge produs** (acesta deschide fluxul de ștergere din catalog, `/produse?sterge=<id>`).
 - Pagina de intrări/ieșiri arată produsul, formularul de mișcare și tabelul mișcărilor:
-  - Data mișcării este aleasă de utilizator (implicit azi), independentă de data și ora curentă, și poate fi și în viitor. Descrierea este obligatorie; cantitatea este un număr întreg între 1 și 100.000.
+  - Data mișcării este aleasă de utilizator (implicit azi), aleasă numai din calendar (câmpul nu acceptă tastare), între 1 ianuarie 1990 și azi; o dată viitoare este respinsă și de server. Descrierea este obligatorie; cantitatea este un număr întreg între 1 și 100.000.
   - La **Ieșire** poți bifa „Beneficiar” și, după alegerea acestuia, „Proiect” (proiectele beneficiarului). Fără ele se completează numai data, cantitatea și descrierea. La **Intrare** aceste câmpuri nu apar.
   - Stocul este suma intrărilor minus suma ieșirilor și poate deveni negativ; o ieșire peste stoc nu este blocată.
   - Coloana „Beneficiar” arată beneficiarul și proiectul ieșirii. Tabelul se filtrează (Intrări/Ieșiri), se sortează după dată și se paginează.

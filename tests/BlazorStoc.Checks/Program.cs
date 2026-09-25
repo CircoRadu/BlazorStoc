@@ -1424,8 +1424,22 @@ try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, proj
 catch (StockMovementOperationException) { Check(true, "A project requires a beneficiary"); }
 try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1), StockMovementKind.Exit, true); throw new Exception("Edit without reason accepted"); }
 catch (StockMovementOperationException) { Check(true, "Editing a movement requires a reason"); }
-Check(StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, date: new DateOnly(2099, 1, 1)), StockMovementKind.Exit, false).Date == new DateOnly(2099, 1, 1),
-    "Movement date may be in the future");
+var movementToday = new DateOnly(2026, 9, 25);
+Check(StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, date: movementToday), StockMovementKind.Exit, false, movementToday).Date == movementToday &&
+      StockMovementRules.Validated(MovementInput(StockMovementKind.Entry, 1, date: movementToday.AddDays(-1)), StockMovementKind.Entry, false, movementToday).Date == movementToday.AddDays(-1),
+    "Movement date may be today or in the past");
+foreach (var futureKind in new[] { StockMovementKind.Entry, StockMovementKind.Exit })
+    foreach (var futureIsEdit in new[] { false, true })
+    {
+        try { StockMovementRules.Validated(MovementInput(futureKind, 1, date: movementToday.AddDays(1), reason: "Corectie"), futureKind, futureIsEdit, movementToday); throw new Exception("Future movement date accepted"); }
+        catch (StockMovementOperationException exception)
+        {
+            Check(exception.Message == StockMovementRules.FutureDateMessage,
+                $"A future movement date is rejected ({futureKind}, {(futureIsEdit ? "edit" : "create")})");
+        }
+    }
+try { StockMovementRules.Validated(MovementInput(StockMovementKind.Entry, 1, date: new DateOnly(2099, 1, 1)), StockMovementKind.Entry, false); throw new Exception("Distant future date accepted"); }
+catch (StockMovementOperationException) { Check(true, "A date far in the future is rejected against the real current day"); }
 Check(AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Create, "t", "d", "", "5")) == "/miscari/5" &&
       AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Delete, "t", "d", "", "5")) is null,
     "Journal links movement events to their product page and not after deletion");
@@ -1465,8 +1479,14 @@ try
     Check(first.Stock == 10 && first.Movement.Version == 0 && !first.Movement.Modified && first.Movement.Operator == "operator.stoc", "An entry increases the stock");
     var exitNoBeneficiary = await stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 4, "Iesire fara beneficiar", new DateOnly(2026, 9, 2)));
     Check(exitNoBeneficiary.Stock == 6 && exitNoBeneficiary.Movement.BeneficiaryId is null, "An exit without beneficiary decreases the stock");
-    var overdraw = await stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 8, "Peste stoc", new DateOnly(2099, 5, 5)));
+    var overdraw = await stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 8, "Peste stoc", StockMovementRules.Today));
     Check(overdraw.Stock == -2 && (await movementProducts.GetProductAsync(product.Id))!.Quantity == -2, "An exit may take the stock below zero without blocking");
+    try { await stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Entry, 5, "Data viitoare", StockMovementRules.Today.AddDays(1))); throw new Exception("Future movement persisted"); }
+    catch (StockMovementOperationException exception)
+    {
+        Check(exception.Message == StockMovementRules.FutureDateMessage && (await movementProducts.GetProductAsync(product.Id))!.Quantity == -2,
+            "SQLite rejects a movement dated in the future and leaves the stock unchanged");
+    }
 
     await RejectedMovement(() => stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Entry, 1, "")), "The repository rejects a blank description");
     await RejectedMovement(() => stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 1, beneficiaryId: 9999)), "An unknown beneficiary is rejected");
@@ -1490,10 +1510,10 @@ try
     await Rejected(() => movementProducts.DeleteAsync(product with { Quantity = 0 }, "Test automat"), "A product with movements cannot be deleted");
 
     var ascending = await stockMovements.GetPageAsync(product.Id, all);
-    Check(ascending.Items.Select(m => m.Date).SequenceEqual(ascending.Items.Select(m => m.Date).Order()) && ascending.Items.Last().Date == new DateOnly(2099, 5, 5),
+    Check(ascending.Items.Select(m => m.Date).SequenceEqual(ascending.Items.Select(m => m.Date).Order()) && ascending.Items.Last().Date == StockMovementRules.Today,
         "Movements are ordered by their own date, not by the time they were entered");
     var descendingPage = await stockMovements.GetPageAsync(product.Id, new StockMovementQuery(null, true, 1, 0));
-    Check(descendingPage.Items.First().Date == new DateOnly(2099, 5, 5), "Descending order lists the latest date first");
+    Check(descendingPage.Items.First().Date == StockMovementRules.Today, "Descending order lists the latest date first");
     var exitsOnly = await stockMovements.GetPageAsync(product.Id, new StockMovementQuery(StockMovementKind.Exit, false, 1, 0));
     Check(exitsOnly.Items.Count == 3 && exitsOnly.Items.All(m => m.Kind == StockMovementKind.Exit) && exitsOnly.TotalCount == 3, "The kind filter keeps only exits");
     var secondPage = await stockMovements.GetPageAsync(product.Id, new StockMovementQuery(null, false, 2, 3));
