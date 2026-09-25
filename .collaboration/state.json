@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Linie despre TESTE_RAMASE.md in CLAUDE.md si AGENTS.md",
     "startedAtUtc":  "2026-09-25T07:14:11.5786887Z",
     "completedAtUtc":  "2026-09-25T07:14:31.6556778Z",
