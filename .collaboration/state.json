@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Data miscarii: camp read-only cu calendar",
     "startedAtUtc":  "2026-09-25T06:26:04.0560320Z",
     "completedAtUtc":  "2026-09-25T06:27:25.7603499Z",
