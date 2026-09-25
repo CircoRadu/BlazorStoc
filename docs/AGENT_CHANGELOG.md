@@ -595,3 +595,17 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 388 verificari trecute (27 noi, inclusiv 24 de cereri simultane cu un singur castigator). Browser 5082, doua sesiuni: banner si Editeaza dezactivat, eliberare live, deblocare fortata cu motiv obligatoriu si intrare in jurnal, heartbeat 30 s, pierdere fara reluare, expirare dupa inchiderea tab-ului. Defecte gasite si corectate: reluare tacita dupa deblocare fortata, reinnoire de catre un circuit fara browser, cache vechi la leave-guard.js. Neverificat: MariaDB real, un al doilea cont autentificat separat, doua calculatoare.
 - **Commit:** `claude: finish Task 9 (temporary product edit lock with heartbeat, read-only view and forced unlock)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T07:13:28.8261599Z â€” claude
+
+- **Task:** Fisier cu testele ramase de efectuat
+- **Rezumat:** La cererea utilizatorului s-a creat docs/TESTE_RAMASE.md: evidenta testelor care mai trebuie efectuate, cu motivul pentru care nu s-au putut face (M1-M6: lipsa serverului MariaDB, a doua statie sau cont, limitele automatizarii browserului, alte browsere, teste care ar modifica sau incheia sesiunea utilizatorului, teste de durata), pasii exacti, rezultatul asteptat si sursa. Grupe: A MariaDB real (schema, format io_data, CUI concurent, miscari, proiecte si fisiere, utilizatori web, trigger-e de sincronizare, blocari), B mai multi utilizatori si calculatoare, C interfata neexersata, D tastatura si accesibilitate, E alte browsere si tactil, F functionare indelungata; plus tabelul testelor efectuate. Referit din PROJECT_STATE.md si VALIDARE.md. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `VALIDARE.md`
+- **Validare:** Nu s-a modificat cod; suita BlazorStoc.Checks neschimbata (388 verificari trecute la ultima rulare). Am verificat numele coloanelor din schema (io.id_io, io_data) folosite in interogarile din fisier.
+- **Commit:** `claude: add docs/TESTE_RAMASE.md (pending tests with reasons and steps)`
+- **Predat cÄƒtre:** codex

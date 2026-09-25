@@ -1,5 +1,7 @@
 # Verificări — versiunea 0.2
 
+> Verificările care nu au putut fi efectuate sunt urmărite, cu pașii și motivul, în `docs/TESTE_RAMASE.md`.
+
 ## Imagini produse — 17 septembrie 2026
 
 - Formularul produsului acceptă o imagine din fișier sau clipboard și refuză salvarea unui produs nou fără imagine.

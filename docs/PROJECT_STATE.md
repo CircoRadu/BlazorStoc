@@ -12,6 +12,10 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Evidența testelor rămase
+
+- La cererea utilizatorului s-a creat `docs/TESTE_RAMASE.md`: fiecare verificare neefectuată până acum (MariaDB pe un server real, mai multe calculatoare și conturi, editoarele neexersate în browser, tastatură/cititor de ecran, alte browsere și dispozitive tactile, funcționare îndelungată) cu motivul (M1–M6), pașii, rezultatul așteptat și sursa. Testele efectuate se mută în secțiunea „Teste efectuate” a aceluiași fișier.
+
 ## Ultimele modificări funcționale (ciclul Claude — Task 9)
 
 Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 9”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`. Este ultimul task activ din `TODO.md`.
@@ -189,6 +193,7 @@ Următorul agent este **Codex**. Taskurile 0–9 sunt complete; `TODO.md` nu mai
 ## Fișiere de orientare
 
 - `TODO.md` — backlog și criterii de acceptare.
+- `docs/TESTE_RAMASE.md` — testele care mai trebuie efectuate (motivul pentru care nu s-au putut face și pașii exacți); se actualizează la fiecare verificare nouă sau rămasă neefectuată.
 - `README.md` — configurare și comportament general.
 - `VALIDARE.md` — verificări istorice, inclusiv secțiunile „Cod produs” și „Proiecte”.
 - `ARCHIVE_RECOVERY.md` — contractul de arhivare și recuperare.
