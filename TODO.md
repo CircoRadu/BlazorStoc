@@ -29,6 +29,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - Generarea situației se **jurnalizează**, cu utilizatorul care a generat-o.
 - Meniul principal: sub „Inventar” există intrarea **„Generare situație inventar”** (duce la pagina descrisă aici) și intrarea **„Preluare inventar”** (funcționalitate care se implementează ulterior; aici există doar intrarea, cu **pagină de rezervă**).
 - Stocul negativ se scrie cu roșu pe **întregul rând** al produsului (cod, valoare stoc și celula „Valoare reală”, care rămâne goală).
+- Situația de inventar folosește **numai valoarea din depozitul fizic** (stocul „în depozit”, fără produsele aflate în mașini, vezi taskul „Ieșire spre vehicul…”); regulile „stoc 0” și „stoc negativ” se aplică acestei valori (decizie a utilizatorului, 25 septembrie 2026).
 - Titlul „Inventar” și textul „Generat la” urmează regula generală: normal, mărime 12.
 - Fontul este orice font gratuit, de tip normal, care nu necesită licențiere (licență liberă de redistribuire, de exemplu o familie sub SIL Open Font License); nu se folosesc fonturi comerciale sau instalate doar pe anumite calculatoare.
 - Biblioteca PDF ramane la alegerea implementării, cu condiția unei licențe permisive fără costuri (implicit se folosește PDFsharp/MigraDoc, licență MIT).
@@ -69,7 +70,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 
 - [ ] Prima pagină are titlul „Inventar” și, sub el, „Generat la: zz.ll.aaaa oo:mm”, calculat din momentul generării (UTC) convertit la ora locală (aceeași convenție de timp local ca în restul aplicației, adică ora serverului).
 - [ ] Pentru fiecare categorie selectată (integral sau parțial): o etichetă cu numele categoriei; sub ea, pentru fiecare subcategorie selectată a categoriei: o etichetă cu numele subcategoriei și un tabel cu antetul **Cod produs | Valoare stoc | Valoare reală**. Secțiunile și tabelele sunt generate numai din opțiunile selectate: categoriile fără nicio subcategorie selectată nu apar, subcategoriile fără produse rămase (inclusiv după eliminarea stocului 0) sunt omise împreună cu tabelul lor, iar o categorie fără nicio subcategorie rămasă este omisă.
-- [ ] „Cod produs” conține codul produsului (fără identificatorul tehnic `#<id>`); „Valoare stoc” conține cantitatea din stocul calculat din mișcări la momentul generării (număr întreg, valorile negative afișate ca atare); „Valoare reală” este **goală**, cu spațiu suficient pentru scrierea de mână.
+- [ ] „Cod produs” conține codul produsului (fără identificatorul tehnic `#<id>`); „Valoare stoc” conține cantitatea din **depozitul fizic** la momentul generării (stocul total calculat din mișcări minus produsele aflate în mașini, așa cum este afișat „în depozit”) (număr întreg, valorile negative afișate ca atare); „Valoare reală” este **goală**, cu spațiu suficient pentru scrierea de mână.
 - [ ] Un produs cu **stoc negativ** are **întregul rând** scris cu **roșu** (codul, valoarea stocului și celula „Valoare reală”, care rămâne goală); celelalte rânduri sunt negre. Culoarea nu este singurul indicator: valoarea negativă se recunoaște și după semnul minus.
 - [ ] Fonturi: numele categoriilor și ale subcategoriilor **bold, mărime 14**; tot restul textului (titlul, „Generat la”, antetele și celulele tabelelor, subsolul) **normal, mărime 12**.
 - [ ] Ordinea: categoriile și subcategoriile ca în pagină (alfabetic); produsele fiecărui tabel sunt ordonate după codul produsului (comparație insensibilă la majuscule), cu ordine stabilă la coduri egale.
@@ -108,7 +109,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - PDF-ul are pe prima pagină „Inventar” și „Generat la: zz.ll.aaaa oo:mm” (ora locală a momentului generării), apoi, pentru fiecare categorie selectată, eticheta categoriei, eticheta fiecărei subcategorii selectate și un tabel „Cod produs | Valoare stoc | Valoare reală”, numai cu produsele rezultate din opțiunile alese; „Valoare reală” este goală.
 - Numele categoriilor și subcategoriilor sunt bold de 14; restul textului este normal de 12; fontul este gratuit și include diacriticele românești, care se văd corect.
 - Tabelele continuă pe pagini cu antet repetat; nu rămân etichete singure la sfârșit de pagină.
-- Stocul din PDF coincide cu stocul afișat în „Produse și stocuri” la momentul generării.
+- „Valoare stoc” din PDF coincide cu valoarea „în depozit” afișată în „Produse și stocuri” la momentul generării (produsele aflate în mașini nu se numără).
 - Fiecare generare reușită este jurnalizată cu utilizatorul care a făcut-o; cererile respinse nu sunt jurnalizate.
 - Funcționalitatea este asincronă, fără Docker, fără fișiere SQL de upgrade separate și nu modifică date de inventar (numai citire, în afara evenimentului de jurnal).
 
@@ -116,12 +117,12 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 
 - Alegerea concretă a familiei de font liberă (Noto Sans, Open Sans sau echivalent) și a versiunii bibliotecii PDF; se notează în `docs/PROJECT_STATE.md` împreună cu licențele.
 - Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 1.7); se documentează.
-- „Valoare stoc” din PDF: după introducerea ieșirilor spre vehicul (taskul „Ieșire spre vehicul…”), stocul total se defalcă în „în depozit” și „în vehicule”; se confirmă cu utilizatorul dacă PDF-ul (numărare fizică) folosește stocul din depozit, totalul sau ambele valori; până atunci se folosește stocul total (comportamentul curent).
+- Până la implementarea taskului „Ieșire spre vehicul…” nu există produse în mașini, deci „în depozit” este egal cu stocul total (comportamentul curent); implementarea inventarului folosește accesorul „stoc în depozit”, care după acel task exclude produsele din mașini.
 - Toate celelalte detalii au fost confirmate de utilizator și sunt descrise în „Decizii stabilite cu utilizatorul”.
 
 ## Task 2 — Ieșire spre vehicul, vânzare generică și corecție de stoc (formularul de ieșire)
 
-Extinde formularul de ieșire din pagina intrărilor/ieșirilor unui produs cu o alegere prin butoane radio a **destinației ieșirii**. Cerută de utilizator (25 septembrie 2026). Depinde de lucrarea finalizată „Administrarea vehiculelor” (pagina `/vehicule`, `IVehicleRepository`, `VehicleRules.CheckDelete`), care furnizează lista de vehicule.
+Extinde formularul de ieșire din pagina intrărilor/ieșirilor unui produs cu o alegere prin butoane radio a **destinației ieșirii** și cu alegerea **sursei** produsului folosit (depozit sau o mașină). Cerută de utilizator (25 septembrie 2026). Depinde de lucrarea finalizată „Administrarea vehiculelor” (pagina `/vehicule`, `IVehicleRepository`, `VehicleRules.CheckDelete`), care furnizează lista de vehicule.
 
 ### Subtask 2.1 — Grupul de butoane radio „Destinație”
 
@@ -131,35 +132,45 @@ Extinde formularul de ieșire din pagina intrărilor/ieșirilor unui produs cu o
 - [ ] **Vânzare generică** și **Corecție stoc** nu au câmpuri suplimentare de relație.
 - [ ] Trecerea de la o opțiune la alta golește câmpurile celorlalte (beneficiar, proiect, vehicul) și nu lasă relații reziduale; schimbarea între opțiuni este tratată ca modificare pentru avertizarea la părăsirea formularului.
 
-### Subtask 2.2 — Precompletarea descrierii
+### Subtask 2.2 — Sursa ieșirii: din depozit sau dintr-o mașină
+
+Cerută de utilizator (25 septembrie 2026): la ieșire se poate folosi un produs din stocul din depozit sau dintr-o mașină.
+
+- [ ] La o **Ieșire**, formularul (adăugare și editare) are, pe lângă destinație, alegerea **sursei** produsului folosit, prin butoane radio: **Depozit** (preselectat) sau **Mașină**; cu „Mașină” aleasă apare lista vehiculelor (număr de înmatriculare și descriere), iar alegerea unui vehicul este obligatorie, cu mesaj în română. Dacă nu există vehicule, opțiunea „Mașină” explică acest lucru și trimite la pagina „Vehicule”. La **Intrare** sursa nu apare.
+- [ ] Cu sursa **Mașină**, cantitatea ieșită **nu poate fi mai mare decât cantitatea existentă în mașina aleasă** pentru produsul respectiv (mesaj în română, de exemplu „În mașina HD-01-FDG există numai 3 bucăți din acest produs.”); formularul afișează cantitatea disponibilă în mașina aleasă. Verificarea se face și pe server, în aceeași tranzacție cu salvarea, astfel încât două sesiuni concurente să nu poată scoate împreună mai mult decât există.
+- [ ] Cantitatea existentă într-o mașină pentru un produs = suma cantităților ieșirilor spre acea mașină (din depozit) − suma cantităților ieșirilor cu sursa acea mașină. Ea nu poate deveni negativă nici prin editarea sau ștergerea unei mișcări (de exemplu ștergerea unui transfer spre o mașină din care produsul a fost deja folosit, sau micșorarea cantității lui sub cât s-a folosit, este respinsă cu mesaj în română).
+- [ ] Sursa **Mașină** se combină cu destinațiile **Beneficiar**, **Vânzare generică** și **Corecție stoc**: produsul este folosit din mașină, deci scade stocul total și cantitatea din mașină, iar stocul din depozit rămâne neschimbat. Sursa **Depozit** scade stocul din depozit (și pe cel total, cu excepția transferului spre autovehicul, vezi subtaskul 2.4). Un transfer dintr-o mașină în alta (sau în aceeași) nu este permis în acest task (mesaj în română; vezi „Detalii de stabilit”).
+- [ ] Sursa se salvează în mișcare (identificatorul mașinii sursă; lipsa lui înseamnă depozit), se afișează în tabel și în jurnal (`Details`/`Target`, valori inițiale și finale la editare) și se păstrează în arhiva mișcărilor; ieșirile existente rămân „din depozit”, fără migrare a datelor. Schimbarea sursei este tratată ca modificare pentru avertizarea la părăsirea formularului.
+
+### Subtask 2.3 — Precompletarea descrierii
 
 - [ ] Când se alege **Autovehicul** și un vehicul, câmpul de descriere/motivare al mișcării se precompletează cu textul **„Completare stoc mașină <număr de înmatriculare> <zz.ll.aaaa>”**, unde data este data de azi (formatul `dd.mm.yyyy`, regula generală a datelor); forma exactă a textului cerut de utilizator este „completare stoc mașină + data de azi”.
 - [ ] Când se alege **Corecție stoc**, câmpul se precompletează cu **„Corecție stoc <zz.ll.aaaa>”**, cu data de azi.
 - [ ] Precompletarea nu suprascrie un text scris de utilizator: se aplică numai când câmpul este gol sau conține o precompletare anterioară neschimbată (la schimbarea vehiculului sau a opțiunii textul precompletat se actualizează); textul rămâne editabil, iar descrierea rămâne obligatorie. Opțiunile **Beneficiar** și **Vânzare generică** nu precompletează nimic; trecerea la ele elimină o precompletare neschimbată.
 - [ ] Data folosită este data de azi de pe server (ora locală), aceeași convenție ca restul aplicației.
 
-### Subtask 2.3 — Ieșirea spre vehicul mută produsul, nu îl scade din stoc
+### Subtask 2.4 — Ieșirea spre vehicul mută produsul, nu îl scade din stoc
 
 Cerută de utilizator (25 septembrie 2026): produsul ieșit spre un autovehicul nu este consumat, ci mutat în vehicul.
 
-- [ ] O ieșire spre **Autovehicul nu scade produsul din stocul total**: produsul se mută practic în vehicul, fără a fi folosit. **Numărul total de produse rămâne neschimbat.** Ieșirile spre **Beneficiar**, **Vânzare generică** și **Corecție stoc** scad stocul ca până acum. Cantitatea ieșirii spre vehicul se păstrează în mișcare (câte bucăți au fost mutate), dar efectul ei asupra totalului este 0; regula se aplică uniform la creare, editare (inclusiv schimbarea destinației dintr-una în alta, care recalculează totalul), ștergere și în istoricul „[*]” al mișcării.
-- [ ] Oriunde se afișează stocul existent, acesta se descrie **defalcat**: **„N produse: X în depozit, Y în vehicule”**, unde N este stocul total, Y este suma cantităților ieșirilor spre autovehicul (calculată din mișcări, din același instantaneu coerent cu totalul) și X = N − Y. Locuri: „Total produse în stoc” din pagina intrărilor/ieșirilor, stocul din catalogul „Produse și stocuri” (rânduri și carduri de rezumat), precum și orice alt loc al aplicației care arată stocul unui produs (se caută în cod fiecare afișare a cantității). Textul respectă acordul de număr în română („1 produs”, „2 produse”).
-- [ ] Stocul din depozit poate deveni negativ, ca acum: o ieșire spre vehicul peste stocul din depozit nu este blocată (aceeași regulă ca pentru celelalte ieșiri) și se afișează cu semnul minus.
+- [ ] O ieșire spre **Autovehicul nu scade produsul din stocul total**: produsul se mută practic în vehicul, fără a fi folosit. **Numărul total de produse rămâne neschimbat.** Ieșirile spre **Beneficiar**, **Vânzare generică** și **Corecție stoc** scad stocul total ca până acum: din stocul din depozit când sursa este „Depozit” și din cantitatea din mașină când sursa este „Mașină” (subtaskul 2.2). Cantitatea ieșirii spre vehicul se păstrează în mișcare (câte bucăți au fost mutate), dar efectul ei asupra totalului este 0; regula se aplică uniform la creare, editare (inclusiv schimbarea destinației dintr-una în alta, care recalculează totalul), ștergere și în istoricul „[*]” al mișcării.
+- [ ] Oriunde se afișează stocul existent, acesta se descrie **defalcat, dar numai când există produse în mașini** (Y > 0): **„N produse: X în depozit, Y în vehicule”**, unde N este stocul total al produsului, Y este cantitatea lui aflată în mașini (transferurile spre mașini minus ce s-a folosit din ele, calculată din mișcări, din același instantaneu coerent cu totalul) și X = N − Y. Când niciun produs din locul respectiv nu se află în mașini, se afișează numai stocul, ca acum. Locuri: „Total produse în stoc” din pagina intrărilor/ieșirilor, stocul din catalogul „Produse și stocuri” (rânduri și carduri de rezumat), precum și orice alt loc al aplicației care arată stocul unui produs (se caută în cod fiecare afișare a cantității). Textul respectă acordul de număr în română („1 produs”, „2 produse”).
+- [ ] Stocul din depozit poate deveni negativ, ca acum: o ieșire din depozit (inclusiv spre vehicul) peste stocul din depozit nu este blocată și se afișează cu semnul minus. Cantitatea dintr-o mașină, în schimb, nu poate deveni negativă (subtaskul 2.2).
 - [ ] Ștergerea unui produs rămâne blocată de stocul total nenul, deci și de produsele aflate în vehicule (mesajul menționează vehiculele).
-- [ ] Implementare: stocul total rămâne valoarea existentă a produsului (`quantity`; `produs_cantitate` în MariaDB), actualizată atomic cu mișcarea (o ieșire spre vehicul nu o modifică); cantitatea din vehicule se derivă din mișcări sau se stochează în aceeași tranzacție, fără să poată deveni inconsistentă cu ele — se stabilește la implementare și se documentează, inclusiv compatibilitatea cu tabela `io` a aplicației vechi în modul MariaDB. Verificările „stoc = suma mișcărilor” existente se adaptează la „stoc total = suma efectelor”.
+- [ ] Implementare: stocul total rămâne valoarea existentă a produsului (`quantity`; `produs_cantitate` în MariaDB), actualizată atomic cu mișcarea (o ieșire spre vehicul nu o modifică); cantitatea din vehicule se derivă din mișcări sau se stochează în aceeași tranzacție, fără să poată deveni inconsistentă cu ele — se stabilește la implementare și se documentează, inclusiv compatibilitatea cu tabela `io` a aplicației vechi în modul MariaDB. Verificările „stoc = suma mișcărilor” existente se adaptează la „stoc total = suma efectelor”. Situația de inventar (Task 1) folosește numai stocul „în depozit”.
 
-### Subtask 2.4 — Stocare, afișare și jurnal
+### Subtask 2.5 — Stocare, afișare și jurnal
 
-- [ ] Mișcarea păstrează destinația ieșirii (beneficiar cu eventual proiect, autovehicul, vânzare generică sau corecție de stoc) într-un mod care permite rapoarte ulterioare (de exemplu un tip explicit al destinației și `VehicleId` pentru autovehicul); mișcările existente (cu sau fără beneficiar) rămân valide și sunt interpretate fără migrare a datelor, fără fișiere SQL de upgrade separate; stocul total se calculează din intrări și din ieșirile cu efect asupra lui (fără ieșirile spre autovehicul, vezi subtaskul 2.3).
+- [ ] Mișcarea păstrează destinația ieșirii (beneficiar cu eventual proiect, autovehicul, vânzare generică sau corecție de stoc) într-un mod care permite rapoarte ulterioare (de exemplu un tip explicit al destinației și `VehicleId` pentru autovehicul); mișcările existente (cu sau fără beneficiar) rămân valide și sunt interpretate fără migrare a datelor, fără fișiere SQL de upgrade separate; stocul total se calculează din intrări și din ieșirile cu efect asupra lui (fără ieșirile spre autovehicul, vezi subtaskul 2.4).
 - [ ] Validare pe server: o ieșire spre autovehicul are un vehicul existent; celelalte destinații nu pot avea vehicul, beneficiar sau proiect; combinațiile incompatibile sunt respinse cu mesaje în română. Un vehicul șters/arhivat nu mai poate fi ales.
 - [ ] Tabelul intrărilor/ieșirilor primește o coloană separată cu antetul **„VEHICUL”**, care arată numărul de înmatriculare (link către vehicul) al ieșirilor spre autovehicul; coloana „BENEFICIAR/PROIECT” rămâne neschimbată. Pentru „Vânzare generică” și „Corecție stoc” se afișează o etichetă clară a destinației (locul ei se stabilește la implementare); mișcările vechi fără destinație afișează „—”.
 - [ ] Pagina „Vehicule” (finalizată) primește o coloană cu numărul mișcărilor asociate fiecărui vehicul, cu link către ele; un vehicul cu mișcări nu poate fi șters: regula `VehicleRules.CheckDelete` există și este testată, iar acest task o leagă de mișcări în SQLite și MariaDB (verificare în aceeași tranzacție cu arhivarea) și extinde `archive_stock_movements` cu destinația și vehiculul.
 - [ ] Jurnalul mișcărilor (creare, editare, ștergere, istoricul „[*]”) include destinația și vehiculul în `Details`/`Target`, cu valorile inițiale și finale la editare; funcționează în SQLite și MariaDB, prin infrastructura comună.
 
-### Subtask 2.5 — Verificări
+### Subtask 2.6 — Verificări
 
-- [ ] Teste automate: fiecare destinație se salvează corect; combinațiile incompatibile sunt respinse; precompletarea (text, data, nesuprascrierea unui text scris de utilizator, actualizarea la schimbarea vehiculului sau a opțiunii); mișcările existente rămân neschimbate; o ieșire spre vehicul lasă totalul neschimbat și crește „în vehicule” cu cantitatea ei, iar cele spre beneficiar, vânzare generică și corecție îl scad; editarea destinației (vehicul ↔ beneficiar etc.) și ștergerea unei mișcări recalculează corect totalul și defalcarea; „X în depozit, Y în vehicule” însumează N; depozitul negativ; ștergerea produsului blocată de stocul din vehicule; jurnalul; două sesiuni concurente.
-- [ ] Verificare în browser (modul demonstrativ): grupul radio la Ieșire (adăugare și editare), lipsa lui la Intrare, precompletările pentru Autovehicul și Corecție stoc cu data de azi, salvarea și afișarea în tabel, avertizarea la părăsire; o ieșire spre vehicul nu scade totalul, iar defalcarea „X în depozit, Y în vehicule” apare în pagina mișcărilor și în catalog; la 375 și 768 px fără depășire orizontală.
+- [ ] Teste automate: fiecare destinație se salvează corect; combinațiile incompatibile sunt respinse; precompletarea (text, data, nesuprascrierea unui text scris de utilizator, actualizarea la schimbarea vehiculului sau a opțiunii); mișcările existente rămân neschimbate (sursă depozit); ieșirea cu sursa mașină respinsă peste cantitatea din mașină și acceptată până la ea, inclusiv la două sesiuni concurente; editarea sau ștergerea unui transfer deja folosit respinsă; ieșirea din mașină scade totalul și mașina, nu depozitul; transferul mașină → mașină respins; o ieșire spre vehicul lasă totalul neschimbat și crește „în vehicule” cu cantitatea ei, iar cele spre beneficiar, vânzare generică și corecție îl scad; editarea destinației (vehicul ↔ beneficiar etc.) și ștergerea unei mișcări recalculează corect totalul și defalcarea; „X în depozit, Y în vehicule” însumează N; depozitul negativ; ștergerea produsului blocată de stocul din vehicule; jurnalul; două sesiuni concurente.
+- [ ] Verificare în browser (modul demonstrativ): grupul radio la Ieșire (adăugare și editare), lipsa lui la Intrare, precompletările pentru Autovehicul și Corecție stoc cu data de azi, salvarea și afișarea în tabel, avertizarea la părăsire; sursa Depozit/Mașină cu cantitatea disponibilă și mesajul la depășire; o ieșire spre vehicul nu scade totalul, iar defalcarea „X în depozit, Y în vehicule” apare în pagina mișcărilor și în catalog numai când există produse în mașini; la 375 și 768 px fără depășire orizontală.
 - [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și `docs/TESTE_RAMASE.md` pentru ce nu se poate verifica.
 
 ### Criterii de acceptare
@@ -169,14 +180,16 @@ Cerută de utilizator (25 septembrie 2026): produsul ieșit spre un autovehicul 
 - Nicio ieșire nu se salvează fără destinație aleasă din grupul radio.
 - Destinația se salvează, se afișează în tabel (vehiculul în coloana „VEHICUL”) și în jurnal; mișcările existente nu sunt afectate.
 - O ieșire spre autovehicul nu scade stocul total (produsul este mutat în vehicul); celelalte ieșiri îl scad ca până acum.
-- Oriunde apare stocul unui produs, este descris defalcat: „N produse: X în depozit, Y în vehicule”, cu X + Y = N.
+- La ieșire se alege sursa produsului: depozit sau o mașină; din mașină nu se poate scoate mai mult decât există în ea pentru acel produs.
+- Oriunde apare stocul unui produs care are bucăți în mașini, este descris defalcat: „N produse: X în depozit, Y în vehicule”, cu X + Y = N; fără produse în mașini se afișează numai stocul.
+- Situația de inventar (Task 1) folosește numai valoarea din depozitul fizic.
 
 ### Detalii de stabilit la implementare
 
 - Textul exact al precompletărilor (majuscule, diacritice — care se elimină oricum la salvare, conform regulii existente) și formatul datei (`dd.mm.yyyy`).
 - Locul etichetei pentru „Vânzare generică” și „Corecție stoc” în tabel (decizii deja luate: destinația este obligatorie, coloana vehiculului se numește „VEHICUL”).
-- Cum ies produsele din vehicul (consum sau restituire în depozit): nu este cerut în acest task, deci cantitatea „în vehicule” crește numai prin ieșiri spre autovehicul și scade numai prin editarea sau ștergerea acelor mișcări; o operație de consum/restituire se stabilește separat cu utilizatorul.
-- Afișarea când nu există produse în vehicule (Y = 0): implicit se arată tot „N produse: N în depozit, 0 în vehicule”, pentru consecvență.
+- Transferul dintr-o mașină în alta nu este cerut; implicit nu este permis. Restituirea produselor din mașină în depozit nu are operație proprie (nu este cerută) și se stabilește separat dacă apare nevoia.
+- Cum apare sursa (mașina din care s-a scos produsul) în tabel: implicit în coloana „VEHICUL”, cu prefixul „din” pentru sursă și „în” pentru destinația transferului.
 
 ## Observații pentru etapa de implementare
 

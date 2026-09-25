@@ -864,3 +864,18 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu se aplica (numai documentatie); verificata numerotarea taskurilor si subtaskurilor.
 - **Commit:** `claude: add vehicle stock-transfer rule to TODO`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:51:43.4544616Z â€” claude
+
+- **Task:** Adaugare in TODO: sursa iesirii (depozit sau masina) si inventar numai din depozit
+- **Rezumat:** TODO: la Task 2 (iesire spre vehicul) subtask nou 2.2 - sursa iesirii (depozit sau masina), din masina nu se poate scoate mai mult decat exista, defalcarea N produse: X in depozit, Y in vehicule numai cand exista produse in masini; subtaskurile renumerotate 2.1-2.6; Task 1 (inventar) foloseste numai valoarea din depozitul fizic. CLAUDE.md si AGENTS.md: regula ca la terminarea fiecarui task ramane un preview in functiune (utilizatorul il inchide manual). Preview pornit pe 5082 cu build-ul curent (vehicule). PROJECT_STATE actualizat. Nu s-a modificat cod de aplicatie.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu se aplica (documentatie); verificata numerotarea taskurilor; build Release 0 avertismente si preview 5082 health 200.
+- **Commit:** `claude: add stock source rules and preview-left-running rule`
+- **Predat cÄƒtre:** codex
