@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 1: mesaje exclusiv in limba romana",
     "startedAtUtc":  "2026-09-25T11:16:11.9910524Z",
     "completedAtUtc":  "2026-09-25T11:23:19.5525732Z",
