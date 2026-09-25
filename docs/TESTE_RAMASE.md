@@ -112,6 +112,12 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 
 ---
 
+### A9. Vehicule pe MariaDB
+- **Verifică**: `MariaVehicleRepository` — crearea tabelei `vehicul` la prima accesare, unicitatea numărului (indexul `UX_vehicul_numar`), traducerea erorii 1062 la creare concurentă, arhivarea (`archive_vehicles`) în aceeași tranzacție cu evenimentul din `audit_events`.
+- **Pași**: (1) pornește în modul MariaDB și deschide Administrare → Vehicule (`SHOW TABLES` conține `vehicul`); (2) adaugă `HD-01-FDG`, apoi încearcă din nou `hd01fdg` → mesajul cu numărul și descrierea existentă; (3) din două tab-uri creează simultan același număr nou (5–10 repetări) → o singură salvare reușește, cealaltă primește mesajul cu vehiculul existent, nu o eroare 500; (4) editează cu motivare și șterge în doi pași → rând în `archive_vehicles` și în `archive_operations`, eveniment „Ștergere” în `audit_events` cu același `archive_operation_id`; (5) verifică în Jurnal filtrul „Vehicule”.
+- **Așteptat**: niciodată două rânduri cu același număr; ștergerea nu lasă un vehicul parțial arhivat.
+- **Sursă**: administrarea vehiculelor.
+
 ## B. Mai mulți utilizatori și mai multe calculatoare (motiv: M2, M6)
 
 ### B1. Două calculatoare, două conturi distincte

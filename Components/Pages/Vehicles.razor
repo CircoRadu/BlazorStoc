@@ -1,0 +1,131 @@
+@page "/vehicule"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject UnsavedChanges Guard
+@inject IVehicleRepository Repository
+@inject IAccessControl Access
+@inject NavigationManager Navigation
+@inject ILogger<Vehicles> Logger
+@implements IDisposable
+
+<PageTitle>Vehicule · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
+<div class="page-heading">
+    <div><p class="eyebrow">FLOTA FIRMEI</p><h1>Vehicule</h1><p class="muted">Administrează autovehiculele firmei, către care vor putea fi operate ieșirile de stoc.</p></div>
+    <div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă vehicul</button></div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error @if (!denied) { <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button> }</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (editing) { <VehicleEditor @key="editorKey" Original="editingVehicle" Saved="VehicleSavedAsync" Closed="CloseEditorAsync" /> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Registru vehicule <span>@Filtered.Count</span></h2><small>Numărul de înmatriculare identifică în mod unic fiecare vehicul</small></div>
+    <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută vehicule" placeholder="Caută după număr de înmatriculare sau descriere…" @bind="query" @bind:event="oninput" /></label></div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă vehiculele</h3></div> }
+    else if (loaded && vehicles.Count == 0) { <div class="empty-state"><span class="empty-icon">▣</span><h3>Nu există vehicule</h3><p>Adaugă primul vehicul al firmei cu butonul „Adaugă vehicul”.</p></div> }
+    else if (Filtered.Count == 0 && loaded) { <div class="empty-state"><span class="empty-icon">▣</span><h3>Nu există vehicule pentru căutarea curentă</h3><p>Șterge textul din câmpul de căutare pentru a vedea toate vehiculele.</p></div> }
+    else if (loaded)
+    {
+        <div class="table-scroll"><table><thead><tr><th>NUMĂR DE ÎNMATRICULARE</th><th>DESCRIERE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var vehicle in Filtered)
+        {
+            <tr @key="vehicle.Id"><td><span class="role-badge limited">@vehicle.PlateNumber</span></td><td class="movement-text"><strong>@vehicle.Description</strong></td><td><div class="row-buttons"><button class="row-action edit" aria-label="Editează vehiculul @vehicle.PlateNumber" @onclick="() => OpenEditorAsync(vehicle)">✎</button><button class="row-action delete" aria-label="Șterge vehiculul @vehicle.PlateNumber" @onclick="() => RequestDeleteAsync(vehicle)">×</button></div></td></tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi vehiculul?" Subject="Vehiculul"
+                              ObjectLabel="@($"{deleting.PlateNumber} · {deleting.Description}")"
+                              Description="Vehiculele care au mișcări de stoc asociate nu pot fi șterse."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteVehicleAsync"
+                              Cancelled="CancelDeleteAsync" />
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
+    private IReadOnlyList<Vehicle> vehicles = Array.Empty<Vehicle>();
+    private Vehicle? editingVehicle, deleting;
+    private string query = "";
+    private bool loading, syncing, loaded, editing, deleteBusy, denied;
+    private string? error, notice, deleteError;
+    private Guid editorKey;
+    private readonly CancellationTokenSource lifetime = new();
+    private List<Vehicle> Filtered => VehicleSearch.Filter(vehicles, query).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Access.CanManageProductsAsync(lifetime.Token)) { denied = true; error = "Nu ai dreptul să administrezi vehiculele."; return; }
+        await LoadAsync(true);
+        _ = SynchronizePeriodicallyAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (EditId is > 0 && loaded && (!editing || editingVehicle?.Id != EditId.Value))
+        {
+            var requested = vehicles.FirstOrDefault(vehicle => vehicle.Id == EditId.Value);
+            if (requested is not null) await OpenEditorAsync(requested);
+            else error = "Vehiculul solicitat pentru editare nu mai există.";
+        }
+    }
+
+    private Task RetryLoadAsync() => LoadAsync(true);
+    private async Task LoadAsync(bool showLoading)
+    {
+        if (syncing) return;
+        syncing = true;
+        if (showLoading) loading = true;
+        error = null;
+        try { vehicles = await Repository.GetVehiclesAsync(lifetime.Token); loaded = true; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { denied = true; error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Vehicle loading failed ({ErrorType}).", exception.GetType().Name); error = "Vehiculele nu au putut fi încărcate."; }
+        finally { loading = false; syncing = false; }
+    }
+
+    private async Task SynchronizePeriodicallyAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(async () => { if (!editing && deleting is null) { await LoadAsync(false); StateHasChanged(); } });
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+    }
+
+    private Task OpenEditorAsync(Vehicle? vehicle) { editingVehicle = vehicle; editorKey = Guid.NewGuid(); editing = true; notice = null; return Task.CompletedTask; }
+    private Task CloseEditorAsync()
+    {
+        editing = false; editingVehicle = null;
+        if (EditId is not null) { EditId = null; if (!Guard.IsDiscarding) Navigation.NavigateTo("/vehicule"); }
+        return Task.CompletedTask;
+    }
+    private async Task VehicleSavedAsync(Vehicle vehicle)
+    {
+        var created = editingVehicle is null;
+        vehicles = vehicles.Where(existing => existing.Id != vehicle.Id).Append(vehicle).OrderBy(existing => existing.PlateNumber, StringComparer.Ordinal).ToArray();
+        await CloseEditorAsync();
+        notice = created ? "Vehiculul a fost adăugat." : "Vehiculul a fost actualizat.";
+    }
+    private Task RequestDeleteAsync(Vehicle vehicle) { deleting = vehicle; deleteError = null; notice = null; return Task.CompletedTask; }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+    private async Task DeleteVehicleAsync(string reason)
+    {
+        if (deleteBusy || deleting is null) return;
+        deleteBusy = true;
+        deleteError = null;
+        try { await Repository.DeleteAsync(deleting, reason, lifetime.Token); vehicles = vehicles.Where(vehicle => vehicle.Id != deleting.Id).ToArray(); deleting = null; notice = "Vehiculul a fost mutat în arhivă."; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (VehicleOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Vehicle deletion failed ({ErrorType}).", exception.GetType().Name); deleteError = "Vehiculul nu a putut fi șters. Actualizează lista și reîncearcă."; }
+        finally { deleteBusy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

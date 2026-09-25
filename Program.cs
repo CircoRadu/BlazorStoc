@@ -74,6 +74,9 @@ builder.Services.AddScoped<IStockMovementRepository>(services => demo
 builder.Services.AddScoped<IBeneficiaryRepository>(services => demo
     ? new SqliteBeneficiaryRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
     : new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
+builder.Services.AddScoped<IVehicleRepository>(services => demo
+    ? new SqliteVehicleRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
+    : new MariaVehicleRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddSingleton<IProductImageStore>(services => demo
     ? new SqliteProductImageStore(services.GetRequiredService<SqliteLocalStore>())
     : new FileProductImageStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>()));

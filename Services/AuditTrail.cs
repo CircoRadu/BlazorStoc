@@ -14,6 +14,7 @@ public static class AuditEntities
     public const string ProjectObservation = "Observatie";
     public const string ProjectObservationFile = "FisierObservatie";
     public const string StockMovement = "MiscareStoc";
+    public const string Vehicle = "Vehicul";
 }
 
 public static class AuditActions
@@ -72,7 +73,9 @@ public static class AuditNavigation
         // The event stores the observation id; /observatii/{id} resolves it to the page under its project.
         [AuditEntities.ProjectObservation] = ProjectNavigation.ObservationUrl,
         // The event stores the movement id; /miscari/{id} resolves it to the product's movements page.
-        [AuditEntities.StockMovement] = StockMovementNavigation.MovementUrl
+        [AuditEntities.StockMovement] = StockMovementNavigation.MovementUrl,
+        // The vehicles page opens the editor of the vehicle named by the identifier.
+        [AuditEntities.Vehicle] = VehicleNavigation.EditUrl
     };
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)

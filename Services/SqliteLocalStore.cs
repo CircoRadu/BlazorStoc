@@ -53,7 +53,7 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
                 "CREATE INDEX IF NOT EXISTS ix_stock_movements_product ON stock_movements(product_id,movement_date,id)",
                 cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, """
-                INSERT INTO app_metadata(key,value) VALUES('schema_version','8')
+                INSERT INTO app_metadata(key,value) VALUES('schema_version','9')
                 ON CONFLICT(key) DO UPDATE SET value=excluded.value;
                 """, cancellationToken).ConfigureAwait(false);
             await SeedIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -455,6 +455,13 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             normalized_cui TEXT NOT NULL UNIQUE,
             version INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS vehicles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plate_number TEXT NOT NULL,
+            normalized_plate TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL,
+            version INTEGER NOT NULL DEFAULT 0
+        );
         CREATE TABLE IF NOT EXISTS web_users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
@@ -580,6 +587,13 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             cui TEXT NOT NULL,
             version INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS archive_vehicles (
+            archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
+            original_id INTEGER NOT NULL,
+            plate_number TEXT NOT NULL,
+            description TEXT NOT NULL,
+            version INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS archive_web_users (
             archive_id TEXT PRIMARY KEY REFERENCES archive_operations(id) ON DELETE RESTRICT,
             original_id INTEGER NOT NULL,
@@ -668,6 +682,7 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
         CREATE INDEX IF NOT EXISTS ix_archive_products_original ON archive_products(original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_beneficiaries_original ON archive_beneficiaries(original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_web_users_original ON archive_web_users(original_id);
+        CREATE INDEX IF NOT EXISTS ix_archive_vehicles_original ON archive_vehicles(original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_projects_original ON archive_projects(original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_project_observations_original ON archive_project_observations(original_id);
         CREATE INDEX IF NOT EXISTS ix_archive_project_observation_files_original ON archive_project_observation_files(original_id);

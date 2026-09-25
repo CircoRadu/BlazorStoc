@@ -21,7 +21,7 @@
     <div class="catalog-heading"><h2>Istoric operații <span>@Filtered.Count</span></h2><small>Sincronizare automată la 15 secunde · afișare în ora locală · stocare UTC</small></div>
     <div class="filters audit-filters">
         <label class="search-box"><span>⌕</span><input aria-label="Caută în jurnal" placeholder="Utilizator, țintă sau detalii…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label>
-        <label><span class="sr-only">Tip înregistrare</span><select @bind="entity" @bind:after="ResetPage"><option value="">Toate tipurile</option><option value="@AuditEntities.Product">Produse</option><option value="@AuditEntities.Beneficiary">Beneficiari</option><option value="@AuditEntities.User">Utilizatori</option></select></label>
+        <label><span class="sr-only">Tip înregistrare</span><select @bind="entity" @bind:after="ResetPage"><option value="">Toate tipurile</option><option value="@AuditEntities.Product">Produse</option><option value="@AuditEntities.Beneficiary">Beneficiari</option><option value="@AuditEntities.Vehicle">Vehicule</option><option value="@AuditEntities.User">Utilizatori</option></select></label>
         <label><span class="sr-only">Operație</span><select @bind="action" @bind:after="ResetPage"><option value="">Toate operațiile</option><option value="@AuditActions.Create">Adăugare</option><option value="@AuditActions.Edit">Editare</option><option value="@AuditActions.Delete">Ștergere</option><option value="@AuditActions.Login">Conectare</option><option value="@AuditActions.Logout">Deconectare</option><option value="@AuditActions.Unlock">Deblocare</option></select></label>
     </div>
     @if (HasFilters)

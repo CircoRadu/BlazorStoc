@@ -1,0 +1,108 @@
+@using BlazorStoc.Services
+@inject IVehicleRepository Repository
+@inject ILogger<VehicleEditor> Logger
+@implements IDisposable
+
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="vehicle-editor-title">
+    <div class="catalog-heading"><h2 id="vehicle-editor-title">@(Original is null ? "Adaugă vehicul" : $"Editează vehiculul {Original.PlateNumber}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="vehicle-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="vehicle-plate">Număr de înmatriculare *<InputText id="vehicle-plate" @bind-Value="input.PlateNumber" @bind-Value:after="NormalizePlate" maxlength="12" autocomplete="off" placeholder="HD-01-FDG" /><small>Forma AA-OOO-AAA: 1–2 litere, 2–3 cifre, 3 litere (HD-01-FDG, HD-233-VDG, B-123-ABC).</small><ValidationMessage For="() => input.PlateNumber" /></label>
+                <label for="vehicle-description">Descriere *<InputText id="vehicle-description" @bind-Value="input.Description" maxlength="100" autocomplete="off" placeholder="Dacia Dokker albă" /><small>Text scurt, de exemplu marca, modelul și culoarea.</small><ValidationMessage For="() => input.Description" /></label>
+                @if (Original is not null)
+                {
+                    <ChangeReasonField Id="vehicle-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
+                }
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează vehiculul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+@if (pendingChanges is not null && Original is not null)
+{
+    <SaveConfirmationDialog Title="Salvezi modificările vehiculului?" ObjectLabel="@Original.PlateNumber" Changes="pendingChanges"
+                            Reason="@input.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
+
+@code {
+    [Parameter] public Vehicle? Original { get; set; }
+    [Parameter] public EventCallback<Vehicle> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    private UnsavedChangesTracker? tracker;
+    private string CurrentSnapshot() => FormSnapshot.Of(input);
+    // "Părăsește editarea": the leave warning closes the form without saving.
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private VehicleInput input = new();
+    private bool saving;
+    private IReadOnlyList<AuditChange>? pendingChanges;
+    private string? error, reasonError;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override Task OnInitializedAsync()
+    {
+        input = Original is null ? new() : VehicleInput.From(Original);
+        return Task.CompletedTask;
+    }
+
+    // The mask is completed for the user: upper case and hyphens are inserted when the typed value is valid.
+    private void NormalizePlate()
+    {
+        if (VehiclePlate.TryNormalize(input.PlateNumber, out var plate)) input.PlateNumber = plate;
+    }
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
+        if (reasonError is not null) return;
+        if (Original is not null)
+        {
+            // Saving over existing data needs an explicit confirmation of the changed fields.
+            error = null;
+            try
+            {
+                var value = input.Validated(true);
+                pendingChanges = SaveSummary.Changed(new("Număr de înmatriculare", Original.PlateNumber, value.PlateNumber), new("Descriere", Original.Description, value.Description));
+            }
+            catch (VehicleOperationException exception) { error = exception.Message; }
+            return;
+        }
+        await PersistAsync();
+    }
+
+    private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
+    private Task CancelConfirmation() { pendingChanges = null; return Task.CompletedTask; }
+
+    private async Task PersistAsync()
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        Vehicle? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (VehicleOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Vehicle saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Vehiculul nu a putut fi salvat. Datele formularului au fost păstrate; actualizează lista înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

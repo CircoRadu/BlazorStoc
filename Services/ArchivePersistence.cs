@@ -159,6 +159,14 @@ internal static class SqliteArchivePersistence
                     ("@beneficiary", movement.BeneficiaryId), ("@project", movement.ProjectId),
                     ("@operator", movement.Operator), ("@version", movement.Version));
                 break;
+            case AuditEntities.Vehicle:
+                var vehicle = ArchiveJson.Entity<Vehicle>(snapshot);
+                command = SqliteLocalStore.Command(connection, transaction, """
+                    INSERT INTO archive_vehicles(archive_id,original_id,plate_number,description,version)
+                    VALUES(@archiveId,@id,@plate,@description,@version)
+                    """, ("@archiveId", operation.Id.ToString("D")), ("@id", vehicle.Id),
+                    ("@plate", vehicle.PlateNumber), ("@description", vehicle.Description), ("@version", vehicle.Version));
+                break;
             default:
                 throw new ArchiveContractException(
                     $"Tipul «{snapshot.EntityType}» este înregistrat, dar nu are mapare SQLite pentru tabela sa archive_*.");
@@ -295,6 +303,14 @@ internal static class MariaArchivePersistence
                     ("@date", StockMovementRules.StorageDate(movement.Date)), ("@description", movement.Description),
                     ("@beneficiary", movement.BeneficiaryId), ("@project", movement.ProjectId),
                     ("@operator", movement.Operator), ("@version", movement.Version)).ConfigureAwait(false);
+                break;
+            case AuditEntities.Vehicle:
+                var vehicle = ArchiveJson.Entity<Vehicle>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_vehicles(archive_id,original_id,plate_number,description,version)
+                    VALUES(@archiveId,@id,@plate,@description,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", vehicle.Id),
+                    ("@plate", vehicle.PlateNumber), ("@description", vehicle.Description), ("@version", vehicle.Version)).ConfigureAwait(false);
                 break;
             default:
                 throw new ArchiveContractException(

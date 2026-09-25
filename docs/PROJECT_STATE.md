@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Stare ciclu: **Eticheta „Beneficiar/Proiect” din tabelul de intrări/ieșiri finalizată; rămâne un singur task activ (Task 1, situația de inventar); pregătit pentru predarea către Codex după commitul curent**
+Beneficiar/Proiect din tabelul de intrări/ieșiri finalizată; rămâne un singur task activ (Task 1, situația de inventar); pregătit pentru predarea către Codex după commitul curent**„Beneficiar/Proiect” din tabelul de intrări/ieșiri finalizată; rămâne un singur task activ (Task 1, situația de inventar); pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -46,6 +46,13 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 - La cererea utilizatorului („implementează task 1”, ordinea agenților schimbată printr-un commit separat): antetul coloanei din `Components/Pages/ProductMovements.razor` este „BENEFICIAR/PROIECT” (coloana arată beneficiarul și proiectul mișcării). `README.md` și `VALIDARE.md` folosesc noua etichetă; etichetele „Beneficiar” din formularul de ieșire, formularul proiectului, pagina Beneficiari și jurnal nu s-au modificat.
 - Validare: build Release 0 avertismente; `BlazorStoc.Checks` 413 trecute, 0 eșuate; browser (instanță de probă pe 5083, modul demonstrativ, `/produse/1`): antetul pe un rând, fără depășire orizontală a paginii la 768 și 375 px (tabelul defilează în propriul container la 375 px, ca înainte). Neverificat: preview-ul de pe 5082 (proces pornit de alt cont, nu a putut fi oprit din sesiune) arată antetul vechi până la repornirea lui din `bin\Release\net9.0\BlazorStoc.exe --urls http://127.0.0.1:5082`.
 - Taskuri active rămase: 1 (situația de inventar) — următorul pas.
+
+## Administrarea vehiculelor (secțiunea „Vehicule”)
+
+- La cererea utilizatorului („implementează task 2”): pagina `/vehicule` (Administrare → Vehicule), cu `Vehicles.razor`/`VehicleEditor.razor`, `Services/Vehicles.cs` (număr `VehiclePlate`, `VehicleInput`, `VehicleRules`, `IVehicleRepository`), `SqliteVehicleRepository` și `MariaVehicleRepository`. Număr de înmatriculare unic cu masca `AA-OOO-AAA` extinsă la cererea utilizatorului la 1–2 litere, 2–3 cifre, 3 litere (`B-123-ABC` permis, `HD-1-FDG` respins), descriere obligatorie (100 de caractere). Arhivare (`archive_vehicles`, SQLite schema 9, MariaDB arhivă versiunea 5), jurnal (tip „Vehicul”, filtru în Jurnal, link `/vehicule?edit={id}`), tabelă `vehicul` creată la prima folosire în MariaDB.
+- Validare: build Release 0 avertismente; `BlazorStoc.Checks` 464 trecute (51 noi); browser pe instanță de probă 5083 cu bază separată (adăugare, număr invalid, completare automată, editare cu confirmare, jurnal, ștergere în doi pași, 375/768 px). Neverificat: MariaDB pe server real (`docs/TESTE_RAMASE.md` A9).
+- Decizii pentru taskul următor („Ieșire spre vehicul…”), primite de la utilizator: o ieșire nu poate exista fără destinație aleasă din grupul radio; coloana vehiculului din tabelul mișcărilor are antetul „VEHICUL”. Blocarea ștergerii unui vehicul cu mișcări și numărul mișcărilor pe pagina Vehicule au fost mutate în acel task (mișcările nu au încă vehicul); `VehicleRules.CheckDelete` este pregătită și testată.
+- Următorul pas: Task 1 (situația de inventar) sau Task 2 (ieșire spre vehicul), în ordinea din `TODO.md`.
 
 ## Pregătire TODO — vehicule și ieșire spre vehicul
 

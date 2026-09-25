@@ -286,7 +286,7 @@ Verificat la 25 septembrie 2026.
 - `BlazorStoc.Checks` 413 (verificarea literalelor de mesaj); browser pe 5082: −5, 0, valoare prea mare, câmp gol, 404 și dialogul de reconectare cu serverul oprit.
 - Neverificat: ferestrele native (calendar, selector de fișiere).
 
-## Eticheta „Beneficiar/Proiect” în tabelul mișcărilor (25 septembrie 2026)
+Beneficiar/Proiect în tabelul mișcărilor (25 septembrie 2026)„Beneficiar/Proiect” în tabelul mișcărilor (25 septembrie 2026)
 
 - Antetul coloanei din tabelul de intrări/ieșiri este „BENEFICIAR/PROIECT”; conținutul și linkurile coloanei sunt neschimbate.
 - BlazorStoc.Checks 413 trecute; browser (instanță de probă pe http://127.0.0.1:5083, modul demonstrativ, /produse/1): antetele „DATA, INTRARE/IEȘIRE, NUMĂR BUCĂȚI, DESCRIERE, BENEFICIAR/PROIECT, Acțiuni” pe un singur rând; la 768 px fără depășire orizontală, la 375 px pagina rămâne pe 375 px, iar tabelul defilează în propriul container.

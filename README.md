@@ -35,8 +35,13 @@ Administratorii și utilizatorii cu acces limitat pot lista, căuta, adăuga, ed
 
 În modul MariaDB, prima accesare a secțiunii completează direct tabela existentă `beneficiar` cu coloanele necesare pentru CUI și versiunea de concurență, numai în baza configurată exact cu numele `BlazorStoc`. Nu este generat un fișier SQL de upgrade.
 
-## Administrarea utilizatorilor
+## Vehicule
 
+Meniul **Administrare → Vehicule** (`/vehicule`) administrează autovehiculele firmei, pentru toți utilizatorii autentificați. Fiecare vehicul are un **număr de înmatriculare** obligatoriu și unic și o **descriere** scurtă obligatorie (cel mult 100 de caractere, de exemplu „Dacia Dokker alba”). Numărul respectă masca `AA-OOO-AAA`: 1–2 litere, 2–3 cifre (două sau trei, deci `01`, nu `1`), 3 litere — `HD-01-FDG`, `HD-233-VDG`, `B-123-ABC`. Se poate tasta cu litere mici, cu spații sau fără cratime; se salvează cu majuscule și cratime. Editarea cere motivare și confirmarea salvării, ștergerea se face în doi pași (motiv, apoi `sterge`) și arhivează vehiculul; adăugările, editările și ștergerile apar în Jurnal (tip „Vehicul”). Legarea vehiculelor de ieșirile de stoc urmează într-un task separat.
+
+În modul MariaDB tabela `vehicul` este creată la prima accesare a secțiunii, numai în baza `BlazorStoc`; nu este generat un fișier SQL de upgrade.
+
+## Administrarea utilizatorilor
 Administratorul configurat prin `Authentication__Username` și `Authentication__Password` rămâne contul de inițializare. După autentificare, pagina **Utilizatori** permite:
 
 - adăugarea conturilor cu parolă de minimum 12 caractere;

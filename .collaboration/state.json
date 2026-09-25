@@ -1,14 +1,14 @@
-{
+﻿{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Adaugare in TODO a taskurilor Vehicule si Iesire spre vehicul",
-    "startedAtUtc":  "2026-09-25T11:30:11.2396193Z",
-    "completedAtUtc":  "2026-09-25T11:31:16.6872683Z",
-    "lastSummary":  "Adaugate in TODO.md doua taskuri active noi, la cererea utilizatorului: Task 2 Administrarea vehiculelor (sectiunea Vehicule in Administrare, numar de inmatriculare unic cu masca AA-OOO-AAA, descriere obligatorie, arhivare, jurnal) si Task 3 Iesire spre vehicul, vanzare generica si corectie de stoc (butoane radio in formularul de iesire, precompletarea descrierii cu data de azi). Task 1 (inventar) neschimbat. PROJECT_STATE actualizat. Nu s-a modificat cod.",
-    "lastCommitSubject":  "claude: add vehicles and vehicle-exit tasks to TODO",
+    "nextAgent":  "codex",
+    "currentTask":  "Task 2: administrarea vehiculelor (sectiunea Vehicule)",
+    "startedAtUtc":  "2026-09-25T11:41:22.7711285Z",
+    "completedAtUtc":  "2026-09-25T11:43:03.7758914Z",
+    "lastSummary":  "Task 2 implementat: administrarea vehiculelor. Pagina /vehicule (Administrare -\u003e Vehicule) cu adaugare, editare cu motivare si confirmare, stergere in doi pasi cu arhivare, cautare, sincronizare la 15s. Numar de inmatriculare unic cu masca AA-OOO-AAA extinsa la cererea utilizatorului la 1-2 litere, 2-3 cifre, 3 litere (B-123-ABC permis, HD-1-FDG respins), normalizat cu majuscule si cratime; descriere obligatorie max 100. Servicii: Vehicles.cs, SqliteVehicleRepository, MariaVehicleRepository (tabela vehicul creata la prima folosire), archive_vehicles (SQLite schema 9, Maria arhiva v5), tip de jurnal Vehicul cu filtru si link /vehicule?edit=id, DI in Program.cs. Legarea de miscari si blocarea stergerii cu miscari mutate in taskul de iesire spre vehicul (destinatie obligatorie, coloana VEHICUL). TODO: task arhivat, iesirea spre vehicul renumerotata 2. README, VALIDARE, PROJECT_STATE, TESTE_RAMASE (A9) actualizate.",
+    "lastCommitSubject":  "claude: vehicles administration page (Administrare \u003e Vehicule)",
     "claudeStatus":  "active"
 }

@@ -649,7 +649,7 @@ try
             "SQLite creates the project, observation and observation-file live and archive tables");
         await using var version = schemaConnection.CreateCommand();
         version.CommandText = "SELECT value FROM app_metadata WHERE key='schema_version'";
-        Check((string?)await version.ExecuteScalarAsync() == "8", "Archive schema is versioned with the live SQLite schema");
+        Check((string?)await version.ExecuteScalarAsync() == "9", "Archive schema is versioned with the live SQLite schema");
         await using var indexes = schemaConnection.CreateCommand();
         indexes.CommandText = """
             SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN
@@ -663,7 +663,7 @@ try
     Check(ArchiveSchemaRegistry.All.Select(item => item.EntityType).Order()
             .SequenceEqual(new[] { AuditEntities.Beneficiary, AuditEntities.Product, AuditEntities.User,
                 AuditEntities.Project, AuditEntities.ProjectObservation, AuditEntities.ProjectObservationFile,
-                AuditEntities.StockMovement }.Order()),
+                AuditEntities.StockMovement, AuditEntities.Vehicle }.Order()),
         "Every currently deletable entity is registered with an archive table");
     try
     {
@@ -2223,6 +2223,140 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
     var userBefore = FormSnapshot.Of(user);
     user.Password = "abcd";
     Check(FormSnapshot.Of(user) != userBefore, "A typed password counts as a change (compared only through a hash)");
+}
+
+// Vehicles administration: registration number mask, normalization, CRUD, archive, journal (SQLite).
+{
+    foreach (var (typed, expected) in new[]
+             {
+                 ("HD-01-FDG", "HD-01-FDG"), ("HD-233-VDG", "HD-233-VDG"), ("B-123-ABC", "B-123-ABC"), ("B-12-ABC", "B-12-ABC"),
+                 ("hd-01-fdg", "HD-01-FDG"), ("  b 123 abc ", "B-123-ABC"), ("HD01FDG", "HD-01-FDG"), ("hd233vdg", "HD-233-VDG"),
+                 ("HĂ-01-FDG", "HA-01-FDG")
+             })
+        Check(VehiclePlate.TryNormalize(typed, out var plate) && plate == expected, $"Registration number «{typed}» is accepted as {expected}");
+    foreach (var badPlate in new[]
+             {
+                 "", "   ", "HD-1-FDG", "HD-2334-FDG", "HD-01-FD", "HD-01-FDGH", "HDD-01-FDG", "-01-FDG", "H1-01-FDG",
+                 "HD-0A-FDG", "HD-01-F1G", "HD_01_FDG", "HD-01-FDG-1", "12-345-ABC"
+             })
+        Check(!VehiclePlate.TryNormalize(badPlate, out _), $"Registration number «{badPlate}» is rejected");
+
+    var vehicleRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-vehicles-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(vehicleRoot);
+    try
+    {
+        var vehicleConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:LocalDatabasePath"] = Path.Combine(vehicleRoot, "vehicles.db"),
+            ["App:ProductImagesPath"] = Path.Combine(vehicleRoot, "product-images"),
+            ["App:ArchiveFilesPath"] = Path.Combine(vehicleRoot, "archive-files"),
+            ["App:AuditPath"] = Path.Combine(vehicleRoot, "legacy-audit.jsonl")
+        }).Build();
+        var vehicleEnvironment = new TestWebHostEnvironment(vehicleRoot);
+        var vehicleAccess = new TestAccessControl(true, "operator.vehicule");
+        var vehicleStore = new SqliteLocalStore(vehicleEnvironment, vehicleConfiguration, NullLogger<SqliteLocalStore>.Instance);
+        var vehicles = new SqliteVehicleRepository(vehicleStore, vehicleAccess);
+        var vehicleAudit = new SqliteAuditTrail(vehicleStore);
+        async Task VehicleRejected(Func<Task> operation, string message)
+        {
+            try { await operation(); }
+            catch (VehicleOperationException) { Check(true, message); return; }
+            throw new Exception(message + " (accepted)");
+        }
+        Check((await vehicles.GetVehiclesAsync()).Count == 0, "A new database has no vehicles");
+
+        var dokker = await vehicles.CreateAsync(new VehicleInput { PlateNumber = " hd 01 fdg ", Description = "  Dacia   Dokker albă " });
+        Check(dokker.PlateNumber == "HD-01-FDG" && dokker.Description == "Dacia Dokker alba" && dokker.Version == 0 && dokker.Id > 0,
+            "A vehicle is saved with the canonical number, a trimmed description without diacritics and version 0");
+        var bucharest = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "B-123-ABC", Description = "Autoutilitara Bucuresti" });
+        Check((await vehicles.GetVehiclesAsync()).Select(vehicle => vehicle.PlateNumber).SequenceEqual(["B-123-ABC", "HD-01-FDG"]),
+            "Vehicles are listed alphabetically by registration number");
+
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "", Description = "Fara numar" }), "A missing registration number is rejected");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-1-FDG", Description = "Numar gresit" }), "An invalid registration number is rejected");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-02-FDG", Description = "   " }), "A missing description is rejected");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-02-FDG", Description = new string('a', 101) }), "An oversize description is rejected");
+        try { await vehicles.CreateAsync(new VehicleInput { PlateNumber = "hd01fdg", Description = "Duplicat" }); throw new Exception("Duplicate number accepted"); }
+        catch (VehicleOperationException exception)
+        {
+            Check(exception.Message == VehicleRules.DuplicatePlateMessage("HD-01-FDG", "Dacia Dokker alba"),
+                "A duplicate registration number (any letter case, hyphens optional) is rejected naming the stored vehicle");
+        }
+        Check(VehicleInput.From(dokker).PlateNumber == "HD-01-FDG" && VehiclePlate.FormatMessage.Contains("HD-233-VDG") && VehiclePlate.FormatMessage.Contains("B-123-ABC"),
+            "The format message shows the accepted examples");
+
+        var noReason = VehicleInput.From(dokker); noReason.Description = "Dacia Dokker gri";
+        await VehicleRejected(() => vehicles.UpdateAsync(dokker, noReason), "A vehicle edit requires a reason");
+        var edit = VehicleInput.From(dokker); edit.Description = "Dacia Dokker gri"; edit.Reason = "Culoare corectata";
+        var edited = await vehicles.UpdateAsync(dokker, edit);
+        Check(edited.Description == "Dacia Dokker gri" && edited.Version == 1 && edited.PlateNumber == "HD-01-FDG", "A vehicle edit changes the description and increments the version");
+        await VehicleRejected(() => vehicles.UpdateAsync(dokker, edit), "A stale vehicle edit cannot overwrite newer data");
+        var toDuplicate = VehicleInput.From(bucharest); toDuplicate.PlateNumber = "HD-01-FDG"; toDuplicate.Reason = "Test automat";
+        await VehicleRejected(() => vehicles.UpdateAsync(bucharest, toDuplicate), "Editing a number to an existing one is rejected");
+        var keepNumber = VehicleInput.From(edited); keepNumber.Description = "Dacia Dokker gri inchis"; keepNumber.Reason = "Test automat";
+        var keptNumber = await vehicles.UpdateAsync(edited, keepNumber);
+        Check(keptNumber.Version == 2, "Saving without changing the number does not report the vehicle itself as a duplicate");
+
+        var afterCreateEvents = await vehicleAudit.GetEventsAsync();
+        var vehicleEvents = afterCreateEvents.Where(entry => entry.EntityType == AuditEntities.Vehicle).ToArray();
+        Check(vehicleEvents.Count(entry => entry.Action == AuditActions.Create) == 2 && vehicleEvents.Count(entry => entry.Action == AuditActions.Edit) == 2 &&
+              vehicleEvents.All(entry => entry.ActorUsername == "operator.vehicule"),
+            "Each successful vehicle operation writes exactly one journal event with the operator; rejected ones write nothing");
+        var editEvent = vehicleEvents.Where(entry => entry.Action == AuditActions.Edit).OrderBy(entry => entry.TimestampUtc).First();
+        Check(editEvent.Details == "Descriere: Dacia Dokker alba → Dacia Dokker gri" && editEvent.Motif == "Culoare corectata" &&
+              editEvent.EntityId == dokker.Id.ToString() && editEvent.Target == $"#{dokker.Id} · HD-01-FDG",
+            "A vehicle edit journals the changed fields (before → after), the reason and the vehicle as target");
+        Check(AuditNavigation.TargetUrl(editEvent) == $"/vehicule?edit={dokker.Id}", "The journal links a vehicle event to its editor");
+
+        // Concurrent creations of the same number: exactly one succeeds.
+        var racing = await Task.WhenAll(Enumerable.Range(0, 4).Select(async index =>
+        {
+            try { await new SqliteVehicleRepository(vehicleStore, vehicleAccess).CreateAsync(new VehicleInput { PlateNumber = "CJ-77-XYZ", Description = "Sesiune " + index }); return true; }
+            catch (Exception exception) when (exception is VehicleOperationException or Microsoft.Data.Sqlite.SqliteException) { return false; }
+        }));
+        Check(racing.Count(created => created) == 1 && (await vehicles.GetVehiclesAsync()).Count(vehicle => vehicle.PlateNumber == "CJ-77-XYZ") == 1,
+            "Two sessions creating the same registration number at once produce a single vehicle");
+
+        // Deletion: archive + journal in one transaction; blocked rules; persistence after restart.
+        await VehicleRejected(() => vehicles.DeleteAsync(dokker, "Motiv"), "Deleting a stale vehicle snapshot is rejected");
+        await VehicleRejected(() => vehicles.DeleteAsync(keptNumber, "  "), "A vehicle deletion requires a reason");
+        var eventsBeforeDelete = (await vehicleAudit.GetEventsAsync()).Count;
+        await vehicles.DeleteAsync(keptNumber, "Vehiculul nu va mai fi folosit");
+        Check((await vehicles.GetVehiclesAsync()).All(vehicle => vehicle.Id != keptNumber.Id), "A deleted vehicle leaves the live list");
+        await using (var connection = await vehicleStore.OpenConnectionAsync())
+        {
+            await using var archived = TestSqliteCommand(connection, """
+                SELECT a.plate_number,a.description,a.version,o.motif,o.actor_username,
+                       (SELECT COUNT(*) FROM audit_events e WHERE e.archive_operation_id=o.id AND e.action=@delete)
+                FROM archive_vehicles a INNER JOIN archive_operations o ON o.id=a.archive_id WHERE a.original_id=@id
+                """, ("@id", keptNumber.Id), ("@delete", AuditActions.Delete));
+            await using var reader = await archived.ExecuteReaderAsync();
+            Check(await reader.ReadAsync() && reader.GetString(0) == "HD-01-FDG" && reader.GetString(1) == "Dacia Dokker gri inchis" &&
+                  reader.GetInt64(2) == 2 && reader.GetString(3) == "Vehiculul nu va mai fi folosit" && reader.GetString(4) == "operator.vehicule" &&
+                  reader.GetInt32(5) == 1,
+                "Deleting a vehicle archives its data with the reason and the operator and writes the journal event in the same operation");
+        }
+        Check((await vehicleAudit.GetEventsAsync()).Count == eventsBeforeDelete + 1, "A deletion writes exactly one journal event");
+        await VehicleRejected(() => vehicles.DeleteAsync(keptNumber, "Motiv"), "A repeated deletion is rejected");
+        var reused = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-01-FDG", Description = "Alt vehicul" });
+        Check(reused.Id != keptNumber.Id, "The number of an archived vehicle can be registered again");
+        VehicleRules.CheckDelete(false);
+        try { VehicleRules.CheckDelete(true); throw new Exception("Deleting a vehicle with movements accepted"); }
+        catch (VehicleOperationException) { Check(true, "A vehicle with stock movements must not be deleted"); }
+
+        var restartedStore = new SqliteLocalStore(vehicleEnvironment, vehicleConfiguration, NullLogger<SqliteLocalStore>.Instance);
+        var restartedList = await new SqliteVehicleRepository(restartedStore, vehicleAccess).GetVehiclesAsync();
+        Check(restartedList.Select(vehicle => vehicle.PlateNumber).SequenceEqual(["B-123-ABC", "CJ-77-XYZ", "HD-01-FDG"]),
+            "Vehicles survive the restart of the application");
+    }
+    finally
+    {
+        try { Directory.Delete(vehicleRoot, true); } catch (IOException) { }
+    }
+
+    Check(VehicleSearch.Filter([new Vehicle(1, "HD-01-FDG", "Dacia Dokker alba"), new Vehicle(2, "B-123-ABC", "Autoutilitara")], "hd01").Single().Id == 1 &&
+          VehicleSearch.Filter([new Vehicle(1, "HD-01-FDG", "Dacia Dokker alba"), new Vehicle(2, "B-123-ABC", "Autoutilitara")], "auto").Single().Id == 2,
+        "Vehicles are searched by registration number (hyphens optional) or description");
 }
 
 // Task 1: every message shown to the user is in Romanian. The literals that become user-visible messages (validation

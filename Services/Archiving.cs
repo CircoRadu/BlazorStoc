@@ -15,7 +15,8 @@ public static class ArchiveSchemaRegistry
             new ArchiveEntitySchema(AuditEntities.Project, "archive_projects", true, true),
             new ArchiveEntitySchema(AuditEntities.ProjectObservation, "archive_project_observations", true, true),
             new ArchiveEntitySchema(AuditEntities.ProjectObservationFile, "archive_project_observation_files", false, true),
-            new ArchiveEntitySchema(AuditEntities.StockMovement, "archive_stock_movements", true, false)
+            new ArchiveEntitySchema(AuditEntities.StockMovement, "archive_stock_movements", true, false),
+            new ArchiveEntitySchema(AuditEntities.Vehicle, "archive_vehicles", true, false)
         }.ToDictionary(schema => schema.EntityType, StringComparer.Ordinal);
 
     public static IReadOnlyCollection<ArchiveEntitySchema> All { get; } = Schemas.Values.ToArray();
@@ -155,6 +156,13 @@ public static class ArchiveRequests
         var details = AuditDetails.Identification(("Denumire", value.Name), ("CUI", value.Cui));
         return new(ArchiveSnapshot.Create(AuditEntities.Beneficiary, value.Id.ToString(), value.Version, value),
             $"#{value.Id} · {value.Name}", details, motif);
+    }
+
+    public static ArchiveRequest Vehicle(Vehicle value, string motif)
+    {
+        var details = AuditDetails.Identification(("Număr de înmatriculare", value.PlateNumber), ("Descriere", value.Description));
+        return new(ArchiveSnapshot.Create(AuditEntities.Vehicle, value.Id.ToString(), value.Version, value),
+            SqliteVehicleRepository.Target(value), details, motif);
     }
 
     public static ArchiveRequest User(WebUser value, string motif,

@@ -4,7 +4,7 @@ namespace BlazorStoc.Services;
 
 public static class MariaArchiveSchema
 {
-    public const int Version = 4;
+    public const int Version = 5;
 
     public static async Task InitializeAsync(IConfiguration configuration,
         CancellationToken cancellationToken = default)
@@ -87,6 +87,17 @@ public static class MariaArchiveSchema
             version BIGINT UNSIGNED NOT NULL,
             INDEX ix_archive_beneficiaries_original(original_id),
             CONSTRAINT fk_archive_beneficiaries_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS archive_vehicles (
+            archive_id CHAR(36) CHARACTER SET ascii NOT NULL PRIMARY KEY,
+            original_id INT NOT NULL,
+            plate_number VARCHAR(12) NOT NULL,
+            description VARCHAR(100) NOT NULL,
+            version BIGINT UNSIGNED NOT NULL,
+            INDEX ix_archive_vehicles_original(original_id),
+            CONSTRAINT fk_archive_vehicles_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         """,
         """

@@ -821,3 +821,33 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu se aplica (numai documentatie); verificata numerotarea taskurilor active 1-3.
 - **Commit:** `claude: add vehicles and vehicle-exit tasks to TODO`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:43:03.7758914Z â€” claude
+
+- **Task:** Task 2: administrarea vehiculelor (sectiunea Vehicule)
+- **Rezumat:** Task 2 implementat: administrarea vehiculelor. Pagina /vehicule (Administrare -> Vehicule) cu adaugare, editare cu motivare si confirmare, stergere in doi pasi cu arhivare, cautare, sincronizare la 15s. Numar de inmatriculare unic cu masca AA-OOO-AAA extinsa la cererea utilizatorului la 1-2 litere, 2-3 cifre, 3 litere (B-123-ABC permis, HD-1-FDG respins), normalizat cu majuscule si cratime; descriere obligatorie max 100. Servicii: Vehicles.cs, SqliteVehicleRepository, MariaVehicleRepository (tabela vehicul creata la prima folosire), archive_vehicles (SQLite schema 9, Maria arhiva v5), tip de jurnal Vehicul cu filtru si link /vehicule?edit=id, DI in Program.cs. Legarea de miscari si blocarea stergerii cu miscari mutate in taskul de iesire spre vehicul (destinatie obligatorie, coloana VEHICUL). TODO: task arhivat, iesirea spre vehicul renumerotata 2. README, VALIDARE, PROJECT_STATE, TESTE_RAMASE (A9) actualizate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Layout/MainLayout.razor`
+  - `Components/Pages/Audit.razor`
+  - `Components/Pages/VehicleEditor.razor`
+  - `Components/Pages/Vehicles.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `Program.cs`
+  - `README.md`
+  - `Services/ArchivePersistence.cs`
+  - `Services/Archiving.cs`
+  - `Services/AuditTrail.cs`
+  - `Services/MariaArchiveSchema.cs`
+  - `Services/MariaVehicleRepository.cs`
+  - `Services/SqliteLocalStore.cs`
+  - `Services/SqliteVehicleRepository.cs`
+  - `Services/Vehicles.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+- **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 464 PASS (51 noi), 0 FAIL; browser pe instanta de proba 5083 cu baza separata: meniu, stare goala, numar invalid respins, completare automata b123abc -> B-123-ABC, adaugare, editare cu confirmare, jurnal si link, stergere in doi pasi, 375/768 px fara depasire. Neverificat: MariaDB pe server real (TESTE_RAMASE A9); preview 5082 nu a putut fi repornit din sesiune si ruleaza codul vechi.
+- **Commit:** `claude: vehicles administration page (Administrare > Vehicule)`
+- **Predat cÄƒtre:** codex

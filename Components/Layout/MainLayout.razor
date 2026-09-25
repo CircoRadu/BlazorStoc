@@ -49,6 +49,7 @@
                 <ChildContent>
                     <NavLink href="/categorii" Match="NavLinkMatch.Prefix">Categorii</NavLink>
                     <NavLink href="/beneficiari" Match="NavLinkMatch.Prefix">Beneficiari</NavLink>
+                    <NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink>
                     <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection>
@@ -107,6 +108,7 @@
         productSection = uri.AbsolutePath.Equals("/produse", StringComparison.OrdinalIgnoreCase);
         administrationSection = uri.AbsolutePath.StartsWith("/categorii", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/beneficiari", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/vehicule", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase);
         if (administrationSection) administrationExpanded = true;
         var query = QueryHelpers.ParseQuery(uri.Query);
