@@ -402,3 +402,31 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 324 verificari trecute. Browser 5082: formularul de editare al proiectului arata doar Denumire, Observatii si Motivare; nu s-au salvat date.
 - **Commit:** `claude: remove beneficiary field from the project edit form`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T06:14:02.1038445Z â€” claude
+
+- **Task:** Task 5 - Confirmarea salvarilor
+- **Rezumat:** Task 5 finalizat: componenta SaveConfirmationDialog (rezumat Camp / Valoare actuala / Valoare noua doar pentru campurile schimbate, motivare, Confirma salvarea / Anuleaza, Escape, focus) si SaveSummary. Confirmarea apare la editarea beneficiarului, produsului (inclusiv imagine), proiectului, observatiei, utilizatorului (parola nu apare), categoriei, subcategoriei si a miscarii de stoc; validarea ruleaza inainte de popup, refuzul pastreaza formularul si nu salveaza. Crearile (inclusiv produsul nou) se salveaza direct. La cererea utilizatorului, regula de server pentru proiecte: ProjectRules.CheckBeneficiaryUnchanged respinge orice UpdateAsync care schimba beneficiarul (SQLite si MariaDB), testele de mutare inlocuite cu teste de respingere. TODO.md: Task 5 mutat in arhiva, ordinea etapelor actualizata. Autentificarea si regulile de acces nu au fost modificate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/BeneficiaryEditor.razor`
+  - `Components/Pages/ProductEditor.razor`
+  - `Components/Pages/ProductGroups.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Pages/ProjectEditor.razor`
+  - `Components/Pages/ProjectObservationEditor.razor`
+  - `Components/Pages/UserEditor.razor`
+  - `Components/Shared/SaveConfirmationDialog.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Services/MariaProjectRepository.cs`
+  - `Services/Projects.cs`
+  - `Services/SaveConfirmation.cs`
+  - `Services/SqliteProjectRepository.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 329 verificari trecute (5 noi fata de 324). Browser 5082 (sesiune autentificata de utilizator): pe /beneficiari/2 popup cu rezumat, Anuleaza pastreaza formularul, Confirma salveaza; numele readus prin acelasi flux. Neverificat manual: popup in celelalte editoare, Escape in browser, MariaDB pe server real.
+- **Commit:** `claude: finish Task 5 (save confirmation dialog for edits, server rule: project beneficiary is fixed)`
+- **Predat cÄƒtre:** codex

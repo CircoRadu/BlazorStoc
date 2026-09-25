@@ -23,6 +23,11 @@
         </fieldset>
     </EditForm>
 </section>
+@if (pendingChanges is not null && Original is not null)
+{
+    <SaveConfirmationDialog Title="Salvezi modificările observației?" ObjectLabel="@Original.Name" Changes="pendingChanges"
+                            Reason="@input.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
 
 @code {
     [Parameter] public int ProjectId { get; set; }
@@ -31,6 +36,7 @@
     [Parameter] public EventCallback Closed { get; set; }
     private ProjectObservationInput input = new();
     private bool saving;
+    private IReadOnlyList<AuditChange>? pendingChanges;
     private string? error, reasonError;
     private readonly CancellationTokenSource lifetime = new();
 
@@ -46,6 +52,27 @@
         if (saving) return;
         reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
         if (reasonError is not null) return;
+        if (Original is not null)
+        {
+            // Saving over existing data needs an explicit confirmation of the changed fields.
+            error = null;
+            try
+            {
+                var value = input.Validated(true);
+                pendingChanges = SaveSummary.Changed(new("Denumire observație", Original.Name, value.Name), new("Conținut", Original.Content, value.Content));
+            }
+            catch (ProjectOperationException exception) { error = exception.Message; }
+            return;
+        }
+        await PersistAsync();
+    }
+
+    private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
+    private Task CancelConfirmation() { pendingChanges = null; return Task.CompletedTask; }
+
+    private async Task PersistAsync()
+    {
+        if (saving) return;
         saving = true;
         error = null;
         ProjectObservation? saved = null;

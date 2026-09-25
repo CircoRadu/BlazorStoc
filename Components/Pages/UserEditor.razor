@@ -25,6 +25,11 @@
         </fieldset>
     </EditForm>
 </section>
+@if (pendingChanges is not null && Original is not null)
+{
+    <SaveConfirmationDialog Title="Salvezi modificările utilizatorului?" ObjectLabel="@Original.Username" Changes="pendingChanges"
+                            Reason="@input.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
 
 @code {
     [Parameter] public WebUser? Original { get; set; }
@@ -32,6 +37,7 @@
     [Parameter] public EventCallback Closed { get; set; }
     private WebUserInput input = new();
     private bool saving;
+    private IReadOnlyList<AuditChange>? pendingChanges;
     private string? error, reasonError;
     private readonly CancellationTokenSource lifetime = new();
 
@@ -48,6 +54,31 @@
         if (saving) return;
         reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
         if (reasonError is not null) return;
+        if (Original is not null)
+        {
+            // Saving over existing data needs an explicit confirmation of the changed fields (never the password itself).
+            error = null;
+            try
+            {
+                var value = input.Validated(false);
+                pendingChanges = SaveSummary.Changed(
+                    new("Nume utilizator", Original.Username, value.Username), new("Nume afișat", Original.DisplayName, value.DisplayName),
+                    new("Nivel de acces", Original.Role, value.Role),
+                    new("Cont activ", Original.IsActive ? "Da" : "Nu", value.IsActive ? "Da" : "Nu"),
+                    new("Parolă", "neschimbată", value.Password.Length > 0 ? "va fi schimbată" : "neschimbată"));
+            }
+            catch (UserOperationException exception) { error = exception.Message; }
+            return;
+        }
+        await PersistAsync();
+    }
+
+    private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
+    private Task CancelConfirmation() { pendingChanges = null; return Task.CompletedTask; }
+
+    private async Task PersistAsync()
+    {
+        if (saving) return;
         saving = true; error = null;
         WebUser? saved = null;
         try

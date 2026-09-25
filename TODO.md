@@ -13,27 +13,11 @@
 
 Taskurile sunt grupate în două etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
 
-1. **Dialoguri comune:** Task 5 → Task 6; Task 5 → Task 7.
-2. **Colaborare în timp real:** Taskurile 5–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
+1. **Dialoguri comune:** Taskurile 6 și 7 reutilizează confirmarea finalizată din Task 5.
+2. **Colaborare în timp real:** Taskurile 6–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
-
-## Task 5 — Confirmarea salvărilor
-
-Depinde de structura catalogului finalizată, de produsul („Cod produs”, finalizat), de proiectele finalizate și de beneficiarii finalizați (Task 4). Reutilizează infrastructura accesibilă a dialogului de ștergere deja finalizat.
-
-- [ ] Afișează un popup de confirmare înaintea tuturor salvărilor care modifică date existente.
-- [ ] Prezintă în popup un rezumat clar al câmpurilor și valorilor care urmează să fie modificate.
-- [ ] Execută salvarea numai dacă utilizatorul confirmă modificările.
-- [ ] Dacă utilizatorul refuză confirmarea, nu salva și păstrează formularul deschis cu valorile curente.
-- [ ] Exceptează crearea unui produs nou: salvarea produsului nou se execută direct, fără popup de confirmare.
-
-### Criterii de acceptare
-
-- Salvările care modifică date existente afișează înainte de execuție un rezumat al modificărilor.
-- Confirmarea aplică modificările, iar refuzul păstrează datele nesalvate în formular.
-- Crearea unui produs nou nu afișează dialogul de confirmare a salvării.
 
 ## Task 6 — Confirmare la părăsirea formularului de adăugare
 
@@ -122,6 +106,18 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Task 5: Confirmarea salvărilor
+
+Implementat la 25 septembrie 2026 de Claude. `Components/Shared/SaveConfirmationDialog.razor`, `SaveSummary` (`Services/SaveConfirmation.cs`), `BeneficiaryEditor`, `ProductEditor`, `ProjectEditor`, `ProjectObservationEditor`, `UserEditor`, `ProductGroups` (categorii și subcategorii) și dialogul de editare din `ProductMovements`.
+
+- [x] Fiecare salvare care modifică date existente (beneficiar, produs, proiect, observație, utilizator, categorie, subcategorie, mișcare de stoc) deschide un popup de confirmare înaintea execuției.
+- [x] Popup-ul (`role="dialog"`, `aria-modal`, focus pe dialog, Escape = refuz) prezintă un tabel „Câmp / Valoare actuală / Valoare nouă” doar pentru câmpurile care se schimbă, plus motivarea; valorile goale apar ca „(gol)”, textele foarte lungi sunt scurtate, iar parola nu apare niciodată (doar „va fi schimbată”). Pentru mișcări apare și corecția de stoc, pentru produs și imaginea înlocuită.
+- [x] Validarea (`Validated`, motivare obligatorie, câmpuri invalide) rulează înaintea popup-ului; salvarea se execută numai după „Confirmă salvarea”.
+- [x] La „Anulează” (sau Escape) nu se salvează nimic, iar formularul rămâne deschis cu valorile curente.
+- [x] Crearea nu afișează popup: produsul nou, ca și beneficiarul, proiectul, observația, utilizatorul, categoria, subcategoria și mișcarea nouă se salvează direct. Adăugarea unei mișcări este creare, nu editare, deci nu cere confirmare (decizie a implementării; poate fi extinsă).
+- [x] Regulă de server cerută de utilizator (formularul de editare a proiectului nu mai are „Beneficiar”): `ProjectRules.CheckBeneficiaryUnchanged` respinge orice `UpdateAsync` care schimbă beneficiarul unui proiect (`BeneficiaryLockedMessage`), în SQLite și MariaDB, înaintea oricărei scrieri, fără eveniment de audit sau de sincronizare. Mutarea proiectului dintre beneficiari (Task 2) nu mai este posibilă.
+- Neverificat manual în browser: dialogul pentru produs, utilizator, proiect, observație, categorie și mișcare (același component, acoperit de compilare); MariaDB neverificat pe server real.
 
 ## Finalizat — Task 4: Identificarea beneficiarului cu CUI duplicat
 
@@ -219,7 +215,7 @@ Implementat la 24 septembrie 2026 de Claude. `Components/Pages/BeneficiaryDetail
 - [x] În pagina beneficiarului, permite filtrarea proiectelor după denumire și paginarea listei atunci când numărul lor o impune.
 - [x] Adaugă în pagina beneficiarului butonul „Adaugă proiect”; formularul pornește cu beneficiarul curent preselectat și nemodificabil în fluxul de creare.
 - [x] Formularul de creare solicită denumirea proiectului și observațiile generale.
-- [x] Permite editarea beneficiarului asociat, a denumirii și a observațiilor generale, cu motivare obligatorie și verificarea versiunii; după mutare, proiectul apare numai în pagina noului beneficiar.
+- [x] Permite editarea beneficiarului asociat, a denumirii și a observațiilor generale, cu motivare obligatorie și verificarea versiunii; după mutare, proiectul apare numai în pagina noului beneficiar. **Înlocuit ulterior (Task 5):** beneficiarul proiectului nu se mai poate schimba; regula este aplicată și pe server.
 - [x] Respinge salvarea dacă beneficiarul selectat nu mai există sau dacă denumirea este deja folosită de alt proiect al aceluiași beneficiar.
 - [x] Aplică stilul unitar al linkurilor și butoanelor și păstrează datele formularului după o validare respinsă.
 

@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Stare ciclu: **Taskurile 0, 1, 2, 3 și 4 finalizate; pregătit pentru predarea către Codex după commitul curent**
+Stare ciclu: **Taskurile 0, 1, 2, 3, 4 și 5 finalizate; pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -12,10 +12,20 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Ultimele modificări funcționale (ciclul Claude — Task 5)
+
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 5”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`.
+
+- **Componenta** `Components/Shared/SaveConfirmationDialog.razor` (+ `SaveSummary` în `Services/SaveConfirmation.cs`, stiluri `.save-confirmation-dialog`/`.save-summary` în `wwwroot/app.css`): popup modal accesibil cu tabelul Câmp / Valoare actuală / Valoare nouă (doar câmpurile schimbate), notă opțională (corecția de stoc), motivarea și „Confirmă salvarea” / „Anulează”; Escape = anulare, focus pe dialog.
+- **Editoare care confirmă** (doar editarea unui obiect existent): `BeneficiaryEditor`, `ProductEditor` (inclusiv imaginea înlocuită), `ProjectEditor`, `ProjectObservationEditor`, `UserEditor` (parola apare doar ca „va fi schimbată”), `ProductGroups` (categorie/subcategorie: `RequestSaveCategoryAsync`/`RequestSaveSubcategoryAsync`) și dialogul de editare din `ProductMovements` (`SaveEditAsync` → `ConfirmEditAsync`). Modelul: `SaveAsync` validează (`Validated`, motivarea) → construiește rezumatul → afișează popup-ul; `PersistAsync` rulează numai după confirmare; refuzul închide doar popup-ul.
+- **Creările nu cer confirmare** (produs nou, beneficiar, proiect, observație, utilizator, categorie, subcategorie, mișcare nouă). Adăugarea unei mișcări schimbă stocul, dar este o creare; nu s-a cerut confirmare pentru ea.
+- **Regula de server pentru proiecte** (cerută de utilizator după eliminarea câmpului din formular): `ProjectRules.CheckBeneficiaryUnchanged` / `BeneficiaryLockedMessage`, aplicată în `ProjectRules.Edited` și în `SqliteProjectRepository`/`MariaProjectRepository.UpdateAsync` înaintea oricărei scrieri. Testele de mutare (domeniu, feed de modificări) au fost înlocuite cu teste de respingere. Logica de notificare a beneficiarului vechi din `ChangeFeed` a rămas (inofensivă).
+- **Validare**: build Release 0 avertismente; `BlazorStoc.Checks` 329 (327 + 2 pentru `SaveSummary`, după 324 la Task 4); browser pe 5082 (popup, anulare, confirmare la beneficiar; numele readus). Neverificat manual: celelalte editoare, Escape în browser, MariaDB pe server real.
+
 ## Modificare la cererea utilizatorului — editarea proiectului fără „Beneficiar”
 
 - `Components/Pages/ProjectEditor.razor`: formularul de editare nu mai are câmpul „Beneficiar” (proiectul rămâne legat de beneficiarul de la creare); lista beneficiarilor nu se mai încarcă. La creare, din pagina beneficiarului, beneficiarul fix rămâne afișat dezactivat.
-- Repository-urile și `ProjectRules` acceptă în continuare un `BeneficiaryId` diferit la `UpdateAsync` (fluxul de mutare din Task 2 și evenimentele asociate), dar nicio pagină nu îl mai declanșează; blocarea la nivel de server nu a fost cerută și nu a fost implementată.
+- Blocarea la nivel de server a fost adăugată ulterior, în ciclul Task 5 (`ProjectRules.CheckBeneficiaryUnchanged`).
 - Validare: build Release 0 avertismente, `BlazorStoc.Checks` 324 trecute, verificat în browser pe 5082 (formularul de editare al proiectului „Instalare TVCI Barcea”).
 
 ## Ultimele modificări funcționale (ciclul Claude — Task 4)
@@ -100,7 +110,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 
 ## Validare
 
-- Ciclul curent (Task 4): build Release 0 avertismente, 0 erori (proiect principal și `BlazorStoc.Checks`); `BlazorStoc.Checks` — 324 verificări trecute (319 + 5 noi). Browser pe 5082 (sesiune autentificată de utilizator, modul demonstrativ): „Adaugă beneficiar” cu CUI 10000003 și nume nou → mesajul „Există deja un beneficiar cu acest CUI: «Servicii Industriale SA».”, formularul rămas deschis cu numele și CUI-ul introduse; nu s-au salvat date. Neverificat manual: editarea în browser, MariaDB pe server real.
+- Ciclul anterior (Task 4): build Release 0 avertismente, 0 erori (proiect principal și `BlazorStoc.Checks`); `BlazorStoc.Checks` — 324 verificări trecute (319 + 5 noi). Browser pe 5082 (sesiune autentificată de utilizator, modul demonstrativ): „Adaugă beneficiar” cu CUI 10000003 și nume nou → mesajul „Există deja un beneficiar cu acest CUI: «Servicii Industriale SA».”, formularul rămas deschis cu numele și CUI-ul introduse; nu s-au salvat date. Neverificat manual: editarea în browser, MariaDB pe server real.
 - Ciclul anterior (Task 3): build Release 0 avertismente, 0 erori; `BlazorStoc.Checks` — 319 verificări trecute (312 + 7 noi pentru rute, obiecte eliminate și starea jurnalului). Browser pe 5082 (sesiune autentificată de utilizator): filtrul jurnalului în adresă și restaurat prin Înapoi, `/produse/3` fără editor, `/utilizatori/{id}` și `/utilizatori/99999`, „Editează” la beneficiar și utilizator (deschidere și anulare). Neverificat manual: paginarea prin adresă, poziția de derulare în jurnal, utilizatorul limitat, MariaDB pe server real.
 - Ciclul curent (Task 2 / 2.3–2.5): build Release 0 avertismente, 0 erori; `BlazorStoc.Checks` — 312 verificări trecute (285 dinainte + 27 noi: evenimente pentru fiecare operație și niciunul pentru operații respinse, identificatori fără date sensibile, abonați care eșuează, filtrarea pe pagini, auditul încărcării fișierelor, rutele observațiilor, starea listei de proiecte). Browser, `http://127.0.0.1:5082`, două tab-uri, sesiune autentificată de utilizator: filtrul în adresă fără pierderea caracterelor tastate, linkul „înapoi” cu filtrul, Înapoi din browser cu filtrul și poziția de derulare (y=120) restaurate o singură dată, „Echipamente” goală și cu o ieșire asociată, ieșire cu proiect din formularul mișcărilor, linkul observației din jurnal (`/observatii/3` → pagina proiectului) și `/observatii/99999` („Observația nu mai există”), reîmprospătarea live a listei de proiecte și a observațiilor din alt tab, notificarea peste un formular de editare deschis (textul local a rămas). Datele de test (proiect, observații, ieșirea de stoc) au fost șterse prin fluxul normal (arhivate); stocul produsului 1 a revenit la 12. Neverificat manual: paginarea listei de proiecte (peste 10) și reîmprospătarea paginii observației la ștergerea proiectului de către altă sesiune (acoperite de verificările de filtrare); MariaDB neverificat pe server real. Preview repornit din contul `Alex`.
 - Build Release: 0 avertismente, 0 erori (proiect principal și `BlazorStoc.Checks`).
@@ -123,7 +133,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Taskurile 0–4 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este **Task 5** (confirmarea salvărilor).
+Următorul agent este **Codex**. Taskurile 0–5 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este **Task 6** (confirmare la părăsirea formularului de adăugare), care reutilizează `SaveConfirmationDialog`.
 
 ## Fișiere de orientare
 

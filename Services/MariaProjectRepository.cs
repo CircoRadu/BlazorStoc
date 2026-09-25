@@ -75,6 +75,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         {
             var current = await GetLockedAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
             ProjectRules.CheckCurrent(current, original);
+            ProjectRules.CheckBeneficiaryUnchanged(original, value.BeneficiaryId);
             var beneficiaryName = await GetBeneficiaryNameAsync(connection, transaction, value.BeneficiaryId, cancellationToken).ConfigureAwait(false);
             ProjectRules.CheckBeneficiaryExists(beneficiaryName is null ? null : new Beneficiary(value.BeneficiaryId, beneficiaryName, ""));
             await EnsureUniqueNameAsync(connection, transaction, value.BeneficiaryId, value.Name, original.Id, cancellationToken).ConfigureAwait(false);

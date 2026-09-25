@@ -51,6 +51,11 @@
         </fieldset>
     </EditForm>
 </section>
+@if (pendingChanges is not null && Original is not null)
+{
+    <SaveConfirmationDialog Title="Salvezi modificările produsului?" ObjectLabel="@Original.Name" Changes="pendingChanges"
+                            Reason="@input.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
 
 @code {
     [Parameter] public Product? Original { get; set; }
@@ -61,6 +66,7 @@
     [Parameter] public EventCallback Closed { get; set; }
     private ProductInput input = new();
     private bool saving;
+    private IReadOnlyList<AuditChange>? pendingChanges;
     private string? error, reasonError, imageError, imageFileName, imagePreviewUrl;
     private ProductImageData? selectedImage;
     private ElementReference pasteArea;
@@ -118,6 +124,30 @@
         if (saving) return;
         reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
         if (reasonError is not null) return;
+        if (Original is not null)
+        {
+            // Saving over existing data needs an explicit confirmation; a new product is saved directly.
+            error = null;
+            try
+            {
+                var value = input.Validated(Original);
+                pendingChanges = SaveSummary.Changed(
+                    new(ProductCode.Label, Original.Name, value.Name), new("Categorie", Original.Category, value.Category),
+                    new("Subcategorie", Original.Subcategory, value.Subcategory), new("Descriere", Original.Description, value.Description),
+                    new("Imagine", "neschimbată", selectedImage is null ? "neschimbată" : $"înlocuită cu {imageFileName}"));
+            }
+            catch (ProductOperationException exception) { error = exception.Message; }
+            return;
+        }
+        await PersistAsync();
+    }
+
+    private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
+    private Task CancelConfirmation() { pendingChanges = null; return Task.CompletedTask; }
+
+    private async Task PersistAsync()
+    {
+        if (saving) return;
         saving = true; error = null;
         Product? saved = null;
         try

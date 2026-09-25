@@ -82,6 +82,7 @@ public sealed class SqliteProjectRepository(SqliteLocalStore store, IAccessContr
         try
         {
             ProjectRules.CheckCurrent(await GetAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false), original);
+            ProjectRules.CheckBeneficiaryUnchanged(original, value.BeneficiaryId);
             var beneficiaryName = await GetBeneficiaryNameAsync(connection, transaction, value.BeneficiaryId, cancellationToken).ConfigureAwait(false);
             ProjectRules.CheckBeneficiaryExists(beneficiaryName is null ? null : new Beneficiary(value.BeneficiaryId, beneficiaryName, ""));
             await EnsureUniqueNameAsync(connection, transaction, value.BeneficiaryId, value.Name, original.Id, beneficiaryName!, cancellationToken).ConfigureAwait(false);

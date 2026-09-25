@@ -1,0 +1,68 @@
+@using BlazorStoc.Services
+@inject ILogger<SaveConfirmationDialog> Logger
+
+<div class="delete-overlay" @onkeydown="KeyDownAsync">
+    <section class="delete-dialog save-confirmation-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="dialog"
+             aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
+        <h2 id="@TitleId">@Title</h2>
+        @if (!string.IsNullOrWhiteSpace(ObjectLabel))
+        {
+            <p class="delete-object"><strong>@ObjectLabel</strong></p>
+        }
+        <p id="@DescriptionId">@(Changes.Count == 0
+            ? "Nu ai modificat nicio valoare a câmpurilor. Salvarea va înregistra doar motivarea."
+            : "Următoarele valori vor fi modificate:")</p>
+        @if (Changes.Count > 0)
+        {
+            <div class="table-scroll">
+                <table class="save-summary">
+                    <caption class="sr-only">Câmpuri modificate</caption>
+                    <thead><tr><th scope="col">Câmp</th><th scope="col">Valoare actuală</th><th scope="col">Valoare nouă</th></tr></thead>
+                    <tbody>
+                        @foreach (var change in Changes)
+                        {
+                            <tr><th scope="row">@change.Field</th><td>@change.Before</td><td><strong>@change.After</strong></td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Note))
+        {
+            <p class="form-note">@Note</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(Reason))
+        {
+            <p class="form-note">Motivare: @Reason</p>
+        }
+        <div class="editor-actions">
+            <button type="button" class="primary" @onclick="() => Confirmed.InvokeAsync()">Confirmă salvarea</button>
+            <button type="button" class="danger" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Salvezi modificările?";
+    [Parameter] public string ObjectLabel { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<AuditChange> Changes { get; set; } = Array.Empty<AuditChange>();
+    [Parameter] public string? Note { get; set; }
+    [Parameter] public string? Reason { get; set; }
+    [Parameter, EditorRequired] public EventCallback Confirmed { get; set; }
+    [Parameter, EditorRequired] public EventCallback Cancelled { get; set; }
+
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private ElementReference dialog;
+    private string TitleId => $"save-title-{instanceId}";
+    private string DescriptionId => $"save-description-{instanceId}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await dialog.FocusAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (Exception exception) { Logger.LogWarning("Save confirmation dialog could not take focus ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? Cancelled.InvokeAsync() : Task.CompletedTask;
+}

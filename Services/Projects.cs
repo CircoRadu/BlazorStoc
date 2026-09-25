@@ -111,12 +111,22 @@ public static class ProjectRules
         return new(id, validated.BeneficiaryId, validated.Name, validated.Observations, 0, nowUtc, nowUtc);
     }
 
+    public const string BeneficiaryLockedMessage =
+        "Beneficiarul unui proiect nu poate fi schimbat; proiectul rămâne legat de beneficiarul de la creare.";
+
+    // A project belongs to the beneficiary chosen when it was created; edits never move it.
+    public static void CheckBeneficiaryUnchanged(Project original, int requestedBeneficiaryId)
+    {
+        if (requestedBeneficiaryId != original.BeneficiaryId)
+            throw new ProjectOperationException(BeneficiaryLockedMessage);
+    }
+
     public static Project Edited(Project original, ProjectInput validated, DateTime nowUtc)
     {
         RequireUtc(nowUtc);
+        CheckBeneficiaryUnchanged(original, validated.BeneficiaryId);
         return original with
         {
-            BeneficiaryId = validated.BeneficiaryId,
             Name = validated.Name,
             Observations = validated.Observations,
             Version = checked(original.Version + 1),

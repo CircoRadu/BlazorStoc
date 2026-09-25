@@ -23,7 +23,7 @@
             <label class="full-width" for="category-name">Denumire categorie *<input id="category-name" maxlength="100" @bind="categoryName" disabled="@saving" /></label>
             @if (!creatingCategory) { <ChangeReasonField Id="category-reason" @bind-Value="reason" Disabled="@saving" /> }
         </div>
-        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="SaveCategoryAsync">@(creatingCategory ? "Adaugă categoria" : "Salvează categoria")</button><button class="danger" disabled="@saving" @onclick="CancelEdit">Anulează</button></div>
+        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveCategoryAsync">@(creatingCategory ? "Adaugă categoria" : "Salvează categoria")</button><button class="danger" disabled="@saving" @onclick="CancelEdit">Anulează</button></div>
     </section>
 }
 else if (creatingSubcategory || editingSubcategory is not null)
@@ -35,8 +35,16 @@ else if (creatingSubcategory || editingSubcategory is not null)
             <label for="subcategory-category">Categorie *<select id="subcategory-category" @bind="targetCategory" disabled="@(saving || creatingSubcategory)">@foreach (var category in Categories) { <option value="@category">@category</option> }</select></label>
             @if (!creatingSubcategory) { <ChangeReasonField Id="subcategory-reason" @bind-Value="reason" Disabled="@saving" /> }
         </div>
-        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="SaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="CancelEdit">Anulează</button></div>
+        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="CancelEdit">Anulează</button></div>
     </section>
+}
+
+@if (pendingChanges is not null)
+{
+    <SaveConfirmationDialog Title="@(editingCategory is not null ? "Salvezi modificările categoriei?" : "Salvezi modificările subcategoriei?")"
+                            ObjectLabel="@(editingCategory ?? editingSubcategory?.Subcategory ?? string.Empty)" Changes="pendingChanges"
+                            Note="@(editingSubcategory is not null ? "Produsele subcategoriei vor urma modificările de mai sus." : "Produsele categoriei vor urma noua denumire.")"
+                            Reason="@reason" Confirmed="ConfirmGroupSaveAsync" Cancelled="CancelGroupConfirmation" />
 }
 
 @if (loading)
@@ -92,6 +100,7 @@ else
     private string categoryName = "", subcategoryName = "", targetCategory = "", reason = "";
     private string? error, notice;
     private bool loading, saving;
+    private IReadOnlyList<AuditChange>? pendingChanges;
     private readonly HashSet<string> expandedCategories = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource lifetime = new();
     private bool IsEditing => creatingCategory || creatingSubcategory || editingCategory is not null || editingSubcategory is not null;
@@ -145,7 +154,40 @@ else
     private void CreateSubcategory(string category) { CancelEdit(); creatingSubcategory = true; targetCategory = category; subcategoryName = ""; notice = null; }
     private void EditCategory(string category) { CancelEdit(); editingCategory = category; categoryName = category; notice = null; }
     private void EditSubcategory(ProductGroup group) { CancelEdit(); editingSubcategory = group; subcategoryName = group.Subcategory; targetCategory = group.Category; notice = null; }
-    private void CancelEdit() { creatingCategory = creatingSubcategory = false; editingCategory = null; editingSubcategory = null; reason = ""; error = null; }
+    private void CancelEdit() { pendingChanges = null; creatingCategory = creatingSubcategory = false; editingCategory = null; editingSubcategory = null; reason = ""; error = null; }
+
+    // Renaming or moving existing groups needs an explicit confirmation of the changed fields; creating one is saved directly.
+    private Task RequestSaveCategoryAsync()
+    {
+        if (saving) return Task.CompletedTask;
+        if (creatingCategory) return SaveCategoryAsync();
+        if (editingCategory is null) return Task.CompletedTask;
+        error = null;
+        if (ChangeReasonRules.ValidationError(reason) is { } reasonError) { error = reasonError; return Task.CompletedTask; }
+        pendingChanges = SaveSummary.Changed(new AuditChange("Categorie", editingCategory, TextNormalization.ForObjectNameOrCode(categoryName)));
+        return Task.CompletedTask;
+    }
+
+    private Task RequestSaveSubcategoryAsync()
+    {
+        if (saving) return Task.CompletedTask;
+        if (creatingSubcategory) return SaveSubcategoryAsync();
+        if (editingSubcategory is null) return Task.CompletedTask;
+        error = null;
+        if (ChangeReasonRules.ValidationError(reason) is { } reasonError) { error = reasonError; return Task.CompletedTask; }
+        pendingChanges = SaveSummary.Changed(
+            new("Subcategorie", editingSubcategory.Subcategory, TextNormalization.ForObjectNameOrCode(subcategoryName)),
+            new("Categorie", editingSubcategory.Category, TextNormalization.ForObjectNameOrCode(targetCategory)));
+        return Task.CompletedTask;
+    }
+
+    private Task ConfirmGroupSaveAsync()
+    {
+        pendingChanges = null;
+        return editingCategory is not null ? SaveCategoryAsync() : SaveSubcategoryAsync();
+    }
+
+    private Task CancelGroupConfirmation() { pendingChanges = null; return Task.CompletedTask; }
 
     private async Task SaveCategoryAsync()
     {

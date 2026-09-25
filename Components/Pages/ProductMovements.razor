@@ -212,6 +212,14 @@ else
     </div>
 }
 
+@if (pendingEditChanges is not null && editing is not null)
+{
+    <SaveConfirmationDialog Title="Salvezi modificările mișcării?"
+                            ObjectLabel="@($"{StockMovementRules.KindLabel(editing.Kind)} · {editing.Quantity} buc. · {StockMovementRules.DisplayDate(editing.Date)}")"
+                            Changes="pendingEditChanges" Note="@($"Corecție stoc: {CorrectionText} buc.")" Reason="@editForm.Reason"
+                            Confirmed="ConfirmEditAsync" Cancelled="CancelEditConfirmation" />
+}
+
 @if (deleting is not null)
 {
     <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi mișcarea?" Subject="Mișcarea"
@@ -257,6 +265,7 @@ else
     private StockMovementInput form = NewForm();
     private bool useBeneficiary, useProject;
     private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
+    private IReadOnlyList<AuditChange>? pendingEditChanges;
     private IReadOnlyList<Project> projects = Array.Empty<Project>(), editProjects = Array.Empty<Project>();
     private StockMovement? editing, deleting, historyFor;
     private StockMovementInput editForm = new();
@@ -418,11 +427,34 @@ else
         }
     }
 
-    private async Task SaveEditAsync()
+    // Editing an existing movement needs an explicit confirmation of the changed fields before anything is saved.
+    private Task SaveEditAsync()
+    {
+        if (editSaving || editing is null) return Task.CompletedTask;
+        editError = RelationError(editing.Kind, editUseBeneficiary, editUseProject, editForm);
+        if (editError is not null) return Task.CompletedTask;
+        try
+        {
+            var value = StockMovementRules.Validated(editForm, editing.Kind, true);
+            string? BeneficiaryName(int? id) => editUseBeneficiary ? beneficiaries.FirstOrDefault(item => item.Id == id)?.Name : null;
+            string? ProjectName(int? id) => editUseProject ? editProjects.FirstOrDefault(item => item.Id == id)?.Name : null;
+            pendingEditChanges = SaveSummary.Changed(
+                new("Data", StockMovementRules.DisplayDate(editing.Date), StockMovementRules.DisplayDate(value.Date!.Value)),
+                new("Cantitate", editing.Quantity.ToString(), value.Quantity!.Value.ToString()),
+                new("Descriere", editing.Description, value.Description),
+                new("Beneficiar", editing.BeneficiaryName ?? "—", BeneficiaryName(value.BeneficiaryId) ?? "—"),
+                new("Proiect", editing.ProjectName ?? "—", ProjectName(value.ProjectId) ?? "—"));
+        }
+        catch (StockMovementOperationException exception) { editError = exception.Message; }
+        return Task.CompletedTask;
+    }
+
+    private Task ConfirmEditAsync() { pendingEditChanges = null; return PersistEditAsync(); }
+    private Task CancelEditConfirmation() { pendingEditChanges = null; return Task.CompletedTask; }
+
+    private async Task PersistEditAsync()
     {
         if (editSaving || editing is null) return;
-        editError = RelationError(editing.Kind, editUseBeneficiary, editUseProject, editForm);
-        if (editError is not null) return;
         editSaving = true;
         try
         {
@@ -436,8 +468,8 @@ else
         finally { editSaving = false; }
     }
 
-    private void CloseEdit() { if (!editSaving) editing = null; }
-    private void EditKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") CloseEdit(); }
+    private void CloseEdit() { if (!editSaving) { editing = null; pendingEditChanges = null; } }
+    private void EditKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape" && pendingEditChanges is null) CloseEdit(); }
     private void ImageKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") imagePreview = false; }
     private void RequestDelete(StockMovement movement) { notice = null; deleteError = null; deleting = movement; }
     private Task CancelDelete() { deleting = null; deleteError = null; return Task.CompletedTask; }

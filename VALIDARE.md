@@ -202,3 +202,9 @@ Verificat la 25 septembrie 2026.
 - Proiectul rămâne legat de beneficiarul de la creare: formularul de editare (`ProjectEditor`) nu mai are câmpul „Beneficiar” și nu mai încarcă lista beneficiarilor; formularul de creare din pagina beneficiarului păstrează beneficiarul fix, afișat dezactivat.
 - Browser (`http://127.0.0.1:5082`, sesiune autentificată de utilizator): `/proiecte/{id}` → „Editează” arată numai Denumire, Observații și Motivare; nu s-au salvat date. `BlazorStoc.Checks`: 324 verificări trecute.
 - **Neschimbat**: repository-urile și `ProjectRules` acceptă în continuare un `BeneficiaryId` diferit la `UpdateAsync` (mutarea proiectului), dar nicio pagină nu o mai declanșează.
+
+## Task 5 — Confirmarea salvărilor (25 septembrie 2026)
+
+- **Suita automată** (`BlazorStoc.Checks`, 329 verificări): rezumatul (`SaveSummary`) listează doar câmpurile modificate, arată „(gol)” și scurtează valorile lungi; regula de server care respinge schimbarea beneficiarului unui proiect (domeniu, SQLite cu proiectul și auditul neschimbate, feed fără eveniment).
+- **Browser** (`http://127.0.0.1:5082`, sesiune autentificată de utilizator, modul demonstrativ), pagina `/beneficiari/2`: „Editează” + modificarea numelui + motivare → popup „Salvezi modificările beneficiarului?” cu tabelul Câmp / Valoare actuală / Valoare nouă și motivarea; „Anulează” lasă formularul deschis cu valorile introduse și nu salvează; „Confirmă salvarea” salvează („Beneficiarul a fost actualizat.”). Numele a fost readus la valoarea inițială prin același flux (două evenimente „Editare” în jurnal).
+- **Neverificat manual**: popup-ul în editoarele de produs, proiect, observație, utilizator, categorie/subcategorie și mișcare (același component); tastatura (Escape) în browser; MariaDB pe un server real.

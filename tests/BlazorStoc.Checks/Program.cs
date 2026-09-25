@@ -576,6 +576,11 @@ try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "BENEFIC
 catch (BeneficiaryOperationException exception) { Check(exception.Message.Contains("ro12345678", StringComparison.Ordinal), "Duplicate beneficiary name is rejected and reports its CUI"); }
 try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "CUI invalid", Cui = "RO-ABC" }); throw new Exception("Invalid CUI accepted"); }
 catch (BeneficiaryOperationException) { Check(true, "Invalid beneficiary CUI is rejected"); }
+var saveSummary = SaveSummary.Changed(new("Nume", "Alfa", "Alfa"), new("Descriere", "", "Text nou"), new("Cod", " A1 ", "B2"), new("Lung", "x", new string('y', 500)));
+Check(saveSummary.Select(change => change.Field).SequenceEqual(["Descriere", "Cod", "Lung"]) &&
+      saveSummary[0].Before == SaveSummary.Empty && saveSummary[1].Before == "A1" && saveSummary[2].After.Length == SaveSummary.MaximumValueLength + 1,
+    "Save summary lists only changed fields, shows empty values and shortens very long ones");
+Check(SaveSummary.Changed(new AuditChange("Nume", "Alfa", "Alfa")).Count == 0, "Save summary is empty when no field changed");
 var beneficiaryInput = BeneficiaryEdit(beneficiary); beneficiaryInput.Name = "  Beneficiar   actualizat   SRL  ";
 var beneficiaryWithoutReason = BeneficiaryInput.From(beneficiary); beneficiaryWithoutReason.Name = "Fără motiv";
 try { await demoBeneficiaries.UpdateAsync(beneficiary, beneficiaryWithoutReason); throw new Exception("Beneficiary edit without reason accepted"); }
@@ -997,6 +1002,18 @@ try
     try { await secondProjects.UpdateAsync(reloadedProject!, projectEditInput); throw new Exception("Stale SQLite project accepted"); }
     catch (ProjectOperationException) { Check(true, "Stale SQLite project edit is rejected"); }
 
+    var lockedBeneficiaryInput = ProjectInput.From(editedProjectRecord);
+    lockedBeneficiaryInput.BeneficiaryId = editedProjectRecord.BeneficiaryId + 1000; lockedBeneficiaryInput.Reason = "Mutare";
+    var auditCountBeforeMoveAttempt = (await new SqliteAuditTrail(secondStore).GetEventsAsync()).Count;
+    try { await secondProjects.UpdateAsync(editedProjectRecord, lockedBeneficiaryInput); throw new Exception("SQLite project moved to another beneficiary"); }
+    catch (ProjectOperationException exception)
+    {
+        Check(exception.Message == ProjectRules.BeneficiaryLockedMessage &&
+              (await secondProjects.GetAsync(editedProjectRecord.Id))! == editedProjectRecord &&
+              (await new SqliteAuditTrail(secondStore).GetEventsAsync()).Count == auditCountBeforeMoveAttempt,
+            "SQLite rejects moving a project to another beneficiary and leaves the project and audit unchanged");
+    }
+
     var observationEditInput = ProjectObservationInput.From(persistentObservation);
     observationEditInput.Content = "Continut fara motiv";
     try { await secondProjects.UpdateObservationAsync(persistentObservation, observationEditInput); throw new Exception("SQLite observation edit without reason accepted"); }
@@ -1298,12 +1315,15 @@ catch (ProjectOperationException exception)
 }
 Check(ProjectRules.NormalizedName("  hală   PRODUCȚIE ") == ProjectRules.NormalizedName("Hala productie"),
     "Normalized project name key is stable for the per-beneficiary unique index");
-var projectEdit = ProjectInput.From(project); projectEdit.BeneficiaryId = 2; projectEdit.Name = "Hala noua";
+var projectEdit = ProjectInput.From(project); projectEdit.Name = "Hala noua";
 ProjectRejected(() => projectEdit.Validated(true), "Project edits require a reason");
-projectEdit.Reason = "Mutare la beneficiarul corect";
+projectEdit.Reason = "Corectie denumire";
 var editedProject = ProjectRules.Edited(project, projectEdit.Validated(true), projectNow.AddMinutes(5));
-Check(editedProject.Version == 1 && editedProject.BeneficiaryId == 2 && editedProject.CreatedAtUtc == projectNow &&
+Check(editedProject.Version == 1 && editedProject.BeneficiaryId == project.BeneficiaryId && editedProject.CreatedAtUtc == projectNow &&
       editedProject.UpdatedAtUtc == projectNow.AddMinutes(5), "Project edits increment the version and keep the creation timestamp");
+var projectMoveAttempt = ProjectInput.From(project); projectMoveAttempt.BeneficiaryId = project.BeneficiaryId + 1; projectMoveAttempt.Reason = "Mutare";
+try { ProjectRules.Edited(project, projectMoveAttempt.Validated(true), projectNow.AddMinutes(5)); throw new Exception("Project moved to another beneficiary"); }
+catch (ProjectOperationException exception) { Check(exception.Message == ProjectRules.BeneficiaryLockedMessage, "A project edit cannot change the beneficiary chosen at creation"); }
 ProjectRejected(() => ProjectRules.CheckCurrent(editedProject, project), "Stale project version is rejected");
 ProjectRejected(() => ProjectRules.CheckCurrent(null, project), "Deleted project is rejected on edit");
 ProjectRejected(() => ProjectRules.CheckBeneficiaryExists(null), "Project save is rejected when the beneficiary no longer exists");
@@ -1632,23 +1652,30 @@ try
     Check(received.Count == 4 && received[3].Action == AuditActions.Edit && received[3].ObservationId == feedObservation.Id, "Editing an observation publishes an edit event");
 
     var projectMove = ProjectInput.From(feedProject); projectMove.BeneficiaryId = feedOtherBeneficiary.Id; projectMove.Reason = "Mutare";
-    var movedProject = await feedProjects.UpdateAsync(feedProject, projectMove);
+    try { await feedProjects.UpdateAsync(feedProject, projectMove); throw new Exception("Project moved to another beneficiary"); }
+    catch (ProjectOperationException exception)
+    {
+        Check(exception.Message == ProjectRules.BeneficiaryLockedMessage && received.Count == 4 &&
+              (await feedProjects.GetAsync(feedProject.Id))!.BeneficiaryId == feedBeneficiary.Id,
+            "The server rejects moving a project to another beneficiary, leaves it unchanged and publishes no event");
+    }
+    var projectRename = ProjectInput.From(feedProject); projectRename.Name = "Proiect feed redenumit"; projectRename.Reason = "Corectie";
+    var movedProject = await feedProjects.UpdateAsync(feedProject, projectRename);
     var moveEvents = received.Skip(4).ToList();
-    Check(moveEvents.Count == 2 && moveEvents.All(change => change.Action == AuditActions.Edit && change.ProjectId == feedProject.Id) &&
-          moveEvents.Select(change => change.BeneficiaryId).Order().SequenceEqual(new int?[] { feedBeneficiary.Id, feedOtherBeneficiary.Id }.Order()),
-        "Moving a project notifies both the previous and the new beneficiary");
+    Check(moveEvents.Count == 1 && moveEvents[0].Action == AuditActions.Edit && moveEvents[0].ProjectId == feedProject.Id && moveEvents[0].BeneficiaryId == feedBeneficiary.Id,
+        "Editing a project notifies its beneficiary");
     Check(ProjectChanges.AffectsBeneficiary(moveEvents[0], moveEvents[0].BeneficiaryId!.Value) && !ProjectChanges.AffectsBeneficiary(received[1], feedBeneficiary.Id),
         "Only project events concern a beneficiary page");
 
     await feedFiles.DeleteAsync(feedFile.Id, "Fisier inlocuit");
-    Check(received.Count == 7 && received[6].EntityType == AuditEntities.ProjectObservationFile && received[6].Action == AuditActions.Delete &&
-          received[6].EntityId == feedFile.Id.ToString() && received[6].ObservationId is null, "Removing a file publishes a deletion whose observation is unknown");
+    Check(received.Count == 6 && received[5].EntityType == AuditEntities.ProjectObservationFile && received[5].Action == AuditActions.Delete &&
+          received[5].EntityId == feedFile.Id.ToString() && received[5].ObservationId is null, "Removing a file publishes a deletion whose observation is unknown");
     await feedProjects.DeleteObservationAsync(editedFeedObservation, "Observatie stearsa");
-    Check(received.Count == 8 && received[7].EntityType == AuditEntities.ProjectObservation && received[7].Action == AuditActions.Delete &&
-          received[7].ObservationId == feedObservation.Id, "Deleting an observation publishes a deletion");
+    Check(received.Count == 7 && received[6].EntityType == AuditEntities.ProjectObservation && received[6].Action == AuditActions.Delete &&
+          received[6].ObservationId == feedObservation.Id, "Deleting an observation publishes a deletion");
     await feedProjects.DeleteAsync(movedProject, "Proiect sters");
-    Check(received.Count == 9 && received[8].EntityType == AuditEntities.Project && received[8].Action == AuditActions.Delete &&
-          received[8].BeneficiaryId == feedOtherBeneficiary.Id && ProjectChanges.IsDeletionOf(received[8], AuditEntities.Project, feedProject.Id),
+    Check(received.Count == 8 && received[7].EntityType == AuditEntities.Project && received[7].Action == AuditActions.Delete &&
+          received[7].BeneficiaryId == feedBeneficiary.Id && ProjectChanges.IsDeletionOf(received[7], AuditEntities.Project, feedProject.Id),
         "Deleting a project publishes a deletion for its current beneficiary");
 
     var serialized = string.Join('|', received.Select(change => System.Text.Json.JsonSerializer.Serialize(change)));

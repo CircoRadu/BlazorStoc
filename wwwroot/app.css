@@ -243,3 +243,12 @@
 .movement-history-list li { border-left:3px solid var(--line); padding-left:12px; overflow-wrap:anywhere; }
 @media (max-width:900px) { .movement-layout { grid-template-columns:1fr; } .movement-date { flex:1 1 100%; } }
 .info-banner { background:#eef4f8; color:#2c5673; border:1px solid #c6d9e6; border-radius:8px; padding:15px 18px; margin-bottom:20px; }
+
+/* Save confirmation (Task 5): summary of fields about to change */
+.save-confirmation-dialog { width:min(640px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; }
+.save-confirmation-dialog:focus { outline:none; }
+.save-confirmation-dialog h2 { margin-top:0; }
+.save-summary { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 4px; }
+.save-summary th, .save-summary td { text-align:left; vertical-align:top; padding:9px 10px; border-bottom:1px solid var(--line); overflow-wrap:anywhere; white-space:pre-wrap; }
+.save-summary thead th { font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.save-summary tbody th { font-size:13px; font-weight:650; letter-spacing:0; text-transform:none; color:var(--ink); white-space:nowrap; }
