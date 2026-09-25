@@ -89,7 +89,7 @@ Sistemul refuză eliminarea ultimului administrator activ. Un administrator nu �
   - Data mișcării este aleasă de utilizator (implicit azi), aleasă numai din calendar (câmp doar pentru citire, fără tastare), între 1 ianuarie 1990 și azi; o dată viitoare este respinsă și de server. Descrierea este obligatorie; cantitatea este un număr întreg între 1 și 100.000.
   - La **Ieșire** poți bifa „Beneficiar” și, după alegerea acestuia, „Proiect” (proiectele beneficiarului). Fără ele se completează numai data, cantitatea și descrierea. La **Intrare** aceste câmpuri nu apar.
   - Stocul este suma intrărilor minus suma ieșirilor și poate deveni negativ; o ieșire peste stoc nu este blocată.
-  - Coloana „Beneficiar” arată beneficiarul și proiectul ieșirii. Tabelul se filtrează (Intrări/Ieșiri), se sortează după dată și se paginează.
+  - Coloana „Beneficiar/Proiect” arată beneficiarul și proiectul ieșirii. Tabelul se filtrează (Intrări/Ieșiri), se sortează după dată și se paginează.
   - **Editează**/**Șterge** cer un motiv; editarea corectează stocul și marchează mișcarea cu `[*]`. Istoricul modificărilor se deschide cu click dreapta pe rând sau cu butonul „Istoric”. Ștergerea (în doi pași) mută mișcarea și istoricul ei în arhivă.
   - Produsele care aveau deja stoc în baza de date locală primesc o singură dată o mișcare „Stoc initial”, ca stocul să fie egal cu suma mișcărilor.
 - Formularele de creare și editare nu conțin câmp pentru cantitate: stocul se afișează numai pentru consultare și nu poate fi introdus sau corectat manual. Un stoc existent (inclusiv negativ) rămâne neschimbat la editarea produsului.

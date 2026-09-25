@@ -142,7 +142,7 @@ else
                 <table class="movement-table">
                     <thead><tr>
                         <th aria-sort="@(descending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleSortAsync" aria-label="Sortează după dată @(descending ? "crescător" : "descrescător")">DATA <span aria-hidden="true">@(descending ? "▼" : "▲")</span></button></th>
-                        <th>INTRARE/IEȘIRE</th><th class="number">NUMĂR BUCĂȚI</th><th>DESCRIERE</th><th>BENEFICIAR</th>
+                        <th>INTRARE/IEȘIRE</th><th class="number">NUMĂR BUCĂȚI</th><th>DESCRIERE</th><th>BENEFICIAR/PROIECT</th>
                         @if (canManage) { <th><span class="sr-only">Acțiuni</span></th> }
                     </tr></thead>
                     <tbody>

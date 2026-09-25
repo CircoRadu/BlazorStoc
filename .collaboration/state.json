@@ -1,14 +1,14 @@
-{
+﻿{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 1: mesaje exclusiv in limba romana",
-    "startedAtUtc":  "2026-09-25T11:16:11.9910524Z",
-    "completedAtUtc":  "2026-09-25T11:23:19.5525732Z",
-    "lastSummary":  "Mesaje exclusiv in limba romana. Mesajul in engleza la valoare negativa venea din validarea nativa a browserului: wwwroot/romanian-ui.js (App.razor si pagina de autentificare) o inlocuieste prin setCustomValidity cu mesaje romanesti si traduce dialogul implicit de reconectare Blazor (shadow DOM). Program.cs: UseRequestLocalization ro-RO, UseStatusCodePages romanesc (404/403/401/altele), mesaj romanesc la limitarea cererilor; Routes.razor cu NotFound in romana; ParsingErrorMessage la campurile de cantitate. Verificare automata in BlazorStoc.Checks care scaneaza literalele de mesaj pentru cuvinte englezesti. TODO: taskul mutat in arhiva, restul renumerotat 1-2. README, VALIDARE, PROJECT_STATE, TESTE_RAMASE (C11) actualizate.",
-    "lastCommitSubject":  "claude: all user-visible messages in Romanian (native validation, reconnect dialog, status pages, ro-RO)",
+    "nextAgent":  "codex",
+    "currentTask":  "Task 1: eticheta Beneficiar/Proiect in tabelul de intrari/iesiri",
+    "startedAtUtc":  "2026-09-25T11:25:12.6244835Z",
+    "completedAtUtc":  "2026-09-25T11:29:40.8609976Z",
+    "lastSummary":  "Eticheta coloanei din tabelul de intrari/iesiri al produsului este acum BENEFICIAR/PROIECT (ProductMovements.razor); README si VALIDARE actualizate; nu exista alte texte, teste sau exporturi care sa foloseasca vechea eticheta pentru coloana; formularele si celelalte pagini neschimbate. TODO: taskul mutat in arhiva cu data si ora, taskul de inventar renumerotat 1. PROJECT_STATE actualizat.",
+    "lastCommitSubject":  "claude: Beneficiar/Proiect header in the movements table",
     "claudeStatus":  "active"
 }

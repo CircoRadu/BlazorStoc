@@ -792,3 +792,19 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 413 PASS; browser pe 5082: -5 si 0 -> mesaj romanesc, valoare prea mare, camp gol (mesaj server romanesc), 404 romanesc, dialog de reconectare tradus cu serverul oprit, functia de traducere pentru starea finala. Neverificat: ferestrele native (calendar, selector fisiere), starea finala a reconectarii in browser.
 - **Commit:** `claude: all user-visible messages in Romanian (native validation, reconnect dialog, status pages, ro-RO)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:29:40.8609976Z â€” claude
+
+- **Task:** Task 1: eticheta Beneficiar/Proiect in tabelul de intrari/iesiri
+- **Rezumat:** Eticheta coloanei din tabelul de intrari/iesiri al produsului este acum BENEFICIAR/PROIECT (ProductMovements.razor); README si VALIDARE actualizate; nu exista alte texte, teste sau exporturi care sa foloseasca vechea eticheta pentru coloana; formularele si celelalte pagini neschimbate. TODO: taskul mutat in arhiva cu data si ora, taskul de inventar renumerotat 1. PROJECT_STATE actualizat.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/ProductMovements.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `README.md`
+  - `TODO.md`
+  - `VALIDARE.md`
+- **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 413 PASS, 0 FAIL; browser pe instanta de proba 5083 (demonstrativ, /produse/1): antet pe un rand, fara depasire a paginii la 768 si 375 px. Neverificat: preview-ul 5082 (proces al altui cont, nu a putut fi repornit) arata antetul vechi pana la repornire.
+- **Commit:** `claude: Beneficiar/Proiect header in the movements table`
+- **Predat cÄƒtre:** codex

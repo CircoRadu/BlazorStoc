@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Stare ciclu: **Avertizarea la părăsirea editării (fost Task 1) finalizată; rămân taskurile active 1–4 (două corecturi mici, mesaje în română, inventar); pregătit pentru predarea către Codex după commitul curent**
+Stare ciclu: **Eticheta „Beneficiar/Proiect” din tabelul de intrări/ieșiri finalizată; rămâne un singur task activ (Task 1, situația de inventar); pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -40,6 +40,12 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 ## Antetul „Data” din tabelul mișcărilor
 
 - La cererea utilizatorului („implementează task 1”, ordinea agenților schimbată printr-un commit separat): `.movement-table .sort-header` aliniază antetul „Data” la începutul datelor (fusese împins la dreapta de stilul comun al catalogului). Doar CSS; verificat în browser la desktop, 375 și 768 px. Taskuri active rămase: 1 (mesaje în română), 2 („Beneficiar/Proiect”), 3 (inventar).
+
+## Eticheta „Beneficiar/Proiect” în tabelul mișcărilor
+
+- La cererea utilizatorului („implementează task 1”, ordinea agenților schimbată printr-un commit separat): antetul coloanei din `Components/Pages/ProductMovements.razor` este „BENEFICIAR/PROIECT” (coloana arată beneficiarul și proiectul mișcării). `README.md` și `VALIDARE.md` folosesc noua etichetă; etichetele „Beneficiar” din formularul de ieșire, formularul proiectului, pagina Beneficiari și jurnal nu s-au modificat.
+- Validare: build Release 0 avertismente; `BlazorStoc.Checks` 413 trecute, 0 eșuate; browser (instanță de probă pe 5083, modul demonstrativ, `/produse/1`): antetul pe un rând, fără depășire orizontală a paginii la 768 și 375 px (tabelul defilează în propriul container la 375 px, ca înainte). Neverificat: preview-ul de pe 5082 (proces pornit de alt cont, nu a putut fi oprit din sesiune) arată antetul vechi până la repornirea lui din `bin\Release\net9.0\BlazorStoc.exe --urls http://127.0.0.1:5082`.
+- Taskuri active rămase: 1 (situația de inventar) — următorul pas.
 
 ## Regula datelor `dd.mm.yyyy`
 

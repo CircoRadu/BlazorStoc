@@ -102,7 +102,7 @@ Verificări pentru pagina `/produse/<id>/miscari`:
 
 1. Codul produsului și „↗” din catalog deschid pagina; panoul de detalii din catalog nu mai există. `/miscari/<id>` redirecționează către pagina produsului mișcării; `/produse?sterge=<id>` deschide dialogul de ștergere al produsului.
 2. Formularul: data implicită azi, comutatorul Intrare/Ieșire, „Beneficiar” și „Proiect” doar la Ieșire (proiectul se poate bifa numai după alegerea beneficiarului), descriere și cantitate obligatorii. „Beneficiar”/„Proiect” bifate fără selecție sunt respinse cu mesaj, iar formularul rămâne completat. După salvare se golesc descrierea și cantitatea; data, tipul și beneficiarul rămân.
-3. Tabelul: Data (`zz-LL-aaaa`), Intrare/Ieșire cu `[*]` pentru mișcările modificate, Număr bucăți, Descriere, Beneficiar (beneficiar și proiect ca linkuri); filtru, sortare după dată, paginare 10/20/50/Toate; „Total produse în stoc” actualizat după fiecare operație, inclusiv negativ.
+3. Tabelul: Data (`zz-LL-aaaa`), Intrare/Ieșire cu `[*]` pentru mișcările modificate, Număr bucăți, Descriere, Beneficiar/Proiect (beneficiar și proiect ca linkuri); filtru, sortare după dată, paginare 10/20/50/Toate; „Total produse în stoc” actualizat după fiecare operație, inclusiv negativ.
 4. Editare: motiv obligatoriu, tipul nu se schimbă, rezumat „Cantitate veche/nouă · Corecție stoc”, respingerea unei editări fără modificări sau pe o versiune veche. Istoric: click dreapta pe un rând cu `[*]` (sau butonul „Istoric”) afișează operatorul, ora locală, valorile, corecția și motivul; Escape închide dialogul.
 5. Ștergere: dialogul în doi pași afișează corecția de stoc; mișcarea și istoricul ei sunt mutate în `archive_stock_movements`/`archive_relations` (`IstoricMiscareStoc`), stocul se corectează, iar un produs sau proiect cu mișcări nu poate fi șters.
 6. Jurnalul: evenimente `MiscareStoc` (Adăugare/Editare/Ștergere) cu ținta „cod produs”, detalii, motiv și legătura către arhivă la ștergere; linkurile duc la `/miscari/<id>`.
@@ -285,3 +285,9 @@ Verificat la 25 septembrie 2026.
 - Mesajul în engleză la o intrare cu valoare negativă venea din validarea nativă a browserului; `wwwroot/romanian-ui.js` o înlocuiește cu mesaje românești (și pentru celelalte câmpuri, inclusiv paginile de autentificare). Dialogul de reconectare Blazor, paginile de eroare HTTP, limitarea cererilor și cultura `ro-RO` sunt în română.
 - `BlazorStoc.Checks` 413 (verificarea literalelor de mesaj); browser pe 5082: −5, 0, valoare prea mare, câmp gol, 404 și dialogul de reconectare cu serverul oprit.
 - Neverificat: ferestrele native (calendar, selector de fișiere).
+
+## Eticheta „Beneficiar/Proiect” în tabelul mișcărilor (25 septembrie 2026)
+
+- Antetul coloanei din tabelul de intrări/ieșiri este „BENEFICIAR/PROIECT”; conținutul și linkurile coloanei sunt neschimbate.
+- BlazorStoc.Checks 413 trecute; browser (instanță de probă pe http://127.0.0.1:5083, modul demonstrativ, /produse/1): antetele „DATA, INTRARE/IEȘIRE, NUMĂR BUCĂȚI, DESCRIERE, BENEFICIAR/PROIECT, Acțiuni” pe un singur rând; la 768 px fără depășire orizontală, la 375 px pagina rămâne pe 375 px, iar tabelul defilează în propriul container.
+- Neverificat: preview-ul de pe 5082 până la repornirea lui.
