@@ -388,3 +388,17 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 324 verificari trecute (5 noi). Browser 5082 (sesiune autentificata de utilizator, modul demonstrativ): CUI duplicat la Adauga beneficiar afiseaza numele existent si pastreaza formularul; nu s-au salvat date. Neverificat manual: editarea in browser, MariaDB pe server real.
 - **Commit:** `claude: finish Task 4 (duplicate beneficiary CUI message names the stored beneficiary)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T06:05:44.9011116Z â€” claude
+
+- **Task:** Formularul de editare a proiectului fara campul Beneficiar
+- **Rezumat:** La cererea utilizatorului, formularul de editare a proiectului nu mai are campul Beneficiar: proiectul ramane legat de beneficiarul de la creare. ProjectEditor nu mai incarca lista beneficiarilor; la creare beneficiarul fix ramane afisat dezactivat. Repository-urile si ProjectRules accepta in continuare un BeneficiaryId diferit la UpdateAsync, dar nicio pagina nu il mai declanseaza.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/ProjectEditor.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `VALIDARE.md`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 324 verificari trecute. Browser 5082: formularul de editare al proiectului arata doar Denumire, Observatii si Motivare; nu s-au salvat date.
+- **Commit:** `claude: remove beneficiary field from the project edit form`
+- **Predat cÄƒtre:** codex

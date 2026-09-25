@@ -12,6 +12,12 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Modificare la cererea utilizatorului — editarea proiectului fără „Beneficiar”
+
+- `Components/Pages/ProjectEditor.razor`: formularul de editare nu mai are câmpul „Beneficiar” (proiectul rămâne legat de beneficiarul de la creare); lista beneficiarilor nu se mai încarcă. La creare, din pagina beneficiarului, beneficiarul fix rămâne afișat dezactivat.
+- Repository-urile și `ProjectRules` acceptă în continuare un `BeneficiaryId` diferit la `UpdateAsync` (fluxul de mutare din Task 2 și evenimentele asociate), dar nicio pagină nu îl mai declanșează; blocarea la nivel de server nu a fost cerută și nu a fost implementată.
+- Validare: build Release 0 avertismente, `BlazorStoc.Checks` 324 trecute, verificat în browser pe 5082 (formularul de editare al proiectului „Instalare TVCI Barcea”).
+
 ## Ultimele modificări funcționale (ciclul Claude — Task 4)
 
 Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 4”), deși `nextAgent` era `codex`; working tree-ul era curat. Ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`, apoi `start` normal.

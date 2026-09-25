@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 4 - Identificarea beneficiarului cu CUI duplicat",
-    "startedAtUtc":  "2026-09-25T05:59:49.7072245Z",
-    "completedAtUtc":  "2026-09-25T06:03:21.4481497Z",
-    "lastSummary":  "Task 4 finalizat: mesajul CUI duplicat este unic (BeneficiaryRules.DuplicateCuiMessage) si contine numele beneficiarului salvat in baza, in modul demonstrativ, SQLite si MariaDB, la creare si la editare. Beneficiarul editat este exclus din verificare. MariaDB: verificarea citeste numele proprietarului, iar eroarea 1062 a indexului UX_beneficiar_cui la salvari concurente este tradusa dupa rollback in acelasi mesaj. Formularul BeneficiaryEditor pastra deja valorile dupa respingere. TODO.md: Task 4 mutat in arhiva, ordinea etapelor actualizata. Autentificarea si regulile de acces nu au fost modificate.",
-    "lastCommitSubject":  "claude: finish Task 4 (duplicate beneficiary CUI message names the stored beneficiary)",
+    "nextAgent":  "codex",
+    "currentTask":  "Formularul de editare a proiectului fara campul Beneficiar",
+    "startedAtUtc":  "2026-09-25T06:05:33.0015622Z",
+    "completedAtUtc":  "2026-09-25T06:05:44.9011116Z",
+    "lastSummary":  "La cererea utilizatorului, formularul de editare a proiectului nu mai are campul Beneficiar: proiectul ramane legat de beneficiarul de la creare. ProjectEditor nu mai incarca lista beneficiarilor; la creare beneficiarul fix ramane afisat dezactivat. Repository-urile si ProjectRules accepta in continuare un BeneficiaryId diferit la UpdateAsync, dar nicio pagina nu il mai declanseaza.",
+    "lastCommitSubject":  "claude: remove beneficiary field from the project edit form",
     "claudeStatus":  "active"
 }

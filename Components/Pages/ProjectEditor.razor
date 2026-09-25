@@ -1,6 +1,5 @@
 @using BlazorStoc.Services
 @inject IProjectRepository Repository
-@inject IBeneficiaryRepository Beneficiaries
 @inject ILogger<ProjectEditor> Logger
 @implements IDisposable
 
@@ -15,18 +14,6 @@
                 @if (Original is null && FixedBeneficiaryId is not null)
                 {
                     <label class="full-width">Beneficiar<input value="@FixedBeneficiaryName" disabled /></label>
-                }
-                else
-                {
-                    <label for="project-beneficiary" class="full-width">Beneficiar *
-                        <InputSelect id="project-beneficiary" @bind-Value="input.BeneficiaryId">
-                            @foreach (var beneficiary in beneficiaries)
-                            {
-                                <option value="@beneficiary.Id">@beneficiary.Name</option>
-                            }
-                        </InputSelect>
-                        <ValidationMessage For="() => input.BeneficiaryId" />
-                    </label>
                 }
                 <label class="full-width" for="project-name">Denumire proiect *<InputText id="project-name" @bind-Value="input.Name" maxlength="200" /><ValidationMessage For="() => input.Name" /></label>
                 <label class="full-width" for="project-observations">Observații<InputTextArea id="project-observations" @bind-Value="input.Observations" maxlength="4000" rows="4" /><ValidationMessage For="() => input.Observations" /></label>
@@ -47,31 +34,13 @@
     [Parameter] public EventCallback<Project> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
     private ProjectInput input = new();
-    private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
     private bool saving;
     private string? error, reasonError;
     private readonly CancellationTokenSource lifetime = new();
 
-    protected override async Task OnInitializedAsync()
-    {
-        if (Original is null && FixedBeneficiaryId is { } fixedId)
-        {
-            input = new ProjectInput { BeneficiaryId = fixedId };
-            return;
-        }
-        input = Original is null ? new ProjectInput() : ProjectInput.From(Original);
-        try
-        {
-            beneficiaries = await Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
-            if (Original is null && beneficiaries.Count > 0) input.BeneficiaryId = beneficiaries[0].Id;
-        }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (Exception exception)
-        {
-            Logger.LogError("Beneficiary list loading for project editor failed ({ErrorType}).", exception.GetType().Name);
-            error = "Lista beneficiarilor nu a putut fi încărcată.";
-        }
-    }
+    // The beneficiary is fixed when the project is created and never edited afterwards.
+    protected override void OnInitialized() =>
+        input = Original is not null ? ProjectInput.From(Original) : new ProjectInput { BeneficiaryId = FixedBeneficiaryId ?? 0 };
 
     private Task CloseAsync() => saving ? Task.CompletedTask : Closed.InvokeAsync();
 

@@ -196,3 +196,9 @@ Verificat la 25 septembrie 2026.
 - **Suita automată** (`BlazorStoc.Checks`, 324 verificări; 5 noi): mesajul exact `BeneficiaryRules.DuplicateCuiMessage` cu numele salvat (nu cel tastat) la creare în modul demonstrativ și SQLite; editarea către un CUI existent (numele proprietarului, valorile formularului păstrate, obiectul neschimbat); editarea fără schimbarea CUI-ului nu îl raportează pe beneficiarul curent ca duplicat; mesajul fără proprietar cunoscut.
 - **Browser** (`http://127.0.0.1:5082`, sesiune autentificată de utilizator, modul demonstrativ): „Adaugă beneficiar” cu numele „Firma Test Duplicat” și CUI `10000003` → „Există deja un beneficiar cu acest CUI: «Servicii Industriale SA».”; formularul rămâne deschis cu ambele valori; nu s-au salvat date.
 - **Neverificat manual**: editarea în browser, MariaDB pe un server real (inclusiv traducerea erorii 1062 la cereri concurente).
+
+## Formularul de editare a proiectului — fără câmpul „Beneficiar” (25 septembrie 2026)
+
+- Proiectul rămâne legat de beneficiarul de la creare: formularul de editare (`ProjectEditor`) nu mai are câmpul „Beneficiar” și nu mai încarcă lista beneficiarilor; formularul de creare din pagina beneficiarului păstrează beneficiarul fix, afișat dezactivat.
+- Browser (`http://127.0.0.1:5082`, sesiune autentificată de utilizator): `/proiecte/{id}` → „Editează” arată numai Denumire, Observații și Motivare; nu s-au salvat date. `BlazorStoc.Checks`: 324 verificări trecute.
+- **Neschimbat**: repository-urile și `ProjectRules` acceptă în continuare un `BeneficiaryId` diferit la `UpdateAsync` (mutarea proiectului), dar nicio pagină nu o mai declanșează.
