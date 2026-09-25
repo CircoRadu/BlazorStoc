@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 10 - detalii confirmate de utilizator in TODO",
     "startedAtUtc":  "2026-09-25T07:41:37.8065933Z",
     "completedAtUtc":  "2026-09-25T07:42:00.7513236Z",
