@@ -483,3 +483,23 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 335 verificari trecute. Browser 5082: campul afiseaza 25-09-2026 doar pentru citire, click deschide calendarul cu zilele viitoare dezactivate, alegerea din calendar schimba valoarea (24-09-2026), tastarea nu schimba nimic, acelasi camp in dialogul de editare. Neverificat: click direct pe o zi din popup (popup-ul nativ nu primeste click-uri automate), Safari/Firefox.
 - **Commit:** `claude: movement date field is read-only and filled only from the calendar`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T06:32:36.4755857Z â€” claude
+
+- **Task:** Task 6 - Confirmare la parasirea formularului de adaugare
+- **Rezumat:** Task 6 finalizat: cat timp formularul Adauga produs este deschis, alegerea altei categorii, subcategorii sau Toate produsele din meniul produselor este interceptata de wwwroot/leave-guard.js (inclusiv antetele de categorie, care navigheaza prin reincarcare completa) si Home afiseaza un popup accesibil Parasesti adaugarea produsului? cu Paraseste adaugarea (rosu) si Continua adaugarea (verde), reutilizand SaveConfirmationDialog din Task 5 (parametri noi pentru mesaj si etichete). Confirmarea inchide formularul si executa navigarea ceruta; anularea (sau Escape) pastreaza formularul, valorile, imaginea si pozitia meniului. Fara formular deschis nu apare popup; selectia curenta nu declanseaza popup (ProductMenuSelection.IsSameSelection). TODO.md: Task 6 mutat in arhiva. Autentificarea si regulile de acces nu au fost modificate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/App.razor`
+  - `Components/Pages/Home.razor`
+  - `Components/Shared/SaveConfirmationDialog.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Services/LeaveConfirmation.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/leave-guard.js`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 337 verificari trecute (2 noi). Browser 5082: popup la click pe categorie cu formularul completat, Continua pastreaza formularul si meniul, Paraseste inchide formularul si navigheaza, fara formular nu apare popup, subcategorie plus Escape pastreaza formularul; nimic salvat. Neverificat manual: ecran tactil, imagine selectata pastrata dupa anulare.
+- **Commit:** `claude: finish Task 6 (confirm leaving the add-product form from the products menu)`
+- **Predat cÄƒtre:** codex

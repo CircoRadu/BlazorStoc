@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Stare ciclu: **Taskurile 0, 1, 2, 3, 4 și 5 finalizate; pregătit pentru predarea către Codex după commitul curent**
+Stare ciclu: **Taskurile 0, 1, 2, 3, 4, 5 și 6 finalizate; pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -11,6 +11,15 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs”, stocul modificabil exclusiv prin mișcări de intrare/ieșire (pagina `/produse/{id}/miscari`) și istoricul mișcărilor.
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Ultimele modificări funcționale (ciclul Claude — Task 6)
+
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 6”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`.
+
+- **Interceptare în JavaScript**: antetele de categorie din meniul produselor navighează prin `window.location.assign` (reîncărcare completă), deci un hook Blazor `LocationChanging` nu le-ar prinde. `wwwroot/leave-guard.js` (încărcat din `App.razor`) interceptează în faza de captură clicurile pe linkurile `.sidebar a[href^="/produse"]` și pe `summary`-urile categoriilor, oprește evenimentul și apelează `Home.RequestLeave(url, reload)` prin `DotNetObjectReference`. Se activează numai cât timp `Home` are formularul „Adaugă produs” deschis (`OnAfterRenderAsync` sincronizează `blazorStocLeaveGuard.enable/disable`).
+- **Popup**: `SaveConfirmationDialog` a primit parametri (`Message`, `ConfirmLabel`, `CancelLabel`, `ConfirmClass`, `CancelClass`); pentru părăsire: „Părăsește adăugarea” (roșu) / „Continuă adăugarea” (verde). Confirmarea închide formularul și apelează `NavigateTo(url, forceLoad: reload)`; anularea nu atinge editorul, deci valorile și imaginea rămân.
+- **`ProductMenuSelection.IsSameSelection`** (`Services/LeaveConfirmation.cs`, testată): nu se afișează popup pentru selecția curentă.
+- **Validare**: build Release 0 avertismente; `BlazorStoc.Checks` 337 (335 + 2); browser pe 5082 (popup, continuare, părăsire, lipsa popup-ului fără formular, subcategorie + Escape). Neverificat manual: ecran tactil, imagine selectată păstrată după anulare.
 
 ## Data mișcării — calendar numai pentru selectare, fără date viitoare
 
@@ -139,7 +148,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Taskurile 0–5 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este **Task 6** (confirmare la părăsirea formularului de adăugare), care reutilizează `SaveConfirmationDialog`.
+Următorul agent este **Codex**. Taskurile 0–6 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este **Task 7** (confirmarea deconectării), care reutilizează `SaveConfirmationDialog`.
 
 ## Fișiere de orientare
 

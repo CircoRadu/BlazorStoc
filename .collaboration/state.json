@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Data miscarii: camp read-only cu calendar",
-    "startedAtUtc":  "2026-09-25T06:26:04.0560320Z",
-    "completedAtUtc":  "2026-09-25T06:27:25.7603499Z",
-    "lastSummary":  "La cererea utilizatorului, campul Data miscarii este read-only: componenta noua PickOnlyDate (camp text readonly cu format zz-ll-aaaa si pictograma de calendar, care nu poate fi tastat, peste un input type=date nativ ascuns cu min 1990 si max azi care ofera calendarul). Un input date cu atributul readonly nu poate deschide calendarul, de aceea sunt doua campuri. date-pick-only.js redus la deschiderea calendarului (click, Enter, Space, F4, Alt+Jos). Folosit la adaugarea si editarea miscarii. Regula de server (fara date viitoare) neschimbata.",
-    "lastCommitSubject":  "claude: movement date field is read-only and filled only from the calendar",
+    "nextAgent":  "codex",
+    "currentTask":  "Task 6 - Confirmare la parasirea formularului de adaugare",
+    "startedAtUtc":  "2026-09-25T06:30:22.0333965Z",
+    "completedAtUtc":  "2026-09-25T06:32:36.4755857Z",
+    "lastSummary":  "Task 6 finalizat: cat timp formularul Adauga produs este deschis, alegerea altei categorii, subcategorii sau Toate produsele din meniul produselor este interceptata de wwwroot/leave-guard.js (inclusiv antetele de categorie, care navigheaza prin reincarcare completa) si Home afiseaza un popup accesibil Parasesti adaugarea produsului? cu Paraseste adaugarea (rosu) si Continua adaugarea (verde), reutilizand SaveConfirmationDialog din Task 5 (parametri noi pentru mesaj si etichete). Confirmarea inchide formularul si executa navigarea ceruta; anularea (sau Escape) pastreaza formularul, valorile, imaginea si pozitia meniului. Fara formular deschis nu apare popup; selectia curenta nu declanseaza popup (ProductMenuSelection.IsSameSelection). TODO.md: Task 6 mutat in arhiva. Autentificarea si regulile de acces nu au fost modificate.",
+    "lastCommitSubject":  "claude: finish Task 6 (confirm leaving the add-product form from the products menu)",
     "claudeStatus":  "active"
 }

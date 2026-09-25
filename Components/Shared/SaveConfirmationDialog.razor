@@ -9,9 +9,9 @@
         {
             <p class="delete-object"><strong>@ObjectLabel</strong></p>
         }
-        <p id="@DescriptionId">@(Changes.Count == 0
+        <p id="@DescriptionId">@(Message ?? (Changes.Count == 0
             ? "Nu ai modificat nicio valoare a câmpurilor. Salvarea va înregistra doar motivarea."
-            : "Următoarele valori vor fi modificate:")</p>
+            : "Următoarele valori vor fi modificate:"))</p>
         @if (Changes.Count > 0)
         {
             <div class="table-scroll">
@@ -36,8 +36,8 @@
             <p class="form-note">Motivare: @Reason</p>
         }
         <div class="editor-actions">
-            <button type="button" class="primary" @onclick="() => Confirmed.InvokeAsync()">Confirmă salvarea</button>
-            <button type="button" class="danger" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
+            <button type="button" class="@ConfirmClass" @onclick="() => Confirmed.InvokeAsync()">@ConfirmLabel</button>
+            <button type="button" class="@CancelClass" @onclick="() => Cancelled.InvokeAsync()">@CancelLabel</button>
         </div>
     </section>
 </div>
@@ -46,6 +46,11 @@
     [Parameter] public string Title { get; set; } = "Salvezi modificările?";
     [Parameter] public string ObjectLabel { get; set; } = string.Empty;
     [Parameter, EditorRequired] public IReadOnlyList<AuditChange> Changes { get; set; } = Array.Empty<AuditChange>();
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string ConfirmLabel { get; set; } = "Confirmă salvarea";
+    [Parameter] public string CancelLabel { get; set; } = "Anulează";
+    [Parameter] public string ConfirmClass { get; set; } = "primary";
+    [Parameter] public string CancelClass { get; set; } = "danger";
     [Parameter] public string? Note { get; set; }
     [Parameter] public string? Reason { get; set; }
     [Parameter, EditorRequired] public EventCallback Confirmed { get; set; }

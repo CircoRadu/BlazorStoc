@@ -13,29 +13,11 @@
 
 Taskurile sunt grupate în două etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
 
-1. **Dialoguri comune:** Taskurile 6 și 7 reutilizează confirmarea finalizată din Task 5.
-2. **Colaborare în timp real:** Taskurile 6–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
+1. **Dialoguri comune:** Task 7 reutilizează confirmarea finalizată din Task 5 (`SaveConfirmationDialog`).
+2. **Colaborare în timp real:** Task 7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
-
-## Task 6 — Confirmare la părăsirea formularului de adăugare
-
-Depinde de forma finală a produsului („Cod produs”, finalizat; stoc doar prin mișcări, Task 0) și reutilizează componenta de confirmare stabilizată în Task 5.
-
-- [ ] Detectează selectarea unei alte categorii, subcategorii sau a opțiunii „Toate produsele” cât timp formularul „Adaugă produs” este deschis.
-- [ ] Afișează un popup de avertizare înainte de schimbarea selecției din meniul produselor.
-- [ ] Informează clar utilizatorul că formularul de adăugare va fi închis și datele nesalvate vor fi pierdute.
-- [ ] Dacă utilizatorul confirmă părăsirea, închide formularul și execută navigarea selectată din meniu.
-- [ ] Dacă utilizatorul refuză, anulează navigarea, păstrează meniul la poziția anterioară și menține formularul deschis cu toate valorile și imaginea deja introduse.
-- [ ] Folosește un dialog accesibil, cu acțiuni explicite „Părăsește adăugarea” și „Continuă adăugarea”.
-
-### Criterii de acceptare
-
-- Schimbarea categoriei sau subcategoriei nu poate închide accidental un formular de adăugare activ.
-- Confirmarea execută exact navigarea solicitată și închide formularul.
-- Anularea păstrează categoria și subcategoria curente, toate câmpurile completate și imaginea selectată.
-- Mesajul nu este afișat dacă formularul de adăugare nu este deschis.
 
 ## Task 7 — Confirmarea deconectării și jurnalizarea sesiunilor
 
@@ -106,6 +88,16 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Task 6: Confirmare la părăsirea formularului de adăugare
+
+Implementat la 25 septembrie 2026 de Claude. `Components/Pages/Home.razor`, `wwwroot/leave-guard.js`, `ProductMenuSelection` (`Services/LeaveConfirmation.cs`), `Components/Shared/SaveConfirmationDialog.razor` (etichete și mesaj configurabile).
+
+- [x] Cât timp formularul „Adaugă produs” este deschis, alegerea altei categorii, subcategorii sau a „Toate produsele” din meniul produselor este interceptată (clic, Enter sau Spațiu): `leave-guard.js` oprește navigarea înainte să se producă, inclusiv navigarea prin reîncărcare a antetelor de categorie, deci meniul rămâne la poziția anterioară.
+- [x] Popup accesibil (`role="dialog"`, `aria-modal`, focus pe dialog, Escape = continuare): „Părăsești adăugarea produsului?” cu mesajul că formularul va fi închis și datele nesalvate, inclusiv imaginea selectată, se pierd; acțiunile explicite „Părăsește adăugarea” (roșu) și „Continuă adăugarea” (verde), reutilizând `SaveConfirmationDialog` din Task 5.
+- [x] Confirmarea închide formularul și execută exact navigarea solicitată; anularea lasă formularul și meniul neschimbate, cu toate valorile și imaginea introduse (editorul nu este atins).
+- [x] Popup-ul nu apare dacă formularul de adăugare nu este deschis (protecția se activează numai cât timp `editing && editingProduct is null`), nici la editarea unui produs existent, nici la alegerea selecției curente (`ProductMenuSelection.IsSameSelection`).
+- Neverificat manual: comportamentul pe ecran tactil; ieșirea din pagină prin alte linkuri (Meniu principal, Administrare) nu este protejată, conform cerinței (numai meniul produselor).
 
 ## Finalizat — Task 5: Confirmarea salvărilor
 

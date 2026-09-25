@@ -7,7 +7,8 @@
 @inject IAccessControl Access
 @inject NavigationManager Navigation
 @inject ILogger<Home> Logger
-@implements IDisposable
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">INVENTAR CENTRALIZAT</p><h1>Produse și stocuri</h1><p class="muted">Găsește rapid produsele și verifică disponibilitatea lor.</p></div><div class="heading-actions"><a class="refresh" href="/">← Meniu principal</a>@if (canManage) { <a class="refresh" href="/categorii">Administrează categorii</a><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă produs</button> }<button class="refresh" disabled="@(loading || editing || deleting is not null)" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
@@ -37,6 +38,15 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     </div>
 }
 
+@if (pendingLeaveUrl is not null)
+{
+    <SaveConfirmationDialog Title="Părăsești adăugarea produsului?"
+                            Message="Formularul „Adaugă produs” va fi închis, iar datele nesalvate, inclusiv imaginea selectată, vor fi pierdute."
+                            ConfirmLabel="Părăsește adăugarea" CancelLabel="Continuă adăugarea"
+                            ConfirmClass="danger" CancelClass="primary"
+                            Changes="Array.Empty<AuditChange>()" Confirmed="ConfirmLeaveAsync" Cancelled="CancelLeaveAsync" />
+}
+
 @if (deleting is not null)
 {
     <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi produsul?" Subject="Produsul"
@@ -63,6 +73,11 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private int page = 1;
     private const int PageSize = 10;
     private Product? imagePreview;
+    // Leave guard (Task 6): active only while the "Adaugă produs" form is open.
+    private DotNetObjectReference<Home>? guardReference;
+    private bool guardActive;
+    private string? pendingLeaveUrl;
+    private bool pendingLeaveReload;
     private DateTime? lastLoaded;
     private readonly CancellationTokenSource lifetime = new();
     private List<Product> ScopedProducts => products
@@ -86,6 +101,38 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private int Pages => Math.Max(1, (Filtered.Count + PageSize - 1) / PageSize);
     private IEnumerable<Product> Paged => Filtered.Skip((page - 1) * PageSize).Take(PageSize);
     protected override Task OnInitializedAsync() => LoadAsync();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var wanted = editing && editingProduct is null;
+        if (wanted == guardActive) return;
+        try
+        {
+            if (wanted) { guardReference ??= DotNetObjectReference.Create(this); await JS.InvokeVoidAsync("blazorStocLeaveGuard.enable", guardReference); }
+            else await JS.InvokeVoidAsync("blazorStocLeaveGuard.disable");
+            guardActive = wanted;
+        }
+        catch (JSDisconnectedException) { }
+        catch (Exception ex) { Logger.LogWarning("Leave guard could not be updated ({ErrorType}).", ex.GetType().Name); }
+    }
+
+    // Called by wwwroot/leave-guard.js when a products-menu entry is chosen while the add form is open.
+    [JSInvokable]
+    public Task RequestLeave(string url, bool reload)
+    {
+        if (!(editing && editingProduct is null) || ProductMenuSelection.IsSameSelection(Navigation.Uri, url)) return Task.CompletedTask;
+        pendingLeaveUrl = url; pendingLeaveReload = reload;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task CancelLeaveAsync() { pendingLeaveUrl = null; return Task.CompletedTask; }
+
+    private async Task ConfirmLeaveAsync()
+    {
+        var url = pendingLeaveUrl; var reload = pendingLeaveReload;
+        pendingLeaveUrl = null;
+        await CloseEditorAsync();
+        if (url is not null) Navigation.NavigateTo(url, forceLoad: reload);
+    }
     protected override async Task OnParametersSetAsync()
     {
         category = CategoryQuery?.Trim() ?? "";
@@ -168,5 +215,15 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private static string ProductImageUrl(Product product) => $"/media/products/{product.Id}?v={product.Version}";
     private static string StockClass(int quantity) => quantity < 0 ? "negative" : quantity == 0 ? "zero" : "positive";
     private static string StockLabel(int quantity) => quantity < 0 ? "Stoc negativ" : quantity == 0 ? "Fără stoc" : "În stoc";
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel(); lifetime.Dispose();
+        if (guardActive)
+        {
+            try { await JS.InvokeVoidAsync("blazorStocLeaveGuard.disable"); }
+            catch (JSDisconnectedException) { }
+            catch (InvalidOperationException) { }
+        }
+        guardReference?.Dispose();
+    }
 }

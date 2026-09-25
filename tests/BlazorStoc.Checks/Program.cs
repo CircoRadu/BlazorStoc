@@ -576,6 +576,15 @@ try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "BENEFIC
 catch (BeneficiaryOperationException exception) { Check(exception.Message.Contains("ro12345678", StringComparison.Ordinal), "Duplicate beneficiary name is rejected and reports its CUI"); }
 try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "CUI invalid", Cui = "RO-ABC" }); throw new Exception("Invalid CUI accepted"); }
 catch (BeneficiaryOperationException) { Check(true, "Invalid beneficiary CUI is rejected"); }
+Check(ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?categorie=Scule&subcategorie=Găurire", "/produse?subcategorie=G%C4%83urire&categorie=scule") &&
+      ProductMenuSelection.IsSameSelection("http://localhost:5082/produse", "/produse/") &&
+      ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?edit=3", "/produse"),
+    "The leave guard treats the same category and subcategory as the same selection");
+Check(!ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?categorie=Scule", "/produse") &&
+      !ProductMenuSelection.IsSameSelection("http://localhost:5082/produse", "/produse?categorie=Scule") &&
+      !ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?categorie=Scule", "/produse?categorie=Scule&subcategorie=Găurire") &&
+      !ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?categorie=Scule", "/produse?categorie=Altele"),
+    "The leave guard detects another category, another subcategory or \"Toate produsele\"");
 var saveSummary = SaveSummary.Changed(new("Nume", "Alfa", "Alfa"), new("Descriere", "", "Text nou"), new("Cod", " A1 ", "B2"), new("Lung", "x", new string('y', 500)));
 Check(saveSummary.Select(change => change.Field).SequenceEqual(["Descriere", "Cod", "Lung"]) &&
       saveSummary[0].Before == SaveSummary.Empty && saveSummary[1].Before == "A1" && saveSummary[2].After.Length == SaveSummary.MaximumValueLength + 1,
