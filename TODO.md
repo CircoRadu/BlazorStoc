@@ -11,7 +11,85 @@
 
 ## Ordinea de implementare optimizată
 
-Nu mai există taskuri active: Taskurile 0–9 și mecanismul collapse sunt finalizate și arhivate mai jos. Un task nou se adaugă în această parte, pe poziția stabilită de regula de prioritizare, iar dependențele lui față de lucrările finalizate se descriu în textul taskului. Agenții lucrează în cicluri strict secvențiale Codex–Claude; niciodată simultan.
+Taskurile 0–9 și mecanismul collapse sunt finalizate și arhivate mai jos. Singurul task activ este Task 10 (situația de inventar), care se bazează pe lucrări finalizate și poate fi implementat independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
+
+## Task 10 — Situația de inventar (pagina „Inventar” și fișierul PDF)
+
+Adaugă o pagină nouă, „Inventar”, din care utilizatorul alege categoriile și subcategoriile pentru care se generează o situație de inventar în format PDF, folosită la numărarea fizică a stocului. Pagina reutilizează structura vizuală și mecanismul collapse din „Categorii și subcategorii”, dar este numai pentru consultare și selectare. Depinde de structura catalogului, de „Cod produs” și de stocul calculat din mișcări (Taskurile 0–1, finalizate); nu depinde de alte taskuri active.
+
+### Subtask 10.1 — Pagina, ruta și accesul
+
+- [ ] Creează pagina „Inventar” la ruta stabilă `/inventar`, cu titlul „Inventar” (`<h1>` și titlul paginii), accesibilă utilizatorilor autentificați care pot consulta produsele (aceleași drepturi ca pentru catalog); nu cere rol de administrator.
+- [ ] Adaugă „Inventar” în meniul principal din bara laterală (secțiunea „Spațiu de lucru”, între „Produse și stocuri” și „Administrare”, cu pictogramă proprie), cu evidențierea elementului activ pe `/inventar`.
+- [ ] Adaugă „Inventar” în dashboard-ul (pagina principală), ca element de același tip cu cele existente, cu o descriere scurtă (de exemplu „Generează situația de inventar pentru numărarea stocului.”) și link către `/inventar`.
+- [ ] Pagina afișează stări clare: încărcare, catalog gol („Nu există categorii sau produse pentru inventar”) și eroare de încărcare cu „Reîncearcă”; nu afișează date simulate.
+
+### Subtask 10.2 — Afișarea categoriilor și subcategoriilor
+
+- [ ] Afișează categoriile și subcategoriile în același stil ca în „Categorii și subcategorii” (carduri extensibile cu `CollapsibleSection`, denumirea categoriei, numărul de subcategorii și de produse asociate, tabel/listă a subcategoriilor cu numărul de produse), **fără** butoanele „Adaugă categorie”, „Adaugă subcategorie”, „Editează categoria” și „Editează / Mută”.
+- [ ] Categoriile pornesc restrânse, ca în pagina de administrare; starea extinsă/restrânsă a unui card nu se pierde la reîmprospătări ale datelor și nu modifică selecția.
+- [ ] Ordinea categoriilor și a subcategoriilor este aceeași ca în pagina de administrare (alfabetică, după regulile de comparație existente); categoriile sau subcategoriile fără produse sunt afișate și selectabile, dar produc secțiuni goale sau sunt omise din PDF conform subtaskului 10.5.
+
+### Subtask 10.3 — Selectarea
+
+- [ ] Fiecare categorie și fiecare subcategorie are o casetă de selectare (`<input type="checkbox">` cu etichetă accesibilă, de exemplu „Selectează categoria Scule electrice”); selectarea unei subcategorii marchează pentru inventar toate produsele ei, iar selectarea unei categorii marchează toate produsele categoriei.
+- [ ] Selectarea sau deselectarea unei categorii se propagă asupra tuturor subcategoriilor ei. Când doar o parte din subcategoriile unei categorii sunt selectate, caseta categoriei este în stare **nedeterminată** (`indeterminate`, expusă corect accesibilității); când toate sunt selectate devine bifată, iar când niciuna nu este selectată devine debifată. Apăsarea pe o casetă nedeterminată selectează toate subcategoriile.
+- [ ] Deasupra listei de categorii există caseta „Selectează toate categoriile”, cu aceeași logică (bifată, nedeterminată, debifată) calculată din toate categoriile; apăsarea ei selectează sau deselectează toate categoriile și subcategoriile.
+- [ ] Sub caseta „Selectează toate categoriile” există caseta „Elimină din situația de inventar produsele cu stoc 0”. Când este bifată, produsele cu stoc exact 0 nu apar în PDF; produsele cu stoc negativ **rămân** în situație (sunt o anomalie de verificat la numărare) — de confirmat cu utilizatorul. Starea implicită este debifată.
+- [ ] Caseta din antetul cardului unei categorii și apăsarea antetului sunt acțiuni independente: bifarea nu extinde/restrânge cardul, iar extinderea nu schimbă selecția (regula din Subtask 0.1 pentru acțiunile din antet).
+- [ ] Toate casetele se pot folosi cu mouse, touch și tastatură (Tab, Spațiu); starea selecției este afișată și ca text pentru cititoare de ecran (de exemplu „3 din 5 subcategorii selectate”). Selecția și opțiunea „stoc 0” se păstrează pe durata sesiunii paginii, nu în baza de date.
+- [ ] Logica selecției (categorie ↔ subcategorii ↔ „toate”) este o clasă independentă de interfață, acoperită de teste (vezi Subtask 10.7).
+
+### Subtask 10.4 — Butonul „Generează situația de inventar”
+
+- [ ] În partea de sus a paginii, în locul butonului „Adaugă categorie” din pagina de administrare, există butonul „Generează situația de inventar”.
+- [ ] Butonul este dezactivat, cu explicație („Selectează cel puțin o categorie sau subcategorie”), cât timp nu este selectat nimic; pe durata generării este dezactivat și afișează „Se generează…” pentru a preveni dubla trimitere.
+- [ ] Apăsarea generează fișierul PDF și îl oferă utilizatorului pentru descărcare (nume propus `Inventar_aaaa-ll-zz_oomm.pdf`, ora locală). Fișierul **nu** se păstrează pe server.
+- [ ] Selecția trimisă la server este validată pe server: numai identificatori valizi de categorii/subcategorii existente, fără date de produse primite de la client; o selecție care nu mai corespunde catalogului (structură modificată între timp) este semnalată clar, iar PDF-ul nu se generează parțial. Cererea este autorizată și protejată împotriva CSRF, ca celelalte operații.
+- [ ] Dacă după aplicarea opțiunii „stoc 0” nu rămâne niciun produs, utilizatorul primește un mesaj („Nu există produse de inventariat pentru selecția făcută”) și nu se generează un PDF gol.
+
+### Subtask 10.5 — Conținutul fișierului PDF
+
+- [ ] Prima pagină are titlul „Inventar” și, sub el, „Generat la: zz-ll-aaaa oo:mm” în **ora locală** (aceeași convenție de timp local ca în restul aplicației; se confirmă dacă ora este a serverului sau a browserului).
+- [ ] Pentru fiecare categorie selectată (integral sau parțial): o etichetă cu numele categoriei; sub ea, pentru fiecare subcategorie selectată a categoriei: o etichetă cu numele subcategoriei și un tabel cu antetul **Cod produs | Valoare stoc | Valoare reală**. Secțiunile și tabelele sunt generate numai din opțiunile selectate: categoriile fără nicio subcategorie selectată nu apar, iar subcategoriile fără produse rămase (inclusiv după eliminarea stocului 0) sunt omise împreună cu tabelul lor; o categorie fără nicio subcategorie rămasă este omisă.
+- [ ] Coloana „Cod produs” conține codul produsului (denumirea salvată, cu diacriticele păstrate în afișare, fără identificatorul tehnic `#<id>`); „Valoare stoc” conține cantitatea din stocul calculat din mișcări la momentul generării (număr întreg, valorile negative afișate ca atare); „Valoare reală” este **lăsată goală** pentru completare manuală la numărarea fizică — de confirmat cu utilizatorul.
+- [ ] Ordinea: categoriile și subcategoriile ca în pagină (alfabetic); produsele fiecărui tabel sunt ordonate după codul produsului (comparație insensibilă la majuscule), cu ordine stabilă la coduri egale.
+- [ ] Aspect: format A4, orientare portret, font care conține diacriticele românești (ă, â, î, ș, ț) încorporat în fișier; antetul fiecărui tabel se repetă pe paginile următoare când tabelul continuă; o etichetă de categorie sau de subcategorie nu rămâne singură la finalul unei pagini (fără tabel sub ea); coduri lungi se împart pe mai multe rânduri fără să depășească marginile; număr de pagină („Pagina x din y”) în subsol; coloanele „Valoare stoc” și „Valoare reală” au lățime suficientă pentru scrierea de mână și pentru cel puțin 6 cifre.
+- [ ] Datele sunt citite într-o singură interogare/instantaneu coerent al catalogului la momentul generării, astfel încât stocul dintr-o secțiune să nu provină din momente diferite; generarea este complet asincronă și nu blochează alte sesiuni.
+
+### Subtask 10.6 — Bibliotecă PDF și dependențe
+
+- [ ] Alege o bibliotecă de generare PDF fără Docker, fără servicii externe și cu licență compatibilă cu folosirea comercială internă (propunere de evaluat: PDFsharp/MigraDoc, licență MIT; alternativa QuestPDF are condiții de licență de verificat înainte de adoptare). Decizia și motivul se notează în `docs/PROJECT_STATE.md`.
+- [ ] Fontul încorporat are licență de redistribuire și este inclus în aplicație (nu depinde de fonturile instalate pe server); fără acces la internet la generare.
+- [ ] Generatorul este un serviciu separat (de exemplu `IInventoryReportBuilder` → model `InventoryReport` → `IInventoryPdfWriter`), astfel încât construirea datelor (selecție, filtrare, ordonare) să poată fi testată fără PDF.
+
+### Subtask 10.7 — Verificări
+
+- [ ] Teste automate pentru logica selecției: selectare/deselectare categorie ↔ subcategorii, stare nedeterminată, „toate categoriile”, apăsare pe caseta nedeterminată, categorii fără subcategorii.
+- [ ] Teste automate pentru construirea situației: doar selecția făcută, eliminarea stocului 0 (stocul negativ rămâne), omiterea secțiunilor goale, ordinea categoriilor/subcategoriilor/produselor, stoc calculat din mișcări (inclusiv un produs cu mișcări), respingerea identificatorilor inexistenți, selecție goală.
+- [ ] Test de generare PDF: fișierul începe cu `%PDF`, are cel puțin o pagină, conține textele „Inventar”, „Generat la:”, numele categoriei și subcategoriei, antetul „Cod produs / Valoare stoc / Valoare reală” și un cod cu diacritice (extragere de text din PDF în test), iar un catalog mare (de exemplu 300 de produse) produce mai multe pagini cu antet repetat.
+- [ ] Verificare în browser (mod demonstrativ): selectarea unei categorii, a unei subcategorii, a tuturor, starea nedeterminată, opțiunea „stoc 0”, dezactivarea butonului fără selecție, descărcarea fișierului și deschiderea lui într-un cititor PDF (conținutul comparat cu pagina și cu stocul din „Produse și stocuri”); la 375 și 768 px fără depășire orizontală.
+- [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și, pentru ce nu se poate verifica (de exemplu deschiderea în alte cititoare PDF sau tipărirea), `docs/TESTE_RAMASE.md`.
+
+### Criterii de acceptare
+
+- „Inventar” apare în meniul principal, în dashboard și are pagină proprie la `/inventar`, accesibilă utilizatorilor autentificați.
+- Pagina arată categoriile și subcategoriile ca în „Categorii și subcategorii”, fără butoane de adăugare sau editare.
+- Fiecare categorie și subcategorie are o casetă de selectare; categoria se propagă la subcategorii, iar starea parțială este nedeterminată; „Selectează toate categoriile” selectează sau deselectează tot.
+- „Elimină din situația de inventar produsele cu stoc 0” exclude din PDF produsele cu stoc zero.
+- „Generează situația de inventar” este dezactivat fără selecție și generează un PDF pentru selecția făcută.
+- PDF-ul are pe prima pagină „Inventar” și „Generat la: …” (ora locală), apoi, pentru fiecare categorie selectată, eticheta categoriei, eticheta fiecărei subcategorii selectate și un tabel „Cod produs | Valoare stoc | Valoare reală”, numai cu produsele rezultate din opțiunile alese.
+- Diacriticele românești se văd corect; tabelele continuă pe pagini cu antet repetat; nu rămân etichete singure la sfârșit de pagină.
+- Stocul din PDF coincide cu stocul afișat în „Produse și stocuri” la momentul generării.
+- Funcționalitatea este asincronă, fără Docker, fără fișiere SQL de upgrade separate și nu modifică date (este numai citire).
+
+### Decizii de confirmat înainte de implementare
+
+- „Valoare reală” rămâne goală (completare manuală) sau se precompletează cu ceva?
+- Produsele cu **stoc negativ** rămân în situație când „stoc 0” este bifat?
+- Ora „locală” din „Generat la” este a serverului (ca restul aplicației) sau a browserului utilizatorului?
+- Alegerea bibliotecii PDF (MIT vs. licența QuestPDF) și a fontului încorporat.
+- Se jurnalizează generarea situației de inventar în jurnalul de activitate (nu este cerut; nu se modifică date)?
 
 ## Observații pentru etapa de implementare
 

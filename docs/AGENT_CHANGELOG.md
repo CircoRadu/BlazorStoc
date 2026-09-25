@@ -623,3 +623,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod; git diff arata cate o linie adaugata in CLAUDE.md si AGENTS.md, cu terminatorii de linie existenti pastrati.
 - **Commit:** `claude: instruct agents to maintain docs/TESTE_RAMASE.md`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T07:25:28.7393982Z â€” claude
+
+- **Task:** Pregatire TODO pentru pagina Inventar si PDF
+- **Rezumat:** La cererea utilizatorului s-a pregatit in TODO.md Task 10 - Situatia de inventar: pagina Inventar (/inventar, in meniul principal si dashboard), afisarea categoriilor/subcategoriilor ca in Categorii si subcategorii fara butoane de adaugare/editare, casete de selectare cu propagare categorie-subcategorii si stare nedeterminata, Selecteaza toate categoriile, Elimina produsele cu stoc 0, butonul Genereaza situatia de inventar si PDF-ul (titlu Inventar, Generat la in ora locala, sectiuni categorie/subcategorie cu tabel Cod produs, Valoare stoc, Valoare reala). Sapte subtaskuri, criterii de acceptare si lista deciziilor de confirmat (Valoare reala goala, stoc negativ, ora locala, biblioteca PDF si font, jurnalizare). Sectiunea de ordine actualizata. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu s-a modificat cod; structura TODO.md verificata (Task 10 cu subtaskurile 10.1-10.7, criterii de acceptare si decizii de confirmat), suita neschimbata.
+- **Commit:** `claude: prepare TODO for inventory page and PDF (Task 10)`
+- **Predat cÄƒtre:** codex

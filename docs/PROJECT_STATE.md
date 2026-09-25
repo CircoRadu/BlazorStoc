@@ -12,6 +12,10 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Pregătire TODO — Task 10 (situația de inventar)
+
+- La cererea utilizatorului s-a pregătit în `TODO.md` **Task 10 — Situația de inventar**: pagina „Inventar” (`/inventar`, în meniul principal și în dashboard), afișarea categoriilor/subcategoriilor ca în „Categorii și subcategorii” fără butoane de adăugare/editare, casete de selectare cu propagare categorie → subcategorii și stare nedeterminată, „Selectează toate categoriile”, „Elimină produsele cu stoc 0” și butonul „Genereaza situatie inventar”, care produce un PDF (titlu „Inventar”, „Generat la” în ora locală, secțiuni categorie/subcategorie cu tabel „Cod produs | Valoare stoc | Valoare reală”). Taskul are 7 subtaskuri (pagină, afișare, selectare, buton, conținut PDF, bibliotecă PDF, verificări), criterii de acceptare și o listă de decizii de confirmat înainte de implementare (semnificația „Valoare reală”, stocul negativ, ora locală, biblioteca PDF, jurnalizarea). Nu s-a modificat cod; următorul pas este confirmarea deciziilor și implementarea.
+
 ## Evidența testelor rămase
 
 - La cererea utilizatorului s-a creat `docs/TESTE_RAMASE.md`: fiecare verificare neefectuată până acum (MariaDB pe un server real, mai multe calculatoare și conturi, editoarele neexersate în browser, tastatură/cititor de ecran, alte browsere și dispozitive tactile, funcționare îndelungată) cu motivul (M1–M6), pașii, rezultatul așteptat și sursa. Testele efectuate se mută în secțiunea „Teste efectuate” a aceluiași fișier. `CLAUDE.md` și `AGENTS.md` cer acum explicit actualizarea acestui fișier când o verificare nu poate fi efectuată sau una din listă este efectuată.
