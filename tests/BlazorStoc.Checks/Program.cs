@@ -422,13 +422,52 @@ var beneficiaryAuditLink = productAuditLink with
     { EntityType = AuditEntities.Beneficiary, Action = AuditActions.Edit, EntityId = "7" };
 var userAuditLink = productAuditLink with
     { EntityType = AuditEntities.User, Action = AuditActions.Create, EntityId = "3" };
-Check(AuditNavigation.EditUrl(productAuditLink) == "/produse?edit=12" &&
-      AuditNavigation.EditUrl(beneficiaryAuditLink) == "/beneficiari?edit=7" &&
-      AuditNavigation.EditUrl(userAuditLink) == "/utilizatori?edit=3",
-    "Product, beneficiary and user audit targets use entity type and stable identifier for navigation");
-Check(AuditNavigation.EditUrl(productAuditLink with { Action = AuditActions.Delete }) is null &&
-      AuditNavigation.EditUrl(productAuditLink with { EntityType = AuditEntities.Category }) is null &&
-      AuditNavigation.EditUrl(productAuditLink with { EntityId = "invalid" }) is null,
+Check(AuditNavigation.TargetUrl(productAuditLink) == "/produse/12" &&
+      AuditNavigation.TargetUrl(beneficiaryAuditLink) == "/beneficiari/7" &&
+      AuditNavigation.TargetUrl(userAuditLink) == "/utilizatori/3" &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityType = AuditEntities.Project, EntityId = "4" }) == "/proiecte/4",
+    "Product, beneficiary, user and project audit targets open the read-only object page from entity type and stable identifier");
+Check(AuditNavigation.TargetUrl(productAuditLink)!.Contains("edit", StringComparison.Ordinal) == false &&
+      AuditNavigation.TargetUrl(userAuditLink)!.Contains('?') == false,
+    "Audit target links never carry an edit trigger");
+Check(AuditNavigation.TargetUrl(productAuditLink with { Target = "/proiecte/99" }) == "/produse/12" &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityId = "12abc", Target = "#99 · Produs" }) is null &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityId = "" }) is null &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityId = "-3" }) is null,
+    "Audit routes ignore the display text of the target and require a valid stable identifier");
+Check(AuditNavigation.TargetUrl(userAuditLink with { Action = AuditActions.Login, EntityId = "" }) is null &&
+      AuditNavigation.TargetUrl(userAuditLink with { Action = AuditActions.Logout, EntityId = "" }) is null &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityType = AuditEntities.Subcategory }) is null &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityType = AuditEntities.ProjectObservationFile }) is null,
+    "Session events and entity types without a page are shown as text");
+var removedAt = productAuditLink.TimestampUtc.AddMinutes(5);
+var productDeleteAudit = productAuditLink with { Id = Guid.NewGuid(), TimestampUtc = removedAt, Action = AuditActions.Delete };
+var removals = AuditNavigation.RemovalTimes([productAuditLink, productDeleteAudit, beneficiaryAuditLink]);
+Check(AuditNavigation.TargetUrl(productAuditLink, removals) is null &&
+      AuditNavigation.TargetUrl(productAuditLink with { Action = AuditActions.Edit, TimestampUtc = removedAt.AddMinutes(1) }, removals) == "/produse/12" &&
+      AuditNavigation.TargetUrl(beneficiaryAuditLink, removals) == "/beneficiari/7" &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityId = "13" }, removals) == "/produse/13" &&
+      AuditNavigation.TargetUrl(userAuditLink with { EntityId = "12" }, removals) == "/utilizatori/12",
+    "Objects deleted after the event get no link, while other objects, other types and later events keep theirs");
+
+Check(AuditListState.Default.Url() == "/jurnal" &&
+      AuditListState.From("  ", null, null, null, null, null, null) == AuditListState.Default &&
+      AuditListState.From("cod x", "Produs", "Editare", "admin", "2026-09-25", 50, 3).Url() ==
+        "/jurnal?q=cod%20x&tip=Produs&operatie=Editare&operator=admin&data=2026-09-25&pe-pagina=50&pagina=3",
+    "The journal state is written to the address only for values that differ from the defaults");
+var restoredJournal = AuditListState.From("a&b=c", "Beneficiar", "Adăugare", "op", "2026-09-25", 20, 2);
+Check(restoredJournal.Query == "a&b=c" && restoredJournal.PageSize == 20 && restoredJournal.Page == 2 &&
+      AuditListState.DateLabel("2026-09-25") == "25.09.2026" &&
+      new Uri("http://localhost" + restoredJournal.Url()).Query.Contains("q=a%26b%3Dc", StringComparison.Ordinal),
+    "The journal state round-trips through the address and keeps special characters escaped");
+Check(AuditListState.From(null, null, null, null, "25/09/2026", 7, 0) == AuditListState.Default &&
+      AuditListState.From(null, null, null, null, "2026-13-40", 0, -4).PageSize == 0 &&
+      AuditListState.From(null, null, null, null, "2026-13-40", 0, -4).DateKey is null &&
+      AuditListState.From(null, null, null, null, null, null, -4).Page == 1,
+    "Malformed journal address values fall back to the defaults");
+Check(AuditNavigation.TargetUrl(productAuditLink with { Action = AuditActions.Delete }) is null &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityType = AuditEntities.Category }) is null &&
+      AuditNavigation.TargetUrl(productAuditLink with { EntityId = "invalid" }) is null,
     "Deleted objects and entities without edit pages do not receive invalid audit links");
 
 var auditRulesTrail = new TestAuditTrail();
@@ -1329,8 +1368,8 @@ try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1), Sto
 catch (StockMovementOperationException) { Check(true, "Editing a movement requires a reason"); }
 Check(StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, date: new DateOnly(2099, 1, 1)), StockMovementKind.Exit, false).Date == new DateOnly(2099, 1, 1),
     "Movement date may be in the future");
-Check(AuditNavigation.EditUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Create, "t", "d", "", "5")) == "/miscari/5" &&
-      AuditNavigation.EditUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Delete, "t", "d", "", "5")) is null,
+Check(AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Create, "t", "d", "", "5")) == "/miscari/5" &&
+      AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Delete, "t", "d", "", "5")) is null,
     "Journal links movement events to their product page and not after deletion");
 
 var movementRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-movements-" + Guid.NewGuid().ToString("N"));
@@ -1629,14 +1668,14 @@ try
     // Observation route in the journal registry (Subtask 2.3).
     AuditEvent ObservationAudit(string action, string entityId) =>
         new(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.ProjectObservation, action, "t", "d", "", entityId);
-    Check(AuditNavigation.EditUrl(ObservationAudit(AuditActions.Create, "12")) == "/observatii/12" &&
-          AuditNavigation.EditUrl(ObservationAudit(AuditActions.Edit, "12")) == "/observatii/12" &&
-          AuditNavigation.EditUrl(ObservationAudit(AuditActions.Delete, "12")) is null &&
-          AuditNavigation.EditUrl(ObservationAudit(AuditActions.Create, "abc")) is null &&
-          AuditNavigation.EditUrl(ObservationAudit(AuditActions.Create, "0")) is null,
+    Check(AuditNavigation.TargetUrl(ObservationAudit(AuditActions.Create, "12")) == "/observatii/12" &&
+          AuditNavigation.TargetUrl(ObservationAudit(AuditActions.Edit, "12")) == "/observatii/12" &&
+          AuditNavigation.TargetUrl(ObservationAudit(AuditActions.Delete, "12")) is null &&
+          AuditNavigation.TargetUrl(ObservationAudit(AuditActions.Create, "abc")) is null &&
+          AuditNavigation.TargetUrl(ObservationAudit(AuditActions.Create, "0")) is null,
         "Observation events link to the stable /observatii/{id} route; deleted or invalid ones do not");
     Check(ProjectNavigation.ObservationPageUrl(3, 12) == "/proiecte/3/observatii/12" && ProjectNavigation.ProjectUrl(3) == "/proiecte/3" &&
-          AuditNavigation.EditUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.ProjectObservationFile, AuditActions.Create, "t", "d", "", "4")) is null,
+          AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.ProjectObservationFile, AuditActions.Create, "t", "d", "", "4")) is null,
         "The observation route resolves under its project; files have no page of their own");
 
     // Return to the project list of a beneficiary (Subtask 2.3).

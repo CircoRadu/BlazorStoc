@@ -69,6 +69,8 @@ Meniul **Jurnal activitate** este afișat numai administratorilor. Fiecare opera
 - identificatorul și denumirea țintei;
 - un rezumat al schimbării, inclusiv motivul unei corecții de stoc.
 
+Coloana „Țintă” deschide pagina de consultare a obiectului (`/produse/{id}`, `/beneficiari/{id}`, `/utilizatori/{id}`, `/proiecte/{id}` etc.), nu formularul de editare; editarea pornește numai din butonul „Editează” al paginii. Obiectele șterse (arhivate), tipurile fără pagină și evenimentele fără identificator sunt afișate ca text. Filtrele, dimensiunea paginii și pagina jurnalului sunt păstrate în adresă (`/jurnal?q=…&tip=…&pagina=…`), astfel că Înapoi din browser le restaurează.
+
 Parolele și hash-urile nu sunt incluse în jurnal. În faza locală, dashboard-ul citește jurnalul persistent din `data/audit-events.jsonl`; directorul este exclus din sursele distribuite. În modul MariaDB, jurnalizarea tranzacțională existentă în baza de date rămâne activă, iar jurnalul aplicației furnizează vizualizarea unificată.
 
 Sistemul refuză eliminarea ultimului administrator activ. Un administrator nu își poate șterge, dezactiva, redenumi sau retrograda propriul cont în sesiunea curentă. În modul real, implementarea este pregătită să auditeze modificările fără parole sau hash-uri.

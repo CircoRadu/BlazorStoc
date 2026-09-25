@@ -5,6 +5,7 @@
 @inject IAuditTrail AuditTrail
 @inject ILogger<Audit> Logger
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 @implements IAsyncDisposable
 
 <PageTitle>Jurnal activitate · BlazorStoc</PageTitle>
@@ -49,9 +50,9 @@
                 <td><button type="button" class="audit-action audit-filter-link @ActionClass(entry.Action)" title="Filtrează după această operație" @onclick="() => FilterByAction(entry.Action)">@entry.Action</button><small class="user-id">@entry.EntityType</small></td>
                 <td>
                     @{ var target = AuditNavigation.DisplayTarget(entry); }
-                    @if (AuditNavigation.EditUrl(entry) is { } editUrl)
+                    @if (AuditNavigation.TargetUrl(entry, removals) is { } targetUrl)
                     {
-                        <a class="audit-target-link" href="@editUrl" title="Deschide pagina de editare pentru @target"><strong>@target</strong></a>
+                        <a class="audit-target-link" data-restore-scroll href="@targetUrl" title="Deschide pagina obiectului: @target"><strong>@target</strong></a>
                     }
                     else
                     {
@@ -86,7 +87,17 @@
 
 @code {
     private IReadOnlyList<AuditEvent> events = Array.Empty<AuditEvent>();
+    [SupplyParameterFromQuery(Name = "q")] public string? QueryText { get; set; }
+    [SupplyParameterFromQuery(Name = "tip")] public string? EntityParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "operatie")] public string? ActionParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "operator")] public string? ActorParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "data")] public string? DateParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "pe-pagina")] public int? PageSizeParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "pagina")] public int? PageParameter { get; set; }
     private string query = "", entity = "", action = "", actor = "";
+    private IReadOnlyDictionary<string, DateTime> removals = new Dictionary<string, DateTime>();
+    private bool scrollRestorePending = true;
+    private string? syncedUrl;
     private string? selectedDateKey, selectedDateLabel;
     private string? error;
     private bool loading, loaded, syncing;
@@ -142,13 +153,39 @@
         ResetPage();
     }
 
-    private void ResetPage() => currentPage = 1;
-    private void PreviousPage() => currentPage = Math.Max(1, currentPage - 1);
-    private void NextPage() => currentPage = Math.Min(TotalPages, currentPage + 1);
-    private void NormalizePage() => currentPage = Math.Clamp(currentPage, 1, TotalPages);
+    private void ResetPage() { currentPage = 1; SyncState(); }
+    private void PreviousPage() { currentPage = Math.Max(1, currentPage - 1); SyncState(); }
+    private void NextPage() { currentPage = Math.Min(TotalPages, currentPage + 1); SyncState(); }
+    private void NormalizePage()
+    {
+        var page = Math.Clamp(currentPage, 1, TotalPages);
+        if (page == currentPage) return;
+        currentPage = page;
+        SyncState();
+    }
+
+    // Filters and page live in the address (replaced in place, so Back from an object page restores them). They are
+    // read from the address only when the page is opened, so that a delayed location update cannot overwrite typed text.
+    private void ApplyStateFromAddress()
+    {
+        var state = AuditListState.From(QueryText, EntityParameter, ActionParameter, ActorParameter, DateParameter, PageSizeParameter, PageParameter);
+        (query, entity, action, actor, selectedDateKey, pageSize, currentPage) =
+            (state.Query, state.Entity, state.Action, state.Actor, state.DateKey, state.PageSize, state.Page);
+        selectedDateLabel = state.DateKey is null ? null : AuditListState.DateLabel(state.DateKey);
+        syncedUrl = state.Url();
+    }
+
+    private void SyncState()
+    {
+        var url = new AuditListState(query.Trim(), entity, action, actor, selectedDateKey, pageSize, currentPage).Url();
+        if (url == syncedUrl) return;
+        syncedUrl = url;
+        Navigation.NavigateTo(url, replace: true);
+    }
 
     protected override async Task OnInitializedAsync()
     {
+        ApplyStateFromAddress();
         await LoadAsync(true);
         _ = SynchronizePeriodicallyAsync();
     }
@@ -161,6 +198,7 @@
         try
         {
             events = await AuditTrail.GetEventsAsync(lifetime.Token);
+            removals = AuditNavigation.RemovalTimes(events);
             loaded = true;
             timestampsDirty = true;
             NormalizePage();
@@ -184,6 +222,12 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (scrollRestorePending && loaded && !timestampsDirty && localTimes.Count > 0)
+        {
+            scrollRestorePending = false;
+            try { await JS.InvokeVoidAsync("blazorStocNavigationContext.restoreScroll"); }
+            catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
+        }
         if (!timestampsDirty || !loaded || lifetime.IsCancellationRequested) return;
         timestampsDirty = false;
         try

@@ -59,27 +59,60 @@ public static class AuditNavigation
             : entry.Target;
     }
 
-    public static string? EditUrl(AuditEvent entry)
+    // Registry of the read-only pages that the "Țintă" column links to, keyed by entity type. A new entity with its
+    // own page is added here and nowhere else; entity types without an entry are shown as plain text. Every route
+    // is built from the entity type and the stable identifier only, never from the display text of the target.
+    private static readonly IReadOnlyDictionary<string, Func<int, string>> Routes = new Dictionary<string, Func<int, string>>
+    {
+        [AuditEntities.Product] = ProductNavigation.ProductUrl,
+        [AuditEntities.Beneficiary] = BeneficiaryProjectListState.BeneficiaryUrl,
+        [AuditEntities.User] = UserNavigation.UserUrl,
+        [AuditEntities.Project] = ProjectNavigation.ProjectUrl,
+        // The event stores the observation id; /observatii/{id} resolves it to the page under its project.
+        [AuditEntities.ProjectObservation] = ProjectNavigation.ObservationUrl,
+        // The event stores the movement id; /miscari/{id} resolves it to the product's movements page.
+        [AuditEntities.StockMovement] = StockMovementNavigation.MovementUrl
+    };
+
+    public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)
     {
         if (entry.Action is not (AuditActions.Create or AuditActions.Edit) ||
-            !int.TryParse(entry.EntityId, out var entityId) || entityId <= 0)
+            !int.TryParse(entry.EntityId, out var entityId) || entityId <= 0 ||
+            !Routes.TryGetValue(entry.EntityType, out var route))
             return null;
-
-        // Project already has a stable read-only page; the other types still route through the editor's query trigger.
-        if (entry.EntityType == AuditEntities.Project) return ProjectNavigation.ProjectUrl(entityId);
-        // The event stores the observation id; /observatii/{id} resolves it to the page under its project.
-        if (entry.EntityType == AuditEntities.ProjectObservation) return ProjectNavigation.ObservationUrl(entityId);
-        // The event stores the movement id; /miscari/{id} resolves it to the product's movements page.
-        if (entry.EntityType == AuditEntities.StockMovement) return StockMovementNavigation.MovementUrl(entityId);
-        var path = entry.EntityType switch
-        {
-            AuditEntities.Product => "/produse",
-            AuditEntities.Beneficiary => "/beneficiari",
-            AuditEntities.User => "/utilizatori",
-            _ => null
-        };
-        return path is null ? null : $"{path}?edit={entityId}";
+        // A deletion recorded at or after this event means the live page no longer exists (the object is archived).
+        if (removals is not null && removals.TryGetValue(ObjectKey(entry.EntityType, entry.EntityId), out var removedAt) &&
+            removedAt >= entry.TimestampUtc)
+            return null;
+        return route(entityId);
     }
+
+    // Latest recorded deletion per object. Events after the deletion (for example an identifier reused later) keep
+    // their links, older ones are shown as text.
+    public static IReadOnlyDictionary<string, DateTime> RemovalTimes(IEnumerable<AuditEvent> events)
+    {
+        var removals = new Dictionary<string, DateTime>(StringComparer.Ordinal);
+        foreach (var entry in events)
+        {
+            if (entry.Action != AuditActions.Delete || entry.EntityId.Length == 0) continue;
+            var key = ObjectKey(entry.EntityType, entry.EntityId);
+            if (!removals.TryGetValue(key, out var known) || entry.TimestampUtc > known) removals[key] = entry.TimestampUtc;
+        }
+        return removals;
+    }
+
+    private static string ObjectKey(string entityType, string entityId) => $"{entityType}:{entityId}";
+}
+
+public static class ProductNavigation
+{
+    // Stable read-only page of a product (its data and stock movements); editing needs the explicit "Editează" action.
+    public static string ProductUrl(int productId) => $"/produse/{productId}";
+}
+
+public static class UserNavigation
+{
+    public static string UserUrl(int userId) => $"/utilizatori/{userId}";
 }
 
 public interface IAuditTrail

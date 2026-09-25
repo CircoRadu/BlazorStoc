@@ -180,3 +180,13 @@ Verificat la 25 septembrie 2026.
   7. O editare a proiectului din alt tab afișează notificarea „…modificat de alt utilizator…” peste formularul deschis; lista proiectelor din pagina beneficiarului se actualizează live.
   8. Datele de test au fost șterse prin fluxul normal (mișcarea arhivată, stocul revenit la 12, proiectul și observațiile arhivate).
 - **Neverificat manual**: paginarea listei peste 10 proiecte, reîmprospătarea paginii observației la ștergerea proiectului de altă sesiune, MariaDB pe un server real.
+
+## Task 3 — Navigarea din jurnal către pagina obiectului (25 septembrie 2026)
+
+- **Suita automată** (`BlazorStoc.Checks`, 319 verificări; 7 noi): rutele produselor, beneficiarilor, utilizatorilor și proiectelor din tip și identificator, fără `?edit=`; textul țintei ignorat; identificatori invalizi sau lipsă; conectări/deconectări și tipuri fără pagină ca text; obiecte cu ștergere ulterioară fără link (evenimentele ulterioare și alte obiecte păstrează linkul); starea jurnalului în adresă (doar valorile diferite de implicit, escape, valori invalide → implicit).
+- **Browser** (`http://127.0.0.1:5082`, sesiune autentificată de utilizator):
+  1. Căutarea „casca” în jurnal apare în adresă (`/jurnal?q=casca`) fără pierderea caracterelor tastate; linkul țintei este `/produse/3`.
+  2. Linkul deschide pagina produsului în consultare (fără editor); Înapoi din browser restaurează căutarea și rezultatul filtrat.
+  3. `/utilizatori` are linkuri către `/utilizatori/{id}`; pagina afișează datele contului, fără editor deschis; „Editează” deschide editorul, „Anulează” îl închide; `/utilizatori/99999` afișează „Utilizatorul nu mai există”.
+  4. `/beneficiari/2` are „Editează” (editorul nu se deschide singur; se deschide și se închide la cerere, fără salvare).
+- **Neverificat manual**: paginarea și dimensiunea paginii prin adresă în browser, poziția de derulare a jurnalului, autorizarea utilizatorului limitat pe `/utilizatori/{id}` (rolul este verificat prin atributul de rută și în pagină, ca la `/utilizatori`), MariaDB pe un server real.

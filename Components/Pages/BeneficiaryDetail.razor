@@ -4,6 +4,7 @@
 @using BlazorStoc.Services
 @inject IBeneficiaryRepository Beneficiaries
 @inject IProjectRepository Projects
+@inject IAccessControl Access
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject IChangeFeed ChangeFeed
@@ -27,9 +28,17 @@ else if (beneficiary is not null)
 {
     <div class="page-heading">
         <div><p class="eyebrow">BENEFICIAR</p><h1>@beneficiary.Name</h1><p class="muted">CUI @beneficiary.Cui</p></div>
-        <div class="heading-actions"><button class="primary" disabled="@(addingProject)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button></div>
+        <div class="heading-actions">
+            @if (canManage) { <button class="refresh" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenEditBeneficiaryAsync">Editează</button> }
+            <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button>
+        </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+    @if (editingBeneficiary)
+    {
+        <BeneficiaryEditor @key="beneficiaryEditorKey" Original="beneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditBeneficiaryAsync" />
+    }
 
     @if (addingProject)
     {
@@ -77,12 +86,12 @@ else if (beneficiary is not null)
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
     private Beneficiary? beneficiary;
     private IReadOnlyList<Project> projects = Array.Empty<Project>();
-    private bool loading = true, projectsLoading, addingProject;
+    private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage;
     private string? error, notice;
     private string query = "";
     private int pageNumber = 1;
     private const int PageSize = 10;
-    private Guid editorKey;
+    private Guid editorKey, beneficiaryEditorKey;
     private readonly CancellationTokenSource lifetime = new();
 
     private List<Project> FilteredProjects
@@ -178,6 +187,7 @@ else if (beneficiary is not null)
         error = null;
         try
         {
+            canManage = await Access.CanManageBeneficiariesAsync(lifetime.Token);
             var all = await Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
             beneficiary = all.FirstOrDefault(item => item.Id == Id);
             if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }
@@ -203,6 +213,17 @@ else if (beneficiary is not null)
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         finally { projectsLoading = false; }
+    }
+
+    // The page only shows the beneficiary; the editor is opened by the explicit "Editează" action, never by arriving here.
+    private Task OpenEditBeneficiaryAsync() { editingBeneficiary = true; beneficiaryEditorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
+    private Task CloseEditBeneficiaryAsync() { editingBeneficiary = false; return Task.CompletedTask; }
+    private Task BeneficiarySavedAsync(Beneficiary saved)
+    {
+        beneficiary = saved;
+        editingBeneficiary = false;
+        notice = "Beneficiarul a fost actualizat.";
+        return Task.CompletedTask;
     }
 
     private Task OpenAddProjectAsync() { addingProject = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }

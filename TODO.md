@@ -4,8 +4,8 @@
 
 - Taskurile active sunt ordonate crescător după prioritate; numărul cel mai mic indică prioritatea cea mai mare.
 - Când se introduce un task nou pe o poziție existentă, taskul aflat pe acea poziție și toate taskurile active următoare sunt mutate cu o poziție mai jos și renumerotate.
-- În cadrul fiecărui task, subtaskurile nefinalizate sunt afișate primele și renumerotate; subtaskurile finalizate sunt grupate după ele.
-- Toate taskurile active sunt păstrate în prima parte a fișierului, iar taskurile finalizate sunt grupate în arhiva de la final.
+- Prima parte a fișierului conține numai ce mai trebuie implementat: taskurile active și, în cadrul lor, doar subtaskurile nefinalizate, renumerotate.
+- Tot ce este terminat (taskuri, subtaskuri, elemente bifate) se mută în arhiva „Taskuri finalizate” de la finalul documentului, imediat ce este finalizat.
 
 # Taskuri active
 
@@ -13,37 +13,12 @@
 
 Taskurile sunt grupate în patru etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
 
-1. **Interacțiuni comune finalizate:** componenta comună de extindere și restrângere este implementată și devine contract obligatoriu pentru structurile ierarhice actuale și viitoare.
-2. **Stabilizarea entităților și formularelor:** identificarea produsului prin „Cod produs” este finalizată, stocul introdus manual a fost eliminat (fostul Task 0 finalizat: stoc 0 la creare, fără editarea cantității), Task 1 (finalizat) a introdus pagina de intrări/ieșiri a produsului (mișcările de stoc), Task 2 (finalizat) a introdus proiectele și relațiile lor folosind componenta comună de collapse finalizată, iar Task 4 uniformizează validarea beneficiarilor.
-3. **Navigare și dialoguri comune:** Taskurile 1 și 2 → Task 3; Taskurile 1, 2 și 4 → Task 5; Taskurile 1 și 5 → Task 6; Task 5 și dialogurile comune finalizate → Task 7.
-4. **Colaborare în timp real:** Taskurile 3–7 (Taskurile 0, 1 și 2 sunt finalizate), împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
+1. **Validare:** Task 4 uniformizează validarea beneficiarilor înaintea confirmării generice.
+2. **Dialoguri comune:** Task 4 → Task 5; Task 5 → Task 6; Task 5 → Task 7.
+3. **Colaborare în timp real:** Taskurile 4–7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
-
-## Task 3 — Navigarea din jurnal către pagina obiectului
-
-Depinde de pagina de administrare finalizată, de modelul produsului („Cod produs”, finalizat) și de rutele proiectelor din Task 2 (finalizat: proiectele `/proiecte/{id}` și observațiile `/observatii/{id}` sunt deja în registrul `AuditNavigation.EditUrl`). Înlocuiește comportamentul actual prin care linkul din coloana „Țintă” deschide direct formularul de editare.
-
-- [ ] Definește pentru fiecare tip de obiect o rută stabilă de consultare bazată pe tipul entității și identificatorul său, de exemplu `/produse/{id}`, `/beneficiari/{id}`, `/utilizatori/{id}` și `/proiecte/{id}`.
-- [ ] Modifică linkul din coloana „Țintă” astfel încât să deschidă pagina obiectului în mod de consultare, nu formularul de editare.
-- [ ] Afișează în pagina obiectului datele actuale și acțiunile permise utilizatorului, inclusiv un buton separat „Editează” atunci când acesta are dreptul necesar.
-- [ ] Nu activa modul de editare și nu obține viitorul lock de editare doar prin deschiderea linkului din jurnal.
-- [ ] Construiește ruta exclusiv din tipul și identificatorul stabil al obiectului, fără extragerea identificatorului din textul `Target`.
-- [ ] Aplică regulile de autorizare ale obiectului: pagina utilizatorului rămâne disponibilă numai administratorilor, iar produsele și beneficiarii respectă permisiunile lor existente.
-- [ ] Pentru un obiect șters, arhivat sau inaccesibil, nu genera un link către o pagină live inexistentă; afișează ținta ca text până la implementarea unei pagini dedicate arhivei.
-- [ ] Definește un registru extensibil de rute pentru proiecte și toate tipurile de obiecte adăugate ulterior, evitând ramificații dispersate în componenta jurnalului.
-- [ ] Păstrează filtrele și pagina curentă a jurnalului în istoricul de navigare, astfel încât revenirea în browser să restaureze contextul anterior.
-- [ ] Adaugă verificări automate pentru rutele produselor, beneficiarilor, utilizatorilor, proiectelor, observațiilor, obiectelor fără pagină și obiectelor eliminate.
-
-### Criterii de acceptare
-
-- Apăsarea unei ținte pentru un obiect existent deschide pagina sa de consultare.
-- Deschiderea paginii nu pornește editarea și nu creează un lock de editare.
-- Editarea poate fi inițiată numai prin acțiunea explicită „Editează” și numai de un utilizator autorizat.
-- Revenirea la jurnal păstrează filtrele și pagina selectată anterior.
-- Obiectele șterse, arhivate, inexistente sau fără pagină de consultare nu produc linkuri invalide.
-- Entitățile noi cu pagină proprie sunt adăugate prin registrul comun de rute.
 
 ## Task 4 — Identificarea beneficiarului cu CUI duplicat
 
@@ -96,17 +71,12 @@ Depinde de forma finală a produsului („Cod produs”, finalizat; stoc doar pr
 
 ## Task 7 — Confirmarea deconectării și jurnalizarea sesiunilor
 
-Reutilizează infrastructura dialogului de ștergere finalizat și confirmarea comună din Task 5. Jurnalizarea sesiunilor este deja implementată și verificată; rămâne fluxul popup de confirmare.
+Reutilizează infrastructura dialogului de ștergere finalizat și confirmarea comună din Task 5. Rămâne fluxul popup de confirmare.
 
 - [ ] La apăsarea acțiunii „Deconectare”, afișează un popup de confirmare în locul paginii actuale de deconectare.
 - [ ] Afișează în popup butonul roșu „Deconectare” și butonul verde „Anulează deconectarea”.
 - [ ] Execută deconectarea numai după confirmarea explicită a utilizatorului.
 - [ ] La anulare, închide popup-ul și păstrează utilizatorul în pagina curentă, fără pierderea stării acesteia.
-
-### Elemente deja finalizate
-
-- [x] Jurnalizează fiecare conectare reușită și fiecare deconectare efectuată de utilizator.
-- [x] Înregistrează în jurnal utilizatorul, tipul operației și timestampul UTC.
 
 ### Criterii de acceptare
 
@@ -168,6 +138,32 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Task 7 (parțial): jurnalizarea sesiunilor
+
+Elementele finalizate ale taskului „Confirmarea deconectării și jurnalizarea sesiunilor”; fluxul popup de confirmare rămâne activ în Task 7.
+
+- [x] Jurnalizează fiecare conectare reușită și fiecare deconectare efectuată de utilizator.
+- [x] Înregistrează în jurnal utilizatorul, tipul operației și timestampul UTC.
+
+## Finalizat — Task 3: Navigarea din jurnal către pagina obiectului
+
+Implementat la 25 septembrie 2026 de Claude. `Services/AuditTrail.cs` (`AuditNavigation.TargetUrl`, `RemovalTimes`, `ProductNavigation`, `UserNavigation`), `Services/ListNavigationContext.cs` (`AuditListState`), `Components/Pages/Audit.razor`, `Components/Pages/ProductMovements.razor`, `Components/Pages/BeneficiaryDetail.razor`, `Components/Pages/UserDetail.razor`, `Components/Pages/Users.razor`.
+
+- [x] Fiecare tip de obiect are o rută stabilă de consultare, construită numai din tipul entității și identificatorul din `EntityId`: `/produse/{id}` (pagina produsului cu datele și mișcările de stoc; `/produse/{id}/miscari` rămâne valabilă), `/beneficiari/{id}`, `/utilizatori/{id}` (nouă, numai administratori), `/proiecte/{id}`, `/observatii/{id}` și `/miscari/{id}`.
+- [x] Linkul din coloana „Țintă” deschide pagina obiectului, nu formularul de editare; rutele nu mai conțin `?edit=`.
+- [x] Pagina beneficiarului și pagina utilizatorului au buton separat „Editează” (beneficiar: utilizatorii autentificați; utilizator: administratorii); pagina produsului îl afișează utilizatorilor autorizați. Deschiderea paginii nu pornește editarea; nu există încă lock de editare (Task 8).
+- [x] Autorizarea rămâne cea existentă: `/utilizatori/{id}` cere rolul Administrator (atât rută, cât și verificare în pagină), produsele și beneficiarii cer autentificare.
+- [x] Registrul extensibil este dicționarul `AuditNavigation.Routes`, un singur loc pentru toate tipurile; tipurile fără intrare (categorii, subcategorii, fișiere de observație) și evenimentele fără identificator (conectări, deconectări) rămân text.
+- [x] Obiectele cu o ștergere înregistrată după eveniment (mutate în arhivă) nu primesc link (`AuditNavigation.RemovalTimes`); evenimentele de ștergere rămân text, iar evenimentele ulterioare ale unui identificator reutilizat își păstrează linkul. Paginile obiectelor inexistente afișează „nu mai există”.
+- [x] Filtrele, dimensiunea paginii și pagina jurnalului sunt în adresă (`/jurnal?q=…&tip=…&operatie=…&operator=…&data=…&pe-pagina=…&pagina=…`, doar valorile diferite de implicit, înlocuită pe loc), citite doar la deschiderea paginii; Înapoi din browser le restaurează, împreună cu poziția de derulare (`data-restore-scroll`). Valorile invalide din adresă revin la implicit.
+- [x] Verificări automate în `BlazorStoc.Checks` pentru rutele tuturor tipurilor, textul țintei ignorat, identificatori invalizi, obiecte fără pagină, obiecte eliminate și starea jurnalului din adresă.
+
+### Neacoperit intenționat
+
+- Declanșatoarele `?edit=<id>` ale listelor (`/produse`, `/beneficiari`, `/utilizatori`) au rămas pentru butonul explicit „Editează” al produsului și pentru linkuri existente; jurnalul nu le mai folosește.
+- Pentru observațiile arhivate odată cu proiectul lor nu s-a verificat dacă fiecare are propriul eveniment de ștergere; dacă nu, linkul din jurnal rămâne, iar pagina afișează „Observația nu mai există”, nu o pagină invalidă.
+
 
 ## Finalizat — Proiecte asociate beneficiarilor
 
@@ -592,7 +588,7 @@ Depinde de Task 2, deoarece administrarea trebuie să opereze pe categorii și s
 
 ## Finalizat — Păstrarea categoriilor și subcategoriilor goale
 
-Taskul stabilizează entitățile necesare administrării din Task 3. SQLite și MariaDB folosesc tabele independente, iar catalogul demonstrativ folosește acum o colecție separată de grupuri.
+Taskul stabilizează entitățile necesare administrării. SQLite și MariaDB folosesc tabele independente, iar catalogul demonstrativ folosește acum o colecție separată de grupuri.
 
 - [x] Stochează categoriile și subcategoriile ca entități independente de produsele asociate.
 - [x] Păstrează categoria și subcategoria după mutarea sau ștergerea ultimului produs asociat.

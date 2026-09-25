@@ -25,6 +25,42 @@ public sealed record BeneficiaryProjectListState(string Query, int Page)
     public static string BeneficiaryUrl(int beneficiaryId) => $"/beneficiari/{beneficiaryId}";
 }
 
+// Filters, page size and page of the audit journal (TODO Task 3). They live in the address of the journal (replaced in
+// place, so the browser's Back button from an object page restores them). Only values that differ from the defaults
+// are written; unknown or malformed values fall back to the defaults.
+public sealed record AuditListState(string Query, string Entity, string Action, string Actor, string? DateKey, int PageSize, int Page)
+{
+    public const int DefaultPageSize = 10;
+    public static readonly IReadOnlyList<int> PageSizes = [10, 20, 50, 0];
+    public static AuditListState Default { get; } = new("", "", "", "", null, DefaultPageSize, 1);
+
+    public static AuditListState From(string? query, string? entity, string? action, string? actor, string? dateKey,
+        int? pageSize, int? page) =>
+        new((query ?? "").Trim(), (entity ?? "").Trim(), (action ?? "").Trim(), (actor ?? "").Trim(),
+            ValidDateKey(dateKey), pageSize is { } size && PageSizes.Contains(size) ? size : DefaultPageSize, Math.Max(1, page ?? 1));
+
+    public static string? ValidDateKey(string? value) =>
+        DateOnly.TryParseExact(value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var date) ? date.ToString("yyyy-MM-dd") : null;
+
+    public static string DateLabel(string dateKey) =>
+        DateOnly.ParseExact(dateKey, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture).ToString("dd.MM.yyyy");
+
+    public string Url()
+    {
+        var parts = new List<string>();
+        void Add(string name, string value) { if (value.Length > 0) parts.Add($"{name}={Uri.EscapeDataString(value)}"); }
+        Add("q", Query);
+        Add("tip", Entity);
+        Add("operatie", Action);
+        Add("operator", Actor);
+        Add("data", DateKey ?? "");
+        if (PageSize != DefaultPageSize) parts.Add($"pe-pagina={PageSize}");
+        if (Page > 1) parts.Add($"pagina={Page}");
+        return "/jurnal" + (parts.Count == 0 ? "" : "?" + string.Join('&', parts));
+    }
+}
+
 public sealed class ListNavigationContext
 {
     private readonly Dictionary<int, BeneficiaryProjectListState> beneficiaryLists = new();

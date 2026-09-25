@@ -1,0 +1,91 @@
+@page "/utilizatori/{Id:int}"
+@attribute [Authorize(Roles = AccessRoles.Administrator)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IUserRepository Repository
+@inject IAccessControl Access
+@inject ILogger<UserDetail> Logger
+@implements IDisposable
+
+<PageTitle>@(user?.Username ?? "Utilizator") · BlazorStoc</PageTitle>
+<a class="nav-back" href="/utilizatori"><span>←</span> Utilizatori</a>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă utilizatorul</h3></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+}
+else if (user is null)
+{
+    <div class="empty-state"><span class="empty-icon">♙</span><h3>Utilizatorul nu mai există</h3><p>Contul a fost șters (mutat în arhivă) sau linkul nu este valid.</p><a class="refresh" href="/utilizatori">Înapoi la utilizatori</a></div>
+}
+else
+{
+    <div class="page-heading">
+        <div><p class="eyebrow">UTILIZATOR</p><h1>@user.Username</h1><p class="muted">@user.DisplayName</p></div>
+        <div class="heading-actions"><button class="refresh" disabled="@editing" @onclick="OpenEditorAsync">Editează</button></div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (editing) { <UserEditor @key="editorKey" Original="user" Saved="UserSavedAsync" Closed="CloseEditorAsync" /> }
+
+    <section class="movement-card" aria-labelledby="user-facts-title">
+        <h2 id="user-facts-title">Date cont</h2>
+        <dl class="movement-facts">
+            <dt>Nume utilizator</dt><dd>@user.Username</dd>
+            <dt>Nume afișat</dt><dd>@user.DisplayName</dd>
+            <dt>Nivel acces</dt><dd><span class="role-badge @(user.Role == AccessRoles.Administrator ? "admin" : "limited")">@user.Role</span></dd>
+            <dt>Stare</dt><dd><span class="stock-badge @(user.IsActive ? "positive" : "zero")">@(user.IsActive ? "Activ" : "Inactiv")</span></dd>
+        </dl>
+        <p class="muted">Parola nu este afișată și nu poate fi recuperată.</p>
+    </section>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private WebUser? user;
+    private bool loading = true, editing;
+    private string? error, notice;
+    private Guid editorKey;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (user is null || user.Id != Id) { editing = false; notice = null; await LoadAsync(); }
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            // The route is guarded by the administrator role; the check is repeated so the data is never read without it.
+            await Access.EnsureAdministratorAsync(lifetime.Token);
+            var users = await Repository.GetUsersAsync(lifetime.Token);
+            user = users.FirstOrDefault(item => item.Id == Id);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { user = null; error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("User detail loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Utilizatorul nu a putut fi încărcat.";
+        }
+        finally { loading = false; }
+    }
+
+    // Arriving on this page only shows the account; editing starts from the explicit "Editează" action.
+    private Task OpenEditorAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
+    private Task CloseEditorAsync() { editing = false; return Task.CompletedTask; }
+    private Task UserSavedAsync(WebUser saved)
+    {
+        user = saved;
+        editing = false;
+        notice = "Utilizatorul a fost actualizat.";
+        return Task.CompletedTask;
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

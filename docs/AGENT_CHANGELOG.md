@@ -345,3 +345,28 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal: 0 avertismente, 0 erori. BlazorStoc.Checks: 312 verificari trecute (27 noi). Browser 5082, doua tab-uri, sesiune autentificata de utilizator: filtru in adresa, link inapoi si Inapoi din browser cu filtru si pozitie de derulare, Echipamente goala si cu iesire asociata, link observatie din jurnal si observatie inexistenta, refresh live intre sesiuni, notificare peste formular deschis; datele de test sterse. Neverificat: paginare peste 10 proiecte, MariaDB pe server real.
 - **Commit:** `claude: finish Task 2 (equipment page, navigation context, observation route, change events)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T05:58:40.7382177Z â€” claude
+
+- **Task:** Task 3 - Navigarea din jurnal catre pagina obiectului
+- **Rezumat:** Task 3 finalizat: jurnalul deschide pagina de consultare a obiectului, nu formularul de editare. Registrul extensibil AuditNavigation.Routes (produs /produse/{id}, beneficiar, utilizator /utilizatori/{id} nou, proiect, observatie, miscare) construieste ruta doar din tip si EntityId; obiectele cu stergere ulterioara in jurnal, tipurile fara pagina si evenimentele fara identificator raman text. Pagina beneficiarului si pagina utilizatorului au buton Editeaza; deschiderea unei pagini nu porneste editarea. Filtrele, dimensiunea paginii si pagina jurnalului sunt in adresa (AuditListState, replace pe loc) si Inapoi din browser le restaureaza, cu pozitia de derulare. TODO.md: Task 3 si elementele terminate ale Task 7 mutate in arhiva de la final, regula actualizata (prima parte contine doar ce mai trebuie implementat). Autentificarea si regulile de acces nu au fost modificate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/Audit.razor`
+  - `Components/Pages/BeneficiaryDetail.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Pages/UserDetail.razor`
+  - `Components/Pages/Users.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `README.md`
+  - `Services/AuditTrail.cs`
+  - `Services/ListNavigationContext.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 319 verificari trecute (7 noi). Browser 5082 (sesiune autentificata de utilizator): filtru in adresa si restaurat prin Inapoi, /produse/3 fara editor, /utilizatori/{id} si /utilizatori/99999, Editeaza la beneficiar si utilizator (deschidere si anulare), pagina 2 inexistenta adusa la 1, stergerile fara link. Neverificat manual: pozitia de derulare in jurnal, utilizator limitat pe /utilizatori/{id}, MariaDB pe server real.
+- **Commit:** `claude: finish Task 3 (journal targets open object pages, journal state in address)
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
+- **Predat cÄƒtre:** codex

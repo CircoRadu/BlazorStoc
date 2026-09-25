@@ -1,3 +1,4 @@
+@page "/produse/{Id:int}"
 @page "/produse/{Id:int}/miscari"
 @attribute [Authorize]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
@@ -47,7 +48,7 @@ else
                 @if (canManage)
                 {
                     <div class="movement-product-actions">
-                        <a class="refresh" href="@($"/produse?edit={product.Id}")">Editare produs</a>
+                        <a class="refresh" href="@($"/produse?edit={product.Id}")">Editează</a>
                         <a class="danger movement-link-danger" href="@($"/produse?sterge={product.Id}")">Șterge produs</a>
                     </div>
                 }
