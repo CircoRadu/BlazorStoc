@@ -81,6 +81,7 @@ builder.Services.AddHostedService(services => new ChangeEventRelay(services.GetR
 builder.Services.AddSignalR();
 builder.Services.AddHostedService<SignalRChangeBroadcaster>();
 builder.Services.AddScoped<ChangeOrigin>();
+builder.Services.AddScoped<UnsavedChanges>();
 builder.Services.AddScoped<ListNavigationContext>();
 builder.Services.AddScoped<IProductLockRepository>(services => new ChangeNotifyingProductLockRepository(demo
     ? new SqliteProductLockRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>())

@@ -6,6 +6,7 @@
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="editor-title">
     <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? "Adaugă produs" : $"Editează produsul {Original.Name}")</h2><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></div>
     @if (Mode.IsDemo) { <p class="form-note">Mod demo: modificările sunt salvate în baza de date locală și rămân disponibile după repornirea aplicației.</p> }
@@ -64,6 +65,10 @@
     [Parameter] public IReadOnlyList<ProductGroup> Groups { get; set; } = Array.Empty<ProductGroup>();
     [Parameter] public EventCallback<Product> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
+    private UnsavedChangesTracker? tracker;
+    private string CurrentSnapshot() => FormSnapshot.Of(input, imageFileName);
+    // "Părăsește editarea": the leave warning closes the form without saving (Task 1).
+    private Task DiscardAsync() => Closed.InvokeAsync();
     private ProductInput input = new();
     private bool saving;
     private IReadOnlyList<AuditChange>? pendingChanges;
@@ -118,7 +123,7 @@
         input.Subcategory = Subcategories.FirstOrDefault(subcategory =>
             string.Equals(subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)) ?? Subcategories.FirstOrDefault() ?? "";
     }
-    private Task Close() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+    private Task Close() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
     private async Task SaveAsync()
     {
         if (saving) return;
@@ -163,7 +168,7 @@
             error = "Salvarea nu a putut fi confirmată. Datele formularului sunt păstrate. Verifică în catalog dacă modificarea apare înainte să reîncerci; dacă problema continuă, verifică accesul de scriere și pregătirea bazei cu administratorul.";
         }
         finally { saving = false; }
-        if (saved is not null) await Saved.InvokeAsync(saved);
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
     }
 
     private async Task ImageSelectedAsync(InputFileChangeEventArgs eventArgs)

@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Stare ciclu: **Taskurile 0–9 finalizate; nu mai există taskuri active; pregătit pentru predarea către Codex după commitul curent**
+Stare ciclu: **Avertizarea la părăsirea editării (fost Task 1) finalizată; rămân taskurile active 1–4 (două corecturi mici, mesaje în română, inventar); pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -31,6 +31,18 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 ## Evidența testelor rămase
 
 - La cererea utilizatorului s-a creat `docs/TESTE_RAMASE.md`: fiecare verificare neefectuată până acum (MariaDB pe un server real, mai multe calculatoare și conturi, editoarele neexersate în browser, tastatură/cititor de ecran, alte browsere și dispozitive tactile, funcționare îndelungată) cu motivul (M1–M6), pașii, rezultatul așteptat și sursa. Testele efectuate se mută în secțiunea „Teste efectuate” a aceluiași fișier. `CLAUDE.md` și `AGENTS.md` cer acum explicit actualizarea acestui fișier când o verificare nu poate fi efectuată sau una din listă este efectuată.
+
+## Ultimele modificări funcționale (ciclul Claude — avertizarea la părăsirea editării)
+
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 1”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`. La cererea utilizatorului, Task 1 a fost redus la avertizarea la părăsirea unei editări nesalvate (blocarea generalizată și deblocarea cu ieșire din pagină au fost scoase din TODO; problema raportată cu lock-ul produsului nu s-a mai manifestat).
+
+- **Serviciu** (`Services/UnsavedChanges.cs`): scoped; `EditTracker` per editor (instantaneu hash, `Rebase` după salvare, `RunAfterConfirmAsync`), cerere de părăsire cu continuare (`Request`/`ConfirmAsync`/`Cancel`), `FormSnapshot` (reflecție pe modelul de intrare, fără „Reason”), `IsDiscarding` (paginile nu navighează singure din „închide” când editorul este anulat de avertizare).
+- **Componente**: `UnsavedChangesTracker` (în editori și formulare), `UnsavedChangesHost` (în fiecare pagină cu editori: `NavigationLock`, apeluri de la script, popup), `UnsavedChangesDialog` (verde „Înapoi…”, roșu „Părăsește…”, Escape = înapoi, text diferit pentru adăugare și editare).
+- **Script** (`wwwroot/leave-guard.js`, rescris): interceptează linkurile interne, antetele meniului produselor, „Deconectare” și Înapoi/Înainte (intrările de istoric sunt etichetate; mutarea este anulată și repetată după răspuns); decizia este a serverului, fiindcă un câmp ajunge pe server la pierderea focusului.
+- **Pagini**: `ProductEditor`, `BeneficiaryEditor`, `ProjectEditor`, `ProjectObservationEditor`, `UserEditor`, `ProductGroups`, `ProductMovements` (formular de adăugare și dialog de editare); `Home`, `Beneficiaries`, `Users` nu navighează la închiderea unui editor anulat de avertizare. `Home` nu mai are protecția veche (dialog, `RequestLeave`).
+- **Neschimbat**: lock-ul produselor (eliberat de „Părăsește” prin închiderea editorului), deblocarea de administrator, verificarea versiunii, autentificarea. Nu există modificări de schemă.
+- **Validare**: build Release 0 avertismente; `BlazorStoc.Checks` 409; browser pe 5082 (vezi `VALIDARE.md`). Neverificat: `docs/TESTE_RAMASE.md` C10.
+- **Următorul pas**: taskul activ 1 din `TODO.md` (antetul „Data” din tabelul de intrări/ieșiri), grupabil cu taskurile 2–3.
 
 ## Ultimele modificări funcționale (ciclul Claude — Task 9)
 

@@ -3,6 +3,7 @@
 @inject ILogger<UserEditor> Logger
 @implements IDisposable
 
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="user-editor-title">
     <div class="catalog-heading"><h2 id="user-editor-title">@(Original is null ? "Adaugă utilizator" : $"Editează utilizatorul #{Original.Id}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -35,6 +36,10 @@
     [Parameter] public WebUser? Original { get; set; }
     [Parameter] public EventCallback<WebUser> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
+    private UnsavedChangesTracker? tracker;
+    private string CurrentSnapshot() => FormSnapshot.Of(input);
+    // "Părăsește editarea": the leave warning closes the form without saving (Task 1).
+    private Task DiscardAsync() => Closed.InvokeAsync();
     private WebUserInput input = new();
     private bool saving;
     private IReadOnlyList<AuditChange>? pendingChanges;
@@ -47,7 +52,7 @@
         return Task.CompletedTask;
     }
 
-    private Task CloseAsync() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
 
     private async Task SaveAsync()
     {
@@ -96,7 +101,7 @@
             error = "Utilizatorul nu a putut fi salvat. Datele formularului sunt păstrate; actualizează lista înainte să reîncerci.";
         }
         finally { saving = false; }
-        if (saved is not null) await Saved.InvokeAsync(saved);
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
     }
 
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }

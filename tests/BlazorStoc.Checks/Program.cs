@@ -2139,6 +2139,90 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
         "The read-only message says who edits the product, since when, and that it can still be consulted");
 }
 
+// Task 1: unsaved-changes tracking and the leave warning.
+{
+    var guard = new UnsavedChanges();
+    var name = "Ciocan";
+    var closedOne = 0; var closedTwo = 0; var discardingSeen = false;
+    var first = guard.Track(() => FormSnapshot.Values(name), () => { closedOne++; discardingSeen = guard.IsDiscarding; return Task.CompletedTask; });
+    var otherText = "Nemodificat";
+    var second = guard.Track(() => FormSnapshot.Values(otherText), () => { closedTwo++; return Task.CompletedTask; });
+    Check(guard.TrackerCount == 2 && !guard.HasUnsavedChanges && !first.IsModified, "A form that was just opened is not modified");
+    name = "Ciocan 2 kg";
+    Check(first.IsModified && guard.HasUnsavedChanges, "A changed value marks the form as modified");
+    name = "Ciocan";
+    Check(!first.IsModified && !guard.HasUnsavedChanges, "Returning to the initial value makes the form unmodified again");
+
+    var ran = 0;
+    await first.RunAfterConfirmAsync(() => { ran++; return Task.CompletedTask; });
+    Check(ran == 1 && guard.Pending is null, "An unmodified form is closed without asking");
+    name = "Ciocan nou";
+    await first.RunAfterConfirmAsync(() => { ran++; return Task.CompletedTask; });
+    Check(ran == 1 && guard.Pending is not null, "A modified form asks first and does not run the action yet");
+    guard.Cancel();
+    Check(ran == 1 && guard.Pending is null && first.IsModified, "\"Înapoi la editare\" keeps the values, the form and the warning");
+    await first.RunAfterConfirmAsync(() => { ran++; return Task.CompletedTask; });
+    await guard.ConfirmAsync();
+    Check(ran == 2 && closedOne == 1 && discardingSeen && !guard.IsDiscarding && !first.IsModified && closedTwo == 0,
+        "\"Părăsește editarea\" discards only that form and then runs the interrupted action");
+
+    otherText = "Modificat";
+    var navigated = "";
+    guard.Request(() => { navigated = "/beneficiari"; return Task.CompletedTask; });
+    await guard.ConfirmAsync();
+    Check(navigated == "/beneficiari" && closedTwo == 1 && closedOne == 1 && !guard.HasUnsavedChanges,
+        "Leaving the page discards every modified form (and only those) and then performs the navigation");
+
+    otherText = "Salvat";
+    Check(second.IsModified == false, "A discarded form no longer counts as modified");
+    var saved = guard.Track(() => FormSnapshot.Values(otherText), () => Task.CompletedTask);
+    otherText = "Salvat cu succes";
+    Check(saved.IsModified, "A new tracker starts from the values at that moment");
+    saved.Rebase();
+    Check(!saved.IsModified && !guard.HasUnsavedChanges, "A successful save makes the saved values the unmodified state");
+    otherText = "Altă valoare";
+    Check(saved.IsModified, "Changes after a save are detected again");
+
+    var flips = 0;
+    guard.Changed += () => flips++;
+    saved.NotifyRendered(); saved.NotifyRendered();
+    otherText = "Salvat cu succes"; // back to the saved value
+    saved.Rebase();
+    Check(flips >= 1, "The host is notified when the unsaved state flips");
+
+    var addingValue = "";
+    var addTracker = guard.Track(() => FormSnapshot.Values(addingValue), () => Task.CompletedTask, adding: true);
+    var editValue = "a";
+    var editTracker = guard.Track(() => FormSnapshot.Values(editValue), () => Task.CompletedTask);
+    addingValue = "nou";
+    guard.Request(() => Task.CompletedTask);
+    Check(guard.Pending is { Adding: true }, "The question says \"adăugare\" when only forms that add a new object are affected");
+    guard.Cancel();
+    editValue = "b";
+    guard.Request(() => Task.CompletedTask);
+    Check(guard.Pending is { Adding: false }, "The question says \"editare\" as soon as an edited (existing) object is affected");
+    guard.Cancel();
+    guard.Request(() => Task.CompletedTask, addTracker);
+    Check(guard.Pending is { Adding: true }, "Closing a single add form asks about the adding");
+    guard.Cancel();
+    addTracker.Dispose(); editTracker.Dispose();
+
+    saved.Dispose(); first.Dispose(); second.Dispose();
+    Check(guard.TrackerCount == 0 && !guard.HasUnsavedChanges, "Closing an editor removes its tracker");
+
+    var product = ProductInput.From(data[0]);
+    var before = FormSnapshot.Of(product);
+    product.Reason = "Doar un motiv";
+    Check(FormSnapshot.Of(product) == before, "Typing only the change reason is not an unsaved value change");
+    product.Name += " x";
+    Check(FormSnapshot.Of(product) != before, "Changing a product field changes the snapshot");
+    Check(FormSnapshot.Of(product, "imagine.png") != FormSnapshot.Of(product), "A selected image counts as a change");
+    var user = new WebUserInput { Username = "ana", Password = "abc" };
+    var userBefore = FormSnapshot.Of(user);
+    user.Password = "abcd";
+    Check(FormSnapshot.Of(user) != userBefore, "A typed password counts as a change (compared only through a hash)");
+}
+
 sealed class ManualTimeProvider : TimeProvider
 {
     private DateTimeOffset now = new(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);

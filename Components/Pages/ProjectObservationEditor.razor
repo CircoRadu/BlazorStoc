@@ -4,6 +4,7 @@
 @inject ILogger<ProjectObservationEditor> Logger
 @implements IDisposable
 
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="observation-editor-title">
     <div class="catalog-heading"><h2 id="observation-editor-title">@(Original is null ? "Adaugă observație" : $"Editează observația {Original.Name}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -34,6 +35,10 @@
     [Parameter] public ProjectObservation? Original { get; set; }
     [Parameter] public EventCallback<ProjectObservation> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
+    private UnsavedChangesTracker? tracker;
+    private string CurrentSnapshot() => FormSnapshot.Of(input);
+    // "Părăsește editarea": the leave warning closes the form without saving (Task 1).
+    private Task DiscardAsync() => Closed.InvokeAsync();
     private ProjectObservationInput input = new();
     private bool saving;
     private IReadOnlyList<AuditChange>? pendingChanges;
@@ -45,7 +50,7 @@
         input = Original is null ? new() : ProjectObservationInput.From(Original);
     }
 
-    private Task CloseAsync() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
 
     private async Task SaveAsync()
     {
@@ -94,7 +99,7 @@
             error = "Observația nu a putut fi salvată. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
         }
         finally { saving = false; }
-        if (saved is not null) await Saved.InvokeAsync(saved);
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
     }
 
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }

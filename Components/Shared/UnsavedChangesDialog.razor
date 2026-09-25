@@ -1,0 +1,39 @@
+@using BlazorStoc.Services
+@inject ILogger<UnsavedChangesDialog> Logger
+
+@* Task 1: shown when an action would leave an edit form with unsaved changes. The safe answer (green) comes first
+   and takes the focus; Escape means "back to editing". *@
+<div class="delete-overlay" @onkeydown="KeyDownAsync">
+    <section class="delete-dialog unsaved-changes-dialog" role="alertdialog" aria-modal="true" tabindex="-1" @ref="dialog"
+             aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
+        <h2 id="@TitleId">@(Adding ? "Adăugarea nu a fost finalizată" : "Editarea nu a fost finalizată")</h2>
+        <p id="@DescriptionId">@(Adding
+            ? "Ai completat valori care nu au fost salvate. Dacă părăsești adăugarea acum, datele introduse se pierd."
+            : "Ai modificat valori care nu au fost salvate. Dacă părăsești editarea acum, modificările se pierd.")</p>
+        <div class="editor-actions">
+            <button type="button" class="primary" @ref="backButton" @onclick="() => BackToEditing.InvokeAsync()">@(Adding ? "Înapoi la adăugare" : "Înapoi la editare")</button>
+            <button type="button" class="danger" @onclick="() => Leave.InvokeAsync()">@(Adding ? "Părăsește adăugarea fără salvare" : "Părăsește editarea fără salvarea modificărilor")</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter] public bool Adding { get; set; }
+    [Parameter, EditorRequired] public EventCallback BackToEditing { get; set; }
+    [Parameter, EditorRequired] public EventCallback Leave { get; set; }
+
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private ElementReference dialog, backButton;
+    private string TitleId => $"unsaved-title-{instanceId}";
+    private string DescriptionId => $"unsaved-description-{instanceId}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await backButton.FocusAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (Exception exception) { Logger.LogWarning("Unsaved changes dialog could not take focus ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? BackToEditing.InvokeAsync() : Task.CompletedTask;
+}

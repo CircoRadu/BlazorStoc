@@ -259,3 +259,11 @@ Verificat la 25 septembrie 2026.
 - **Corecție**: `wwwroot/collapsible.js` navighează numai când `toggle` urmează unei apăsări reale pe antetul secțiunii (clic, Enter sau Spațiu, în ultima secundă; un clic anulat, de exemplu de protecția din Task 6, nu contează). Deschiderile făcute de aplicație nu mai navighează.
 - **Browser** (`http://127.0.0.1:5082`): din `/produse`, linkul „Protecție mâini” duce la `?categorie=…&subcategorie=Protecție mâini` și rămâne acolo, cu 1 produs și categoria extinsă în meniu (înainte se ajungea la `?categorie=…`, cu 2 produse); clic real pe antetul unei categorii → pagina categoriei; al doilea clic → `/produse` (toate produsele).
 - **Neverificat**: Enter/Spațiu pe antet (același cod, prin evenimentul `click`), ecran tactil.
+
+## Avertizare la părăsirea unei pagini de editare cu modificări nesalvate (25 septembrie 2026)
+
+- Serviciul `UnsavedChanges` urmărește editorii deschiși îi compară, prin hash, cu valorile de la deschidere; popup-ul „Editarea/Adăugarea nu a fost finalizată” apare la link, meniu, antet de categorie, „Anulează”/„Închide”, „Deconectare” și Înapoi al browserului, numai pentru formulare modificate; „Părăsește” închide editorul (eliberând lock-ul produsului) și execută acțiunea inițială.
+- `BlazorStoc.Checks`: 21 de verificări noi (409 în total) și build Release fără avertismente.
+- Browser pe 5082 (SQLite, administrator): părăsire fără modificări = fără popup; cu modificări, popup pentru link din meniu, antet de categorie, „Închide”/„Anulează”, „Deconectare”, `history.back()` și formularul de mișcare; „Înapoi la editare” păstrează valorile și focusul; „Părăsește” navighează, revine în istoric sau deschide dialogul de deconectare; `product_locks` gol după părăsire; texte diferite la adăugare (beneficiar) și editare (produs).
+- Defect găsit prin verificare: routerul aplicației nu raportează Înapoi către `NavigationLock`, deci intercepția Înapoi/Înainte este făcută în `leave-guard.js` (intrări de istoric etichetate, mutarea anulată și repetată după răspuns).
+- Neverificat: vezi `docs/TESTE_RAMASE.md` (C10).

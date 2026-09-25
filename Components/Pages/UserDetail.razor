@@ -10,6 +10,7 @@
 @implements IDisposable
 
 <PageTitle>@(user?.Username ?? "Utilizator") · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
 <a class="nav-back" href="/utilizatori"><span>←</span> Utilizatori</a>
 
 @if (loading)

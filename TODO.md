@@ -14,51 +14,14 @@
 
 ## Ordinea de implementare optimizată
 
-Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskurile active (1–5) se bazează pe lucrări finalizate și se implementează în ordinea numerelor, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan. Taskurile 2–4 sunt corecturi mici ale tabelului de intrări/ieșiri și ale mesajelor și pot fi grupate într-un singur ciclu.
+Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskurile active (1–4) se bazează pe lucrări finalizate și se implementează în ordinea numerelor, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan. Taskurile 1–3 sunt corecturi mici ale tabelului de intrări/ieșiri și ale mesajelor și pot fi grupate într-un singur ciclu.
 
-## Task 1 — Avertizare la părăsirea unei pagini de editare cu modificări nesalvate
-
-Orice pagină sau formular care permite introducerea sau editarea unei valori (adăugare și editare de produse, beneficiari, proiecte, observații, utilizatori, categorii și subcategorii, mișcări de stoc) primește **unitar** aceeași avertizare: dacă utilizatorul a modificat o valoare, nu a salvat modificarea și alege o altă acțiune care părăsește pagina de editare, se afișează un popup care îl atenționează că **editarea nu a fost finalizată**. Nu se implementează o soluție separată pentru fiecare pagină: mecanismul este comun (serviciu + componentă în layout), astfel încât editorii noi îl primesc implicit.
-
-Mecanismul de blocare a editării (lock-ul produselor), eliberarea lui și deblocarea forțată de administrator **rămân așa cum sunt** și nu fac parte din acest task. Taskul nu depinde de celelalte taskuri active.
-
-### Subtask 1.1 — Urmărirea modificărilor nesalvate
-
-- [ ] Serviciu scoped (pe sesiune) în care se înregistrează fiecare editor deschis; o pagină poate avea mai mulți editori simultan (de exemplu pagina proiectului: editorul proiectului și cel al observației), iar avertizarea se declanșează dacă **oricare** are modificări nesalvate.
-- [ ] Un editor este „modificat” când valorile lui diferă de cele inițiale: pentru editare, față de obiectul original (se reutilizează comparația folosită pentru rezumatul modificărilor la salvare); pentru adăugare, față de formularul gol sau precompletat. Revenirea la valoarea inițială înseamnă „nemodificat”. Motivarea modificării nu contează singură; se iau în calcul și fișierele sau imaginile adăugate în formular.
-- [ ] Un formular nemodificat se părăsește fără avertizare. După o salvare reușită, editorul se elimină din serviciu și nu mai avertizează; o salvare eșuată sau respinsă de validare păstrează formularul și avertizarea.
-- [ ] Editorii existenți (`ProductEditor`, `BeneficiaryEditor`, `ProjectEditor`, `ProjectObservationEditor`, `UserEditor`, formularele din `ProductGroups`, formularul de adăugare a mișcărilor și dialogul de editare din `ProductMovements`) se înregistrează prin aceeași componentă sau același ajutor comun.
-
-### Subtask 1.2 — Interceptarea părăsirii și popup-ul
-
-- [ ] O singură componentă `NavigationLock` în layout intercepta navigarea internă (linkuri și elemente din meniul principal, meniul produselor, butoanele de navigare din pagini, butonul „Înapoi” al browserului, navigări programatice) și o oprește când există un editor modificat. Înlocuiește protecția actuală, limitată, din `leave-guard.js` și dialogul „Părăsești adăugarea produsului?”, iar comportamentul existent al meniului produselor (selecție identică = fără avertizare) se păstrează.
-- [ ] „Deconectare” trece prin aceeași verificare: cu un editor modificat, popup-ul de editare nefinalizată apare înaintea dialogului de deconectare și, la „Părăsește…”, se continuă cu dialogul obișnuit.
-- [ ] „Anulează” și „Închide” de pe formularul modificat declanșează același popup; pe un formular nemodificat închid formularul direct.
-- [ ] Popup-ul spune că **editarea nu a fost finalizată** și are două butoane: **„Înapoi la editare”** (verde) — închide popup-ul și păstrează formularul, valorile și starea; **„Părăsește editarea fără salvarea modificărilor”** (roșu) — renunță la modificări, închide editorul (eliberând lock-ul existent, ca la „Anulează”) și **execută acțiunea care a generat părăsirea paginii** (navigarea către linkul apăsat, deconectarea etc.). Tasta Escape este echivalentă cu „Înapoi la editare”; nu există altă cale de ieșire din popup.
-- [ ] La închiderea sau reîncărcarea tabului, unde browserul permite numai dialogul lui nativ, se folosește confirmarea nativă (`ConfirmExternalNavigation`); popup-ul aplicației se folosește pentru toate acțiunile din interiorul aplicației.
-- [ ] Popup-ul respectă regulile existente de stil și accesibilitate (focus mutat în dialog și readus la elementul de unde a pornit acțiunea, Tab, Escape, `role="dialog"`, etichete, contrast, culori: acțiunea sigură verde, cea distructivă roșie); textele sunt în limba română.
-- [ ] Cât timp popup-ul este deschis, datele formularului și sincronizările automate nu îl modifică sau închid.
-
-### Subtask 1.3 — Verificări
-
-- [ ] Teste automate pentru serviciul de urmărire: nemodificat, modificat, revenit la valoarea inițială, mai mulți editori simultan, salvare reușită, salvare eșuată.
-- [ ] Verificare în browser (modul demonstrativ), pentru fiecare tip de editor: modificare urmată de element din meniul principal, de o categorie din meniul produselor, de „Înapoi” al browserului, de „Deconectare”, de „Anulează”/„Închide”; „Înapoi la editare” păstrează valorile, „Părăsește…” execută acțiunea inițială și eliberează lock-ul produsului; formular nemodificat = fără popup; salvare reușită = fără popup; la 375 și 768 px fără depășire orizontală.
-- [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și, pentru ce nu se poate verifica (de exemplu dialogul nativ la închiderea tabului), `docs/TESTE_RAMASE.md`.
-
-### Criterii de acceptare
-
-- Toate formularele de adăugare și de editare folosesc același mecanism de avertizare.
-- Un formular modificat și nesalvat, urmat de o acțiune de părăsire, afișează popup-ul cu „Înapoi la editare” (verde) și „Părăsește editarea fără salvarea modificărilor” (roșu); al doilea execută acțiunea inițială.
-- Un formular nemodificat se părăsește fără avertizare; salvarea reușită nu declanșează avertizarea.
-- Lock-ul de editare al produselor și deblocarea de administrator funcționează neschimbat.
-- Funcționează în modul demonstrativ (SQLite) și în modul MariaDB, fără modificări de schemă și fără Docker.
-
-## Task 2 — Antetul „Data” deplasat în tabelul de intrări/ieșiri
+## Task 1 — Antetul „Data” deplasat în tabelul de intrări/ieșiri
 
 - [ ] În tabelul de intrări/ieșiri al unui produs (pagina produsului), elementul „Data” din capul tabelului este mult deplasat spre stânga față de valorile din coloană. Aliniază antetul cu conținutul coloanei (același început de text, același padding/aliniere ca celulele), fără să modifice celelalte coloane.
 - [ ] Verifică alinierea la 375, 768 și desktop (fără depășire orizontală) și cu ambele teme, dacă există; verifică și antetele celorlalte coloane („Intrare/Ieșire”, „Număr bucăți”, „Descriere”, „Beneficiar/Proiect”), astfel încât toate să fie aliniate cu conținutul lor.
 
-## Task 3 — Mesaje exclusiv în limba română
+## Task 2 — Mesaje exclusiv în limba română
 
 - [ ] Mesajul de eroare generat la adăugarea unei intrări cu valoare **negativă** (număr de bucăți) trebuie să fie în limba română, cu formulare clară (de exemplu „Numărul de bucăți trebuie să fie un număr întreg pozitiv.”); același lucru pentru zero, valori necompletate sau non-numerice, la intrări, ieșiri și editarea mișcărilor.
 - [ ] Regulă unitară generală: **toate mesajele afișate utilizatorului sunt în limba română** — validări de formular și de server, erori de repository și de reguli de business, mesajele din popup-uri și dialoguri, notificări, texte de stare (încărcare, eroare, gol), mesaje ale verificărilor HTML5/DataAnnotations/Blazor (de exemplu culturi și mesaje implicite ale framework-ului), eventualele excepții afișate direct utilizatorului. Fără mesaje în engleză sau amestecate.
@@ -67,13 +30,13 @@ Mecanismul de blocare a editării (lock-ul produselor), eliberarea lui și deblo
 - [ ] Introdu o verificare automată care împiedică reapariția regulii încălcate (de exemplu un test care scanează mesajele de eroare/validare definite în cod pentru cuvinte englezești frecvente, sau o listă centralizată de mesaje) și documentează regula în `README.md` și `docs/PROJECT_STATE.md`, ca să fie respectată de toate taskurile viitoare.
 - [ ] Verificare în browser: introducerea unei intrări cu valoare negativă, zero, text și câmp gol; o eroare de server (de exemplu duplicat) și o validare de formular din alte pagini; toate mesajele apar în română.
 
-## Task 4 — Eticheta „Beneficiar/Proiect” în tabelul de intrări/ieșiri
+## Task 3 — Eticheta „Beneficiar/Proiect” în tabelul de intrări/ieșiri
 
 - [ ] În tabelul de intrări/ieșiri al unui produs, antetul coloanei „Beneficiar” se schimbă în **„Beneficiar/Proiect”** (coloana afișează și proiectul mișcării, alături de beneficiar). Conținutul coloanei și linkurile către beneficiar și proiect rămân neschimbate.
 - [ ] Actualizează consecvent orice loc care folosește vechea etichetă pentru aceeași coloană (antet, etichete accesibile, exportul sau textele de ajutor, dacă există) și testele care o verifică; nu modifică eticheta „Beneficiar” din formularul de ieșire, unde câmpul este distinct de „Proiect”.
 - [ ] Verifică că noul antet nu produce depășiri sau împărțire pe rânduri deranjantă la 375 și 768 px.
 
-## Task 5 — Situația de inventar (pagina „Inventar” și fișierul PDF)
+## Task 4 — Situația de inventar (pagina „Inventar” și fișierul PDF)
 
 Adaugă în meniul principal secțiunea „Inventar” și o pagină din care utilizatorul alege categoriile și subcategoriile pentru care se generează o situație de inventar în format PDF, folosită la numărarea fizică a stocului. Pagina reutilizează structura vizuală și mecanismul collapse din „Categorii și subcategorii”, dar este numai pentru consultare și selectare. Depinde de structura catalogului, de „Cod produs”, de stocul calculat din mișcări („Stoc exclusiv prin mișcări de intrare și ieșire” și „Intrări și ieșiri pentru un produs existent”) și de jurnalul de activitate (finalizate); nu depinde de alte taskuri active.
 
@@ -90,7 +53,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - Fontul este orice font gratuit, de tip normal, care nu necesită licențiere (licență liberă de redistribuire, de exemplu o familie sub SIL Open Font License); nu se folosesc fonturi comerciale sau instalate doar pe anumite calculatoare.
 - Biblioteca PDF ramane la alegerea implementării, cu condiția unei licențe permisive fără costuri (implicit se folosește PDFsharp/MigraDoc, licență MIT).
 
-### Subtask 5.1 — Pagina, ruta, meniul și dashboard-ul
+### Subtask 4.1 — Pagina, ruta, meniul și dashboard-ul
 
 - [ ] Creează pagina la ruta stabilă `/inventar`, cu titlul „Inventar” (`<h1>` și titlul paginii), accesibilă utilizatorilor autentificați care pot consulta produsele (aceleași drepturi ca pentru catalog); nu cere rol de administrator.
 - [ ] Adaugă în meniul principal (bara laterală, secțiunea „Spațiu de lucru”, între „Produse și stocuri” și „Administrare”) elementul extensibil „Inventar” (aceeași componentă `CollapsibleSection` ca „Administrare”, cu pictogramă proprie), cu două intrări: **„Generare situație inventar”** → `/inventar` și **„Preluare inventar”** → `/inventar/preluare`. Elementul „Inventar” este evidențiat și rămâne extins când pagina activă este oricare dintre cele două rute.
@@ -98,13 +61,13 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Adaugă „Inventar” în dashboard (pagina principală), ca element de același tip cu cele existente, cu descriere scurtă (de exemplu „Generează situația de inventar pentru numărarea stocului.”), cu link către `/inventar`.
 - [ ] Pagina afișează stări clare: încărcare, catalog gol („Nu există categorii sau produse pentru inventar”) și eroare de încărcare cu „Reîncearcă”; nu afișează date simulate.
 
-### Subtask 5.2 — Afișarea categoriilor și subcategoriilor
+### Subtask 4.2 — Afișarea categoriilor și subcategoriilor
 
 - [ ] Afișează categoriile și subcategoriile în același stil ca în „Categorii și subcategorii” (carduri extensibile cu `CollapsibleSection`, denumirea categoriei, numărul de subcategorii și de produse asociate, lista subcategoriilor cu numărul de produse), **fără** butoanele „Adaugă categorie”, „Adaugă subcategorie”, „Editează categoria” și „Editează / Mută”.
 - [ ] Categoriile pornesc restrânse, ca în pagina de administrare; starea extinsă/restrânsă a unui card nu se pierde la reîmprospătări ale datelor și nu modifică selecția.
 - [ ] Ordinea categoriilor și a subcategoriilor este aceeași ca în pagina de administrare (alfabetică, după regulile de comparație existente). Categoriile sau subcategoriile fără produse sunt afișate și selectabile, dar sunt omise din PDF (subtaskul 5.5).
 
-### Subtask 5.3 — Selectarea
+### Subtask 4.3 — Selectarea
 
 - [ ] Fiecare categorie și fiecare subcategorie are o casetă de selectare (`<input type="checkbox">` cu etichetă accesibilă, de exemplu „Selectează categoria Scule electrice”); selectarea unei subcategorii marchează pentru inventar toate produsele ei, iar selectarea unei categorii marchează toate produsele categoriei.
 - [ ] Selectarea sau deselectarea unei categorii se propagă asupra tuturor subcategoriilor ei. Când doar o parte din subcategoriile unei categorii sunt selectate, caseta categoriei este în stare **nedeterminată** (`indeterminate`, expusă corect accesibilității); când toate sunt selectate devine bifată, iar când niciuna nu este selectată devine debifată. Apăsarea pe o casetă nedeterminată selectează toate subcategoriile.
@@ -112,9 +75,9 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Sub caseta „Selectează toate categoriile” există caseta „Elimină din situația de inventar produsele cu stoc 0”. Când este bifată, produsele cu stoc **exact 0** nu apar în PDF; produsele cu stoc negativ **rămân** (decizie stabilită). Starea implicită este debifată.
 - [ ] Caseta din antetul cardului unei categorii și apăsarea antetului sunt acțiuni independente: bifarea nu extinde/restrânge cardul, iar extinderea nu schimbă selecția (regula din „Collapse unitar pentru elementele cu structură subordonată” pentru acțiunile din antet).
 - [ ] Toate casetele se pot folosi cu mouse, touch și tastatură (Tab, Spațiu); starea selecției este afișată și ca text pentru cititoare de ecran (de exemplu „3 din 5 subcategorii selectate”). Selecția și opțiunea „stoc 0” se păstrează pe durata sesiunii paginii, nu în baza de date.
-- [ ] Logica selecției (categorie ↔ subcategorii ↔ „toate”) este o clasă independentă de interfață, acoperită de teste (Subtask 5.8).
+- [ ] Logica selecției (categorie ↔ subcategorii ↔ „toate”) este o clasă independentă de interfață, acoperită de teste (Subtask 4.8).
 
-### Subtask 5.4 — Butonul „Generează situația de inventar”
+### Subtask 4.4 — Butonul „Generează situația de inventar”
 
 - [ ] În partea de sus a paginii, în locul butonului „Adaugă categorie” din pagina de administrare, există butonul „Generează situația de inventar”.
 - [ ] Butonul este dezactivat, cu explicație („Selectează cel puțin o categorie sau subcategorie”), cât timp nu este selectat nimic; pe durata generării este dezactivat și afișează „Se generează…” pentru a preveni dubla trimitere.
@@ -122,7 +85,7 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Selecția trimisă la server este validată pe server: numai identificatori valizi de categorii/subcategorii existente, fără date de produse primite de la client; o selecție care nu mai corespunde catalogului (structură modificată între timp) este semnalată clar, iar PDF-ul nu se generează parțial. Cererea este autorizată și protejată împotriva CSRF, ca celelalte operații.
 - [ ] Dacă după aplicarea opțiunii „stoc 0” nu rămâne niciun produs, utilizatorul primește un mesaj („Nu există produse de inventariat pentru selecția făcută”), nu se generează un PDF gol și nu se scrie nimic în jurnal.
 
-### Subtask 5.5 — Conținutul și aspectul fișierului PDF
+### Subtask 4.5 — Conținutul și aspectul fișierului PDF
 
 - [ ] Prima pagină are titlul „Inventar” și, sub el, „Generat la: zz/ll/aaaa oo:mm”, calculat din momentul generării (UTC) convertit la ora locală (aceeași convenție de timp local ca în restul aplicației, adică ora serverului).
 - [ ] Pentru fiecare categorie selectată (integral sau parțial): o etichetă cu numele categoriei; sub ea, pentru fiecare subcategorie selectată a categoriei: o etichetă cu numele subcategoriei și un tabel cu antetul **Cod produs | Valoare stoc | Valoare reală**. Secțiunile și tabelele sunt generate numai din opțiunile selectate: categoriile fără nicio subcategorie selectată nu apar, subcategoriile fără produse rămase (inclusiv după eliminarea stocului 0) sunt omise împreună cu tabelul lor, iar o categorie fără nicio subcategorie rămasă este omisă.
@@ -133,20 +96,20 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 - [ ] Aspect: format A4, orientare portret; antetul fiecărui tabel se repetă pe paginile următoare când tabelul continuă; o etichetă de categorie sau de subcategorie nu rămâne singură la finalul unei pagini (fără tabel sub ea); coduri lungi se împart pe mai multe rânduri fără să depășească marginile; număr de pagină („Pagina x din y”) în subsol; coloanele „Valoare stoc” și „Valoare reală” au lățime suficientă pentru cel puțin 6 cifre.
 - [ ] Datele sunt citite într-un singur instantaneu coerent al catalogului la momentul generării, astfel încât stocul dintr-o secțiune să nu provină din momente diferite; generarea este complet asincronă și nu blochează alte sesiuni.
 
-### Subtask 5.6 — Bibliotecă PDF și font
+### Subtask 4.6 — Bibliotecă PDF și font
 
 - [ ] Folosește o bibliotecă de generare PDF fără Docker, fără servicii externe și fără costuri de licențiere: implicit PDFsharp/MigraDoc (licență MIT); QuestPDF nu se adoptă fără verificarea condițiilor lui de licență. Decizia și motivul se notează în `docs/PROJECT_STATE.md`.
 - [ ] Fontul este **gratuit**, de tip normal (fără caracter decorativ), care nu necesită licențiere: licență care permite redistribuirea și încorporarea în PDF (de exemplu o familie sub SIL Open Font License, ca Noto Sans sau Open Sans, în variantele normal și bold), conține diacriticele românești (ă, â, î, ș, ț — atenție la variantele cu virgulă, nu cu sedilă) și este inclus în aplicație; nu depinde de fonturile instalate pe server și nu are nevoie de internet la generare. Licența fontului se păstrează în proiect.
 - [ ] Generatorul este un serviciu separat (de exemplu `IInventoryReportBuilder` → model `InventoryReport` → `IInventoryPdfWriter`), astfel încât construirea datelor (selecție, filtrare, ordonare, marcarea stocului negativ) să poată fi testată fără PDF.
 
-### Subtask 5.7 — Jurnalizarea generării
+### Subtask 4.7 — Jurnalizarea generării
 
 - [ ] Fiecare generare reușită scrie un eveniment în jurnalul de activitate cu **utilizatorul** care a generat situația (și rolul lui), tipul de obiect „Inventar”, acțiunea nouă „Generare” (adăugată și în filtrele de tip și de operație ale paginii Jurnal) și momentul UTC.
 - [ ] Detaliile evenimentului conțin doar rezumatul cererii: numărul de categorii și de subcategorii selectate, dacă a fost bifată eliminarea stocului 0, numărul de produse din situație (din care cu stoc negativ) și numele fișierului; **nu** conțin lista produselor sau valorile stocului. Evenimentul nu are identificator de obiect și nu primește link către o pagină.
 - [ ] Nu se jurnalizează cererile respinse, cele fără produse sau cele eșuate; evenimentul se scrie după ce PDF-ul a fost construit cu succes, astfel încât un eșec de jurnalizare să nu producă un fișier nejurnalizat (comportamentul la eroarea de jurnalizare se stabilește la implementare și se documentează).
 - [ ] Funcționează în modul demonstrativ (SQLite) și în modul MariaDB, prin infrastructura comună de audit; nu se adaugă fișiere SQL de upgrade separate.
 
-### Subtask 5.8 — Verificări
+### Subtask 4.8 — Verificări
 
 - [ ] Teste automate pentru logica selecției: selectare/deselectare categorie ↔ subcategorii, stare nedeterminată, „toate categoriile”, apăsare pe caseta nedeterminată, categorii fără subcategorii.
 - [ ] Teste automate pentru construirea situației: doar selecția făcută, eliminarea stocului 0 (stocul negativ rămâne și este marcat pentru roșu), omiterea secțiunilor goale, ordinea categoriilor/subcategoriilor/produselor, stoc calculat din mișcări (inclusiv un produs cu mișcări), respingerea identificatorilor inexistenți, selecție goală, formatul „zz/ll/aaaa oo:mm” al momentului generării (conversie din UTC la ora locală, inclusiv schimbarea orei de vară).
@@ -172,14 +135,14 @@ Adaugă în meniul principal secțiunea „Inventar” și o pagină din care ut
 ### Detalii de stabilit la implementare
 
 - Alegerea concretă a familiei de font liberă (Noto Sans, Open Sans sau echivalent) și a versiunii bibliotecii PDF; se notează în `docs/PROJECT_STATE.md` împreună cu licențele.
-- Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 5.7); se documentează.
+- Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 4.7); se documentează.
 - Toate celelalte detalii au fost confirmate de utilizator și sunt descrise în „Decizii stabilite cu utilizatorul”.
 
 ## Observații pentru etapa de implementare
 
 - Schema bazei de date și scripturile aferente se stabilesc în etapa dedicată integrării MariaDB.
 - Implementarea trebuie să rămână complet asincronă.
-- Toate mesajele afișate utilizatorului sunt în limba română (regula din Task 3).
+- Toate mesajele afișate utilizatorului sunt în limba română (regula din Task 2).
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
@@ -1041,3 +1004,18 @@ Implementat la 25 septembrie 2026 de Claude. `Services/ProductLocks.cs` (`IProdu
 - [x] Verificarea versiunii produsului rămâne protecția finală, inclusiv după expirarea sau preluarea lock-ului.
 - Neverificat: MariaDB pe un server real; două calculatoare diferite (testat cu două tab-uri, cu același cont); un al doilea utilizator cu cont distinct în browser.
 - Corectură legată: scripturile proprii sunt acum încărcate prin `@Assets[...]` (nume cu amprentă), deoarece browserul păstra o versiune veche a `leave-guard.js`.
+
+## Finalizat la 25.09.2026 14:08 — Avertizare la părăsirea unei pagini de editare cu modificări nesalvate
+
+**Data și ora implementării:** 25.09.2026 14:08 (ora locală).
+
+Implementat la 25 septembrie 2026 de Claude. `Services/UnsavedChanges.cs` (`UnsavedChanges`, `EditTracker`, `FormSnapshot`), `Components/Shared/UnsavedChangesTracker.razor`, `UnsavedChangesHost.razor`, `UnsavedChangesDialog.razor`, `wwwroot/leave-guard.js` (rescris), editorii `ProductEditor`, `BeneficiaryEditor`, `ProjectEditor`, `ProjectObservationEditor`, `UserEditor`, formularele din `ProductGroups` și `ProductMovements` (adăugarea și dialogul de editare a mișcării), paginile cu editori (`UnsavedChangesHost`), `Program.cs`.
+
+- [x] Serviciu scoped `UnsavedChanges` în care se înregistrează fiecare editor deschis (`UnsavedChangesTracker`); avertizarea se declanșează dacă **oricare** editor al paginii este modificat (proiectul și observația pe aceeași pagină). Un editor este „modificat” când valorile diferă de cele de la deschidere (instantaneu păstrat ca hash, prin reflecție pe modelul de intrare; motivarea nu contează, imaginea aleasă și parola introdusă contează); revenirea la valoarea inițială înseamnă „nemodificat”; după o salvare reușită valorile salvate devin starea nemodificată (`Rebase`).
+- [x] Verificarea este făcută pe server, în momentul acțiunii: valoarea unui câmp ajunge pe server la pierderea focusului, iar mesajul acesta precede întotdeauna apăsarea care urmează.
+- [x] Interceptarea: script (`leave-guard.js`) pentru clicurile pe linkuri interne, antetele meniului produselor și „Deconectare”; pentru Înapoi/Înainte ale browserului (routerul aplicației nu le raportează către `NavigationLock`) scriptul etichetează intrările din istoric, anulează mutarea și o repetă după răspuns; `NavigationLock` rămâne pentru navigările din cod și pentru confirmarea nativă la închiderea sau reîncărcarea tabului. Înlocuiește protecția veche din meniul produselor și dialogul „Părăsești adăugarea produsului?”.
+- [x] Popup cu titlul „Editarea nu a fost finalizată” (editare) sau „Adăugarea nu a fost finalizată” (formular de adăugare), cu „Înapoi la editare”/„Înapoi la adăugare” (verde, primește focusul, Escape are același efect; focusul revine la elementul de unde a pornit acțiunea) și „Părăsește editarea fără salvarea modificărilor”/„Părăsește adăugarea fără salvare” (roșu), care închide editorul (eliberând lock-ul produsului) și execută acțiunea inițială (navigare, mutare în istoric, deschiderea dialogului de deconectare). Textul diferă între adăugare și editare (cerere ulterioară a utilizatorului).
+- [x] „Anulează”/„Închide” de pe un formular modificat afișează același popup (numai pentru acel formular); pe un formular nemodificat închid direct. Selectarea aceleiași categorii în meniul produselor nu întreabă.
+- [x] Teste automate: 21 de verificări noi (nemodificat, modificat, revenire, „Înapoi”, „Părăsește” doar pentru formularele modificate, `Rebase`, dispariția trackerului, motivarea ignorată, imagine și parolă, textul de adăugare/editare).
+- [x] Verificat în browser (modul demonstrativ, contul administrator, `http://127.0.0.1:5082`): formular nemodificat părăsit fără întrebare; formular modificat + link din meniu, antet de categorie, „Închide”/„Anulează”, „Deconectare”, Înapoi al browserului și mișcare de stoc (formularul de adăugare); „Înapoi la editare” păstrează valorile; „Părăsește” navighează (cu reîncărcare pentru antetul de categorie), deschide dialogul de deconectare sau revine la pagina anterioară; lock-ul produsului editat este eliberat; textele diferă între adăugare (beneficiar) și editare (produs).
+- Neverificat (trecut în `docs/TESTE_RAMASE.md`): dialogul nativ la închiderea/reîncărcarea tabului cu un formular modificat, dialogul de editare a mișcării și formularele din pagina proiectului și a observației în browser, tastatura și cititorul de ecran, Înainte al browserului, mutări de mai mulți pași în istoric.

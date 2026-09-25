@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
+@inject UnsavedChanges Guard
 @inject IBeneficiaryRepository Repository
 @inject AppMode Mode
 @inject NavigationManager Navigation
@@ -9,6 +10,7 @@
 @implements IDisposable
 
 <PageTitle>Beneficiari · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
 <div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button></div></div>
 @if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Mod demonstrativ.</strong> Modificările beneficiarilor sunt salvate în baza de date locală și rămân disponibile după repornire.</div></div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
@@ -103,7 +105,7 @@
     private Task CloseEditorAsync()
     {
         editing = false; editingBeneficiary = null;
-        if (EditId is not null) { EditId = null; Navigation.NavigateTo("/beneficiari"); }
+        if (EditId is not null) { EditId = null; if (!Guard.IsDiscarding) Navigation.NavigateTo("/beneficiari"); }
         return Task.CompletedTask;
     }
     private async Task BeneficiarySavedAsync(Beneficiary beneficiary)

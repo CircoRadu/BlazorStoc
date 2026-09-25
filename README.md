@@ -132,3 +132,9 @@ Lucrul pentru NAS/QNAP, Docker și publicarea în containere rămân explicit î
 
 - Când începi editarea unui produs existent, produsul este blocat pentru tine (lease de 90 s, reînnoit la 30 s cât timp formularul este deschis). Ceilalți utilizatori îl pot consulta, văd cine îl editează și de când, iar butonul „Editează” este dezactivat; când se eliberează (salvare, anulare, închiderea formularului) sau expiră (browser închis, conexiune pierdută), sunt anunțați automat.
 - Un administrator poate elibera forțat blocarea din pagina produsului, cu motiv obligatoriu; acțiunea „Deblocare” apare în jurnalul de activitate. Verificarea versiunii produsului rămâne protecția finală la salvare.
+
+## Avertizare la părăsirea unei editări nefinalizate
+
+- Dacă ai modificat valori într-un formular de adăugare sau de editare (produs, beneficiar, proiect, observație, utilizator, categorie, subcategorie, mișcare de stoc) și pleci fără să salvezi, aplicația afișează un popup: „Editarea nu a fost finalizată” (sau „Adăugarea nu a fost finalizată”). „Înapoi la editare” (verde) păstrează formularul și valorile; „Părăsește editarea fără salvarea modificărilor” (roșu) renunță la modificări și execută acțiunea aleasă (link, meniu, „Înapoi” al browserului, „Deconectare”, „Anulează”/„Închide”).
+- Un formular nemodificat se părăsește fără întrebare. Închiderea sau reîncărcarea tabului folosește dialogul nativ al browserului.
+- Mecanismul este comun (`Services/UnsavedChanges.cs`, `UnsavedChangesTracker`/`UnsavedChangesHost`, `wwwroot/leave-guard.js`): un editor nou primește avertizarea prin `<UnsavedChangesTracker …>` în formular și `<UnsavedChangesHost />` în pagină.

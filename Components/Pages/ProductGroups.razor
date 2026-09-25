@@ -8,6 +8,7 @@
 @implements IDisposable
 
 <PageTitle>Categorii produse · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
 <div class="page-heading">
     <div><p class="eyebrow">ORGANIZARE CATALOG</p><h1>Categorii și subcategorii</h1><p class="muted">Redenumește categoriile și mută subcategoriile fără să pierzi produsele asociate.</p></div>
     <div class="heading-actions"><button class="primary" disabled="@(saving || IsEditing)" @onclick="CreateCategory">+ Adaugă categorie</button></div>
@@ -18,24 +19,26 @@
 @if (creatingCategory || editingCategory is not null)
 {
     <section class="product-editor" aria-labelledby="category-editor-title">
+        <UnsavedChangesTracker @ref="groupTracker" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
         <div class="catalog-heading"><h2 id="category-editor-title">@(creatingCategory ? "Adaugă categorie" : $"Editează categoria „{editingCategory}”")</h2></div>
         <div class="editor-grid">
             <label class="full-width" for="category-name">Denumire categorie *<input id="category-name" maxlength="100" @bind="categoryName" disabled="@saving" /></label>
             @if (!creatingCategory) { <ChangeReasonField Id="category-reason" @bind-Value="reason" Disabled="@saving" /> }
         </div>
-        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveCategoryAsync">@(creatingCategory ? "Adaugă categoria" : "Salvează categoria")</button><button class="danger" disabled="@saving" @onclick="CancelEdit">Anulează</button></div>
+        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveCategoryAsync">@(creatingCategory ? "Adaugă categoria" : "Salvează categoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
     </section>
 }
 else if (creatingSubcategory || editingSubcategory is not null)
 {
     <section class="product-editor" aria-labelledby="subcategory-editor-title">
+        <UnsavedChangesTracker @ref="groupTracker" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
         <div class="catalog-heading"><h2 id="subcategory-editor-title">@(creatingSubcategory ? $"Adaugă subcategorie în „{targetCategory}”" : $"Editează subcategoria „{editingSubcategory!.Subcategory}”")</h2></div>
         <div class="editor-grid">
             <label for="subcategory-name">Denumire subcategorie *<input id="subcategory-name" maxlength="100" @bind="subcategoryName" disabled="@saving" /></label>
             <label for="subcategory-category">Categorie *<select id="subcategory-category" @bind="targetCategory" disabled="@(saving || creatingSubcategory)">@foreach (var category in Categories) { <option value="@category">@category</option> }</select></label>
             @if (!creatingSubcategory) { <ChangeReasonField Id="subcategory-reason" @bind-Value="reason" Disabled="@saving" /> }
         </div>
-        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="CancelEdit">Anulează</button></div>
+        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
     </section>
 }
 
@@ -103,6 +106,11 @@ else
     private IReadOnlyList<AuditChange>? pendingChanges;
     private readonly HashSet<string> expandedCategories = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource lifetime = new();
+    // Task 1: leaving an edit form with modified values (the reason alone does not count) asks for confirmation first.
+    private UnsavedChangesTracker? groupTracker;
+    private string CurrentSnapshot() => FormSnapshot.Values(categoryName, subcategoryName, targetCategory);
+    private Task DiscardEditAsync() { CancelEdit(); return Task.CompletedTask; }
+    private Task RequestCancelEditAsync() => groupTracker is null ? DiscardEditAsync() : groupTracker.RunAfterConfirmAsync(DiscardEditAsync);
     private bool IsEditing => creatingCategory || creatingSubcategory || editingCategory is not null || editingSubcategory is not null;
     private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
         .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();

@@ -1,0 +1,138 @@
+@using BlazorStoc.Services
+@using Microsoft.AspNetCore.Components.Routing
+@implements IAsyncDisposable
+@inject UnsavedChanges Guard
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject ILogger<UnsavedChangesHost> Logger
+
+@* Task 1: one per page that has editors. Stops navigation (links, menus, Back, programmatic) and the tab-close
+   confirmation while an editor has unsaved changes, and shows the "editing not finished" question. *@
+<NavigationLock OnBeforeInternalNavigation="BeforeNavigationAsync" ConfirmExternalNavigation="@confirmExternal" />
+@if (Guard.Pending is not null)
+{
+    <UnsavedChangesDialog Adding="@(Guard.Pending?.Adding == true)" BackToEditing="BackToEditingAsync" Leave="LeaveAsync" />
+}
+
+@code {
+    private DotNetObjectReference<UnsavedChangesHost>? reference;
+    private readonly string hostId = Guid.NewGuid().ToString("N");
+    private bool guardActive, confirmExternal, disposed;
+
+    protected override void OnInitialized() => Guard.Changed += OnGuardChanged;
+
+    private void OnGuardChanged()
+    {
+        if (disposed) return;
+        _ = InvokeAsync(() =>
+        {
+            if (disposed) return;
+            confirmExternal = Guard.HasUnsavedChanges;
+            StateHasChanged();
+        });
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var wanted = Guard.TrackerCount > 0;
+        if (wanted == guardActive || disposed) return;
+        try
+        {
+            if (wanted) { reference ??= DotNetObjectReference.Create(this); await JS.InvokeVoidAsync("blazorStocLeaveGuard.enable", reference, hostId); }
+            else await JS.InvokeVoidAsync("blazorStocLeaveGuard.disable", hostId);
+            guardActive = wanted;
+        }
+        catch (JSDisconnectedException) { }
+        catch (InvalidOperationException) { }
+        catch (Exception ex) { Logger.LogWarning("Leave guard could not be updated ({ErrorType}).", ex.GetType().Name); }
+    }
+
+    // Any internal navigation that was not intercepted by the script (Back button, programmatic navigation).
+    private async Task BeforeNavigationAsync(LocationChangingContext context)
+    {
+        if (!Guard.HasUnsavedChanges) return;
+        context.PreventNavigation();
+        var target = context.TargetLocation;
+        await RememberFocusAsync();
+        Guard.Request(() => { Navigation.NavigateTo(target); return Task.CompletedTask; });
+    }
+
+    // Called by wwwroot/leave-guard.js for a clicked link or menu header while an editor is open.
+    [JSInvokable]
+    public Task RequestLeave(string url, bool reload) => InvokeAsync(async () =>
+    {
+        if (!Guard.HasUnsavedChanges)
+        {
+            if (reload || !string.Equals(Navigation.ToAbsoluteUri(url).ToString(), Navigation.Uri, StringComparison.Ordinal)) Navigation.NavigateTo(url, forceLoad: reload);
+            return;
+        }
+        // Choosing the menu entry that is already selected changes nothing, so it does not raise the question.
+        if (ProductMenuSelection.IsSameSelection(Navigation.Uri, url)) return;
+        await RememberFocusAsync();
+        Guard.Request(() => { Navigation.NavigateTo(url, forceLoad: reload); return Task.CompletedTask; });
+    });
+
+    // Called by the script after it undid a Back/Forward move: true = nothing is modified, repeat the move at once;
+    // false = the question is open and the move is repeated when the user chooses to leave.
+    [JSInvokable]
+    public async Task<bool> RequestHistory(int delta)
+    {
+        var proceed = true;
+        await InvokeAsync(async () =>
+        {
+            if (!Guard.HasUnsavedChanges) return;
+            proceed = false;
+            await RememberFocusAsync();
+            Guard.Request(async () =>
+            {
+                try { await JS.InvokeVoidAsync("blazorStocLeaveGuard.goHistory", delta); }
+                catch (JSDisconnectedException) { }
+            });
+        });
+        return proceed;
+    }
+
+    // Called by the script when "Deconectare" is pressed: the sign-out dialog opens after the question is answered.
+    [JSInvokable]
+    public Task RequestLogout() => InvokeAsync(async () =>
+    {
+        if (!Guard.HasUnsavedChanges) { await OpenLogoutAsync(); return; }
+        await RememberFocusAsync();
+        Guard.Request(OpenLogoutAsync);
+    });
+
+    private async Task OpenLogoutAsync()
+    {
+        try { await JS.InvokeVoidAsync("blazorStocLeaveGuard.openLogout"); }
+        catch (JSDisconnectedException) { }
+    }
+
+    private async Task RememberFocusAsync()
+    {
+        try { await JS.InvokeVoidAsync("blazorStocLeaveGuard.rememberFocus"); }
+        catch (Exception) { }
+    }
+
+    private async Task BackToEditingAsync()
+    {
+        Guard.Cancel();
+        try { await JS.InvokeVoidAsync("blazorStocLeaveGuard.restoreFocus"); }
+        catch (Exception) { }
+    }
+
+    private Task LeaveAsync() => Guard.ConfirmAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        Guard.Changed -= OnGuardChanged;
+        if (Guard.Pending is not null) Guard.Cancel();
+        if (guardActive)
+        {
+            try { await JS.InvokeVoidAsync("blazorStocLeaveGuard.disable", hostId); }
+            catch (JSDisconnectedException) { }
+            catch (InvalidOperationException) { }
+        }
+        reference?.Dispose();
+    }
+}

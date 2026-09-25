@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = AccessRoles.Administrator)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
+@inject UnsavedChanges Guard
 @inject IUserRepository Repository
 @inject IAccessControl Access
 @inject AppMode Mode
@@ -12,6 +13,7 @@
 @implements IDisposable
 
 <PageTitle>Utilizatori · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
 <div class="page-heading"><div><p class="eyebrow">ADMINISTRARE ACCES</p><h1>Utilizatori</h1><p class="muted">Gestionează persoanele care se pot autentifica și nivelul lor de acces.</p></div>@if (authorized) { <div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă utilizator</button></div> }</div>
 @if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Mod demonstrativ.</strong> Modificările utilizatorilor sunt salvate în baza de date locală și rămân disponibile după repornire.</div></div> }
 @if (!authorized && !loading) { <div class="error-banner" role="alert">Nu ai drepturi de administrator. Conturile cu acces limitat pot consulta numai catalogul.</div> }
@@ -127,7 +129,7 @@
     private Task CloseEditorAsync()
     {
         editing = false; editingUser = null;
-        if (EditId is not null) { EditId = null; Navigation.NavigateTo("/utilizatori"); }
+        if (EditId is not null) { EditId = null; if (!Guard.IsDiscarding) Navigation.NavigateTo("/utilizatori"); }
         return Task.CompletedTask;
     }
     private async Task UserSavedAsync(WebUser user)

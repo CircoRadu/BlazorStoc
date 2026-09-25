@@ -174,6 +174,11 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 - **Pași**: deschide `/produse?edit=1&inapoi=https://exemplu.invalid` și `/produse?edit=1&inapoi=//exemplu.invalid`, apoi „Anulează”.
 - **Așteptat**: se revine în catalog (adresa externă este ignorată).
 
+### C10. Avertizarea la părăsirea editării: cazuri neexersate în browser (avertizare la părăsirea unei pagini de editare)
+- **Pași**: (1) modifică un câmp al unui formular și închide sau reîncarcă tabul → trebuie să apară dialogul nativ al browserului; (2) modifică dialogul „Editează mișcarea” și apasă „Anulează”; (3) în pagina proiectului deschide editorul proiectului și pe cel al observației, modifică-le pe rând și apasă un link din meniu; (4) apasă „Înainte” al browserului după o revenire; (5) mută mai mulți pași în istoric (meniul lung al butonului Înapoi) cu un formular modificat; (6) folosește numai tastatura (Tab, Enter, Escape) pe popup și verifică citirea de către un cititor de ecran.
+- **Așteptat**: dialogul nativ la (1); popup „Editarea nu a fost finalizată” la (2)–(5); la (5) mutarea se repetă corect după „Părăsește” sau este anulată la „Înapoi la editare”; Escape = „Înapoi la editare”.
+- **De ce nu s-a făcut**: dialogul nativ al tabului și tastatura/cititorul de ecran nu pot fi acționate din panoul Browser; restul nu a fost exersat în ciclu.
+
 ---
 
 ## D. Tastatură și accesibilitate (motiv: M3)

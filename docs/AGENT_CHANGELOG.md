@@ -693,3 +693,40 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod; TODO.md verificat programatic: 27 de sectiuni finalizate in ordine cronologica, nicio referinta Task N sau Subtask N.M ramasa in arhiva, un singur task activ (Task 1) cu subtaskurile 1.1-1.8; suita neschimbata.
 - **Commit:** `claude: new TODO update mode (chronological archive, descriptive names, renumbering)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:10:03.2097831Z â€” claude
+
+- **Task:** Task 1: avertizare la parasirea unei pagini de editare cu modificari nesalvate
+- **Rezumat:** La cererea utilizatorului Task 1 a fost redus la avertizarea la parasirea unei pagini de editare cu modificari nesalvate (blocarea generalizata si deblocarea cu iesire din pagina au fost scoase din TODO). Serviciul UnsavedChanges (EditTracker per editor, instantaneu hash, Rebase dupa salvare, FormSnapshot fara motivare), componentele UnsavedChangesTracker/Host/Dialog, leave-guard.js rescris (linkuri, antete meniu, Deconectare, Inapoi/Inainte cu intrari de istoric etichetate) si NavigationLock pentru navigari din cod si dialogul nativ la inchiderea tabului. Popup verde Inapoi la editare / rosu Paraseste editarea, text diferit pentru adaugare si editare (cerere ulterioara), Escape = inapoi, focus restaurat. Aplicat editorilor produs, beneficiar, proiect, observatie, utilizator, categorii/subcategorii si formularelor din pagina produsului. Home nu mai are protectia veche. TODO: taskul finalizat mutat la sfarsit, restul renumerotat 1-4. README, VALIDARE, PROJECT_STATE, TESTE_RAMASE (C10) actualizate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/Beneficiaries.razor`
+  - `Components/Pages/BeneficiaryDetail.razor`
+  - `Components/Pages/BeneficiaryEditor.razor`
+  - `Components/Pages/Home.razor`
+  - `Components/Pages/ProductEditor.razor`
+  - `Components/Pages/ProductGroups.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Pages/ProjectEditor.razor`
+  - `Components/Pages/ProjectObservationEditor.razor`
+  - `Components/Pages/ProjectObservationPage.razor`
+  - `Components/Pages/ProjectPage.razor`
+  - `Components/Pages/UserDetail.razor`
+  - `Components/Pages/UserEditor.razor`
+  - `Components/Pages/Users.razor`
+  - `Components/Shared/UnsavedChangesDialog.razor`
+  - `Components/Shared/UnsavedChangesHost.razor`
+  - `Components/Shared/UnsavedChangesTracker.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `Program.cs`
+  - `README.md`
+  - `Services/UnsavedChanges.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/leave-guard.js`
+- **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 409 PASS (21 noi); browser pe 5082 (SQLite, administrator): fara modificari = fara popup; cu modificari popup la link, antet categorie, Inchide/Anuleaza, Deconectare, history.back, formular miscare; Inapoi pastreaza valorile si focusul; Paraseste navigheaza/revine/deschide dialogul de deconectare si elibereaza lock-ul produsului; texte diferite la adaugare si editare. Neverificat: dialog nativ la inchiderea tabului, dialogul de editare miscare si editorii din pagina proiectului in browser, tastatura, Inainte, mutari multi-pas (TESTE_RAMASE C10).
+- **Commit:** `claude: warn before leaving an edit form with unsaved changes (add/edit wording)`
+- **Predat cÄƒtre:** codex

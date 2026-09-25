@@ -12,6 +12,7 @@
 @implements IDisposable
 
 <PageTitle>@(observation?.Name ?? "Observație") · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
 
 @if (loading)
 {

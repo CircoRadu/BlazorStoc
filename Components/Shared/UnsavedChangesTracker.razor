@@ -1,0 +1,29 @@
+@using BlazorStoc.Services
+@implements IDisposable
+@inject UnsavedChanges Guard
+
+@* Task 1: place inside an editor (or an inline form) to register its unsaved changes with the leave warning.
+   Snapshot returns the comparable current values (FormSnapshot.Of); Discard closes the editor without saving. *@
+
+@code {
+    [Parameter, EditorRequired] public Func<string> Snapshot { get; set; } = () => string.Empty;
+    [Parameter, EditorRequired] public Func<Task> Discard { get; set; } = () => Task.CompletedTask;
+    // True for a form that creates a new object: the warning then speaks about "adăugare", not "editare".
+    [Parameter] public bool Adding { get; set; }
+
+    private EditTracker? tracker;
+
+    public bool IsModified => tracker?.IsModified ?? false;
+
+    // After a successful save the current values are the new "unmodified" state.
+    public void Rebase() => tracker?.Rebase();
+
+    // Runs the action now when nothing changed, otherwise after the user confirmed leaving without saving.
+    public Task RunAfterConfirmAsync(Func<Task> action) => tracker is null ? action() : tracker.RunAfterConfirmAsync(action);
+
+    protected override void OnInitialized() => tracker = Guard.Track(() => Snapshot(), () => Discard(), Adding);
+
+    protected override void OnAfterRender(bool firstRender) => tracker?.NotifyRendered();
+
+    public void Dispose() { tracker?.Dispose(); tracker = null; }
+}

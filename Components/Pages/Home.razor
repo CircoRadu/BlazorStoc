@@ -10,10 +10,12 @@
 @inject IJSRuntime JS
 @inject IChangeFeed ChangeFeed
 @inject ChangeOrigin Origin
+@inject UnsavedChanges Guard
 @inject IProductLockRepository Locks
 @implements IAsyncDisposable
 
 <PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
 <div class="page-heading"><div><p class="eyebrow">INVENTAR CENTRALIZAT</p><h1>Produse și stocuri</h1><p class="muted">Găsește rapid produsele și verifică disponibilitatea lor.</p></div><div class="heading-actions"><a class="refresh" href="/">← Meniu principal</a>@if (canManage) { <a class="refresh" href="/categorii">Administrează categorii</a><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă produs</button> }<button class="refresh" disabled="@(loading || editing || deleting is not null)" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
 @if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Explorezi o colecție demonstrativă.</strong> Produsele de mai jos sunt exemple, fără legătură cu stocul real.</div></div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
@@ -44,15 +46,6 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     </div>
 }
 
-@if (pendingLeaveUrl is not null)
-{
-    <SaveConfirmationDialog Title="Părăsești adăugarea produsului?"
-                            Message="Formularul „Adaugă produs” va fi închis, iar datele nesalvate, inclusiv imaginea selectată, vor fi pierdute."
-                            ConfirmLabel="Părăsește adăugarea" CancelLabel="Continuă adăugarea"
-                            ConfirmClass="danger" CancelClass="primary"
-                            Changes="Array.Empty<AuditChange>()" Confirmed="ConfirmLeaveAsync" Cancelled="CancelLeaveAsync" />
-}
-
 @if (deleting is not null)
 {
     <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi produsul?" Subject="Produsul"
@@ -80,11 +73,6 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private int page = 1;
     private const int PageSize = 10;
     private Product? imagePreview;
-    // Leave guard (Task 6): active only while the "Adaugă produs" form is open.
-    private DotNetObjectReference<Home>? guardReference;
-    private bool guardActive;
-    private string? pendingLeaveUrl;
-    private bool pendingLeaveReload;
     private DateTime? lastLoaded;
     private readonly CancellationTokenSource lifetime = new();
     private List<Product> ScopedProducts => products
@@ -118,7 +106,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
             () => InvokeAsync(async () => { await RefreshLocksAsync(); StateHasChanged(); }), () => false,
             () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(15));
         live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Product,
-            () => InvokeAsync(RefreshSilentlyAsync), () => editing || deleting is not null || pendingLeaveUrl is not null,
+            () => InvokeAsync(RefreshSilentlyAsync), () => editing || deleting is not null,
             () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
     }
     private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
@@ -137,38 +125,6 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Logger.LogWarning("Catalog refresh failed ({ErrorType}).", ex.GetType().Name); }
         StateHasChanged();
-    }
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        var wanted = editing && editingProduct is null;
-        if (wanted == guardActive) return;
-        try
-        {
-            if (wanted) { guardReference ??= DotNetObjectReference.Create(this); await JS.InvokeVoidAsync("blazorStocLeaveGuard.enable", guardReference); }
-            else await JS.InvokeVoidAsync("blazorStocLeaveGuard.disable");
-            guardActive = wanted;
-        }
-        catch (JSDisconnectedException) { }
-        catch (Exception ex) { Logger.LogWarning("Leave guard could not be updated ({ErrorType}).", ex.GetType().Name); }
-    }
-
-    // Called by wwwroot/leave-guard.js when a products-menu entry is chosen while the add form is open.
-    [JSInvokable]
-    public Task RequestLeave(string url, bool reload)
-    {
-        if (!(editing && editingProduct is null) || ProductMenuSelection.IsSameSelection(Navigation.Uri, url)) return Task.CompletedTask;
-        pendingLeaveUrl = url; pendingLeaveReload = reload;
-        return InvokeAsync(StateHasChanged);
-    }
-
-    private Task CancelLeaveAsync() { pendingLeaveUrl = null; return Task.CompletedTask; }
-
-    private async Task ConfirmLeaveAsync()
-    {
-        var url = pendingLeaveUrl; var reload = pendingLeaveReload;
-        pendingLeaveUrl = null;
-        await CloseEditorAsync();
-        if (url is not null) Navigation.NavigateTo(url, forceLoad: reload);
     }
     protected override async Task OnParametersSetAsync()
     {
@@ -296,7 +252,8 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     {
         editing = false; editingProduct = null;
         await ReleaseLockAsync();
-        if (EditId is not null) { EditId = null; Navigation.NavigateTo(OriginOrCatalog(category, subcategory)); }
+        // A discarded editor (leave warning) must not send the user back to the product page: the chosen target follows.
+        if (EditId is not null) { EditId = null; if (!Guard.IsDiscarding) Navigation.NavigateTo(OriginOrCatalog(category, subcategory)); }
     }
     private async Task ProductSavedAsync(Product product)
     {
@@ -372,12 +329,5 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
             catch (Exception) { }
         }
         lifetime.Cancel(); lifetime.Dispose();
-        if (guardActive)
-        {
-            try { await JS.InvokeVoidAsync("blazorStocLeaveGuard.disable"); }
-            catch (JSDisconnectedException) { }
-            catch (InvalidOperationException) { }
-        }
-        guardReference?.Dispose();
     }
 }
