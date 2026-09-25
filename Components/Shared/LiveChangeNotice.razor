@@ -1,0 +1,13 @@
+@* Shown when another session or application changed data behind a form or dialog that is open (Task 8). *@
+@if (Visible)
+{
+    <div class="info-banner live-change-notice" role="status">
+        <span>Datele au fost modificate de altă sesiune sau aplicație. Formularul sau dialogul deschis nu a fost schimbat; la salvare se verifică versiunea înregistrării.</span>
+        <button type="button" class="refresh" @onclick="() => Reload.InvokeAsync()">Reîncarcă datele</button>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter, EditorRequired] public EventCallback Reload { get; set; }
+}

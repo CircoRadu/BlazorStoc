@@ -649,7 +649,7 @@ try
             "SQLite creates the project, observation and observation-file live and archive tables");
         await using var version = schemaConnection.CreateCommand();
         version.CommandText = "SELECT value FROM app_metadata WHERE key='schema_version'";
-        Check((string?)await version.ExecuteScalarAsync() == "6", "Archive schema is versioned with the live SQLite schema");
+        Check((string?)await version.ExecuteScalarAsync() == "7", "Archive schema is versioned with the live SQLite schema");
         await using var indexes = schemaConnection.CreateCommand();
         indexes.CommandText = """
             SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN
@@ -1799,6 +1799,207 @@ finally
 {
     Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
     try { Directory.Delete(feedRoot, true); } catch (IOException) { }
+}
+
+
+// ---- Task 8: change events from database triggers, relay, ledger and live refresh ----
+var syncRoot = Path.Combine(Path.GetTempPath(), $"blazorstoc-sync-{Guid.NewGuid():N}");
+Directory.CreateDirectory(syncRoot);
+try
+{
+    var syncConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["App:LocalDatabasePath"] = Path.Combine(syncRoot, "sync.db"),
+        ["App:ProductImagesPath"] = Path.Combine(syncRoot, "product-images"),
+        ["App:ProjectFilesPath"] = Path.Combine(syncRoot, "project-files"),
+        ["App:ArchiveFilesPath"] = Path.Combine(syncRoot, "archive-files"),
+        ["App:AuditPath"] = Path.Combine(syncRoot, "legacy-audit.jsonl")
+    }).Build();
+    var syncStore = new SqliteLocalStore(new TestWebHostEnvironment(syncRoot), syncConfiguration, NullLogger<SqliteLocalStore>.Instance);
+    await syncStore.InitializeAsync();
+    var syncSource = new SqliteChangeEventSource(syncStore);
+    var startId = await syncSource.LatestIdAsync(default);
+    Check((await syncSource.ReadAfterAsync(0, 1000, default)).All(change => change.Id <= startId),
+        "The one-time seeding and migrations do not create change events");
+
+    // What an external application would do: plain SQL against the tables, no application code involved.
+    await using (var external = await syncStore.OpenConnectionAsync())
+    {
+        async Task Run(string sql, params (string Name, object? Value)[] parameters)
+        {
+            await using var command = TestSqliteCommand(external, sql, parameters);
+            await command.ExecuteNonQueryAsync();
+        }
+        var stamp = DateTime.UtcNow.ToString("O");
+        await Run("INSERT INTO categories(name,normalized_name) VALUES('Sync','sync')");
+        await Run("INSERT INTO subcategories(category_id,name,normalized_name) VALUES((SELECT id FROM categories WHERE normalized_name='sync'),'Sync sub','sync sub')");
+        await Run("INSERT INTO products(category_id,subcategory_id,name,normalized_name) VALUES((SELECT id FROM categories WHERE normalized_name='sync'),(SELECT id FROM subcategories WHERE normalized_name='sync sub'),'P-SYNC','p-sync')");
+        await Run("UPDATE products SET description='nou' WHERE normalized_name='p-sync'");
+        await Run("INSERT INTO stock_movements(product_id,quantity,created_utc) VALUES((SELECT id FROM products WHERE normalized_name='p-sync'),3,@t)", ("@t", stamp));
+        await Run("UPDATE stock_movements SET quantity=4 WHERE product_id=(SELECT id FROM products WHERE normalized_name='p-sync')");
+        await Run("DELETE FROM stock_movements WHERE product_id=(SELECT id FROM products WHERE normalized_name='p-sync')");
+        await Run("INSERT INTO web_users(username,normalized_username,display_name,password_hash,role) VALUES('sync.user','sync.user','Sync','SECRET-HASH-VALUE','Utilizator')");
+        await Run("UPDATE web_users SET is_active=0 WHERE normalized_username='sync.user'");
+        await Run("INSERT INTO beneficiaries(name,normalized_name,cui,normalized_cui) VALUES('Sync SRL','sync srl','RO99000001','ro99000001')");
+        await Run("INSERT INTO projects(beneficiary_id,name,normalized_name,created_utc,updated_utc) VALUES((SELECT id FROM beneficiaries WHERE normalized_name='sync srl'),'Proiect sync','proiect sync',@t,@t)", ("@t", stamp));
+        await Run("INSERT INTO project_observations(project_id,name,author,created_utc,updated_utc) VALUES((SELECT id FROM projects WHERE normalized_name='proiect sync'),'Obs sync','ext',@t,@t)", ("@t", stamp));
+        await Run("INSERT INTO project_observation_files(observation_id,relative_path,original_name,content_type,byte_length,sha256,author,uploaded_utc) VALUES((SELECT id FROM project_observations WHERE name='Obs sync'),'x','secret-name.txt','text/plain',1,'aa','ext',@t)", ("@t", stamp));
+        await Run("DELETE FROM project_observation_files WHERE original_name='secret-name.txt'");
+        await Run("UPDATE project_observations SET content='nou' WHERE name='Obs sync'");
+        await Run("DELETE FROM project_observations WHERE name='Obs sync'");
+        await Run("DELETE FROM projects WHERE normalized_name='proiect sync'");
+        await Run("DELETE FROM web_users WHERE normalized_username='sync.user'");
+        await Run("DELETE FROM products WHERE normalized_name='p-sync'");
+    }
+    var recorded = await syncSource.ReadAfterAsync(startId, 1000, default);
+    var summary = string.Join("|", recorded.Select(change => $"{change.EntityType}:{change.Action}"));
+    Check(summary == string.Join("|", new[]
+        {
+            "Produs:Adăugare", "Produs:Editare", "Produs:Editare", "Produs:Editare", "Produs:Editare",
+            "Utilizator:Adăugare", "Utilizator:Editare", "Proiect:Adăugare", "Observatie:Adăugare", "FisierObservatie:Adăugare",
+            "FisierObservatie:Ștergere", "Observatie:Editare", "Observatie:Ștergere", "Proiect:Ștergere", "Utilizator:Ștergere", "Produs:Ștergere"
+        }),
+        "Triggers record every insert, update and delete of products, movements, users, projects, observations and files");
+    var recordedProduct = recorded[0];
+    Check(recorded.Take(5).All(change => change.EntityId == recordedProduct.EntityId) && recorded[4].EntityType == AuditEntities.Product,
+        "A stock movement is reported as a change of its product");
+    var recordedProject = recorded.Single(change => change.EntityType == AuditEntities.Project && change.Action == AuditActions.Create);
+    var recordedObservation = recorded.Single(change => change.EntityType == AuditEntities.ProjectObservation && change.Action == AuditActions.Create);
+    var recordedFile = recorded.Single(change => change.EntityType == AuditEntities.ProjectObservationFile && change.Action == AuditActions.Create);
+    Check(recordedProject.ProjectId == int.Parse(recordedProject.EntityId) && recordedProject.BeneficiaryId is not null &&
+          recordedObservation.ProjectId == recordedProject.ProjectId && recordedObservation.ObservationId == int.Parse(recordedObservation.EntityId) &&
+          recordedFile.ObservationId == recordedObservation.ObservationId,
+        "Events carry the project, observation and beneficiary identifiers that pages filter on");
+    var serializedEvents = System.Text.Json.JsonSerializer.Serialize(recorded);
+    Check(!serializedEvents.Contains("SECRET-HASH-VALUE") && !serializedEvents.Contains("secret-name") && !serializedEvents.Contains("Proiect sync") && !serializedEvents.Contains("sync.user"),
+        "Recorded events never contain passwords, names, texts or file names");
+    Check(recorded.Zip(recorded.Skip(1)).All(pair => pair.First.Id < pair.Second.Id) && recorded.All(change => change.CreatedUtc.Kind == DateTimeKind.Utc),
+        "Events are ordered by identifier and timestamped in UTC");
+
+    await syncSource.PurgeAsync(startId + 5, DateTime.UtcNow.AddMinutes(1), default);
+    var afterPurge = await syncSource.ReadAfterAsync(startId, 1000, default);
+    Check(afterPurge.Count == recorded.Count - 5 && afterPurge[0].Id == recorded[5].Id, "Purging removes only processed events up to the given identifier");
+    await syncSource.PurgeAsync(long.MaxValue, DateTime.UtcNow.AddDays(-1), default);
+    Check((await syncSource.ReadAfterAsync(startId, 1000, default)).Count == afterPurge.Count, "Purging keeps events newer than the retention period");
+
+    var triggerSql = ChangeEventTriggers.MariaTriggerSql(ChangeEventTriggers.Maria.Single(table => table.Table == "project"), "d");
+    Check(triggerSql.Contains("AFTER DELETE ON project FOR EACH ROW") && triggerSql.Contains("OLD.id_project") && triggerSql.Contains("OLD.id_beneficiar") &&
+          triggerSql.Contains("UTC_TIMESTAMP(6)") && !ChangeEventTriggers.Maria.Any(table => MariaSql(table).Contains("password")),
+        "MariaDB triggers use the project table's columns and the server's UTC time and read no secret column");
+    string MariaSql(WatchedTable table) => string.Join(' ', ChangeEventTriggers.Suffixes.Select(suffix => ChangeEventTriggers.MariaTriggerSql(table, suffix)));
+    Check(ChangeEventTriggers.Maria.Count == ChangeEventTriggers.Sqlite.Count && ChangeEventTriggers.Maria.Select(table => table.EntityType).SequenceEqual(ChangeEventTriggers.Sqlite.Select(table => table.EntityType)),
+        "SQLite and MariaDB watch the same entities");
+}
+finally
+{
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    try { Directory.Delete(syncRoot, true); } catch (IOException) { }
+}
+
+// Relay: cursor, grace period, ledger, failures (with an in-memory source and a manual clock).
+{
+    var clock = new ManualTimeProvider();
+    var source = new FakeChangeSource();
+    var relayFeed = new InProcessChangeFeed(null, clock);
+    var seen = new List<ChangeEvent>();
+    using var relaySubscription = relayFeed.Subscribe(change => { lock (seen) seen.Add(change); return Task.CompletedTask; });
+    source.Add("Produs", AuditActions.Edit, "1");
+    var relay = new ChangeEventRelay(source, relayFeed, NullLogger<ChangeEventRelay>.Instance,
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Sync:GraceMilliseconds"] = "1000" }).Build(), clock);
+    Check(await relay.PollOnceAsync(default) == 0 && relay.Cursor == 1, "The relay starts after the newest stored event instead of replaying history");
+    source.Add("Produs", AuditActions.Edit, "2");
+    source.Add("Utilizator", AuditActions.Create, "7");
+    Check(await relay.PollOnceAsync(default) == 0 && seen.Count == 0, "A new event is held back during the grace period");
+    clock.Advance(TimeSpan.FromMilliseconds(1100));
+    Check(await relay.PollOnceAsync(default) == 2 && seen.Count == 2 && seen[0].EntityId == "2" && seen[1].EntityType == "Utilizator" &&
+          seen.All(change => change.Origin == Guid.Empty) && relay.Cursor == 3,
+        "After the grace period each event is published once, in order, without an origin");
+    clock.Advance(TimeSpan.FromSeconds(5));
+    Check(await relay.PollOnceAsync(default) == 0 && seen.Count == 2, "Polling again never publishes an event twice");
+
+    var ownOrigin = Guid.NewGuid();
+    relayFeed.Publish(new("Proiect", AuditActions.Edit, "5", ownOrigin, clock.GetUtcNow().UtcDateTime, ProjectId: 5));
+    source.Add("Proiect", AuditActions.Edit, "5", projectId: 5);
+    source.Add("Proiect", AuditActions.Edit, "5", projectId: 5);
+    seen.Clear();
+    await relay.PollOnceAsync(default);
+    clock.Advance(TimeSpan.FromMilliseconds(1100));
+    await relay.PollOnceAsync(default);
+    Check(seen.Count == 1 && seen[0].Origin == Guid.Empty, "The trigger's copy of a change already published by a session is dropped once; a second change is still announced");
+
+    relayFeed.Publish(new("Proiect", AuditActions.Delete, "9", ownOrigin, clock.GetUtcNow().UtcDateTime, ProjectId: 9));
+    clock.Advance(TimeSpan.FromSeconds(40));
+    Check(!relayFeed.TryConsumeLocal("Proiect", AuditActions.Delete, "9"), "A locally published change is forgotten after the ledger lifetime");
+
+    source.FailNextRead = true;
+    var cursorBeforeFailure = relay.Cursor;
+    source.Add("Produs", AuditActions.Edit, "11");
+    try { await relay.PollOnceAsync(default); throw new Exception("Failing source did not throw"); }
+    catch (InvalidOperationException) { }
+    seen.Clear();
+    clock.Advance(TimeSpan.FromMilliseconds(1100));
+    await relay.PollOnceAsync(default);
+    clock.Advance(TimeSpan.FromMilliseconds(1100));
+    await relay.PollOnceAsync(default);
+    Check(relay.Cursor > cursorBeforeFailure && seen.Any(change => change.EntityId == "11"), "After a failed read the relay resumes from its cursor and loses nothing");
+}
+
+// Live refresh: bursts, own origin, busy forms, fallback.
+{
+    var liveFeed = new InProcessChangeFeed();
+    var own = Guid.NewGuid();
+    var refreshes = 0; var renders = 0; var busy = false;
+    using var live = new LiveRefresh(liveFeed, own, change => change.EntityType == "Produs" && change.EntityId == "1",
+        () => { Interlocked.Increment(ref refreshes); return Task.CompletedTask; }, () => busy,
+        () => { Interlocked.Increment(ref renders); return Task.CompletedTask; }, TimeSpan.FromMilliseconds(60));
+    for (var i = 0; i < 3; i++) liveFeed.Publish(new("Produs", AuditActions.Edit, "1", Guid.Empty, DateTime.UtcNow));
+    liveFeed.Publish(new("Produs", AuditActions.Edit, "2", Guid.Empty, DateTime.UtcNow));
+    liveFeed.Publish(new("Produs", AuditActions.Edit, "1", own, DateTime.UtcNow));
+    await Task.Delay(400);
+    Check(refreshes == 1 && !live.HasPendingChange, "A burst of relevant events refreshes once; other entities and the session's own changes are ignored");
+
+    busy = true;
+    liveFeed.Publish(new("Produs", AuditActions.Edit, "1", Guid.Empty, DateTime.UtcNow));
+    await Task.Delay(300);
+    Check(refreshes == 1 && live.HasPendingChange && renders >= 1, "While a form is open nothing is refreshed and the page is asked to show a notice");
+    busy = false;
+    await live.ReloadPendingAsync();
+    Check(refreshes == 2 && !live.HasPendingChange, "The user's reload applies the pending change and clears the notice");
+}
+{
+    var fallbackRefreshes = 0; var fallbackBusy = true;
+    using var fallback = new LiveRefresh(new InProcessChangeFeed(), Guid.NewGuid(), _ => true,
+        () => { Interlocked.Increment(ref fallbackRefreshes); return Task.CompletedTask; }, () => fallbackBusy,
+        () => Task.CompletedTask, fallbackInterval: TimeSpan.FromMilliseconds(80));
+    await Task.Delay(300);
+    Check(fallbackRefreshes == 0, "The periodic fallback does not refresh while a form is open");
+    fallbackBusy = false;
+    await Task.Delay(400);
+    Check(fallbackRefreshes >= 1, "The periodic fallback refreshes when the page is idle even if no notification arrived");
+}
+
+
+sealed class ManualTimeProvider : TimeProvider
+{
+    private DateTimeOffset now = new(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);
+    public override DateTimeOffset GetUtcNow() => now;
+    public void Advance(TimeSpan span) => now += span;
+}
+
+sealed class FakeChangeSource : IChangeEventSource
+{
+    private readonly List<StoredChange> events = [];
+    public bool FailNextRead { get; set; }
+    public void Add(string type, string action, string id, int? projectId = null) =>
+        events.Add(new(events.Count + 1, type, action, id, projectId, null, null, DateTime.UtcNow));
+    public Task EnsureAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task<long> LatestIdAsync(CancellationToken cancellationToken) => Task.FromResult<long>(events.Count);
+    public Task<IReadOnlyList<StoredChange>> ReadAfterAsync(long afterId, int limit, CancellationToken cancellationToken)
+    {
+        if (FailNextRead) { FailNextRead = false; throw new InvalidOperationException("Source unavailable"); }
+        return Task.FromResult<IReadOnlyList<StoredChange>>(events.Where(change => change.Id > afterId).Take(limit).ToList());
+    }
+    public Task PurgeAsync(long throughId, DateTime olderThanUtc, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 sealed class TestAccessControl(bool administrator, string username) : IAccessControl

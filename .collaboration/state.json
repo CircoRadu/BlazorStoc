@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 7 - Confirmarea deconectarii",
-    "startedAtUtc":  "2026-09-25T06:35:58.5473936Z",
-    "completedAtUtc":  "2026-09-25T06:37:30.3833204Z",
-    "lastSummary":  "Task 7 finalizat: Deconectare din bara de sus deschide un popup de confirmare (dialog nativ modal, accesibil) in locul paginii de deconectare, cu butonul rosu Deconectare (POST /Account/Logout cu token antiforgery) si butonul verde Anuleaza deconectarea (focus initial, Escape = anulare). Deconectarea se executa numai dupa confirmare; anularea inchide doar popup-ul si pastreaza pagina si starea ei. GET /Account/Logout redirectioneaza la /. Jurnalizarea sesiunilor era deja finalizata. TODO.md: Task 7 mutat in arhiva, ordinea etapelor actualizata. Autentificarea si regulile de acces nu au fost modificate.",
-    "lastCommitSubject":  "claude: finish Task 7 (sign-out confirmation popup)",
+    "nextAgent":  "codex",
+    "currentTask":  "Task 8 - Sincronizare intre utilizatori",
+    "startedAtUtc":  "2026-09-25T06:41:11.7059550Z",
+    "completedAtUtc":  "2026-09-25T06:51:58.4663457Z",
+    "lastSummary":  "Task 8 finalizat: sincronizare intre utilizatori. Triggere AFTER INSERT/UPDATE/DELETE scriu doar identificatori in change_events pentru produse, miscari de stoc (raportate ca editare a produsului), utilizatori, proiecte, observatii si fisiere (SQLite: schema 7, la finalul initializarii; MariaDB: create de aplicatie la prima folosire si reverificate, netestate pe server real). ChangeEventRelay (BackgroundService) citeste la 1 s, porneste dupa ultimul eveniment, retine 1,5 s, publica o singura data in ordine cu cursor care avanseaza numai inainte, elimina copia trigger a modificarilor deja publicate de sesiune (ILocalChangeLedger) si sterge evenimentele procesate mai vechi de 24 h. Hub SignalR autorizat /hubs/changes cu mesajul changed. LiveRefresh + LiveChangeNotice in catalog, pagina produsului, lista si pagina utilizatorului: reimprospatare numai a datelor afectate, notificare cu Reincarca datele cand un formular este deschis, rezerva periodica. Verificarea versiunii ramane. TODO.md: Task 8 mutat in arhiva; utilizatorul a confirmat ca deconectarea din Task 7 functioneaza. Autentificarea si regulile de acces nu au fost modificate.",
+    "lastCommitSubject":  "claude: finish Task 8 (database change events, relay, SignalR hub, live refresh)",
     "claudeStatus":  "active"
 }

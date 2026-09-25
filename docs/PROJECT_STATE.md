@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Stare ciclu: **Taskurile 0–7 finalizate; pregătit pentru predarea către Codex după commitul curent**
+Stare ciclu: **Taskurile 0–8 finalizate; pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -11,6 +11,17 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs”, stocul modificabil exclusiv prin mișcări de intrare/ieșire (pagina `/produse/{id}/miscari`) și istoricul mișcărilor.
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Ultimele modificări funcționale (ciclul Claude — Task 8)
+
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 8”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`. Utilizatorul a confirmat că butonul de deconectare din Task 7 funcționează.
+
+- **Trigger-e și tabel** (`Services/ChangeEvents.cs`): `change_events` + trigger-e `AFTER INSERT/UPDATE/DELETE` generate din `ChangeEventTriggers` pentru produse, mișcări (raportate ca editare a produsului), utilizatori, proiecte, observații și fișiere. SQLite: create la finalul `SqliteLocalStore.InitializeAsync` (schema versiunea 7). MariaDB: `MariaChangeEventSource.EnsureAsync` creează tabelul și trigger-ele lipsă (`produs`, `io`, `web_user`, `project`, `project_observation`, `project_observation_file`), reverificat la 5 minute; **netestat pe un server MariaDB real**, contul aplicației are nevoie de CREATE/TRIGGER.
+- **Relay** (`ChangeEventRelay`, `BackgroundService`): polling la 1 s (`Sync:PollMilliseconds`), grație 1,5 s (`Sync:GraceMilliseconds`) numărată de la prima citire a evenimentului, cursor numai înainte, pornire după ultimul eveniment, retenție 24 h, avertisment jurnalizat cel mult o dată pe minut la erori. `InProcessChangeFeed` implementează `ILocalChangeLedger`: o modificare publicată direct de o sesiune (cu origine) consumă copia ei din trigger (30 s), deci nu apare notificare la propria sesiune. Modificările în cascadă sau externe se anunță fără origine.
+- **SignalR**: `ChangesHub` (`[Authorize]`, `/hubs/changes`) și `SignalRChangeBroadcaster`; mesajul `changed` are numai identificatori. Paginile Blazor rulează în același proces și se abonează direct la feed.
+- **Pagini**: `LiveRefresh` (debounce 300 ms, notificare când un formular este deschis, rezervă periodică 60 s) + `LiveChangeNotice.razor` în `Home` (catalog), `ProductMovements`, `Users` (păstrează sincronizarea de 15 s) și `UserDetail`; paginile beneficiar/proiect/observație folosesc deja feed-ul (Task 2) și primesc acum și evenimentele externe.
+- **Ce nu s-a schimbat**: verificarea versiunii la salvare, autentificarea și regulile de acces; schema nu are fișier SQL separat (trigger-ele sunt gestionate de aplicație).
+- **Validare**: build Release 0 avertismente; `BlazorStoc.Checks` 361 (22 noi, inclusiv un bug prins de teste: stilurile `DateTimeStyles` ale cititorului SQLite și marcarea sosirii tuturor evenimentelor unui lot); browser pe 5082 cu două tab-uri, modificări SQL externe, dialog deschis, client SignalR real. Datele de test au fost readuse (mișcarea arhivată, numele produsului readus). Neverificat: MariaDB real, două calculatoare.
 
 ## Ultimele modificări funcționale (ciclul Claude — Task 7)
 
@@ -161,7 +172,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Taskurile 0–7 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este **Task 8** (sincronizare între utilizatori), apoi **Task 9** (blocarea temporară a editării unui produs).
+Următorul agent este **Codex**. Taskurile 0–8 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul (și ultimul activ) element este **Task 9** (blocarea temporară a editării unui produs), care folosește canalul de notificare din Task 8.
 
 ## Fișiere de orientare
 

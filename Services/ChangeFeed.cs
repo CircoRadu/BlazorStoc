@@ -18,16 +18,49 @@ public interface IChangeFeed
     IDisposable Subscribe(Func<ChangeEvent, Task> handler);
 }
 
-public sealed class InProcessChangeFeed(ILogger<InProcessChangeFeed>? logger = null) : IChangeFeed
+// Remembers the changes published directly by sessions (they carry an origin) so the copy of the same change that a
+// database trigger records a moment later is not announced a second time (Task 8).
+public interface ILocalChangeLedger
 {
+    // True (and the entry is used up) when a matching local change was published recently.
+    bool TryConsumeLocal(string entityType, string action, string entityId);
+}
+
+public sealed class InProcessChangeFeed(ILogger<InProcessChangeFeed>? logger = null, TimeProvider? timeProvider = null) : IChangeFeed, ILocalChangeLedger
+{
+    private static readonly TimeSpan LedgerLifetime = TimeSpan.FromSeconds(30);
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private readonly object gate = new();
     private List<Func<ChangeEvent, Task>> handlers = [];
+    private readonly List<(string Type, string Action, string Id, DateTimeOffset At)> ledger = [];
 
     public void Publish(ChangeEvent change)
     {
         Func<ChangeEvent, Task>[] snapshot;
-        lock (gate) snapshot = [.. handlers];
+        lock (gate)
+        {
+            snapshot = [.. handlers];
+            if (change.Origin != Guid.Empty)
+            {
+                var now = clock.GetUtcNow();
+                ledger.RemoveAll(entry => now - entry.At > LedgerLifetime);
+                ledger.Add((change.EntityType, change.Action, change.EntityId, now));
+            }
+        }
         foreach (var handler in snapshot) _ = DeliverAsync(handler, change);
+    }
+
+    public bool TryConsumeLocal(string entityType, string action, string entityId)
+    {
+        lock (gate)
+        {
+            var now = clock.GetUtcNow();
+            ledger.RemoveAll(entry => now - entry.At > LedgerLifetime);
+            var index = ledger.FindIndex(entry => entry.Type == entityType && entry.Action == action && entry.Id == entityId);
+            if (index < 0) return false;
+            ledger.RemoveAt(index);
+            return true;
+        }
     }
 
     public IDisposable Subscribe(Func<ChangeEvent, Task> handler)

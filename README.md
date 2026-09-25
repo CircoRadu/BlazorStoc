@@ -121,3 +121,9 @@ Rulează verificările de căutare și CRUD cu `dotnet run --project tests/Blazo
 Contul tehnic pentru jurnalul produselor rămâne asociat prin `Database__ApplicationUserId` unei identități din tabela legacy `user`. Conturile de autentificare noi sunt exclusiv în `web_user`. Scrierile sunt refuzate dacă baza configurată nu se numește exact `BlazorStoc` sau dacă lipsește identitatea tehnică pentru jurnalul produselor. Arhiva 0.1 de la rădăcina proiectului este istorică; folosește sursele actuale din acest director.
 
 Lucrul pentru NAS/QNAP, Docker și publicarea în containere rămân explicit în afara fazei curente.
+
+## Sincronizare între utilizatori
+
+- Modificările produselor, mișcărilor de stoc, utilizatorilor, proiectelor, observațiilor și fișierelor sunt înregistrate de trigger-e ale bazei de date în tabelul `change_events` (numai identificatori), inclusiv cele făcute de aplicații externe. Un serviciu de fundal le publică la aproximativ o secundă către paginile deschise și către clienții SignalR conectați la `/hubs/changes` (mesajul `changed`).
+- Paginile afectate se reîmprospătează singure; dacă un formular sau un dialog este deschis, apare o notificare cu butonul „Reîncarcă datele”, iar verificarea versiunii la salvare rămâne protecția finală. Sincronizarea periodică (60 s, 15 s la lista de utilizatori) rămâne rezervă.
+- Configurare opțională: `Sync:PollMilliseconds` (implicit 1000) și `Sync:GraceMilliseconds` (implicit 1500). În MariaDB, contul aplicației are nevoie de privilegiile CREATE și TRIGGER pentru a crea tabelul și trigger-ele la prima folosire.

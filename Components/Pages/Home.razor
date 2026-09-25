@@ -8,6 +8,8 @@
 @inject NavigationManager Navigation
 @inject ILogger<Home> Logger
 @inject IJSRuntime JS
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
 @implements IAsyncDisposable
 
 <PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
@@ -15,6 +17,7 @@
 @if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Explorezi o colecție demonstrativă.</strong> Produsele de mai jos sunt exemple, fără legătură cu stocul real.</div></div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+<LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
 @if (editing) { <ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" /> }
 <section class="metrics" aria-label="Rezumat inventar">
     <article><span>Produse în selecție</span><strong>@(loaded ? ScopedProducts.Count.ToString("N0") : "—")</strong><small>@SelectionDescription</small><i>▦</i></article>
@@ -101,7 +104,31 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     }
     private int Pages => Math.Max(1, (Filtered.Count + PageSize - 1) / PageSize);
     private IEnumerable<Product> Paged => Filtered.Skip((page - 1) * PageSize).Take(PageSize);
-    protected override Task OnInitializedAsync() => LoadAsync();
+    // Other sessions and external applications: refresh the catalog in place (Task 8).
+    private LiveRefresh? live;
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Product,
+            () => InvokeAsync(RefreshSilentlyAsync), () => editing || deleting is not null || pendingLeaveUrl is not null,
+            () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
+    }
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
+    private async Task RefreshSilentlyAsync()
+    {
+        if (loading || !loaded) return;
+        try
+        {
+            var productsTask = Repository.GetProductsAsync(lifetime.Token);
+            var groupsTask = Repository.GetGroupsAsync(lifetime.Token);
+            await Task.WhenAll(productsTask, groupsTask);
+            products = await productsTask; groups = await groupsTask;
+            lastLoaded = DateTime.UtcNow; page = Math.Min(page, Pages);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogWarning("Catalog refresh failed ({ErrorType}).", ex.GetType().Name); }
+        StateHasChanged();
+    }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         var wanted = editing && editingProduct is null;
@@ -228,6 +255,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private static string StockLabel(int quantity) => quantity < 0 ? "Stoc negativ" : quantity == 0 ? "Fără stoc" : "În stoc";
     public async ValueTask DisposeAsync()
     {
+        live?.Dispose();
         lifetime.Cancel(); lifetime.Dispose();
         if (guardActive)
         {

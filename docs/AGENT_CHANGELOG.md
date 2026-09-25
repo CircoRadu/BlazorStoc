@@ -540,3 +540,31 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal: 0 avertismente, 0 erori; BlazorStoc.Checks: 339 verificari trecute. Browser 5082 (sesiune autentificata de utilizator): popup cu butoanele rosu si verde, Anuleaza pastreaza editorul deschis cu textul tastat, formularul are POST /Account/Logout si token antiforgery. Neverificat manual: confirmarea efectiva a deconectarii, Escape, tastatura.
 - **Commit:** `claude: finish Task 7 (sign-out confirmation popup)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T06:51:58.4663457Z â€” claude
+
+- **Task:** Task 8 - Sincronizare intre utilizatori
+- **Rezumat:** Task 8 finalizat: sincronizare intre utilizatori. Triggere AFTER INSERT/UPDATE/DELETE scriu doar identificatori in change_events pentru produse, miscari de stoc (raportate ca editare a produsului), utilizatori, proiecte, observatii si fisiere (SQLite: schema 7, la finalul initializarii; MariaDB: create de aplicatie la prima folosire si reverificate, netestate pe server real). ChangeEventRelay (BackgroundService) citeste la 1 s, porneste dupa ultimul eveniment, retine 1,5 s, publica o singura data in ordine cu cursor care avanseaza numai inainte, elimina copia trigger a modificarilor deja publicate de sesiune (ILocalChangeLedger) si sterge evenimentele procesate mai vechi de 24 h. Hub SignalR autorizat /hubs/changes cu mesajul changed. LiveRefresh + LiveChangeNotice in catalog, pagina produsului, lista si pagina utilizatorului: reimprospatare numai a datelor afectate, notificare cu Reincarca datele cand un formular este deschis, rezerva periodica. Verificarea versiunii ramane. TODO.md: Task 8 mutat in arhiva; utilizatorul a confirmat ca deconectarea din Task 7 functioneaza. Autentificarea si regulile de acces nu au fost modificate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/Home.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Pages/UserDetail.razor`
+  - `Components/Pages/Users.razor`
+  - `Components/Shared/LiveChangeNotice.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Program.cs`
+  - `README.md`
+  - `Services/ChangeEvents.cs`
+  - `Services/ChangeFeed.cs`
+  - `Services/ChangesHub.cs`
+  - `Services/LiveRefresh.cs`
+  - `Services/SqliteLocalStore.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 361 verificari trecute (22 noi; testele au prins doua defecte corectate: DateTimeStyles la citirea SQLite si marcarea sosirii tuturor evenimentelor unui lot). Browser 5082, doua tab-uri: modificare SQL externa reimprospata pagina produsului; dialog deschis ramane neschimbat cu notificare si Reincarca datele; catalog in al doilea tab a urmarit stocul 13 apoi 12; negotiate hub 200 autentificat si 302 anonim; client SignalR real a primit mesajul changed. Date de test readuse. Neverificat: MariaDB real, doua calculatoare.
+- **Commit:** `claude: finish Task 8 (database change events, relay, SignalR hub, live refresh)`
+- **Predat cÄƒtre:** codex

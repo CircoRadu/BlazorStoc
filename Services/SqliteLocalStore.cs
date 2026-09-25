@@ -53,13 +53,15 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
                 "CREATE INDEX IF NOT EXISTS ix_stock_movements_product ON stock_movements(product_id,movement_date,id)",
                 cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, """
-                INSERT INTO app_metadata(key,value) VALUES('schema_version','6')
+                INSERT INTO app_metadata(key,value) VALUES('schema_version','7')
                 ON CONFLICT(key) DO UPDATE SET value=excluded.value;
                 """, cancellationToken).ConfigureAwait(false);
             await SeedIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
             await ImportLegacyAuditIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
             await ReconcileLegacyProductStateAsync(connection, cancellationToken).ConfigureAwait(false);
             await CreateStockBaselineMovementsAsync(connection, cancellationToken).ConfigureAwait(false);
+            // Created last, so the one-time seeding and migrations above do not produce change events (Task 8).
+            await ExecuteAsync(connection, null, ChangeEventTriggers.SqliteSchema(), cancellationToken).ConfigureAwait(false);
             initialized = true;
         }
         finally { initializationGate.Release(); }

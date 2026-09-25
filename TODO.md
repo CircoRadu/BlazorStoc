@@ -13,30 +13,10 @@
 
 Interacțiunile comune, modelele de date și operațiile sunt stabilizate (Taskurile 0–7 finalizate). Sincronizarea în timp real se adaugă acum, după stabilizarea fluxurilor de modificare.
 
-1. **Colaborare în timp real:** Taskurile 0–7 și mecanismul collapse finalizate → Task 8 → Task 9.
+1. **Colaborare în timp real:** Taskurile 0–8 și mecanismul collapse finalizate → Task 9 (singurul task rămas activ).
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
-
-## Task 8 — Sincronizare între utilizatori
-
-Se implementează după stabilizarea operațiilor și contractelor de date din Taskurile 1–7. Furnizează canalul de notificare folosit ulterior de mecanismul de lock din Task 9. Contractul de evenimente pentru proiecte, observații și fișiere există deja (`IChangeFeed` și `ChangeEvent`, Task 2, publicat în proces după commit); Task 8 adaugă sursele externe (trigger-e) și transportul SignalR către același feed, iar paginile beneficiarului, proiectului și observației se abonează deja și se reîmprospătează fără a înlocui formularele deschise.
-
-- [ ] Adaugă un mecanism de înregistrare a modificărilor din baza de date pentru produse, utilizatori, proiecte, observații și fișierele asociate.
-- [ ] Folosește trigger-ele bazei de date numai pentru a scrie evenimente într-un tabel dedicat, astfel încât să fie detectate și modificările făcute de aplicații externe.
-- [ ] Adaugă un serviciu asincron care citește evenimentele noi și le publică prin SignalR către sesiunile conectate.
-- [ ] Reîncarcă în browser numai datele afectate de eveniment.
-- [ ] Păstrează sincronizarea periodică drept mecanism de rezervă dacă o notificare este pierdută.
-- [ ] Păstrează verificarea versiunii înregistrării pentru prevenirea suprascrierilor concurente.
-- [ ] Nu întrerupe un formular sau un dialog deschis; afișează o notificare că datele s-au modificat și permite reîncărcarea controlată.
-- [ ] Testează sincronizarea cu doi utilizatori autentificați, pe două calculatoare sau în două sesiuni independente.
-
-### Criterii de acceptare
-
-- O modificare salvată de utilizatorul A apare automat în pagina utilizatorului B.
-- Modificările făcute printr-o aplicație externă sunt detectate prin evenimentele înregistrate de trigger.
-- Evenimentele sunt procesate o singură dată sau idempotent și nu expun parole ori alte date sensibile.
-- O întrerupere temporară SignalR este recuperată prin sincronizarea periodică.
 
 ## Task 9 — Blocarea temporară a editării unui produs
 
@@ -72,6 +52,21 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 
 # Taskuri finalizate
 
+## Finalizat — Task 8: Sincronizare între utilizatori
+
+Implementat la 25 septembrie 2026 de Claude. `Services/ChangeEvents.cs` (trigger-e, surse SQLite/MariaDB, `ChangeEventRelay`), `Services/ChangeFeed.cs` (`ILocalChangeLedger`), `Services/LiveRefresh.cs`, `Services/ChangesHub.cs`, `Components/Shared/LiveChangeNotice.razor`, `Program.cs`, paginile `Home`, `ProductMovements`, `Users`, `UserDetail`; paginile beneficiarului, proiectului și observației (Task 2) folosesc același feed.
+
+- [x] Mecanism de înregistrare în baza de date: tabelul `change_events` (identificator, tip, operație, identificatori de entitate/proiect/observație/beneficiar, moment UTC) și trigger-e `AFTER INSERT/UPDATE/DELETE` pentru produse, utilizatori, proiecte, observații și fișierele lor. Mișcările de stoc sunt raportate drept modificare a produsului lor, deci și pagina produsului se reîmprospătează. SQLite: create la inițializarea schemei locale (versiunea 7), după migrări și seed, fără evenimente de pornire. MariaDB (`io`, `produs`, `web_user`, `project*`): create de aplicație la prima folosire și reverificate la 5 minute (tabelele unor module sunt create târziu), cu `CREATE TRIGGER` numai dacă lipsesc.
+- [x] Trigger-ele scriu numai identificatori într-un tabel dedicat; detectează și modificările aplicațiilor externe. Nu se stochează denumiri, texte, nume de fișiere sau parole (verificat prin test).
+- [x] Serviciu asincron `ChangeEventRelay`: citește la 1 s evenimentele noi, pornește de la ultimul eveniment existent (fără reluarea istoricului), reține fiecare eveniment 1,5 s (perioadă de grație), îl publică o singură dată în ordine (cursor care avansează numai înainte) și șterge evenimentele procesate mai vechi de 24 h. Un eveniment identic deja publicat direct de sesiunea care a făcut modificarea (`ILocalChangeLedger`, 30 s) nu este anunțat a doua oară; erorile de citire sunt jurnalizate și reluate.
+- [x] Publicare prin SignalR: hub autorizat `/hubs/changes` și `SignalRChangeBroadcaster`, care trimite fiecare eveniment (doar identificatori) mesajului `changed`. Paginile aplicației, care rulează în același proces, se abonează direct la feed.
+- [x] Reîncărcare numai a datelor afectate: `LiveRefresh` reîmprospătează catalogul (`Home`), pagina produsului (`ProductMovements`), lista și pagina utilizatorului la evenimentele care le privesc, după 300 ms (rafalele se unesc); evenimentele propriei sesiuni sunt ignorate.
+- [x] Sincronizarea periodică rămâne rezervă: 60 s pentru catalog, produs și utilizator (15 s existent pentru lista de utilizatori și beneficiari).
+- [x] Verificarea versiunii înregistrării rămâne neschimbată, ca protecție finală la salvare.
+- [x] Un formular sau dialog deschis nu este întrerupt: pagina afișează „Datele au fost modificate de altă sesiune sau aplicație… [Reîncarcă datele]”, iar reîncărcarea este la alegerea utilizatorului (sau la sincronizarea periodică, după închiderea formularului).
+- [x] Testat cu două sesiuni: catalogul deschis într-un al doilea tab a arătat stocul 13 și apoi 12 după adăugarea și ștergerea unei mișcări în primul tab; o modificare SQL directă (aplicație externă) a actualizat pagina produsului; un dialog de editare deschis nu s-a schimbat, iar notificarea și „Reîncarcă datele” au funcționat; un client SignalR real conectat la `/hubs/changes` a primit evenimentul extern.
+- Neverificat: MariaDB pe un server real (trigger-ele MariaDB sunt generate și testate ca text, nu executate); două calculatoare diferite; contul MariaDB al aplicației trebuie să aibă privilegiile CREATE și TRIGGER, altfel se jurnalizează un avertisment și rămâne doar sincronizarea periodică.
+
 ## Finalizat — Task 7: Confirmarea deconectării
 
 Implementat la 25 septembrie 2026 de Claude. `Components/Layout/MainLayout.razor` (buton și dialog), `wwwroot/logout-dialog.js`, `Pages/Account/Logout.cshtml.cs`, stiluri `.logout-dialog` în `wwwroot/app.css`. Jurnalizarea sesiunilor era finalizată anterior (vezi „Task 7 (parțial)” mai jos).
@@ -81,7 +76,7 @@ Implementat la 25 septembrie 2026 de Claude. `Components/Layout/MainLayout.razor
 - [x] Deconectarea se execută numai după confirmare: butonul roșu trimite formularul `POST /Account/Logout` cu token antiforgery (`<AntiforgeryToken />`), iar `LogoutModel` încheie sesiunea, înregistrează deconectarea în jurnal și redirecționează la autentificare.
 - [x] La anulare (buton sau Escape) popup-ul se închide și nu se modifică nimic altceva: pagina, formularele deschise și textul introdus rămân (verificat cu un editor deschis și text tastat).
 - [x] Conectările reușite și deconectările confirmate rămân vizibile în jurnalul de activitate (finalizat anterior).
-- Neverificat manual: confirmarea efectivă a deconectării (butonul roșu) — ar fi încheiat sesiunea autentificată a utilizatorului din panoul Browser; formularul are tokenul antiforgery și acțiunea corectă.
+- Confirmarea efectivă a deconectării (butonul roșu) a fost verificată de utilizator: duce la pagina de autentificare.
 
 ## Finalizat — Revenirea în pagina de origine după editarea sau ștergerea produsului
 

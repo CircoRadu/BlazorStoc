@@ -70,7 +70,16 @@ builder.Services.AddScoped<IBeneficiaryRepository>(services => demo
 builder.Services.AddSingleton<IProductImageStore>(services => demo
     ? new SqliteProductImageStore(services.GetRequiredService<SqliteLocalStore>())
     : new FileProductImageStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>()));
-builder.Services.AddSingleton<IChangeFeed, InProcessChangeFeed>();
+builder.Services.AddSingleton<InProcessChangeFeed>();
+builder.Services.AddSingleton<IChangeFeed>(services => services.GetRequiredService<InProcessChangeFeed>());
+builder.Services.AddSingleton<IChangeEventSource>(services => demo
+    ? new SqliteChangeEventSource(services.GetRequiredService<SqliteLocalStore>())
+    : new MariaChangeEventSource(services.GetRequiredService<IConfiguration>()));
+builder.Services.AddHostedService(services => new ChangeEventRelay(services.GetRequiredService<IChangeEventSource>(),
+    services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ILogger<ChangeEventRelay>>(),
+    services.GetRequiredService<IConfiguration>()));
+builder.Services.AddSignalR();
+builder.Services.AddHostedService<SignalRChangeBroadcaster>();
 builder.Services.AddScoped<ChangeOrigin>();
 builder.Services.AddScoped<ListNavigationContext>();
 builder.Services.AddScoped<IProjectFileStore>(services => new ChangeNotifyingProjectFileStore(demo
@@ -111,6 +120,7 @@ app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileS
         ? Results.NotFound()
         : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
 }).RequireAuthorization();
+app.MapHub<ChangesHub>(ChangesHub.Path);
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.Run();

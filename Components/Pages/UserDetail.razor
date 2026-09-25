@@ -5,6 +5,8 @@
 @inject IUserRepository Repository
 @inject IAccessControl Access
 @inject ILogger<UserDetail> Logger
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
 @implements IDisposable
 
 <PageTitle>@(user?.Username ?? "Utilizator") · BlazorStoc</PageTitle>
@@ -29,6 +31,7 @@ else
         <div class="heading-actions"><button class="refresh" disabled="@editing" @onclick="OpenEditorAsync">Editează</button></div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
     @if (editing) { <UserEditor @key="editorKey" Original="user" Saved="UserSavedAsync" Closed="CloseEditorAsync" /> }
 
     <section class="movement-card" aria-labelledby="user-facts-title">
@@ -50,6 +53,14 @@ else
     private string? error, notice;
     private Guid editorKey;
     private readonly CancellationTokenSource lifetime = new();
+
+    // Another session or application changed this account: refresh in place (Task 8).
+    private LiveRefresh? live;
+    protected override void OnInitialized() =>
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.User && change.EntityId == Id.ToString(),
+            () => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); }), () => editing,
+            () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -87,5 +98,5 @@ else
         return Task.CompletedTask;
     }
 
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
 }

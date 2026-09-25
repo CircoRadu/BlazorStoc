@@ -9,6 +9,8 @@
 @inject IProjectRepository Projects
 @inject IAccessControl Access
 @inject NavigationManager Navigation
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
 @inject ILogger<ProductMovements> Logger
 @implements IDisposable
 
@@ -34,6 +36,7 @@ else
     </div>
     @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadPageAsync">Reîncearcă</button></div> }
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
 
     <div class="movement-layout">
         <section class="movement-card movement-product" aria-labelledby="movement-product-title">
@@ -295,6 +298,15 @@ else
 
     private static StockMovementInput NewForm() => new() { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
 
+    // Another session or application changed this product or its movements: refresh in place (Task 8).
+    private LiveRefresh? live;
+    protected override void OnInitialized() =>
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Product && change.EntityId == Id.ToString(),
+            () => InvokeAsync(async () => { if (!loading) { await LoadAsync(); StateHasChanged(); } }),
+            () => editing is not null || deleting is not null || historyFor is not null,
+            () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
+
     protected override async Task OnParametersSetAsync()
     {
         if (product is not null && product.Id != Id) { product = null; filter = null; pageNumber = 1; form = NewForm(); useBeneficiary = useProject = false; }
@@ -503,5 +515,5 @@ else
 
     private void CloseHistory() => historyFor = null;
     private void HistoryKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") CloseHistory(); }
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
 }

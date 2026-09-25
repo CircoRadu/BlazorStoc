@@ -7,6 +7,8 @@
 @inject AppMode Mode
 @inject NavigationManager Navigation
 @inject ILogger<Users> Logger
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
 @implements IDisposable
 
 <PageTitle>Utilizatori · BlazorStoc</PageTitle>
@@ -15,6 +17,7 @@
 @if (!authorized && !loading) { <div class="error-banner" role="alert">Nu ai drepturi de administrator. Conturile cu acces limitat pot consulta numai catalogul.</div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+<LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
 @if (editing) { <UserEditor @key="editorKey" Original="editingUser" Saved="UserSavedAsync" Closed="CloseEditorAsync" /> }
 
 @if (authorized)
@@ -59,11 +62,17 @@
     private Guid editorKey;
     private readonly CancellationTokenSource lifetime = new();
 
+    // Event-driven refresh (Task 8); the 15 s periodic synchronisation below stays as the fallback.
+    private LiveRefresh? live;
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync(true);
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.User,
+            () => InvokeAsync(async () => { await LoadAsync(false); StateHasChanged(); }), () => editing || deleting is not null,
+            () => InvokeAsync(StateHasChanged));
         _ = SynchronizePeriodicallyAsync();
     }
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -141,5 +150,5 @@
         catch (Exception exception) { Logger.LogError("User deletion failed ({ErrorType}).", exception.GetType().Name); deleteError = "Utilizatorul nu a putut fi șters. Actualizează lista și reîncearcă."; }
         finally { deleteBusy = false; }
     }
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
 }
