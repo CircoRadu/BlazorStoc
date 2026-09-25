@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Regula datelor dd.mm.yyyy si corectarea UI",
     "startedAtUtc":  "2026-09-25T11:11:20.0104737Z",
     "completedAtUtc":  "2026-09-25T11:13:42.1314625Z",
