@@ -662,3 +662,17 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod; TODO.md verificat (decizii, subtaskuri 10.1-10.8, criterii, detalii de stabilit); suita neschimbata.
 - **Commit:** `claude: confirm remaining Task 10 details`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T07:46:28.9217677Z â€” claude
+
+- **Task:** Filtrarea pe subcategorie din meniu ramane pe subcategorie
+- **Rezumat:** Defect raportat de utilizator: din Toate produsele, alegerea subcategoriei Protectie maini afisa si Protectie cap. Cauza: linkul de subcategorie schimba adresa, meniul redeschidea programatic categoria parinte, iar collapsible.js trata orice toggle de incredere ca actiune a utilizatorului si naviga la adresa categoriei, pierzand subcategoria. Corectie: navigare numai dupa o apasare reala pe antetul sectiunii (click/Enter/Space in ultima secunda; un click anulat, ca la protectia din Task 6, nu conteaza). Nu s-au modificat autentificarea sau regulile de acces.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `VALIDARE.md`
+  - `wwwroot/collapsible.js`
+- **Validare:** dotnet build Release proiect principal: 0 avertismente, 0 erori (suita BlazorStoc.Checks neschimbata, 388 verificari la ultima rulare; JS fara teste automate). Browser 5082: din /produse linkul Protectie maini ramane pe ?categorie=..&subcategorie=.. cu 1 produs si categoria extinsa (inainte 2 produse); click real pe antetul unei categorii duce la categorie, al doilea click la /produse. Neverificat: Enter/Space pe antet, ecran tactil.
+- **Commit:** `claude: fix subcategory filter dropped by programmatic category expansion`
+- **Predat cÄƒtre:** codex

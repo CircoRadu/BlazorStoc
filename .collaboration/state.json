@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 10 - detalii confirmate de utilizator in TODO",
-    "startedAtUtc":  "2026-09-25T07:41:37.8065933Z",
-    "completedAtUtc":  "2026-09-25T07:42:00.7513236Z",
-    "lastSummary":  "Detaliile confirmate de utilizator pentru Task 10 au fost trecute in TODO.md: rosu pe intregul rand pentru stocul negativ; titlul Inventar si Generat la normal 12; Preluare inventar cu pagina de rezerva; font free normal fara licentiere (implicit familie SIL OFL) si biblioteca PDF MIT implicit. Sectiunea Detalii de confirmat a devenit Detalii de stabilit la implementare (familia de font, versiunea bibliotecii, comportamentul la eroare de jurnalizare). PROJECT_STATE.md actualizat. Nu s-a modificat cod.",
-    "lastCommitSubject":  "claude: confirm remaining Task 10 details",
+    "nextAgent":  "codex",
+    "currentTask":  "Filtrarea pe subcategorie din meniu ramane pe subcategorie",
+    "startedAtUtc":  "2026-09-25T07:45:14.5790739Z",
+    "completedAtUtc":  "2026-09-25T07:46:28.9217677Z",
+    "lastSummary":  "Defect raportat de utilizator: din Toate produsele, alegerea subcategoriei Protectie maini afisa si Protectie cap. Cauza: linkul de subcategorie schimba adresa, meniul redeschidea programatic categoria parinte, iar collapsible.js trata orice toggle de incredere ca actiune a utilizatorului si naviga la adresa categoriei, pierzand subcategoria. Corectie: navigare numai dupa o apasare reala pe antetul sectiunii (click/Enter/Space in ultima secunda; un click anulat, ca la protectia din Task 6, nu conteaza). Nu s-au modificat autentificarea sau regulile de acces.",
+    "lastCommitSubject":  "claude: fix subcategory filter dropped by programmatic category expansion",
     "claudeStatus":  "active"
 }

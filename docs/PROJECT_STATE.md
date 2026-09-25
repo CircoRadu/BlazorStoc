@@ -12,6 +12,10 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Corecție — filtrarea pe subcategorie din meniul produselor
+
+- La cererea utilizatorului: alegerea unei subcategorii din „Toate produsele” afișa toată categoria. Cauza: `collapsible.js` naviga la adresa categoriei la orice `toggle` de încredere, inclusiv la deschiderea programatică a categoriei de către meniu (defect mai vechi, apărut la migrarea la componenta comună de collapse). `collapsible.js` navighează acum numai după o apăsare reală pe antetul secțiunii. Detalii și verificare în `VALIDARE.md`. Nu s-au modificat autentificarea sau regulile de acces.
+
 ## Pregătire TODO — Task 10 (situația de inventar)
 
 - **Decizii primite de la utilizator (25 septembrie 2026) și trecute în TODO**: „Valoare reală” goală; stocul negativ rămâne când „stoc 0” este bifat și se scrie cu roșu; „Generat la” = momentul generării în ora locală, `zz/ll/aaaa oo:mm`; font gratuit, nume de categorie/subcategorie bold 14, restul normal 12; generarea se jurnalizează cu utilizatorul (subtask nou 10.7); meniul „Inventar” are intrările „Generare situație inventar” (`/inventar`) și „Preluare inventar” (pagină de rezervă, funcționalitate ulterioară). Taskul are acum 8 subtaskuri (10.1–10.8) și o listă scurtă de detalii de confirmat la implementare (roșu pe întregul rând sau numai pe valoare, dimensiunea titlului, biblioteca PDF, forma intrării „Preluare inventar”).
