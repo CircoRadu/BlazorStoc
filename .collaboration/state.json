@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Formularul de editare a proiectului fara campul Beneficiar",
     "startedAtUtc":  "2026-09-25T06:05:33.0015622Z",
     "completedAtUtc":  "2026-09-25T06:05:44.9011116Z",
