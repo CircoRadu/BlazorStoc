@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 1: eticheta Beneficiar/Proiect in tabelul de intrari/iesiri",
     "startedAtUtc":  "2026-09-25T11:25:12.6244835Z",
     "completedAtUtc":  "2026-09-25T11:29:40.8609976Z",
