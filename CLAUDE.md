@@ -22,6 +22,7 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
 - Nu genera fișiere SQL de upgrade separate; modificările de schemă sunt gestionate în proiect.
 - După modificări funcționale, actualizează preview-ul local la `http://127.0.0.1:5082/`.
 - Actualizează `TODO.md` când starea taskurilor se schimbă.
+- Când o verificare nu poate fi efectuată sau una din `docs/TESTE_RAMASE.md` este efectuată, actualizează `docs/TESTE_RAMASE.md` (motivul, pașii, rezultatul).
 
 ## Înainte de predare
 

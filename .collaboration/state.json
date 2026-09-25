@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Fisier cu testele ramase de efectuat",
-    "startedAtUtc":  "2026-09-25T07:11:06.5062550Z",
-    "completedAtUtc":  "2026-09-25T07:13:28.8261599Z",
-    "lastSummary":  "La cererea utilizatorului s-a creat docs/TESTE_RAMASE.md: evidenta testelor care mai trebuie efectuate, cu motivul pentru care nu s-au putut face (M1-M6: lipsa serverului MariaDB, a doua statie sau cont, limitele automatizarii browserului, alte browsere, teste care ar modifica sau incheia sesiunea utilizatorului, teste de durata), pasii exacti, rezultatul asteptat si sursa. Grupe: A MariaDB real (schema, format io_data, CUI concurent, miscari, proiecte si fisiere, utilizatori web, trigger-e de sincronizare, blocari), B mai multi utilizatori si calculatoare, C interfata neexersata, D tastatura si accesibilitate, E alte browsere si tactil, F functionare indelungata; plus tabelul testelor efectuate. Referit din PROJECT_STATE.md si VALIDARE.md. Nu s-a modificat cod.",
-    "lastCommitSubject":  "claude: add docs/TESTE_RAMASE.md (pending tests with reasons and steps)",
+    "nextAgent":  "codex",
+    "currentTask":  "Linie despre TESTE_RAMASE.md in CLAUDE.md si AGENTS.md",
+    "startedAtUtc":  "2026-09-25T07:14:11.5786887Z",
+    "completedAtUtc":  "2026-09-25T07:14:31.6556778Z",
+    "lastSummary":  "La cererea utilizatorului, CLAUDE.md si AGENTS.md primesc in sectiunea In timpul lucrului linia: cand o verificare nu poate fi efectuata sau una din docs/TESTE_RAMASE.md este efectuata, se actualizeaza docs/TESTE_RAMASE.md (motivul, pasii, rezultatul). PROJECT_STATE.md notat. Nu s-a modificat cod.",
+    "lastCommitSubject":  "claude: instruct agents to maintain docs/TESTE_RAMASE.md",
     "claudeStatus":  "active"
 }

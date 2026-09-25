@@ -609,3 +609,17 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod; suita BlazorStoc.Checks neschimbata (388 verificari trecute la ultima rulare). Am verificat numele coloanelor din schema (io.id_io, io_data) folosite in interogarile din fisier.
 - **Commit:** `claude: add docs/TESTE_RAMASE.md (pending tests with reasons and steps)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T07:14:31.6556778Z â€” claude
+
+- **Task:** Linie despre TESTE_RAMASE.md in CLAUDE.md si AGENTS.md
+- **Rezumat:** La cererea utilizatorului, CLAUDE.md si AGENTS.md primesc in sectiunea In timpul lucrului linia: cand o verificare nu poate fi efectuata sau una din docs/TESTE_RAMASE.md este efectuata, se actualizeaza docs/TESTE_RAMASE.md (motivul, pasii, rezultatul). PROJECT_STATE.md notat. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+- **Validare:** Nu s-a modificat cod; git diff arata cate o linie adaugata in CLAUDE.md si AGENTS.md, cu terminatorii de linie existenti pastrati.
+- **Commit:** `claude: instruct agents to maintain docs/TESTE_RAMASE.md`
+- **Predat cÄƒtre:** codex

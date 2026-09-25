@@ -14,7 +14,7 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 
 ## Evidența testelor rămase
 
-- La cererea utilizatorului s-a creat `docs/TESTE_RAMASE.md`: fiecare verificare neefectuată până acum (MariaDB pe un server real, mai multe calculatoare și conturi, editoarele neexersate în browser, tastatură/cititor de ecran, alte browsere și dispozitive tactile, funcționare îndelungată) cu motivul (M1–M6), pașii, rezultatul așteptat și sursa. Testele efectuate se mută în secțiunea „Teste efectuate” a aceluiași fișier.
+- La cererea utilizatorului s-a creat `docs/TESTE_RAMASE.md`: fiecare verificare neefectuată până acum (MariaDB pe un server real, mai multe calculatoare și conturi, editoarele neexersate în browser, tastatură/cititor de ecran, alte browsere și dispozitive tactile, funcționare îndelungată) cu motivul (M1–M6), pașii, rezultatul așteptat și sursa. Testele efectuate se mută în secțiunea „Teste efectuate” a aceluiași fișier. `CLAUDE.md` și `AGENTS.md` cer acum explicit actualizarea acestui fișier când o verificare nu poate fi efectuată sau una din listă este efectuată.
 
 ## Ultimele modificări funcționale (ciclul Claude — Task 9)
 
