@@ -48,8 +48,8 @@ else
                 @if (canManage)
                 {
                     <div class="movement-product-actions">
-                        <a class="refresh" href="@($"/produse?edit={product.Id}")">Editează</a>
-                        <a class="danger movement-link-danger" href="@($"/produse?sterge={product.Id}")">Șterge produs</a>
+                        <a class="refresh" href="@ReturnNavigation.EditUrl(product.Id, CurrentPath)">Editează</a>
+                        <a class="danger movement-link-danger" href="@ReturnNavigation.DeleteUrl(product.Id, CurrentPath)">Șterge produs</a>
                     </div>
                 }
             </div>
@@ -275,6 +275,8 @@ else
 
     private string ImageUrl => $"/media/products/{Id}?v={product?.Version}";
     // Back to the catalog scoped to the product's category and subcategory, as the catalog's own links do.
+    // The page the edit/delete actions start from; closing them brings the user back here.
+    private string CurrentPath => new Uri(Navigation.Uri).AbsolutePath;
     private string CatalogUrl => product is null ? "/produse"
         : $"/produse?categorie={Uri.EscapeDataString(product.Category)}&subcategorie={Uri.EscapeDataString(product.Subcategory)}";
     private int TotalPages => pageSize <= 0 ? 1 : Math.Max(1, (pageData.TotalCount + pageSize - 1) / pageSize);

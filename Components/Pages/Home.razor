@@ -60,6 +60,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     [SupplyParameterFromQuery(Name = "subcategorie")] public string? SubcategoryQuery { get; set; }
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
     [SupplyParameterFromQuery(Name = "sterge")] public int? DeleteId { get; set; }
+    [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnQuery { get; set; }
     private IReadOnlyList<Product> products = Array.Empty<Product>();
     private string query = "", category = "", subcategory = "", stock = "";
     private string? error, notice, deleteError;
@@ -174,7 +175,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private Task CloseEditorAsync()
     {
         editing = false; editingProduct = null;
-        if (EditId is not null) { EditId = null; Navigation.NavigateTo(ProductUrl(category, subcategory)); }
+        if (EditId is not null) { EditId = null; Navigation.NavigateTo(OriginOrCatalog(category, subcategory)); }
         return Task.CompletedTask;
     }
     private async Task ProductSavedAsync(Product product)
@@ -182,14 +183,24 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         var created = editingProduct is null;
         products = products.Where(p => p.Id != product.Id).Append(product).OrderBy(p => p.Subcategory).ThenBy(p => p.Name).ThenBy(p => p.Id).ToArray();
         groups = groups.Append(new(product.Category, product.Subcategory)).Distinct().ToArray();
+        var origin = !created && EditId is not null ? ReturnNavigation.Safe(ReturnQuery) : null;
         await CloseEditorAsync(); query = stock = ""; loaded = true; error = null;
         notice = created ? "Produsul a fost adăugat." : "Modificările au fost salvate.";
-        Navigation.NavigateTo(ProductUrl(product.Category, product.Subcategory));
+        // An edit started from the product page returns there after saving; other saves show the catalog.
+        Navigation.NavigateTo(origin ?? ProductUrl(product.Category, product.Subcategory));
     }
     private Task RequestDeleteAsync(Product? product) { deleting = product; deleteError = null; notice = null; return Task.CompletedTask; }
-    private Task CancelDeleteAsync() { deleting = null; deleteError = null; ClearDeleteQuery(); return Task.CompletedTask; }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; ClearDeleteQuery(returnToOrigin: true); return Task.CompletedTask; }
     // The product page (movements) links here with ?sterge=<id> so the existing deletion flow stays in one place.
-    private void ClearDeleteQuery() { if (DeleteId is not null) { DeleteId = null; Navigation.NavigateTo(ProductUrl(category, subcategory)); } }
+    // A cancelled deletion returns to the page it was started from; after a real deletion the product page no longer
+    // exists, so the catalog is shown instead.
+    private void ClearDeleteQuery(bool returnToOrigin = false)
+    {
+        if (DeleteId is null) return;
+        DeleteId = null;
+        Navigation.NavigateTo(returnToOrigin ? OriginOrCatalog(category, subcategory) : ProductUrl(category, subcategory));
+    }
+    private string OriginOrCatalog(string? category, string? subcategory) => ReturnNavigation.Safe(ReturnQuery) ?? ProductUrl(category, subcategory);
     private void OpenMovements(Product product) => Navigation.NavigateTo(StockMovementNavigation.ProductUrl(product.Id));
     private async Task DeleteProductAsync(string reason)
     {

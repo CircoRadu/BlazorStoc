@@ -585,6 +585,15 @@ Check(!ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?categ
       !ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?categorie=Scule", "/produse?categorie=Scule&subcategorie=Găurire") &&
       !ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?categorie=Scule", "/produse?categorie=Altele"),
     "The leave guard detects another category, another subcategory or \"Toate produsele\"");
+Check(ReturnNavigation.Safe("/produse/3/miscari") == "/produse/3/miscari" && ReturnNavigation.Safe(" /produse/3 ") == "/produse/3" &&
+      ReturnNavigation.Safe(null) is null && ReturnNavigation.Safe("") is null && ReturnNavigation.Safe("produse/3") is null &&
+      ReturnNavigation.Safe("//evil.example/x") is null && ReturnNavigation.Safe("https://evil.example/x") is null &&
+      ReturnNavigation.Safe("/\\evil.example") is null && ReturnNavigation.Safe("/a\nb") is null,
+    "The return address accepts only same-site paths");
+Check(ReturnNavigation.EditUrl(3, "/produse/3/miscari") == "/produse?edit=3&inapoi=%2Fproduse%2F3%2Fmiscari" &&
+      ReturnNavigation.DeleteUrl(3, "/produse/3/miscari") == "/produse?sterge=3&inapoi=%2Fproduse%2F3%2Fmiscari" &&
+      ReturnNavigation.EditUrl(3, "https://evil.example") == "/produse?edit=3",
+    "Edit and delete links from the product page carry the page to return to");
 var saveSummary = SaveSummary.Changed(new("Nume", "Alfa", "Alfa"), new("Descriere", "", "Text nou"), new("Cod", " A1 ", "B2"), new("Lung", "x", new string('y', 500)));
 Check(saveSummary.Select(change => change.Field).SequenceEqual(["Descriere", "Cod", "Lung"]) &&
       saveSummary[0].Before == SaveSummary.Empty && saveSummary[1].Before == "A1" && saveSummary[2].After.Length == SaveSummary.MaximumValueLength + 1,

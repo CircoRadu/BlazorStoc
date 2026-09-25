@@ -12,6 +12,11 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Revenirea în pagina de origine după editarea/ștergerea produsului
+
+- La cererea utilizatorului: „Editează” și „Șterge produs” din pagina produsului trimit `&inapoi=<adresa paginii>` către `/produse`; `Home.razor` (`ReturnQuery`, `OriginOrCatalog`, `ClearDeleteQuery(returnToOrigin)`) readuce utilizatorul acolo la închiderea/anularea editării, la salvarea unei editări și la anularea ștergerii. După o ștergere efectivă se merge în catalog (produsul nu mai există). `ReturnNavigation.Safe` (`Services/ReturnNavigation.cs`, testată) acceptă numai căi locale.
+- Validare: build Release 0 avertismente; `BlazorStoc.Checks` 339; browser pe 5082 (editare și ștergere anulate din pagina produsului). Neverificat manual: salvarea și ștergerea efectivă.
+
 ## Ultimele modificări funcționale (ciclul Claude — Task 6)
 
 Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 6”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`.

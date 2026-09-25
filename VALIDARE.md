@@ -223,3 +223,9 @@ Verificat la 25 septembrie 2026.
 - **Suita automată** (`BlazorStoc.Checks`, 337 verificări; 2 noi): `ProductMenuSelection.IsSameSelection` recunoaște aceeași categorie/subcategorie (fără diferențe de majuscule, diacritice codificate, `/` final, parametri străini) și detectează altă categorie, altă subcategorie sau „Toate produsele”.
 - **Browser** (`http://127.0.0.1:5082`, sesiune autentificată de utilizator, modul demonstrativ): cu „Adaugă produs” deschis și „COD-TEST-6” introdus, clic pe o categorie → popup „Părăsești adăugarea produsului?”, meniul rămâne pe „Toate produsele”; „Continuă adăugarea” păstrează formularul cu valoarea introdusă; „Părăsește adăugarea” închide formularul și deschide categoria „Scule electrice”; fără formular deschis, clicul pe o altă categorie navighează direct, fără popup; un clic pe o subcategorie (formular deschis) afișează popup-ul, iar Escape păstrează formularul și selecția curentă. Nu s-a salvat niciun produs.
 - **Neverificat manual**: imaginea selectată păstrată după anulare (editorul nu este re-randat, dar nu s-a încărcat o imagine în test), ecran tactil.
+
+## Revenirea în pagina de origine după editarea/ștergerea produsului (25 septembrie 2026)
+
+- **Suita automată** (`BlazorStoc.Checks`, 339 verificări; 2 noi): `ReturnNavigation.Safe` acceptă numai căi locale (respinge gazdă externă, `//`, `\`, caractere de control, valori goale) și linkurile de editare/ștergere poartă adresa de întoarcere.
+- **Browser** (`http://127.0.0.1:5082`): din `/produse/1/miscari`, „Editează” duce la `/produse?edit=1&inapoi=%2Fproduse%2F1%2Fmiscari`, iar „Anulează” readuce în pagina produsului; „Șterge produs” deschide dialogul de ștergere, iar „Anulează” readuce în pagina produsului. Nu s-a salvat și nu s-a șters nimic.
+- **Neverificat manual**: salvarea confirmată a editării (aceeași cale de navigare, acoperită de cod) și ștergerea efectivă (duce în catalog, nemodificat).
