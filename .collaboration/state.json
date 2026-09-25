@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Regula datelor dd.mm.yyyy si corectarea UI",
-    "startedAtUtc":  "2026-09-25T11:11:20.0104737Z",
-    "completedAtUtc":  "2026-09-25T11:13:42.1314625Z",
-    "lastSummary":  "La cererea utilizatorului: regula de dezvoltare Toate datele calendaristice afisate sunt dd.mm.yyyy, scrisa in CLAUDE.md, AGENTS.md, TODO.md (Observatii), README.md; TODO: taskul PDF inventar foloseste zz.ll.aaaa. UI corectat: StockMovementRules.DisplayDate = dd.MM.yyyy (campul Data miscarii si indiciul zz.ll.aaaa, tabelul, dialogurile, rezumatele de salvare, istoricul miscarilor, jurnalul), LegacyDate (dd-MM-yyyy) pastrat numai pentru coloana io_data din MariaDB (compatibilitate cu aplicatia veche), ProductLocks fara dd-MM-yyyy, texte vechi din jurnal si istoric normalizate la afisare (NormalizeDisplayDates, doar date reale). Intrare finalizata adaugata in TODO.",
-    "lastCommitSubject":  "claude: dates displayed as dd.mm.yyyy (development rule and UI fixes)",
+    "nextAgent":  "codex",
+    "currentTask":  "Task 1: alinierea antetului Data in tabelul de intrari/iesiri",
+    "startedAtUtc":  "2026-09-25T11:14:10.3368841Z",
+    "completedAtUtc":  "2026-09-25T11:15:24.5362140Z",
+    "lastSummary":  "Antetul Data din tabelul de intrari/iesiri era impins la dreapta de stilul comun .sort-header (justify-content:flex-end, gandit pentru coloana numerica din catalog). Regula noua .movement-table .sort-header (flex-start, width auto) in wwwroot/app.css aliniaza antetul cu inceputul datelor; catalogul neafectat. TODO: taskul mutat in arhiva cu data si ora, taskurile ramase renumerotate 1-3. VALIDARE si PROJECT_STATE actualizate.",
+    "lastCommitSubject":  "claude: align the Data header of the movements table",
     "claudeStatus":  "active"
 }

@@ -754,3 +754,18 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 410 PASS (formatul, formatul legacy, normalizarea); browser pe 5082: camp data 25.09.2026 cu indiciu zz.ll.aaaa, tabel 24.09.2026, jurnal fara date in alt format; pagini beneficiar, proiect, utilizatori fara date de afisat. Neverificat: calendarul nativ al browserului (limba browserului).
 - **Commit:** `claude: dates displayed as dd.mm.yyyy (development rule and UI fixes)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T11:15:24.5362140Z â€” claude
+
+- **Task:** Task 1: alinierea antetului Data in tabelul de intrari/iesiri
+- **Rezumat:** Antetul Data din tabelul de intrari/iesiri era impins la dreapta de stilul comun .sort-header (justify-content:flex-end, gandit pentru coloana numerica din catalog). Regula noua .movement-table .sort-header (flex-start, width auto) in wwwroot/app.css aliniaza antetul cu inceputul datelor; catalogul neafectat. TODO: taskul mutat in arhiva cu data si ora, taskurile ramase renumerotate 1-3. VALIDARE si PROJECT_STATE actualizate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+- **Validare:** Build Release 0 avertismente; browser pe 5082: inceputul antetului DATA coincide cu inceputul datelor la desktop, 375 si 768 px, celelalte antete aliniate cu continutul lor, fara depasire orizontala. Suita BlazorStoc.Checks neschimbata (410). Neverificat: tema inchisa (exista o singura tema).
+- **Commit:** `claude: align the Data header of the movements table`
+- **Predat cÄƒtre:** codex

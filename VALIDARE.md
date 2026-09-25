@@ -274,3 +274,8 @@ Verificat la 25 septembrie 2026.
 - `io_data` (MariaDB) păstrează `dd-MM-yyyy` prin `StockMovementRules.LegacyDate`; SQLite păstrează `yyyy-MM-dd`.
 - `BlazorStoc.Checks` 410 verificări; browser pe 5082: câmpul de dată `25.09.2026`, tabelul `24.09.2026`, jurnalul fără date în alt format.
 - Neverificat: calendarul nativ al browserului (limba browserului).
+
+## Antetul „Data” din tabelul de intrări/ieșiri (25.09.2026)
+
+- Butonul de sortare al antetului folosea `.sort-header` cu `justify-content:flex-end`; în tabelul mișcărilor începe acum unde încep datele (`wwwroot/app.css`).
+- Browser pe 5082: începutul antetului coincide cu începutul datelor la desktop, 375 și 768 px; celelalte antete sunt aliniate cu conținutul lor; fără depășire orizontală.

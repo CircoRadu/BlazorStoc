@@ -136,6 +136,8 @@
 .sort-header { display:inline-flex; align-items:center; justify-content:flex-end; gap:6px; width:100%; border:0; background:transparent; color:inherit; padding:0; font:inherit; font-weight:inherit; letter-spacing:inherit; cursor:pointer; }
 .sort-header:hover { color:var(--green); }
 .sort-header span { font-size:13px; line-height:1; }
+/* The movement table's date column is left-aligned: its sort button starts where the dates start. */
+.movement-table .sort-header { justify-content:flex-start; width:auto; }
 
 .danger:hover { background:#8d302a; border-color:#8d302a; }
 .danger:focus-visible { outline-color:#e58983; }
