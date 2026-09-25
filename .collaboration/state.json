@@ -4,7 +4,7 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Task 1: avertizare la parasirea unei pagini de editare cu modificari nesalvate",
     "startedAtUtc":  "2026-09-25T10:50:28.7806442Z",
     "completedAtUtc":  "2026-09-25T11:10:03.2097831Z",
