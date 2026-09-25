@@ -1,0 +1,53 @@
+@using BlazorStoc.Services
+
+@* Administrator releases another user's product edit lock; the reason is mandatory and goes to the activity journal (Task 9). *@
+<div class="delete-overlay" @onkeydown="KeyDownAsync">
+    <section class="delete-dialog force-unlock-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="dialog"
+             aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
+        <h2 id="@TitleId">Deblochezi produsul?</h2>
+        <p class="delete-object"><strong>@ObjectLabel</strong></p>
+        <p id="@DescriptionId">Editarea în curs a utilizatorului <strong>@Owner</strong> nu este oprită, dar produsul devine disponibil pentru alții.
+            La salvare se verifică versiunea produsului, deci nicio modificare nu este suprascrisă în tăcere. Deblocarea se înregistrează în jurnalul de activitate.</p>
+        <ChangeReasonField Id="@ReasonId" @bind-Value="reason" Error="@reasonError" Disabled="@Busy" />
+        @if (Error is not null) { <div class="error-banner delete-error" role="alert">@Error</div> }
+        <div class="editor-actions">
+            <button type="button" class="danger" disabled="@Busy" @onclick="ConfirmAsync">@(Busy ? "Se deblochează…" : "Deblochează")</button>
+            <button type="button" class="primary" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter] public string ObjectLabel { get; set; } = string.Empty;
+    [Parameter] public string Owner { get; set; } = string.Empty;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> Confirmed { get; set; }
+    [Parameter, EditorRequired] public EventCallback Cancelled { get; set; }
+
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private ElementReference dialog;
+    private string reason = string.Empty;
+    private string? reasonError;
+    private string TitleId => $"unlock-title-{instanceId}";
+    private string DescriptionId => $"unlock-description-{instanceId}";
+    private string ReasonId => $"unlock-reason-{instanceId}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await dialog.FocusAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (Exception) { }
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (Busy) return;
+        reasonError = ProductLockRules.ForceReleaseReasonError(reason);
+        if (reasonError is not null) return;
+        await Confirmed.InvokeAsync(ChangeReasonRules.Normalize(reason));
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" && !Busy ? Cancelled.InvokeAsync() : Task.CompletedTask;
+}

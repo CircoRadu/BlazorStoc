@@ -127,3 +127,8 @@ Lucrul pentru NAS/QNAP, Docker și publicarea în containere rămân explicit î
 - Modificările produselor, mișcărilor de stoc, utilizatorilor, proiectelor, observațiilor și fișierelor sunt înregistrate de trigger-e ale bazei de date în tabelul `change_events` (numai identificatori), inclusiv cele făcute de aplicații externe. Un serviciu de fundal le publică la aproximativ o secundă către paginile deschise și către clienții SignalR conectați la `/hubs/changes` (mesajul `changed`).
 - Paginile afectate se reîmprospătează singure; dacă un formular sau un dialog este deschis, apare o notificare cu butonul „Reîncarcă datele”, iar verificarea versiunii la salvare rămâne protecția finală. Sincronizarea periodică (60 s, 15 s la lista de utilizatori) rămâne rezervă.
 - Configurare opțională: `Sync:PollMilliseconds` (implicit 1000) și `Sync:GraceMilliseconds` (implicit 1500). În MariaDB, contul aplicației are nevoie de privilegiile CREATE și TRIGGER pentru a crea tabelul și trigger-ele la prima folosire.
+
+## Blocarea temporară a editării unui produs
+
+- Când începi editarea unui produs existent, produsul este blocat pentru tine (lease de 90 s, reînnoit la 30 s cât timp formularul este deschis). Ceilalți utilizatori îl pot consulta, văd cine îl editează și de când, iar butonul „Editează” este dezactivat; când se eliberează (salvare, anulare, închiderea formularului) sau expiră (browser închis, conexiune pierdută), sunt anunțați automat.
+- Un administrator poate elibera forțat blocarea din pagina produsului, cu motiv obligatoriu; acțiunea „Deblocare” apare în jurnalul de activitate. Verificarea versiunii produsului rămâne protecția finală la salvare.

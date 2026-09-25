@@ -4,11 +4,11 @@
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Task 8 - Sincronizare intre utilizatori",
-    "startedAtUtc":  "2026-09-25T06:41:11.7059550Z",
-    "completedAtUtc":  "2026-09-25T06:51:58.4663457Z",
-    "lastSummary":  "Task 8 finalizat: sincronizare intre utilizatori. Triggere AFTER INSERT/UPDATE/DELETE scriu doar identificatori in change_events pentru produse, miscari de stoc (raportate ca editare a produsului), utilizatori, proiecte, observatii si fisiere (SQLite: schema 7, la finalul initializarii; MariaDB: create de aplicatie la prima folosire si reverificate, netestate pe server real). ChangeEventRelay (BackgroundService) citeste la 1 s, porneste dupa ultimul eveniment, retine 1,5 s, publica o singura data in ordine cu cursor care avanseaza numai inainte, elimina copia trigger a modificarilor deja publicate de sesiune (ILocalChangeLedger) si sterge evenimentele procesate mai vechi de 24 h. Hub SignalR autorizat /hubs/changes cu mesajul changed. LiveRefresh + LiveChangeNotice in catalog, pagina produsului, lista si pagina utilizatorului: reimprospatare numai a datelor afectate, notificare cu Reincarca datele cand un formular este deschis, rezerva periodica. Verificarea versiunii ramane. TODO.md: Task 8 mutat in arhiva; utilizatorul a confirmat ca deconectarea din Task 7 functioneaza. Autentificarea si regulile de acces nu au fost modificate.",
-    "lastCommitSubject":  "claude: finish Task 8 (database change events, relay, SignalR hub, live refresh)",
+    "nextAgent":  "codex",
+    "currentTask":  "Task 9 - Blocarea temporara a editarii unui produs",
+    "startedAtUtc":  "2026-09-25T06:53:43.0371067Z",
+    "completedAtUtc":  "2026-09-25T07:09:31.9811858Z",
+    "lastSummary":  "Task 9 finalizat: blocare lease a editarii produsului. Un rand per produs (product_locks / product_lock) cu utilizator, sesiune, obtinere, reinnoire, expirare 90 s, operatii atomice scurte cu ceasul bazei de date (reinnoire de aceeasi sesiune, preluare de lock expirat, inserare cu cheie primara), fara tranzactii deschise. Home: lock la intrarea in editare, heartbeat la 30 s numai daca browserul raspunde (blazorStocPing), RenewAsync strict care nu reia tacut un lock eliberat, eliberare la salvare/anulare/dispose, mesaj de lock pierdut. Pagina produsului: banner cine editeaza si de cand, Editeaza dezactivat, notificare imediata la eliberare prin feed-ul Task 8 (BlocareProdus) si verificare la 10-15 s pentru expirare; catalog cu insigna. Deblocare fortata doar de administrator cu motiv obligatoriu, dialog ForceUnlockDialog, jurnal Deblocare (nou si in filtru). Scripturile proprii se incarca prin Assets cu amprenta (cache vechi). Verificarea versiunii ramane. TODO.md: Task 9 arhivat, nu mai exista taskuri active. Autentificarea si regulile de acces nu au fost modificate.",
+    "lastCommitSubject":  "claude: finish Task 9 (temporary product edit lock with heartbeat, read-only view and forced unlock)",
     "claudeStatus":  "active"
 }

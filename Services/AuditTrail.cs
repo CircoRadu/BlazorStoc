@@ -23,6 +23,7 @@ public static class AuditActions
     public const string Delete = "Ștergere";
     public const string Login = "Conectare";
     public const string Logout = "Deconectare";
+    public const string Unlock = "Deblocare";
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -209,6 +210,11 @@ public static class AuditRecorder
             operation.Request.Snapshot.EntityType, AuditActions.Delete, operation.Request.Target,
             operation.Request.Details, operation.Request.Motif, operation.Request.Snapshot.OriginalId,
             operation.Id), cancellationToken);
+
+    // An administrator released another user's product edit lock; the reason is mandatory (Task 9).
+    public static Task RecordUnlockAsync(IAuditTrail? trail, IAccessControl? access, string entityId, string target,
+        string details, string motif, CancellationToken cancellationToken) =>
+        RecordEntityAsync(trail, access, AuditEntities.Product, AuditActions.Unlock, entityId, target, details, motif, cancellationToken);
 
     public static Task RecordSessionAsync(IAuditTrail? trail, string actorUsername, string actorRole,
         bool connected, CancellationToken cancellationToken) => trail is null

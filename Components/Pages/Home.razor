@@ -10,6 +10,7 @@
 @inject IJSRuntime JS
 @inject IChangeFeed ChangeFeed
 @inject ChangeOrigin Origin
+@inject IProductLockRepository Locks
 @implements IAsyncDisposable
 
 <PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
@@ -18,6 +19,8 @@
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
+@if (lockMessage is not null) { <div class="info-banner" role="status">@lockMessage</div> }
+@if (lockLost && editing) { <div class="info-banner" role="status">Blocarea editării a fost pierdută (a expirat sau a fost eliberată de un administrator). Poți continua, dar la salvare se verifică versiunea produsului.</div> }
 @if (editing) { <ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" /> }
 <section class="metrics" aria-label="Rezumat inventar">
     <article><span>Produse în selecție</span><strong>@(loaded ? ScopedProducts.Count.ToString("N0") : "—")</strong><small>@SelectionDescription</small><i>▦</i></article>
@@ -29,7 +32,7 @@
 <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după cod produs sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label></div>
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
-else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small></div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small></td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td><button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)">↗</button></td></tr> }</tbody></table></div> }
+else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small></td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td><button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)">↗</button></td></tr> }</tbody></table></div> }
 <footer class="table-footer"><span>@Filtered.Count @(Filtered.Count == 1 ? "rezultat" : "rezultate")</span><div class="pagination"><button disabled="@(page <= 1)" @onclick="() => page--" aria-label="Pagina anterioară">‹</button><span>Pagina @(page) din @Pages</span><button disabled="@(page >= Pages)" @onclick="() => page++" aria-label="Pagina următoare">›</button></div></footer></section>
 <p class="workspace-note"><span class="status-dot"></span> @(Mode.IsDemo ? "Date demonstrative" : "Date din BlazorStoc") <span>·</span> Catalog și gestiune produse</p>
 
@@ -105,10 +108,15 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private int Pages => Math.Max(1, (Filtered.Count + PageSize - 1) / PageSize);
     private IEnumerable<Product> Paged => Filtered.Skip((page - 1) * PageSize).Take(PageSize);
     // Other sessions and external applications: refresh the catalog in place (Task 8).
-    private LiveRefresh? live;
+    private LiveRefresh? live, liveLocks;
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
+        // Product edit locks (Task 9): taken and released by other sessions, refreshed on their events and every 15 s
+        // because a lock also ends silently when its lease expires.
+        liveLocks = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == ChangeEntities.ProductLock,
+            () => InvokeAsync(async () => { await RefreshLocksAsync(); StateHasChanged(); }), () => false,
+            () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(15));
         live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Product,
             () => InvokeAsync(RefreshSilentlyAsync), () => editing || deleting is not null || pendingLeaveUrl is not null,
             () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
@@ -124,6 +132,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
             await Task.WhenAll(productsTask, groupsTask);
             products = await productsTask; groups = await groupsTask;
             lastLoaded = DateTime.UtcNow; page = Math.Min(page, Pages);
+            await RefreshLocksAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Logger.LogWarning("Catalog refresh failed ({ErrorType}).", ex.GetType().Name); }
@@ -193,17 +202,101 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
             groups = await groupsTask;
             canManage = await accessTask;
             loaded = true; lastLoaded = DateTime.UtcNow; ResetPage();
+            await RefreshLocksAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Logger.LogError("Product loading failed ({ErrorType}).", ex.GetType().Name); error = "Catalogul nu a putut fi încărcat. Verifică serverul, accesul contului SQL și configurarea conexiunii."; products = Array.Empty<Product>(); loaded = false; lastLoaded = null; ResetPage(); }
         finally { loading = false; }
     }
-    private Task OpenEditorAsync(Product? product) { editingProduct = product; editorKey = Guid.NewGuid(); editing = true; notice = null; return Task.CompletedTask; }
-    private Task CloseEditorAsync()
+    // ---- Edit lock (Task 9): taken when an existing product enters edit mode, renewed while the form is open,
+    // released on save, cancel, navigation or when the page is disposed; it expires by itself if the browser vanishes.
+    private IReadOnlyDictionary<int, ProductLock> locks = new Dictionary<int, ProductLock>();
+    private string? lockMessage;
+    private bool lockLost;
+    private int lockedProductId;
+    private CancellationTokenSource? heartbeat;
+    private ProductLock? LockOfOthers(int productId) =>
+        locks.TryGetValue(productId, out var held) && held.SessionId != Origin.Id.ToString() ? held : null;
+
+    private async Task RefreshLocksAsync()
+    {
+        try { locks = (await Locks.GetActiveAsync(lifetime.Token)).ToDictionary(item => item.ProductId); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogWarning("Product lock listing failed ({ErrorType}).", ex.GetType().Name); }
+    }
+
+    private async Task<bool> TryLockAsync(Product product)
+    {
+        try
+        {
+            var attempt = await Locks.AcquireAsync(product.Id, Origin.Id.ToString(), lifetime.Token);
+            if (attempt.Acquired) { StartHeartbeat(product.Id); return true; }
+            lockMessage = attempt.Lock is { } held ? ProductLockRules.HeldMessage(held) : "Produsul nu mai există și nu poate fi blocat pentru editare.";
+            await RefreshLocksAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Product lock failed ({ErrorType}).", ex.GetType().Name); error = "Blocarea pentru editare nu a putut fi obținută. Reîncearcă."; }
+        if (EditId is not null) { EditId = null; Navigation.NavigateTo(OriginOrCatalog(category, subcategory)); }
+        return false;
+    }
+
+    private void StartHeartbeat(int productId)
+    {
+        StopHeartbeat();
+        lockedProductId = productId; lockLost = false;
+        var source = heartbeat = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        _ = HeartbeatAsync(productId, source.Token);
+    }
+
+    private async Task HeartbeatAsync(int productId, CancellationToken token)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(ProductLockRules.HeartbeatSeconds));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                try
+                {
+                    // Renew only while the browser answers; a vanished client must not keep the product locked. Any reply,
+                    // even a JavaScript error, proves the browser is alive; silence or a closed connection does not.
+                    try { await JS.InvokeAsync<bool>("blazorStocPing").AsTask().WaitAsync(TimeSpan.FromSeconds(10), token); }
+                    catch (JSException) { }
+                    catch (Exception ex) when (ex is JSDisconnectedException or TimeoutException or InvalidOperationException) { continue; }
+                    var attempt = await Locks.RenewAsync(productId, Origin.Id.ToString(), token);
+                    await InvokeAsync(() => { lockLost = !attempt.Acquired; StateHasChanged(); });
+                    if (!attempt.Acquired) return;
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+                catch (Exception ex) { Logger.LogWarning("Product lock renewal failed ({ErrorType}).", ex.GetType().Name); }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void StopHeartbeat() { heartbeat?.Cancel(); heartbeat?.Dispose(); heartbeat = null; }
+
+    private async Task ReleaseLockAsync()
+    {
+        StopHeartbeat();
+        var productId = lockedProductId;
+        lockedProductId = 0; lockLost = false;
+        if (productId <= 0) return;
+        try { await Locks.ReleaseAsync(productId, Origin.Id.ToString(), CancellationToken.None); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { Logger.LogWarning("Product lock release failed ({ErrorType}).", ex.GetType().Name); }
+    }
+
+    private async Task OpenEditorAsync(Product? product)
+    {
+        lockMessage = null;
+        if (product is not null && !await TryLockAsync(product)) return;
+        editingProduct = product; editorKey = Guid.NewGuid(); editing = true; notice = null;
+    }
+    private async Task CloseEditorAsync()
     {
         editing = false; editingProduct = null;
+        await ReleaseLockAsync();
         if (EditId is not null) { EditId = null; Navigation.NavigateTo(OriginOrCatalog(category, subcategory)); }
-        return Task.CompletedTask;
     }
     private async Task ProductSavedAsync(Product product)
     {
@@ -216,7 +309,23 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         // An edit started from the product page returns there after saving; other saves show the catalog.
         Navigation.NavigateTo(origin ?? ProductUrl(product.Category, product.Subcategory));
     }
-    private Task RequestDeleteAsync(Product? product) { deleting = product; deleteError = null; notice = null; return Task.CompletedTask; }
+    private async Task RequestDeleteAsync(Product? product)
+    {
+        lockMessage = null;
+        if (product is not null)
+        {
+            ProductLock? held = null;
+            try { held = await Locks.GetAsync(product.Id, lifetime.Token); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { Logger.LogWarning("Product lock check failed ({ErrorType}).", ex.GetType().Name); }
+            if (held is not null && held.SessionId != Origin.Id.ToString())
+            {
+                lockMessage = $"Produsul nu poate fi șters cât timp este editat de {held.Owner}. Un administrator poate elibera blocarea din pagina produsului.";
+                if (DeleteId is not null) { DeleteId = null; Navigation.NavigateTo(OriginOrCatalog(category, subcategory)); }
+                return;
+            }
+        }
+        deleting = product; deleteError = null; notice = null;
+    }
     private Task CancelDeleteAsync() { deleting = null; deleteError = null; ClearDeleteQuery(returnToOrigin: true); return Task.CompletedTask; }
     // The product page (movements) links here with ?sterge=<id> so the existing deletion flow stays in one place.
     // A cancelled deletion returns to the page it was started from; after a real deletion the product page no longer
@@ -255,7 +364,13 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private static string StockLabel(int quantity) => quantity < 0 ? "Stoc negativ" : quantity == 0 ? "Fără stoc" : "În stoc";
     public async ValueTask DisposeAsync()
     {
-        live?.Dispose();
+        live?.Dispose(); liveLocks?.Dispose();
+        var lockedId = lockedProductId; StopHeartbeat();
+        if (lockedId > 0)
+        {
+            try { await Locks.ReleaseAsync(lockedId, Origin.Id.ToString(), CancellationToken.None); }
+            catch (Exception) { }
+        }
         lifetime.Cancel(); lifetime.Dispose();
         if (guardActive)
         {

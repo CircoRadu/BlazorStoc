@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Stare ciclu: **Taskurile 0–8 finalizate; pregătit pentru predarea către Codex după commitul curent**
+Stare ciclu: **Taskurile 0–9 finalizate; nu mai există taskuri active; pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -11,6 +11,18 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs”, stocul modificabil exclusiv prin mișcări de intrare/ieșire (pagina `/produse/{id}/miscari`) și istoricul mișcărilor.
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Ultimele modificări funcționale (ciclul Claude — Task 9)
+
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 9”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`. Este ultimul task activ din `TODO.md`.
+
+- **Lock lease** (`Services/ProductLocks.cs`): un rând per produs (`product_locks`, SQLite schema 8; `product_lock`, MariaDB creat la prima folosire) cu utilizator, sesiune (`ChangeOrigin.Id`), obținere, reînnoire, expirare (90 s). Operații atomice și scurte, cu ceasul bazei de date: `AcquireAsync` (reînnoire de aceeași sesiune → preluare de lock expirat → inserare cu cheie primară), `RenewAsync` (heartbeat strict), `ReleaseAsync` (numai proprietarul), `ForceReleaseAsync` (administrator, motiv obligatoriu, jurnal `Deblocare`), `GetAsync`/`GetActiveAsync` (numai lease-uri valide, cu timpul rămas din baza de date). `ChangeNotifyingProductLockRepository` publică evenimentul `BlocareProdus` (feed-ul din Task 8, deci și SignalR) la obținere, eliberare și deblocare forțată.
+- **Editare** (`Home.razor`): lock la intrarea în editare (inclusiv `?edit=`; dacă este ocupat, mesaj și revenire în pagina de origine), heartbeat la 30 s cu `blazorStocPing` (nu reînnoiește dacă browserul nu răspunde), eliberare la salvare/anulare/eliminarea paginii, notificare „Blocarea editării a fost pierdută” fără reluare tăcută. Ștergerea unui produs editat de altcineva este refuzată.
+- **Consultare** (`ProductMovements.razor`): banner „🔒 Produsul este editat de … din …”, „Editează” dezactivat, buton „Deblochează (administrator)” cu `ForceUnlockDialog`, mesaj „eliberat și poate fi editat acum” la eliberare; reîmprospătare la evenimentul produsului și la 10 s (catalogul: insigna „În editare de …”, 15 s).
+- **Jurnal**: acțiune nouă `AuditActions.Unlock` („Deblocare”), în filtrul de operații al jurnalului; `AuditRecorder.RecordUnlockAsync`.
+- **Scripturi**: scripturile proprii se încarcă prin `@Assets[...]` (amprentă), fiindcă un `leave-guard.js` vechi din cache nu avea `blazorStocPing`.
+- **Verificarea versiunii** produsului rămâne protecția finală. Autentificarea și regulile de acces nu au fost modificate.
+- **Validare**: build Release 0 avertismente; `BlazorStoc.Checks` 388 (27 noi); browser pe 5082 cu două sesiuni (banner, eliberare live, deblocare forțată cu jurnal, heartbeat, pierdere fără reluare, expirare după închiderea tab-ului). Neverificat: MariaDB real, un al doilea cont autentificat separat.
 
 ## Ultimele modificări funcționale (ciclul Claude — Task 8)
 
@@ -172,7 +184,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Taskurile 0–8 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul (și ultimul activ) element este **Task 9** (blocarea temporară a editării unui produs), care folosește canalul de notificare din Task 8.
+Următorul agent este **Codex**. Taskurile 0–9 sunt complete; `TODO.md` nu mai are taskuri active. Următorul pas îl stabilește utilizatorul (taskuri noi, verificare MariaDB pe un server real, teste cu două calculatoare).
 
 ## Fișiere de orientare
 

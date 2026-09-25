@@ -649,7 +649,7 @@ try
             "SQLite creates the project, observation and observation-file live and archive tables");
         await using var version = schemaConnection.CreateCommand();
         version.CommandText = "SELECT value FROM app_metadata WHERE key='schema_version'";
-        Check((string?)await version.ExecuteScalarAsync() == "7", "Archive schema is versioned with the live SQLite schema");
+        Check((string?)await version.ExecuteScalarAsync() == "8", "Archive schema is versioned with the live SQLite schema");
         await using var indexes = schemaConnection.CreateCommand();
         indexes.CommandText = """
             SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN
@@ -1978,6 +1978,166 @@ finally
     Check(fallbackRefreshes >= 1, "The periodic fallback refreshes when the page is idle even if no notification arrived");
 }
 
+
+
+// ---- Task 9: product edit locks ----
+var lockRoot = Path.Combine(Path.GetTempPath(), $"blazorstoc-lock-{Guid.NewGuid():N}");
+Directory.CreateDirectory(lockRoot);
+try
+{
+    var lockConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["App:LocalDatabasePath"] = Path.Combine(lockRoot, "locks.db"),
+        ["App:ProductImagesPath"] = Path.Combine(lockRoot, "product-images"),
+        ["App:ProjectFilesPath"] = Path.Combine(lockRoot, "project-files"),
+        ["App:ArchiveFilesPath"] = Path.Combine(lockRoot, "archive-files"),
+        ["App:AuditPath"] = Path.Combine(lockRoot, "legacy-audit.jsonl")
+    }).Build();
+    var lockStore = new SqliteLocalStore(new TestWebHostEnvironment(lockRoot), lockConfiguration, NullLogger<SqliteLocalStore>.Instance);
+    await lockStore.InitializeAsync();
+    await using (var seedConnection = await lockStore.OpenConnectionAsync())
+    {
+        foreach (var sql in new[]
+                 {
+                     "INSERT INTO categories(name,normalized_name) VALUES('Blocari','blocari')",
+                     "INSERT INTO subcategories(category_id,name,normalized_name) VALUES((SELECT id FROM categories WHERE normalized_name='blocari'),'Test','blocari test')",
+                     "INSERT INTO products(category_id,subcategory_id,name,normalized_name) VALUES((SELECT id FROM categories WHERE normalized_name='blocari'),(SELECT id FROM subcategories WHERE normalized_name='blocari test'),'P-LOCK','p-lock')"
+                 })
+        {
+            await using var command = TestSqliteCommand(seedConnection, sql);
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+    int lockedProduct;
+    await using (var idConnection = await lockStore.OpenConnectionAsync())
+    {
+        await using var command = TestSqliteCommand(idConnection, "SELECT id FROM products WHERE normalized_name='p-lock'");
+        lockedProduct = Convert.ToInt32(await command.ExecuteScalarAsync());
+    }
+    async Task ExpireLockAsync(int productId)
+    {
+        await using var connection = await lockStore.OpenConnectionAsync();
+        await using var command = TestSqliteCommand(connection, "UPDATE product_locks SET expires_utc=strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 seconds') WHERE product_id=@p", ("@p", productId));
+        await command.ExecuteNonQueryAsync();
+    }
+
+    var lockAudit = new SqliteAuditTrail(lockStore);
+    var lockAdmin = new TestAccessControl(true, "administrator.demo");
+    var locksAna = new SqliteProductLockRepository(lockStore, new TestAccessControl(false, "ana"), lockAudit);
+    var locksBob = new SqliteProductLockRepository(lockStore, new TestAccessControl(false, "bob"), lockAudit);
+    var locksAdmin = new SqliteProductLockRepository(lockStore, lockAdmin, lockAudit);
+
+    var first = await locksAna.AcquireAsync(lockedProduct, "sesiune-ana");
+    Check(first.Acquired && first.Changed && first.Lock!.Owner == "ana" && first.Lock.SessionId == "sesiune-ana" &&
+          first.Lock.RemainingSeconds is > 80 and <= ProductLockRules.LeaseSeconds &&
+          Math.Abs((first.Lock.ExpiresUtc - DateTime.UtcNow).TotalSeconds - ProductLockRules.LeaseSeconds) < 5 &&
+          first.Lock.AcquiredUtc.Kind == DateTimeKind.Utc,
+        "Entering edit mode takes a lease lock identified by product, user, session, acquisition and expiry (database UTC time)");
+    var refused = await locksBob.AcquireAsync(lockedProduct, "sesiune-bob");
+    Check(!refused.Acquired && !refused.Changed && refused.Lock!.Owner == "ana" && refused.Lock.AcquiredUtc == first.Lock!.AcquiredUtc,
+        "A second user cannot take the lock and learns who holds it and since when");
+    var renewed = await locksAna.AcquireAsync(lockedProduct, "sesiune-ana");
+    Check(renewed.Acquired && !renewed.Changed && renewed.Lock!.AcquiredUtc == first.Lock!.AcquiredUtc && renewed.Lock.RenewedUtc >= first.Lock!.RenewedUtc,
+        "The heartbeat renews the same lock without changing who holds it");
+    Check((await locksBob.GetAsync(lockedProduct))!.Owner == "ana" && (await locksBob.GetActiveAsync()).Count == 1,
+        "The product stays readable and its lock is visible to other users");
+    Check(!await locksBob.ReleaseAsync(lockedProduct, "sesiune-bob") && (await locksAna.GetAsync(lockedProduct)) is not null,
+        "Only the holding session can release a lock");
+    Check(await locksAna.ReleaseAsync(lockedProduct, "sesiune-ana") && await locksAna.GetAsync(lockedProduct) is null,
+        "Saving, cancelling or closing releases the lock");
+    Check((await locksBob.AcquireAsync(lockedProduct, "sesiune-bob")) is { Acquired: true, Changed: true },
+        "The product is available for editing right after a release");
+    await ExpireLockAsync(lockedProduct);
+    Check(await locksAna.GetAsync(lockedProduct) is null && (await locksAna.GetActiveAsync()).Count == 0,
+        "A lease that expired (browser closed, connection lost) no longer blocks or shows");
+    var takeover = await locksAna.AcquireAsync(lockedProduct, "sesiune-ana");
+    Check(takeover is { Acquired: true, Changed: true } && takeover.Lock!.Owner == "ana",
+        "An expired lock is taken over by the next editor");
+    var staleRenewal = await locksBob.AcquireAsync(lockedProduct, "sesiune-bob");
+    Check(!staleRenewal.Acquired && staleRenewal.Lock!.Owner == "ana",
+        "A session whose lock was taken over learns on its next heartbeat that it lost the lock");
+    await locksAna.ReleaseAsync(lockedProduct, "sesiune-ana");
+    await locksBob.AcquireAsync(lockedProduct, "sesiune-bob");
+    await ExpireLockAsync(lockedProduct);
+    Check((await locksBob.AcquireAsync(lockedProduct, "sesiune-bob")) is { Acquired: true, Changed: false },
+        "A lapsed lock that nobody took over is simply renewed by its own session");
+    await ExpireLockAsync(lockedProduct);
+    Check((await locksBob.RenewAsync(lockedProduct, "sesiune-bob")) is { Acquired: true, Changed: false } && await locksBob.GetAsync(lockedProduct) is not null,
+        "The heartbeat renews a lapsed lock that nobody has taken over");
+    Check(!(await locksAna.RenewAsync(lockedProduct, "sesiune-ana")).Acquired, "A session that never held the lock cannot renew it");
+    await locksBob.ReleaseAsync(lockedProduct, "sesiune-bob");
+    Check(!(await locksAna.AcquireAsync(lockedProduct + 999, "sesiune-ana")).Acquired, "A missing product cannot be locked");
+
+    // Two simultaneous requests: exactly one wins.
+    var contenders = await Task.WhenAll(Enumerable.Range(1, 24).Select(index =>
+        Task.Run(() => (index % 2 == 0 ? locksAna : locksBob).AcquireAsync(lockedProduct, $"sesiune-{index}"))));
+    Check(contenders.Count(attempt => attempt.Acquired) == 1 && (await locksAna.GetActiveAsync()).Count == 1,
+        "Two simultaneous lock requests can never both obtain the right to edit");
+    var winner = contenders.Single(attempt => attempt.Acquired).Lock!;
+
+    // Administrative release.
+    try { await locksBob.ForceReleaseAsync(lockedProduct, "Motiv"); throw new Exception("Non-administrator forced a release"); }
+    catch (AccessDeniedException) { Check(true, "Only administrators can force a release"); }
+    try { await locksAdmin.ForceReleaseAsync(lockedProduct, "  "); throw new Exception("Forced release without reason accepted"); }
+    catch (ProductLockException) { Check((await locksAdmin.GetAsync(lockedProduct)) is not null, "A forced release requires a reason and leaves the lock untouched without one"); }
+    var auditBefore = (await lockAudit.GetEventsAsync()).Count;
+    var removed = await locksAdmin.ForceReleaseAsync(lockedProduct, "Colegul a plecat, produsul trebuie corectat urgent");
+    Check(!(await locksAdmin.RenewAsync(lockedProduct, winner.SessionId)).Acquired && await locksAdmin.GetAsync(lockedProduct) is null,
+        "After a forced release the former editor's heartbeat does not silently take the lock back");
+    var unlockEvent = (await lockAudit.GetEventsAsync()).OrderBy(entry => entry.TimestampUtc).Last();
+    Check(removed is not null && removed.SessionId == winner.SessionId && await locksAdmin.GetAsync(lockedProduct) is null &&
+          (await lockAudit.GetEventsAsync()).Count == auditBefore + 1 && unlockEvent.Action == AuditActions.Unlock &&
+          unlockEvent.EntityType == AuditEntities.Product && unlockEvent.EntityId == lockedProduct.ToString() &&
+          unlockEvent.Motif.Contains("urgent") && unlockEvent.Target == "P-LOCK" && unlockEvent.Details.Contains(winner.Owner) &&
+          unlockEvent.ActorUsername == "administrator.demo",
+        "A forced release removes the lock and is written to the journal with actor, product, previous editor and reason");
+    Check(await locksAdmin.ForceReleaseAsync(lockedProduct, "Din nou") is null && (await lockAudit.GetEventsAsync()).Count == auditBefore + 1,
+        "Forcing a release when there is no lock changes nothing and writes no journal entry");
+
+    // Notifications to waiting sessions.
+    var lockFeed = new InProcessChangeFeed();
+    var lockEvents = new List<ChangeEvent>();
+    using var lockSubscription = lockFeed.Subscribe(change => { lock (lockEvents) lockEvents.Add(change); return Task.CompletedTask; });
+    var lockOrigin = new ChangeOrigin();
+    var notifying = new ChangeNotifyingProductLockRepository(new SqliteProductLockRepository(lockStore, new TestAccessControl(false, "ana"), lockAudit), lockFeed, lockOrigin);
+    var otherNotifying = new ChangeNotifyingProductLockRepository(new SqliteProductLockRepository(lockStore, new TestAccessControl(false, "bob"), lockAudit), lockFeed, new ChangeOrigin());
+    await notifying.AcquireAsync(lockedProduct, "sesiune-ana");
+    await notifying.AcquireAsync(lockedProduct, "sesiune-ana");
+    await otherNotifying.AcquireAsync(lockedProduct, "sesiune-bob");
+    Check(lockEvents.Count == 1 && lockEvents[0].EntityType == ChangeEntities.ProductLock && lockEvents[0].Action == AuditActions.Create &&
+          lockEvents[0].EntityId == lockedProduct.ToString() && lockEvents[0].Origin == lockOrigin.Id,
+        "Taking a lock is announced once; a renewal or a refused request is not");
+    await otherNotifying.ReleaseAsync(lockedProduct, "sesiune-bob");
+    Check(lockEvents.Count == 1, "A release by a session that does not hold the lock is not announced");
+    await notifying.ReleaseAsync(lockedProduct, "sesiune-ana");
+    Check(lockEvents.Count == 2 && lockEvents[1].Action == AuditActions.Delete && lockEvents[1].EntityId == lockedProduct.ToString(),
+        "A release is announced at once so waiting users are notified");
+    await notifying.AcquireAsync(lockedProduct, "sesiune-ana");
+    lockEvents.Clear();
+    await new ChangeNotifyingProductLockRepository(locksAdmin, lockFeed, new ChangeOrigin()).ForceReleaseAsync(lockedProduct, "Test automat pentru notificare");
+    Check(lockEvents.Count == 1 && lockEvents[0].Action == AuditActions.Delete, "A forced release is announced like a normal one");
+
+    await using (var cascadeConnection = await lockStore.OpenConnectionAsync())
+    {
+        await locksAna.AcquireAsync(lockedProduct, "sesiune-ana");
+        await using var delete = TestSqliteCommand(cascadeConnection, "DELETE FROM products WHERE id=@p", ("@p", lockedProduct));
+        await delete.ExecuteNonQueryAsync();
+    }
+    Check((await locksAna.GetActiveAsync()).Count == 0, "Deleting a product removes its lock");
+}
+finally
+{
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    try { Directory.Delete(lockRoot, true); } catch (IOException) { }
+}
+Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 120 && ProductLockRules.HeartbeatSeconds * 2 < ProductLockRules.LeaseSeconds,
+    "The lease expires within 1–2 minutes and the heartbeat renews it well before that");
+{
+    var sample = new ProductLock(3, "ana", "s", new DateTime(2026, 9, 25, 10, 5, 0, DateTimeKind.Utc), DateTime.UtcNow, DateTime.UtcNow.AddSeconds(90), 90);
+    var message = ProductLockRules.HeldMessage(sample);
+    Check(message.Contains("ana") && message.Contains(sample.AcquiredUtc.ToLocalTime().ToString("HH:mm")) && message.Contains("consulta"),
+        "The read-only message says who edits the product, since when, and that it can still be consulted");
+}
 
 sealed class ManualTimeProvider : TimeProvider
 {

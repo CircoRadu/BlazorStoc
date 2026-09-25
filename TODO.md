@@ -11,38 +11,7 @@
 
 ## Ordinea de implementare optimizată
 
-Interacțiunile comune, modelele de date și operațiile sunt stabilizate (Taskurile 0–7 finalizate). Sincronizarea în timp real se adaugă acum, după stabilizarea fluxurilor de modificare.
-
-1. **Colaborare în timp real:** Taskurile 0–8 și mecanismul collapse finalizate → Task 9 (singurul task rămas activ).
-
-Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
-
-
-## Task 9 — Blocarea temporară a editării unui produs
-
-Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recuperarea stării în sesiunile conectate.
-
-- [ ] Creează un lock de tip lease la intrarea în modul de editare, nu la simpla consultare a produsului.
-- [ ] Identifică lock-ul prin produs, utilizator, sesiune, momentul obținerii, ultima reînnoire și momentul expirării.
-- [ ] Permite un singur editor activ pentru fiecare produs, folosind o operație atomică în baza de date.
-- [ ] Reînnoiește lock-ul periodic prin heartbeat cât timp formularul de editare este activ.
-- [ ] Eliberează lock-ul la salvare, anulare, navigare sau închiderea normală a formularului.
-- [ ] Expiră automat lock-ul după 1–2 minute dacă browserul, conexiunea sau aplicația se închide neașteptat.
-- [ ] Pentru al doilea utilizator, păstrează produsul disponibil în mod read-only și afișează cine îl editează și de când.
-- [ ] Notifică automat utilizatorul care așteaptă imediat ce lock-ul este eliberat sau expiră.
-- [ ] Oferă administratorului deblocare forțată, cu motiv obligatoriu și jurnalizare.
-- [ ] Folosește timpul UTC furnizat de baza de date pentru expirări.
-- [ ] Nu păstra o tranzacție SQL sau un row lock deschis pe durata editării din interfață.
-- [ ] Păstrează verificarea versiunii produsului ca protecție finală, inclusiv după expirarea sau preluarea lock-ului.
-
-### Criterii de acceptare
-
-- Dacă utilizatorul A editează un produs, utilizatorul B nu poate porni editarea aceluiași produs.
-- Utilizatorul B poate consulta produsul și primește o explicație clară despre blocare.
-- După salvare, anulare sau expirare, produsul devine automat disponibil pentru editare.
-- Închiderea forțată a browserului nu poate lăsa produsul blocat permanent.
-- Două cereri simultane de lock nu pot obține ambele dreptul de editare.
-- Orice deblocare administrativă este înregistrată în jurnal.
+Nu mai există taskuri active: Taskurile 0–9 și mecanismul collapse sunt finalizate și arhivate mai jos. Un task nou se adaugă în această parte, pe poziția stabilită de regula de prioritizare, iar dependențele lui față de lucrările finalizate se descriu în textul taskului. Agenții lucrează în cicluri strict secvențiale Codex–Claude; niciodată simultan.
 
 ## Observații pentru etapa de implementare
 
@@ -51,6 +20,25 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Task 9: Blocarea temporară a editării unui produs
+
+Implementat la 25 septembrie 2026 de Claude. `Services/ProductLocks.cs` (`IProductLockRepository`, `SqliteProductLockRepository`, `MariaProductLockRepository`, `ChangeNotifyingProductLockRepository`, `ProductLockRules`), `Components/Pages/Home.razor` (editorul, heartbeat, insigne), `Components/Pages/ProductMovements.razor` (pagina produsului în consultare), `Components/Shared/ForceUnlockDialog.razor`, `wwwroot/leave-guard.js` (`blazorStocPing`), tabelul `product_locks` (SQLite, schema 8) și `product_lock` (MariaDB, creat la prima folosire).
+
+- [x] Lock de tip lease creat la intrarea în modul de editare (butonul „Editează”, inclusiv `?edit=`), nu la consultarea produsului.
+- [x] Lock-ul este identificat prin produs, utilizator, sesiune (circuitul), momentul obținerii, ultima reînnoire și momentul expirării.
+- [x] Un singur editor activ per produs, prin operații atomice ale bazei de date: reînnoire de către aceeași sesiune, preluarea unui lock expirat și inserare cu cheie primară (`INSERT OR IGNORE`/`INSERT IGNORE`); 24 de cereri simultane au dat exact un câștigător.
+- [x] Heartbeat la 30 s cât timp formularul este deschis (`RenewAsync`), doar dacă browserul răspunde (`blazorStocPing`): un tab închis nu mai reînnoiește, deși serverul păstrează circuitul câteva minute. Un lock eliberat de administrator sau preluat de altă sesiune nu este reluat în tăcere; editorul afișează „Blocarea editării a fost pierdută…”, iar salvarea rămâne protejată de verificarea versiunii.
+- [x] Eliberare la salvare, anulare, închiderea formularului, navigare sau eliminarea paginii (`ReleaseAsync`, numai de sesiunea care îl deține).
+- [x] Expirare automată după 90 s de la ultima reînnoire (1–2 minute) dacă browserul, conexiunea sau aplicația se închid; verificat prin închiderea unui tab în timpul editării.
+- [x] Al doilea utilizator vede produsul în consultare (pagina produsului): „Produsul este editat de <utilizator> din <ora>. Îl poți consulta, dar nu îl poți edita până când este eliberat.”, butonul „Editează” dezactivat; în catalog, produsul are insigna „🔒 În editare de <utilizator>”. Ștergerea unui produs editat de altcineva este refuzată cu explicație.
+- [x] Notificare automată a celui care așteaptă: eliberarea sau preluarea este anunțată imediat prin feed-ul din Task 8 (evenimentul `BlocareProdus`, vizibil și clienților SignalR), iar expirarea silențioasă este detectată la cel mult 10 s (pagina produsului) sau 15 s (catalog). La eliberare pagina afișează „Produsul a fost eliberat și poate fi editat acum.”
+- [x] Deblocare forțată de administrator (buton „Deblochează (administrator)” în pagina produsului, dialog `ForceUnlockDialog`), cu motiv obligatoriu și jurnalizare: acțiunea „Deblocare” (nouă în jurnal și în filtrul de operații), țintă = codul produsului, detalii = editorul anterior și ora, motiv = motivul dat, actor = administratorul. Nu este permisă altor roluri; fără lock nu se scrie nimic în jurnal.
+- [x] Timpul UTC al expirărilor este cel al bazei de date (`strftime('now')` în SQLite, `UTC_TIMESTAMP(6)` în MariaDB); timpul rămas vine din baza de date, nu din ceasul aplicației.
+- [x] Nicio tranzacție SQL sau blocare de rând nu rămâne deschisă cât timp formularul este activ: fiecare operație este o singură instrucțiune atomică pe o conexiune scurtă.
+- [x] Verificarea versiunii produsului rămâne protecția finală, inclusiv după expirarea sau preluarea lock-ului.
+- Neverificat: MariaDB pe un server real; două calculatoare diferite (testat cu două tab-uri, cu același cont); un al doilea utilizator cu cont distinct în browser.
+- Corectură legată: scripturile proprii sunt acum încărcate prin `@Assets[...]` (nume cu amprentă), deoarece browserul păstra o versiune veche a `leave-guard.js`.
 
 ## Finalizat — Task 8: Sincronizare între utilizatori
 

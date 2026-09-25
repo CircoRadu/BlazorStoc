@@ -53,7 +53,7 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
                 "CREATE INDEX IF NOT EXISTS ix_stock_movements_product ON stock_movements(product_id,movement_date,id)",
                 cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, """
-                INSERT INTO app_metadata(key,value) VALUES('schema_version','7')
+                INSERT INTO app_metadata(key,value) VALUES('schema_version','8')
                 ON CONFLICT(key) DO UPDATE SET value=excluded.value;
                 """, cancellationToken).ConfigureAwait(false);
             await SeedIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
@@ -464,6 +464,14 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             role TEXT NOT NULL CHECK(role IN ('Administrator','Utilizator')),
             is_active INTEGER NOT NULL DEFAULT 1,
             version INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS product_locks (
+            product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+            owner_username TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            acquired_utc TEXT NOT NULL,
+            renewed_utc TEXT NOT NULL,
+            expires_utc TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS product_images (
             product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,

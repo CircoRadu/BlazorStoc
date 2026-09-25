@@ -37,6 +37,10 @@
         }
     }, true);
 
+    // Answered by the browser only while it is connected: the product edit lock (Task 9) is renewed only when this
+    // call succeeds, so a closed tab lets the lease expire even while the server keeps the circuit for a few minutes.
+    window.blazorStocPing = () => true;
+
     window.blazorStocLeaveGuard = {
         enable(reference) { page = reference; },
         disable() { page = null; }

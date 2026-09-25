@@ -11,6 +11,7 @@
 @inject NavigationManager Navigation
 @inject IChangeFeed ChangeFeed
 @inject ChangeOrigin Origin
+@inject IProductLockRepository Locks
 @inject ILogger<ProductMovements> Logger
 @implements IDisposable
 
@@ -37,6 +38,14 @@ else
     @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadPageAsync">Reîncearcă</button></div> }
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
+    @if (holder is not null)
+    {
+        <div class="info-banner live-change-notice" role="status">
+            <span>🔒 @ProductLockRules.HeldMessage(holder)</span>
+            @if (isAdministrator) { <button type="button" class="danger" @onclick="OpenUnlock">Deblochează (administrator)</button> }
+        </div>
+    }
+    else if (holderReleased) { <div class="success-banner" role="status">Produsul a fost eliberat și poate fi editat acum.</div> }
 
     <div class="movement-layout">
         <section class="movement-card movement-product" aria-labelledby="movement-product-title">
@@ -51,7 +60,8 @@ else
                 @if (canManage)
                 {
                     <div class="movement-product-actions">
-                        <a class="refresh" href="@ReturnNavigation.EditUrl(product.Id, CurrentPath)">Editează</a>
+                        @if (holder is null) { <a class="refresh" href="@ReturnNavigation.EditUrl(product.Id, CurrentPath)">Editează</a> }
+                        else { <button type="button" class="refresh" disabled title="@ProductLockRules.HeldMessage(holder)">Editează</button> }
                         <a class="danger movement-link-danger" href="@ReturnNavigation.DeleteUrl(product.Id, CurrentPath)">Șterge produs</a>
                     </div>
                 }
@@ -223,6 +233,12 @@ else
                             Confirmed="ConfirmEditAsync" Cancelled="CancelEditConfirmation" />
 }
 
+@if (unlocking && holder is not null)
+{
+    <ForceUnlockDialog ObjectLabel="@product?.Name" Owner="@holder.Owner" Busy="@unlockBusy" Error="@unlockError"
+                       Confirmed="ForceUnlockAsync" Cancelled="CancelUnlock" />
+}
+
 @if (deleting is not null)
 {
     <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi mișcarea?" Subject="Mișcarea"
@@ -299,8 +315,56 @@ else
     private static StockMovementInput NewForm() => new() { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
 
     // Another session or application changed this product or its movements: refresh in place (Task 8).
-    private LiveRefresh? live;
-    protected override void OnInitialized() =>
+    private LiveRefresh? live, liveLocks;
+    // Edit lock held by another session (Task 9): shown read-only with who and since when; refreshed on the lock's
+    // events and every 10 s, because a lease also ends silently when it expires.
+    private ProductLock? holder;
+    private bool isAdministrator, holderReleased, unlocking, unlockBusy;
+    private string? unlockError;
+
+    private async Task RefreshHolderAsync()
+    {
+        try
+        {
+            var held = await Locks.GetAsync(Id, lifetime.Token);
+            var other = held is not null && held.SessionId != Origin.Id.ToString() ? held : null;
+            if (holder is not null && other is null) holderReleased = true;
+            else if (other is not null) holderReleased = false;
+            holder = other;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogWarning("Product lock check failed ({ErrorType}).", ex.GetType().Name); }
+    }
+
+    private void OpenUnlock() { unlockError = null; unlocking = true; }
+    private void CancelUnlock() { if (!unlockBusy) unlocking = false; }
+    private async Task ForceUnlockAsync(string reason)
+    {
+        if (unlockBusy) return;
+        unlockBusy = true; unlockError = null;
+        try
+        {
+            await Locks.ForceReleaseAsync(Id, reason, lifetime.Token);
+            unlocking = false;
+            notice = "Blocarea a fost eliberată și înregistrată în jurnal.";
+            await RefreshHolderAsync();
+            holderReleased = false;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is ProductLockException or AccessDeniedException) { unlockError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Forced unlock failed ({ErrorType}).", ex.GetType().Name); unlockError = "Deblocarea nu a putut fi efectuată. Reîncearcă."; }
+        finally { unlockBusy = false; }
+    }
+
+    protected override void OnInitialized()
+    {
+        liveLocks = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == ChangeEntities.ProductLock && change.EntityId == Id.ToString(),
+            () => InvokeAsync(async () => { await RefreshHolderAsync(); StateHasChanged(); }), () => false,
+            () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(10));
+        InitializeLive();
+    }
+
+    private void InitializeLive() =>
         live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Product && change.EntityId == Id.ToString(),
             () => InvokeAsync(async () => { if (!loading) { await LoadAsync(); StateHasChanged(); } }),
             () => editing is not null || deleting is not null || historyFor is not null,
@@ -322,7 +386,8 @@ else
             var accessTask = Access.CanManageProductsAsync(lifetime.Token);
             await Task.WhenAll(productTask, accessTask);
             product = await productTask; canManage = await accessTask;
-            if (product is not null) await LoadPageAsync();
+            isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
+            if (product is not null) { await LoadPageAsync(); await RefreshHolderAsync(); }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Logger.LogError("Movement page loading failed ({ErrorType}).", ex.GetType().Name); error = "Pagina nu a putut fi încărcată. Verifică serverul și conexiunea la baza de date."; }
@@ -515,5 +580,5 @@ else
 
     private void CloseHistory() => historyFor = null;
     private void HistoryKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") CloseHistory(); }
-    public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { live?.Dispose(); liveLocks?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
 }

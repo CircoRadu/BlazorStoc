@@ -266,3 +266,7 @@
 .logout-dialog button:focus-visible { outline:3px solid #76bfb0; outline-offset:3px; }
 
 .live-change-notice { display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+
+.lock-badge { display:block; color:#8a5a12; font-weight:600; margin-top:2px; }
+.force-unlock-dialog { width:min(560px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; }
+.force-unlock-dialog:focus { outline:none; }

@@ -568,3 +568,30 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 361 verificari trecute (22 noi; testele au prins doua defecte corectate: DateTimeStyles la citirea SQLite si marcarea sosirii tuturor evenimentelor unui lot). Browser 5082, doua tab-uri: modificare SQL externa reimprospata pagina produsului; dialog deschis ramane neschimbat cu notificare si Reincarca datele; catalog in al doilea tab a urmarit stocul 13 apoi 12; negotiate hub 200 autentificat si 302 anonim; client SignalR real a primit mesajul changed. Date de test readuse. Neverificat: MariaDB real, doua calculatoare.
 - **Commit:** `claude: finish Task 8 (database change events, relay, SignalR hub, live refresh)`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T07:09:31.9811858Z â€” claude
+
+- **Task:** Task 9 - Blocarea temporara a editarii unui produs
+- **Rezumat:** Task 9 finalizat: blocare lease a editarii produsului. Un rand per produs (product_locks / product_lock) cu utilizator, sesiune, obtinere, reinnoire, expirare 90 s, operatii atomice scurte cu ceasul bazei de date (reinnoire de aceeasi sesiune, preluare de lock expirat, inserare cu cheie primara), fara tranzactii deschise. Home: lock la intrarea in editare, heartbeat la 30 s numai daca browserul raspunde (blazorStocPing), RenewAsync strict care nu reia tacut un lock eliberat, eliberare la salvare/anulare/dispose, mesaj de lock pierdut. Pagina produsului: banner cine editeaza si de cand, Editeaza dezactivat, notificare imediata la eliberare prin feed-ul Task 8 (BlocareProdus) si verificare la 10-15 s pentru expirare; catalog cu insigna. Deblocare fortata doar de administrator cu motiv obligatoriu, dialog ForceUnlockDialog, jurnal Deblocare (nou si in filtru). Scripturile proprii se incarca prin Assets cu amprenta (cache vechi). Verificarea versiunii ramane. TODO.md: Task 9 arhivat, nu mai exista taskuri active. Autentificarea si regulile de acces nu au fost modificate.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/App.razor`
+  - `Components/Pages/Audit.razor`
+  - `Components/Pages/Home.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Shared/ForceUnlockDialog.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `Program.cs`
+  - `README.md`
+  - `Services/AuditTrail.cs`
+  - `Services/ProductLocks.cs`
+  - `Services/SqliteLocalStore.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+  - `wwwroot/leave-guard.js`
+- **Validare:** dotnet build Release proiect principal si BlazorStoc.Checks: 0 avertismente, 0 erori; BlazorStoc.Checks: 388 verificari trecute (27 noi, inclusiv 24 de cereri simultane cu un singur castigator). Browser 5082, doua sesiuni: banner si Editeaza dezactivat, eliberare live, deblocare fortata cu motiv obligatoriu si intrare in jurnal, heartbeat 30 s, pierdere fara reluare, expirare dupa inchiderea tab-ului. Defecte gasite si corectate: reluare tacita dupa deblocare fortata, reinnoire de catre un circuit fara browser, cache vechi la leave-guard.js. Neverificat: MariaDB real, un al doilea cont autentificat separat, doua calculatoare.
+- **Commit:** `claude: finish Task 9 (temporary product edit lock with heartbeat, read-only view and forced unlock)`
+- **Predat cÄƒtre:** codex

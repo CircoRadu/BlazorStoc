@@ -82,6 +82,10 @@ builder.Services.AddSignalR();
 builder.Services.AddHostedService<SignalRChangeBroadcaster>();
 builder.Services.AddScoped<ChangeOrigin>();
 builder.Services.AddScoped<ListNavigationContext>();
+builder.Services.AddScoped<IProductLockRepository>(services => new ChangeNotifyingProductLockRepository(demo
+    ? new SqliteProductLockRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>())
+    : new MariaProductLockRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()),
+    services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
 builder.Services.AddScoped<IProjectFileStore>(services => new ChangeNotifyingProjectFileStore(demo
     ? new SqliteProjectFileStore(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
     : new MariaProjectFileStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>(),
