@@ -1,10 +1,10 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "codex",
+    "nextAgent":  "claude",
     "currentTask":  "Adaugare in TODO: sursa iesirii (depozit sau masina) si inventar numai din depozit",
     "startedAtUtc":  "2026-09-25T11:49:25.4729626Z",
     "completedAtUtc":  "2026-09-25T11:51:43.4544616Z",
