@@ -229,3 +229,8 @@ Verificat la 25 septembrie 2026.
 - **Suita automată** (`BlazorStoc.Checks`, 339 verificări; 2 noi): `ReturnNavigation.Safe` acceptă numai căi locale (respinge gazdă externă, `//`, `\`, caractere de control, valori goale) și linkurile de editare/ștergere poartă adresa de întoarcere.
 - **Browser** (`http://127.0.0.1:5082`): din `/produse/1/miscari`, „Editează” duce la `/produse?edit=1&inapoi=%2Fproduse%2F1%2Fmiscari`, iar „Anulează” readuce în pagina produsului; „Șterge produs” deschide dialogul de ștergere, iar „Anulează” readuce în pagina produsului. Nu s-a salvat și nu s-a șters nimic.
 - **Neverificat manual**: salvarea confirmată a editării (aceeași cale de navigare, acoperită de cod) și ștergerea efectivă (duce în catalog, nemodificat).
+
+## Task 7 — Confirmarea deconectării (25 septembrie 2026)
+
+- **Browser** (`http://127.0.0.1:5082`, sesiune autentificată de utilizator): cu editorul beneficiarului deschis și textul „text de pastrat” tastat în motivare, „Deconectare” din bara de sus deschide popup-ul „Închizi sesiunea?” cu butonul roșu „Deconectare” și butonul verde „Anulează deconectarea”; „Anulează deconectarea” închide popup-ul, iar editorul și textul tastat rămân. Formularul popup-ului are `method="post"`, `action="/Account/Logout"` și tokenul antiforgery.
+- **Neverificat manual**: butonul roșu (ar fi încheiat sesiunea utilizatorului din panoul Browser), Escape, tastatura. `GET /Account/Logout` redirecționează la `/`. `BlazorStoc.Checks`: 339 verificări trecute (neschimbate; UI-ul nu are teste automate).

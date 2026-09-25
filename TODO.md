@@ -11,29 +11,12 @@
 
 ## Ordinea de implementare optimizată
 
-Taskurile sunt grupate în două etape, astfel încât interacțiunile comune, modelele de date și operațiile să fie stabilizate înaintea paginilor și dialogurilor care le folosesc, iar sincronizarea în timp real să fie adăugată după stabilizarea fluxurilor de modificare.
+Interacțiunile comune, modelele de date și operațiile sunt stabilizate (Taskurile 0–7 finalizate). Sincronizarea în timp real se adaugă acum, după stabilizarea fluxurilor de modificare.
 
-1. **Dialoguri comune:** Task 7 reutilizează confirmarea finalizată din Task 5 (`SaveConfirmationDialog`).
-2. **Colaborare în timp real:** Task 7, împreună cu mecanismul collapse finalizat → Task 8 → Task 9.
+1. **Colaborare în timp real:** Taskurile 0–7 și mecanismul collapse finalizate → Task 8 → Task 9.
 
 Dependențele indică ordinea tehnică recomandată. Taskurile fără legătură directă pot fi implementate independent, în cicluri strict secvențiale Codex–Claude; agenții nu lucrează niciodată simultan.
 
-
-## Task 7 — Confirmarea deconectării și jurnalizarea sesiunilor
-
-Reutilizează infrastructura dialogului de ștergere finalizat și confirmarea comună din Task 5. Rămâne fluxul popup de confirmare.
-
-- [ ] La apăsarea acțiunii „Deconectare”, afișează un popup de confirmare în locul paginii actuale de deconectare.
-- [ ] Afișează în popup butonul roșu „Deconectare” și butonul verde „Anulează deconectarea”.
-- [ ] Execută deconectarea numai după confirmarea explicită a utilizatorului.
-- [ ] La anulare, închide popup-ul și păstrează utilizatorul în pagina curentă, fără pierderea stării acesteia.
-
-### Criterii de acceptare
-
-- Apăsarea opțiunii „Deconectare” nu mai deschide pagina actuală de deconectare.
-- Confirmarea roșie încheie sesiunea și conduce utilizatorul la pagina de autentificare.
-- Anularea verde păstrează sesiunea și pagina curentă.
-- Conectările reușite și deconectările confirmate sunt vizibile în jurnalul de activitate.
 
 ## Task 8 — Sincronizare între utilizatori
 
@@ -88,6 +71,17 @@ Depinde de Task 8 pentru heartbeat, notificarea eliberării lock-ului și recupe
 - Funcționalitățile trebuie validate atât în modul demonstrativ, cât și prin teste de integrare cu două sesiuni concurente.
 
 # Taskuri finalizate
+
+## Finalizat — Task 7: Confirmarea deconectării
+
+Implementat la 25 septembrie 2026 de Claude. `Components/Layout/MainLayout.razor` (buton și dialog), `wwwroot/logout-dialog.js`, `Pages/Account/Logout.cshtml.cs`, stiluri `.logout-dialog` în `wwwroot/app.css`. Jurnalizarea sesiunilor era finalizată anterior (vezi „Task 7 (parțial)” mai jos).
+
+- [x] Acțiunea „Deconectare” din bara de sus deschide un popup de confirmare (element nativ `<dialog>` modal, cu `aria-labelledby`/`aria-describedby`, focus pe „Anulează deconectarea”, Escape = anulare) în locul paginii de deconectare; `GET /Account/Logout` redirecționează acum la `/`.
+- [x] Popup-ul are butonul roșu „Deconectare” și butonul verde „Anulează deconectarea”.
+- [x] Deconectarea se execută numai după confirmare: butonul roșu trimite formularul `POST /Account/Logout` cu token antiforgery (`<AntiforgeryToken />`), iar `LogoutModel` încheie sesiunea, înregistrează deconectarea în jurnal și redirecționează la autentificare.
+- [x] La anulare (buton sau Escape) popup-ul se închide și nu se modifică nimic altceva: pagina, formularele deschise și textul introdus rămân (verificat cu un editor deschis și text tastat).
+- [x] Conectările reușite și deconectările confirmate rămân vizibile în jurnalul de activitate (finalizat anterior).
+- Neverificat manual: confirmarea efectivă a deconectării (butonul roșu) — ar fi încheiat sesiunea autentificată a utilizatorului din panoul Browser; formularul are tokenul antiforgery și acțiunea corectă.
 
 ## Finalizat — Revenirea în pagina de origine după editarea sau ștergerea produsului
 

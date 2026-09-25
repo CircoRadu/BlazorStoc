@@ -56,8 +56,19 @@
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>@(Mode.IsDemo ? "Date demonstrative" : "BlazorStoc · MariaDB")</small></div>
     </aside>
-    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">@(Mode.IsDemo ? "Mod demonstrativ" : "Sesiune autentificată")</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><a class="logout-action" href="/Account/Logout">Deconectare</a><span class="avatar">ES</span></div></header><main class="workspace">@Body</main></div>
+    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">@(Mode.IsDemo ? "Mod demonstrativ" : "Sesiune autentificată")</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header><main class="workspace">@Body</main></div>
 </div>
+<dialog id="logout-dialog" class="delete-dialog logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description">
+    <form method="post" action="/Account/Logout">
+        <AntiforgeryToken />
+        <h2 id="logout-title">Închizi sesiunea?</h2>
+        <p id="logout-description">Vei fi deconectat și redirecționat la pagina de autentificare. Pagina curentă nu se modifică dacă anulezi.</p>
+        <div class="editor-actions">
+            <button type="submit" class="danger">Deconectare</button>
+            <button type="button" class="primary" data-logout-cancel autofocus>Anulează deconectarea</button>
+        </div>
+    </form>
+</dialog>
 <div id="blazor-error-ui" role="alert">Conexiunea cu aplicația a fost întreruptă. <a href="" class="reload">Reîncarcă pagina</a><a class="dismiss">×</a></div>
 
 @code {

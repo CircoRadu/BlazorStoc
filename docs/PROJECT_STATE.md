@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Stare ciclu: **Taskurile 0, 1, 2, 3, 4, 5 și 6 finalizate; pregătit pentru predarea către Codex după commitul curent**
+Stare ciclu: **Taskurile 0–7 finalizate; pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -11,6 +11,14 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs”, stocul modificabil exclusiv prin mișcări de intrare/ieșire (pagina `/produse/{id}/miscari`) și istoricul mișcărilor.
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Ultimele modificări funcționale (ciclul Claude — Task 7)
+
+Ciclul a fost pornit la cererea explicită a utilizatorului („implementează task 7”), deși `nextAgent` era `codex`; ordinea a fost schimbată printr-un commit separat al `.collaboration/state.json`.
+
+- `MainLayout.razor`: „Deconectare” este acum un buton (`data-logout-open`) care deschide un `<dialog>` modal („Închizi sesiunea?”) cu butonul roșu „Deconectare” (submit `POST /Account/Logout`, cu `<AntiforgeryToken />`) și butonul verde „Anulează deconectarea” (`data-logout-cancel`, focus inițial). `wwwroot/logout-dialog.js` (încărcat din `App.razor`) deschide/închide dialogul; Escape îl închide nativ.
+- `Pages/Account/Logout.cshtml.cs`: `OnGet` redirecționează la `/` (pagina veche de confirmare nu mai este afișată); `OnPostAsync` neschimbat (încheie sesiunea, jurnalizează deconectarea, redirecționează la autentificare).
+- Autentificarea și regulile de acces nu au fost modificate. Validare: build Release 0 avertismente; `BlazorStoc.Checks` 339; browser pe 5082 (popup, anulare cu starea paginii păstrată, token antiforgery prezent). Neverificat manual: confirmarea efectivă a deconectării.
 
 ## Revenirea în pagina de origine după editarea/ștergerea produsului
 
@@ -153,7 +161,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 
 ## Următorul pas
 
-Următorul agent este **Codex**. Taskurile 0–6 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este **Task 7** (confirmarea deconectării), care reutilizează `SaveConfirmationDialog`.
+Următorul agent este **Codex**. Taskurile 0–7 sunt complete. Dacă utilizatorul nu stabilește altă prioritate, următorul element recomandat este **Task 8** (sincronizare între utilizatori), apoi **Task 9** (blocarea temporară a editării unui produs).
 
 ## Fișiere de orientare
 
