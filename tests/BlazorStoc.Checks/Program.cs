@@ -649,7 +649,7 @@ try
             "SQLite creates the project, observation and observation-file live and archive tables");
         await using var version = schemaConnection.CreateCommand();
         version.CommandText = "SELECT value FROM app_metadata WHERE key='schema_version'";
-        Check((string?)await version.ExecuteScalarAsync() == "9", "Archive schema is versioned with the live SQLite schema");
+        Check((string?)await version.ExecuteScalarAsync() == "10", "Archive schema is versioned with the live SQLite schema");
         await using var indexes = schemaConnection.CreateCommand();
         indexes.CommandText = """
             SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name IN
@@ -1418,11 +1418,16 @@ async Task RejectedMovement(Func<Task> operation, string message)
     catch (StockMovementOperationException) { Check(true, message); return; }
     throw new Exception("Expected rejection: " + message);
 }
+// Exits need a destination: unless given, an exit with a beneficiary goes to the beneficiary, any other one is a generic sale.
 StockMovementInput MovementInput(StockMovementKind kind, int quantity, string description = "Test", DateOnly? date = null,
-    int? beneficiaryId = null, int? projectId = null, string reason = "") => new()
+    int? beneficiaryId = null, int? projectId = null, string reason = "", ExitDestination? destination = null,
+    int? vehicleId = null, int? sourceVehicleId = null, bool noDestination = false) => new()
 {
     Kind = kind, Quantity = quantity, Description = description, Date = date ?? new DateOnly(2026, 9, 24),
-    BeneficiaryId = beneficiaryId, ProjectId = projectId, Reason = reason
+    BeneficiaryId = beneficiaryId, ProjectId = projectId, Reason = reason,
+    Destination = noDestination || kind == StockMovementKind.Entry ? null
+        : destination ?? (beneficiaryId is not null ? ExitDestination.Beneficiary : ExitDestination.GenericSale),
+    VehicleId = vehicleId, SourceVehicleId = sourceVehicleId
 };
 
 var entryRule = StockMovementRules.Validated(MovementInput(StockMovementKind.Entry, 3, "  Factură nouă  "), StockMovementKind.Entry, false);
@@ -1549,7 +1554,7 @@ try
     Check(editHistory.Count == 1 && editHistory[0].StockCorrection == 2 && editHistory[0].Reason == "Eroare de tastare" && editHistory[0].Actor == "operator.stoc" &&
           editHistory[0].Changes.Contains("Cantitate: 10 → 12") && editHistory[0].Changes.Contains("Corecție stoc: +2"), "The edit is kept in the movement history");
     await RejectedMovement(() => stockMovements.UpdateAsync(first.Movement, MovementInput(StockMovementKind.Entry, 15, "Factura 1", reason: "Vechi")), "A stale edit cannot overwrite a newer version");
-    var kindStays = await stockMovements.UpdateAsync(edited.Movement, MovementInput(StockMovementKind.Exit, 11, "Factura 1 corectata", new DateOnly(2026, 9, 1), reason: "Schimb tip"));
+    var kindStays = await stockMovements.UpdateAsync(edited.Movement, MovementInput(StockMovementKind.Exit, 11, "Factura 1 corectata", new DateOnly(2026, 9, 1), reason: "Schimb tip", noDestination: true));
     Check(kindStays.Movement.Kind == StockMovementKind.Entry && kindStays.Stock == -2, "The movement type cannot be changed by an edit");
     var exitEdit = await stockMovements.UpdateAsync(projectExit.Movement, MovementInput(StockMovementKind.Exit, 1, "Montaj", new DateOnly(2026, 9, 3), reason: "Fara beneficiar"));
     Check(exitEdit.Movement.BeneficiaryId is null && exitEdit.Movement.ProjectId is null && exitEdit.Stock == kindStays.Stock, "An exit edit can remove the beneficiary and project");
@@ -1603,6 +1608,226 @@ try
 finally
 {
     try { Directory.Delete(movementRoot, true); } catch (IOException) { }
+}
+
+// Exit destinations, sources and stock held by vehicles.
+{
+    StockMovementOperationException? Expect(Action operation)
+    {
+        try { operation(); }
+        catch (StockMovementOperationException exception) { return exception; }
+        return null;
+    }
+    StockMovementOperationException? Refused(StockMovementInput input, StockMovementKind kind = StockMovementKind.Exit) =>
+        Expect(() => StockMovementRules.Validated(input, kind, false));
+    var day = new DateOnly(2026, 9, 24);
+    StockMovementInput Exit(ExitDestination? destination, int? beneficiaryId = null, int? projectId = null, int? vehicleId = null, int? sourceId = null) =>
+        new() { Kind = StockMovementKind.Exit, Quantity = 1, Description = "Test", Date = day, Destination = destination,
+                BeneficiaryId = beneficiaryId, ProjectId = projectId, VehicleId = vehicleId, SourceVehicleId = sourceId };
+
+    // Rules without a database.
+    Check(Refused(Exit(null))?.Message == StockMovementRules.DestinationRequiredMessage, "An exit without a destination is refused");
+    Check(Refused(Exit((ExitDestination)9)) is not null, "An unknown destination is refused");
+    Check(Refused(Exit(ExitDestination.Beneficiary)) is not null && Refused(Exit(ExitDestination.Beneficiary, beneficiaryId: 3)) is null &&
+          Refused(Exit(ExitDestination.Beneficiary, beneficiaryId: 3, projectId: 4)) is null && Refused(Exit(ExitDestination.Beneficiary, beneficiaryId: 3, vehicleId: 2)) is not null,
+        "The beneficiary destination requires a beneficiary (the project is optional) and refuses a vehicle");
+    Check(Refused(Exit(ExitDestination.Vehicle)) is not null && Refused(Exit(ExitDestination.Vehicle, vehicleId: 2)) is null &&
+          Refused(Exit(ExitDestination.Vehicle, vehicleId: 2, beneficiaryId: 3)) is not null,
+        "The vehicle destination requires a vehicle and refuses a beneficiary or project");
+    Check(Refused(Exit(ExitDestination.GenericSale)) is null && Refused(Exit(ExitDestination.StockCorrection)) is null &&
+          Refused(Exit(ExitDestination.GenericSale, vehicleId: 2)) is not null && Refused(Exit(ExitDestination.StockCorrection, beneficiaryId: 3)) is not null,
+        "A generic sale and a stock correction have no beneficiary, project or vehicle");
+    Check(Refused(Exit(ExitDestination.GenericSale, sourceId: 5)) is null && Refused(Exit(ExitDestination.GenericSale, sourceId: 0)) is not null,
+        "The source vehicle is optional for exits (null means the warehouse)");
+    Check(Refused(Exit(ExitDestination.Vehicle, vehicleId: 2, sourceId: 5))?.Message == StockMovementRules.TransferBetweenVehiclesMessage,
+        "A transfer from one vehicle to another is not done from the exit form");
+    Check(Refused(Exit(ExitDestination.GenericSale), StockMovementKind.Entry) is not null &&
+          Refused(new StockMovementInput { Kind = StockMovementKind.Entry, Quantity = 1, Description = "Test", Date = day, SourceVehicleId = 5 }, StockMovementKind.Entry) is not null,
+        "Destination and source belong to exits only");
+    Check(StockMovementRules.Effect(StockMovementKind.Exit, ExitDestination.Vehicle, 5) == 0 && StockMovementRules.Effect(StockMovementKind.Exit, ExitDestination.Beneficiary, 5) == -5 &&
+          StockMovementRules.Effect(StockMovementKind.Exit, ExitDestination.GenericSale, 5) == -5 && StockMovementRules.Effect(StockMovementKind.Exit, ExitDestination.StockCorrection, 5) == -5 &&
+          StockMovementRules.Effect(StockMovementKind.Exit, null, 5) == -5 && StockMovementRules.Effect(StockMovementKind.Entry, null, 5) == 5,
+        "Only a transfer into a vehicle leaves the total stock unchanged");
+    var suggestionDay = new DateOnly(2026, 9, 25);
+    Check(StockMovementRules.SuggestedDescription(ExitDestination.Vehicle, "HD-01-FDG", suggestionDay) == "Completare stoc mașină HD-01-FDG 25.09.2026" &&
+          StockMovementRules.SuggestedDescription(ExitDestination.StockCorrection, null, suggestionDay) == "Corecție stoc 25.09.2026" &&
+          StockMovementRules.SuggestedDescription(ExitDestination.Vehicle, null, suggestionDay) is null &&
+          StockMovementRules.SuggestedDescription(ExitDestination.Beneficiary, null, suggestionDay) is null &&
+          StockMovementRules.SuggestedDescription(ExitDestination.GenericSale, null, suggestionDay) is null,
+        "The description is suggested for a vehicle transfer and a stock correction, with today's date as dd.MM.yyyy");
+    Check(StockMovementRules.ApplySuggestion("", null, "Corecție stoc 25.09.2026") == "Corecție stoc 25.09.2026" &&
+          StockMovementRules.ApplySuggestion("Corecție stoc 25.09.2026", "Corecție stoc 25.09.2026", "Completare stoc mașină B-1-ABC 25.09.2026") == "Completare stoc mașină B-1-ABC 25.09.2026" &&
+          StockMovementRules.ApplySuggestion("Corecție stoc 25.09.2026", "Corecție stoc 25.09.2026", null) == "" &&
+          StockMovementRules.ApplySuggestion("Text scris de mine", "Corecție stoc 25.09.2026", "Completare stoc mașină B-1-ABC 25.09.2026") == "Text scris de mine" &&
+          StockMovementRules.ApplySuggestion("Text scris de mine", null, null) == "Text scris de mine",
+        "A suggested description replaces only an empty or unchanged suggestion, never the user's text");
+    Check(StockMovementRules.StockBreakdown(10, 4) == "10 produse: 6 în depozit, 4 în vehicule" && StockMovementRules.StockBreakdown(1, 1) == "1 produs: 0 în depozit, 1 în vehicule" &&
+          StockMovementRules.StockBreakdown(10, 0) is null && StockMovementRules.WarehouseStock(10, 4) == 6 && StockMovementRules.WarehouseStock(-2, 0) == -2,
+        "The stock is split into warehouse and vehicles only when vehicles hold pieces");
+
+    var vehicleStockRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-vehicle-stock-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(vehicleStockRoot);
+    try
+    {
+        var vsConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:LocalDatabasePath"] = Path.Combine(vehicleStockRoot, "stock.db"),
+            ["App:ProductImagesPath"] = Path.Combine(vehicleStockRoot, "product-images"),
+            ["App:ArchiveFilesPath"] = Path.Combine(vehicleStockRoot, "archive-files"),
+            ["App:AuditPath"] = Path.Combine(vehicleStockRoot, "legacy-audit.jsonl")
+        }).Build();
+        var vsEnvironment = new TestWebHostEnvironment(vehicleStockRoot);
+        var vsAccess = new TestAccessControl(true, "operator.masini");
+        var vsStore = new SqliteLocalStore(vsEnvironment, vsConfiguration, NullLogger<SqliteLocalStore>.Instance);
+        var vsProducts = new SqliteProductRepository(vsStore, vsAccess);
+        var vsVehicles = new SqliteVehicleRepository(vsStore, vsAccess);
+        var vsMovements = new SqliteStockMovementRepository(vsStore, vsAccess);
+        var vsBeneficiaries = new SqliteBeneficiaryRepository(vsStore, vsAccess);
+        var vsAudit = new SqliteAuditTrail(vsStore);
+        var vsProduct = await CreateProductAsync(vsProducts, new ProductInput { Name = "Produs in masini", Category = "Masini", Subcategory = "Test" });
+        var otherProduct = await CreateProductAsync(vsProducts, new ProductInput { Name = "Alt produs in masini", Category = "Masini", Subcategory = "Test" });
+        var van = await vsVehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-01-FDG", Description = "Dacia Dokker" });
+        var truck = await vsVehicles.CreateAsync(new VehicleInput { PlateNumber = "B-123-ABC", Description = "Autoutilitara" });
+        var xBeneficiary = await vsBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar masini", Cui = "RO17777771" });
+        var allMovements = new StockMovementQuery(null, false, 1, 0);
+        StockMovementInput InputOf(StockMovementKind kind, int quantity, ExitDestination? destination = null, int? vehicleId = null, int? sourceId = null,
+            string description = "Test", int? beneficiaryId = null, string reason = "") =>
+            new() { Kind = kind, Quantity = quantity, Description = description, Date = day, Destination = destination,
+                    VehicleId = vehicleId, SourceVehicleId = sourceId, BeneficiaryId = beneficiaryId, Reason = reason };
+        async Task<StockMovementOperationException?> RefusedAsync(Func<Task> operation)
+        {
+            try { await operation(); }
+            catch (StockMovementOperationException exception) { return exception; }
+            return null;
+        }
+        await vsMovements.CreateAsync(vsProduct.Id, InputOf(StockMovementKind.Entry, 10));
+        Check((await vsMovements.GetVehicleStocksAsync(vsProduct.Id)).Count == 0 && (await vsMovements.GetPageAsync(vsProduct.Id, allMovements)).InVehicles == 0,
+            "Before any transfer no vehicle holds the product");
+
+        // Warehouse -> vehicle: the total does not change, the vehicle holds the pieces.
+        var transferIn = await vsMovements.CreateAsync(vsProduct.Id, InputOf(StockMovementKind.Exit, 4, ExitDestination.Vehicle, vehicleId: van.Id, description: "Completare stoc masina"));
+        Check(transferIn.Stock == 10 && transferIn.Movement.Effect == 0 && transferIn.Movement.VehiclePlate == "HD-01-FDG" && transferIn.Movement.Destination == ExitDestination.Vehicle &&
+              transferIn.Movement.SourceVehicleId is null && (await vsProducts.GetProductAsync(vsProduct.Id))!.Quantity == 10,
+            "An exit to a vehicle does not lower the total stock");
+        var afterTransfer = await vsMovements.GetPageAsync(vsProduct.Id, allMovements);
+        Check(afterTransfer.Stock == 10 && afterTransfer.InVehicles == 4 && StockMovementRules.StockBreakdown(afterTransfer.Stock, afterTransfer.InVehicles) == "10 produse: 6 în depozit, 4 în vehicule",
+            "The page reports the part of the stock held by vehicles");
+        var heldByVan = await vsMovements.GetVehicleStocksAsync(vsProduct.Id);
+        Check(heldByVan.Count == 1 && heldByVan[0].VehicleId == van.Id && heldByVan[0].Quantity == 4 && heldByVan[0].PlateNumber == "HD-01-FDG",
+            "The vehicle stock lists the vehicle with its quantity");
+        var inVehiclesByProduct = await vsMovements.GetQuantitiesInVehiclesAsync();
+        Check(inVehiclesByProduct.Count == 1 && inVehiclesByProduct[vsProduct.Id] == 4, "The catalog can read the quantity held by vehicles per product");
+        Check((await vsMovements.GetMovementCountsByVehicleAsync())[van.Id] == 1, "The movement count per vehicle is available for the vehicles page");
+        try { await vsVehicles.DeleteAsync(van, "Motiv"); throw new Exception("Vehicle with movements deleted"); }
+        catch (VehicleOperationException exception) { Check(exception.Message.Contains("mișcări de stoc"), "A vehicle used by a movement cannot be deleted"); }
+
+        // Vehicle -> use: never more than the vehicle holds.
+        var tooMuch = await RefusedAsync(() => vsMovements.CreateAsync(vsProduct.Id, InputOf(StockMovementKind.Exit, 5, ExitDestination.GenericSale, sourceId: van.Id)));
+        Check(tooMuch?.Message == StockMovementRules.NotEnoughInVehicleMessage("HD-01-FDG", 4) && tooMuch.Message.Contains("numai 4 bucăți"),
+            "An exit from a vehicle cannot exceed the quantity held by that vehicle");
+        var emptyVehicle = await RefusedAsync(() => vsMovements.CreateAsync(vsProduct.Id, InputOf(StockMovementKind.Exit, 1, ExitDestination.GenericSale, sourceId: truck.Id)));
+        Check(emptyVehicle?.Message == StockMovementRules.NotEnoughInVehicleMessage("B-123-ABC", 0), "A vehicle without the product cannot supply it");
+        Check((await vsProducts.GetProductAsync(vsProduct.Id))!.Quantity == 10, "Refused exits do not change the stock");
+        var usedFromVan = await vsMovements.CreateAsync(vsProduct.Id, InputOf(StockMovementKind.Exit, 3, ExitDestination.Beneficiary, sourceId: van.Id, beneficiaryId: xBeneficiary.Id));
+        var afterUse = await vsMovements.GetPageAsync(vsProduct.Id, allMovements);
+        Check(usedFromVan.Stock == 7 && usedFromVan.Movement.SourceVehiclePlate == "HD-01-FDG" && afterUse.InVehicles == 1 &&
+              (await vsMovements.GetVehicleStocksAsync(vsProduct.Id)).Single().Quantity == 1,
+            "Using pieces from a vehicle lowers the total and that vehicle, not the warehouse");
+        var toTruck = await vsMovements.CreateAsync(vsProduct.Id, InputOf(StockMovementKind.Exit, 2, ExitDestination.Vehicle, vehicleId: truck.Id));
+        var twoVehicles = await vsMovements.GetPageAsync(vsProduct.Id, allMovements);
+        Check(toTruck.Stock == 7 && twoVehicles.InVehicles == 3 && (await vsMovements.GetVehicleStocksAsync(vsProduct.Id)).Select(item => item.PlateNumber).SequenceEqual(["B-123-ABC", "HD-01-FDG"]) &&
+              StockMovementRules.WarehouseStock(twoVehicles.Stock, twoVehicles.InVehicles) == 4,
+            "Several vehicles hold pieces of the same product; the warehouse keeps the rest");
+
+        // Editing and deleting must not leave a vehicle with a negative quantity.
+        var shrink = InputOf(StockMovementKind.Exit, 2, ExitDestination.Vehicle, vehicleId: van.Id, reason: "Corectie");
+        var shrinkRefused = await RefusedAsync(() => vsMovements.UpdateAsync(transferIn.Movement, shrink));
+        Check(shrinkRefused?.Message == StockMovementRules.NegativeVehicleStockMessage("HD-01-FDG"),
+            "Lowering a transfer below what was already used from the vehicle is refused");
+        var deleteUsed = await RefusedAsync(() => vsMovements.DeleteAsync(transferIn.Movement, "Motiv"));
+        Check(deleteUsed?.Message == StockMovementRules.NegativeVehicleStockMessage("HD-01-FDG") && (await vsMovements.GetAsync(transferIn.Movement.Id)) is not null,
+            "Deleting a transfer whose pieces were already used is refused and nothing changes");
+        // Changing the destination of a transfer recomputes the total: 2 pieces to the truck become a generic sale.
+        var toSale = InputOf(StockMovementKind.Exit, 2, ExitDestination.GenericSale, reason: "Nu a fost mutat, a fost vandut");
+        var totalBefore = (await vsProducts.GetProductAsync(vsProduct.Id))!.Quantity;
+        var changedExit = await vsMovements.UpdateAsync(toTruck.Movement, toSale);
+        Check(changedExit.Stock == totalBefore - 2 && changedExit.Movement.Destination == ExitDestination.GenericSale && changedExit.Movement.VehicleId is null &&
+              (await vsMovements.GetVehicleStocksAsync(vsProduct.Id)).All(item => item.VehicleId != truck.Id),
+            "Changing a transfer into a sale lowers the total and empties the vehicle");
+        Check(changedExit.Movement.Modified && (await vsMovements.GetHistoryAsync(changedExit.Movement.Id)).Single().Changes.Contains("Destinație: Autovehicul → Vânzare generică"),
+            "The movement history records the changed destination");
+        var back = InputOf(StockMovementKind.Exit, 2, ExitDestination.Vehicle, vehicleId: truck.Id, reason: "Revenire la transfer");
+        var restored = await vsMovements.UpdateAsync(changedExit.Movement, back);
+        Check(restored.Stock == totalBefore, "Changing a sale back into a transfer restores the total");
+        Check((await vsMovements.CreateAsync(vsProduct.Id, InputOf(StockMovementKind.Exit, 12, ExitDestination.Vehicle, vehicleId: van.Id))).Stock == 7 &&
+              (await vsMovements.GetPageAsync(vsProduct.Id, allMovements)).InVehicles == 15,
+            "A transfer beyond the warehouse stock is not blocked (the warehouse stock may become negative)");
+        var negativeWarehouse = await vsMovements.GetPageAsync(vsProduct.Id, allMovements);
+        Check(StockMovementRules.WarehouseStock(negativeWarehouse.Stock, negativeWarehouse.InVehicles) == -8, "The warehouse quantity is the total minus the vehicles and can be negative");
+        // Deleting a use from a vehicle returns the pieces to that vehicle and restores the total.
+        var beforeDeleteUse = (await vsProducts.GetProductAsync(vsProduct.Id))!.Quantity;
+        var stockAfterDeletingUse = await vsMovements.DeleteAsync(usedFromVan.Movement, "Test automat");
+        Check(stockAfterDeletingUse == beforeDeleteUse + 3 && (await vsMovements.GetVehicleStocksAsync(vsProduct.Id)).Single(item => item.VehicleId == van.Id).Quantity == 16,
+            "Deleting a use from a vehicle restores the vehicle quantity and the total");
+
+        // Journal, archive, legacy exits.
+        var journal = (await vsAudit.GetEventsAsync()).Where(entry => entry.EntityType == AuditEntities.StockMovement && entry.EntityId == transferIn.Movement.Id.ToString()).ToArray();
+        Check(journal.Any(entry => entry.Action == AuditActions.Create && entry.Details.Contains("Destinație: Autovehicul") && entry.Details.Contains("Vehicul: HD-01-FDG") && entry.Details.Contains("Sursă: Depozit")),
+            "The journal records the destination, the vehicle and the source of a movement");
+        var usedEvent = (await vsAudit.GetEventsAsync()).Single(entry => entry.EntityType == AuditEntities.StockMovement && entry.EntityId == usedFromVan.Movement.Id.ToString() && entry.Action == AuditActions.Create);
+        Check(usedEvent.Details.Contains("Sursă: Mașina HD-01-FDG") && usedEvent.Details.Contains("Destinație: Beneficiar"), "The journal records a source vehicle");
+        await using (var connection = await vsStore.OpenConnectionAsync())
+        {
+            await using (var archived = TestSqliteCommand(connection,
+                "SELECT destination,vehicle_id,source_vehicle_id FROM archive_stock_movements WHERE original_id=@id", ("@id", usedFromVan.Movement.Id)))
+            await using (var reader = await archived.ExecuteReaderAsync())
+                Check(await reader.ReadAsync() && reader.GetInt32(0) == (int)ExitDestination.Beneficiary && reader.IsDBNull(1) && reader.GetInt32(2) == van.Id,
+                    "The archive of a deleted movement keeps its destination and vehicles");
+            var legacyProduct = await CreateProductAsync(vsProducts, new ProductInput { Name = "Produs iesire veche", Category = "Masini", Subcategory = "Test" });
+            await using var legacyRow = TestSqliteCommand(connection, """
+                INSERT INTO stock_movements(product_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc)
+                VALUES(@product,1,@now,0,'2026-09-20','Iesire veche','sistem',0,@now); SELECT last_insert_rowid();
+                """, ("@product", legacyProduct.Id), ("@now", DateTime.UtcNow.ToString("O")));
+            var legacyId = Convert.ToInt32(await legacyRow.ExecuteScalarAsync());
+            var xLegacy = (await vsMovements.GetAsync(legacyId))!;
+            Check(xLegacy.Destination is null && xLegacy.Effect == -1 && StockMovementInput.From(xLegacy).Destination is null &&
+                  StockMovementInput.From(xLegacy with { BeneficiaryId = 1 }).Destination == ExitDestination.Beneficiary,
+                "An exit recorded before destinations existed keeps its effect and has no destination");
+            var xLegacyEdit = StockMovementInput.From(xLegacy); xLegacyEdit.Quantity = 2; xLegacyEdit.Reason = "Completare";
+            Check((await RefusedAsync(() => vsMovements.UpdateAsync(xLegacy, xLegacyEdit)))?.Message == StockMovementRules.DestinationRequiredMessage,
+                "Editing an older exit requires choosing its destination");
+        }
+
+        // Two sessions cannot use the same pieces of a vehicle twice.
+        var concurrentVehicle = await vsVehicles.CreateAsync(new VehicleInput { PlateNumber = "CJ-77-XYZ", Description = "Masina concurenta" });
+        await vsMovements.CreateAsync(otherProduct.Id, InputOf(StockMovementKind.Entry, 10));
+        await vsMovements.CreateAsync(otherProduct.Id, InputOf(StockMovementKind.Exit, 4, ExitDestination.Vehicle, vehicleId: concurrentVehicle.Id));
+        var raced = await Task.WhenAll(Enumerable.Range(0, 4).Select(async index =>
+        {
+            try
+            {
+                await new SqliteStockMovementRepository(vsStore, vsAccess).CreateAsync(otherProduct.Id,
+                    InputOf(StockMovementKind.Exit, 3, ExitDestination.GenericSale, sourceId: concurrentVehicle.Id, description: "Concurent " + index));
+                return true;
+            }
+            catch (Exception exception) when (exception is StockMovementOperationException or Microsoft.Data.Sqlite.SqliteException) { return false; }
+        }));
+        Check(raced.Count(created => created) == 1 && (await vsMovements.GetVehicleStocksAsync(otherProduct.Id)).Single().Quantity == 1,
+            "Two sessions cannot take more from a vehicle than it holds");
+        Check((await vsProducts.GetProductAsync(otherProduct.Id))!.Quantity == (await vsMovements.GetPageAsync(otherProduct.Id, allMovements)).Items.Sum(m => m.Effect),
+            "The total stock equals the sum of the movement effects");
+        await Rejected(async () => await vsProducts.DeleteAsync((await vsProducts.GetProductAsync(otherProduct.Id))!, "Test automat"), "A product with pieces in vehicles cannot be deleted");
+
+        // Restart: vehicle quantities are derived from the stored movements.
+        var vsRestarted = new SqliteLocalStore(vsEnvironment, vsConfiguration, NullLogger<SqliteLocalStore>.Instance);
+        var restartedStocks = await new SqliteStockMovementRepository(vsRestarted, vsAccess).GetVehicleStocksAsync(vsProduct.Id);
+        Check(restartedStocks.Count == 2 && restartedStocks.Sum(item => item.Quantity) == (await vsMovements.GetPageAsync(vsProduct.Id, allMovements)).InVehicles,
+            "The quantities held by vehicles survive a restart");
+    }
+    finally
+    {
+        try { Directory.Delete(vehicleStockRoot, true); } catch (IOException) { }
+    }
 }
 
 // Databases created before this module keep their stock_movements rows and receive the new columns.

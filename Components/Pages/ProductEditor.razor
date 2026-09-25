@@ -1,5 +1,6 @@
 @using BlazorStoc.Services
 @inject IProductRepository Repository
+@inject IStockMovementRepository Movements
 @inject IProductImageStore ImageStore
 @inject AppMode Mode
 @inject ILogger<ProductEditor> Logger
@@ -41,7 +42,7 @@
                 </div>
                 <div class="form-note full-width" id="product-stock">
                     @if (Original is null) { <span>Produsul nou este creat cu stoc 0. Stocul se modifică numai prin intrări și ieșiri.</span> }
-                    else { <span>Stoc curent: <strong>@Original.Quantity buc.</strong> Stocul nu se editează aici; se modifică numai prin intrări și ieșiri.</span> }
+                    else { <span>Stoc curent: <strong>@Original.Quantity buc.</strong>@if (inVehicles > 0) { <text> (@(Original.Quantity - inVehicles) în depozit, @inVehicles în vehicule)</text> } Stocul nu se editează aici; se modifică numai prin intrări și ieșiri.</span> }
                 </div>
                 @if (Original is not null)
                 {
@@ -86,6 +87,17 @@
         .Select(group => group.Subcategory).Where(value => !string.IsNullOrWhiteSpace(value))
         .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToArray();
     private bool HasSelectableGroup => Categories.Count > 0 && Subcategories.Count > 0;
+
+    private int inVehicles;
+
+    // The part of the stock held by vehicles is shown next to the total (best effort: the editor works without it).
+    protected override async Task OnInitializedAsync()
+    {
+        if (Original is null) return;
+        try { inVehicles = (await Movements.GetVehicleStocksAsync(Original.Id, lifetime.Token)).Sum(stock => stock.Quantity); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Vehicle stock loading failed ({ErrorType}).", exception.GetType().Name); }
+    }
 
     protected override void OnInitialized()
     {

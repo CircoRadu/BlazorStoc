@@ -96,6 +96,8 @@ public static class VehicleNavigation
 {
     // The event stores the vehicle id; the administration page opens the editor of that vehicle.
     public static string EditUrl(int vehicleId) => $"/vehicule?edit={vehicleId}";
+    // Where links to a vehicle point (the movements table); it moves to the vehicle page when that page exists.
+    public static string PageUrl(int vehicleId) => EditUrl(vehicleId);
 }
 
 public static class VehicleRules

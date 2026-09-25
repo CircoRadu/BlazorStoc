@@ -6,6 +6,7 @@
 @inject IProductRepository Products
 @inject IStockMovementRepository Movements
 @inject IBeneficiaryRepository Beneficiaries
+@inject IVehicleRepository VehicleRepository
 @inject IProjectRepository Projects
 @inject IAccessControl Access
 @inject NavigationManager Navigation
@@ -88,13 +89,13 @@ else
                         </div>
                         @if (form.Kind == StockMovementKind.Exit)
                         {
-                            <RelationPicker Prefix="add" Beneficiaries="beneficiaries" Projects="projects" Disabled="saving"
-                                            UseBeneficiary="useBeneficiary" UseProject="useProject"
-                                            BeneficiaryId="form.BeneficiaryId" ProjectId="form.ProjectId"
-                                            BeneficiaryToggled="v => ToggleBeneficiaryAsync(form, v, false)"
-                                            ProjectToggled="v => ToggleProject(form, v, false)"
-                                            BeneficiaryChanged="id => SelectBeneficiaryAsync(form, id, false)"
-                                            ProjectChanged="id => SetProject(form, id)" />
+                            <ExitDestinationPicker @ref="addPicker" Prefix="add" Model="form" Beneficiaries="beneficiaries" Projects="projects"
+                                                   Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="saving" UseProject="useProject"
+                                                   DestinationChanged="() => DestinationChangedAsync(false)"
+                                                   VehicleChanged="() => { ApplySuggestion(false); return Task.CompletedTask; }"
+                                                   BeneficiaryChanged="id => SelectBeneficiaryAsync(form, id, false)"
+                                                   ProjectToggled="v => ToggleProject(form, v, false)"
+                                                   ProjectChanged="id => SetProject(form, id)" />
                         }
                         <label class="movement-description" for="movement-description">Descriere *
                             <InputTextArea id="movement-description" @bind-Value="form.Description" rows="3" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
@@ -113,7 +114,8 @@ else
     <section class="movement-card movement-history" aria-labelledby="movement-list-title">
         <div class="movement-list-head">
             <h2 id="movement-list-title">Intrări/ieșiri produs: @product.Name</h2>
-            <span class="movement-stock @StockClass" role="status">Total produse în stoc: <strong>@stock</strong></span>
+            <span class="movement-stock @StockClass" role="status">Total produse în stoc: <strong>@stock</strong>
+                @if (StockMovementRules.StockSplit(stock, inVehicles) is { } breakdown) { <small class="movement-breakdown">· @breakdown</small> }</span>
         </div>
         <div class="movement-filters">
             <fieldset class="movement-radios">
@@ -142,7 +144,7 @@ else
                 <table class="movement-table">
                     <thead><tr>
                         <th aria-sort="@(descending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleSortAsync" aria-label="Sortează după dată @(descending ? "crescător" : "descrescător")">DATA <span aria-hidden="true">@(descending ? "▼" : "▲")</span></button></th>
-                        <th>INTRARE/IEȘIRE</th><th class="number">NUMĂR BUCĂȚI</th><th>DESCRIERE</th><th>BENEFICIAR/PROIECT</th>
+                        <th>INTRARE/IEȘIRE</th><th class="number">NUMĂR BUCĂȚI</th><th>DESCRIERE</th><th>BENEFICIAR/PROIECT</th><th>VEHICUL</th>
                         @if (canManage) { <th><span class="sr-only">Acțiuni</span></th> }
                     </tr></thead>
                     <tbody>
@@ -159,6 +161,14 @@ else
                                         <a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a>
                                         @if (m.ProjectName is not null) { <span class="movement-project"> · <a class="category-table-link" href="@($"/proiecte/{m.ProjectId}")">@m.ProjectName</a></span> }
                                     }
+                                    else if (m.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection)
+                                    {
+                                        <span class="destination-label">@StockMovementRules.DestinationLabel(m.Destination.Value)</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (m.VehiclePlate is not null) { <span class="movement-project">în <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.VehicleId!.Value)">@m.VehiclePlate</a></span> }
+                                    @if (m.SourceVehiclePlate is not null) { <span class="movement-project">din <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.SourceVehicleId!.Value)">@m.SourceVehiclePlate</a></span> }
                                 </td>
                                 @if (canManage)
                                 {
@@ -207,13 +217,14 @@ else
                         @if (editing.Kind == StockMovementKind.Exit)
                         {
                             <div class="full-width">
-                                <RelationPicker Prefix="edit" Beneficiaries="beneficiaries" Projects="editProjects" Disabled="editSaving"
-                                                UseBeneficiary="editUseBeneficiary" UseProject="editUseProject"
-                                                BeneficiaryId="editForm.BeneficiaryId" ProjectId="editForm.ProjectId"
-                                                BeneficiaryToggled="v => ToggleBeneficiaryAsync(editForm, v, true)"
-                                                ProjectToggled="v => ToggleProject(editForm, v, true)"
-                                                BeneficiaryChanged="id => SelectBeneficiaryAsync(editForm, id, true)"
-                                                ProjectChanged="id => SetProject(editForm, id)" />
+                                <ExitDestinationPicker @ref="editPicker" Prefix="edit" Model="editForm" Beneficiaries="beneficiaries" Projects="editProjects"
+                                                       Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="editSaving" UseProject="editUseProject"
+                                                       EditingSourceVehicleId="editing.SourceVehicleId" EditingQuantity="editing.Quantity"
+                                                       DestinationChanged="() => DestinationChangedAsync(true)"
+                                                       VehicleChanged="() => { ApplySuggestion(true); return Task.CompletedTask; }"
+                                                       BeneficiaryChanged="id => SelectBeneficiaryAsync(editForm, id, true)"
+                                                       ProjectToggled="v => ToggleProject(editForm, v, true)"
+                                                       ProjectChanged="id => SetProject(editForm, id)" />
                             </div>
                         }
                         <label class="full-width" for="edit-description">Descriere *<InputTextArea id="edit-description" @bind-Value="editForm.Description" rows="3" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
@@ -278,20 +289,26 @@ else
     private static readonly int[] PageSizes = [10, 20, 50, 0];
     private Product? product;
     private StockMovementPage pageData = new([], 0, 0, false);
-    private int stock;
+    private int stock, inVehicles;
     private bool loading = true, canManage, saving, editSaving, deleteBusy, imagePreview;
     private string? error, notice, formError, editError, deleteError, historyError;
     private StockMovementKind? filter;
     private bool descending;
     private int pageNumber = 1, pageSize = 10;
     private StockMovementInput form = NewForm();
-    private bool useBeneficiary, useProject;
+    private bool useProject;
     private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
+    private IReadOnlyList<Vehicle> vehicles = Array.Empty<Vehicle>();
+    private IReadOnlyList<VehicleStock> vehicleStocks = Array.Empty<VehicleStock>();
+    private bool vehiclesLoaded;
+    private ExitDestinationPicker? addPicker, editPicker;
+    // The description proposed by the form (destination vehicle, stock correction); replaced only while untouched.
+    private string? addSuggestion, editSuggestion;
     private IReadOnlyList<AuditChange>? pendingEditChanges;
     private IReadOnlyList<Project> projects = Array.Empty<Project>(), editProjects = Array.Empty<Project>();
     private StockMovement? editing, deleting, historyFor;
     private StockMovementInput editForm = new();
-    private bool editUseBeneficiary, editUseProject;
+    private bool editUseProject;
     private IReadOnlyList<StockMovementHistoryEntry> history = Array.Empty<StockMovementHistoryEntry>();
     private readonly CancellationTokenSource lifetime = new();
 
@@ -308,12 +325,14 @@ else
         get
         {
             if (editing is null || editForm.Quantity is not { } quantity) return "—";
-            var correction = StockMovementRules.Effect(editing.Kind, quantity) - editing.Effect;
+            var correction = StockMovementRules.Effect(editing.Kind, editForm.Destination, quantity) - editing.Effect;
             return correction > 0 ? $"+{correction}" : correction.ToString();
         }
     }
     private string DeleteDescription => deleting is null ? string.Empty
-        : $"Stocul produsului va fi corectat cu {(deleting.Effect <= 0 ? "+" : "-")}{Math.Abs(deleting.Effect)} buc. Mișcarea și istoricul ei vor fi mutate în arhivă.";
+        : deleting.Effect == 0
+            ? "Stocul total al produsului nu se schimbă (produsul mutat în vehicul nu mai apare acolo). Mișcarea și istoricul ei vor fi mutate în arhivă."
+            : $"Stocul produsului va fi corectat cu {(deleting.Effect <= 0 ? "+" : "-")}{Math.Abs(deleting.Effect)} buc. Mișcarea și istoricul ei vor fi mutate în arhivă.";
 
     private static StockMovementInput NewForm() => new() { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
 
@@ -376,7 +395,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        if (product is not null && product.Id != Id) { product = null; filter = null; pageNumber = 1; form = NewForm(); useBeneficiary = useProject = false; }
+        if (product is not null && product.Id != Id) { product = null; filter = null; pageNumber = 1; form = NewForm(); useProject = false; addSuggestion = null; }
         if (product is null) await LoadAsync();
     }
 
@@ -403,7 +422,8 @@ else
         try
         {
             pageData = await Movements.GetPageAsync(Id, new StockMovementQuery(filter, descending, pageNumber, pageSize), lifetime.Token);
-            stock = pageData.Stock;
+            stock = pageData.Stock; inVehicles = pageData.InVehicles;
+            if (canManage) vehicleStocks = await Movements.GetVehicleStocksAsync(Id, lifetime.Token);
             var pages = TotalPages;
             if (pageNumber > pages) { pageNumber = pages; pageData = await Movements.GetPageAsync(Id, new StockMovementQuery(filter, descending, pageNumber, pageSize), lifetime.Token); }
             if (product is not null) product = product with { Quantity = stock };
@@ -425,28 +445,43 @@ else
     private async Task SetKindAsync(StockMovementKind kind)
     {
         form.Kind = kind; formError = null;
-        if (kind == StockMovementKind.Entry) { useBeneficiary = useProject = false; form.BeneficiaryId = form.ProjectId = null; }
-        else await EnsureBeneficiariesAsync();
+        if (kind == StockMovementKind.Entry)
+        {
+            useProject = false; form.BeneficiaryId = form.ProjectId = form.VehicleId = form.SourceVehicleId = null; form.Destination = null;
+            form.Description = StockMovementRules.ApplySuggestion(form.Description, addSuggestion, null); addSuggestion = null;
+        }
+        else { await EnsureBeneficiariesAsync(); await EnsureVehiclesAsync(); }
     }
 
-    private async Task ToggleBeneficiaryAsync(StockMovementInput target, bool value, bool isEdit)
+    private async Task EnsureVehiclesAsync()
     {
-        if (isEdit) editUseBeneficiary = value; else useBeneficiary = value;
-        if (value) { await EnsureBeneficiariesAsync(); return; }
-        target.BeneficiaryId = target.ProjectId = null;
-        if (isEdit) { editUseProject = false; editProjects = Array.Empty<Project>(); } else { useProject = false; projects = Array.Empty<Project>(); }
+        if (vehiclesLoaded) return;
+        try { vehicles = await VehicleRepository.GetVehiclesAsync(lifetime.Token); vehiclesLoaded = true; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogError("Vehicle list loading failed ({ErrorType}).", ex.GetType().Name); formError = "Lista vehiculelor nu a putut fi încărcată."; }
+    }
+
+    private async Task DestinationChangedAsync(bool isEdit)
+    {
+        var target = isEdit ? editForm : form;
+        if (isEdit) editError = null; else formError = null;
+        if (target.Destination == ExitDestination.Beneficiary) await EnsureBeneficiariesAsync();
+        if (!isEdit && target.Destination != ExitDestination.Beneficiary) { projects = Array.Empty<Project>(); }
+        if (isEdit && target.Destination != ExitDestination.Beneficiary) { editProjects = Array.Empty<Project>(); }
+        ApplySuggestion(isEdit);
+    }
+
+    // Proposes the description for a vehicle transfer or a stock correction; text typed by the user is never overwritten.
+    private void ApplySuggestion(bool isEdit)
+    {
+        var target = isEdit ? editForm : form;
+        var plate = target.VehicleId is { } vehicleId ? vehicles.FirstOrDefault(vehicle => vehicle.Id == vehicleId)?.PlateNumber : null;
+        var suggestion = StockMovementRules.SuggestedDescription(target.Destination, plate, StockMovementRules.Today);
+        target.Description = StockMovementRules.ApplySuggestion(target.Description, isEdit ? editSuggestion : addSuggestion, suggestion);
+        if (isEdit) editSuggestion = suggestion; else addSuggestion = suggestion;
     }
 
     private static void SetProject(StockMovementInput target, int? projectId) => target.ProjectId = projectId;
-
-    // A checked "Beneficiar"/"Proiect" box without a selection is refused instead of silently ignored.
-    private static string? RelationError(StockMovementKind kind, bool useBeneficiary, bool useProject, StockMovementInput input)
-    {
-        if (kind != StockMovementKind.Exit) return null;
-        if (useBeneficiary && input.BeneficiaryId is null) return "Alege un beneficiar din listă sau debifează opțiunea beneficiar.";
-        if (useProject && input.ProjectId is null) return "Alege un proiect din listă sau debifează opțiunea proiect.";
-        return null;
-    }
 
     private void ToggleProject(StockMovementInput target, bool value, bool isEdit)
     {
@@ -470,14 +505,14 @@ else
     private async Task AddAsync()
     {
         if (saving || product is null) return;
-        formError = RelationError(form.Kind, useBeneficiary, useProject, form);
+        formError = form.Kind == StockMovementKind.Exit ? addPicker?.ValidationError() : null;
         if (formError is not null) return;
         saving = true; notice = null;
         try
         {
             var result = await Movements.CreateAsync(product.Id, form, lifetime.Token);
             stock = result.Stock; product = product with { Quantity = stock };
-            form.Description = ""; form.Quantity = null; addTracker?.Rebase();
+            form.Description = ""; form.Quantity = null; addSuggestion = null; ApplySuggestion(false); addTracker?.Rebase();
             notice = $"Mișcarea a fost adăugată. Stoc curent: {stock} buc.";
             pageNumber = 1; await LoadPageAsync();
         }
@@ -496,10 +531,11 @@ else
     private async Task OpenEditAsync(StockMovement movement)
     {
         notice = null; editError = null; editing = movement; editForm = StockMovementInput.From(movement);
-        editUseBeneficiary = movement.BeneficiaryId is not null; editUseProject = movement.ProjectId is not null; editProjects = Array.Empty<Project>();
+        editUseProject = movement.ProjectId is not null; editProjects = Array.Empty<Project>(); editSuggestion = null;
         if (movement.Kind == StockMovementKind.Exit)
         {
             await EnsureBeneficiariesAsync();
+            await EnsureVehiclesAsync();
             if (movement.BeneficiaryId is { } beneficiaryId)
             {
                 try { editProjects = await Projects.GetForBeneficiaryAsync(beneficiaryId, lifetime.Token); }
@@ -513,19 +549,25 @@ else
     private Task SaveEditAsync()
     {
         if (editSaving || editing is null) return Task.CompletedTask;
-        editError = RelationError(editing.Kind, editUseBeneficiary, editUseProject, editForm);
+        editError = editing.Kind == StockMovementKind.Exit ? editPicker?.ValidationError() : null;
         if (editError is not null) return Task.CompletedTask;
         try
         {
             var value = StockMovementRules.Validated(editForm, editing.Kind, true);
-            string? BeneficiaryName(int? id) => editUseBeneficiary ? beneficiaries.FirstOrDefault(item => item.Id == id)?.Name : null;
+            string? BeneficiaryName(int? id) => value.Destination == ExitDestination.Beneficiary ? beneficiaries.FirstOrDefault(item => item.Id == id)?.Name : null;
             string? ProjectName(int? id) => editUseProject ? editProjects.FirstOrDefault(item => item.Id == id)?.Name : null;
+            string? VehiclePlate(int? id) => vehicles.FirstOrDefault(item => item.Id == id)?.PlateNumber;
+            string SourceText(int? id) => id is null ? "Depozit" : $"Mașina {VehiclePlate(id)}";
             pendingEditChanges = SaveSummary.Changed(
                 new("Data", StockMovementRules.DisplayDate(editing.Date), StockMovementRules.DisplayDate(value.Date!.Value)),
                 new("Cantitate", editing.Quantity.ToString(), value.Quantity!.Value.ToString()),
                 new("Descriere", editing.Description, value.Description),
+                new("Destinație", editing.Destination is { } oldDestination ? StockMovementRules.DestinationLabel(oldDestination) : "—",
+                    value.Destination is { } newDestination ? StockMovementRules.DestinationLabel(newDestination) : "—"),
                 new("Beneficiar", editing.BeneficiaryName ?? "—", BeneficiaryName(value.BeneficiaryId) ?? "—"),
-                new("Proiect", editing.ProjectName ?? "—", ProjectName(value.ProjectId) ?? "—"));
+                new("Proiect", editing.ProjectName ?? "—", ProjectName(value.ProjectId) ?? "—"),
+                new("Vehicul", editing.VehiclePlate ?? "—", VehiclePlate(value.VehicleId) ?? "—"),
+                new("Sursă", StockMovementRules.SourceLabel(editing), SourceText(value.SourceVehicleId)));
         }
         catch (StockMovementOperationException exception) { editError = exception.Message; }
         return Task.CompletedTask;
@@ -555,9 +597,9 @@ else
 
     // Task 1: leaving the add form or the edit dialog with modified values asks for confirmation first.
     private UnsavedChangesTracker? addTracker, editTracker;
-    private string AddSnapshot() => FormSnapshot.Of(form, useBeneficiary, useProject);
-    private string EditSnapshot() => FormSnapshot.Of(editForm, editUseBeneficiary, editUseProject);
-    private Task DiscardAddAsync() { form = NewForm(); useBeneficiary = useProject = false; formError = null; addTracker?.Rebase(); return Task.CompletedTask; }
+    private string AddSnapshot() => FormSnapshot.Of(form, useProject);
+    private string EditSnapshot() => FormSnapshot.Of(editForm, editUseProject);
+    private Task DiscardAddAsync() { form = NewForm(); useProject = false; addSuggestion = null; formError = null; addTracker?.Rebase(); return Task.CompletedTask; }
     private Task DiscardEditAsync() { CloseEdit(); return Task.CompletedTask; }
     private Task RequestCloseEditAsync() => editTracker is null ? DiscardEditAsync() : editTracker.RunAfterConfirmAsync(DiscardEditAsync);
     private void ImageKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") imagePreview = false; }

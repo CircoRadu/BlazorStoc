@@ -1,0 +1,203 @@
+@using BlazorStoc.Services
+
+@* Destination and source of a stock exit. The destination (beneficiary with an optional project, vehicle, generic sale or
+   stock correction) is required; the source is the warehouse or a vehicle holding the product. The model is changed
+   in place; the callbacks let the page load projects and update the suggested description. *@
+<div class="relation-picker exit-picker">
+    <fieldset class="destination-group" disabled="@Disabled">
+        <legend>Destinația ieșirii *</legend>
+        <div class="destination-options">
+            @foreach (var option in Destinations)
+            {
+                <label><input type="radio" name="@($"{Prefix}-destination")" id="@($"{Prefix}-destination-{(int)option}")"
+                              checked="@(Model.Destination == option)" @onchange="() => SelectDestinationAsync(option)" /> @StockMovementRules.DestinationLabel(option)</label>
+            }
+        </div>
+    </fieldset>
+
+    @if (Model.Destination == ExitDestination.Beneficiary)
+    {
+        <div class="relation-row">
+            <span class="relation-check">Beneficiar</span>
+            <input type="search" class="relation-filter" placeholder="Caută beneficiar…" aria-label="Caută beneficiar"
+                   value="@filter" disabled="@Disabled" @oninput="args => filter = args.Value?.ToString() ?? string.Empty" />
+            <select id="@($"{Prefix}-beneficiary")" aria-label="Beneficiar" disabled="@Disabled"
+                    @onchange="args => SelectBeneficiaryAsync(ParseId(args.Value))">
+                <option value="" selected="@(Model.BeneficiaryId is null)">— alege beneficiarul —</option>
+                @foreach (var beneficiary in Visible)
+                {
+                    <option value="@beneficiary.Id" selected="@(Model.BeneficiaryId == beneficiary.Id)">@beneficiary.Name</option>
+                }
+            </select>
+        </div>
+        <div class="relation-row">
+            <label class="relation-check" for="@($"{Prefix}-use-project")">
+                <input id="@($"{Prefix}-use-project")" type="checkbox" checked="@UseProject"
+                       disabled="@(Disabled || Model.BeneficiaryId is null)"
+                       @onchange="args => ProjectToggled.InvokeAsync(args.Value is true)" /> Proiect</label>
+            @if (UseProject)
+            {
+                <select id="@($"{Prefix}-project")" aria-label="Proiect" disabled="@Disabled"
+                        @onchange="args => ProjectChanged.InvokeAsync(ParseId(args.Value))">
+                    <option value="" selected="@(Model.ProjectId is null)">— alege proiectul —</option>
+                    @foreach (var project in Projects)
+                    {
+                        <option value="@project.Id" selected="@(Model.ProjectId == project.Id)">@project.Name</option>
+                    }
+                </select>
+                @if (Projects.Count == 0) { <small class="form-note">Beneficiarul ales nu are proiecte.</small> }
+            }
+        </div>
+    }
+    else if (Model.Destination == ExitDestination.Vehicle)
+    {
+        <div class="relation-row">
+            <span class="relation-check">Autovehicul</span>
+            @if (Vehicles.Count == 0)
+            {
+                <small class="form-note">Nu există vehicule. Adaugă un vehicul în <a href="/vehicule">pagina Vehicule</a>.</small>
+            }
+            else
+            {
+                <select id="@($"{Prefix}-vehicle")" aria-label="Autovehicul" disabled="@Disabled"
+                        @onchange="args => SelectVehicleAsync(ParseId(args.Value))">
+                    <option value="" selected="@(Model.VehicleId is null)">— alege vehiculul —</option>
+                    @foreach (var vehicle in Vehicles)
+                    {
+                        <option value="@vehicle.Id" selected="@(Model.VehicleId == vehicle.Id)">@vehicle.PlateNumber · @vehicle.Description</option>
+                    }
+                </select>
+                <small class="form-note">Produsul se mută în vehicul: stocul total nu se schimbă.</small>
+            }
+        </div>
+    }
+    else if (Model.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection)
+    {
+        <small class="form-note">@(Model.Destination == ExitDestination.GenericSale ? "Vânzare fără beneficiar sau proiect." : "Corecție a stocului, fără beneficiar, proiect sau vehicul.")</small>
+    }
+
+    <fieldset class="destination-group" disabled="@Disabled">
+        <legend>Sursa produsului *</legend>
+        <div class="destination-options">
+            <label><input type="radio" name="@($"{Prefix}-source")" id="@($"{Prefix}-source-warehouse")" checked="@(!sourceIsVehicle)"
+                          @onchange="() => SelectSourceAsync(false)" /> Depozit</label>
+            <label><input type="radio" name="@($"{Prefix}-source")" id="@($"{Prefix}-source-vehicle")" checked="@sourceIsVehicle"
+                          disabled="@(Model.Destination == ExitDestination.Vehicle)"
+                          @onchange="() => SelectSourceAsync(true)" /> Mașină</label>
+        </div>
+        @if (Model.Destination == ExitDestination.Vehicle)
+        {
+            <small class="form-note">Transferul dintr-o mașină în alta se face din pagina vehiculului.</small>
+        }
+    </fieldset>
+    @if (sourceIsVehicle)
+    {
+        <div class="relation-row">
+            <span class="relation-check">Mașina sursă</span>
+            @if (Vehicles.Count == 0)
+            {
+                <small class="form-note">Nu există vehicule. Adaugă un vehicul în <a href="/vehicule">pagina Vehicule</a>.</small>
+            }
+            else
+            {
+                <select id="@($"{Prefix}-source-select")" aria-label="Mașina din care se scoate produsul" disabled="@Disabled"
+                        @onchange="args => SelectSourceVehicleAsync(ParseId(args.Value))">
+                    <option value="" selected="@(Model.SourceVehicleId is null)">— alege mașina —</option>
+                    @foreach (var vehicle in Vehicles)
+                    {
+                        <option value="@vehicle.Id" selected="@(Model.SourceVehicleId == vehicle.Id)">@vehicle.PlateNumber · @vehicle.Description · @Available(vehicle.Id) buc.</option>
+                    }
+                </select>
+                @if (Model.SourceVehicleId is { } chosen)
+                {
+                    <small class="form-note" role="status">Disponibil în mașină: <strong>@Available(chosen) buc.</strong></small>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly ExitDestination[] Destinations =
+        [ExitDestination.Beneficiary, ExitDestination.Vehicle, ExitDestination.GenericSale, ExitDestination.StockCorrection];
+
+    [Parameter, EditorRequired] public string Prefix { get; set; } = "";
+    [Parameter, EditorRequired] public StockMovementInput Model { get; set; } = new();
+    [Parameter] public IReadOnlyList<Beneficiary> Beneficiaries { get; set; } = Array.Empty<Beneficiary>();
+    [Parameter] public IReadOnlyList<Project> Projects { get; set; } = Array.Empty<Project>();
+    [Parameter] public IReadOnlyList<Vehicle> Vehicles { get; set; } = Array.Empty<Vehicle>();
+    [Parameter] public IReadOnlyList<VehicleStock> VehicleStocks { get; set; } = Array.Empty<VehicleStock>();
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool UseProject { get; set; }
+    // A movement being edited already accounts for its own quantity in the source vehicle: it is added back.
+    [Parameter] public int? EditingSourceVehicleId { get; set; }
+    [Parameter] public int EditingQuantity { get; set; }
+    [Parameter] public EventCallback DestinationChanged { get; set; }
+    [Parameter] public EventCallback VehicleChanged { get; set; }
+    [Parameter] public EventCallback<int?> BeneficiaryChanged { get; set; }
+    [Parameter] public EventCallback<bool> ProjectToggled { get; set; }
+    [Parameter] public EventCallback<int?> ProjectChanged { get; set; }
+    private string filter = "";
+    private bool sourceIsVehicle;
+    private bool initialized;
+
+    protected override void OnParametersSet()
+    {
+        if (!initialized) { sourceIsVehicle = Model.SourceVehicleId is not null; initialized = true; }
+    }
+
+    private IEnumerable<Beneficiary> Visible => string.IsNullOrWhiteSpace(filter)
+        ? Beneficiaries
+        : Beneficiaries.Where(beneficiary => beneficiary.Id == Model.BeneficiaryId ||
+                                             beneficiary.Name.Contains(filter.Trim(), StringComparison.CurrentCultureIgnoreCase));
+
+    private int Available(int vehicleId) =>
+        (VehicleStocks.FirstOrDefault(stock => stock.VehicleId == vehicleId)?.Quantity ?? 0) +
+        (EditingSourceVehicleId == vehicleId ? EditingQuantity : 0);
+
+    // Errors the page cannot get from the server before saving: a checked project or vehicle source left unselected.
+    public string? ValidationError()
+    {
+        if (Model.Destination == ExitDestination.Beneficiary && UseProject && Model.ProjectId is null)
+            return "Alege un proiect din listă sau debifează opțiunea proiect.";
+        if (sourceIsVehicle && Model.SourceVehicleId is null)
+            return "Alege mașina din care se scoate produsul sau alege depozitul.";
+        return null;
+    }
+
+    private async Task SelectDestinationAsync(ExitDestination destination)
+    {
+        Model.Destination = destination;
+        if (destination != ExitDestination.Beneficiary)
+        {
+            Model.BeneficiaryId = null; Model.ProjectId = null;
+            if (UseProject) await ProjectToggled.InvokeAsync(false);
+        }
+        if (destination != ExitDestination.Vehicle) Model.VehicleId = null;
+        else if (sourceIsVehicle) { sourceIsVehicle = false; Model.SourceVehicleId = null; }
+        await DestinationChanged.InvokeAsync();
+    }
+
+    private async Task SelectBeneficiaryAsync(int? id)
+    {
+        Model.BeneficiaryId = id; Model.ProjectId = null;
+        await BeneficiaryChanged.InvokeAsync(id);
+    }
+
+    private async Task SelectVehicleAsync(int? id)
+    {
+        Model.VehicleId = id;
+        await VehicleChanged.InvokeAsync();
+    }
+
+    private Task SelectSourceAsync(bool vehicle)
+    {
+        sourceIsVehicle = vehicle;
+        if (!vehicle) Model.SourceVehicleId = null;
+        return Task.CompletedTask;
+    }
+
+    private Task SelectSourceVehicleAsync(int? id) { Model.SourceVehicleId = id; return Task.CompletedTask; }
+
+    private static int? ParseId(object? value) => int.TryParse(value?.ToString(), out var id) ? id : null;
+}

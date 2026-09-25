@@ -99,6 +99,10 @@ public sealed class SqliteVehicleRepository(SqliteLocalStore store, IAccessContr
             try
             {
                 VehicleRules.CheckCurrent(await GetAsync(connection, transaction, original.Id, token).ConfigureAwait(false), original);
+                await using (var relations = SqliteLocalStore.Command(connection, transaction, """
+                    SELECT EXISTS(SELECT 1 FROM stock_movements WHERE vehicle_id=@id OR source_vehicle_id=@id)
+                    """, ("@id", original.Id)))
+                    VehicleRules.CheckDelete(Convert.ToBoolean(await relations.ExecuteScalarAsync(token).ConfigureAwait(false)));
                 await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, [], token).ConfigureAwait(false);
                 await using var delete = SqliteLocalStore.Command(connection, transaction,
                     "DELETE FROM vehicles WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));

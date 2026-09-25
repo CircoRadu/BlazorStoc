@@ -905,3 +905,37 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu se aplica (documentatie).
 - **Commit:** `claude: confirm partial quantity and vehicle-transfer decisions in TODO`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T12:25:16.9139442Z â€” claude
+
+- **Task:** Task 2: iesire spre vehicul, vanzare generica si corectie de stoc
+- **Rezumat:** Task 2 implementat: iesire spre vehicul, vanzare generica si corectie de stoc. Formularul de iesire are destinatie obligatorie (Beneficiar / Autovehicul / Vanzare generica / Corectie stoc, fara preselectie, validata si pe server) si sursa Depozit/Masina; din masina nu se poate scoate mai mult decat contine (verificat in tranzactie, editarile si stergerile nu pot lasa o masina negativa). Iesirea spre autovehicul nu scade stocul total (efect 0); cantitatea din masini este derivata din miscari; defalcarea X in depozit, Y in vehicule apare doar cand exista produse in masini (pagina miscarilor, catalog, editor produs). Descriere precompletata cu data de azi, coloana VEHICUL, jurnal si arhiva cu destinatie/vehicul/sursa, coloana MISCARI si stergere blocata la vehicule cu miscari. SQLite schema 10, MariaDB coloane noi in io si arhiva v6. Componenta noua ExitDestinationPicker inlocuieste RelationPicker. TODO: task arhivat, pagina vehiculului renumerotata 2, inventarul poate folosi WarehouseStock. Documentatie actualizata; corectate doua corupții din documente (antetul din VALIDARE si linia Stare ciclu din PROJECT_STATE).
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Components/Pages/Home.razor`
+  - `Components/Pages/ProductEditor.razor`
+  - `Components/Pages/ProductMovements.razor`
+  - `Components/Pages/Vehicles.razor`
+  - `Components/Shared/ExitDestinationPicker.razor`
+  - `Components/Shared/RelationPicker.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `README.md`
+  - `Services/ArchivePersistence.cs`
+  - `Services/MariaArchiveSchema.cs`
+  - `Services/MariaStockMovementRepository.cs`
+  - `Services/MariaVehicleRepository.cs`
+  - `Services/ProductInput.cs`
+  - `Services/SqliteLocalStore.cs`
+  - `Services/SqliteStockMovementRepository.cs`
+  - `Services/SqliteVehicleRepository.cs`
+  - `Services/StockMovements.cs`
+  - `Services/Vehicles.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+- **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 505 PASS (41 noi), 0 FAIL; browser pe instanta de proba 5084 (radio, mesaje, precompletari, transfer 4 buc, folosire din masina, editare refuzata, catalog, Vehicule, 375/768 px). Neverificat: MariaDB pe server real (TESTE_RAMASE A10). Preview pornit pe 5082.
+- **Commit:** `claude: exit destinations, vehicle source and stock held by vehicles`
+- **Predat cÄƒtre:** codex

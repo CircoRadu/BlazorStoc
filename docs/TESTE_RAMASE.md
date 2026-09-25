@@ -118,6 +118,12 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 - **Așteptat**: niciodată două rânduri cu același număr; ștergerea nu lasă un vehicul parțial arhivat.
 - **Sursă**: administrarea vehiculelor.
 
+### A10. Destinații și mașini pe MariaDB
+- **Verifică**: coloanele adăugate la `io` (`io_destinatie`, `id_vehicul`, `id_vehicul_sursa`), tabela `vehicul` creată de `MariaStockMovementRepository`, interogările cantității din mașini (`VehicleQuantitiesAsync`, subinterogare cu alias), coloanele noi din `archive_stock_movements` (`MariaArchiveSchema`, versiunea 6, `ALTER` pe o arhivă existentă) și blocarea ștergerii unui vehicul cu mișcări (`VehicleHasMovementsAsync`).
+- **Pași**: (1) pornește în modul MariaDB pe o bază cu mișcări vechi; (2) deschide un produs și verifică `SHOW COLUMNS FROM io` și `SHOW TABLES` (`vehicul`); (3) adaugă un vehicul și o intrare de 10 buc., apoi o ieșire spre autovehicul de 4 buc. → totalul (`produs_cantitate`) rămâne 10, „6 în depozit, 4 în vehicule”; (4) ieșire din mașină de 3 buc. → total 7, mașina 1; peste 1 buc. → mesajul cu cantitatea disponibilă; (5) din două tab-uri, ieșiri simultane din aceeași mașină → una singură reușește; (6) șterge o mișcare, apoi încearcă ștergerea vehiculului cu mișcări → refuz; (7) `SELECT * FROM archive_stock_movements` conține destinația și vehiculele.
+- **Așteptat**: totalul = suma efectelor; nicio mașină cu cantitate negativă; mișcările vechi (fără destinație) rămân neschimbate; aplicația veche nu este afectată de coloanele noi (o ieșire spre mașină apare în ea ca ieșire obișnuită — de ținut minte la folosirea în paralel).
+- **Sursă**: ieșire spre vehicul, vânzare generică și corecție de stoc.
+
 ## B. Mai mulți utilizatori și mai multe calculatoare (motiv: M2, M6)
 
 ### B1. Două calculatoare, două conturi distincte

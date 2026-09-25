@@ -4,7 +4,7 @@ namespace BlazorStoc.Services;
 
 public static class MariaArchiveSchema
 {
-    public const int Version = 5;
+    public const int Version = 6;
 
     public static async Task InitializeAsync(IConfiguration configuration,
         CancellationToken cancellationToken = default)
@@ -15,6 +15,18 @@ public static class MariaArchiveSchema
         {
             await using var command = new MySqlCommand(statement, connection);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        // archive_stock_movements created by an earlier version gains the destination and vehicle columns.
+        foreach (var (column, definition) in new[] { ("destination", "TINYINT NULL"), ("vehicle_id", "INT NULL"), ("source_vehicle_id", "INT NULL") })
+        {
+            await using var exists = new MySqlCommand("""
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='archive_stock_movements' AND COLUMN_NAME=@column
+                """, connection);
+            exists.Parameters.AddWithValue("@column", column);
+            if (Convert.ToInt32(await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) > 0) continue;
+            await using var alter = new MySqlCommand($"ALTER TABLE archive_stock_movements ADD COLUMN {column} {definition}", connection);
+            await alter.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -167,6 +179,9 @@ public static class MariaArchiveSchema
             project_id INT NULL,
             operator VARCHAR(191) NOT NULL,
             version BIGINT UNSIGNED NOT NULL,
+            destination TINYINT NULL,
+            vehicle_id INT NULL,
+            source_vehicle_id INT NULL,
             INDEX ix_archive_stock_movements_original(original_id),
             CONSTRAINT fk_archive_stock_movements_operation FOREIGN KEY(archive_id) REFERENCES archive_operations(id) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

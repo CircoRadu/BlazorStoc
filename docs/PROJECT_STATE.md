@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **25 septembrie 2026**
-Beneficiar/Proiect din tabelul de intrări/ieșiri finalizată; rămâne un singur task activ (Task 1, situația de inventar); pregătit pentru predarea către Codex după commitul curent**„Beneficiar/Proiect” din tabelul de intrări/ieșiri finalizată; rămâne un singur task activ (Task 1, situația de inventar); pregătit pentru predarea către Codex după commitul curent**
+Stare ciclu: **Ieșirea spre vehicul (destinație, sursă, stoc în mașini) finalizată; rămân taskurile active 1 (situația de inventar) și 2 (pagina vehiculului); pregătit pentru predarea către Codex după commitul curent**
 
 ## Rezumat
 
@@ -46,6 +46,13 @@ Proiectul folosește un repository Git local și cicluri strict secvențiale Cod
 - La cererea utilizatorului („implementează task 1”, ordinea agenților schimbată printr-un commit separat): antetul coloanei din `Components/Pages/ProductMovements.razor` este „BENEFICIAR/PROIECT” (coloana arată beneficiarul și proiectul mișcării). `README.md` și `VALIDARE.md` folosesc noua etichetă; etichetele „Beneficiar” din formularul de ieșire, formularul proiectului, pagina Beneficiari și jurnal nu s-au modificat.
 - Validare: build Release 0 avertismente; `BlazorStoc.Checks` 413 trecute, 0 eșuate; browser (instanță de probă pe 5083, modul demonstrativ, `/produse/1`): antetul pe un rând, fără depășire orizontală a paginii la 768 și 375 px (tabelul defilează în propriul container la 375 px, ca înainte). Neverificat: preview-ul de pe 5082 (proces pornit de alt cont, nu a putut fi oprit din sesiune) arată antetul vechi până la repornirea lui din `bin\Release\net9.0\BlazorStoc.exe --urls http://127.0.0.1:5082`.
 - Taskuri active rămase: 1 (situația de inventar) — următorul pas.
+
+## Ieșire spre vehicul, vânzare generică și corecție de stoc
+
+- La cererea utilizatorului („implementează task 2”): `StockMovements.cs` (`ExitDestination`, `VehicleStock`, `StockMovementRules.Effect` cu destinație, validarea destinației/sursei, precompletarea descrierii, `StockBreakdown`/`StockSplit`/`WarehouseStock`), `SqliteStockMovementRepository`/`MariaStockMovementRepository` (coloane noi, cantitatea din mașini derivată din mișcări, verificare că nicio mașină nu devine negativă la creare/editare/ștergere, `GetVehicleStocksAsync`, `GetQuantitiesInVehiclesAsync`, `GetMovementCountsByVehicleAsync`), componenta nouă `ExitDestinationPicker.razor` (înlocuiește `RelationPicker.razor`), `ProductMovements.razor`, catalogul (`Home.razor`), editorul produsului, lista „Vehicule” (coloana MIȘCĂRI, ștergere blocată la vehicule cu mișcări). Schema locală SQLite versiunea 10; arhiva MariaDB versiunea 6.
+- **Decizii de implementare**: cantitatea din mașini nu are coloană proprie, se derivă din mișcări (fără risc de inconsistență); stocul total rămâne `products.quantity`/`produs_cantitate`, iar o ieșire spre vehicul nu îl modifică; în MariaDB coloanele noi din `io` sunt ignorate de aplicația veche (o ieșire spre mașină apare acolo ca ieșire obișnuită). Linkul către vehicul din tabelul mișcărilor duce deocamdată la editor (`VehicleNavigation.PageUrl`), până la pagina vehiculului.
+- Validare: build Release 0 avertismente; `BlazorStoc.Checks` 505 trecute (41 noi); browser pe instanță de probă 5084 (radio-uri, mesaje, precompletări, transfer, folosire din mașină, editare refuzată, catalog, Vehicule, 375/768 px). Neverificat: MariaDB pe server real (`docs/TESTE_RAMASE.md` A10). Preview lăsat pe `http://127.0.0.1:5082/`.
+- Taskuri active rămase: 1 (situația de inventar, care poate folosi acum `WarehouseStock`) și 2 (pagina vehiculului).
 
 ## Administrarea vehiculelor (secțiunea „Vehicule”)
 

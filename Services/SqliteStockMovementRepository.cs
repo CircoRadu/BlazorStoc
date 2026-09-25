@@ -13,10 +13,13 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
     private const string SelectMovement = """
         SELECT m.id,m.product_id,m.kind,m.quantity,m.movement_date,m.description,m.beneficiary_id,b.name,m.project_id,p.name,
                m.operator,m.version,m.created_utc,m.updated_utc,
-               EXISTS(SELECT 1 FROM stock_movement_history h WHERE h.movement_id=m.id)
+               EXISTS(SELECT 1 FROM stock_movement_history h WHERE h.movement_id=m.id),
+               m.destination,m.vehicle_id,dv.plate_number,m.source_vehicle_id,sv.plate_number
         FROM stock_movements m
         LEFT JOIN beneficiaries b ON b.id=m.beneficiary_id
         LEFT JOIN projects p ON p.id=m.project_id
+        LEFT JOIN vehicles dv ON dv.id=m.vehicle_id
+        LEFT JOIN vehicles sv ON sv.id=m.source_vehicle_id
         """;
 
     public async Task<StockMovementPage> GetPageAsync(int productId, StockMovementQuery query, CancellationToken cancellationToken = default)
@@ -49,7 +52,51 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var items = new List<StockMovement>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) items.Add(ReadMovement(reader));
-        return new StockMovementPage(items, total, stock, anyModified);
+        var inVehicles = (await VehicleQuantitiesAsync(connection, null, productId, cancellationToken).ConfigureAwait(false))
+            .Sum(entry => Math.Max(0, entry.Quantity));
+        return new StockMovementPage(items, total, stock, anyModified, inVehicles);
+    }
+
+    public async Task<IReadOnlyList<VehicleStock>> GetVehicleStocksAsync(int productId, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        var held = (await VehicleQuantitiesAsync(connection, null, productId, cancellationToken).ConfigureAwait(false))
+            .Where(entry => entry.Quantity > 0).ToDictionary(entry => entry.VehicleId, entry => entry.Quantity);
+        if (held.Count == 0) return [];
+        var result = new List<VehicleStock>();
+        await using var command = SqliteLocalStore.Command(connection, null,
+            "SELECT id,plate_number,description FROM vehicles ORDER BY plate_number,id");
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            if (held.TryGetValue(reader.GetInt32(0), out var quantity))
+                result.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), quantity));
+        return result;
+    }
+
+    public async Task<IReadOnlyDictionary<int, int>> GetQuantitiesInVehiclesAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        return (await VehicleQuantitiesAsync(connection, null, null, cancellationToken).ConfigureAwait(false))
+            .Where(entry => entry.Quantity > 0).GroupBy(entry => entry.ProductId)
+            .ToDictionary(group => group.Key, group => group.Sum(entry => entry.Quantity));
+    }
+
+    public async Task<IReadOnlyDictionary<int, int>> GetMovementCountsByVehicleAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = SqliteLocalStore.Command(connection, null, """
+            SELECT vid,COUNT(*) FROM (
+                SELECT vehicle_id AS vid FROM stock_movements WHERE vehicle_id IS NOT NULL
+                UNION ALL SELECT source_vehicle_id FROM stock_movements WHERE source_vehicle_id IS NOT NULL)
+            GROUP BY vid
+            """);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var counts = new Dictionary<int, int>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) counts[reader.GetInt32(0)] = reader.GetInt32(1);
+        return counts;
     }
 
     public async Task<StockMovement?> GetAsync(int id, CancellationToken cancellationToken = default)
@@ -97,18 +144,31 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
             var productCode = await GetProductCodeAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false)
                               ?? throw new StockMovementOperationException(ProductMissingMessage);
             var (beneficiaryName, projectName) = await ResolveRelationsAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
+            var (vehiclePlate, sourcePlate) = await ResolveVehiclesAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
+            if (value.SourceVehicleId is { } sourceVehicleId)
+            {
+                var held = (await VehicleQuantitiesAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false))
+                    .Where(entry => entry.VehicleId == sourceVehicleId).Sum(entry => entry.Quantity);
+                if (value.Quantity!.Value > held)
+                    throw new StockMovementOperationException(StockMovementRules.NotEnoughInVehicleMessage(sourcePlate!, held));
+            }
             await using var insert = SqliteLocalStore.Command(connection, transaction, """
                 INSERT INTO stock_movements
-                    (product_id,beneficiary_id,project_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc)
-                VALUES(@product,@beneficiary,@project,@quantity,@created,@kind,@date,@description,@operator,0,@created);
+                    (product_id,beneficiary_id,project_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc,
+                     destination,vehicle_id,source_vehicle_id)
+                VALUES(@product,@beneficiary,@project,@quantity,@created,@kind,@date,@description,@operator,0,@created,
+                       @destination,@vehicle,@sourceVehicle);
                 SELECT last_insert_rowid();
                 """, ("@product", productId), ("@beneficiary", value.BeneficiaryId), ("@project", value.ProjectId),
                 ("@quantity", value.Quantity), ("@created", now.ToString("O")), ("@kind", (int)value.Kind),
                 ("@date", StockMovementRules.StorageDate(value.Date!.Value)), ("@description", value.Description),
-                ("@operator", actor.Username));
+                ("@operator", actor.Username), ("@destination", (int?)value.Destination), ("@vehicle", value.VehicleId),
+                ("@sourceVehicle", value.SourceVehicleId));
             var id = checked((int)(long)(await insert.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!);
             var movement = new StockMovement(id, productId, value.Kind, value.Quantity!.Value, value.Date.Value, value.Description,
-                value.BeneficiaryId, beneficiaryName, value.ProjectId, projectName, actor.Username, 0, now, now);
+                value.BeneficiaryId, beneficiaryName, value.ProjectId, projectName, actor.Username, 0, now, now, false,
+                value.Destination, value.VehicleId, vehiclePlate, value.SourceVehicleId, sourcePlate);
+            await EnsureVehicleStocksNotNegativeAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
             var stock = await ApplyStockAsync(connection, transaction, productId, movement.Effect, cancellationToken).ConfigureAwait(false);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
                 AuditEntities.StockMovement, AuditActions.Create, StockMovementRules.Target(productCode),
@@ -138,22 +198,27 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
             var productCode = await GetProductCodeAsync(connection, transaction, current!.ProductId, cancellationToken).ConfigureAwait(false)
                               ?? throw new StockMovementOperationException(ProductMissingMessage);
             var (beneficiaryName, projectName) = await ResolveRelationsAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
+            var (vehiclePlate, sourcePlate) = await ResolveVehiclesAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
             var updated = current with
             {
                 Quantity = value.Quantity!.Value, Date = value.Date!.Value, Description = value.Description,
                 BeneficiaryId = value.BeneficiaryId, BeneficiaryName = beneficiaryName, ProjectId = value.ProjectId,
-                ProjectName = projectName, Version = current.Version + 1, UpdatedUtc = now, Modified = true
+                ProjectName = projectName, Version = current.Version + 1, UpdatedUtc = now, Modified = true,
+                Destination = value.Destination, VehicleId = value.VehicleId, VehiclePlate = vehiclePlate,
+                SourceVehicleId = value.SourceVehicleId, SourceVehiclePlate = sourcePlate
             };
             if (!StockMovementRules.HasChanges(current, updated))
                 throw new StockMovementOperationException("Nu ai modificat nicio valoare a mișcării.");
             var correction = updated.Effect - current.Effect;
             await using (var update = SqliteLocalStore.Command(connection, transaction, """
                 UPDATE stock_movements SET quantity=@quantity,movement_date=@date,description=@description,
-                    beneficiary_id=@beneficiary,project_id=@project,version=@version,updated_utc=@updated
+                    beneficiary_id=@beneficiary,project_id=@project,version=@version,updated_utc=@updated,
+                    destination=@destination,vehicle_id=@vehicle,source_vehicle_id=@sourceVehicle
                 WHERE id=@id AND version=@oldVersion
                 """, ("@quantity", updated.Quantity), ("@date", StockMovementRules.StorageDate(updated.Date)),
                 ("@description", updated.Description), ("@beneficiary", updated.BeneficiaryId), ("@project", updated.ProjectId),
-                ("@version", updated.Version), ("@updated", now.ToString("O")), ("@id", current.Id), ("@oldVersion", current.Version)))
+                ("@version", updated.Version), ("@updated", now.ToString("O")), ("@id", current.Id), ("@oldVersion", current.Version),
+                ("@destination", (int?)updated.Destination), ("@vehicle", updated.VehicleId), ("@sourceVehicle", updated.SourceVehicleId)))
                 if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                     throw new StockMovementOperationException(StockMovementRules.StaleMessage);
             await using (var history = SqliteLocalStore.Command(connection, transaction, """
@@ -163,6 +228,7 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
                 ("@changes", StockMovementRules.HistorySummary(current, updated, correction)), ("@correction", correction),
                 ("@reason", value.Reason)))
                 await history.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            await EnsureVehicleStocksNotNegativeAsync(connection, transaction, current.ProductId, cancellationToken).ConfigureAwait(false);
             var stock = await ApplyStockAsync(connection, transaction, current.ProductId, correction, cancellationToken).ConfigureAwait(false);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
                 AuditEntities.StockMovement, AuditActions.Edit, StockMovementRules.Target(productCode),
@@ -208,7 +274,8 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
                     "DELETE FROM stock_movements WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version)))
                     if (await delete.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)
                         throw new StockMovementOperationException(StockMovementRules.StaleMessage);
-                stock = await ApplyStockAsync(connection, transaction, current!.ProductId, -current.Effect, token).ConfigureAwait(false);
+                await EnsureVehicleStocksNotNegativeAsync(connection, transaction, current!.ProductId, token).ConfigureAwait(false);
+                stock = await ApplyStockAsync(connection, transaction, current.ProductId, -current.Effect, token).ConfigureAwait(false);
                 await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(operation.ActorUsername, operation.ActorRole,
                     AuditEntities.StockMovement, AuditActions.Delete, operation.Request.Target, operation.Request.Details,
                     operation.Request.Motif, original.Id.ToString(), operation.Id), token).ConfigureAwait(false);
@@ -276,6 +343,53 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
         return (beneficiaryName, projectName);
     }
 
+    private static async Task<(string? VehiclePlate, string? SourcePlate)> ResolveVehiclesAsync(SqliteConnection connection,
+        SqliteTransaction transaction, StockMovementInput value, CancellationToken token)
+    {
+        async Task<string> PlateAsync(int id)
+        {
+            await using var command = SqliteLocalStore.Command(connection, transaction,
+                "SELECT plate_number FROM vehicles WHERE id=@id", ("@id", id));
+            return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string
+                   ?? throw new StockMovementOperationException(StockMovementRules.VehicleMissingMessage);
+        }
+        return (value.VehicleId is { } vehicleId ? await PlateAsync(vehicleId).ConfigureAwait(false) : null,
+            value.SourceVehicleId is { } sourceId ? await PlateAsync(sourceId).ConfigureAwait(false) : null);
+    }
+
+    // Quantity held by each vehicle: transfers into it minus what was used from it. Optionally for one product.
+    private static async Task<List<(int ProductId, int VehicleId, int Quantity)>> VehicleQuantitiesAsync(SqliteConnection connection,
+        SqliteTransaction? transaction, int? productId, CancellationToken token)
+    {
+        await using var command = SqliteLocalStore.Command(connection, transaction, """
+            SELECT product_id,vid,SUM(qty) FROM (
+                SELECT product_id,vehicle_id AS vid,quantity AS qty FROM stock_movements
+                WHERE kind=0 AND destination=2 AND vehicle_id IS NOT NULL AND (@product IS NULL OR product_id=@product)
+                UNION ALL
+                SELECT product_id,source_vehicle_id,-quantity FROM stock_movements
+                WHERE kind=0 AND source_vehicle_id IS NOT NULL AND (@product IS NULL OR product_id=@product))
+            GROUP BY product_id,vid
+            """, ("@product", productId));
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        var result = new List<(int, int, int)>();
+        while (await reader.ReadAsync(token).ConfigureAwait(false)) result.Add((reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2)));
+        return result;
+    }
+
+    // After a change: no vehicle may hold a negative quantity of the product (pieces already used or moved on).
+    private static async Task EnsureVehicleStocksNotNegativeAsync(SqliteConnection connection, SqliteTransaction transaction,
+        int productId, CancellationToken token)
+    {
+        foreach (var entry in await VehicleQuantitiesAsync(connection, transaction, productId, token).ConfigureAwait(false))
+        {
+            if (entry.Quantity >= 0) continue;
+            await using var command = SqliteLocalStore.Command(connection, transaction,
+                "SELECT plate_number FROM vehicles WHERE id=@id", ("@id", entry.VehicleId));
+            var plate = await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string ?? $"#{entry.VehicleId}";
+            throw new StockMovementOperationException(StockMovementRules.NegativeVehicleStockMessage(plate));
+        }
+    }
+
     private static async Task<StockMovement?> GetMovementAsync(SqliteConnection connection, SqliteTransaction? transaction, int id, CancellationToken token)
     {
         await using var command = SqliteLocalStore.Command(connection, transaction, $"{SelectMovement} WHERE m.id=@id", ("@id", id));
@@ -306,7 +420,10 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
         return new StockMovement(reader.GetInt32(0), reader.GetInt32(1), (StockMovementKind)reader.GetInt32(2), reader.GetInt32(3),
             date, reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetInt32(6), reader.IsDBNull(7) ? null : reader.GetString(7),
             reader.IsDBNull(8) ? null : reader.GetInt32(8), reader.IsDBNull(9) ? null : reader.GetString(9),
-            reader.GetString(10), reader.GetInt64(11), created, ReadUpdated(reader, created), reader.GetBoolean(14));
+            reader.GetString(10), reader.GetInt64(11), created, ReadUpdated(reader, created), reader.GetBoolean(14),
+            reader.IsDBNull(15) ? null : (ExitDestination)reader.GetInt32(15), reader.IsDBNull(16) ? null : reader.GetInt32(16),
+            reader.IsDBNull(17) ? null : reader.GetString(17), reader.IsDBNull(18) ? null : reader.GetInt32(18),
+            reader.IsDBNull(19) ? null : reader.GetString(19));
     }
 
     private static DateTime ReadUpdated(SqliteDataReader reader, DateTime fallback) =>

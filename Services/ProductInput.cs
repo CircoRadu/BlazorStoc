@@ -78,7 +78,7 @@ public static class ProductRules
     public static void CheckDelete(Product current, bool hasStockMovements)
     {
         if (current.Quantity != 0)
-            throw new ProductOperationException("Poți șterge doar un produs cu stoc zero.");
+            throw new ProductOperationException("Poți șterge doar un produs cu stoc zero; produsele aflate în mașini fac parte din stoc.");
         if (hasStockMovements)
             throw new ProductOperationException("Produsul are mișcări de stoc asociate și nu poate fi șters. Istoricul trebuie păstrat.");
     }

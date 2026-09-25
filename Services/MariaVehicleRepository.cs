@@ -10,6 +10,16 @@ public sealed class MariaVehicleRepository(
     IAuditTrail? auditTrail = null,
     IArchiveService? archiveService = null) : IVehicleRepository
 {
+    // Shared with the stock movement repository, whose queries join this table.
+    internal const string CreateTableSql = """
+        CREATE TABLE IF NOT EXISTS vehicul (
+            id_vehicul INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            vehicul_numar VARCHAR(12) NOT NULL,
+            vehicul_descriere VARCHAR(100) NOT NULL,
+            vehicul_versiune BIGINT NOT NULL DEFAULT 0,
+            UNIQUE KEY UX_vehicul_numar (vehicul_numar)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        """;
     private static readonly SemaphoreSlim SchemaGate = new(1, 1);
     private static volatile bool schemaReady;
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
@@ -85,6 +95,7 @@ public sealed class MariaVehicleRepository(
             await WriteAsync(async (connection, transaction) =>
             {
                 VehicleRules.CheckCurrent(await GetLockedAsync(connection, transaction, original.Id, token).ConfigureAwait(false), original);
+                VehicleRules.CheckDelete(await MariaStockMovementRepository.VehicleHasMovementsAsync(connection, transaction, original.Id, token).ConfigureAwait(false));
                 await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token).ConfigureAwait(false);
                 await using var command = Command(connection, transaction,
                     "DELETE FROM vehicul WHERE id_vehicul=@id AND vehicul_versiune=@version", ("@id", original.Id), ("@version", original.Version));
@@ -129,15 +140,7 @@ public sealed class MariaVehicleRepository(
             if (schemaReady) return;
             if (!string.Equals(configuration["Database:Name"] ?? "BlazorStoc", "BlazorStoc", StringComparison.Ordinal))
                 throw new VehicleOperationException("Secțiunea Vehicule poate modifica schema numai în baza BlazorStoc.");
-            await using var create = new MySqlCommand("""
-                CREATE TABLE IF NOT EXISTS vehicul (
-                    id_vehicul INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                    vehicul_numar VARCHAR(12) NOT NULL,
-                    vehicul_descriere VARCHAR(100) NOT NULL,
-                    vehicul_versiune BIGINT NOT NULL DEFAULT 0,
-                    UNIQUE KEY UX_vehicul_numar (vehicul_numar)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                """, connection);
+            await using var create = new MySqlCommand(CreateTableSql, connection);
             await create.ExecuteNonQueryAsync(token).ConfigureAwait(false);
             schemaReady = true;
         }

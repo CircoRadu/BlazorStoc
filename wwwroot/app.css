@@ -230,6 +230,13 @@
 .movement-stock { font-size:13px; }
 .movement-stock.negative strong { color:#a3332c; }
 .movement-filters { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; align-items:center; margin-bottom:12px; }
+.destination-group { border:0; padding:0; margin:0; display:grid; gap:6px; }
+.destination-group legend { padding:0; font-weight:700; font-size:13px; margin-bottom:6px; }
+.destination-options { display:flex; flex-wrap:wrap; gap:8px 18px; }
+.destination-options label { display:inline-flex !important; align-items:center; gap:6px; margin:0 !important; font-weight:500; }
+.destination-label { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef1f4; font-size:12px; font-weight:600; }
+.movement-breakdown, .stock-breakdown { display:block; font-size:12px; font-weight:500; color:#5b6672; }
+.movement-breakdown { display:inline; margin-left:4px; }
 .movement-radios { display:flex; gap:18px; border:0; padding:0; margin:0; font-size:13px; }
 .movement-radios label { display:inline-flex; align-items:center; gap:6px; }
 .movement-radios .in, .kind-label.in { color:#1f7a3a; }

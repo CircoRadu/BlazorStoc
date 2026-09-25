@@ -286,7 +286,21 @@ Verificat la 25 septembrie 2026.
 - `BlazorStoc.Checks` 413 (verificarea literalelor de mesaj); browser pe 5082: −5, 0, valoare prea mare, câmp gol, 404 și dialogul de reconectare cu serverul oprit.
 - Neverificat: ferestrele native (calendar, selector de fișiere).
 
-Beneficiar/Proiect în tabelul mișcărilor (25 septembrie 2026)„Beneficiar/Proiect” în tabelul mișcărilor (25 septembrie 2026)
+## Ieșire spre vehicul, vânzare generică și corecție de stoc (25 septembrie 2026)
+
+- Formularul de ieșire: destinație obligatorie (Beneficiar / Autovehicul / Vânzare generică / Corecție stoc), sursă Depozit/Mașină, descriere precompletată cu data de azi. O ieșire spre autovehicul nu scade stocul total; din mașină nu se poate scoate mai mult decât conține; editările și ștergerile nu pot lăsa o mașină cu cantitate negativă. Defalcarea „X în depozit, Y în vehicule” apare numai când există produse în mașini.
+- `BlazorStoc.Checks` 505 trecute (41 noi): validarea destinațiilor și a sursei, efectul pe total, precompletarea, defalcarea, transfer, folosire din mașină, respingerea peste cantitate, editare/ștergere care ar face mașina negativă, schimbarea destinației, jurnal, arhivă, ieșiri vechi, sesiuni concurente, repornire.
+- Browser (instanță de probă pe `http://127.0.0.1:5084`, bază separată, sesiune autentificată): radio-urile fără preselecție; „Alege destinația ieșirii.”; precompletările („Corecție stoc 25.09.2026”, „Completare stoc mașină HD-01-FDG 25.09.2026”); transfer de 4 buc. (total 12 neschimbat, „8 în depozit, 4 în vehicule”); folosire din mașină (mesaj peste cantitate, apoi 3 buc.: total 9, „8 în depozit, 1 în vehicule”); editarea transferului spre 2 buc. refuzată de server; catalogul cu defalcare numai pentru produsul cu piese în mașini; lista „Vehicule” cu numărul mișcărilor; 375 și 768 px fără depășire orizontală.
+- **Neverificat**: MariaDB pe un server real (vezi `docs/TESTE_RAMASE.md`, A10); ecran tactil și tastatură.
+
+## Administrarea vehiculelor (25 septembrie 2026)
+
+- Pagina `/vehicule` (Administrare → Vehicule): adăugare, editare cu motivare și confirmare, ștergere în doi pași cu arhivare, căutare, jurnal (tip „Vehicul”, filtru și link către `/vehicule?edit={id}`). Număr de înmatriculare `AA-OOO-AAA` cu 1–2 litere, 2–3 cifre, 3 litere (`HD-01-FDG`, `HD-233-VDG`, `B-123-ABC` valide; `HD-1-FDG` respins), unic; descriere obligatorie.
+- `BlazorStoc.Checks` 464 trecute (51 noi): masca și normalizarea, creare, unicitate, editare cu motiv, editare veche, jurnal, creare concurentă, ștergere cu arhivare și eveniment, reînregistrarea unui număr arhivat, persistență după repornire, căutare.
+- Browser (instanță de probă, bază SQLite separată, sesiune autentificată): meniul, starea goală, număr invalid respins, `b123abc` completat ca `B-123-ABC`, adăugare, editare cu dialog de confirmare, jurnal, link de editare, ștergere în doi pași; la 375 și 768 px fără depășire orizontală.
+- **Neverificat**: MariaDB pe un server real (vezi `docs/TESTE_RAMASE.md`, A9).
+
+## Eticheta „Beneficiar/Proiect” în tabelul mișcărilor (25 septembrie 2026)
 
 - Antetul coloanei din tabelul de intrări/ieșiri este „BENEFICIAR/PROIECT”; conținutul și linkurile coloanei sunt neschimbate.
 - BlazorStoc.Checks 413 trecute; browser (instanță de probă pe http://127.0.0.1:5083, modul demonstrativ, /produse/1): antetele „DATA, INTRARE/IEȘIRE, NUMĂR BUCĂȚI, DESCRIERE, BENEFICIAR/PROIECT, Acțiuni” pe un singur rând; la 768 px fără depășire orizontală, la 375 px pagina rămâne pe 375 px, iar tabelul defilează în propriul container.

@@ -151,13 +151,17 @@ internal static class SqliteArchivePersistence
                 var movement = ArchiveJson.Entity<StockMovement>(snapshot);
                 command = SqliteLocalStore.Command(connection, transaction, """
                     INSERT INTO archive_stock_movements
-                        (archive_id,original_id,product_id,kind,quantity,movement_date,description,beneficiary_id,project_id,operator,version)
-                    VALUES(@archiveId,@id,@product,@kind,@quantity,@date,@description,@beneficiary,@project,@operator,@version)
+                        (archive_id,original_id,product_id,kind,quantity,movement_date,description,beneficiary_id,project_id,operator,version,
+                         destination,vehicle_id,source_vehicle_id)
+                    VALUES(@archiveId,@id,@product,@kind,@quantity,@date,@description,@beneficiary,@project,@operator,@version,
+                           @destination,@vehicle,@sourceVehicle)
                     """, ("@archiveId", operation.Id.ToString("D")), ("@id", movement.Id), ("@product", movement.ProductId),
                     ("@kind", (int)movement.Kind), ("@quantity", movement.Quantity),
                     ("@date", StockMovementRules.StorageDate(movement.Date)), ("@description", movement.Description),
                     ("@beneficiary", movement.BeneficiaryId), ("@project", movement.ProjectId),
-                    ("@operator", movement.Operator), ("@version", movement.Version));
+                    ("@operator", movement.Operator), ("@version", movement.Version),
+                    ("@destination", (int?)movement.Destination), ("@vehicle", movement.VehicleId),
+                    ("@sourceVehicle", movement.SourceVehicleId));
                 break;
             case AuditEntities.Vehicle:
                 var vehicle = ArchiveJson.Entity<Vehicle>(snapshot);
@@ -296,13 +300,17 @@ internal static class MariaArchivePersistence
                 var movement = ArchiveJson.Entity<StockMovement>(snapshot);
                 await ExecuteAsync(connection, transaction, """
                     INSERT INTO archive_stock_movements
-                        (archive_id,original_id,product_id,kind,quantity,movement_date,description,beneficiary_id,project_id,operator,version)
-                    VALUES(@archiveId,@id,@product,@kind,@quantity,@date,@description,@beneficiary,@project,@operator,@version)
+                        (archive_id,original_id,product_id,kind,quantity,movement_date,description,beneficiary_id,project_id,operator,version,
+                         destination,vehicle_id,source_vehicle_id)
+                    VALUES(@archiveId,@id,@product,@kind,@quantity,@date,@description,@beneficiary,@project,@operator,@version,
+                           @destination,@vehicle,@sourceVehicle)
                     """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", movement.Id), ("@product", movement.ProductId),
                     ("@kind", (int)movement.Kind), ("@quantity", movement.Quantity),
                     ("@date", StockMovementRules.StorageDate(movement.Date)), ("@description", movement.Description),
                     ("@beneficiary", movement.BeneficiaryId), ("@project", movement.ProjectId),
-                    ("@operator", movement.Operator), ("@version", movement.Version)).ConfigureAwait(false);
+                    ("@operator", movement.Operator), ("@version", movement.Version),
+                    ("@destination", (int?)movement.Destination), ("@vehicle", movement.VehicleId),
+                    ("@sourceVehicle", movement.SourceVehicleId)).ConfigureAwait(false);
                 break;
             case AuditEntities.Vehicle:
                 var vehicle = ArchiveJson.Entity<Vehicle>(snapshot);

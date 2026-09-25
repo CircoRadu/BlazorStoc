@@ -2,6 +2,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProductRepository Repository
+@inject IStockMovementRepository Movements
 @inject IProductImageStore ImageStore
 @inject AppMode Mode
 @inject IAccessControl Access
@@ -34,7 +35,7 @@
 <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după cod produs sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label></div>
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
-else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small></td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td><button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)">↗</button></td></tr> }</tbody></table></div> }
+else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td><button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)">↗</button></td></tr> }</tbody></table></div> }
 <footer class="table-footer"><span>@Filtered.Count @(Filtered.Count == 1 ? "rezultat" : "rezultate")</span><div class="pagination"><button disabled="@(page <= 1)" @onclick="() => page--" aria-label="Pagina anterioară">‹</button><span>Pagina @(page) din @Pages</span><button disabled="@(page >= Pages)" @onclick="() => page++" aria-label="Pagina următoare">›</button></div></footer></section>
 <p class="workspace-note"><span class="status-dot"></span> @(Mode.IsDemo ? "Date demonstrative" : "Date din BlazorStoc") <span>·</span> Catalog și gestiune produse</p>
 
@@ -110,6 +111,9 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
             () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
     }
     private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
+    // Quantity of each product held by vehicles (products without pieces in vehicles are absent).
+    private IReadOnlyDictionary<int, int> inVehicles = new Dictionary<int, int>();
+    private int InVehicles(int productId) => inVehicles.GetValueOrDefault(productId);
     private async Task RefreshSilentlyAsync()
     {
         if (loading || !loaded) return;
@@ -117,8 +121,9 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         {
             var productsTask = Repository.GetProductsAsync(lifetime.Token);
             var groupsTask = Repository.GetGroupsAsync(lifetime.Token);
-            await Task.WhenAll(productsTask, groupsTask);
-            products = await productsTask; groups = await groupsTask;
+            var vehiclesTask = Movements.GetQuantitiesInVehiclesAsync(lifetime.Token);
+            await Task.WhenAll(productsTask, groupsTask, vehiclesTask);
+            products = await productsTask; groups = await groupsTask; inVehicles = await vehiclesTask;
             lastLoaded = DateTime.UtcNow; page = Math.Min(page, Pages);
             await RefreshLocksAsync();
         }
@@ -153,9 +158,11 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
             var productsTask = Repository.GetProductsAsync(lifetime.Token);
             var groupsTask = Repository.GetGroupsAsync(lifetime.Token);
             var accessTask = Access.CanManageProductsAsync(lifetime.Token);
-            await Task.WhenAll(productsTask, groupsTask, accessTask);
+            var vehiclesTask = Movements.GetQuantitiesInVehiclesAsync(lifetime.Token);
+            await Task.WhenAll(productsTask, groupsTask, accessTask, vehiclesTask);
             products = await productsTask;
             groups = await groupsTask;
+            inVehicles = await vehiclesTask;
             canManage = await accessTask;
             loaded = true; lastLoaded = DateTime.UtcNow; ResetPage();
             await RefreshLocksAsync();

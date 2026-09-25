@@ -41,6 +41,22 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             await EnsureColumnAsync(connection, "stock_movements", "project_id",
                 "ALTER TABLE stock_movements ADD COLUMN project_id INTEGER NULL REFERENCES projects(id) ON DELETE RESTRICT",
                 cancellationToken).ConfigureAwait(false);
+            // Exit destination (1 beneficiary, 2 vehicle, 3 generic sale, 4 stock correction), destination vehicle and source
+            // vehicle (null = the warehouse); older databases receive them here.
+            foreach (var (column, definition) in new[]
+                     {
+                         ("destination", "INTEGER NULL"),
+                         ("vehicle_id", "INTEGER NULL REFERENCES vehicles(id) ON DELETE RESTRICT"),
+                         ("source_vehicle_id", "INTEGER NULL REFERENCES vehicles(id) ON DELETE RESTRICT")
+                     })
+                await EnsureColumnAsync(connection, "stock_movements", column,
+                    $"ALTER TABLE stock_movements ADD COLUMN {column} {definition}", cancellationToken).ConfigureAwait(false);
+            foreach (var (column, definition) in new[]
+                     {
+                         ("destination", "INTEGER NULL"), ("vehicle_id", "INTEGER NULL"), ("source_vehicle_id", "INTEGER NULL")
+                     })
+                await EnsureColumnAsync(connection, "archive_stock_movements", column,
+                    $"ALTER TABLE archive_stock_movements ADD COLUMN {column} {definition}", cancellationToken).ConfigureAwait(false);
             foreach (var (column, definition) in new[]
                      {
                          ("kind", "INTEGER NOT NULL DEFAULT 1"), ("movement_date", "TEXT NOT NULL DEFAULT ''"),
@@ -53,7 +69,11 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
                 "CREATE INDEX IF NOT EXISTS ix_stock_movements_product ON stock_movements(product_id,movement_date,id)",
                 cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, """
-                INSERT INTO app_metadata(key,value) VALUES('schema_version','9')
+                CREATE INDEX IF NOT EXISTS ix_stock_movements_vehicle ON stock_movements(vehicle_id);
+                CREATE INDEX IF NOT EXISTS ix_stock_movements_source_vehicle ON stock_movements(source_vehicle_id);
+                """, cancellationToken).ConfigureAwait(false);
+            await ExecuteAsync(connection, null, """
+                INSERT INTO app_metadata(key,value) VALUES('schema_version','10')
                 ON CONFLICT(key) DO UPDATE SET value=excluded.value;
                 """, cancellationToken).ConfigureAwait(false);
             await SeedIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
