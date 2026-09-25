@@ -139,7 +139,7 @@ Cerută de utilizator (25 septembrie 2026): la ieșire se poate folosi un produs
 - [ ] La o **Ieșire**, formularul (adăugare și editare) are, pe lângă destinație, alegerea **sursei** produsului folosit, prin butoane radio: **Depozit** (preselectat) sau **Mașină**; cu „Mașină” aleasă apare lista vehiculelor (număr de înmatriculare și descriere), iar alegerea unui vehicul este obligatorie, cu mesaj în română. Dacă nu există vehicule, opțiunea „Mașină” explică acest lucru și trimite la pagina „Vehicule”. La **Intrare** sursa nu apare.
 - [ ] Cu sursa **Mașină**, cantitatea ieșită **nu poate fi mai mare decât cantitatea existentă în mașina aleasă** pentru produsul respectiv (mesaj în română, de exemplu „În mașina HD-01-FDG există numai 3 bucăți din acest produs.”); formularul afișează cantitatea disponibilă în mașina aleasă. Verificarea se face și pe server, în aceeași tranzacție cu salvarea, astfel încât două sesiuni concurente să nu poată scoate împreună mai mult decât există.
 - [ ] Cantitatea existentă într-o mașină pentru un produs = suma cantităților ieșirilor spre acea mașină (din depozit) − suma cantităților ieșirilor cu sursa acea mașină. Ea nu poate deveni negativă nici prin editarea sau ștergerea unei mișcări (de exemplu ștergerea unui transfer spre o mașină din care produsul a fost deja folosit, sau micșorarea cantității lui sub cât s-a folosit, este respinsă cu mesaj în română).
-- [ ] Sursa **Mașină** se combină cu destinațiile **Beneficiar**, **Vânzare generică** și **Corecție stoc**: produsul este folosit din mașină, deci scade stocul total și cantitatea din mașină, iar stocul din depozit rămâne neschimbat. Sursa **Depozit** scade stocul din depozit (și pe cel total, cu excepția transferului spre autovehicul, vezi subtaskul 2.4). Un transfer dintr-o mașină în alta (sau în aceeași) nu este permis în acest task (mesaj în română; vezi „Detalii de stabilit”).
+- [ ] Sursa **Mașină** se combină cu destinațiile **Beneficiar**, **Vânzare generică** și **Corecție stoc**: produsul este folosit din mașină, deci scade stocul total și cantitatea din mașină, iar stocul din depozit rămâne neschimbat. Sursa **Depozit** scade stocul din depozit (și pe cel total, cu excepția transferului spre autovehicul, vezi subtaskul 2.4). Un transfer dintr-o mașină în alta (sau în aceeași) nu este permis în formularul de ieșire (mesaj în română care trimite la pagina vehiculului; decizie confirmată de utilizator, 25 septembrie 2026); transferul se face din pagina vehiculului (Task 3).
 - [ ] Sursa se salvează în mișcare (identificatorul mașinii sursă; lipsa lui înseamnă depozit), se afișează în tabel și în jurnal (`Details`/`Target`, valori inițiale și finale la editare) și se păstrează în arhiva mișcărilor; ieșirile existente rămân „din depozit”, fără migrare a datelor. Schimbarea sursei este tratată ca modificare pentru avertizarea la părăsirea formularului.
 
 ### Subtask 2.3 — Precompletarea descrierii
@@ -188,7 +188,7 @@ Cerută de utilizator (25 septembrie 2026): produsul ieșit spre un autovehicul 
 
 - Textul exact al precompletărilor (majuscule, diacritice — care se elimină oricum la salvare, conform regulii existente) și formatul datei (`dd.mm.yyyy`).
 - Locul etichetei pentru „Vânzare generică” și „Corecție stoc” în tabel (decizii deja luate: destinația este obligatorie, coloana vehiculului se numește „VEHICUL”).
-- Restituirea produselor din mașină în depozit și mutarea lor în altă mașină se fac din pagina vehiculului (taskul „Pagina vehiculului…”, Task 3), nu din formularul de ieșire; în formularul de ieșire transferul mașină → mașină rămâne nepermis (se confirmă).
+- Restituirea produselor din mașină în depozit și mutarea lor în altă mașină se fac din pagina vehiculului (taskul „Pagina vehiculului…”, Task 3), nu din formularul de ieșire; în formularul de ieșire transferul mașină → mașină rămâne nepermis (decizie confirmată de utilizator, 25 septembrie 2026).
 - Cum apare sursa (mașina din care s-a scos produsul) în tabel: implicit în coloana „VEHICUL”, cu prefixul „din” pentru sursă și „în” pentru destinația transferului.
 
 ## Task 3 — Pagina vehiculului: materiale și echipamente, restituire în depozit și mutare între mașini
@@ -210,6 +210,7 @@ Cerută de utilizator (25 septembrie 2026). Pagina de administrare a unui vehicu
 
 ### Subtask 3.3 — Acțiuni pentru fiecare reper
 
+- [ ] Decizie confirmată de utilizator (25 septembrie 2026): restituirea și mutarea unui reper pot fi făcute cu o **cantitate parțială** (implicit toată cantitatea din mașină); transferul dintr-o mașină în alta se face numai de pe această pagină, nu din formularul de ieșire.
 - [ ] Fiecare rând are două acțiuni: **„Restituie în depozit”** și **„Mută în altă mașină”**.
 - [ ] Ambele deschid un dialog cu cantitatea (implicit **toată** cantitatea din mașină, editabilă între 1 și cantitatea disponibilă) și, pentru mutare, lista celorlalte vehicule existente (fără cel curent; dacă nu există altul, acțiunea explică acest lucru și rămâne dezactivată). Confirmarea aplică operația; „Anulează” (roșu, ca restul dialogurilor) nu modifică nimic.
 - [ ] Efectul: **restituirea** crește stocul din depozit și scade cantitatea din mașină; **mutarea** scade cantitatea din mașina curentă și o crește în mașina aleasă; în ambele cazuri **stocul total al produsului rămâne neschimbat**. O cantitate mai mare decât cea existentă în mașină este respinsă cu mesaj în română.
@@ -240,7 +241,7 @@ Cerută de utilizator (25 septembrie 2026). Pagina de administrare a unui vehicu
 
 ### Detalii de stabilit la implementare
 
-- Textele exacte ale mesajelor și ale precompletărilor descrierii (formatul datei `dd.mm.yyyy`); dacă mutarea unui reper permite alegerea unei cantități parțiale (propus: da, implicit toată cantitatea).
+- Textele exacte ale mesajelor și ale precompletărilor descrierii (formatul datei `dd.mm.yyyy`).
 - Locul mișcărilor de restituire și de mutare în tabelul „Intrări/ieșiri” (etichetă a destinației, în stilul stabilit în Task 2).
 
 ## Observații pentru etapa de implementare

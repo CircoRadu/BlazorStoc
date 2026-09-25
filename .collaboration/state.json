@@ -1,14 +1,14 @@
-{
+﻿{
     "schemaVersion":  1,
     "mode":  "sequential",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
-    "nextAgent":  "claude",
-    "currentTask":  "Adaugare in TODO: pagina vehiculului, materiale si echipamente, restituire si mutare",
-    "startedAtUtc":  "2026-09-25T11:58:56.3278852Z",
-    "completedAtUtc":  "2026-09-25T11:59:49.7127643Z",
-    "lastSummary":  "TODO: Task 3 nou - pagina vehiculului /vehicule/{id} dupa logica paginii proiectului, fara observatii si fisiere, cu intrarea Materiale si echipamente (/vehicule/{id}/echipamente): tabel COD PRODUS / CANTITATE, restituire in depozit sau mutare in alta masina pentru fiecare reper, plus restituire/mutare a tuturor reperelor (atomic); fiecare operatie este miscare de stoc jurnalizata, totalul produsului neschimbat. Task 2: punctul deschis despre transfer masina-masina si restituire rezolvat prin Task 3. PROJECT_STATE actualizat. Nu s-a modificat cod. Preview-ul de pe 5082 ramane pornit.",
-    "lastCommitSubject":  "claude: add vehicle page (equipment, return, move) task to TODO",
+    "nextAgent":  "codex",
+    "currentTask":  "Confirmare decizii: cantitate partiala si transfer masina-masina doar din pagina vehiculului",
+    "startedAtUtc":  "2026-09-25T12:01:54.2181043Z",
+    "completedAtUtc":  "2026-09-25T12:01:54.5125492Z",
+    "lastSummary":  "TODO: confirmate de utilizator decizia de cantitate partiala la restituire si mutare (implicit toata) si faptul ca transferul masina-masina ramane nepermis in formularul de iesire, facandu-se numai din pagina vehiculului (Task 3); punctele scoase din Detalii de stabilit. PROJECT_STATE actualizat. Nu s-a modificat cod. Preview 5082 ramane pornit.",
+    "lastCommitSubject":  "claude: confirm partial quantity and vehicle-transfer decisions in TODO",
     "claudeStatus":  "active"
 }

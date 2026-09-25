@@ -892,3 +892,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu se aplica (documentatie); verificata numerotarea taskurilor si subtaskurilor.
 - **Commit:** `claude: add vehicle page (equipment, return, move) task to TODO`
 - **Predat cÄƒtre:** codex
+
+## 2026-09-25T12:01:54.5125492Z â€” claude
+
+- **Task:** Confirmare decizii: cantitate partiala si transfer masina-masina doar din pagina vehiculului
+- **Rezumat:** TODO: confirmate de utilizator decizia de cantitate partiala la restituire si mutare (implicit toata) si faptul ca transferul masina-masina ramane nepermis in formularul de iesire, facandu-se numai din pagina vehiculului (Task 3); punctele scoase din Detalii de stabilit. PROJECT_STATE actualizat. Nu s-a modificat cod. Preview 5082 ramane pornit.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu se aplica (documentatie).
+- **Commit:** `claude: confirm partial quantity and vehicle-transfer decisions in TODO`
+- **Predat cÄƒtre:** codex
