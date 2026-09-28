@@ -17,6 +17,10 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 // docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md (application-connection.private.json); poate fi schimbata prin
 // Database:PrivateConfigPath (variabila de mediu Database__PrivateConfigPath) fara sa schimbe mecanismul.
 // Fisierul e optional: absenta lui nu opreste pornirea in mod demonstrativ (App:DemoMode=true, implicit).
+// Follow-up Task 2 (28.09.2026, dupa comutarea 2.13): acelasi fisier poate contine si o sectiune
+// "Authentication": { "Username": "...", "Password": "..." }, incarcata generic de acelasi AddJsonFile
+// (nu e nevoie de cod separat) — asta permite pornirea reala (App:DemoMode=false) fara nicio parola in
+// appsettings.json sau in argumente de proces, in loc de variabile de mediu setate manual ca la preview-ul 5085.
 var mariaPrivateConfigPath = builder.Configuration["Database:PrivateConfigPath"]
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "application-connection.private.json");
 builder.Configuration.AddJsonFile(mariaPrivateConfigPath, optional: true, reloadOnChange: false);
