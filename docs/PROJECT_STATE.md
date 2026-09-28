@@ -12,6 +12,14 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Decizie tehnica OCR - Task 1 (preluare inventar) - 28 septembrie 2026
+
+- Utilizatorul a furnizat un formular de proba (situatia de inventar generata de aplicatie, completata de mana si scanata) pentru a evalua fezabilitatea OCR pe "Valoare reala". Analiza vizuala a mostrei a aratat ca cifrele sunt scrise separat (fara legare intre ele), deci solutia nu necesita schimbarea formatului PDF-ului cu o cutie per cifra.
+- Decizie trecuta in `TODO.md` (Task 1, subtask 1.2, plus o noua sectiune "Decizie tehnica pentru recunoasterea scrisului de mana"): celula "Valoare reala" se decupeaza dupa pozitia cunoscuta din grid; cifrele se segmenteaza prin analiza componentelor conexe/proiectie pe verticala dupa binarizare cu **OpenCvSharp** (local, fara Docker, cross-platform); fiecare cifra izolata se clasifica cu un model mic, gratuit, preinstruit pe cifre scrise de mana, prin **ONNX Runtime** (`Microsoft.ML.OnnxRuntime`, local, cross-platform). "Cod produs" (text tiparit) se citeste separat prin OCR clasic (de exemplu Tesseract), tot local.
+- S-a adaugat la subtask 1.3 cerinta ca "Valoare reala" recunoscuta sa fie afisata editabila pentru fiecare produs, ca plasa de siguranta pentru citiri OCR gresite, inainte de bifare si trimitere.
+- In "Detalii de stabilit la implementare" a fost eliminat punctul privind tehnologia OCR (decis) si adaugat un punct neblocant: sursa exacta a modelului ONNX de cifre si daca merita recalibrat ulterior pe mostre reale.
+- Nu s-a modificat cod si nu s-a adaugat inca nicio dependenta noua in `BlazorStoc.csproj` (OpenCvSharp, ONNX Runtime, Tesseract) — acestea se adauga la implementarea efectiva a taskului. Preview-ul ramane cel de pe `http://127.0.0.1:5082/`, neschimbat.
+
 ## Pregatire TODO - Task 1 (preluare inventar OCR) - 28 septembrie 2026
 
 - La cererea utilizatorului, s-a adaugat in `TODO.md` un task nou cu prioritate maxima: **Task 1 - Preluare inventar din formularul de service scanat (OCR)**. Fostul Task 1 (combobox cu autocompletare beneficiar/proiect) a devenit **Task 2**; subtaskurile lui au fost renumerotate (2.1-2.4).

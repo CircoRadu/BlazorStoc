@@ -26,11 +26,17 @@ Implementeaza pagina de rezerva `/inventar/preluare` (`Components/Pages/Inventor
 - [ ] Valideaza tipul fisierului (.pdf) si dimensiunea maxima acceptata; la un fisier respins, afiseaza un mesaj de eroare in romana, fara sa piarda restul paginii.
 - [ ] Afiseaza starea de progres pe durata incarcarii si a procesarii OCR (poate dura cateva secunde).
 
+### Decizie tehnica pentru recunoasterea scrisului de mana
+
+Pe baza unui formular de proba, completat si scanat de utilizator, s-a constatat ca cifrele din "Valoare reala" sunt scrise separat (fara litere legate intre ele), deci nu este nevoie sa se schimbe formatul PDF-ului generat la pagina `/inventar` cu o cutie per cifra. Solutia aleasa: celula "Valoare reala" a fiecarui rand se decupeaza dupa pozitia cunoscuta din grid-ul tabelului (fara detectie de layout); cifrele individuale se segmenteaza din celula decupata prin analiza componentelor conexe/proiectie pe verticala dupa binarizare, cu **OpenCvSharp** (wrapper .NET peste OpenCV, ruleaza local, fara Docker, cross-platform Windows/Linux); fiecare cifra izolata este clasificata cu un model mic, gratuit, preinstruit pe cifre scrise de mana, rulat prin **ONNX Runtime** (`Microsoft.ML.OnnxRuntime`, local, cross-platform). "Cod produs" (text tiparit de aplicatie, nu scris de mana) se citeste separat prin OCR clasic (de exemplu Tesseract), tot local. Riscul ramas (cifre stilizate, segmentare gresita la cifre scrise legat) este acoperit prin afisarea valorii recunoscute ca editabila (subtask 1.3), pentru corectie manuala inainte de bifare/trimitere.
+
 ### Subtask 1.2 - Procesare OCR si extragerea datelor din formular
 
-- [ ] Extrage din fisierul PDF, prin OCR, "Cod produs" si "Valoare reala" pentru fiecare rand recunoscut al formularului, folosind ca referinta formatul tabelului din situatia de inventar generata la pagina `/inventar` (categorie/subcategorie, Cod produs, Valoare stoc, Valoare reala).
+- [ ] Decupeaza celula "Cod produs" si celula "Valoare reala" ale fiecarui rand folosind pozitia cunoscuta din grid-ul situatiei de inventar (acelasi format ca la generarea PDF-ului, fara detectie de layout).
+- [ ] Extrage "Cod produs" prin OCR clasic (de exemplu Tesseract), local.
+- [ ] Extrage "Valoare reala" prin segmentarea cifrelor individuale (OpenCvSharp) si clasificarea fiecarei cifre izolate cu modelul de cifre scrise de mana (ONNX Runtime), conform deciziei tehnice de mai sus.
 - [ ] Trateaza randurile la care "Valoare reala" a fost lasata necompletata de utilizator ca "neinventariate": nu genereaza pentru ele nicio modificare de stoc.
-- [ ] Semnaleaza distinct, fara sa le includa automat in lista de modificari, randurile pe care OCR nu le-a putut citi cu suficienta certitudine (cod neidentificat sau valoare neclara/nenumerica), si permite utilizatorului sa le vada separat.
+- [ ] Semnaleaza distinct, fara sa le includa automat in lista de modificari, randurile pe care OCR nu le-a putut citi cu suficienta certitudine (cod neidentificat, cifre nesegmentate sau clasificare nesigura), si permite utilizatorului sa le vada separat.
 
 ### Subtask 1.3 - Compararea cu stocul curent si afisarea diferentelor
 
@@ -38,6 +44,7 @@ Implementeaza pagina de rezerva `/inventar/preluare` (`Components/Pages/Inventor
 - [ ] Afiseaza in lista de modificari numai produsele cu diferenta de stoc; produsele la care valoarea reala este identica stocului curent nu genereaza o modificare.
 - [ ] Grupeaza afisarea produselor pe categorie si subcategorie, la fel ca in restul aplicatiei.
 - [ ] Adauga un checkbox pentru fiecare produs din lista, plus "selecteaza toate"/"deselecteaza toate"; afiseaza pentru fiecare produs cod produs, denumire, categorie/subcategorie, stoc curent, valoare reala citita si diferenta (cu semn).
+- [ ] Afiseaza "Valoare reala" recunoscuta ca valoare editabila pentru fiecare produs (nu doar text static), ca utilizatorul sa poata corecta o citire OCR gresita inainte de bifare/trimitere; diferenta afisata se recalculeaza dupa corectie.
 
 ### Subtask 1.4 - Trimiterea modificarilor si popup de confirmare
 
@@ -67,8 +74,8 @@ Implementeaza pagina de rezerva `/inventar/preluare` (`Components/Pages/Inventor
 
 ### Detalii de stabilit la implementare
 
-- Tehnologia OCR folosita (biblioteca .NET care functioneaza fara Docker si fara serviciu extern, in linie cu restul aplicatiei, de exemplu Tesseract, sau un serviciu extern acceptat explicit de utilizator).
 - Formatul exact al formularului scanat acceptat: se presupune situatia de inventar generata de aplicatie (pagina `/inventar`, tabel Cod produs / Valoare stoc / Valoare reala), completata de mana la "Valoare reala"; de confirmat daca trebuie acceptate si alte formate de formular.
+- Sursa concreta a modelului ONNX preinstruit de cifre scrise de mana folosit la clasificare (licenta gratuita, dimensiune redusa) si daca merita recalibrat/reantrenat ulterior pe mostre reale de formulare completate, pentru acuratete mai buna (imbunatatire neblocanta, nu opreste implementarea initiala).
 - Comportamentul implicit al casetelor de selectare (toate bifate implicit sau nebifate implicit).
 - Dimensiunea maxima acceptata a fisierului PDF si numarul maxim de pagini.
 - Ce se face cu produsele gasite in formular dar care nu mai exista in catalog (produs sters sau redenumit intre generarea situatiei si preluare).

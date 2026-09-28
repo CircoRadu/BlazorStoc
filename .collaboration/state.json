@@ -5,10 +5,10 @@
     "activeAgent":  null,
     "lastAgent":  "claude",
     "nextAgent":  "claude",
-    "currentTask":  "Task nou in TODO.md (Task 1, prioritate maxima): preluare inventar prin scanare OCR a formularului de service completat",
-    "startedAtUtc":  "2026-09-28T07:48:38.6091777Z",
-    "completedAtUtc":  "2026-09-28T07:51:47.9607924Z",
-    "lastSummary":  "Adaugat in TODO.md un task nou cu prioritate maxima (Task 1): preluare inventar dintr-un formular de service scanat, cu OCR pe fisierul PDF incarcat prin butonul Preia inventar, afisarea produselor cu diferente de stoc (checkbox de selectare pe fiecare), si butonul Trimite modificari in stoc care deschide un popup cu modificarile (cod produs, modificare stoc), grupate pe categorii si subcategorii, inainte de aplicare. Fostul Task 1 (combobox beneficiar/proiect la iesire) a devenit Task 2, subtaskurile lui renumerotate 2.1-2.4. Actualizat si docs/PROJECT_STATE.md cu pregatirea taskului si deciziile ramase de confirmat. Nu s-a modificat cod.",
-    "lastCommitSubject":  "claude: task nou in TODO (preluare inventar OCR, prioritate 1); combobox beneficiar/proiect devine task 2",
+    "currentTask":  "Trece in TODO.md decizia tehnica pentru OCR pe scris de mana (Task 1, subtask 1.2): segmentare cifre cu OpenCvSharp + clasificare cu ONNX Runtime, pe baza unui formular de proba analizat",
+    "startedAtUtc":  "2026-09-28T08:00:44.3272008Z",
+    "completedAtUtc":  "2026-09-28T08:02:02.5422883Z",
+    "lastSummary":  "Trecuta in TODO.md decizia tehnica pentru OCR pe scris de mana la Task 1 (preluare inventar): pe baza unui formular de proba furnizat de utilizator (situatia de inventar generata de aplicatie, completata de mana si scanata), s-a constatat ca cifrele din Valoare reala sunt scrise separat, deci nu e nevoie de o cutie per cifra in PDF. Solutia aleasa si documentata la subtask 1.2: decuparea celulei dupa pozitia cunoscuta din grid, segmentarea cifrelor cu OpenCvSharp (componente conexe/proiectie pe verticala dupa binarizare), clasificarea fiecarei cifre izolate cu un model gratuit preinstruit prin ONNX Runtime, iar Cod produs (text tiparit) citit separat prin OCR clasic (Tesseract). Adaugata la subtask 1.3 cerinta ca valoarea recunoscuta sa fie editabila, ca plasa de siguranta. Eliminat din Detalii de stabilit punctul privind tehnologia OCR (decis) si adaugat un punct neblocant despre sursa/recalibrarea modelului ONNX. Actualizat si docs/PROJECT_STATE.md cu rationamentul complet. Nu s-a modificat cod si nu s-au adaugat dependente noi in csproj.",
+    "lastCommitSubject":  "claude: decizie tehnica OCR scris de mana in TODO (OpenCvSharp + ONNX Runtime), Task 1 subtask 1.2/1.3",
     "claudeStatus":  "active"
 }

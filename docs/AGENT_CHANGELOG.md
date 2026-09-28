@@ -1048,3 +1048,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod, deci nu a fost necesar build sau rulare de teste. S-a verificat manual TODO.md (renumerotare corecta 1 la 2, subtaskuri 2.1-2.4, text nou fara diacritice) si docs/PROJECT_STATE.md (sectiune noua de pregatire TODO, coerenta cu restul fisierului).
 - **Commit:** `claude: task nou in TODO (preluare inventar OCR, prioritate 1); combobox beneficiar/proiect devine task 2`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-28T08:02:02.5422883Z â€” claude
+
+- **Task:** Trece in TODO.md decizia tehnica pentru OCR pe scris de mana (Task 1, subtask 1.2): segmentare cifre cu OpenCvSharp + clasificare cu ONNX Runtime, pe baza unui formular de proba analizat
+- **Rezumat:** Trecuta in TODO.md decizia tehnica pentru OCR pe scris de mana la Task 1 (preluare inventar): pe baza unui formular de proba furnizat de utilizator (situatia de inventar generata de aplicatie, completata de mana si scanata), s-a constatat ca cifrele din Valoare reala sunt scrise separat, deci nu e nevoie de o cutie per cifra in PDF. Solutia aleasa si documentata la subtask 1.2: decuparea celulei dupa pozitia cunoscuta din grid, segmentarea cifrelor cu OpenCvSharp (componente conexe/proiectie pe verticala dupa binarizare), clasificarea fiecarei cifre izolate cu un model gratuit preinstruit prin ONNX Runtime, iar Cod produs (text tiparit) citit separat prin OCR clasic (Tesseract). Adaugata la subtask 1.3 cerinta ca valoarea recunoscuta sa fie editabila, ca plasa de siguranta. Eliminat din Detalii de stabilit punctul privind tehnologia OCR (decis) si adaugat un punct neblocant despre sursa/recalibrarea modelului ONNX. Actualizat si docs/PROJECT_STATE.md cu rationamentul complet. Nu s-a modificat cod si nu s-au adaugat dependente noi in csproj.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu s-a modificat cod, deci nu a fost necesar build sau rulare de teste. S-a verificat manual coerenta TODO.md (subtask 1.2 si 1.3 actualizate, lista de detalii de stabilit corectata, fara diacritice) si docs/PROJECT_STATE.md (sectiune noua coerenta cu restul fisierului).
+- **Commit:** `claude: decizie tehnica OCR scris de mana in TODO (OpenCvSharp + ONNX Runtime), Task 1 subtask 1.2/1.3`
+- **Predat cÄƒtre:** claude
