@@ -1117,4 +1117,22 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
   - `wwwroot/app.css`
 - **Validare:** dotnet build (Debug si Release) 0 avertismente/0 erori. tests/BlazorStoc.Checks: 578 verificari trecute (19 noi), inclusiv 9 care ruleaza pipeline-ul OCR real pe fixture-ul cu scanarea autentica (tests/BlazorStoc.Checks/Fixtures/inventar-proba.pdf) si verifica valorile citite si ca niciun rand incert nu e eliminat tacut, plus teste de potrivire/aplicare cu repository-uri false. Verificare manuala in browser (preview separat pe 5083, cont administrator.demo, aceeasi baza SQLite ca 5082): incarcarea fisierului real (facuta de utilizator, agentul nu poate automatiza fereastra nativa de selectare fisier), lista de diferente corecta si grupata, editarea unei valori gresite cu recalcularea instanta a diferentei, selectie, popup de confirmare, aplicare cu mesaj de succes, evenimente de jurnal automate corecte (Intrare/Iesire cu destinatia asteptata), stocul din depozit al produsului actualizat corect (verificat pe pagina produsului). Verificat si la 768 px. Neverificat: alte scanere/rezolutii, MariaDB real, alte browsere si ecran tactil pentru incarcare, suport Linux al OpenCvSharp/Tesseract - detaliat in docs/TESTE_RAMASE.md (grupa H).
 - **Commit:** `claude: preluare inventar OCR (Task 1) - PDFtoImage, OpenCvSharp, ONNX Runtime, Tesseract`
-- **Predat cÄƒtre:** claude
+- **Predat către:** claude
+
+## 2026-09-28T11:41:33.0000000Z — claude
+
+- **Task:** Normalizeaza datele existente eliminand diacriticele (seed SQLite si baza locala existenta); regula de eliminare la salvare era deja implementata pentru toate campurile relevante, verificata acum
+- **Rezumat:** Verificata regula 'eliminarea diacriticelor la salvare': era deja implementata consecvent (SQLite si MariaDB) pentru cod produs/denumire, descriere, categorie, subcategorie, beneficiar, CUI, utilizator, vehicul, proiect, observatie, descrierea miscarii de stoc si motivari, prin *Input.Validated()/ChangeReasonRules.Normalize. Gaura reala gasita si corectata: datele demonstrative initiale (DemoProductRepository.InitialProducts, folosite la prima creare a bazei SQLite) ocoleau regula, inserate direct cu diacritice. Literalii corectati; adaugata o migrare unica (SqliteLocalStore.NormalizeExistingDiacriticsAsync, marcaj app_metadata) care normalizeaza retroactiv orice baza SQLite existenta creata cu diacritice; normalized_*, auditul si arhiva raman neschimbate.
+- **Fișiere modificate:**
+  - `Services/Products.cs`
+  - `Services/SqliteLocalStore.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `docs/PROJECT_STATE.md`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+- **Validare:** dotnet build (Debug) 0 avertismente/0 erori. tests/BlazorStoc.Checks: 578 verificari trecute (3 adaptate la noile valori fara diacritice ale datelor demonstrative). Verificat direct pe baza locala persistenta (interogare SQL inainte/dupa repornirea aplicatiei pe portul 5083) si vizual in pagina /produse: toate cele 15 valori afectate (7 produse, 2 categorii, 6 subcategorii) curatate corect, fara alterarea cantitatilor, versiunilor sau cheilor de unicitate. Neverificat: o baza MariaDB reala cu date vechi dinainte de regula (motiv M1, docs/TESTE_RAMASE.md).
+- **Notă:** in docs/ existau la finalul acestui ciclu doua fisiere noi, necomise, dintr-o lucrare separata (Codex, la cererea utilizatorului) despre o instanta MariaDB locala pregatita in paralel. La cererea explicita a utilizatorului, fisierul ramas (`docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md`) a fost lasat necomis si exclus din acest commit; nu a fost modificat, mutat sau sters.
+- **Commit:** `claude: normalizeaza datele existente eliminand diacriticele (seed SQLite + migrare)`
+- **Predat către:** claude
