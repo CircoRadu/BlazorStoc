@@ -1,8 +1,42 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **28 septembrie 2026 (ciclu de reconfirmare prin executie)**
-Stare ciclu: **Task 2 (integrare MariaDB reala): subtask 2.4/2.5/2.11 reconfirmate prin executie reala pe `blazorstoc_test` (miscari de stoc, utilizatori); o problema noua, separata, gasita la stergerea proiectelor (vezi mai jos) - vezi TODO.md pentru detalii. Taskuri active ramase: 1 (combobox beneficiar/proiect), 2 (MariaDB, problema de stergere proiecte + subtask 2.12/2.13 care raman ale utilizatorului), 3-4 (backup/restaurare, depind de Task 2), 5 (inaltime randuri PDF inventar); mod claude_only, fara predare catre Codex**
+Data: **28 septembrie 2026 (cutover final MariaDB, subtask 2.13)**
+Stare ciclu: **Task 2 (integrare MariaDB reala): subtask 2.13 (comutarea definitiva) finalizat - MariaDB (`blazorstoc_dev`) este sursa de adevar de la 28.09.2026 18:05; SQLite inghetata. Task 2 ramane activ (nu se muta la "finalizate") pana se rezolva A15 (stergerea proiectelor pe MariaDB), care e neschimbata de acest ciclu. Taskuri active ramase: 1 (combobox beneficiar/proiect), 2 (MariaDB, doar A15 mai lipseste), 3-4 (backup/restaurare, depind de Task 2), 5 (inaltime randuri PDF inventar); mod claude_only, fara predare catre Codex**
+
+## Cutover final MariaDB (subtask 2.13) - 28.09.2026
+
+Ciclu dedicat exclusiv comutarii definitive cerute in TODO.md subtask 2.13, la autorizarea explicita a utilizatorului. Celelalte subtaskuri ale Task 2 (2.1-2.12) erau deja finalizate/verificate in ciclurile anterioare; A15 (stergerea de proiecte pe MariaDB) ramane deschisa, separat, neatinsa in acest ciclu, conform cererii.
+
+### Ce s-a facut
+
+1. **Identificarea bazei SQLite vii**: `data\blazorstoc-local.db` din radacina proiectului (nu copia invechita din `bin\Release\net9.0\data`, care nu mai primea scrieri din 25.09.2026) - confirmata ca fiind cea folosita de preview-ul de pe portul `5082` (proces `BlazorStoc.exe`, PID 18400, pornit cu cwd in radacina proiectului, cale relativa `data/blazorstoc-local.db` din `App:LocalDatabasePath`).
+2. **Comparatie completa SQLite live vs. MariaDB (`blazorstoc_dev`)**, cu un instrument temporar (C# consola, `Microsoft.Data.Sqlite` + `MySqlConnector`, scris in directorul de scratch al sesiunii, needocumentat in surse), care reproduce metodologia originala a migrarii (`docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` sectiunea 4, pasul 8): pentru fiecare din cele 27 de tabele, fiecare rand e transformat intr-o reprezentare canonica pe coloana (`I:`/`R:`/`T:`/`B:`/NULL, tip + valoare), apoi hash SHA-256 pe randul intreg; comparatia se face pe cheie primara (din `PRAGMA table_info`), nu pozitional sau prin diff brut de text.
+3. **Rezultat**: singura diferenta gasita fata de cele 229 de randuri deja migrate a fost **exact 1 rand nou** in `audit_events` - un eveniment "Generare" (situatie de inventar PDF), creat de `administrator.demo` in SQLite la 28.09.2026 11:15:55 UTC (14:15:55 ora Romaniei), deci ulterior momentul snapshot-ului folosit la migrarea initiala (28.09.2026 13:58 ora Romaniei). Nicio alta tabela (produse, categorii, subcategorii, beneficiari, miscari de stoc, istoricul lor, vehicule, utilizatori web, proiecte, observatii, arhiva, `change_events`, blocari, imagini) nu avea nicio diferenta - toate cele 229 de randuri originale identice byte-cu-byte.
+4. **Migrare**: randul nou a fost inserat in MariaDB cu contul `blazorstoc_dev` (INSERT simplu, parametrizat, valorile citite exact din SQLite; id-ul GUID original pastrat - fara risc de coliziune, GUID-urile `audit_events` sunt generate client-side si unice global).
+5. **Re-verificare dupa migrare, cu aceeasi metodologie**: 230/230 randuri din SQLite regasite identic in MariaDB (0 noi, 0 schimbate). Comparatia a mai scos la iveala **2 randuri `audit_events` care exista doar in MariaDB**, niciodata in SQLite: evenimente "Conectare" scrise direct in `blazorstoc_dev` in timpul verificarii manuale a autentificarii pe preview-ul `5085` (subtask 2.12, 28.09.2026 ~17:48-17:49 UTC). Nu sunt o eroare si nu au fost atinse - sunt evenimente native MariaDB care nu au corespondent (si nu ar trebui sa aiba) in SQLite.
+6. **Momentul exact al opririi scrierilor in SQLite**: **28.09.2026, ora 18:05, Europe/Bucharest** (momentul terminarii comparatiei/migrarii de mai sus si al deciziei de comutare). De la acest moment, `data\blazorstoc-local.db` e tratata ca inghetata/istorica.
+7. **Decizie deliberata: NU s-a schimbat valoarea implicita `App:DemoMode` din `appsettings.json`** (ramane `true`). Vezi motivarea detaliata in TODO.md, subtask 2.13: pe scurt, `Authentication:Password` nu are niciun mecanism de incarcare dintr-un fisier privat (spre deosebire de `Database:Password`, care are `Database:PrivateConfigPath`, dar a carui cale implicita din cod nu mai exista nici ea pe aceasta masina), asa ca simpla schimbare a valorii implicite ar face ca orice pornire "normala" (fara variabile de mediu speciale) sa esueze imediat la `InvalidOperationException`. E o schimbare de cod reala, sensibila din punct de vedere al secretelor, care merita un subtask propriu, nu graba la coada acestui ciclu.
+8. **Build si teste**: `dotnet build -c Release` (proiect principal + `BlazorStoc.Checks`), redirectionat catre un folder de iesire alternativ (`-p:BaseOutputPath=...`) pentru ca `bin\Release\net9.0\BlazorStoc.exe` era blocat de preview-ul de pe 5082, pe care agentul nu l-a putut/nu a incercat sa il opreasca - 0 avertismente, 0 erori. Suita implicita `BlazorStoc.Checks`: **578/578 `PASS`**, nicio regresie. Folderele de iesire temporare au fost sterse dupa verificare (nu au intrat in commit).
+9. **Documentatie**: TODO.md (subtask 2.13, cele trei puncte marcate finalizate, cu detaliile de mai sus), `docs/PROJECT_STATE.md` (aceasta sectiune).
+
+### Verificari
+
+- Build Release: 0 avertismente, 0 erori (proiect principal si `BlazorStoc.Checks`, build redirectionat in afara `bin\Release\net9.0` din cauza preview-ului activ pe 5082).
+- `BlazorStoc.Checks` (suita implicita): 578/578 `PASS`.
+- Comparatie canonica SQLite vs. MariaDB, inainte si dupa migrare: vezi punctele 2-5 de mai sus. Verificata si integritatea celor 229 de randuri deja existente (neschimbate).
+
+### Stare previews la finalul ciclului
+
+- `http://127.0.0.1:5082/` (SQLite, PID 18400) - **ramas pornit, neatins**; nu mai trebuie folosit pentru date reale de acum inainte.
+- `http://127.0.0.1:5083/` - proces separat gasit pornit (`artifacts\preview-5083\BlazorStoc.exe`, `Database:User=blazorstoc_reader`, port Maria 3306), neclar din ce ciclu anterior; neatins, dar de verificat de utilizator daca mai e necesar.
+- `http://127.0.0.1:5085/` (MariaDB reala, `blazorstoc_dev`) - ramas pornit; reflecta corect starea de dupa migrare (audit event-ul nou e vizibil acolo).
+
+### Pasul urmator
+
+1. **A15** (`docs/TESTE_RAMASE.md`) - stergerea proiectelor pe MariaDB nu comite corect pe `blazorstoc_test`; investigatie separata, ramane singurul lucru care tine Task 2 activ.
+2. Subtask de cod separat, facut cu atentie: extinderea mecanismului `Database:PrivateConfigPath` sa poata incarca si `Authentication:Password` dintr-un fisier privat (si repararea caii implicite, care nu mai exista pe aceasta masina), ca sa se poata schimba in siguranta valoarea implicita `App:DemoMode` in `false`.
+3. Utilizatorul ar trebui sa decida ce se intampla cu preview-ul de pe portul `5083` (proces gasit pornit, scop neclar in acest ciclu).
 
 ## Reconfirmare prin executie A13 si gasire noua (stergere proiecte) - 28.09.2026
 
