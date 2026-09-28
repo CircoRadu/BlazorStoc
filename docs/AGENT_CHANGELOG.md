@@ -1061,3 +1061,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod, deci nu a fost necesar build sau rulare de teste. S-a verificat manual coerenta TODO.md (subtask 1.2 si 1.3 actualizate, lista de detalii de stabilit corectata, fara diacritice) si docs/PROJECT_STATE.md (sectiune noua coerenta cu restul fisierului).
 - **Commit:** `claude: decizie tehnica OCR scris de mana in TODO (OpenCvSharp + ONNX Runtime), Task 1 subtask 1.2/1.3`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-28T08:06:03.1659968Z â€” claude
+
+- **Task:** Confirma in TODO.md restul detaliilor de stabilit pentru Task 1 (preluare inventar OCR): format formular, sursa model ONNX, stare implicita checkbox, limite fisier, produse negasite, un singur fisier activ, tipul miscarii de stoc
+- **Rezumat:** Confirmate si trecute in TODO.md toate detaliile ramase de stabilit la Task 1 (preluare inventar OCR): format acceptat exclusiv situatia de inventar generata de aplicatie; model de cifre = MNIST din ONNX Model Zoo, incorporat ca resursa; casetele de selectare bifate implicit pentru diferentele certe; limite fisier 20 MB / 50 pagini; produsele disparute din catalog intr-o sectiune informativa separata; un singur fisier activ per sesiune de preluare, cu confirmare la inlocuire daca exista selectii netrimise; fara tip nou de miscare de stoc - se refoloseste StockMovementKind.Entry pentru plus si ExitDestination.StockCorrection existent pentru minus. Subtaskurile 1.1-1.4 actualizate cu deciziile; sectiunea Detalii de stabilit inlocuita cu Decizii confirmate. Actualizat docs/PROJECT_STATE.md cu rationamentul complet; taskul e acum pregatit pentru implementare. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu s-a modificat cod, deci nu a fost necesar build sau rulare de teste. S-a verificat manual coerenta TODO.md (subtaskurile 1.1-1.4, sectiunea Decizii confirmate, fara diacritice) si consistenta cu Services/StockMovements.cs (StockMovementKind, ExitDestination.StockCorrection, StockMovementRules.SuggestedDescription existente, citite din cod inainte de a scrie decizia).
+- **Commit:** `claude: confirma detaliile ramase la Task 1 (preluare inventar OCR); task pregatit pentru implementare`
+- **Predat cÄƒtre:** claude

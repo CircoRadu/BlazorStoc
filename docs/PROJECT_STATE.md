@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **28 septembrie 2026**
-Stare ciclu: **Situatia de inventar finalizata; taskuri active ramase in TODO.md: 1 (preluare inventar OCR, task nou, pregatire) si 2 (combobox cu autocompletare beneficiar/proiect la iesire); mod claude_only, fara predare catre Codex**
+Stare ciclu: **Situatia de inventar finalizata; taskuri active ramase in TODO.md: 1 (preluare inventar OCR, pregatit pentru implementare, toate deciziile confirmate) si 2 (combobox cu autocompletare beneficiar/proiect la iesire); mod claude_only, fara predare catre Codex**
 
 ## Rezumat
 
@@ -11,6 +11,19 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs”, stocul modificabil exclusiv prin mișcări de intrare/ieșire (pagina `/produse/{id}/miscari`) și istoricul mișcărilor.
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Task 1 (preluare inventar OCR) pregatit pentru implementare - 28 septembrie 2026
+
+- La cererea utilizatorului ("confirma si celelalte detalii ramase de stabilit"), au fost confirmate si trecute in `TODO.md` toate deciziile ramase deschise la Task 1:
+  - **Format acceptat**: exclusiv situatia de inventar generata de aplicatie la `/inventar` (tabel Cod produs / Valoare stoc / Valoare reala); alt format e respins cu mesaj clar, fara procesare partiala.
+  - **Model de cifre**: modelul MNIST din ONNX Model Zoo (licenta MIT), incorporat ca resursa in proiect (similar fonturilor din `Assets/Fonts`); recalibrarea pe mostre reale ramane o imbunatatire ulterioara neblocanta.
+  - **Selectie implicita**: toate produsele cu diferenta recunoscuta cu certitudine sunt bifate implicit; produsele nesigure nu apar niciodata in lista de trimis.
+  - **Limite fisier**: 20 MB, maximum 50 de pagini.
+  - **Produse disparute din catalog**: sectiune separata, informativa, "Produse negasite in catalog", fara modificare de stoc.
+  - **Fisiere succesive**: un singur fisier activ per sesiune de preluare; incarcarea altuia inlocuieste lista curenta, cu confirmare daca exista selectii netrimise.
+  - **Tipul miscarii de stoc**: fara tip nou — se refoloseste mecanismul existent din `Services/StockMovements.cs`: diferenta pozitiva genereaza o miscare de Intrare, diferenta negativa o miscare de Iesire cu destinatia deja existenta `ExitDestination.StockCorrection` ("Corecție stoc"), cu descriere sugerata extinsa pentru a mentiona inventarul; referinta la fisier ramane in `Motif`/`Details` din jurnal, fara coloana noua in miscari.
+- Subtaskurile 1.1-1.4 din `TODO.md` au fost actualizate cu aceste decizii (limite si inlocuire fisier la 1.1, sursa modelului la 1.2, selectie implicita si sectiunea de produse negasite la 1.3, mecanismul exact de miscare la 1.4); sectiunea "Detalii de stabilit la implementare" a fost inlocuita cu "Decizii confirmate".
+- Nu s-a modificat cod si nu s-au adaugat inca dependentele noi (OpenCvSharp, ONNX Runtime, Tesseract) in `BlazorStoc.csproj`. Taskul este pregatit pentru implementare; preview-ul ramane cel de pe `http://127.0.0.1:5082/`, neschimbat.
 
 ## Decizie tehnica OCR - Task 1 (preluare inventar) - 28 septembrie 2026
 

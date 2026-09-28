@@ -23,8 +23,10 @@ Implementeaza pagina de rezerva `/inventar/preluare` (`Components/Pages/Inventor
 ### Subtask 1.1 - Buton "Preia inventar" si incarcarea fisierului PDF
 
 - [ ] Adauga in partea de sus a paginii `/inventar/preluare` butonul "Preia inventar", care deschide un dialog de incarcare a unui singur fisier PDF.
-- [ ] Valideaza tipul fisierului (.pdf) si dimensiunea maxima acceptata; la un fisier respins, afiseaza un mesaj de eroare in romana, fara sa piarda restul paginii.
+- [ ] Accepta exclusiv fisiere PDF cu structura situatiei de inventar generate de aplicatie la pagina `/inventar` (tabel Cod produs / Valoare stoc / Valoare reala); un fisier cu alt format sau structura nerecunoscuta este respins cu un mesaj clar, fara procesare partiala.
+- [ ] Valideaza tipul fisierului (.pdf), dimensiunea maxima (20 MB) si numarul maxim de pagini (50); peste aceste limite, fisierul este respins cu un mesaj clar, in romana, inainte de a incepe OCR.
 - [ ] Afiseaza starea de progres pe durata incarcarii si a procesarii OCR (poate dura cateva secunde).
+- [ ] Incarcarea unui nou fisier inlocuieste lista curenta de diferente; daca exista produse bifate netrimise, cere confirmare explicita inainte de a le pierde.
 
 ### Decizie tehnica pentru recunoasterea scrisului de mana
 
@@ -34,7 +36,7 @@ Pe baza unui formular de proba, completat si scanat de utilizator, s-a constatat
 
 - [ ] Decupeaza celula "Cod produs" si celula "Valoare reala" ale fiecarui rand folosind pozitia cunoscuta din grid-ul situatiei de inventar (acelasi format ca la generarea PDF-ului, fara detectie de layout).
 - [ ] Extrage "Cod produs" prin OCR clasic (de exemplu Tesseract), local.
-- [ ] Extrage "Valoare reala" prin segmentarea cifrelor individuale (OpenCvSharp) si clasificarea fiecarei cifre izolate cu modelul de cifre scrise de mana (ONNX Runtime), conform deciziei tehnice de mai sus.
+- [ ] Extrage "Valoare reala" prin segmentarea cifrelor individuale (OpenCvSharp) si clasificarea fiecarei cifre izolate cu un model ONNX preinstruit gratuit pe cifre scrise de mana (modelul MNIST din ONNX Model Zoo, licenta MIT, incorporat ca resursa in proiect, similar fonturilor din `Assets/Fonts`), rulat prin ONNX Runtime, conform deciziei tehnice de mai sus.
 - [ ] Trateaza randurile la care "Valoare reala" a fost lasata necompletata de utilizator ca "neinventariate": nu genereaza pentru ele nicio modificare de stoc.
 - [ ] Semnaleaza distinct, fara sa le includa automat in lista de modificari, randurile pe care OCR nu le-a putut citi cu suficienta certitudine (cod neidentificat, cifre nesegmentate sau clasificare nesigura), si permite utilizatorului sa le vada separat.
 
@@ -43,15 +45,18 @@ Pe baza unui formular de proba, completat si scanat de utilizator, s-a constatat
 - [ ] Pentru fiecare produs identificat cu succes, calculeaza diferenta dintre "Valoare reala" citita si stocul curent din baza de date la momentul incarcarii.
 - [ ] Afiseaza in lista de modificari numai produsele cu diferenta de stoc; produsele la care valoarea reala este identica stocului curent nu genereaza o modificare.
 - [ ] Grupeaza afisarea produselor pe categorie si subcategorie, la fel ca in restul aplicatiei.
-- [ ] Adauga un checkbox pentru fiecare produs din lista, plus "selecteaza toate"/"deselecteaza toate"; afiseaza pentru fiecare produs cod produs, denumire, categorie/subcategorie, stoc curent, valoare reala citita si diferenta (cu semn).
+- [ ] Adauga un checkbox pentru fiecare produs din lista, bifat implicit pentru toate produsele cu diferenta recunoscuta cu certitudine (selectie completa implicita), plus "selecteaza toate"/"deselecteaza toate" pentru ajustare; produsele semnalate ca nesigure (subtask 1.2) nu sunt niciodata incluse in aceasta lista.
+- [ ] Afiseaza pentru fiecare produs cod produs, denumire, categorie/subcategorie, stoc curent, valoare reala citita si diferenta (cu semn).
 - [ ] Afiseaza "Valoare reala" recunoscuta ca valoare editabila pentru fiecare produs (nu doar text static), ca utilizatorul sa poata corecta o citire OCR gresita inainte de bifare/trimitere; diferenta afisata se recalculeaza dupa corectie.
+- [ ] Afiseaza intr-o sectiune separata, informativa, "Produse negasite in catalog" produsele al caror cod citit nu (mai) exista in catalog (produs sters sau redenumit intre generarea situatiei si preluare); acestea nu genereaza nicio modificare de stoc si nu au checkbox.
 
 ### Subtask 1.4 - Trimiterea modificarilor si popup de confirmare
 
 - [ ] Adauga butonul "Trimite modificari in stoc", activ numai cand cel putin un produs este bifat.
 - [ ] La apasare, afiseaza un popup cu toate modificarile care vor fi operate pentru produsele bifate: cod produs si modificare de stoc (numar de bucati, cu semn), grupate pe categorie si subcategorie.
 - [ ] Popup-ul are un buton de confirmare, care aplica modificarile in baza de date, si un buton "Anuleaza" (stil rosu), care inchide popup-ul fara nicio modificare.
-- [ ] Fiecare modificare aplicata este o miscare de stoc obisnuita (intrare sau iesire, conform diferentei), jurnalizata ca restul miscarilor, cu referinta la operatia de inventar si la fisierul incarcat.
+- [ ] Fiecare modificare confirmata genereaza o miscare de stoc obisnuita, refolosind mecanismul existent (`StockMovementKind`/`ExitDestination`), fara tip nou de miscare: diferenta pozitiva (valoare reala mai mare decat stocul curent) genereaza o miscare de Intrare; diferenta negativa genereaza o miscare de Iesire cu destinatia existenta "Corecție stoc" (`ExitDestination.StockCorrection`); descrierea sugerata mentioneaza inventarul si data preluarii, ca extensie a `StockMovementRules.SuggestedDescription` existent.
+- [ ] Jurnalizeaza fiecare miscare ca restul miscarilor de stoc; referinta la operatia de inventar si la fisierul incarcat se pastreaza in `Motif`/`Details` din jurnal, fara o coloana noua in miscari.
 - [ ] Dupa confirmare, afiseaza o notificare de succes cu numarul de produse modificate.
 - [ ] O eroare la aplicarea uneia dintre modificarile confirmate nu lasa baza de date intr-o stare intermediara nespecificata (tranzactie sau raportare clara a modificarilor reusite si a celor nereusite).
 
@@ -72,15 +77,17 @@ Pe baza unui formular de proba, completat si scanat de utilizator, s-a constatat
 - Modificarile se aplica in baza de date numai dupa confirmarea din popup si sunt jurnalizate ca miscari de stoc.
 - Randurile necompletate sau pe care OCR nu le-a putut citi cu certitudine nu genereaza modificari automate de stoc.
 
-### Detalii de stabilit la implementare
+### Decizii confirmate
 
-- Formatul exact al formularului scanat acceptat: se presupune situatia de inventar generata de aplicatie (pagina `/inventar`, tabel Cod produs / Valoare stoc / Valoare reala), completata de mana la "Valoare reala"; de confirmat daca trebuie acceptate si alte formate de formular.
-- Sursa concreta a modelului ONNX preinstruit de cifre scrise de mana folosit la clasificare (licenta gratuita, dimensiune redusa) si daca merita recalibrat/reantrenat ulterior pe mostre reale de formulare completate, pentru acuratete mai buna (imbunatatire neblocanta, nu opreste implementarea initiala).
-- Comportamentul implicit al casetelor de selectare (toate bifate implicit sau nebifate implicit).
-- Dimensiunea maxima acceptata a fisierului PDF si numarul maxim de pagini.
-- Ce se face cu produsele gasite in formular dar care nu mai exista in catalog (produs sters sau redenumit intre generarea situatiei si preluare).
-- Daca se permite incarcarea mai multor fisiere succesive inainte de trimiterea modificarilor, sau un singur fisier per sesiune de preluare.
-- Tipul exact de miscare de stoc generata pentru diferente (intrare/iesire cu sursa/destinatie "Inventar", sau un tip nou dedicat de miscare).
+- Formatul acceptat este exclusiv situatia de inventar generata de aplicatie la `/inventar`; orice alt format e respins cu mesaj clar.
+- Modelul de cifre scrise de mana este modelul MNIST din ONNX Model Zoo (licenta MIT), incorporat ca resursa in proiect; recalibrarea pe mostre reale ramane o imbunatatire ulterioara neblocanta, evaluata dupa verificarile in browser cu formulare reale.
+- Casetele de selectare sunt bifate implicit pentru toate produsele cu diferenta recunoscuta cu certitudine.
+- Limite fisier: 20 MB, maximum 50 de pagini.
+- Produsele gasite in formular dar disparute din catalog apar informativ in sectiunea "Produse negasite in catalog", fara modificare de stoc.
+- Se permite un singur fisier activ per sesiune de preluare; incarcarea altuia inlocuieste lista curenta, cu confirmare daca exista selectii netrimise.
+- Nu se introduce un tip nou de miscare de stoc: diferentele folosesc mecanismul existent (Intrare pentru plus, Iesire cu `ExitDestination.StockCorrection` pentru minus).
+
+Toate deciziile de mai sus au fost confirmate de utilizator; taskul este pregatit pentru implementare.
 
 ## Task 2 - Combobox cu autocompletare pentru beneficiar si proiect la iesire, cu adaugare fara pierderea formularului
 
