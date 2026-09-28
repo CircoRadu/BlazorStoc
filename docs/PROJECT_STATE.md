@@ -1,8 +1,42 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **28 septembrie 2026 (cutover final MariaDB, subtask 2.13)**
-Stare ciclu: **Task 2 (integrare MariaDB reala): subtask 2.13 (comutarea definitiva) finalizat - MariaDB (`blazorstoc_dev`) este sursa de adevar de la 28.09.2026 18:05; SQLite inghetata. Task 2 ramane activ (nu se muta la "finalizate") pana se rezolva A15 (stergerea proiectelor pe MariaDB), care e neschimbata de acest ciclu. Taskuri active ramase: 1 (combobox beneficiar/proiect), 2 (MariaDB, doar A15 mai lipseste), 3-4 (backup/restaurare, depind de Task 2), 5 (inaltime randuri PDF inventar); mod claude_only, fara predare catre Codex**
+Data: **28 septembrie 2026 (rezolvarea A15, Task 2 mutat la "Taskuri finalizate")**
+Stare ciclu: **Bugul A15 (stergerea proiectelor pe MariaDB) a fost investigat pana la cauza reala si corectat: `MariaProjectRepository` construia timpul `CreatedAtUtc`/`UpdatedAtUtc` din `DateTime.UtcNow` neschimbat, cu precizie mai mare decat ce `MariaTimeText.Format` scrie in baza (milisecunda); la re-citirea din baza in aceeasi tranzactie de Update/Delete, `ProjectRules.CheckCurrent` respingea fals operatia ca "modificat/sters intre timp". Corectat cu `MariaTimeText.Now()`. Cu A15 rezolvat, toate subtaskurile 2.1-2.13 sunt finalizate si verificate real; Task 2 a fost mutat integral in TODO.md la "Taskuri finalizate" ("Integrare MariaDB reala si comutarea definitiva de dezvoltare"), iar taskurile active ramase au fost renumerotate: 1 (combobox beneficiar/proiect), 2 (backup la preluare inventar, fost 3), 3 (pagina de restaurare, fost 4), 4 (inaltime randuri PDF inventar, fost 5); mod claude_only, fara predare catre Codex.**
+
+## Rezolvarea A15 (stergerea proiectelor pe MariaDB) si finalizarea Task 2 - 28.09.2026 (ciclu final)
+
+Ciclu dedicat exclusiv investigarii si corectarii A15, singurul lucru ramas deschis din Task 2 (subtask 2.11).
+
+### Investigatie (executie reala, nu presupunere)
+
+1. **Reproducere**: rulat `tests/BlazorStoc.Checks/MariaIntegrationChecks.cs` (`RUN_MARIA_INTEGRATION_CHECKS=1`, `MARIA_TEST_CONFIG_PATH` catre `local-secrets\test-database.private.json`) impotriva `blazorstoc_test`, build separat in `bin\ChecksRun` (in afara `bin\Debug`/`bin\Release` blocate de preview-urile de pe 5082/5085, care au ramas pornite, neatinse). Sectiunea "Projects" a esuat exact cum descria A15: dupa `DeleteObservationAsync`+`DeleteAsync(project)`, blocul `finally` al testului (curatarea beneficiarului seed) a lovit o eroare de FK reala (`fk_projects_0`, "Cannot delete or update a parent row") - confirmand ca proiectul chiar ramanea viu si ca aceasta eroare de curatare masca orice exceptie anterioara.
+2. **Instrumentare temporara**: `DeleteObservationAsync`/`DeleteAsync` invelite temporar in try/catch in scriptul de verificare, care afisa tipul si mesajul exceptiei originale inainte de a o arunca mai departe. Exceptia reala: `BlazorStoc.Services.ProjectOperationException: Observatia a fost modificata sau stearsa intre timp. Actualizeaza pagina si reia operatia.` - aruncata de `ProjectRules.CheckCurrent`, **nu** de pasul de arhivare (`MariaArchivePersistence.InsertAsync`/`InsertAuditAsync`), cum banuia investigatia initiala.
+3. **Cauza radacina**: `Project`/`ProjectObservation` sunt record-uri C# (`Services/Projects.cs`), a caror egalitate implicita compara toate campurile, inclusiv `CreatedAtUtc`/`UpdatedAtUtc`. `MariaTimeText.Format` (`Services/MariaTimeText.cs`) scrie aceste coloane text cu precizie de milisecunda (`yyyy-MM-ddTHH:mm:ss.fffZ`), ca sa se potriveasca formatul deja folosit de cele 18 triggere (`DATE_FORMAT(UTC_TIMESTAMP(3),...)`). `MariaProjectRepository.CreateAsync`/`UpdateAsync`/`CreateObservationAsync`/`UpdateObservationAsync` insa construiau obiectul intors catre apelant direct din `DateTime.UtcNow`, cu precizie mai mare (sub-milisecunda). Cand acelasi obiect era comparat, in `DeleteAsync`/`DeleteObservationAsync`/`UpdateAsync`/`UpdateObservationAsync`, cu randul proaspat re-citit din baza (`GetLockedAsync`/`GetObservationLockedAsync`, care trece prin `MariaTimeText.Parse` pe textul trunchiat), cele doua obiecte nu mai erau egale bit-cu-bit ori de cate ori componenta sub-milisecunda a lui `DateTime.UtcNow` nu era exact zero - deci intermitent, exact cum fusese observat empiric in ciclurile anterioare.
+4. **De ce a fost mascata**: exceptia reala (`ProjectOperationException`) se propaga normal din `DeleteAsync`/`DeleteObservationAsync` (niciun `catch` general nu o inghitea); dar in scriptul de test, ea trecea prin blocul `finally` al `MariaIntegrationChecks.RunAsync`, care apela `CleanupSeedsAsync` - iar acolo, stergerea beneficiarului seed esua cu o eroare de FK (proiectul ramasese viu), iar aceasta a doua exceptie, aruncata in `finally`, a inlocuit-o pe prima in output-ul .NET. De aici impresia initiala de "rollback silentios in pasul de arhivare".
+
+### Corectare
+
+- Adaugat `MariaTimeText.Now()` in `Services/MariaTimeText.cs`: `DateTime.UtcNow` trecut prin acelasi `Format`/`Parse` folosit la scriere/citire, deci rotunjit exact la precizia pe care o pastreaza baza.
+- Inlocuit cele 4 aparitii ale `var nowUtc = DateTime.UtcNow;` din `Services/MariaProjectRepository.cs` (`CreateAsync`, `UpdateAsync`, `CreateObservationAsync`, `UpdateObservationAsync`) cu `MariaTimeText.Now()`.
+- Verificat ca niciun alt tip de entitate Maria (`Product`, `Beneficiary`, `Vehicle`, `WebUser`) nu are `CreatedAtUtc`/`UpdatedAtUtc` in record-ul sau (doar `Version`), deci niciunul nu era afectat de acelasi bug; fixul a ramas limitat la `Services/MariaProjectRepository.cs`/`Services/MariaTimeText.cs`.
+- Testul de integrare (`CheckProjectsAsync` din `MariaIntegrationChecks.cs`) a fost extins cu verificari suplimentare permanente: `archive_projects` are exact 1 rand pentru proiectul sters, nicio ramasita in `projects`/`project_observations`. Instrumentarea temporara (try/catch de depanare, curatarea manuala de leftover-uri) a fost eliminata dupa investigatie.
+
+### Verificari
+
+- 5 rulari consecutive ale suitei de integrare pe `blazorstoc_test` (`RUN_MARIA_INTEGRATION_CHECKS=1`), toate cu exit code 0 si `PASS: The deleted project is gone from blazorstoc_test`, `PASS: archive_projects has exactly one row for the deleted project #N`, `PASS: No row survives in projects/project_observations for the deleted project #N`.
+- Suita implicita `BlazorStoc.Checks` (fara variabile MariaDB): **578/578 `PASS`**, exit code 0, build separat in `bin\ChecksReleaseRun` - nicio regresie.
+- Niciun date orfan lasat in `blazorstoc_test`: fiecare rulare isi curata singura beneficiarul/proiectul/observatia proprii (`CleanupSeedsAsync`), iar acum reuseste, pentru ca proiectul chiar e sters inainte de curatare.
+- Nu s-au atins baza reala de livrare (`blazorstoc_dev`, 229/230 randuri) si nici preview-urile active de pe porturile 5082/5085 (verificate cu `Get-NetTCPConnection` inainte si dupa, ramase neatinse).
+
+### Documentatie actualizata
+
+- `docs/TESTE_RAMASE.md`: A15 mutat din lista activa in "Teste efectuate", cu cauza reala si fixul.
+- `TODO.md`: subtask 2.11 marcat complet finalizat; cu toate subtaskurile 2.1-2.13 acum `[x]`, Task 2 intreg a fost mutat la "Taskuri finalizate" ("Integrare MariaDB reala si comutarea definitiva de dezvoltare"), iar taskurile active ramase (fost 3, 4, 5) au fost renumerotate la 2, 3, 4 (Task 0 si Task 1 neschimbate), inclusiv toate trimiterile incrucisate din text.
+
+### Pasul urmator
+
+Niciun element deschis din Task 2. Urmatoarele taskuri active, in ordine: 1 (combobox beneficiar/proiect la iesire), 2 (backup automat la preluare inventar), 3 (pagina de restaurare a bazei de date), 4 (inaltimea randurilor din PDF-ul de inventar, pentru OCR).
 
 ## Cutover final MariaDB (subtask 2.13) - 28.09.2026
 

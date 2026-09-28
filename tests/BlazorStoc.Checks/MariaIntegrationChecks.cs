@@ -430,6 +430,18 @@ public static class MariaIntegrationChecks
             "SELECT COUNT(*) FROM audit_events WHERE entity_type=@type AND entity_id=@id",
             ("@type", AuditEntities.Project), ("@id", project.Id.ToString())).ConfigureAwait(false);
         check(auditCount >= 1, $"audit_events recorded {auditCount} entries for project #{project.Id}");
+
+        // A15 regression coverage: the project's own archive row exists, but archive_relations has none for it -
+        // the observation was already archived and deleted independently by DeleteObservationAsync above, so by
+        // the time DeleteAsync(project) reads the project's observations there are none left to attach - and no
+        // row survives in the live tables.
+        var archiveProjectsCount = await ScalarLongAsync(probe,
+            "SELECT COUNT(*) FROM archive_projects WHERE original_id=@id", ("@id", project.Id)).ConfigureAwait(false);
+        check(archiveProjectsCount == 1, $"archive_projects has exactly one row for the deleted project #{project.Id}");
+        var remainingProjectRows = await ScalarLongAsync(probe, "SELECT COUNT(*) FROM projects WHERE id=@id", ("@id", project.Id)).ConfigureAwait(false);
+        check(remainingProjectRows == 0, $"No row survives in projects for the deleted project #{project.Id}");
+        var remainingObservationRows = await ScalarLongAsync(probe, "SELECT COUNT(*) FROM project_observations WHERE project_id=@id", ("@id", project.Id)).ConfigureAwait(false);
+        check(remainingObservationRows == 0, $"No row survives in project_observations for the deleted project #{project.Id}");
     }
 
     // ---- Product locks (no write guard - exercised in full) -------------------------------------------------------

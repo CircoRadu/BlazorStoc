@@ -25,6 +25,20 @@ internal static class MariaTimeText
 
     public static DateTime? ParseOrNull(string? text) =>
         string.IsNullOrEmpty(text) ? null : Parse(text);
+
+    // Bug A15 (Task 2, subtask 2.11): "now" truncated to the exact millisecond precision that Format/Parse
+    // round-trip through the database. Records such as Project/ProjectObservation carry CreatedAtUtc/UpdatedAtUtc
+    // in their equality (they are plain C# records), and ProjectRules.CheckCurrent compares the in-memory
+    // "original" object against a row just re-read from the database with `current != original`. DateTime.UtcNow
+    // keeps sub-millisecond ticks that Format() then discards when writing the row; a caller that builds its
+    // in-memory object straight from an untruncated DateTime.UtcNow therefore never matches what a later read of
+    // the same row parses back, and every Update/Delete on a project or observation intermittently (whenever the
+    // sub-millisecond ticks are non-zero) fails its optimistic-concurrency check with a false "modified or deleted
+    // in the meantime" error - which for Delete happens inside the same archive+delete transaction and looks, from
+    // outside, like the whole transaction silently rolled back. Use this instead of DateTime.UtcNow wherever the
+    // resulting timestamp ends up on an object that MariaTimeText.Format will also persist and that is later
+    // compared by record equality (Project/ProjectObservation create and update in MariaProjectRepository).
+    public static DateTime Now() => Parse(Format(DateTime.UtcNow));
 }
 
 // Subtask 2.7 (Task 2): where MariaDB-mode file stores keep their files on disk, shared by every store so they

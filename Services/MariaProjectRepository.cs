@@ -52,7 +52,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     {
         await EnsureOperatorAsync(cancellationToken);
         var value = input.Validated();
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = MariaTimeText.Now(); // A15 fix: match Format/Parse precision so CheckCurrent equality survives a round trip
         try
         {
             var (project, beneficiaryName) = await WriteAsync(async (connection, transaction) =>
@@ -84,7 +84,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     {
         await EnsureOperatorAsync(cancellationToken);
         var value = input.Validated(true);
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = MariaTimeText.Now(); // A15 fix: match Format/Parse precision so CheckCurrent equality survives a round trip
         Project updated;
         try
         {
@@ -206,7 +206,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     {
         await EnsureOperatorAsync(cancellationToken);
         var value = input.Validated();
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = MariaTimeText.Now(); // A15 fix: match Format/Parse precision so CheckCurrent equality survives a round trip
         var (observation, projectName) = await WriteAsync(async (connection, transaction) =>
         {
             var projectName = await GetProjectNameAsync(connection, transaction, projectId, cancellationToken).ConfigureAwait(false)
@@ -230,7 +230,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     {
         await EnsureOperatorAsync(cancellationToken);
         var value = input.Validated(true);
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = MariaTimeText.Now(); // A15 fix: match Format/Parse precision so CheckCurrent equality survives a round trip
         var updated = await WriteAsync(async (connection, transaction) =>
         {
             var current = await GetObservationLockedAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);

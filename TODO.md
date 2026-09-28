@@ -69,118 +69,15 @@ Inlocuieste, in formularul de iesire (`Components/Shared/ExitDestinationPicker.r
 - Mecanismul concret de pastrare a starii formularului de iesire in timpul navigarii (serviciu scoped, sessionStorage sau alta solutie), tinand cont de faptul ca Blazor Server poate reporni circuitul intre navigari.
 - Locul exact al butonului "Adauga proiect" (langa combobox sau langa caseta "Proiect") si textul exact al mesajelor noi.
 
-## Task 2 - Integrarea aplicatiei cu baza MariaDB locala permanenta (migrata din SQLite)
+## Task 2 - Copie de siguranta a bazei de date la preluarea situatiei de inventar
 
-Baza MariaDB locala permanenta a fost deja creata si populata printr-o migrare punctuala din SQLite (vezi [docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md](docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md)): server MariaDB 11.4.13 pe `127.0.0.1:3307`, baza `BlazorStoc`, 27 de tabele InnoDB, 229 de inregistrari, chei externe, constrangeri CHECK si 18 triggere, verificate integral. Instanta este pornita si isi pastreaza datele. Acest task NU recreeaza baza si NU repeta importul.
+Depinde de integrarea aplicatiei cu baza MariaDB reala (finalizata — vezi "Integrare MariaDB reala si comutarea definitiva de dezvoltare" in Taskuri finalizate), deoarece backupul opereaza pe schema si contul MariaDB rezultate din acel task.
 
-**Actualizare 28.09.2026 (ciclul curent Claude):** blocajul de mediu semnalat mai devreme in acest ciclu (directorul `C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB` inaccesibil) a fost rezolvat de utilizator, care a pus fisierele necesare intr-o locatie alternativa accesibila (`C:\Users\Alex\Documents\ChatGPT\BlazorESP\Livrare-DDL-MariaDB\` pentru DDL/triggere/credentiale admin, `local-secrets\application-connection.private.json` in acest repo pentru parola contului `blazorstoc_dev`). Toate subtaskurile 2.1-2.10 si 2.12 sunt finalizate si verificate real (conectare TLS confirmata, toate cele 6 repository-uri Maria rescrise pe schema reala, cont de migrare creat si verificat, preview MariaDB pornit si testat).
-
-**Actualizare 28.09.2026 (ciclu ulterior, reconfirmare prin executie):** re-rularea verificarilor de integrare pe `blazorstoc_test` care fusese blocata anterior de clasificatorul de siguranta a fost reincercata si de data asta a rulat integral, fara blocaj. A confirmat prin executie reala miscarile de stoc si utilizatorii (subtask 2.4/2.5/2.11, dupa corectarea unei a treia probleme, tot in scriptul de verificare — vezi 2.11 mai jos). In aceeasi rulare a iesit la iveala o problema noua, separata si necorectata, la stergerea proiectelor pe MariaDB (vezi nota "NOU GASITA, NECORECTATA" de la subtask 2.11). Subtask 2.11 ramane deschis doar pentru acea problema noua; restul lui (inclusiv miscarile de stoc si utilizatorii) e confirmat.
-
-### Subtask 2.1 - Confirmare conectare si validare fara modificari
-
-- [x] Conectare confirmata cu contul `blazorstoc_dev` (TLS, cifru `TLS_AES_256_GCM_SHA384`); toate cele 27 de tabele si 229 de randuri verificate identic cu raportul din documentul de predare; 18 triggere confirmate. Nicio scriere.
-- [x] DDL-ul si trigger-ele citite integral din `Livrare-DDL-MariaDB\schema-mariadb.sql`/`triggers-mariadb.sql`.
-- [x] Parola nu a fost copiata in cod, mesaje, argumente de proces sau Git (citita din `local-secrets\application-connection.private.json`, fisier privat, ignorat de Git).
-
-### Subtask 2.2 - Configuratia aplicatiei
-
-- [x] `Program.cs`, `Services/DatabaseConnections.cs`, `appsettings.json` revizuite; valorile implicite corectate (port `3307`, utilizator `blazorstoc_dev`, `CharacterSet=utf8mb4`).
-- [x] Incarcarea optionala a fisierului JSON privat (`Database:PrivateConfigPath`) verificata: forma `{ "Database": { "Host","Port","Name","User","Password","SslMode" } }` confirmata identica cu fisierul real folosit de utilizator.
-- [x] Collation `utf8mb4_nopad_bin` confirmata pe toate tabelele din DDL; nu necesita cod suplimentar in `DatabaseConnections.cs`.
-
-### Subtask 2.3 - Produse, categorii, subcategorii, beneficiari
-
-- [x] `Services/Products.cs` (partiala Maria), `Services/MariaProductRepository.Crud.cs`, `Services/MariaProductGroups.cs`, `Services/MariaBeneficiaryRepository.cs` rescrise pe `products`/`categories`/`subcategories`/`beneficiaries`. Verificat real: creare/citire/editare (versiune)/stergere produs, unicitate nume, audit_events si change_events populate corect de triggere; creare beneficiar, CUI duplicat respins.
-
-### Subtask 2.4 - Miscari de stoc
-
-- [x] `Services/MariaStockMovementRepository.cs` rescris integral pe `stock_movements`/`stock_movement_history` (cel mai mare fisier din acest task); identificatori, sursa/destinatie, vehicule, proiecte pastrate; blocare pe randul produsului (`FOR UPDATE`) pentru garda de stoc negativ, ordonare ascendenta a blocarilor la transferuri multi-produs.
-- [x] **RECONFIRMAT PRIN EXECUTIE (28.09.2026, ciclul curent)**: re-rularea nu a mai fost blocata de clasificator; a rulat integral. A gasit insa o a treia problema, de data asta in scriptul de verificare (`tests/BlazorStoc.Checks/MariaIntegrationChecks.cs`): garda de stoc negativ testata folosea o iesire CATRE vehicul (`Destination=Vehicle`) care nu poate fi niciodata negativa (doar adauga la vehicul); garda reala pentru stoc negativ pe vehicul se aplica doar la o retragere DIN vehicul (`Destination=WarehouseReturn`, `SourceVehicleId`). Corectat testul sa foloseasca acel scenariu; re-rulat cu succes: intrare, iesire spre vehicul (defalcare stoc), si garda de stoc negativ la restituire peste cantitatea din vehicul — toate `PASS` prin executie reala pe `blazorstoc_test`.
-
-### Subtask 2.5 - Autentificare
-
-- [x] `Services/MariaUserRepository.cs` rescris pe `web_users` (rolul in coloana `role`, verificat cu CHECK-ul din baza). Acelasi `PasswordHasher<object>` (PBKDF2) ca `SqliteUserRepository`; niciun cod nu reseteaza/rescrie hash-urile celor doi utilizatori reali existenti.
-- [x] **RECONFIRMAT PRIN EXECUTIE (28.09.2026, ciclul curent)**: autentificare cu utilizator inexistent, creare utilizator nou, autentificare cu parola corecta/gresita, nume duplicat respins, stergere — toate `PASS` prin executie reala pe `blazorstoc_test`.
-
-### Subtask 2.6 - Audit si arhivare
-
-- [x] `MariaAuditTrail`, `MariaArchiveSchema`, `Services/ArchivePersistence.cs` (partea Maria) adaptate. Toate coloanele `_utc` din schema reala sunt text (LONGTEXT/VARCHAR), niciodata DATETIME nativ — citite/scrise printr-un helper nou comun, `Services/MariaTimeText.cs`, in acelasi format folosit deja de cele 18 triggere. Verificat real: `audit_events` si `change_events` populate corect pentru operatiile de produs.
-- [x] `MariaArchiveSchema.InitializeAsync` nu mai ruleaza niciun DDL; verifica doar (SELECT) ca tabelele asteptate exista si opreste pornirea cu un mesaj clar daca lipsesc.
-
-### Subtask 2.7 - Proiecte, vehicule, imagini si atasamente
-
-- [x] Nume de tabele/ID-uri verificate pentru toate entitatile. Directoarele locale (imagini produse, fisiere proiect, arhiva, chei Data Protection) folosesc acum un helper comun (`MariaAssetPaths`, in `Services/MariaTimeText.cs`) cu radacina configurabila `Database:MariaAssetsRoot` (implicit sub `%LOCALAPPDATA%\BlazorStoc-MariaDB\assets`), niciodata directoarele SQLite active. Verificat real la pornirea preview-ului MariaDB (2.12): cheia Data Protection a fost creata cu succes in directorul asteptat.
-
-### Subtask 2.8 - Blocari si sincronizare
-
-- [x] `ProductLocks` (`MariaProductLockRepository`) rescris pe `product_locks`/`products` (fara creare de schema). Verificat real: obtinere, citire, reinnoire si eliberare a unui lacat de produs, toate cu succes pe baza de test izolata.
-- [x] `ChangeEvents` (`MariaChangeEventSource`) adaptat la structura reala; lista de tabele urmarite este acum identica cu cea din SQLite (aceleasi nume reale), iar `EnsureAsync` doar verifica (SELECT) ca tabela si cele 18 triggere exista, fara sa incerce vreodata sa le creeze.
-- [x] Parsarea timpilor textuali UTC verificata prin `MariaTimeText` (folosit consecvent in toate repository-urile de mai sus).
-
-### Subtask 2.9 - Initializare, migrari si cont operational
-
-- [x] Cont operational dedicat creat si verificat: `blazorstoc_migrator`, cu `CREATE, ALTER, INDEX, DROP, REFERENCES, CREATE VIEW, TRIGGER` numai pe baza `BlazorStoc`, fara SELECT/INSERT/UPDATE/DELETE si fara drepturi globale (verificat direct: contul nu poate citi din `products`). Contul `blazorstoc_dev` ramane fara DDL. Credentiale in `local-secrets\migration-account.private.json` (privat, ignorat de Git).
-- [x] Initializarea aplicatiei (`MariaArchiveSchema.InitializeAsync`) separata de migrari: nu mai contine DDL, doar verificare.
-
-### Subtask 2.10 - Identitatea tehnica a operatorului
-
-- [x] `Database:ApplicationUserId` si dependenta de o tabela `user` eliminate complet din toate cele 6 repository-uri Maria rescrise (nu doar `MariaProductRepository`, cum sugera formularea initiala). Identitatea operatorului foloseste acum username text prin `IAccessControl`/`IAuditTrail`, la fel ca in SQLite; verificat real prin evenimentele de audit scrise corect pentru operatiile de produs.
-
-### Subtask 2.11 - Verificari de integrare
-
-- [x] Baza MariaDB izolata creata (`blazorstoc_test`, acelasi DDL si 18 triggere, separata de cele 229 de randuri reale ale bazei de livrare), impreuna cu un cont dedicat doar pentru ea; script de recreare pastrat pentru refolosire ulterioara.
-- [x] Verificari reale (nu simulate) rulate cu succes pe aceasta baza: conectare TLS, produse/categorii/subcategorii (CRUD complet, concurenta optimista, audit+evenimente), beneficiari (CRUD, CUI duplicat respins), vehicule (CRUD, numar duplicat respins), blocari de produs (obtinere/citire/reinnoire/eliberare), proiecte (creare + observatie).
-- **Gasita si corectata o problema reala de proiectare**: garda "scrie numai in baza BlazorStoc" din cele 5 repository-uri cu scriere compara numele bazei configurate cu literalul fix `"BlazorStoc"`, ceea ce facea imposibila testarea pe orice baza izolata cu alt nume — exact ce cere acest subtask. Corectat printr-un helper comun (`MariaDatabaseGuard` in `Services/MariaTimeText.cs`): numele asteptat e acum configurabil (`Database:ExpectedName`, implicit tot `"BlazorStoc"`), deci o instalare reala nemodificata pastreaza exact comportamentul vechi, iar configuratia bazei de test seteaza explicit ambele chei la `"blazorstoc_test"`, numai in fisierul ei privat.
-- **Gasita si corectata o problema in scriptul de verificare** (nu in aplicatie): sectiunea de miscari de stoc presupunea gresit ca garda de mai sus va bloca mereu scrierea si folosea un ID de produs inexistent (`int.MaxValue`) — dupa corectarea gardei, aceasta presupunere a devenit falsa si testul a esuat cu o eroare reala ("Produsul nu mai exista"). Rescris sa creeze propriile categorie/subcategorie/produs/vehicul, sa verifice o intrare, o iesire spre vehicul (defalcarea stocului) si garda de stoc negativ la iesirea peste cantitatea din vehicul, cu curatare completa la final.
-- [x] **RECONFIRMAT PRIN EXECUTIE (28.09.2026, ciclul curent)**: clasificatorul de siguranta NU a mai blocat comanda (a rulat pana la capat); a gasit o a treia problema, de data asta tot in scriptul de verificare — garda de stoc negativ testa scenariul gresit (iesire CATRE vehicul, care nu poate deveni niciodata negativa; garda reala se aplica la restituire DIN vehicul). Corectat in `tests/BlazorStoc.Checks/MariaIntegrationChecks.cs`; re-rulat cu succes — toate verificarile din sectiunile "Stock movements" si "Users" au trecut (`PASS`) prin executie reala pe `blazorstoc_test`. Vezi `docs/TESTE_RAMASE.md` A13 (mutat la "Teste efectuate") si `docs/PROJECT_STATE.md`.
-- [x] Fluxurile prin browser validate partial (vezi 2.12 mai jos) — flow-urile care necesita autentificare raman de facut manual de utilizator, ca de obicei (agentul nu introduce parole).
-- [ ] **NOU GASITA, NECORECTATA (28.09.2026)**: in aceeasi re-rulare, dupa ce sectiunile Stock movements/Users/Product locks au trecut, sectiunea Projects a esuat la stergerea proiectului de test (si a observatiei lui): `DeleteObservationAsync`/`DeleteAsync(project)` par sa reuseasca structural (verificat separat, cu instructiuni DELETE brute rulate manual: afecteaza exact 1 rand), dar tranzactia se ruleaza integral impreuna cu insererea in arhiva (`MariaArchivePersistence.InsertAsync`/`InsertAuditAsync`); dupa executie proiectul si observatia au ramas vii in baza (nesterse), ceea ce indica un rollback cauzat de o eroare in pasul de arhivare, nu confirmata inca. Aceasta a mascat eroarea originala (o exceptie ulterioara in blocul `finally` de curatare a testului, la stergerea beneficiarului, blocata de FK-ul catre proiectul ne-sters, a suprascris-o). Datele orfane create de test (proiectul "Integrare Test Proiect", beneficiarul "Integrare Test Proiect SRL"/`RO19998877`) au fost curatate manual din `blazorstoc_test` in acest ciclu. Necesita investigatie separata (posibil in scriptul de arhivare Maria pentru proiecte, sau o diferenta de schema intre `blazorstoc_test` si baza reala pentru `archive_projects`/`archive_relations`) inainte de a considera stergerea de proiecte pe MariaDB complet verificata.
-
-### Subtask 2.12 - Comutarea preview-ului
-
-- [x] Preview pornit pe portul `5085`, configurat cu `App:DemoMode=false` si conectat la baza reala de livrare (`blazorstoc_dev`, fara drepturi DDL). Pornire fara exceptii (verificare implicita a tabelelor reusita), redirectionare corecta la autentificare pentru cereri neautentificate, `/health/live` raspunde 200, pagina 404 romaneasca functioneaza.
-- [x] Persistenta la restart confirmata: procesul oprit si repornit, cheia Data Protection refolosita de pe disc, reconectare la MariaDB fara erori.
-- [x] Autentificare confirmata de utilizator (28.09.2026) pe `http://127.0.0.1:5085/`, din doua browsere diferite simultan (panoul de browser Claude si Brave), cu conturile reale `administrator.demo`/`utilizator.demo` din baza de livrare. Doua sesiuni concurente autentificate functioneaza.
-
-### Subtask 2.13 - Comutarea definitiva de dezvoltare
-
-- [x] **Momentul opririi scrierilor in SQLite stabilit explicit: 28.09.2026 18:05, ora Europe/Bucharest.** De la acest moment, `data\blazorstoc-local.db` (baza reala folosita de preview-ul de pe portul 5082, singurul care mai scria) este considerata inghetata/istorica; nu se mai fac scrieri de date reale in ea. Comutarea a fost facuta procedural (decizie + documentatie), nu prin schimbarea valorii implicite `App:DemoMode` in `appsettings.json` - motivul e detaliat mai jos, la "Detaliu important, netrivial".
-- [x] **Comparatie completa executata intre `data\blazorstoc-local.db` (live) si baza de livrare MariaDB (`blazorstoc_dev`), pe toate cele 27 de tabele**, cu un instrument temporar (C#, `Microsoft.Data.Sqlite` + `MySqlConnector`, needocumentat in surse) care reproduce metodologia din `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` sectiunea 4 pasul 8: pentru fiecare rand, reprezentare canonica pe tip (`I:`/`R:`/`T:`/`B:`/NULL) a fiecarei coloane, apoi SHA-256 pe randul intreg; comparatie facuta pe cheie primara, nu pozitional. **Rezultat: singura diferenta gasita a fost 1 rand nou in `audit_events`** (eveniment "Generare" pentru situatia de inventar, generat de `administrator.demo` la 28.09.2026 11:15:55 UTC = 14:15 Romania, deci dupa snapshot-ul de 13:58). Toate celelalte 26 de tabele si toate cele 229 de randuri originale erau identice byte-cu-byte fata de MariaDB, fara nicio schimbare. Randul nou a fost inserat in MariaDB (cont `blazorstoc_dev`, INSERT simplu, id GUID pastrat identic, fara risc de coliziune). **Re-verificat dupa migrare cu aceeasi metodologie: 230/230 randuri SQLite identice in MariaDB, 0 randuri noi, 0 schimbate.** Au mai fost gasite 2 randuri `audit_events` prezente doar in MariaDB, niciodata in SQLite: 2 evenimente "Conectare" scrise direct in `blazorstoc_dev` in timpul verificarii manuale a autentificarii pe preview-ul 5085 (subtask 2.12, 28.09.2026 17:48-17:49 UTC) - nu sunt o problema, nu se ating (nu exista si nu trebuie sa existe in SQLite).
-- [x] Nu raman doua baze independente care par ambele sursa de adevar: **MariaDB (`127.0.0.1:3307`, baza `BlazorStoc`) este declarata sursa de adevar de la 28.09.2026 18:05**; SQLite ramane doar ca artefact istoric/de backup, nu mai e tratata ca sursa curenta. Vezi mai jos ce inseamna asta concret pentru preview-uri.
-
-**Detaliu important, netrivial (decizie deliberata, nu implementata inca in cod la finalul ciclului precedent)**: task-ul cerea sa se ia in calcul schimbarea valorii implicite `App:DemoMode` din `appsettings.json` in `false`, ca preview-urile pornite normal sa foloseasca automat MariaDB. **Nu s-a facut aceasta schimbare** (ramane `App:DemoMode=true` implicit in `appsettings.json` - decizie mentinuta si dupa follow-up-ul de mai jos, ca sa nu se schimbe comportamentul implicit al unei porniri obisnuite fara variabile de mediu explicite).
-
-**Follow-up (28.09.2026, ciclu separat, la cererea utilizatorului): piesa lipsa a fost rezolvata.** `Authentication:Password` nu avea niciun mecanism de fisier privat (doar variabila de mediu, cum a fost pornit manual preview-ul 5085). Nu a fost nevoie de cod nou: acelasi `AddJsonFile(mariaPrivateConfigPath, ...)` din `Program.cs` (subtask 2.2) incarca generic orice sectiune din fisierul privat, deci a fost suficient sa se adauge o sectiune noua `"Authentication": { "Username": "...", "Password": "..." }` (parola noua, generata, minim 24 octeti/48 caractere hex) in `local-secrets\application-connection.private.json`. Verificat real: build separat, pornire cu `App__DemoMode=false` si numai `Database__PrivateConfigPath` setat (fara niciun `Authentication__Password` in variabile de mediu) -> pornire fara exceptie, `/health/live` raspunde 200; instanta de verificare oprita si stearsa dupa test. Comentariul din `Program.cs` a fost extins sa documenteze asta.
-
-Ramane totusi neschimbata calea implicita din cod (`%LOCALAPPDATA%\BlazorStoc-MariaDB\application-connection.private.json`), care nu e accesibila din aceasta sesiune Claude Code (vezi Task 0) - o pornire "normala" fara `Database:PrivateConfigPath` setat explicit tot ar folosi implicit modul demonstrativ (SQLite), fiindca fisierul de la calea implicita fie nu exista, fie (pe masina reala) nu a fost inca sincronizat cu cel din `local-secrets`. Schimbarea valorii implicite `App:DemoMode` ramane, in continuare, o decizie separata, netratata aici.
-
-**Stare preview-uri la finalul acestui ciclu (28.09.2026, cca. 18:10-21:10)**: portul `5082` (SQLite, proces `BlazorStoc.exe`, PID 18400, cwd radacina proiectului) era deja pornit si a ramas pornit - **nu a fost oprit** (agentul nu a putut/nu a incercat sa opreasca un proces de lucru al utilizatorului fara cerere explicita); utilizatorul trebuie sa nu mai foloseasca acest preview pentru introducere de date reale de acum inainte. Portul `5083` (alt proces `BlazorStoc.exe`, dintr-un build vechi in `artifacts\preview-5083`, `Database:User=blazorstoc_reader`, port Maria 3306 - **neclar/nefolosit in acest ciclu**, posibil un artefact ramas dintr-o sesiune anterioara) era de asemenea pornit; nu a fost atins, dar utilizatorul ar trebui sa verifice daca mai are vreun rol. Portul `5085` (MariaDB, `dotnet ... Temp\blazorstoc-maria-preview\BlazorStoc.dll`) era pornit si conectat la baza reala de livrare (`blazorstoc_dev`) - acesta e preview-ul care reflecta corect starea curenta dupa migrare.
-
-### Criterii de acceptare
-
-- Aplicatia functioneaza integral (produse, categorii, beneficiari, miscari, autentificare, audit, arhivare, proiecte, vehicule, imagini, blocari, evenimente) pe baza MariaDB reala descrisa in documentul de predare, fara redenumiri artificiale de tabele si fara reschema peste datele migrate.
-- Contul aplicatiei nu are drepturi DDL in operarea curenta; migrarile de schema sunt separate si documentate.
-- Datele migrate (229 de inregistrari initiale) raman corecte si verificabile dupa adaptarea codului.
-- Persistenta, autentificarea si concurenta a doua sesiuni sunt validate pe MariaDB inainte de comutarea definitiva.
-- SQLite si MariaDB nu functioneaza simultan ca surse de adevar dupa comutarea definitiva.
-
-### Detalii de stabilit la implementare
-
-- Limitele VARCHAR si collation `utf8mb4_nopad_bin` (comparare binara, sensibila la majuscule/accente/spatii) trebuie respectate de validarile noi de cod; DDL-ul local din `migration\schema-mariadb.sql` descrie exact fiecare coloana.
-- `lower_case_table_names=1` pe instanta Windows; numele bazei poate aparea `blazorstoc` in metadate — verifica diferentele de capitalizare inainte de configurarea serverului final.
-- Compatibilitatea cheilor Data Protection copiate (`assets\data-protection-keys`) cu identitatea Windows/application name trebuie verificata la integrare; nu presupune portabilitate automata pe alta gazda.
-- Documentul [docs/CLAUDE_BACKUP_RESTAURARE.md](docs/CLAUDE_BACKUP_RESTAURARE.md) referit in sectiunea 8 a documentului de predare nu exista inca in repository; cerintele functionale pentru backup/restaurare au fost primite direct de la utilizator si sunt detaliate in Task 3 si Task 4 de mai jos.
-
-## Task 3 - Copie de siguranta a bazei de date la preluarea situatiei de inventar
-
-Depinde de Task 2 (integrarea aplicatiei cu baza MariaDB reala), deoarece backupul opereaza pe schema si contul MariaDB rezultate din acel task.
-
-### Decizie tehnica - mecanism de backup/restaurare (comuna pentru Task 3 si Task 4)
+### Decizie tehnica - mecanism de backup/restaurare (comuna pentru Task 2 si Task 3)
 
 - **Format fisier:** arhiva (`.zip`) continand un export SQL logic complet al bazei (generat cu utilitarul `mariadb-dump`/`mysqldump` din aceeasi distributie MariaDB locala, cu `--single-transaction`, `--routines`, `--triggers`, pentru consistenta InnoDB fara blocare exclusiva la nivel de server), un fisier `manifest.json` (data/ora, operator, rol, numarul de tabele, numarul de randuri per tabela, versiunea schemei, hash SHA-256 al dumpului) si hashul SHA-256 al arhivei insasi. Se prefera dumpul logic (nu o copie binara a directorului de date), pentru ca este portabil, verificabil rand cu rand si independent de versiunea exacta de fisiere InnoDB.
 - **Motivul folosirii `mariadb-dump`:** e deja prezent langa serverul local (acelasi pachet ca `mariadbd.exe`), e testat pe cazuri complexe (chei externe, triggere, CHECK-uri), si evita reinventarea unui exportator SQL propriu predispus la erori de escapare/tip de date.
-- **Blocarea sesiunilor:** contul aplicatiei nu are drepturi de administrare (nu poate opri conexiuni MariaDB straine, vezi Task 2 subtask 2.9), deci blocarea se face la nivelul aplicatiei, nu al serverului: un lacat (lock) partajat, persistent in baza de date (de exemplu o inregistrare dedicata cu operatie curenta, operator, identificator de proces si marca de timp/heartbeat), verificat de fiecare circuit Blazor si de fiecare operatie de scriere.
+- **Blocarea sesiunilor:** contul aplicatiei nu are drepturi de administrare (nu poate opri conexiuni MariaDB straine, vezi subtask 2.9 din taskul finalizat de integrare MariaDB), deci blocarea se face la nivelul aplicatiei, nu al serverului: un lacat (lock) partajat, persistent in baza de date (de exemplu o inregistrare dedicata cu operatie curenta, operator, identificator de proces si marca de timp/heartbeat), verificat de fiecare circuit Blazor si de fiecare operatie de scriere.
   - Cand lacatul e activ: sesiunile existente primesc o notificare si sunt redirectionate catre un mesaj de intretinere ("Backup/restaurare in curs, reveniti mai tarziu"); sesiunile noi vad acelasi mesaj si nu pot initia operatii.
   - Lacatul are un timp de expirare (heartbeat reimprospatat periodic in timpul operatiei); daca aplicatia se opreste neasteptat cu lacatul activ, la urmatoarea pornire lacatul este recunoscut ca orfan (heartbeat expirat) si eliberat automat, cu inregistrare in jurnal, nu lasat blocat definitiv.
   - Eliberarea lacatului se face intotdeauna intr-un bloc final (`finally`), inclusiv la eroare.
@@ -190,23 +87,23 @@ Depinde de Task 2 (integrarea aplicatiei cu baza MariaDB reala), deoarece backup
 - **Securitate continut:** dumpul SQL contine hashuri de parole si date de audit; directorul de backup primeste acelasi nivel de protectie ca zonele sensibile deja folosite in proiect (acces restrans, fara publicare, fara includere in raspunsuri catre utilizatori neautorizati).
 - **Jurnalizare:** crearea, listarea incercarilor de stergere, stergerea efectiva si restaurarea sunt evenimente de audit, cu operator, rol, timestamp si denumirea pachetului, fara date sensibile in `Details`/`Motif`, conform serviciului comun de jurnalizare deja existent.
 
-### Subtask 3.1 - Declansarea backupului la preluarea inventarului
+### Subtask 2.1 - Declansarea backupului la preluarea inventarului
 
 - [ ] Identifica punctul din pagina de preluare inventar unde utilizatorul apasa butonul de preluare si insereaza declansarea backupului ca parte a aceleiasi actiuni: preluarea se confirma utilizatorului abia dupa ce backupul este generat si verificat cu succes (varianta cu siguranta maxima, aliniata cu cerinta ca fisierul sa fie disponibil pentru restaurare imediat ce preluarea e considerata reusita).
 - [ ] Daca backupul esueaza (verificare nereusita, spatiu insuficient, eroare de export), preluarea inventarului nu este confirmata ca reusita, iar utilizatorul primeste mesajul de eroare specific backupului, cu posibilitatea de a reincerca.
 - [ ] Foloseste lacatul comun descris mai sus pentru a bloca alte sesiuni pe durata snapshotului.
 - [ ] Afiseaza utilizatorului progresul operatiei (etape + indicator vizual), fara sa blocheze restul aplicatiei mai mult decat este necesar.
 
-### Subtask 3.2 - Generarea si validarea arhivei
+### Subtask 2.2 - Generarea si validarea arhivei
 
 - [ ] Genereaza dumpul SQL cu `mariadb-dump` (transactional, consistent) intr-un fisier temporar, apoi `manifest.json` cu metadatele operatiei.
 - [ ] Calculeaza hashurile SHA-256 (dump si arhiva finala) si compara continutul dumpului cu baza vie folosind comparatia canonica tip-si-hash existenta din procesul de migrare.
 - [ ] Salveaza arhiva definitiv (redenumire atomica din fisier temporar) numai dupa ce verificarea trece; daca verificarea esueaza, sterge fisierele temporare, elibereaza lacatul si informeaza utilizatorul clar despre esec, fara sa lase o arhiva partiala/nesigura pe disc.
 
-### Subtask 3.3 - Denumirea si pastrarea pachetului
+### Subtask 2.3 - Denumirea si pastrarea pachetului
 
 - [ ] Denumeste fisierul dupa modelul "Copie siguranta preluare inventar data ora user_level user_name", cu data/ora in formatul de afisare al proiectului (`dd.MM.yyyy HH:mm`) transpus intr-un nume de fisier valid (fara caractere interzise de sistemul de fisiere, fara diacritice), si cu rolul/numele utilizatorului care a declansat preluarea.
-- [ ] Pastreaza pachetul pe server, in directorul dedicat, disponibil ulterior in pagina de restaurare stoc (Task 4).
+- [ ] Pastreaza pachetul pe server, in directorul dedicat, disponibil ulterior in pagina de restaurare stoc (Task 3).
 
 ### Criterii de acceptare
 
@@ -215,42 +112,42 @@ Depinde de Task 2 (integrarea aplicatiei cu baza MariaDB reala), deoarece backup
 - O verificare esuata nu lasa pe server o arhiva nesigura si informeaza clar utilizatorul.
 - Utilizatorul vede progresul operatiei de backup.
 
-### Subtask 3.4 - Spatiu pe disc
+### Subtask 2.4 - Spatiu pe disc
 
 - [ ] Inainte de a incepe exportul, verifica spatiul liber disponibil in directorul de backup fata de o estimare a dimensiunii bazei (de exemplu dimensiunea ultimului export reusit, plus o marja); daca spatiul e insuficient, opreste operatia inainte de a scrie orice fisier si informeaza utilizatorul cu un mesaj clar.
 
 ### Decizii acceptate (fara alte optiuni de stabilit)
 
-- Backupul face parte din aceeasi actiune cu preluarea inventarului si o conditioneaza (subtask 3.1); nu ruleaza asincron/deconectat de rezultatul preluarii.
-- Pachetele de tip "preluare inventar" nu au expirare automata si nu sunt sterse de sistem; se pastreaza pe server nelimitat si pot fi sterse numai manual de administrator, prin fluxul dual de confirmare (Task 4, subtask 4.2). Spatiul ocupat este vizibil administratorului in pagina de restaurare (Task 4, subtask 4.1).
+- Backupul face parte din aceeasi actiune cu preluarea inventarului si o conditioneaza (subtask 2.1); nu ruleaza asincron/deconectat de rezultatul preluarii.
+- Pachetele de tip "preluare inventar" nu au expirare automata si nu sunt sterse de sistem; se pastreaza pe server nelimitat si pot fi sterse numai manual de administrator, prin fluxul dual de confirmare (Task 3, subtask 3.2). Spatiul ocupat este vizibil administratorului in pagina de restaurare (Task 3, subtask 3.1).
 
-## Task 4 - Pagina de restaurare a bazei de date (meniu Inventar, exclusiv administrator)
+## Task 3 - Pagina de restaurare a bazei de date (meniu Inventar, exclusiv administrator)
 
-Depinde de Task 2 si de Task 3 (foloseste pachetele generate la preluarea inventarului si acelasi mecanism de backup/lacat/verificare).
+Depinde de integrarea MariaDB reala (finalizata) si de Task 2 (foloseste pachetele generate la preluarea inventarului si acelasi mecanism de backup/lacat/verificare).
 
-### Subtask 4.1 - Meniu si listare pachete
+### Subtask 3.1 - Meniu si listare pachete
 
 - [ ] Adauga in meniul Inventar optiunea "Restaureaza stoc", vizibila numai utilizatorilor cu rol administrator.
-- [ ] Afiseaza in pagina toate pachetele disponibile pe server: cele generate la preluarea situatiei de inventar (Task 3) si cele generate automat inainte de o restaurare anterioara (subtask 4.3), intr-un tabel cu selectie unica de tip radio button per rand.
+- [ ] Afiseaza in pagina toate pachetele disponibile pe server: cele generate la preluarea situatiei de inventar (Task 2) si cele generate automat inainte de o restaurare anterioara (subtask 3.3), intr-un tabel cu selectie unica de tip radio button per rand.
 - [ ] Distinge vizual cele doua categorii de pachete (preluare inventar / pre-restaurare), fara sa permita confuzia intre ele la selectare.
-- [ ] Afiseaza dimensiunea fiecarui pachet si spatiul total ocupat de backupuri pe server, pentru ca administratorul sa poata urmari cresterea spatiului folosit (pachetele pre-restaurare nu pot fi sterse, vezi subtask 4.2).
+- [ ] Afiseaza dimensiunea fiecarui pachet si spatiul total ocupat de backupuri pe server, pentru ca administratorul sa poata urmari cresterea spatiului folosit (pachetele pre-restaurare nu pot fi sterse, vezi subtask 3.2).
 
-### Subtask 4.2 - Stergerea pachetelor de tip "preluare inventar"
+### Subtask 3.2 - Stergerea pachetelor de tip "preluare inventar"
 
 - [ ] Permite administratorului sa stearga numai pachetele generate la preluarea inventarului, folosind acelasi flux dual de confirmare deja implementat (pagina de atentionare cu motiv + pagina cu introducerea cuvantului exact `sterge`), reutilizand componentele existente din taskul finalizat "Flux in doi pasi pentru confirmarea stergerii".
 - [ ] Nu permite stergerea pachetelor generate automat inainte de o restaurare (butonul/optiunea de stergere nu este disponibila pentru aceasta categorie), atat in interfata cat si la nivelul serviciului (respinge explicit o cerere de stergere pentru aceasta categorie, indiferent de origine).
 - [ ] Jurnalizeaza stergerea unui pachet (operator, denumire pachet, motiv).
 
-### Subtask 4.3 - Declansarea restaurarii si confirmarea
+### Subtask 3.3 - Declansarea restaurarii si confirmarea
 
 - [ ] Adauga butonul "Restaureaza baza de date", activ numai cand este selectat exact un pachet din tabel.
 - [ ] La apasare, deschide un popup care avertizeaza explicit ca restaurarea aduce baza de date la o versiune anterioara si ca pot fi pierdute date introduse ulterior momentului backupului selectat.
 - [ ] Confirmarea finala se face prin introducerea cuvantului exact `confirma` (aceeasi regula de comparare stricta ca la cuvantul `sterge` din fluxul de stergere existent).
 - [ ] O confirmare gresita, incompleta sau abandonata nu declanseaza nicio modificare asupra bazei de date.
 
-### Subtask 4.4 - Pasii de restaurare (executati numai dupa confirmare)
+### Subtask 3.4 - Pasii de restaurare (executati numai dupa confirmare)
 
-- [ ] **Pas 0 - blocare si snapshot curent.** Activeaza lacatul comun (blocheaza sesiuni noi si notifica sesiunile active, cu exceptia sesiunii care a initiat restaurarea); genereaza imediat un export/arhiva complet al bazei curente, cu hash de verificare, folosind acelasi mecanism ca la Task 3. Acest pachet este denumit dupa modelul "Copie siguranta baza de date inainte restaurare baza de date folosind backup preluare inventar, data ora user_level user_name", marcat ca nesters din categoria pre-restaurare (subtask 4.2) si pastrat pe server indiferent de rezultatul restaurarii.
+- [ ] **Pas 0 - blocare si snapshot curent.** Activeaza lacatul comun (blocheaza sesiuni noi si notifica sesiunile active, cu exceptia sesiunii care a initiat restaurarea); genereaza imediat un export/arhiva complet al bazei curente, cu hash de verificare, folosind acelasi mecanism ca la Task 2. Acest pachet este denumit dupa modelul "Copie siguranta baza de date inainte restaurare baza de date folosind backup preluare inventar, data ora user_level user_name", marcat ca nesters din categoria pre-restaurare (subtask 3.2) si pastrat pe server indiferent de rezultatul restaurarii.
 - [ ] **Pas 1 - integritatea backupului ales.** Verifica hashul arhivei si al dumpului selectat fata de `manifest.json`; daca nu corespund, opreste procesul, elibereaza lacatul si informeaza utilizatorul ca pachetul este corupt/invalid, fara sa continue.
 - [ ] **Pas 2 - diferente de structura.** Compara schema (tabele, coloane, tipuri, chei, indecsi, triggere) descrisa/derivabila din pachetul de backup cu schema vie curenta; daca exista diferente, opreste procesul, elibereaza lacatul si informeaza utilizatorul ca pachetul nu poate fi folosit din cauza incompatibilitatii de structura.
 - [ ] **Pas 3 - diferente de continut.** Compara continutul (randurile) din pachetul de backup cu baza vie curenta, cu aceeasi metoda canonica de comparare folosita la migrare/backup. Daca nu exista nicio diferenta, opreste procesul, elibereaza lacatul si informeaza utilizatorul ca backupul si baza actuala sunt identice, deci restaurarea nu este necesara.
@@ -270,7 +167,7 @@ Depinde de Task 2 si de Task 3 (foloseste pachetele generate la preluarea invent
 
 ### Riscuri identificate si masuri de preventie/remediere
 
-- **Scriere concurenta in timpul snapshotului de la o conexiune din afara aplicatiei** (client SQL direct, nu prin aplicatie): lacatul aplicatiei nu poate opri o asemenea conexiune, pentru ca acest cont nu are drepturi de administrare server (vezi Task 2). Se foloseste totusi `--single-transaction` la export pentru consistenta MVCC, iar riscul rezidual ramane un fapt documentat, nu o garantie absoluta; de discutat cu utilizatorul daca e nevoie de restrictionare suplimentara la nivel de cont MariaDB pentru accesul direct in ferestrele de backup/restaurare.
+- **Scriere concurenta in timpul snapshotului de la o conexiune din afara aplicatiei** (client SQL direct, nu prin aplicatie): lacatul aplicatiei nu poate opri o asemenea conexiune, pentru ca acest cont nu are drepturi de administrare server (vezi taskul finalizat de integrare MariaDB). Se foloseste totusi `--single-transaction` la export pentru consistenta MVCC, iar riscul rezidual ramane un fapt documentat, nu o garantie absoluta; de discutat cu utilizatorul daca e nevoie de restrictionare suplimentara la nivel de cont MariaDB pentru accesul direct in ferestrele de backup/restaurare.
 - **Proces de backup/restaurare intrerupt** (crash aplicatie, repornire server): fisierele se scriu intai cu nume temporar si se redenumesc atomic doar dupa succes; lacatul are heartbeat si expira, fiind recunoscut si eliberat automat ca orfan la urmatoarea initializare, cu inregistrare in jurnal.
 - **Spatiu insuficient pe disc** pentru export sau pentru schema `_bak` in paralel cu schema vie (necesita temporar aproape dublul spatiului bazei): se verifica spatiul liber estimat inainte de a incepe orice pas care scrie date, cu oprire timpurie si mesaj clar daca spatiul e insuficient.
 - **Comparatie de continut cu rezultat eronat din cauza ordinii randurilor** in dumpul SQL (nu reflecta neaparat diferente reale): se foloseste comparatia canonica tip-si-hash (aceeasi metoda validata la migrare), nu un diff text brut pe fisierul SQL.
@@ -285,18 +182,18 @@ Depinde de Task 2 si de Task 3 (foloseste pachetele generate la preluarea invent
 
 - **Cont MariaDB dedicat pentru restaurare:** se defineste un cont operational separat de `blazorstoc_dev`, cu drepturi limitate strict la `CREATE`/`DROP SCHEMA` si `RENAME TABLE` pentru schemele implicate in fluxul de restaurare (schema vie, `_bak`, `_old`), fara alte drepturi globale sau de administrare a serverului. Datele lui de conectare se pastreaza dupa acelasi tipar de fisier privat protejat folosit pentru `admin.private.cnf`/`connection.private.json` (vezi documentul de predare MariaDB), niciodata in cod sau in `appsettings.json` necriptat.
 - **Notificarea sesiunilor Blazor active:** se reutilizeaza tiparul deja existent in aplicatie pentru notificarea schimbarilor de baza de date (componenta similara `FrmDatabaseChangedNotification`/mecanismul curent de "database changed"), extins pentru a afisa mesajul de intretinere si a redirectiona sesiunea catre o pagina de asteptare, fara sa introduca un mecanism nou separat.
-- **Retentia pachetelor pre-restaurare care nu pot fi sterse:** ramane fara stergere automata, conform cerintei explicite; masura de atenuare acceptata este vizibilitatea spatiului ocupat in pagina de restaurare (subtask 4.1), nu o curatare automata. O eventuala politica de arhivare externa (mutare pe alt suport) ramane o decizie ulterioara, separata de acest task.
+- **Retentia pachetelor pre-restaurare care nu pot fi sterse:** ramane fara stergere automata, conform cerintei explicite; masura de atenuare acceptata este vizibilitatea spatiului ocupat in pagina de restaurare (subtask 3.1), nu o curatare automata. O eventuala politica de arhivare externa (mutare pe alt suport) ramane o decizie ulterioara, separata de acest task.
 
-## Task 5 - Mareste inaltimea randurilor din tabelul situatiei de inventar pentru OCR
+## Task 4 - Mareste inaltimea randurilor din tabelul situatiei de inventar pentru OCR
 
 La cererea utilizatorului: in formularul PDF de inventar generat (`Services/InventoryPdfWriter.cs`, constanta `LineHeight`, folosita si de `Services/InventoryPdfLayout.cs` pentru geometria comuna cu pipeline-ul OCR), inaltimea randurilor/celulelor tabelului este prea mica pentru ca utilizatorii sa scrie lizibil valoarea reala de mana, ceea ce reduce fiabilitatea recunoasterii OCR ulterioare (`Services/InventoryPickupOcr.cs`, folosit de fluxul de preluare inventar).
 
-### Subtask 5.1 - Marirea inaltimii randurilor tabelului
+### Subtask 4.1 - Marirea inaltimii randurilor tabelului
 
 - [ ] Mareste `LineHeight` (sau introdu o inaltime dedicata pentru randurile de date ale tabelului, distincta de titlu/antet daca e nevoie) in `Services/InventoryPdfWriter.cs`, pastrand restul geometriei (coloanele din `InventoryPdfLayout.ComputeColumns`, paginarea, antetul repetat) neschimbate.
 - [ ] Nu modifica logica de layout partajata cu OCR-ul (`InventoryPdfLayout`) decat daca marirea inaltimii o cere explicit; coloanele (Cod produs / Valoare stoc / Valoare reala) raman aceleasi.
 
-### Subtask 5.2 - Actualizarea testelor existente
+### Subtask 4.2 - Actualizarea testelor existente
 
 - [ ] Testele din `tests/BlazorStoc.Checks` care verifica layout-ul/continutul exact al PDF-ului generat (pozitii, numarul de pagini pentru un catalog mare, grila celulelor) trebuie actualizate sa reflecte noua inaltime; verifica ce teste devin nepotrivite dupa modificare si corecteaza-le sa continue sa verifice ceva relevant (nu doar sa treaca).
 
@@ -1329,3 +1226,34 @@ Implementat la 28 septembrie 2026 de Claude. `Services/Products.cs`, `Services/S
 - [x] Teste automate actualizate (`BlazorStoc.Checks`, 578 trecute): 3 verificari care depindeau de textul cu diacritice al datelor demonstrative au fost adaptate la noile valori normalizate ("mandrina", "Masurare"); restul suitei (inclusiv testele care folosesc diacritice deliberat, pentru randarea fontului PDF sau normalizarea la salvare) au trecut nemodificate.
 - [x] Verificat direct pe baza locala persistenta (`data/blazorstoc-local.db`, folosita de preview-ul de pe portul 5083): interogare directa inainte si dupa repornire a confirmat eliminarea completa a diacriticelor din toate coloanele vizate (7 produse, 2 categorii, 6 subcategorii afectate), fara alterarea cantitatilor, versiunilor sau cheilor de unicitate; verificat si vizual in pagina `/produse`.
 - Neverificat: o baza MariaDB reala cu date vechi, dinainte de regula (motiv M1); nu s-a adaugat o migrare echivalenta pentru MariaDB, fiindca fiecare scriere prin repository-urile Maria normalizeaza deja la fel ca SQLite si nu exista un mecanism de seed controlat de aplicatie pentru acel motor.
+
+## Finalizat la 28.09.2026 21:32 - Integrare MariaDB reala si comutarea definitiva de dezvoltare
+
+**Data si ora implementarii:** 28.09.2026 21:32 (ora locala), la finalul unui efort pe mai multe cicluri (subtaskurile 2.1-2.13, incepute mai devreme in aceeasi zi).
+
+Baza MariaDB locala permanenta a fost creata si populata printr-o migrare punctuala din SQLite (vezi `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md`): server MariaDB 11.4.13 pe `127.0.0.1:3307`, baza `BlazorStoc`, 27 de tabele InnoDB, 229 de inregistrari initiale, chei externe, constrangeri CHECK si 18 triggere. Taskul nu a recreat baza si nu a repetat importul; a rescris integral cele 6 repository-uri Maria ale aplicatiei pe schema reala migrata si a comutat definitiv dezvoltarea de la SQLite la MariaDB ca sursa de adevar.
+
+**Ce s-a implementat, pe subtaskuri:**
+- [x] **2.1 Confirmare conectare**: conectare TLS confirmata cu contul `blazorstoc_dev` (cifru `TLS_AES_256_GCM_SHA384`); toate cele 27 de tabele, 229 de randuri si 18 triggere verificate identic cu documentul de predare, fara nicio scriere. Parola citita din `local-secrets\application-connection.private.json` (fisier privat, ignorat de Git), niciodata in cod/mesaje/Git.
+- [x] **2.2 Configuratia aplicatiei**: `Program.cs`, `Services/DatabaseConnections.cs`, `appsettings.json` revizuite (port `3307`, utilizator `blazorstoc_dev`, `CharacterSet=utf8mb4`); incarcare optionala a configuratiei private prin `Database:PrivateConfigPath`; collation `utf8mb4_nopad_bin` confirmata.
+- [x] **2.3 Produse, categorii, subcategorii, beneficiari**: `Services/MariaProductRepository.Crud.cs`, `Services/MariaProductGroups.cs`, `Services/MariaBeneficiaryRepository.cs` rescrise pe tabelele reale. Verificat real: CRUD complet, unicitate, audit+evenimente.
+- [x] **2.4 Miscari de stoc**: `Services/MariaStockMovementRepository.cs` rescris integral pe `stock_movements`/`stock_movement_history` (cel mai mare fisier al taskului); identificatori, sursa/destinatie, vehicule, proiecte, blocare `FOR UPDATE` pentru garda de stoc negativ. Verificat real: intrare, iesire spre vehicul (defalcare stoc), garda de stoc negativ la restituire din vehicul.
+- [x] **2.5 Autentificare**: `Services/MariaUserRepository.cs` rescris pe `web_users`, acelasi `PasswordHasher<object>` (PBKDF2) ca SQLite. Verificat real: autentificare, creare, nume duplicat respins, stergere.
+- [x] **2.6 Audit si arhivare**: `MariaAuditTrail`, `MariaArchiveSchema`, partea Maria din `Services/ArchivePersistence.cs` adaptate; toate coloanele `_utc` (text, niciodata DATETIME nativ) citite/scrise printr-un helper nou comun, `Services/MariaTimeText.cs`, in acelasi format folosit de cele 18 triggere. `MariaArchiveSchema.InitializeAsync` doar verifica (SELECT) ca tabelele exista, fara niciun DDL (contul aplicatiei nu are drepturi de schema).
+- [x] **2.7 Proiecte, vehicule, imagini, atasamente**: directoarele locale (imagini, fisiere proiect, arhiva, chei Data Protection) folosesc `MariaAssetPaths` cu radacina configurabila `Database:MariaAssetsRoot`.
+- [x] **2.8 Blocari si sincronizare**: `MariaProductLockRepository` pe `product_locks`/`products`; `MariaChangeEventSource` pe aceleasi nume reale de tabele ca SQLite, doar verificare (SELECT), fara sa creeze niciodata triggere.
+- [x] **2.9 Initializare, migrari, cont operational**: cont dedicat `blazorstoc_migrator` creat (drepturi DDL limitate strict la schema `BlazorStoc`, fara SELECT/INSERT/UPDATE/DELETE, fara drepturi globale - verificat direct). `blazorstoc_dev` (contul aplicatiei) ramane fara DDL, deci nu poate opri conexiuni straine sau schimba schema.
+- [x] **2.10 Identitatea operatorului**: `Database:ApplicationUserId` si dependenta de o tabela `user` eliminate din toate cele 6 repository-uri Maria; identitatea foloseste username text prin `IAccessControl`/`IAuditTrail`, ca in SQLite.
+- [x] **2.11 Verificari de integrare**: baza izolata `blazorstoc_test` creata (acelasi DDL si 18 triggere, separata de cele 229 de randuri reale), cu cont dedicat. Verificari reale rulate cu succes: produse/categorii/subcategorii, beneficiari, vehicule, blocari de produs, miscari de stoc, utilizatori, proiecte (creare, observatie, **stergere**). Trei probleme reale gasite si corectate in acest subtask: (1) garda "scrie numai in baza BlazorStoc" compara literalul fix `"BlazorStoc"` in loc de o valoare configurabila, ceea ce facea imposibila testarea pe o baza izolata - corectat cu `MariaDatabaseGuard`/`Database:ExpectedName` (implicit tot `"BlazorStoc"`, deci o instalare reala nemodificata pastreaza comportamentul vechi); (2) scriptul de verificare a miscarilor de stoc testa scenariul gresit pentru garda de stoc negativ (iesire catre vehicul, care nu poate deveni negativa, in loc de restituire din vehicul) - corectat in `tests/BlazorStoc.Checks/MariaIntegrationChecks.cs`; (3) **bug real de aplicatie (A15)**: stergerea unui proiect/observatie pe MariaDB esua intermitent cu "Proiectul/Observatia a fost modificat(a) sau sters(a) intre timp", desi nimic nu se schimbase - vezi detaliile mai jos.
+- [x] **2.12 Comutarea preview-ului**: preview pornit pe portul `5085` cu `App:DemoMode=false`, conectat la baza reala de livrare (`blazorstoc_dev`); pornire fara exceptii, `/health/live` 200, pagina 404, persistenta la restart (cheia Data Protection refolosita de pe disc). Autentificare confirmata de utilizator din doua browsere simultan.
+- [x] **2.13 Comutarea definitiva de dezvoltare**: momentul opririi scrierilor in SQLite stabilit explicit la 28.09.2026 18:05 (ora Europe/Bucharest); comparatie completa (SHA-256 canonic, pe cheie primara) intre `data\blazorstoc-local.db` si MariaDB pe toate cele 27 de tabele, cu o singura diferenta reala (1 rand nou in `audit_events`, migrat manual, fara risc de coliziune); re-verificat 230/230 randuri identice dupa migrare. MariaDB (`blazorstoc_dev`, baza `BlazorStoc`) declarata sursa de adevar; SQLite ramane artefact istoric. Valoarea implicita `App:DemoMode=true` din `appsettings.json` **nu** a fost schimbata (decizie deliberata, ca sa nu schimbe comportamentul unei porniri obisnuite fara variabile de mediu explicite); parola de autentificare a preview-ului MariaDB a primit acelasi mecanism de fisier privat ca restul configuratiei (`Authentication` in `local-secrets\application-connection.private.json`).
+
+**Bug A15 - stergerea unui proiect pe MariaDB (gasit in 2.11, corectat in acest ciclu final):** investigat pana la cauza reala prin executie reala pe `blazorstoc_test`, cu instrumentare temporara a exceptiei (capturare si afisare inainte de a fi aruncata mai departe), nu prin presupunere. Nu era, cum se banuia initial, un rollback in pasul de arhivare (`MariaArchivePersistence.InsertAsync`/`InsertAuditAsync`): exceptia reala era `ProjectOperationException` ("Proiectul/Observatia a fost modificat(a) sau sters(a) intre timp"), aruncata de `ProjectRules.CheckCurrent` cand compara obiectul "original" din memorie cu randul re-citit din baza in aceeasi tranzactie de Update/Delete. `Project`/`ProjectObservation` sunt record-uri C#, a caror egalitate implicita include `CreatedAtUtc`/`UpdatedAtUtc`. `MariaTimeText.Format` scrie aceste coloane text cu precizie de milisecunda (ca sa se potriveasca formatul deja folosit de cele 18 triggere), dar `MariaProjectRepository` construia obiectul intors catre apelant direct din `DateTime.UtcNow`, cu precizie mai mare (sub-milisecunda); la re-citire, valoarea reparsata din text nu mai era egala bit-cu-bit cu cea din memorie, intermitent - ori de cate ori componenta sub-milisecunda a lui `DateTime.UtcNow` nu era exact zero. Exceptia reala era apoi mascata de o exceptie de FK aparuta in curatarea proprie a scriptului de test (stergerea beneficiarului de test, blocata de proiectul ramas viu cand stergerea esua), ceea ce a facut investigatia initiala din 2.11 sa banuiasca gresit pasul de arhivare. **Corectat** cu un helper nou, `MariaTimeText.Now()` (in `Services/MariaTimeText.cs`: `DateTime.UtcNow` rotunjit prin acelasi `Format`/`Parse` folosit la scriere/citire), folosit in cele 4 locuri din `Services/MariaProjectRepository.cs` unde se calcula `nowUtc` (`CreateAsync`, `UpdateAsync`, `CreateObservationAsync`, `UpdateObservationAsync`). Niciun alt tip de entitate Maria (produs, beneficiar, vehicul, utilizator) nu are `CreatedAtUtc`/`UpdatedAtUtc` in record-ul sau, deci nu era afectat de acelasi bug.
+
+**Fisiere principale (intreg efortul multi-ciclu):** `Services/MariaProductRepository.Crud.cs`, `Services/MariaProductGroups.cs`, `Services/MariaBeneficiaryRepository.cs`, `Services/MariaStockMovementRepository.cs`, `Services/MariaUserRepository.cs`, `Services/MariaProjectRepository.cs`, `Services/MariaProjectFileStore.cs`, `Services/MariaVehicleRepository.cs`, `Services/ProductLocks.cs` (partea Maria), `Services/ChangeEvents.cs` (partea Maria), `Services/ArchivePersistence.cs` (partea Maria), `Services/MariaArchiveSchema.cs`, `Services/MariaTimeText.cs` (helper comun nou: format/parsare timp text, cai de active, garda de baza de date), `Services/DatabaseConnections.cs`, `Program.cs`, `appsettings.json`, `tests/BlazorStoc.Checks/MariaIntegrationChecks.cs` (verificari de integrare reale, opt-in prin `RUN_MARIA_INTEGRATION_CHECKS=1`).
+
+**Decizii:** cont operational separat (`blazorstoc_migrator`) pentru migrari, niciodata contul aplicatiei; toate coloanele `_utc` raman text (nu DATETIME nativ), pentru compatibilitate cu triggerele deja instalate si cu formatul de sortare `utf8mb4_nopad_bin`; garda "scrie numai in baza BlazorStoc" ramane implicit stricta pentru o instalare reala, configurabila explicit doar pentru medii de test izolate; `App:DemoMode` ramane `true` implicit.
+
+**Verificari efectuate:** conectare TLS reala; CRUD real pe toate entitatile (produse, categorii, subcategorii, beneficiari, vehicule, miscari de stoc, utilizatori, proiecte, observatii - inclusiv stergerea proiectelor, dupa corectarea bugului A15) pe baza izolata `blazorstoc_test`; preview real pe portul `5085` conectat la baza de livrare, cu autentificare din doua browsere simultan; comparatie completa SHA-256 canonica intre SQLite si MariaDB pe toate cele 27 de tabele; suita implicita de 578 de verificari, fara regresii, rulata dupa fiecare corectare (inclusiv dupa fixul A15, 5 rulari consecutive ale sectiunii Projects, toate `PASS`).
+
+**Neverificat/ramane deschis:** Task 0 (sincronizarea manuala a fisierelor de root MariaDB, actiune utilizator, separata); fluxurile prin browser care necesita autentificare cu parola reala raman de facut manual de utilizator (agentul nu introduce parole - vezi A14 in `docs/TESTE_RAMASE.md`); eroarea tranzitorie de incarcare a miscarilor observata o singura data pe preview (A16, nereprodusa, separata de acest task); politica de retentie/curatare a preview-urilor vechi ramase pornite pe alte porturi (5082, 5083) nu a fost stabilita in acest task. Detalii complete in `docs/PROJECT_STATE.md` si `docs/TESTE_RAMASE.md`.
