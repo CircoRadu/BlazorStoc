@@ -149,6 +149,13 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 - **Așteptat**: totalul = suma efectelor; nicio mașină cu cantitate negativă; mișcările vechi (fără destinație) rămân neschimbate; aplicația veche nu este afectată de coloanele noi (o ieșire spre mașină apare în ea ca ieșire obișnuită — de ținut minte la folosirea în paralel).
 - **Sursă**: ieșire spre vehicul, vânzare generică și corecție de stoc.
 
+### A17. Verificarea conectarii cu contul root MariaDB dupa sincronizarea fisierelor (Task 0)
+- **Verifica**: ca `admin.private.cnf`/`connection.private.json` copiate in `C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB` (28.09.2026, din `Livrare-DDL-MariaDB`, fisiere identice byte cu byte cu sursa) permit o conectare reusita cu contul `root` la instanta locala (`127.0.0.1:3307`).
+- **Motiv**: M1 — in mediul de lucru al agentului nu exista un client MariaDB nativ (`mariadb.exe`/`mariadbd.exe` nu au fost gasite in `Program Files`); singurul client MySQL gasit este cel din `MySQL Workbench 8.0 CE` (`mysql.exe`), care a returnat `ERROR 1045 (28000): Access denied for user 'root'@'127.0.0.1' (using password: YES)` atat pentru copia din `Livrare-DDL-MariaDB`, cat si pentru copia proaspat sincronizata — rezultat identic pentru ambele fisiere (identice byte cu byte), deci nu indica o problema de copiere, dar nici nu confirma parola: eroarea este ambigua intre parola gresita si o eventuala incompatibilitate de protocol/plugin de autentificare intre acest client MySQL 8.0 si serverul MariaDB (nu s-a putut testa cu un client `mariadb`/`mysql` compatibil garantat).
+- **Pasi**: de la calculatorul fizic (sau cu clientul `mariadb`/`mysql` instalat alaturi de `mariadbd.exe`), ruleaza `mysql --defaults-extra-file="C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB\admin.private.cnf" -e "SELECT 1;"`; daca reuseste, prima verificare din Task 0 e completa.
+- **Asteptat**: conectare reusita, fara eroare de autentificare.
+- **Sursa**: Task 0 (sincronizarea manuala a fisierelor de acces root MariaDB).
+
 ## B. Mai mulți utilizatori și mai multe calculatoare (motiv: M2, M6)
 
 ### B1. Două calculatoare, două conturi distincte
