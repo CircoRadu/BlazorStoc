@@ -136,6 +136,13 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 - **Asteptat**: `PASS: The deleted project is gone from blazorstoc_test` si `PASS: audit_events recorded ... entries`; nicio ramasita in `projects`/`project_observations` dupa rulare.
 - **Sursa**: Task 2, subtask 2.11 (gasita 28.09.2026, ciclul de reconfirmare a A13).
 
+### A16. Eroare tranzitorie "Miscarile nu au putut fi incarcate" pe preview-ul MariaDB (Task 2)
+- **Verifica**: `ProductMovements.razor` (`LoadPageAsync`, catch generic la linia care afiseaza "Miscarile nu au putut fi incarcate. Verifica serverul si conexiunea la baza de date.") pentru produsul de test "Diblu nylon 8 x 40 test 22" (id 12, ramas in baza reala de livrare din verificarile 2.12).
+- **Motiv**: M6 — observata o singura data de utilizator (28.09.2026, pe `http://127.0.0.1:5085/`), nereprodusa la reincercare dupa repornirea preview-ului si reautentificare; jurnalul serverului (pornit ulterior cu iesire redirectionata in fisier) nu contine nicio intrare noua de `Logger.LogError("Movement list loading failed...")` la reincercare, deci exceptia originala nu a putut fi capturata.
+- **Pasi**: daca reapare, verifica imediat (inainte de orice repornire) fisierul de iesire al preview-ului MariaDB pentru mesajul exact `Movement list loading failed ({ErrorType})` si tipul exceptiei; nu reporni serverul inainte de a citi jurnalul, ca sa nu pierzi contextul (o repornire delogheaza toate sesiunile si poate masca eroarea, ca in acest caz).
+- **Asteptat**: pagina de miscari se incarca normal pentru orice produs existent, inclusiv cele create de verificarile automate.
+- **Sursa**: observatie directa a utilizatorului, 28.09.2026, in timpul verificarii subtask 2.12.
+
 ### A14. Autentificare si doua sesiuni concurente pe preview-ul MariaDB (Task 2, subtask 2.12)
 - **Verifica**: autentificarea efectiva pe preview-ul MariaDB (`http://127.0.0.1:5085/`, pornit in acest ciclu, conectat la baza reala de livrare) si comportamentul cu doi utilizatori autentificati simultan.
 - **Motiv suplimentar**: M2 (agentul nu introduce niciodata parole, nici macar cele demonstrative).
