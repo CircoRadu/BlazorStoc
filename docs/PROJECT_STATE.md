@@ -12,6 +12,13 @@ Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, 
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
 
+## Corectie decizie - selectia implicita la Task 1 (preluare inventar OCR) - 28 septembrie 2026
+
+- La cererea utilizatorului, s-a corectat decizia anterioara privind selectia implicita din lista de modificari (Task 1, subtask 1.2/1.3): casetele de selectare sunt acum **NEbifate implicit pentru toate produsele**, inclusiv cele cu diferenta recunoscuta cu certitudine; utilizatorul bifeaza explicit, dupa investigare, ce trimite.
+- Randurile pe care OCR nu le-a putut citi cu suficienta certitudine nu mai sunt excluse/semnalate separat, ci **apar in aceeasi lista principala**, marcate vizual distinct (de exemplu o iconita de avertizare), ca utilizatorul sa le investigheze si sa corecteze/confirme valoarea inainte de a le bifa.
+- Sectiunea "Produse negasite in catalog" (cod citit care nu mai exista in catalog) nu s-a schimbat: ramane informativa, fara checkbox, separata de lista principala.
+- `TODO.md` actualizat: subtask 1.2 (randurile nesigure intra in lista, marcate distinct), subtask 1.3 (checkbox NEbifat implicit + marcaj vizual pentru randurile nesigure), subtask 1.5 (verificarea in browser reflecta noul comportament) si "Decizii confirmate". Nu s-a modificat cod.
+
 ## Task 1 (preluare inventar OCR) pregatit pentru implementare - 28 septembrie 2026
 
 - La cererea utilizatorului ("confirma si celelalte detalii ramase de stabilit"), au fost confirmate si trecute in `TODO.md` toate deciziile ramase deschise la Task 1:

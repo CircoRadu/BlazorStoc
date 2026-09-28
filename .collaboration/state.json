@@ -5,10 +5,10 @@
     "activeAgent":  null,
     "lastAgent":  "claude",
     "nextAgent":  "claude",
-    "currentTask":  "Confirma in TODO.md restul detaliilor de stabilit pentru Task 1 (preluare inventar OCR): format formular, sursa model ONNX, stare implicita checkbox, limite fisier, produse negasite, un singur fisier activ, tipul miscarii de stoc",
-    "startedAtUtc":  "2026-09-28T08:04:19.0441679Z",
-    "completedAtUtc":  "2026-09-28T08:06:03.1659968Z",
-    "lastSummary":  "Confirmate si trecute in TODO.md toate detaliile ramase de stabilit la Task 1 (preluare inventar OCR): format acceptat exclusiv situatia de inventar generata de aplicatie; model de cifre = MNIST din ONNX Model Zoo, incorporat ca resursa; casetele de selectare bifate implicit pentru diferentele certe; limite fisier 20 MB / 50 pagini; produsele disparute din catalog intr-o sectiune informativa separata; un singur fisier activ per sesiune de preluare, cu confirmare la inlocuire daca exista selectii netrimise; fara tip nou de miscare de stoc - se refoloseste StockMovementKind.Entry pentru plus si ExitDestination.StockCorrection existent pentru minus. Subtaskurile 1.1-1.4 actualizate cu deciziile; sectiunea Detalii de stabilit inlocuita cu Decizii confirmate. Actualizat docs/PROJECT_STATE.md cu rationamentul complet; taskul e acum pregatit pentru implementare. Nu s-a modificat cod.",
-    "lastCommitSubject":  "claude: confirma detaliile ramase la Task 1 (preluare inventar OCR); task pregatit pentru implementare",
+    "currentTask":  "Corecteaza in TODO.md decizia privind selectia implicita la Task 1 (preluare inventar OCR): toate produsele NEbifate implicit, iar produsele nesigure apar in lista principala pentru investigare, nu separat/excluse",
+    "startedAtUtc":  "2026-09-28T08:08:43.2779535Z",
+    "completedAtUtc":  "2026-09-28T08:09:53.1945021Z",
+    "lastSummary":  "Corectata in TODO.md decizia privind selectia implicita la Task 1 (preluare inventar OCR), la cererea utilizatorului: casetele de selectare sunt acum NEbifate implicit pentru toate produsele (inclusiv cele cu diferenta certa), nu bifate cum fusese confirmat anterior. Randurile pe care OCR nu le-a putut citi cu certitudine nu mai sunt excluse/semnalate separat, ci apar in aceeasi lista principala, marcate vizual distinct, pentru investigare si confirmare/corectare de catre utilizator inainte de bifare. Subtaskurile 1.2, 1.3 si 1.5 actualizate; sectiunea Decizii confirmate corectata. Sectiunea separata Produse negasite in catalog ramane neschimbata. Actualizat docs/PROJECT_STATE.md cu rationamentul corectiei. Nu s-a modificat cod.",
+    "lastCommitSubject":  "claude: corecteaza selectia implicita la Task 1 (preluare inventar OCR) - nebifat implicit, nesigure in lista principala",
     "claudeStatus":  "active"
 }

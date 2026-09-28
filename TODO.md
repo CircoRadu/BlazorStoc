@@ -38,14 +38,15 @@ Pe baza unui formular de proba, completat si scanat de utilizator, s-a constatat
 - [ ] Extrage "Cod produs" prin OCR clasic (de exemplu Tesseract), local.
 - [ ] Extrage "Valoare reala" prin segmentarea cifrelor individuale (OpenCvSharp) si clasificarea fiecarei cifre izolate cu un model ONNX preinstruit gratuit pe cifre scrise de mana (modelul MNIST din ONNX Model Zoo, licenta MIT, incorporat ca resursa in proiect, similar fonturilor din `Assets/Fonts`), rulat prin ONNX Runtime, conform deciziei tehnice de mai sus.
 - [ ] Trateaza randurile la care "Valoare reala" a fost lasata necompletata de utilizator ca "neinventariate": nu genereaza pentru ele nicio modificare de stoc.
-- [ ] Semnaleaza distinct, fara sa le includa automat in lista de modificari, randurile pe care OCR nu le-a putut citi cu suficienta certitudine (cod neidentificat, cifre nesegmentate sau clasificare nesigura), si permite utilizatorului sa le vada separat.
+- [ ] Include in aceeasi lista de modificari, marcate vizual distinct (de exemplu o iconita de avertizare), randurile pe care OCR nu le-a putut citi cu suficienta certitudine (cod neidentificat, cifre nesegmentate sau clasificare nesigura), ca utilizatorul sa le investigheze si sa confirme sau sa corecteze valoarea inainte de a le bifa.
 
 ### Subtask 1.3 - Compararea cu stocul curent si afisarea diferentelor
 
 - [ ] Pentru fiecare produs identificat cu succes, calculeaza diferenta dintre "Valoare reala" citita si stocul curent din baza de date la momentul incarcarii.
 - [ ] Afiseaza in lista de modificari numai produsele cu diferenta de stoc; produsele la care valoarea reala este identica stocului curent nu genereaza o modificare.
 - [ ] Grupeaza afisarea produselor pe categorie si subcategorie, la fel ca in restul aplicatiei.
-- [ ] Adauga un checkbox pentru fiecare produs din lista, bifat implicit pentru toate produsele cu diferenta recunoscuta cu certitudine (selectie completa implicita), plus "selecteaza toate"/"deselecteaza toate" pentru ajustare; produsele semnalate ca nesigure (subtask 1.2) nu sunt niciodata incluse in aceasta lista.
+- [ ] Adauga un checkbox pentru fiecare produs din lista, NEbifat implicit pentru toate produsele (inclusiv cele cu diferenta recunoscuta cu certitudine); utilizatorul bifeaza explicit, dupa investigare, fiecare modificare pe care vrea sa o trimita; plus "selecteaza toate"/"deselecteaza toate" pentru ajustare rapida.
+- [ ] Marcheaza vizual distinct (de exemplu o iconita de avertizare) produsele semnalate ca nesigure de OCR (subtask 1.2), care apar in aceeasi lista, ca utilizatorul sa le observe si sa verifice/corecteze valoarea inainte de a le bifa.
 - [ ] Afiseaza pentru fiecare produs cod produs, denumire, categorie/subcategorie, stoc curent, valoare reala citita si diferenta (cu semn).
 - [ ] Afiseaza "Valoare reala" recunoscuta ca valoare editabila pentru fiecare produs (nu doar text static), ca utilizatorul sa poata corecta o citire OCR gresita inainte de bifare/trimitere; diferenta afisata se recalculeaza dupa corectie.
 - [ ] Afiseaza intr-o sectiune separata, informativa, "Produse negasite in catalog" produsele al caror cod citit nu (mai) exista in catalog (produs sters sau redenumit intre generarea situatiei si preluare); acestea nu genereaza nicio modificare de stoc si nu au checkbox.
@@ -65,7 +66,7 @@ Pe baza unui formular de proba, completat si scanat de utilizator, s-a constatat
 - [ ] Teste automate pentru extragerea OCR pe fisiere PDF de test (formular completat corect, formular cu randuri necompletate, formular cu text neclar/necitibil).
 - [ ] Teste automate pentru calculul diferentelor de stoc si gruparea pe categorie si subcategorie.
 - [ ] Teste automate pentru aplicarea modificarilor selectate in baza de date si jurnalizarea lor.
-- [ ] Verificare in browser: incarcarea fisierului, afisarea diferentelor, selectarea/deselectarea produselor, popup-ul de confirmare, aplicarea modificarilor, anularea popup-ului, mesajele de eroare pentru fisiere invalide sau OCR nesigur.
+- [ ] Verificare in browser: incarcarea fisierului, afisarea diferentelor (toate NEbifate implicit), produsele nesigure aparute in lista principala cu marcaj vizual si corectarea/bifarea lor dupa investigare, selectarea/deselectarea produselor, popup-ul de confirmare, aplicarea modificarilor, anularea popup-ului, mesajele de eroare pentru fisiere invalide.
 - [ ] Actualizeaza `README.md`, `VALIDARE.md` si `docs/PROJECT_STATE.md`.
 
 ### Criterii de acceptare
@@ -81,7 +82,7 @@ Pe baza unui formular de proba, completat si scanat de utilizator, s-a constatat
 
 - Formatul acceptat este exclusiv situatia de inventar generata de aplicatie la `/inventar`; orice alt format e respins cu mesaj clar.
 - Modelul de cifre scrise de mana este modelul MNIST din ONNX Model Zoo (licenta MIT), incorporat ca resursa in proiect; recalibrarea pe mostre reale ramane o imbunatatire ulterioara neblocanta, evaluata dupa verificarile in browser cu formulare reale.
-- Casetele de selectare sunt bifate implicit pentru toate produsele cu diferenta recunoscuta cu certitudine.
+- Casetele de selectare sunt NEbifate implicit pentru toate produsele; utilizatorul bifeaza explicit, dupa investigare, fiecare modificare pe care vrea sa o trimita. Produsele nesigure (OCR incert) apar in aceeasi lista principala, marcate vizual distinct, nu intr-o zona separata exclusa; utilizatorul le investigheaza, corecteaza valoarea daca e nevoie si le bifeaza pentru a le include.
 - Limite fisier: 20 MB, maximum 50 de pagini.
 - Produsele gasite in formular dar disparute din catalog apar informativ in sectiunea "Produse negasite in catalog", fara modificare de stoc.
 - Se permite un singur fisier activ per sesiune de preluare; incarcarea altuia inlocuieste lista curenta, cu confirmare daca exista selectii netrimise.

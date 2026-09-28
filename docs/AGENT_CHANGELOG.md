@@ -1074,3 +1074,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod, deci nu a fost necesar build sau rulare de teste. S-a verificat manual coerenta TODO.md (subtaskurile 1.1-1.4, sectiunea Decizii confirmate, fara diacritice) si consistenta cu Services/StockMovements.cs (StockMovementKind, ExitDestination.StockCorrection, StockMovementRules.SuggestedDescription existente, citite din cod inainte de a scrie decizia).
 - **Commit:** `claude: confirma detaliile ramase la Task 1 (preluare inventar OCR); task pregatit pentru implementare`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-28T08:09:53.1945021Z â€” claude
+
+- **Task:** Corecteaza in TODO.md decizia privind selectia implicita la Task 1 (preluare inventar OCR): toate produsele NEbifate implicit, iar produsele nesigure apar in lista principala pentru investigare, nu separat/excluse
+- **Rezumat:** Corectata in TODO.md decizia privind selectia implicita la Task 1 (preluare inventar OCR), la cererea utilizatorului: casetele de selectare sunt acum NEbifate implicit pentru toate produsele (inclusiv cele cu diferenta certa), nu bifate cum fusese confirmat anterior. Randurile pe care OCR nu le-a putut citi cu certitudine nu mai sunt excluse/semnalate separat, ci apar in aceeasi lista principala, marcate vizual distinct, pentru investigare si confirmare/corectare de catre utilizator inainte de bifare. Subtaskurile 1.2, 1.3 si 1.5 actualizate; sectiunea Decizii confirmate corectata. Sectiunea separata Produse negasite in catalog ramane neschimbata. Actualizat docs/PROJECT_STATE.md cu rationamentul corectiei. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu s-a modificat cod, deci nu a fost necesar build sau rulare de teste. S-a verificat manual coerenta noii formulari in TODO.md (subtaskurile 1.2, 1.3, 1.5, Decizii confirmate, fara diacritice) si in docs/PROJECT_STATE.md.
+- **Commit:** `claude: corecteaza selectia implicita la Task 1 (preluare inventar OCR) - nebifat implicit, nesigure in lista principala`
+- **Predat cÄƒtre:** claude
