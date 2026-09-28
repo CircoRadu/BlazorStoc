@@ -14,94 +14,20 @@
 
 ## Ordinea de implementare optimizata
 
-Toate taskurile anterioare sunt finalizate si arhivate la sfarsitul fisierului. Taskurile active (1 si 2) nu depind unul de altul si se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex); taskul 1 are prioritatea cea mai mare.
+Toate taskurile anterioare sunt finalizate si arhivate la sfarsitul fisierului. Taskul activ (1) se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex).
 
-## Task 1 - Preluare inventar din formularul de service scanat (OCR)
-
-Implementeaza pagina de rezerva `/inventar/preluare` (`Components/Pages/InventoryPickup.razor`): un buton in partea de sus a paginii, "Preia inventar", permite incarcarea unui fisier PDF cu scanarea unui formular de service completat manual de utilizator, in care a fost notata "Valoare reala" (stocul constatat fizic) pentru produsele numarate. Aplicatia proceseaza fisierul prin OCR, identifica produsele si valorile reale citite, le compara cu stocul curent din baza de date si afiseaza lista produselor cu diferente de stoc, grupata pe categorii si subcategorii. Fiecare produs din lista are un checkbox pentru selectarea modificarii de trimis spre baza de date. Butonul "Trimite modificari in stoc" deschide un popup cu modificarile ce vor fi operate (cod produs, modificare stoc in bucati), grupate pe categorii si subcategorii, inainte de aplicarea lor.
-
-### Subtask 1.1 - Buton "Preia inventar" si incarcarea fisierului PDF
-
-- [ ] Adauga in partea de sus a paginii `/inventar/preluare` butonul "Preia inventar", care deschide un dialog de incarcare a unui singur fisier PDF.
-- [ ] Accepta exclusiv fisiere PDF cu structura situatiei de inventar generate de aplicatie la pagina `/inventar` (tabel Cod produs / Valoare stoc / Valoare reala); un fisier cu alt format sau structura nerecunoscuta este respins cu un mesaj clar, fara procesare partiala.
-- [ ] Valideaza tipul fisierului (.pdf), dimensiunea maxima (20 MB) si numarul maxim de pagini (50); peste aceste limite, fisierul este respins cu un mesaj clar, in romana, inainte de a incepe OCR.
-- [ ] Afiseaza starea de progres pe durata incarcarii si a procesarii OCR (poate dura cateva secunde).
-- [ ] Incarcarea unui nou fisier inlocuieste lista curenta de diferente; daca exista produse bifate netrimise, cere confirmare explicita inainte de a le pierde.
-
-### Decizie tehnica pentru recunoasterea scrisului de mana
-
-Pe baza unui formular de proba, completat si scanat de utilizator, s-a constatat ca cifrele din "Valoare reala" sunt scrise separat (fara litere legate intre ele), deci nu este nevoie sa se schimbe formatul PDF-ului generat la pagina `/inventar` cu o cutie per cifra. Solutia aleasa: celula "Valoare reala" a fiecarui rand se decupeaza dupa pozitia cunoscuta din grid-ul tabelului (fara detectie de layout); cifrele individuale se segmenteaza din celula decupata prin analiza componentelor conexe/proiectie pe verticala dupa binarizare, cu **OpenCvSharp** (wrapper .NET peste OpenCV, ruleaza local, fara Docker, cross-platform Windows/Linux); fiecare cifra izolata este clasificata cu un model mic, gratuit, preinstruit pe cifre scrise de mana, rulat prin **ONNX Runtime** (`Microsoft.ML.OnnxRuntime`, local, cross-platform). "Cod produs" (text tiparit de aplicatie, nu scris de mana) se citeste separat prin OCR clasic (de exemplu Tesseract), tot local. Riscul ramas (cifre stilizate, segmentare gresita la cifre scrise legat) este acoperit prin afisarea valorii recunoscute ca editabila (subtask 1.3), pentru corectie manuala inainte de bifare/trimitere.
-
-### Subtask 1.2 - Procesare OCR si extragerea datelor din formular
-
-- [ ] Decupeaza celula "Cod produs" si celula "Valoare reala" ale fiecarui rand folosind pozitia cunoscuta din grid-ul situatiei de inventar (acelasi format ca la generarea PDF-ului, fara detectie de layout).
-- [ ] Extrage "Cod produs" prin OCR clasic (de exemplu Tesseract), local.
-- [ ] Extrage "Valoare reala" prin segmentarea cifrelor individuale (OpenCvSharp) si clasificarea fiecarei cifre izolate cu un model ONNX preinstruit gratuit pe cifre scrise de mana (modelul MNIST din ONNX Model Zoo, licenta MIT, incorporat ca resursa in proiect, similar fonturilor din `Assets/Fonts`), rulat prin ONNX Runtime, conform deciziei tehnice de mai sus.
-- [ ] Trateaza randurile la care "Valoare reala" a fost lasata necompletata de utilizator ca "neinventariate": nu genereaza pentru ele nicio modificare de stoc.
-- [ ] Include in aceeasi lista de modificari, marcate vizual distinct (de exemplu o iconita de avertizare), randurile pe care OCR nu le-a putut citi cu suficienta certitudine (cod neidentificat, cifre nesegmentate sau clasificare nesigura), ca utilizatorul sa le investigheze si sa confirme sau sa corecteze valoarea inainte de a le bifa.
-
-### Subtask 1.3 - Compararea cu stocul curent si afisarea diferentelor
-
-- [ ] Pentru fiecare produs identificat cu succes, calculeaza diferenta dintre "Valoare reala" citita si stocul curent din baza de date la momentul incarcarii.
-- [ ] Afiseaza in lista de modificari numai produsele cu diferenta de stoc; produsele la care valoarea reala este identica stocului curent nu genereaza o modificare.
-- [ ] Grupeaza afisarea produselor pe categorie si subcategorie, la fel ca in restul aplicatiei.
-- [ ] Adauga un checkbox pentru fiecare produs din lista, NEbifat implicit pentru toate produsele (inclusiv cele cu diferenta recunoscuta cu certitudine); utilizatorul bifeaza explicit, dupa investigare, fiecare modificare pe care vrea sa o trimita; plus "selecteaza toate"/"deselecteaza toate" pentru ajustare rapida.
-- [ ] Marcheaza vizual distinct (de exemplu o iconita de avertizare) produsele semnalate ca nesigure de OCR (subtask 1.2), care apar in aceeasi lista, ca utilizatorul sa le observe si sa verifice/corecteze valoarea inainte de a le bifa.
-- [ ] Afiseaza pentru fiecare produs cod produs, denumire, categorie/subcategorie, stoc curent, valoare reala citita si diferenta (cu semn).
-- [ ] Afiseaza "Valoare reala" recunoscuta ca valoare editabila pentru fiecare produs (nu doar text static), ca utilizatorul sa poata corecta o citire OCR gresita inainte de bifare/trimitere; diferenta afisata se recalculeaza dupa corectie.
-- [ ] Afiseaza intr-o sectiune separata, informativa, "Produse negasite in catalog" produsele al caror cod citit nu (mai) exista in catalog (produs sters sau redenumit intre generarea situatiei si preluare); acestea nu genereaza nicio modificare de stoc si nu au checkbox.
-
-### Subtask 1.4 - Trimiterea modificarilor si popup de confirmare
-
-- [ ] Adauga butonul "Trimite modificari in stoc", activ numai cand cel putin un produs este bifat.
-- [ ] La apasare, afiseaza un popup cu toate modificarile care vor fi operate pentru produsele bifate: cod produs si modificare de stoc (numar de bucati, cu semn), grupate pe categorie si subcategorie.
-- [ ] Popup-ul are un buton de confirmare, care aplica modificarile in baza de date, si un buton "Anuleaza" (stil rosu), care inchide popup-ul fara nicio modificare.
-- [ ] Fiecare modificare confirmata genereaza o miscare de stoc obisnuita, refolosind mecanismul existent (`StockMovementKind`/`ExitDestination`), fara tip nou de miscare: diferenta pozitiva (valoare reala mai mare decat stocul curent) genereaza o miscare de Intrare; diferenta negativa genereaza o miscare de Iesire cu destinatia existenta "Corecție stoc" (`ExitDestination.StockCorrection`); descrierea sugerata mentioneaza inventarul si data preluarii, ca extensie a `StockMovementRules.SuggestedDescription` existent.
-- [ ] Jurnalizeaza fiecare miscare ca restul miscarilor de stoc; referinta la operatia de inventar si la fisierul incarcat se pastreaza in `Motif`/`Details` din jurnal, fara o coloana noua in miscari.
-- [ ] Dupa confirmare, afiseaza o notificare de succes cu numarul de produse modificate.
-- [ ] O eroare la aplicarea uneia dintre modificarile confirmate nu lasa baza de date intr-o stare intermediara nespecificata (tranzactie sau raportare clara a modificarilor reusite si a celor nereusite).
-
-### Subtask 1.5 - Verificari
-
-- [ ] Teste automate pentru extragerea OCR pe fisiere PDF de test (formular completat corect, formular cu randuri necompletate, formular cu text neclar/necitibil).
-- [ ] Teste automate pentru calculul diferentelor de stoc si gruparea pe categorie si subcategorie.
-- [ ] Teste automate pentru aplicarea modificarilor selectate in baza de date si jurnalizarea lor.
-- [ ] Verificare in browser: incarcarea fisierului, afisarea diferentelor (toate NEbifate implicit), produsele nesigure aparute in lista principala cu marcaj vizual si corectarea/bifarea lor dupa investigare, selectarea/deselectarea produselor, popup-ul de confirmare, aplicarea modificarilor, anularea popup-ului, mesajele de eroare pentru fisiere invalide.
-- [ ] Actualizeaza `README.md`, `VALIDARE.md` si `docs/PROJECT_STATE.md`.
-
-### Criterii de acceptare
-
-- Butonul "Preia inventar" din pagina `/inventar/preluare` permite incarcarea unui fisier PDF cu formularul de service scanat.
-- Aplicatia recunoaste prin OCR codul produsului si valoarea reala pentru fiecare rand completat si calculeaza diferenta fata de stocul curent.
-- Lista afisata contine numai produsele cu diferenta de stoc, grupate pe categorie si subcategorie, fiecare cu checkbox de selectare.
-- Butonul "Trimite modificari in stoc" deschide un popup cu modificarile selectate (cod produs, modificare stoc), grupate pe categorie si subcategorie, inainte de aplicarea lor.
-- Modificarile se aplica in baza de date numai dupa confirmarea din popup si sunt jurnalizate ca miscari de stoc.
-- Randurile necompletate sau pe care OCR nu le-a putut citi cu certitudine nu genereaza modificari automate de stoc.
-
-### Decizii confirmate
-
-- Formatul acceptat este exclusiv situatia de inventar generata de aplicatie la `/inventar`; orice alt format e respins cu mesaj clar.
-- Modelul de cifre scrise de mana este modelul MNIST din ONNX Model Zoo (licenta MIT), incorporat ca resursa in proiect; recalibrarea pe mostre reale ramane o imbunatatire ulterioara neblocanta, evaluata dupa verificarile in browser cu formulare reale.
-- Casetele de selectare sunt NEbifate implicit pentru toate produsele; utilizatorul bifeaza explicit, dupa investigare, fiecare modificare pe care vrea sa o trimita. Produsele nesigure (OCR incert) apar in aceeasi lista principala, marcate vizual distinct, nu intr-o zona separata exclusa; utilizatorul le investigheaza, corecteaza valoarea daca e nevoie si le bifeaza pentru a le include.
-- Limite fisier: 20 MB, maximum 50 de pagini.
-- Produsele gasite in formular dar disparute din catalog apar informativ in sectiunea "Produse negasite in catalog", fara modificare de stoc.
-- Se permite un singur fisier activ per sesiune de preluare; incarcarea altuia inlocuieste lista curenta, cu confirmare daca exista selectii netrimise.
-- Nu se introduce un tip nou de miscare de stoc: diferentele folosesc mecanismul existent (Intrare pentru plus, Iesire cu `ExitDestination.StockCorrection` pentru minus).
-
-Toate deciziile de mai sus au fost confirmate de utilizator; taskul este pregatit pentru implementare.
-
-## Task 2 - Combobox cu autocompletare pentru beneficiar si proiect la iesire, cu adaugare fara pierderea formularului
+## Task 1 - Combobox cu autocompletare pentru beneficiar si proiect la iesire, cu adaugare fara pierderea formularului
 
 Inlocuieste, in formularul de iesire (`Components/Shared/ExitDestinationPicker.razor`), campul de cautare text si dropdown-ul separat pentru beneficiar cu un singur control de tip combobox (camp de text + lista derulanta) care restrange optiunile pe masura ce utilizatorul tasteaza; foloseste acelasi mecanism si pentru selectarea proiectului beneficiarului ales. Adauga langa fiecare combobox un buton "Adauga beneficiar" / "Adauga proiect" care deschide pagina de adaugare corespunzatoare fara sa piarda datele introduse in formularul de iesire; dupa salvarea cu succes a beneficiarului/proiectului nou, aplicatia revine in formularul de iesire care a initiat cererea, cu campurile anterioare pastrate si cu beneficiarul/proiectul nou selectat.
 
-### Subtask 2.1 - Componenta combobox cu autocompletare
+### Subtask 1.1 - Componenta combobox cu autocompletare
 
 - [ ] Creeaza o componenta comuna reutilizabila (de exemplu `Components/Shared/SearchableSelect.razor`) care combina campul de cautare si lista de optiuni intr-un singur control accesibil (tastatura, cititor de ecran), cu restrangerea optiunilor pe masura tastarii (ca filtrul actual din `ExitDestinationPicker.razor`, dar intr-un singur control, nu doua separate).
 - [ ] Inlocuieste in `ExitDestinationPicker.razor` campul `input type="search"` si `select`-ul pentru beneficiar cu noua componenta.
 - [ ] Foloseste aceeasi componenta si pentru selectarea proiectului (`select`-ul de proiect), pastrand comportamentul actual (proiectul se goleste la schimbarea beneficiarului, lista de proiecte vine din beneficiarul ales).
 - [ ] Pastreaza validarile si mesajele actuale (proiect obligatoriu daca optiunea e bifata etc.), fara sa schimbe contractul `StockMovementInput`.
 
-### Subtask 2.2 - Buton "Adauga beneficiar" fara pierderea formularului
+### Subtask 1.2 - Buton "Adauga beneficiar" fara pierderea formularului
 
 - [ ] Adauga langa combobox-ul de beneficiar un buton "Adauga beneficiar" care deschide pagina de adaugare beneficiar, vizibil numai cand destinatia iesirii este Beneficiar.
 - [ ] Inainte de navigare, pastreaza starea completa a formularului de iesire (produs, tip miscare, data, cantitate, descriere, destinatie, sursa, beneficiar/proiect partial completate) intr-un mecanism care supravietuieste navigarii (de exemplu un serviciu scoped similar cu `ListNavigationContext`/`UnsavedChanges`, sau stocare in `sessionStorage` prin interop, cu o cheie legata de produs si de sesiune).
@@ -109,13 +35,13 @@ Inlocuieste, in formularul de iesire (`Components/Shared/ExitDestinationPicker.r
 - [ ] Anularea adaugarii beneficiarului (fara salvare) revine de asemenea in formularul de iesire, cu valorile pastrate nemodificate.
 - [ ] Daca formularul de iesire nu mai poate fi restaurat (de exemplu produsul a fost sters intre timp), utilizatorul primeste un mesaj clar si este dus in pagina produsului sau a catalogului, fara eroare nespecificata.
 
-### Subtask 2.3 - Acelasi mecanism pentru proiect
+### Subtask 1.3 - Acelasi mecanism pentru proiect
 
 - [ ] Adauga langa combobox-ul de proiect un buton "Adauga proiect", vizibil numai cand un beneficiar este ales si optiunea proiect este activa.
-- [ ] Butonul deschide pagina de adaugare proiect a beneficiarului ales, cu aceeasi pastrare si restaurare a formularului de iesire ca la subtaskul 2.2.
+- [ ] Butonul deschide pagina de adaugare proiect a beneficiarului ales, cu aceeasi pastrare si restaurare a formularului de iesire ca la subtaskul 1.2.
 - [ ] Dupa salvarea cu succes a proiectului nou, formularul de iesire este restaurat cu beneficiarul deja ales si cu noul proiect selectat automat.
 
-### Subtask 2.4 - Verificari
+### Subtask 1.4 - Verificari
 
 - [ ] Teste automate pentru restrangerea optiunilor in combobox (cautare insensibila la majuscule si diacritice, ca filtrul actual).
 - [ ] Teste automate pentru pastrarea si restaurarea starii formularului de iesire in jurul navigarii catre adaugare beneficiar/proiect si inapoi (valori identice inainte si dupa, inclusiv cand adaugarea e anulata).
@@ -1128,3 +1054,20 @@ Implementat la 28 septembrie 2026 de Claude. `Components/Pages/Inventory.razor` 
 - [x] Teste automate (`BlazorStoc.Checks`, 559 trecute, 36 noi): logica selectiei (propagare, `indeterminate`, "toate", categorie fara subcategorii), construirea situatiei (doar selectia facuta, eliminarea stocului 0, omiterea sectiunilor goale, ordinea, stocul din `WarehouseStock` cu excluderea vehiculelor, selectie invalida sau goala respinsa), generarea PDF-ului (semnatura `%PDF`, text extras printr-un extractor de test propriu care decodeaza CMap-ul `ToUnicode` al fontului incorporat, cod cu diacritice, fontul bold 14/normal 12, randul negativ rosu, 300 de produse pe mai multe pagini cu antet repetat, subsolul "Pagina x din y") si jurnalizarea (un singur eveniment, fara date de produse).
 - [x] Verificat in browser (mod demonstrativ, cont administrator.demo): meniul extins cu cele doua intrari, selectarea unei categorii intregi si `indeterminate` pe "Selecteaza toate categoriile", generarea si descarcarea PDF-ului (deschis si confirmat cu bordurile complete ale celulelor), evenimentul din Jurnal cu rezumatul corect, pagina de rezerva "Preluare inventar"; la 375 si 768 px fara depasire orizontala a paginii.
 - Neverificat: deschiderea fisierului PDF in alte cititoare decat cel folosit la verificare si tiparirea fizica; MariaDB pe un server real (`GetQuantitiesInVehiclesAsync` in modul MariaDB, deja acoperit generic de taskurile anterioare); ecran tactil.
+
+## Finalizat la 28.09.2026 12:12 - Preluare inventar (OCR pe formularul de service scanat)
+
+**Data si ora implementarii:** 28.09.2026 12:12 (ora locala).
+
+Implementat la 28 septembrie 2026 de Claude. `Components/Pages/InventoryPickup.razor` (rescrisa), `Services/InventoryPickupOcr.cs` (nou), `Services/InventoryPickup.cs` (nou), `Services/InventoryPdfLayout.cs` (nou, geometrie de coloane extrasa din `InventoryPdfWriter.cs` si refolosita, fara sa schimbe PDF-ul generat), `Program.cs`, `BlazorStoc.csproj`, `wwwroot/app.css`, `Assets/Models/mnist-12.onnx` si `Assets/Models/LICENSE-onnx-models.txt` (noi, incorporate ca resursa), `Assets/Tessdata/eng.traineddata` si `Assets/Tessdata/LICENSE.txt` (noi, continut copiat la output), `tests/BlazorStoc.Checks/Program.cs`, `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`, `tests/BlazorStoc.Checks/Fixtures/inventar-proba.pdf` (nou, scanare reala furnizata de utilizator, folosita numai in teste).
+
+- [x] Pagina `/inventar/preluare` are butonul "Preia inventar" (incarcare fisier PDF), acceptand exclusiv formatul generat de aplicatie la `/inventar`, maximum 20 MB si 50 de pagini; incarcarea unui nou fisier cand exista selectii nebifate netrimise cere confirmare explicita (popup dedicat) inainte sa inlocuiasca lista.
+- [x] OCR local, fara Docker si fara serviciu extern: rasterizare PDF -> imagine cu **PDFtoImage** (PDFium+SkiaSharp) la 300 dpi; gasirea liniilor orizontale ale tabelului prin densitatea de cerneala pe fiecare rand de pixeli, apoi recalibrarea coloanelor (`InventoryPickupOcrService.CalibrateColumns`) fata de marginile efectiv gasite in scanare, nu doar fata de geometria PDF-ului (un scan real "aluneca" fata de coordonatele exacte - confirmat pe formularul de proba, unde tiparirea a redus latimea utila cu cca. 4%); "Cod produs" citit cu **Tesseract** (motor nou per celula: motorul refolosit intre celule a produs text corupt la testare); "Valoare reala" segmentata pe cifre cu **OpenCvSharp** (componente conexe) si fiecare cifra clasificata cu modelul **MNIST din ONNX Model Zoo** (licenta MIT) prin **ONNX Runtime**.
+- [x] Randurile necompletate ("neinventariate") nu genereaza nicio modificare si nu apar in lista; randurile pe care OCR nu le-a putut citi cu certitudine (cifre nesegmentate) apar totusi in lista principala, marcate "de verificat", cu valoarea editabila - niciun rand cu cerneala prezenta nu este eliminat tacut.
+- [x] Lista de diferente e grupata pe categorie/subcategorie (potrivire cu catalogul exacta, apoi aproximativa prin distanta Levenshtein pentru o mica greseala OCR, fara ambiguitate), cu checkbox NEbifat implicit pentru toate produsele; produsele cu codul citit negasit in catalog apar separat, informativ, fara checkbox; produsele cu valoarea reala identica stocului curent nu genereaza rand (exceptie: randurile nesigure raman vizibile oricum).
+- [x] Butonul "Trimite modificari in stoc" (activ doar cu o selectie) deschide un popup cu modificarile (cod produs, modificare stoc) grupate pe categorie/subcategorie; confirmarea aplica fiecare diferenta ca miscare de stoc obisnuita, fara tip nou - Intrare pentru surplus, Iesire cu `ExitDestination.StockCorrection` existent pentru lipsa - jurnalizata automat de acelasi mecanism de audit ca restul miscarilor (fara cod de jurnalizare nou). O eroare la o linie nu opreste aplicarea celorlalte; rezultatul arata explicit reusitele si esecurile.
+- [x] Teste automate (`BlazorStoc.Checks`, 578 trecute, 19 noi): 9 ruleaza pipeline-ul OCR real pe o scanare autentica furnizata de utilizator (formular tiparit, completat de mana, scanat cu un Kyocera SKM_C3320i, pastrat ca fixture) si verifica valorile citite corect si ca niciun rand nu e eliminat tacut la incertitudine; restul testeaza potrivirea cu catalogul, excluderea randurilor fara diferenta si aplicarea miscarilor (surplus/lipsa, esec partial raportat), cu repository-uri false, independent de OCR.
+- [x] Verificat in browser (preview separat pe portul 5083, acelasi cont si aceeasi baza SQLite ca preview-ul principal): incarcarea fisierului real, lista grupata cu diferentele corecte, badge-ul "de verificat", corectarea unei valori gresite cu recalcularea instanta a diferentei, selectarea a doua produse, popup-ul de confirmare cu gruparea corecta, aplicarea ("2 produse au fost actualizate in stoc", randurile aplicate disparute din lista), evenimentele din Jurnal generate automat cu descrierea si destinatia asteptate, iar stocul din depozit al produsului actualizat corect pe pagina lui. Verificat si la 768 px, fara derulare orizontala a paginii.
+- Decizie de proiectare: geometria coloanelor tabelului (`InventoryPdfLayout.ComputeColumns`) a fost extrasa din `InventoryPdfWriter` si refolosita de OCR, ca sa nu poata diverge intre desenare si citire; PDF-ul generat ramane byte-identic (testele existente pentru situatia de inventar au trecut nemodificate).
+- Limitare cunoscuta: modelul MNIST preinstruit, generic, poate confunda o cifra scrisa intr-un stil neobisnuit (de exemplu un "8" scris intr-o singura bucla) cu alta cifra, uneori cu incredere falsa (fara sa semnaleze randul nesigur) - confirmat pe formularul de proba. Corectia manuala a valorii, inainte de bifare, ramane singura plasa de siguranta; recalibrarea/reantrenarea modelului pe mostre reale este o imbunatatire ulterioara neblocanta, detaliata in `docs/TESTE_RAMASE.md` (grupa H).
+- Neverificat: incarcarea fisierului prin automatizarea browserului (fereastra nativa de selectare, motiv M3 - a facut-o utilizatorul); alte scanere/rezolutii decat cel folosit la proba; MariaDB pe un server real; alte browsere si ecran tactil pentru incarcare; suportul Linux al `OpenCvSharp4`/`Tesseract` pentru o eventuala instalare NAS (in afara fazei curente). Detalii in `docs/TESTE_RAMASE.md` (grupa H).

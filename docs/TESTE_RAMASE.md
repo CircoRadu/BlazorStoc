@@ -258,6 +258,25 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 ### G2. Tiparirea fizica a situatiei de inventar
 - **Pasi**: tipareste situatia de inventar generata (o pagina si un caz cu mai multe pagini) pe o imprimanta fizica, format A4.
 - **Asteptat**: paginarea, antetul repetat pe pagini si spatiul din coloana "Valoare reala" raman utilizabile pe hartie, la marimea reala.
+- **Partial confirmat 28.09.2026**: utilizatorul a tiparit, completat de mana si scanat o situatie de inventar reala (o pagina, scaner Kyocera SKM_C3320i); vezi H1-H2 mai jos si "Teste efectuate". Neverificat: un caz cu mai multe pagini pe hartie fizica.
+
+## H. Preluare inventar - variabilitatea scanarii si a scrisului de mana (motiv: M4, M6, M7)
+
+### H1. Alte scanere si rezolutii decat cea de proba
+- **Pasi**: scaneaza aceeasi situatie de inventar completata cu alt scaner/multifunctionala, la alta rezolutie (de exemplu 150 sau 600 dpi) sau cu usoara inclinare a colii.
+- **Asteptat**: recalibrarea coloanelor per pagina (`InventoryPickupOcrService.CalibrateColumns`) gaseste corect marginile tabelului si dividerii; randurile care nu pot fi calibrate sunt semnalate, nu produc valori gresite tacute.
+
+### H2. Acuratetea modelului de cifre pe un esantion mai mare de scris de mana
+- **Pasi**: aduna mai multe formulare reale completate de utilizatori diferiti si compara valorile recunoscute cu cele scrise.
+- **Asteptat/cunoscut**: modelul MNIST preinstruit (generic, neantrenat pe formularele acestei aplicatii) poate confunda ocazional cifre stilizate cu incredere mare (fals pozitiv), nu doar cu incertitudine semnalata — confirmat pe formularul de proba (cifra "8" scrisa intr-o singura bucla, citita "5" cu `Uncertain=false`). Editarea valorii recunoscute inainte de bifare este singura plasa de siguranta curenta; recalibrarea/reantrenarea modelului pe mostre reale ramane o imbunatatire ulterioara neblocanta (`TODO.md`, Task 1).
+
+### H3. Alte browsere si dispozitive pentru incarcarea fisierului
+- **Pasi**: incarca un formular scanat din alt browser decat cel confirmat (motiv M4) si de pe un dispozitiv tactil (motiv M3).
+- **Asteptat**: `InputFile` si fluxul de incarcare functioneaza identic; fara verificare inca.
+
+### H4. Miscarile de stoc generate pe MariaDB
+- **Pasi**: aplica modificari de stoc prin "Preluare inventar" cu modul MariaDB activ (motiv M1).
+- **Asteptat**: `ExitDestination.StockCorrection` existent si o miscare de tip Intrare se salveaza identic ca in modul demonstrativ SQLite.
 
 ---
 
@@ -268,4 +287,5 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 | 25.09.2026 | Butonul roșu „Deconectare” din popup (Task 7) | utilizatorul | Trecut: duce la pagina de autentificare |
 | 25.09.2026 | Calendarul „Data mișcării” (citire, doar din calendar, fără date viitoare) | utilizatorul | Trecut în Chrome și Brave |
 | 25.09.2026 | Blocarea editării: banner, eliberare live, deblocare forțată cu jurnal, heartbeat, pierdere, expirare după închiderea tabului (SQLite, două sesiuni ale aceluiași cont) | agentul (Claude) | Trecut; detalii în `VALIDARE.md` |
+| 28.09.2026 | Preluare inventar: OCR pe un formular real (tiparit, completat de mana, scanat de utilizator cu un Kyocera SKM_C3320i) | agentul (Claude), pe fisierul furnizat de utilizator | Trecut partial: 8 din 9 produse cu valoare scrisa citite corect (cod si valoare), 1 produs ("Set chei combinate", lasat necompletat) tratat corect ca neinventariat; un produs ("Polizor unghiular") a fost citit cu o valoare gresita (cifra stilizata "8" confundata cu "5") fara sa fie semnalat nesigur — vezi H2. Randul ramane afisat, cu valoarea editabila. Detalii in `VALIDARE.md`. |
 | 25.09.2026 | Sincronizare: modificare SQL externă, dialog deschis cu notificare, catalog live în două tab-uri, client SignalR real | agentul (Claude) | Trecut; detalii în `VALIDARE.md` |

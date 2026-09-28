@@ -1087,3 +1087,34 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Nu s-a modificat cod, deci nu a fost necesar build sau rulare de teste. S-a verificat manual coerenta noii formulari in TODO.md (subtaskurile 1.2, 1.3, 1.5, Decizii confirmate, fara diacritice) si in docs/PROJECT_STATE.md.
 - **Commit:** `claude: corecteaza selectia implicita la Task 1 (preluare inventar OCR) - nebifat implicit, nesigure in lista principala`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-28T09:14:03.3523032Z â€” claude
+
+- **Task:** Implementeaza Task 1 (preluare inventar OCR): pipeline OCR (PDFtoImage, OpenCvSharp, ONNX Runtime, Tesseract), pagina Preluare inventar, aplicarea miscarilor de stoc
+- **Rezumat:** Implementat Task 1 (Preluare inventar OCR): pagina /inventar/preluare permite incarcarea PDF-ului situatiei de inventar tiparite si completate de mana, procesata prin OCR local (PDFtoImage pentru rasterizare, OpenCvSharp pentru segmentarea cifrelor scrise de mana, ONNX Runtime cu modelul MNIST pentru clasificarea lor, Tesseract pentru textul tiparit Cod produs). Servicii noi: InventoryPickupOcrService (scanare, recalibrare coloane per pagina fata de grid-ul scanat), InventoryPickupBuilder (potrivire cu catalogul, exacta si aproximativa, calcul diferente), InventoryPickupApplier (aplica fiecare diferenta ca miscare de stoc obisnuita - Intrare/Iesire cu ExitDestination.StockCorrection existent, fara tip nou). InventoryPdfWriter refactorizat minim: geometria coloanelor extrasa in InventoryPdfLayout, partajata cu OCR, fara sa schimbe PDF-ul generat (testele existente au trecut nemodificate). Pagina afiseaza lista de diferente grupata pe categorie/subcategorie, checkbox nebifat implicit, randurile nesigure vizibile si editabile (niciun rand cu cerneala nu e eliminat tacut), produse negasite separat, popup de confirmare cu gruparea ceruta. Verificat end-to-end (OCR, matching, UI, aplicare, jurnalizare automata) atat cu 19 teste automate noi (dintre care 9 ruleaza pipeline-ul real pe o scanare autentica furnizata de utilizator, pastrata ca fixture) cat si manual in browser pe un preview separat (portul 5083); un produs cu o cifra stilizata a fost citit gresit de model cu incredere falsa - limitare cunoscuta, documentata in docs/TESTE_RAMASE.md, acoperita de valoarea editabila. TODO.md: Task 1 mutat la Taskuri finalizate; fostul Task 2 (combobox beneficiar/proiect) a devenit Task 1, singurul activ.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `Assets/Models/LICENSE-onnx-models.txt`
+  - `Assets/Models/mnist-12.onnx`
+  - `Assets/Tessdata/eng.traineddata`
+  - `Assets/Tessdata/LICENSE.txt`
+  - `BlazorStoc.csproj`
+  - `Components/Pages/InventoryPickup.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `Program.cs`
+  - `README.md`
+  - `Services/InventoryPdfLayout.cs`
+  - `Services/InventoryPdfWriter.cs`
+  - `Services/InventoryPickup.cs`
+  - `Services/InventoryPickupOcr.cs`
+  - `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`
+  - `tests/BlazorStoc.Checks/Fixtures/inventar-proba.pdf`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+- **Validare:** dotnet build (Debug si Release) 0 avertismente/0 erori. tests/BlazorStoc.Checks: 578 verificari trecute (19 noi), inclusiv 9 care ruleaza pipeline-ul OCR real pe fixture-ul cu scanarea autentica (tests/BlazorStoc.Checks/Fixtures/inventar-proba.pdf) si verifica valorile citite si ca niciun rand incert nu e eliminat tacut, plus teste de potrivire/aplicare cu repository-uri false. Verificare manuala in browser (preview separat pe 5083, cont administrator.demo, aceeasi baza SQLite ca 5082): incarcarea fisierului real (facuta de utilizator, agentul nu poate automatiza fereastra nativa de selectare fisier), lista de diferente corecta si grupata, editarea unei valori gresite cu recalcularea instanta a diferentei, selectie, popup de confirmare, aplicare cu mesaj de succes, evenimente de jurnal automate corecte (Intrare/Iesire cu destinatia asteptata), stocul din depozit al produsului actualizat corect (verificat pe pagina produsului). Verificat si la 768 px. Neverificat: alte scanere/rezolutii, MariaDB real, alte browsere si ecran tactil pentru incarcare, suport Linux al OpenCvSharp/Tesseract - detaliat in docs/TESTE_RAMASE.md (grupa H).
+- **Commit:** `claude: preluare inventar OCR (Task 1) - PDFtoImage, OpenCvSharp, ONNX Runtime, Tesseract`
+- **Predat cÄƒtre:** claude

@@ -288,3 +288,7 @@
 .inventory-category-list table td:first-child, .inventory-category-list table th:first-child { width:1%; white-space:nowrap; }
 .inventory-category-list table td:first-child input { width:auto; margin:0; }
 .force-unlock-dialog:focus { outline:none; }
+.file-upload-label { cursor:pointer; }
+.uncertain-badge { display:inline-block; margin-left:8px; padding:2px 7px; border-radius:5px; background:#fbf4e6; color:#a78135; font-size:10px; font-weight:600; white-space:nowrap; }
+.pickup-value-input { width:90px; }
+.negative-stock { color:#b3675a; font-weight:650; }

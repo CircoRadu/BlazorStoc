@@ -16,7 +16,7 @@ public interface IInventoryPdfWriter
 // directly with XGraphics (see docs/PROJECT_STATE.md for the library decision).
 public sealed class InventoryPdfWriter : IInventoryPdfWriter
 {
-    private const string FamilyName = "PT Sans";
+    internal const string FamilyName = "PT Sans";
     private const double PageMargin = 40;
     private const double LineHeight = 16;
     private const double HeadingLineHeight = 20;
@@ -35,7 +35,7 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
     private static readonly XSolidBrush RedBrush = new(XColors.Red);
     private static readonly XPen RulePen = new(XColors.Black, 0.75);
 
-    private static bool EnsureFontResolver()
+    internal static bool EnsureFontResolver()
     {
         if (GlobalFontSettings.FontResolver is not InventoryFontResolver) GlobalFontSettings.FontResolver = new InventoryFontResolver();
         return true;
@@ -78,12 +78,15 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
         DrawLine($"Generat la: {generatedLocal.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)}", NormalFont, BlackBrush, LineHeight);
         y += SectionGap;
 
-        var stockColumnWidth = Math.Max(contentWidth * 0.18, gfx.MeasureString("-000000", NormalFont).Width + 16);
-        var realColumnWidth = Math.Max(contentWidth * 0.18, gfx.MeasureString("000000", NormalFont).Width + 16);
-        var codeColumnWidth = contentWidth - stockColumnWidth - realColumnWidth;
-        var codeX = PageMargin;
-        var stockX = PageMargin + codeColumnWidth;
-        var realX = stockX + stockColumnWidth;
+        // Column geometry is shared with the OCR pickup pipeline (InventoryPdfLayout), which re-crops a scanned
+        // copy of this exact PDF at the same positions; keep both in sync instead of duplicating the formula.
+        var columns = InventoryPdfLayout.ComputeColumns(page.Width.Point);
+        var codeColumnWidth = columns.CodeColumnWidth;
+        var stockColumnWidth = columns.StockColumnWidth;
+        var realColumnWidth = columns.RealColumnWidth;
+        var codeX = columns.CodeX;
+        var stockX = columns.StockX;
+        var realX = columns.RealX;
 
         // Every cell has all four sides drawn (not just a header rule), so the printed sheet is easy to follow while
         // counting by hand: vertical dividers between the three columns, plus the row's top and bottom edges.

@@ -1,9 +1,327 @@
 @page "/inventar/preluare"
 @attribute [Authorize]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Globalization
+@inject IInventoryPickupOcrService OcrService
+@inject IInventoryPickupBuilder PickupBuilder
+@inject IInventoryPickupApplier PickupApplier
+@inject IAccessControl Access
+@inject ILogger<InventoryPickup> Logger
+@implements IAsyncDisposable
 
 <PageTitle>Preluare inventar · BlazorStoc</PageTitle>
 <div class="page-heading">
-    <div><p class="eyebrow">SITUAȚIE DE STOC</p><h1>Preluare inventar</h1><p class="muted">Această funcționalitate va fi implementată ulterior.</p></div>
+    <div><p class="eyebrow">SITUAȚIE DE STOC</p><h1>Preluare inventar</h1>
+        <p class="muted">Încarcă formularul de service scanat, cu valorile reale completate de mână, pentru a compara stocul numărat fizic cu stocul curent.</p></div>
+    <div class="heading-actions">
+        <label class="primary file-upload-label" for="pickup-file-input">@(scanning ? "Se proceseaza…" : "Preia inventar")</label>
+        <InputFile id="pickup-file-input" class="sr-only" OnChange="FileSelectedAsync" accept=".pdf" disabled="@scanning" />
+    </div>
 </div>
-<div class="empty-state"><h3>Preluarea inventarului nu este încă disponibilă</h3><p>Pagina va permite introducerea cantităților numărate fizic, pe baza situației de inventar generate.</p></div>
+
+@if (loadError is not null) { <div class="error-banner" role="alert">@loadError</div> }
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se verifică drepturile de acces</h3></div>
+}
+else if (scanning)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se citește fișierul…</h3><p>OCR-ul poate dura câteva secunde pentru un formular cu multe pagini.</p></div>
+}
+else if (loadError is null && review is null)
+{
+    <div class="empty-state"><h3>Niciun formular încărcat</h3><p>Apasă „Preia inventar” și alege fișierul PDF cu formularul de service scanat.</p></div>
+}
+else if (review is not null)
+{
+    @if (review.Lines.Count == 0 && review.NotFound.Count == 0)
+    {
+        <div class="empty-state"><h3>Nicio diferență de stoc</h3><p>Toate valorile reale citite corespund stocului curent.</p></div>
+    }
+    else
+    {
+        <section class="catalog inventory-options">
+            <label class="check-label">
+                <input type="checkbox" checked="@AllSelected" @onchange="ToggleAllAsync" />
+                Selectează toate produsele
+            </label>
+            <div class="heading-actions">
+                <button class="primary" disabled="@(!HasSelection || sending)" @onclick="OpenSendPopup">Trimite modificări în stoc</button>
+            </div>
+        </section>
+
+        <div class="category-management-list inventory-category-list">
+            @foreach (var category in GroupedLines.Select(group => group.Category).Distinct(StringComparer.OrdinalIgnoreCase)
+                          .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase))
+            {
+                <section class="catalog inventory-category-card">
+                    <div class="catalog-heading"><span class="category-title">@category</span></div>
+                    @foreach (var group in GroupedLines.Where(entry => string.Equals(entry.Category, category, StringComparison.OrdinalIgnoreCase))
+                                  .OrderBy(entry => entry.Subcategory, StringComparer.CurrentCultureIgnoreCase))
+                    {
+                        <div class="category-management-content">
+                            <h4>@group.Subcategory</h4>
+                            <div class="table-scroll">
+                                <table>
+                                    <thead><tr>
+                                        <th><span class="sr-only">Selectează</span></th>
+                                        <th>COD PRODUS</th><th>STOC CURENT</th><th>VALOARE REALĂ</th><th>DIFERENȚĂ</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        @foreach (var line in group.Lines)
+                                        {
+                                            <tr @key="line.ProductId">
+                                                <td><input type="checkbox" aria-label="@($"Selectează {line.ProductName}")"
+                                                           checked="@IsSelected(line)" @onchange="e => ToggleLine(line, (bool)(e.Value ?? false))" /></td>
+                                                <td>
+                                                    @line.ProductName
+                                                    @if (line.Uncertain) { <span class="uncertain-badge" title="Citire OCR nesigura - verifica valoarea">⚠ de verificat</span> }
+                                                </td>
+                                                <td>@line.CurrentStock</td>
+                                                <td>
+                                                    <input type="number" class="pickup-value-input" aria-label="@($"Valoare reala pentru {line.ProductName}")"
+                                                           value="@EditedValue(line)" @onchange="e => SetEditedValue(line, e.Value?.ToString())" />
+                                                </td>
+                                                <td class="@(DifferenceClass(line))">@DifferenceLabel(line)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                </section>
+            }
+        </div>
+
+        @if (review.NotFound.Count > 0)
+        {
+            <section class="catalog inventory-category-card">
+                <div class="catalog-heading"><span class="category-title">Produse negăsite în catalog</span></div>
+                <div class="category-management-content">
+                    <p class="muted">Codul citit din formular nu corespunde niciunui produs curent din catalog (produs șters sau redenumit între generarea situației și preluare). Nu se trimite nicio modificare pentru acestea.</p>
+                    <div class="table-scroll">
+                        <table>
+                            <thead><tr><th>COD CITIT</th><th>VALOARE REALĂ CITITĂ</th></tr></thead>
+                            <tbody>
+                                @foreach (var line in review.NotFound)
+                                {
+                                    <tr><td>@line.RawCode</td><td>@(line.RecognizedValue?.ToString() ?? "—")</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        }
+    }
+}
+
+@if (showSendPopup)
+{
+    <div class="delete-overlay" @onkeydown="PopupKeyDownAsync">
+        <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="popupDialog" aria-labelledby="pickup-popup-title">
+            <h2 id="pickup-popup-title">Confirmă modificările de stoc</h2>
+            <p>Următoarele modificări vor fi operate în stoc:</p>
+            <div class="table-scroll">
+                <table class="save-summary">
+                    <caption class="sr-only">Modificări de stoc</caption>
+                    <thead><tr><th>Categorie / subcategorie</th><th>Cod produs</th><th>Modificare stoc</th></tr></thead>
+                    <tbody>
+                        @foreach (var group in SelectedGroupedForPopup)
+                        {
+                            @foreach (var line in group.Lines)
+                            {
+                                <tr>
+                                    <td>@group.Category / @group.Subcategory</td>
+                                    <td>@line.ProductName</td>
+                                    <td class="@(DifferenceClass(line))">@DifferenceLabel(line)</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (sendError is not null) { <div class="validation-message" role="alert">@sendError</div> }
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@sending" @onclick="ConfirmSendAsync">@(sending ? "Se trimite…" : "Confirmă")</button>
+                <button type="button" class="danger" disabled="@sending" @onclick="CloseSendPopup">Anulează</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (pendingFile is not null)
+{
+    <div class="delete-overlay" @onkeydown="ReplaceKeyDownAsync">
+        <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="replaceDialog" aria-labelledby="pickup-replace-title">
+            <h2 id="pickup-replace-title">Înlocuiești lista curentă?</h2>
+            <p>Ai produse bifate care nu au fost trimise. Încărcarea noului fișier șterge selecția curentă fără să modifice stocul.</p>
+            <div class="editor-actions">
+                <button type="button" class="primary" @onclick="ConfirmReplaceAsync">Continuă</button>
+                <button type="button" class="danger" @onclick="CancelReplace">Anulează</button>
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private bool loading = true, scanning, sending;
+    private string? loadError, error, notice, sendError;
+    private InventoryPickupReview? review;
+    private readonly HashSet<int> selectedProductIds = [];
+    private readonly Dictionary<int, int?> editedValues = [];
+    private bool showSendPopup;
+    private ElementReference popupDialog, replaceDialog;
+    private IBrowserFile? pendingFile;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private sealed record LineGroup(string Category, string Subcategory, IReadOnlyList<InventoryPickupLine> Lines);
+
+    private IEnumerable<LineGroup> GroupedLines => (review?.Lines ?? Array.Empty<InventoryPickupLine>())
+        .GroupBy(line => (line.Category ?? "", line.Subcategory ?? ""))
+        .Select(group => new LineGroup(group.Key.Item1, group.Key.Item2, group.ToList()));
+
+    private IEnumerable<LineGroup> SelectedGroupedForPopup => GroupedLines
+        .Select(group => new LineGroup(group.Category, group.Subcategory, group.Lines.Where(IsSelected).ToList()))
+        .Where(group => group.Lines.Count > 0)
+        .OrderBy(group => group.Category, StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase);
+
+    private bool HasSelection => selectedProductIds.Count > 0;
+    private bool AllSelected => review is not null && review.Lines.Count > 0 && review.Lines.All(IsSelected);
+    private bool IsSelected(InventoryPickupLine line) => line.ProductId is int id && selectedProductIds.Contains(id);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Access.CanManageProductsAsync(lifetime.Token)) { loadError = "Nu ai dreptul să preiei inventarul."; loading = false; return; }
+        loading = false;
+    }
+
+    private int? EditedValue(InventoryPickupLine line) =>
+        line.ProductId is int id && editedValues.TryGetValue(id, out var value) ? value : line.RecognizedValue;
+
+    private void SetEditedValue(InventoryPickupLine line, string? text)
+    {
+        if (line.ProductId is not int id) return;
+        editedValues[id] = int.TryParse(text, out var value) ? value : null;
+    }
+
+    private int? Difference(InventoryPickupLine line) =>
+        line.CurrentStock is int stock && EditedValue(line) is int value ? value - stock : null;
+
+    private string DifferenceLabel(InventoryPickupLine line)
+    {
+        var difference = Difference(line);
+        if (difference is not int value) return "—";
+        return value > 0 ? $"+{value}" : value.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private string DifferenceClass(InventoryPickupLine line) => Difference(line) switch
+    {
+        null => "",
+        < 0 => "negative-stock",
+        _ => ""
+    };
+
+    private Task ToggleAllAsync(ChangeEventArgs e)
+    {
+        var value = e.Value is true;
+        selectedProductIds.Clear();
+        if (value && review is not null)
+            foreach (var line in review.Lines)
+                if (line.ProductId is int id) selectedProductIds.Add(id);
+        return Task.CompletedTask;
+    }
+
+    private void ToggleLine(InventoryPickupLine line, bool value)
+    {
+        if (line.ProductId is not int id) return;
+        if (value) selectedProductIds.Add(id); else selectedProductIds.Remove(id);
+    }
+
+    private async Task FileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        if (HasSelection) { pendingFile = e.File; return; }
+        await ProcessFileAsync(e.File);
+    }
+
+    private Task ConfirmReplaceAsync()
+    {
+        var file = pendingFile!;
+        pendingFile = null;
+        return ProcessFileAsync(file);
+    }
+
+    private void CancelReplace() => pendingFile = null;
+    private Task ReplaceKeyDownAsync(KeyboardEventArgs e) { if (e.Key == "Escape") CancelReplace(); return Task.CompletedTask; }
+
+    private async Task ProcessFileAsync(IBrowserFile file)
+    {
+        error = null; notice = null; review = null;
+        selectedProductIds.Clear();
+        editedValues.Clear();
+        if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) { error = InventoryPickupOcrRules.NotAPdfMessage; return; }
+        if (file.Size > InventoryPickupOcrRules.MaxFileSizeBytes) { error = InventoryPickupOcrRules.TooLargeMessage; return; }
+
+        scanning = true;
+        try
+        {
+            await using var stream = file.OpenReadStream(InventoryPickupOcrRules.MaxFileSizeBytes, lifetime.Token);
+            var scanResult = await OcrService.ScanAsync(stream, lifetime.Token);
+            review = await PickupBuilder.BuildAsync(scanResult.Rows, lifetime.Token);
+            if (review.Lines.Count == 0 && review.NotFound.Count == 0) notice = "Fișierul a fost citit. Nu au fost gasite diferente de stoc.";
+        }
+        catch (InventoryPickupOcrException exception) { error = exception.Message; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Inventory pickup scan failed ({ErrorType}).", exception.GetType().Name);
+            error = InventoryPickupOcrRules.UnreadableMessage;
+        }
+        finally { scanning = false; }
+    }
+
+    private void OpenSendPopup()
+    {
+        if (!HasSelection) { error = InventoryPickupRules.NoSelectionMessage; return; }
+        sendError = null;
+        showSendPopup = true;
+    }
+
+    private void CloseSendPopup() => showSendPopup = false;
+    private Task PopupKeyDownAsync(KeyboardEventArgs e) { if (e.Key == "Escape" && !sending) CloseSendPopup(); return Task.CompletedTask; }
+
+    private async Task ConfirmSendAsync()
+    {
+        if (sending || review is null) return;
+        sending = true;
+        sendError = null;
+        try
+        {
+            var selectedLines = review.Lines.Where(IsSelected)
+                .Select(line => line with { RecognizedValue = EditedValue(line) }).ToList();
+            var result = await PickupApplier.ApplyAsync(selectedLines, lifetime.Token);
+            showSendPopup = false;
+            selectedProductIds.Clear();
+            review = review with { Lines = review.Lines.Where(line => !result.Applied.Any(applied => applied.ProductId == line.ProductId)).ToList() };
+            notice = result.Failed.Count == 0
+                ? $"{result.Applied.Count} {(result.Applied.Count == 1 ? "produs a fost actualizat" : "produse au fost actualizate")} în stoc."
+                : $"{InventoryPickupRules.PartialFailureMessage} Reușite: {result.Applied.Count}. Eșuate: {string.Join(", ", result.Failed.Select(failed => failed.ProductName))}.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Inventory pickup apply failed ({ErrorType}).", exception.GetType().Name);
+            sendError = "Modificările nu au putut fi trimise.";
+        }
+        finally { sending = false; }
+    }
+
+    public ValueTask DisposeAsync() { lifetime.Cancel(); lifetime.Dispose(); return ValueTask.CompletedTask; }
+}

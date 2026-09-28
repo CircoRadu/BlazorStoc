@@ -76,6 +76,10 @@ builder.Services.AddScoped<IBeneficiaryRepository>(services => demo
     : new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddScoped<IInventoryReportBuilder, InventoryReportBuilder>();
 builder.Services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();
+builder.Services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
+builder.Services.AddSingleton<IInventoryPickupOcrService, InventoryPickupOcrService>();
+builder.Services.AddScoped<IInventoryPickupBuilder, InventoryPickupBuilder>();
+builder.Services.AddScoped<IInventoryPickupApplier, InventoryPickupApplier>();
 builder.Services.AddScoped<IVehicleRepository>(services => demo
     ? new SqliteVehicleRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
     : new MariaVehicleRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));

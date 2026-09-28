@@ -11,6 +11,11 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.9" />
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="PDFsharp" Version="6.2.1" />
+    <PackageReference Include="PDFtoImage" Version="5.4.0" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,5 +28,14 @@
     <None Remove="Assets/Fonts/**" />
     <EmbeddedResource Include="Assets/Fonts/PTSans-Regular.ttf" />
     <EmbeddedResource Include="Assets/Fonts/PTSans-Bold.ttf" />
+    <Content Remove="Assets/Models/**" />
+    <None Remove="Assets/Models/**" />
+    <EmbeddedResource Include="Assets/Models/mnist-12.onnx" />
+    <Content Remove="Assets/Tessdata/**" />
+    <None Remove="Assets/Tessdata/**" />
+    <Content Include="Assets/Tessdata/eng.traineddata">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 </Project>

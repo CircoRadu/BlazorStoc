@@ -2933,6 +2933,89 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
     Check(offenders.Count == 0, "Message literals shown to users contain no English words" + (offenders.Count == 0 ? "" : ": " + string.Join(" | ", offenders.Take(5))));
 }
 
+// Task 1 (preluare inventar OCR): the pipeline is exercised against a real scan the user provided of the
+// situatia de inventar PDF, printed, filled in by hand and scanned back (tests/BlazorStoc.Checks/Fixtures).
+InventoryPickupScanResult pickupScan;
+{
+    var projectRoot = AppContext.BaseDirectory;
+    while (projectRoot is not null && !File.Exists(Path.Combine(projectRoot, "BlazorStoc.csproj"))) projectRoot = Path.GetDirectoryName(projectRoot.TrimEnd(Path.DirectorySeparatorChar));
+    Check(projectRoot is not null, "The project folder was found for the inventory pickup fixture");
+    var tessdataEnv = new TestWebHostEnvironment(projectRoot!);
+    using var ocrService = new InventoryPickupOcrService(new TessdataPath(tessdataEnv));
+    await using var fixtureStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "inventar-proba.pdf"));
+    pickupScan = await ocrService.ScanAsync(fixtureStream);
+
+    (string Code, int Value) Row(string code) => pickupScan.Rows
+        .Where(row => TextNormalization.SameUniqueValue(row.RawCode, code))
+        .Select(row => (row.RawCode, row.RecognizedValue ?? -1)).First();
+    Check(pickupScan.PageCount == 1, "The sample scan has a single page");
+    Check(Row("Surub autoforant 4,8 x 25 test").Value == 105, "OCR reads the handwritten value for a fully separated 3-digit number");
+    Check(Row("Casca de protectie alba XXL").Value == 24, "OCR reads a 2-digit handwritten value from a table further down the page");
+    Check(Row("Manusi de lucru").Value == 54, "OCR reads a 2-digit handwritten value after recalibrating the column geometry per page");
+    Check(Row("Nivela cu bula 60 cm").Value == 6, "OCR reads a single handwritten digit");
+    Check(Row("Ciocan rotopercutor SDS Plus").Value == 0, "OCR reads a handwritten zero");
+    Check(pickupScan.Rows.Any(row => TextNormalization.SameUniqueValue(row.RawCode, "Set chei combinate")) is false ||
+          pickupScan.Rows.First(row => TextNormalization.SameUniqueValue(row.RawCode, "Set chei combinate")).RecognizedValue is null,
+        "A row left blank on the form never gets a fabricated value");
+    var diblu = pickupScan.Rows.First(row => TextNormalization.SameUniqueValue(row.RawCode, "Diblu nylon 8 x 40 test 22"));
+    Check(diblu.RecognizedValue == 123, "OCR reads a 3-digit value written with tighter spacing than the other rows");
+    // Known residual limitation (documented in docs/TESTE_RAMASE.md): the embedded generic MNIST classifier
+    // sometimes confidently misreads a stylized handwritten digit (this scan's cursive "8") as a different one.
+    // The row must still surface for the user to see and correct, which is what this checks.
+    Check(pickupScan.Rows.Any(row => TextNormalization.SameUniqueValue(row.RawCode, "Polizor unghiular")),
+        "A row is never silently dropped just because the digit classifier read it with (mistaken) confidence");
+}
+
+// Domain logic (matching, diffing, applying) is tested against fake repositories, independent of the real OCR
+// pipeline above, so these checks stay meaningful even if the sample scan or the embedded model ever change.
+{
+    IReadOnlyList<Product> catalog =
+    [
+        new(1, "Consumabile", "Fixare", "Surub autoforant 4,8 x 25 test", "", 96),
+        new(2, "Scule de mana", "Strangere", "Set chei combinate", "", 7),
+        new(3, "Masurare", "Nivelare", "Nivela cu bula 60 cm", "", 5),
+    ];
+    IReadOnlyDictionary<int, int> noVehicleStock = new Dictionary<int, int>();
+    var builder = new InventoryPickupBuilder(new FakeInventoryProductRepository(catalog, []), new FakeInventoryPickupMovementRepository(noVehicleStock));
+
+    var exactMatch = await builder.BuildAsync([new InventoryPickupScanRow(1, "Surub autoforant 4,8 x 25 test", 105, false)]);
+    Check(exactMatch.Lines.Single().ProductId == 1 && exactMatch.Lines.Single().Difference == 9,
+        "An exact name match computes the difference against the current warehouse stock");
+
+    var noDifference = await builder.BuildAsync([new InventoryPickupScanRow(1, "Nivela cu bula 60 cm", 5, false)]);
+    Check(noDifference.Lines.Count == 0, "A recognized value equal to the current stock produces no line to act on");
+
+    var uncertainNoDifference = await builder.BuildAsync([new InventoryPickupScanRow(1, "Nivela cu bula 60 cm", 5, true)]);
+    Check(uncertainNoDifference.Lines.Count == 1, "An uncertain row is shown for review even when its (possibly wrong) value matches the current stock");
+
+    var fuzzyMatch = await builder.BuildAsync([new InventoryPickupScanRow(1, "Suruh autoforant 4,8 x 25 test", 100, false)]);
+    Check(fuzzyMatch.Lines.SingleOrDefault()?.ProductId == 1, "A one-character OCR misread still matches its product by a close, unambiguous name");
+
+    var notFound = await builder.BuildAsync([new InventoryPickupScanRow(1, "Produs care nu exista", 3, false)]);
+    Check(notFound.Lines.Count == 0 && notFound.NotFound.Single().RawCode == "Produs care nu exista",
+        "A code with no close match in the catalogue is reported separately, not silently matched to something else");
+
+    var pickupRepository = new FakeInventoryPickupMovementRepository(noVehicleStock);
+    var applier = new InventoryPickupApplier(pickupRepository, NullLogger<InventoryPickupApplier>.Instance);
+    var toApply = new[]
+    {
+        new InventoryPickupLine(1, "Surub autoforant 4,8 x 25 test", "Surub autoforant 4,8 x 25 test", "Consumabile", "Fixare", 96, 105, false),
+        new InventoryPickupLine(2, "Set chei combinate", "Set chei combinate", "Scule de mana", "Strangere", 7, 2, false),
+    };
+    var applyResult = await applier.ApplyAsync(toApply);
+    Check(applyResult.Applied.Count == 2 && applyResult.Failed.Count == 0, "Every selected line with a difference is applied");
+    Check(pickupRepository.Created[0].Input.Kind == StockMovementKind.Entry && pickupRepository.Created[0].Input.Quantity == 9,
+        "A surplus (real value above current stock) is recorded as an Entry");
+    Check(pickupRepository.Created[1].Input.Kind == StockMovementKind.Exit && pickupRepository.Created[1].Input.Destination == ExitDestination.StockCorrection
+          && pickupRepository.Created[1].Input.Quantity == 5, "A shortfall is recorded as an Exit with the existing StockCorrection destination, not a new movement type");
+
+    var failingRepository = new FakeInventoryPickupMovementRepository(noVehicleStock, failProductIds: new HashSet<int> { 2 });
+    var partialApplier = new InventoryPickupApplier(failingRepository, NullLogger<InventoryPickupApplier>.Instance);
+    var partialResult = await partialApplier.ApplyAsync(toApply);
+    Check(partialResult.Applied.Count == 1 && partialResult.Failed.Count == 1,
+        "A failure applying one line does not prevent the others from being applied, and is reported back explicitly");
+}
+
 sealed class ManualTimeProvider : TimeProvider
 {
     private DateTimeOffset now = new(2026, 9, 25, 12, 0, 0, TimeSpan.Zero);
@@ -2995,6 +3078,33 @@ sealed class FakeInventoryStockMovementRepository(IReadOnlyDictionary<int, int> 
     public Task<IReadOnlyList<StockMovement>> TransferFromVehicleAsync(VehicleTransfer transfer, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<IReadOnlyDictionary<int, int>> GetMovementCountsByVehicleAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<StockMovementResult> CreateAsync(int productId, StockMovementInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<StockMovementResult> UpdateAsync(StockMovement original, StockMovementInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<int> DeleteAsync(StockMovement original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+}
+
+// Records every movement CreateAsync receives (Task 1's inventory pickup applier checks), and can be told to fail
+// for specific products to exercise partial-failure reporting without touching a real database.
+sealed class FakeInventoryPickupMovementRepository(IReadOnlyDictionary<int, int> inVehicles, ISet<int>? failProductIds = null) : IStockMovementRepository
+{
+    public List<(int ProductId, StockMovementInput Input)> Created { get; } = [];
+    public Task<IReadOnlyDictionary<int, int>> GetQuantitiesInVehiclesAsync(CancellationToken cancellationToken = default) => Task.FromResult(inVehicles);
+    public Task<StockMovementResult> CreateAsync(int productId, StockMovementInput input, CancellationToken cancellationToken = default)
+    {
+        if (failProductIds?.Contains(productId) == true) throw new StockMovementOperationException("Esec de test");
+        Created.Add((productId, input));
+        var movement = new StockMovement(Created.Count, productId, input.Kind, input.Quantity ?? 0,
+            input.Date ?? DateOnly.FromDateTime(DateTime.Now), input.Description, null, null, null, null,
+            "test", 1, DateTime.UtcNow, DateTime.UtcNow, false, input.Destination);
+        return Task.FromResult(new StockMovementResult(movement, 0));
+    }
+    public Task<StockMovementPage> GetPageAsync(int productId, StockMovementQuery query, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<StockMovement?> GetAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<StockMovementHistoryEntry>> GetHistoryAsync(int movementId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<ProjectStockMovement>> GetForProjectAsync(int projectId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<VehicleStock>> GetVehicleStocksAsync(int productId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<VehicleEquipment>> GetVehicleEquipmentAsync(int vehicleId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<StockMovement>> TransferFromVehicleAsync(VehicleTransfer transfer, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyDictionary<int, int>> GetMovementCountsByVehicleAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<StockMovementResult> UpdateAsync(StockMovement original, StockMovementInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<int> DeleteAsync(StockMovement original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
