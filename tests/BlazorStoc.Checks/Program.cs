@@ -321,9 +321,9 @@ var changed = await repository.UpdateAsync(next, change);
 await repository.UpdateAsync(changed, ProductEdit(next));
 await Rejected(() => repository.UpdateAsync(stale, ProductEdit(stale)), "Version detects a change even when values were restored");
 var unconfigured = new MariaProductRepository(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
-await Rejected(() => unconfigured.CreateAsync(ProductInput.From(next)), "Missing database actor blocks writes before opening a SQL connection");
+await Rejected(() => unconfigured.CreateAsync(ProductInput.From(next)), "A missing database password blocks writes before opening a SQL connection");
 var wrongDatabase = new MariaProductRepository(new Microsoft.Extensions.Configuration.ConfigurationBuilder()
-    .AddInMemoryCollection(new Dictionary<string, string?> { ["Database:Name"] = "stocesp", ["Database:ApplicationUserId"] = "1" }).Build());
+    .AddInMemoryCollection(new Dictionary<string, string?> { ["Database:Name"] = "stocesp", ["Database:Password"] = "x" }).Build());
 await Rejected(() => wrongDatabase.CreateAsync(ProductInput.From(next)), "Writes to the original database are rejected before connecting");
 
 async Task RejectedUser(Func<Task> operation, string message)
@@ -2249,13 +2249,14 @@ try
     await syncSource.PurgeAsync(long.MaxValue, DateTime.UtcNow.AddDays(-1), default);
     Check((await syncSource.ReadAfterAsync(startId, 1000, default)).Count == afterPurge.Count, "Purging keeps events newer than the retention period");
 
-    var triggerSql = ChangeEventTriggers.MariaTriggerSql(ChangeEventTriggers.Maria.Single(table => table.Table == "project"), "d");
-    Check(triggerSql.Contains("AFTER DELETE ON project FOR EACH ROW") && triggerSql.Contains("OLD.id_project") && triggerSql.Contains("OLD.id_beneficiar") &&
-          triggerSql.Contains("UTC_TIMESTAMP(6)") && !ChangeEventTriggers.Maria.Any(table => MariaSql(table).Contains("password")),
-        "MariaDB triggers use the project table's columns and the server's UTC time and read no secret column");
-    string MariaSql(WatchedTable table) => string.Join(' ', ChangeEventTriggers.Suffixes.Select(suffix => ChangeEventTriggers.MariaTriggerSql(table, suffix)));
-    Check(ChangeEventTriggers.Maria.Count == ChangeEventTriggers.Sqlite.Count && ChangeEventTriggers.Maria.Select(table => table.EntityType).SequenceEqual(ChangeEventTriggers.Sqlite.Select(table => table.EntityType)),
-        "SQLite and MariaDB watch the same entities");
+    // Task 2 (subtask 2.8): the real migrated MariaDB database already has the 18 triggers installed (verified
+    // against the live instance in this cycle - SHOW TRIGGERS returns exactly 18), so the app no longer generates
+    // trigger SQL for MariaDB (MariaChangeEventSource.EnsureAsync only checks they exist). What matters now is that
+    // the watched-table list used to check for them uses the real table/column names, identical to SQLite's.
+    Check(ReferenceEquals(ChangeEventTriggers.Maria, ChangeEventTriggers.Sqlite),
+        "MariaDB watches the same real table/column names as SQLite (migrated schema, Task 2)");
+    Check(ChangeEventTriggers.Maria.Count == 6 && ChangeEventTriggers.Suffixes.Count() == 3,
+        "6 watched tables x 3 operations = the 18 triggers already installed on the real database");
 }
 finally
 {
@@ -3014,6 +3015,17 @@ InventoryPickupScanResult pickupScan;
     var partialResult = await partialApplier.ApplyAsync(toApply);
     Check(partialResult.Applied.Count == 1 && partialResult.Failed.Count == 1,
         "A failure applying one line does not prevent the others from being applied, and is reported back explicitly");
+}
+
+// Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped
+// entirely (no-op, prints nothing extra) unless RUN_MARIA_INTEGRATION_CHECKS=1, so the default dotnet run/CI
+// experience (the checks above, no network, no MariaDB needed) is unchanged.
+if (Environment.GetEnvironmentVariable("RUN_MARIA_INTEGRATION_CHECKS") == "1")
+{
+    var mariaConfigPath = Environment.GetEnvironmentVariable("MARIA_TEST_CONFIG_PATH")
+        ?? throw new InvalidOperationException("Set MARIA_TEST_CONFIG_PATH to the test database's private config JSON.");
+    var mariaConfiguration = new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddJsonFile(mariaConfigPath).Build();
+    await BlazorStoc.Checks.MariaIntegrationChecks.RunAsync(mariaConfiguration);
 }
 
 sealed class ManualTimeProvider : TimeProvider

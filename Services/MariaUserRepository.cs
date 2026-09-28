@@ -1,14 +1,18 @@
 using System.Data;
-using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using MySqlConnector;
 
 namespace BlazorStoc.Services;
 
+// MariaDB mode: `web_users` mirrors the SQLite schema exactly (single table, no role lookup table), so this
+// repository is the direct MySQL translation of SqliteUserRepository rather than the legacy web_user/web_role shape.
 public sealed class MariaUserRepository(IConfiguration configuration, IAccessControl? accessControl = null,
     IAuditTrail? auditTrail = null, IArchiveService? archiveService = null)
     : IUserRepository, IUserAuthenticator
 {
+    // normalized_username VARCHAR(191); the source username is capped at 100 (WebUserInput), so the uppercase
+    // key can never legitimately need truncation, but a defensive check keeps that silent-truncation impossible.
+    private const int MaxNormalizedUsernameLength = 191;
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
     private static readonly object PasswordSubject = new();
     private static readonly PasswordHasher<object> PasswordHasher = new();
@@ -22,13 +26,10 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
 
         await using var connection = DatabaseConnections.Create(configuration);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("""
-            SELECT u.id_web_user,u.username,u.display_name,r.role_code,u.password_hash,u.is_active
-            FROM web_user u INNER JOIN web_role r ON r.id_web_role=u.id_web_role
-            WHERE UPPER(u.username)=UPPER(@username)
-            LIMIT 1
-            """, connection);
-        command.Parameters.AddWithValue("@username", username);
+        await using var command = Command(connection, null, """
+            SELECT id,username,display_name,role,password_hash,is_active
+            FROM web_users WHERE normalized_username=@username LIMIT 1
+            """, ("@username", TextNormalization.UniquenessKey(username)));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -45,10 +46,9 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         if (!isActive) return new(AuthenticationStatus.Inactive);
         if (verification == PasswordVerificationResult.SuccessRehashNeeded)
         {
-            await using var rehash = new MySqlCommand("UPDATE web_user SET password_hash=@hash,updated_utc=UTC_TIMESTAMP() WHERE id_web_user=@id AND password_hash=@oldHash", connection);
-            rehash.Parameters.AddWithValue("@hash", PasswordHasher.HashPassword(PasswordSubject, password));
-            rehash.Parameters.AddWithValue("@id", user.Id);
-            rehash.Parameters.AddWithValue("@oldHash", storedHash);
+            await using var rehash = Command(connection, null,
+                "UPDATE web_users SET password_hash=@hash WHERE id=@id AND password_hash=@oldHash",
+                ("@hash", PasswordHasher.HashPassword(PasswordSubject, password)), ("@id", user.Id), ("@oldHash", storedHash));
             await rehash.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         return new(AuthenticationStatus.Success, user);
@@ -59,11 +59,8 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         await EnsureAdministratorAsync(cancellationToken);
         await using var connection = DatabaseConnections.Create(configuration);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("""
-            SELECT u.id_web_user,u.username,u.display_name,r.role_code,u.is_active,u.user_version
-            FROM web_user u INNER JOIN web_role r ON r.id_web_role=u.id_web_role
-            ORDER BY u.username,u.id_web_user
-            """, connection);
+        await using var command = new MySqlCommand(
+            "SELECT id,username,display_name,role,is_active,version FROM web_users ORDER BY username,id", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var users = new List<WebUser>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -76,22 +73,20 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         await EnsureAdministratorAsync(cancellationToken);
         var value = input.Validated(true);
         cancellationToken.ThrowIfCancellationRequested();
+        var normalized = NormalizedUsername(value.Username);
         var passwordHash = PasswordHasher.HashPassword(PasswordSubject, value.Password);
         try
         {
-            var user = await WriteAsync(async (connection, transaction, actor) =>
+            var user = await WriteAsync(async (connection, transaction) =>
             {
-                await EnsureUniqueUsernameAsync(connection, transaction, value.Username, null, cancellationToken).ConfigureAwait(false);
+                await EnsureUniqueUsernameAsync(connection, transaction, normalized, null, cancellationToken).ConfigureAwait(false);
                 await using var command = Command(connection, transaction, """
-                    INSERT INTO web_user(username,display_name,password_hash,id_web_role,is_active,user_version,created_utc,updated_utc)
-                    SELECT @username,@displayName,@passwordHash,id_web_role,1,0,UTC_TIMESTAMP(),UTC_TIMESTAMP()
-                    FROM web_role WHERE role_code=@role
-                    """, ("@username", value.Username), ("@displayName", value.DisplayName), ("@passwordHash", passwordHash), ("@role", value.Role));
-                if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
-                    throw new UserOperationException("Nivelul de acces selectat nu există în baza de date.");
-                var user = new WebUser(checked((int)command.LastInsertedId), value.Username, value.DisplayName, value.Role, true, 0);
-                await AuditAsync(connection, transaction, actor, "create", null, user, cancellationToken).ConfigureAwait(false);
-                return user;
+                    INSERT INTO web_users(username,normalized_username,display_name,password_hash,role,is_active,version)
+                    VALUES(@username,@normalized,@displayName,@passwordHash,@role,1,0)
+                    """, ("@username", value.Username), ("@normalized", normalized), ("@displayName", value.DisplayName),
+                    ("@passwordHash", passwordHash), ("@role", value.Role));
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                return new WebUser(checked((int)command.LastInsertedId), value.Username, value.DisplayName, value.Role, true, 0);
             }, cancellationToken).ConfigureAwait(false);
             await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.User, user.Id.ToString(),
                 $"#{user.Id} · {user.Username}", AuditDetails.Identification(
@@ -99,7 +94,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                     ("Rol", user.Role), ("Stare", "activ")), cancellationToken).ConfigureAwait(false);
             return user;
         }
-        catch (MySqlException exception) when (exception.Number == 1062)
+        catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.DuplicateKeyEntry)
         {
             throw new UserOperationException("Există deja un utilizator cu acest nume.");
         }
@@ -118,14 +113,15 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
             throw new UserOperationException("Nu îți poți dezactiva propriul cont și nu îți poți elimina drepturile de administrator.");
 
         cancellationToken.ThrowIfCancellationRequested();
+        var normalized = NormalizedUsername(value.Username);
         var passwordHash = value.Password.Length == 0 ? null : PasswordHasher.HashPassword(PasswordSubject, value.Password);
         try
         {
-            var updated = await WriteAsync(async (connection, transaction, auditActor) =>
+            var updated = await WriteAsync(async (connection, transaction) =>
             {
                 var current = await GetLockedAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
                 WebUserRules.CheckCurrent(current, original);
-                await EnsureUniqueUsernameAsync(connection, transaction, value.Username, original.Id, cancellationToken).ConfigureAwait(false);
+                await EnsureUniqueUsernameAsync(connection, transaction, normalized, original.Id, cancellationToken).ConfigureAwait(false);
                 if (original.Role == AccessRoles.Administrator && original.IsActive &&
                     (value.Role != AccessRoles.Administrator || !value.IsActive) &&
                     await CountOtherActiveAdministratorsAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false) == 0)
@@ -134,25 +130,22 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                 var version = checked(original.Version + 1);
                 var passwordClause = passwordHash is null ? "" : ",password_hash=@passwordHash";
                 await using var command = Command(connection, transaction, $"""
-                    UPDATE web_user u
-                    INNER JOIN web_role r ON r.role_code=@role
-                    SET u.username=@username,u.display_name=@displayName,u.id_web_role=r.id_web_role,
-                        u.is_active=@active,u.user_version=@version,u.updated_utc=UTC_TIMESTAMP(){passwordClause}
-                    WHERE u.id_web_user=@id AND u.user_version=@oldVersion
-                    """, ("@role", value.Role), ("@username", value.Username), ("@displayName", value.DisplayName),
-                    ("@active", value.IsActive), ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version));
+                    UPDATE web_users SET username=@username,normalized_username=@normalized,display_name=@displayName,
+                        role=@role,is_active=@active,version=@version{passwordClause}
+                    WHERE id=@id AND version=@oldVersion
+                    """, ("@username", value.Username), ("@normalized", normalized), ("@displayName", value.DisplayName),
+                    ("@role", value.Role), ("@active", value.IsActive), ("@version", version),
+                    ("@id", original.Id), ("@oldVersion", original.Version));
                 if (passwordHash is not null) command.Parameters.AddWithValue("@passwordHash", passwordHash);
                 if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
-                    throw new UserOperationException("Utilizatorul s-a schimbat între timp sau nivelul de acces nu mai există. Actualizează lista.");
-                var updated = new WebUser(original.Id, value.Username, value.DisplayName, value.Role, value.IsActive, version);
-                await AuditAsync(connection, transaction, auditActor, "update", current, updated, cancellationToken).ConfigureAwait(false);
-                return updated;
+                    throw new UserOperationException("Utilizatorul s-a schimbat între timp. Actualizează lista.");
+                return new WebUser(original.Id, value.Username, value.DisplayName, value.Role, value.IsActive, version);
             }, cancellationToken).ConfigureAwait(false);
             await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.User, updated.Id.ToString(),
                 $"#{updated.Id} · {updated.Username}", UserAuditChanges(original, updated), value.Reason, cancellationToken).ConfigureAwait(false);
             return updated;
         }
-        catch (MySqlException exception) when (exception.Number == 1062)
+        catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.DuplicateKeyEntry)
         {
             throw new UserOperationException("Există deja un utilizator cu acest nume.");
         }
@@ -171,7 +164,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         await archiver.ExecuteAsync(ArchiveRequests.User(original, motif,
             [new ArchiveProtectedValue("PasswordHash", passwordHash)]), async (operation, token) =>
         {
-            await WriteAsync(async (connection, transaction, auditActor) =>
+            await WriteAsync(async (connection, transaction) =>
             {
                 var current = await GetLockedAsync(connection, transaction, original.Id, token).ConfigureAwait(false);
                 WebUserRules.CheckCurrent(current, original);
@@ -180,9 +173,8 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                     throw new UserOperationException("Sistemul trebuie să păstreze cel puțin un administrator activ.");
                 await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token)
                     .ConfigureAwait(false);
-                await AuditAsync(connection, transaction, auditActor, "delete", current, null, token).ConfigureAwait(false);
                 await using var command = Command(connection, transaction,
-                    "DELETE FROM web_user WHERE id_web_user=@id AND user_version=@version", ("@id", original.Id), ("@version", original.Version));
+                    "DELETE FROM web_users WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
                 if (await command.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)
                     throw new UserOperationException("Utilizatorul s-a schimbat între timp. Actualizează lista.");
                 await MariaArchivePersistence.InsertAuditAsync(connection, transaction, operation, token)
@@ -196,11 +188,18 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     {
         await using var connection = DatabaseConnections.Create(configuration);
         await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var command = new MySqlCommand(
-            "SELECT password_hash FROM web_user WHERE id_web_user=@id LIMIT 1", connection);
-        command.Parameters.AddWithValue("@id", id);
+        await using var command = Command(connection, null,
+            "SELECT password_hash FROM web_users WHERE id=@id LIMIT 1", ("@id", id));
         return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string
             ?? throw new UserOperationException("Utilizatorul nu mai există. Actualizează lista.");
+    }
+
+    private static string NormalizedUsername(string username)
+    {
+        var normalized = TextNormalization.UniquenessKey(username);
+        if (normalized.Length > MaxNormalizedUsernameLength)
+            throw new UserOperationException("Numele de utilizator este prea lung pentru a fi stocat.");
+        return normalized;
     }
 
     private static AuditChange[] UserAuditChanges(WebUser before, WebUser after) =>
@@ -211,18 +210,17 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         new("Stare", before.IsActive ? "activ" : "inactiv", after.IsActive ? "activ" : "inactiv")
     ];
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, string, Task<T>> action, CancellationToken token)
+    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (!string.Equals(configuration["Database:Name"] ?? "BlazorStoc", "BlazorStoc", StringComparison.Ordinal))
+        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
             throw new UserOperationException("Administrarea utilizatorilor este permisă numai în baza BlazorStoc.");
-        var actor = await GetCurrentUsernameAsync(token) ?? "administrator-necunoscut";
         await using var connection = DatabaseConnections.Create(configuration);
         await connection.OpenAsync(token).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
         try
         {
-            var result = await action(connection, transaction, actor).ConfigureAwait(false);
+            var result = await action(connection, transaction).ConfigureAwait(false);
             await transaction.CommitAsync(token).ConfigureAwait(false);
             return result;
         }
@@ -235,11 +233,11 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     }
 
     private static async Task EnsureUniqueUsernameAsync(MySqlConnection connection, MySqlTransaction transaction,
-        string username, int? excludedId, CancellationToken token)
+        string normalizedUsername, int? excludedId, CancellationToken token)
     {
         await using var command = Command(connection, transaction,
-            "SELECT EXISTS(SELECT 1 FROM web_user WHERE UPPER(username)=UPPER(@username) AND (@id IS NULL OR id_web_user<>@id))",
-            ("@username", username), ("@id", excludedId is null ? DBNull.Value : excludedId.Value));
+            "SELECT EXISTS(SELECT 1 FROM web_users WHERE normalized_username=@normalized AND (@id IS NULL OR id<>@id))",
+            ("@normalized", normalizedUsername), ("@id", excludedId is null ? DBNull.Value : excludedId.Value));
         if (Convert.ToBoolean(await command.ExecuteScalarAsync(token).ConfigureAwait(false)))
             throw new UserOperationException("Există deja un utilizator cu acest nume.");
     }
@@ -247,9 +245,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     private static async Task<WebUser?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT u.id_web_user,u.username,u.display_name,r.role_code,u.is_active,u.user_version
-            FROM web_user u INNER JOIN web_role r ON r.id_web_role=u.id_web_role
-            WHERE u.id_web_user=@id FOR UPDATE
+            SELECT id,username,display_name,role,is_active,version FROM web_users WHERE id=@id FOR UPDATE
             """, ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? ReadUser(reader) : null;
@@ -258,31 +254,19 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     private static async Task<int> CountOtherActiveAdministratorsAsync(MySqlConnection connection, MySqlTransaction transaction, int excludedId, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT u.id_web_user FROM web_user u INNER JOIN web_role r ON r.id_web_role=u.id_web_role
-            WHERE r.role_code='Administrator' AND u.is_active=1 AND u.id_web_user<>@id FOR UPDATE
-            """, ("@id", excludedId));
+            SELECT id FROM web_users WHERE role=@role AND is_active=1 AND id<>@id FOR UPDATE
+            """, ("@role", AccessRoles.Administrator), ("@id", excludedId));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         var count = 0;
         while (await reader.ReadAsync(token).ConfigureAwait(false)) count++;
         return count;
     }
 
-    private static async Task AuditAsync(MySqlConnection connection, MySqlTransaction transaction, string actor, string action,
-        WebUser? before, WebUser? after, CancellationToken token)
-    {
-        var details = JsonSerializer.Serialize(new { Before = before, After = after });
-        await using var command = Command(connection, transaction, """
-            INSERT INTO web_user_audit(actor_username,target_username,audit_action,audit_details,created_utc)
-            VALUES(@actor,@target,@action,@details,UTC_TIMESTAMP())
-            """, ("@actor", actor), ("@target", after?.Username ?? before?.Username ?? ""), ("@action", action), ("@details", details));
-        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-    }
-
     private Task EnsureAdministratorAsync(CancellationToken token) => accessControl?.EnsureAdministratorAsync(token) ?? Task.CompletedTask;
     private Task<string?> GetCurrentUsernameAsync(CancellationToken token) => accessControl?.GetUsernameAsync(token) ?? Task.FromResult<string?>(null);
     private static WebUser ReadUser(MySqlDataReader reader) => new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2),
         reader.GetString(3), reader.GetBoolean(4), reader.GetInt64(5));
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction transaction, string sql, params (string Name, object Value)[] parameters)
+    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
     {
         var command = new MySqlCommand(sql, connection, transaction);
         foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);

@@ -41,15 +41,10 @@ public static class ChangeEventTriggers
         new("project_observation_files", AuditEntities.ProjectObservationFile, "id", ObservationColumn: "observation_id")
     ];
 
-    public static readonly IReadOnlyList<WatchedTable> Maria =
-    [
-        new("produs", AuditEntities.Product, "id_produs"),
-        new("io", AuditEntities.Product, "id_produs", AlwaysEdit: true),
-        new("web_user", AuditEntities.User, "id_web_user"),
-        new("project", AuditEntities.Project, "id_project", ProjectColumn: "id_project", BeneficiaryColumn: "id_beneficiar"),
-        new("project_observation", AuditEntities.ProjectObservation, "id_observation", ProjectColumn: "id_project", ObservationColumn: "id_observation"),
-        new("project_observation_file", AuditEntities.ProjectObservationFile, "id_file", ObservationColumn: "id_observation")
-    ];
+    // Subtask 2.8 (Task 2): the real migrated schema uses the exact same table/column names as SQLite (it was
+    // migrated from it), and the 18 triggers already installed on the delivered database (verified in this cycle:
+    // SHOW TRIGGERS returns exactly 18) already match this list. There is no separate legacy naming to adapt to.
+    public static readonly IReadOnlyList<WatchedTable> Maria = Sqlite;
 
     private static readonly (string Suffix, string Timing, string Row, string Action)[] Operations =
     [
@@ -94,26 +89,6 @@ public static class ChangeEventTriggers
                                $"BEGIN {InsertStatement(table, row, action, "strftime('%Y-%m-%dT%H:%M:%fZ','now')")}; END;");
         return sql.ToString();
     }
-
-    public const string MariaTableSql = $"""
-        CREATE TABLE IF NOT EXISTS {EventTable} (
-            id BIGINT NOT NULL AUTO_INCREMENT,
-            entity_type VARCHAR(40) NOT NULL,
-            action VARCHAR(20) NOT NULL,
-            entity_id VARCHAR(40) NOT NULL,
-            project_id INT NULL,
-            observation_id INT NULL,
-            beneficiary_id INT NULL,
-            created_utc DATETIME(6) NOT NULL,
-            PRIMARY KEY(id),
-            INDEX ix_change_events_created(created_utc)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        """;
-
-    public static string MariaTriggerSql(WatchedTable table, string suffix) =>
-        Operations.Where(operation => operation.Suffix == suffix).Select(operation =>
-            $"CREATE TRIGGER {TriggerName(table, suffix)} AFTER {operation.Timing} ON {table.Table} FOR EACH ROW " +
-            InsertStatement(table, operation.Row, operation.Action, "UTC_TIMESTAMP(6)")).Single();
 
     public static IEnumerable<string> Suffixes => Operations.Select(operation => operation.Suffix);
 }
@@ -161,26 +136,45 @@ public sealed class SqliteChangeEventSource(SqliteLocalStore store) : IChangeEve
     }
 }
 
-// MariaDB: the event table and the triggers are created by the application on first use, and re-checked periodically
-// because some watched tables (projects, web users) are created lazily by their own modules. The database account
-// needs CREATE and TRIGGER privileges; without them the relay logs a warning and the periodic page sync remains.
+// MariaDB (Subtask 2.8): the event table and its 18 triggers already exist on the real migrated schema (verified
+// in this cycle: SHOW TRIGGERS returns exactly 18, matching the 6 watched tables x 3 operations above) and are
+// never created or altered here - the application account (blazorstoc_dev) has no DDL/TRIGGER rights, and none are
+// requested just to let old initialization code pass. EnsureAsync only checks, with a plain SELECT, that the table
+// and every expected trigger are present, and logs a warning through the normal relay error path otherwise; it
+// never throws and never attempts to create anything. created_utc is TEXT on the real schema (Subtask 2.6), read
+// and written through MariaTimeText in the same format the triggers themselves use.
 public sealed class MariaChangeEventSource(IConfiguration configuration) : IChangeEventSource
 {
+    private static volatile bool warned;
+
     public async Task EnsureAsync(CancellationToken cancellationToken)
     {
         await using var connection = DatabaseConnections.Create(configuration);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using (var table = new MySqlCommand(ChangeEventTriggers.MariaTableSql, connection))
-            await table.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        foreach (var watched in ChangeEventTriggers.Maria)
+        if (!await TableExistsAsync(connection, ChangeEventTriggers.EventTable, cancellationToken).ConfigureAwait(false))
         {
-            if (!await TableExistsAsync(connection, watched.Table, cancellationToken).ConfigureAwait(false)) continue;
+            if (!warned)
+            {
+                warned = true;
+                throw new InvalidOperationException(
+                    $"Tabela {ChangeEventTriggers.EventTable} lipseste din baza MariaDB configurata; " +
+                    "sincronizarea prin evenimente nu poate porni (contul aplicatiei nu are drepturi de creare a tabelelor).");
+            }
+            return;
+        }
+        var missingTriggers = new List<string>();
+        foreach (var watched in ChangeEventTriggers.Maria)
             foreach (var suffix in ChangeEventTriggers.Suffixes)
             {
-                if (await TriggerExistsAsync(connection, ChangeEventTriggers.TriggerName(watched, suffix), cancellationToken).ConfigureAwait(false)) continue;
-                await using var create = new MySqlCommand(ChangeEventTriggers.MariaTriggerSql(watched, suffix), connection);
-                await create.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                var name = ChangeEventTriggers.TriggerName(watched, suffix);
+                if (!await TriggerExistsAsync(connection, name, cancellationToken).ConfigureAwait(false)) missingTriggers.Add(name);
             }
+        if (missingTriggers.Count > 0 && !warned)
+        {
+            warned = true;
+            throw new InvalidOperationException(
+                $"Trigger-ele urmatoare lipsesc din baza MariaDB configurata: {string.Join(", ", missingTriggers)}. " +
+                "Contul aplicatiei nu are drepturi de creare a lor; foloseste o migrare explicita cu contul dedicat.");
         }
     }
 
@@ -223,7 +217,7 @@ public sealed class MariaChangeEventSource(IConfiguration configuration) : IChan
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             result.Add(new(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
                 reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                reader.IsDBNull(6) ? null : reader.GetInt32(6), DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc)));
+                reader.IsDBNull(6) ? null : reader.GetInt32(6), MariaTimeText.Parse(reader.GetString(7))));
         return result;
     }
 
@@ -234,7 +228,7 @@ public sealed class MariaChangeEventSource(IConfiguration configuration) : IChan
         await using var command = new MySqlCommand(
             $"DELETE FROM {ChangeEventTriggers.EventTable} WHERE id<=@through AND created_utc<@older", connection);
         command.Parameters.AddWithValue("@through", throughId);
-        command.Parameters.AddWithValue("@older", olderThanUtc);
+        command.Parameters.AddWithValue("@older", MariaTimeText.Format(olderThanUtc));
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 }

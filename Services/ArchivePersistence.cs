@@ -191,7 +191,8 @@ internal static class MariaArchivePersistence
                 (id,entity_type,original_id,original_version,deleted_utc,actor_username,actor_role,motif,target,details,data_json,protected_data_json)
             VALUES(@id,@entity,@originalId,@version,@deleted,@actor,@role,@motif,@target,@details,@data,@protected)
             """, token, ("@id", operation.Id.ToString("D")), ("@entity", snapshot.EntityType),
-            ("@originalId", snapshot.OriginalId), ("@version", snapshot.Version), ("@deleted", operation.TimestampUtc),
+            ("@originalId", snapshot.OriginalId), ("@version", snapshot.Version),
+            ("@deleted", MariaTimeText.Format(operation.TimestampUtc)),
             ("@actor", operation.ActorUsername), ("@role", operation.ActorRole), ("@motif", request.Motif),
             ("@target", request.Target), ("@details", request.Details), ("@data", snapshot.DataJson),
             ("@protected", ArchiveJson.ProtectedData(snapshot))).ConfigureAwait(false);
@@ -214,7 +215,7 @@ internal static class MariaArchivePersistence
                 ("@originalId", file.OriginalRelationId), ("@livePath", file.LiveRelativePath),
                 ("@archivePath", file.ArchiveRelativePath), ("@contentType", file.ContentType),
                 ("@fileName", file.FileName), ("@length", file.ByteLength), ("@hash", file.ContentHash),
-                ("@archived", file.ArchivedUtc)).ConfigureAwait(false);
+                ("@archived", MariaTimeText.Format(file.ArchivedUtc))).ConfigureAwait(false);
     }
 
     public static Task InsertAuditAsync(MySqlConnection connection, MySqlTransaction transaction,
@@ -222,7 +223,7 @@ internal static class MariaArchivePersistence
             INSERT INTO audit_events
                 (id,timestamp_utc,actor_username,actor_role,entity_type,action,target,details,motif,entity_id,archive_operation_id)
             VALUES(@id,@timestamp,@actor,@role,@entity,@action,@target,@details,@motif,@entityId,@archiveOperationId)
-            """, token, ("@id", Guid.NewGuid().ToString("D")), ("@timestamp", operation.TimestampUtc),
+            """, token, ("@id", Guid.NewGuid().ToString("D")), ("@timestamp", MariaTimeText.Format(operation.TimestampUtc)),
             ("@actor", operation.ActorUsername), ("@role", operation.ActorRole),
             ("@entity", operation.Request.Snapshot.EntityType), ("@action", AuditActions.Delete),
             ("@target", operation.Request.Target), ("@details", operation.Request.Details),
@@ -264,7 +265,7 @@ internal static class MariaArchivePersistence
                     VALUES(@archiveId,@id,@username,@displayName,@role,@active,@version,@passwordHash)
                     """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", user.Id),
                     ("@username", user.Username), ("@displayName", user.DisplayName), ("@role", user.Role),
-                    ("@active", user.IsActive), ("@version", user.Version), ("@passwordHash", passwordHash)).ConfigureAwait(false);
+                    ("@active", user.IsActive ? 1 : 0), ("@version", user.Version), ("@passwordHash", passwordHash)).ConfigureAwait(false);
                 break;
             case AuditEntities.Project:
                 var project = ArchiveJson.Entity<Project>(snapshot);
@@ -294,7 +295,7 @@ internal static class MariaArchivePersistence
                     ("@observation", observationFile.ObservationId), ("@name", observationFile.OriginalName),
                     ("@contentType", observationFile.ContentType), ("@length", observationFile.SizeBytes),
                     ("@hash", observationFile.Sha256), ("@author", observationFile.Author),
-                    ("@uploaded", observationFile.UploadedAtUtc)).ConfigureAwait(false);
+                    ("@uploaded", MariaTimeText.Format(observationFile.UploadedAtUtc))).ConfigureAwait(false);
                 break;
             case AuditEntities.StockMovement:
                 var movement = ArchiveJson.Entity<StockMovement>(snapshot);

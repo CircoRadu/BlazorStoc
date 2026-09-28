@@ -37,6 +37,10 @@ Autentificare cu un cont fictiv de pe pagina de login (`README.md`). Baza local�
 
 ### Mediul MariaDB — pentru grupa A
 
+**Actualizat 28.09.2026 (Task 2, ciclul de adaptare la schema reala):** sectiunea veche de mai jos descria pregatirea unei baze cu schema legacy proprie (`database\BlazorStoc_create.sql`, tabele create la prima folosire, `Database__ApplicationUserId`). Aceasta nu se mai aplica: codul Maria* a fost adaptat la instanta locala reala, deja creata si populata prin migrare din SQLite, descrisa integral in `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md`. Pentru pregatirea mediului foloseste acel document (sectiunile 2-3: conectare, pornire, persistenta) in loc de pasii vechi de mai jos; `Database:ApplicationUserId` nu mai exista in cod (eliminat, vezi TODO.md Task 2 subtask 2.10 si `docs/PROJECT_STATE.md`). Contul aplicatiei (`blazorstoc_dev`) NU are drepturi DDL (`CREATE`,`ALTER`,`INDEX`,`TRIGGER`) — schema si trigger-ele exista deja, create separat; un cont administrativ/de migrare distinct (`blazorstoc_migrator`, creat in acest ciclu) se foloseste numai pentru migrari viitoare de schema, niciodata pentru operarea curenta a aplicatiei. Testele A1-A11 de mai jos raman din perioada schemei legacy (`produs`/`io`/`web_user`/`project` create la prima folosire) si urmeaza sa fie rescrise cand se face verificarea efectiva prin browser (subtask 2.11/2.12); numele de tabele/coloane din ele nu mai corespund codului curent. A12 (mai jos) foloseste deja schema reala si a fost verificat efectiv in acest ciclu.
+
+Pasii vechi (istorici, pastrati fara corectare):
+
 Folosește **o copie** a bazei (restaurată din backup), niciodată baza de producție.
 
 1. Creează baza: rulează `database\BlazorStoc_create.sql`, apoi `database\BlazorStoc_upgrade_0.2.sql` (sau restaurează backup-ul real într-o bază `BlazorStoc` nouă).
@@ -60,9 +64,9 @@ $env:Authentication__Password = "<minimum 12 caractere>"
 
 ---
 
-## A. MariaDB pe un server real (motiv: M1)
+## A. MariaDB pe un server real (motiv: M1, partial rezolvat in ciclul Task 2)
 
-Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe SQLite, dar nicio instrucțiune MariaDB nu a rulat pe un server real.
+Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.md Task 2, `docs/PROJECT_STATE.md`); A1-A11 de mai jos descriu comportamentul asteptat pe schema **veche** si urmeaza sa fie reverificate/rescrise cand se face verificarea completa prin browser (subtask 2.11/2.12), inca neefectuata in acest ciclu. A12 este noul test, deja efectuat pe schema reala.
 
 ### A1. Pornirea și crearea schemei
 - **Verifică**: inițializarea (`MariaArchiveSchema`, tabelele `project`, `project_observation`, `project_observation_file`, `web_user*`, `product_lock`, `change_events`, coloanele adăugate la `io`) rulează fără erori pe o bază existentă.
@@ -125,12 +129,19 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 - **Asteptat**: una singura dintre mutarile simultane reuseste; totalul (`produs_cantitate`) neschimbat; nicio masina cu cantitate negativa; nu apar blocaje (deadlock) intre operatii.
 - **Sursa**: pagina vehiculului.
 
-### A12. Conectarea la instanta MariaDB locala reala (Task 2, subtask 2.1)
-- **Verifica**: conectarea efectiva cu contul `blazorstoc_dev` la instanta locala reala descrisa in `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` (127.0.0.1:3307, SslMode=Required), citirea DDL-ului (`migration\schema-mariadb.sql`, `migration\triggers-mariadb.sql`) si a raportului (`migration\verification.json`).
-- **Motiv**: la 28.09.2026, in sesiunea agentului Claude, directorul `C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB` (parola, fisierele administrative si DDL-ul) nu a fost accesibil din sistemul de fisiere (cale inexistenta la `Test-Path`/`Get-Item`/`cmd dir`), desi procesul `mariadbd.exe` (acelasi cont Windows) rula si portul 3307 raspundea la `netstat`. Detalii complete in `TODO.md`, Task 2 (nota "BLOCAJ DE MEDIU").
-- **Pasi**: intr-o sesiune cu acces la director, ruleaza pasii din sectiunea 2 a `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` (client SQL sau cod .NET cu MySqlConnector), citeste parola din `application-connection.private.json` si confirma `SELECT` pe `products`, `stock_movements`, `web_users`, `audit_events` fara nicio scriere.
-- **Asteptat**: conectare reusita cu TLS, tabelele si numarul de randuri corespund raportului din sectiunea 6 a documentului de predare (229 total).
-- **Sursa**: Task 2.
+### A13. Re-confirmarea prin executie a miscarilor de stoc si utilizatorilor pe MariaDB de test (Task 2, subtask 2.11)
+- **Verifica**: `MariaStockMovementRepository` (intrare, iesire spre vehicul cu defalcarea stocului, garda de stoc negativ la vehicul) si `MariaUserRepository` (creare, autentificare, nume duplicat) pe baza izolata `blazorstoc_test`, dupa corectiile facute in acelasi ciclu (vezi `docs/PROJECT_STATE.md`, "Task 2 aproape finalizat").
+- **Motiv**: comanda de rulare a fost blocata de clasificatorul de siguranta al mediului agentului ("[Auto-Mode Bypass]") la reincercare, dupa ce o rulare anterioara (inainte de corectii) confirmase deja restul sectiunilor (produse, beneficiari, vehicule, blocari, proiecte) prin executie reala. Codul compileaza curat; comportamentul corectat nu a mai putut fi reconfirmat prin executie in acest ciclu.
+- **Pasi**: din `tests/BlazorStoc.Checks`, dupa un build (`dotnet build -c Release -o <folder temporar>`, copiat peste `bin\Release\net9.0`): `RUN_MARIA_INTEGRATION_CHECKS=1 MARIA_TEST_CONFIG_PATH="<cale catre local-secrets\test-database.private.json>" dotnet exec bin\Release\net9.0\BlazorStoc.Checks.dll`.
+- **Asteptat**: toate liniile din sectiunile "Stock movements" si "Users" incep cu `PASS:`, fara exceptie nemanipulata.
+- **Sursa**: Task 2, subtask 2.11.
+
+### A14. Autentificare si doua sesiuni concurente pe preview-ul MariaDB (Task 2, subtask 2.12)
+- **Verifica**: autentificarea efectiva pe preview-ul MariaDB (`http://127.0.0.1:5085/`, pornit in acest ciclu, conectat la baza reala de livrare) si comportamentul cu doi utilizatori autentificati simultan.
+- **Motiv suplimentar**: M2 (agentul nu introduce niciodata parole, nici macar cele demonstrative).
+- **Pasi**: autentifica-te cu `administrator.demo`/`utilizator.demo` (parolele demonstrative din `README.md`) sau cu contul bootstrap din `local-secrets\maria-preview-bootstrap.private.json`; deschide o a doua sesiune (alt browser/fereastra privata) cu celalalt cont; verifica fluxurile CRUD obisnuite (produse, beneficiari, miscari, vehicule, proiecte, jurnal) contra datelor reale migrate.
+- **Asteptat**: autentificare reusita, date reale (229 de randuri initiale) vizibile si corecte, ambele sesiuni functionale simultan.
+- **Sursa**: Task 2, subtask 2.12.
 
 ### A10. Destinații și mașini pe MariaDB
 - **Verifică**: coloanele adăugate la `io` (`io_destinatie`, `id_vehicul`, `id_vehicul_sursa`), tabela `vehicul` creată de `MariaStockMovementRepository`, interogările cantității din mașini (`VehicleQuantitiesAsync`, subinterogare cu alias), coloanele noi din `archive_stock_movements` (`MariaArchiveSchema`, versiunea 6, `ALTER` pe o arhivă existentă) și blocarea ștergerii unui vehicul cu mișcări (`VehicleHasMovementsAsync`).
@@ -296,3 +307,6 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 | 25.09.2026 | Blocarea editării: banner, eliberare live, deblocare forțată cu jurnal, heartbeat, pierdere, expirare după închiderea tabului (SQLite, două sesiuni ale aceluiași cont) | agentul (Claude) | Trecut; detalii în `VALIDARE.md` |
 | 28.09.2026 | Preluare inventar: OCR pe un formular real (tiparit, completat de mana, scanat de utilizator cu un Kyocera SKM_C3320i) | agentul (Claude), pe fisierul furnizat de utilizator | Trecut partial: 8 din 9 produse cu valoare scrisa citite corect (cod si valoare), 1 produs ("Set chei combinate", lasat necompletat) tratat corect ca neinventariat; un produs ("Polizor unghiular") a fost citit cu o valoare gresita (cifra stilizata "8" confundata cu "5") fara sa fie semnalat nesigur — vezi H2. Randul ramane afisat, cu valoarea editabila. Detalii in `VALIDARE.md`. |
 | 25.09.2026 | Sincronizare: modificare SQL externă, dialog deschis cu notificare, catalog live în două tab-uri, client SignalR real | agentul (Claude) | Trecut; detalii în `VALIDARE.md` |
+| 28.09.2026 | A12 (fost): conectare reala la instanta MariaDB locala (`blazorstoc_dev`, TLS) - toate cele 27 de tabele si 229 de randuri, 18 triggere | agentul (Claude) | Trecut: conectare TLS confirmata (`TLS_AES_256_GCM_SHA384`), date identice cu raportul din documentul de predare |
+| 28.09.2026 | Task 2 (Subtask 2.11), verificari reale pe MariaDB izolat (`blazorstoc_test`): produse/categorii/subcategorii (CRUD, concurenta optimista, audit+evenimente), beneficiari (CRUD, CUI duplicat), vehicule (CRUD, numar duplicat), blocari de produs, proiecte (creare+observatie) | agentul (Claude) | Trecut integral prin executie reala; detalii si problemele gasite/corectate in `docs/PROJECT_STATE.md` |
+| 28.09.2026 | Task 2 (Subtask 2.12), preview MariaDB (baza de livrare reala): pornire, rute neautentificate, `/health/live`, pagina 404, persistenta la restart | agentul (Claude) | Trecut; autentificarea efectiva ramane A14 (agentul nu introduce parole) |

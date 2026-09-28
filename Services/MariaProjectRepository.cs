@@ -3,12 +3,22 @@ using MySqlConnector;
 
 namespace BlazorStoc.Services;
 
+// Subtask 2.x (Task 2): rewritten against the REAL, already-populated MariaDB schema
+// (Livrare-DDL-MariaDB\schema-mariadb.sql) - tables `projects` (id,beneficiary_id,name,normalized_name,
+// observations,version,created_utc,updated_utc), `project_observations`
+// (id,project_id,name,content,author,version,created_utc,updated_utc), `project_observation_files`. The legacy
+// `project`/`project_observation`/`project_observation_file` tables created lazily by the old MariaDB module are
+// gone; no CREATE/ALTER is ever issued here (the runtime account `blazorstoc_dev` has only
+// SELECT/INSERT/UPDATE/DELETE). Every "_utc" column is TEXT, never a native DATETIME - read/write it exclusively
+// through MariaTimeText (see that file for why).
+//
+// NOTE: the real `projects` table has a foreign key to `beneficiaries` (id,name,...). `MariaBeneficiaryRepository`
+// was converted to the same real `beneficiaries` table in this same cycle (Task 2 subtask 2.3), so the beneficiary
+// lookups here agree with it.
 public sealed class MariaProjectRepository(IConfiguration configuration, IWebHostEnvironment environment,
     IAccessControl? accessControl = null, IAuditTrail? auditTrail = null, IArchiveService? archiveService = null,
     IProjectFileStore? fileStore = null) : IProjectRepository
 {
-    private static readonly SemaphoreSlim SchemaGate = new(1, 1);
-    private static bool schemaReady;
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
     private readonly IProjectFileStore files = fileStore ?? new MariaProjectFileStore(environment, configuration, accessControl, archiveService);
     private readonly string rootPath = MariaProjectFileStore.RootPath(environment, configuration);
@@ -20,12 +30,10 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         await EnsureOperatorAsync(cancellationToken);
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("""
-            SELECT id_project,id_beneficiar,name,observations,version,created_utc,updated_utc
-            FROM project WHERE id_beneficiar=@beneficiary ORDER BY name,id_project
-            """, connection);
-        command.Parameters.AddWithValue("@beneficiary", beneficiaryId);
+        await using var command = Command(connection, null, """
+            SELECT id,beneficiary_id,name,observations,version,created_utc,updated_utc
+            FROM projects WHERE beneficiary_id=@beneficiary ORDER BY name,id
+            """, ("@beneficiary", beneficiaryId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<Project>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result.Add(Read(reader));
@@ -37,7 +45,6 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         await EnsureOperatorAsync(cancellationToken);
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
         return await GetAsync(connection, null, id, cancellationToken).ConfigureAwait(false);
     }
 
@@ -46,24 +53,31 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         await EnsureOperatorAsync(cancellationToken);
         var value = input.Validated();
         var nowUtc = DateTime.UtcNow;
-        var (project, beneficiaryName) = await WriteAsync(async (connection, transaction) =>
+        try
         {
-            var beneficiaryName = await GetBeneficiaryNameAsync(connection, transaction, value.BeneficiaryId, cancellationToken).ConfigureAwait(false);
-            ProjectRules.CheckBeneficiaryExists(beneficiaryName is null ? null : new Beneficiary(value.BeneficiaryId, beneficiaryName, ""));
-            await EnsureUniqueNameAsync(connection, transaction, value.BeneficiaryId, value.Name, null, cancellationToken).ConfigureAwait(false);
-            await using var command = Command(connection, transaction, """
-                INSERT INTO project(id_beneficiar,name,normalized_name,observations,version,created_utc,updated_utc)
-                VALUES(@beneficiary,@name,@normalized,@observations,0,@created,@updated)
-                """, ("@beneficiary", value.BeneficiaryId), ("@name", value.Name),
-                ("@normalized", ProjectRules.NormalizedName(value.Name)), ("@observations", value.Observations),
-                ("@created", nowUtc), ("@updated", nowUtc));
-            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            return (ProjectRules.Create(checked((int)command.LastInsertedId), value, nowUtc), beneficiaryName!);
-        }, cancellationToken).ConfigureAwait(false);
-        await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Project, project.Id.ToString(), project.Name,
-            AuditDetails.Identification(("Denumire", project.Name), ("Beneficiar", beneficiaryName), ("Observații", project.Observations)),
-            cancellationToken).ConfigureAwait(false);
-        return project;
+            var (project, beneficiaryName) = await WriteAsync(async (connection, transaction) =>
+            {
+                var beneficiaryName = await GetBeneficiaryNameAsync(connection, transaction, value.BeneficiaryId, cancellationToken).ConfigureAwait(false);
+                ProjectRules.CheckBeneficiaryExists(beneficiaryName is null ? null : new Beneficiary(value.BeneficiaryId, beneficiaryName, ""));
+                await EnsureUniqueNameAsync(connection, transaction, value.BeneficiaryId, value.Name, null, beneficiaryName!, cancellationToken).ConfigureAwait(false);
+                await using var command = Command(connection, transaction, """
+                    INSERT INTO projects(beneficiary_id,name,normalized_name,observations,version,created_utc,updated_utc)
+                    VALUES(@beneficiary,@name,@normalized,@observations,0,@created,@updated)
+                    """, ("@beneficiary", value.BeneficiaryId), ("@name", value.Name),
+                    ("@normalized", ProjectRules.NormalizedName(value.Name)), ("@observations", value.Observations),
+                    ("@created", MariaTimeText.Format(nowUtc)), ("@updated", MariaTimeText.Format(nowUtc)));
+                await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                return (ProjectRules.Create(checked((int)command.LastInsertedId), value, nowUtc), beneficiaryName!);
+            }, cancellationToken).ConfigureAwait(false);
+            await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Project, project.Id.ToString(), project.Name,
+                AuditDetails.Identification(("Denumire", project.Name), ("Beneficiar", beneficiaryName), ("Observații", project.Observations)),
+                cancellationToken).ConfigureAwait(false);
+            return project;
+        }
+        catch (MySqlException exception) when (IsProjectNameConflict(exception))
+        {
+            throw new ProjectOperationException(ProjectRules.ConcurrentDuplicateMessage);
+        }
     }
 
     public async Task<Project> UpdateAsync(Project original, ProjectInput input, CancellationToken cancellationToken = default)
@@ -71,26 +85,35 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         await EnsureOperatorAsync(cancellationToken);
         var value = input.Validated(true);
         var nowUtc = DateTime.UtcNow;
-        var updated = await WriteAsync(async (connection, transaction) =>
+        Project updated;
+        try
         {
-            var current = await GetLockedAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
-            ProjectRules.CheckCurrent(current, original);
-            ProjectRules.CheckBeneficiaryUnchanged(original, value.BeneficiaryId);
-            var beneficiaryName = await GetBeneficiaryNameAsync(connection, transaction, value.BeneficiaryId, cancellationToken).ConfigureAwait(false);
-            ProjectRules.CheckBeneficiaryExists(beneficiaryName is null ? null : new Beneficiary(value.BeneficiaryId, beneficiaryName, ""));
-            await EnsureUniqueNameAsync(connection, transaction, value.BeneficiaryId, value.Name, original.Id, cancellationToken).ConfigureAwait(false);
-            var updated = ProjectRules.Edited(original, value, nowUtc);
-            await using var command = Command(connection, transaction, """
-                UPDATE project SET id_beneficiar=@beneficiary,name=@name,normalized_name=@normalized,
-                    observations=@observations,version=@version,updated_utc=@updated
-                WHERE id_project=@id AND version=@oldVersion
-                """, ("@beneficiary", value.BeneficiaryId), ("@name", value.Name),
-                ("@normalized", ProjectRules.NormalizedName(value.Name)), ("@observations", value.Observations),
-                ("@version", updated.Version), ("@updated", nowUtc), ("@id", original.Id), ("@oldVersion", original.Version));
-            if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
-                throw new ProjectOperationException("Proiectul s-a schimbat între timp. Actualizează pagina.");
-            return updated;
-        }, cancellationToken).ConfigureAwait(false);
+            updated = await WriteAsync(async (connection, transaction) =>
+            {
+                var current = await GetLockedAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
+                ProjectRules.CheckCurrent(current, original);
+                ProjectRules.CheckBeneficiaryUnchanged(original, value.BeneficiaryId);
+                var beneficiaryName = await GetBeneficiaryNameAsync(connection, transaction, value.BeneficiaryId, cancellationToken).ConfigureAwait(false);
+                ProjectRules.CheckBeneficiaryExists(beneficiaryName is null ? null : new Beneficiary(value.BeneficiaryId, beneficiaryName, ""));
+                await EnsureUniqueNameAsync(connection, transaction, value.BeneficiaryId, value.Name, original.Id, beneficiaryName!, cancellationToken).ConfigureAwait(false);
+                var updated = ProjectRules.Edited(original, value, nowUtc);
+                await using var command = Command(connection, transaction, """
+                    UPDATE projects SET beneficiary_id=@beneficiary,name=@name,normalized_name=@normalized,
+                        observations=@observations,version=@version,updated_utc=@updated
+                    WHERE id=@id AND version=@oldVersion
+                    """, ("@beneficiary", value.BeneficiaryId), ("@name", value.Name),
+                    ("@normalized", ProjectRules.NormalizedName(value.Name)), ("@observations", value.Observations),
+                    ("@version", updated.Version), ("@updated", MariaTimeText.Format(nowUtc)),
+                    ("@id", original.Id), ("@oldVersion", original.Version));
+                if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+                    throw new ProjectOperationException("Proiectul s-a schimbat între timp. Actualizează pagina.");
+                return updated;
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (MySqlException exception) when (IsProjectNameConflict(exception))
+        {
+            throw new ProjectOperationException(ProjectRules.ConcurrentDuplicateMessage);
+        }
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Project, updated.Id.ToString(), updated.Name,
             [new("Denumire", original.Name, updated.Name),
              new("Beneficiar", original.BeneficiaryId.ToString(), updated.BeneficiaryId.ToString()),
@@ -125,26 +148,27 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
                 {
                     var current = await GetLockedAsync(connection, transaction, original.Id, token).ConfigureAwait(false);
                     ProjectRules.CheckCurrent(current, original);
-                    if (await MariaStockMovementRepository.ProjectHasMovementsAsync(connection, transaction, original.Id, token).ConfigureAwait(false))
-                        throw new ProjectOperationException("Proiectul are mișcări de stoc asociate și nu poate fi șters. Istoricul trebuie păstrat.");
+                    await using (var stock = Command(connection, transaction,
+                        "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE project_id=@id)", ("@id", original.Id)))
+                        if (Convert.ToBoolean(await stock.ExecuteScalarAsync(token).ConfigureAwait(false)))
+                            throw new ProjectOperationException("Proiectul are mișcări de stoc asociate și nu poate fi șters. Istoricul trebuie păstrat.");
                     await MariaArchivePersistence.InsertAsync(connection, transaction, operation, prepared, token).ConfigureAwait(false);
                     await using (var deleteFiles = Command(connection, transaction,
-                        "DELETE FROM project_observation_file WHERE id_observation IN (SELECT id_observation FROM project_observation WHERE id_project=@id)",
+                        "DELETE FROM project_observation_files WHERE observation_id IN (SELECT id FROM project_observations WHERE project_id=@id)",
                         ("@id", original.Id)))
                         await deleteFiles.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await using (var deleteObservations = Command(connection, transaction,
-                        "DELETE FROM project_observation WHERE id_project=@id", ("@id", original.Id)))
+                        "DELETE FROM project_observations WHERE project_id=@id", ("@id", original.Id)))
                         await deleteObservations.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await using var deleteProject = Command(connection, transaction,
-                        "DELETE FROM project WHERE id_project=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
+                        "DELETE FROM projects WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
                     if (await deleteProject.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)
                         throw new ProjectOperationException("Proiectul s-a schimbat între timp. Actualizează pagina.");
                     await MariaArchivePersistence.InsertAuditAsync(connection, transaction, operation, token).ConfigureAwait(false);
                     return true;
                 }, token).ConfigureAwait(false);
                 foreach (var file in prepared)
-                    await ArchiveFileSafety.CompleteAsync(rootPath,
-                        archivePath, file, token).ConfigureAwait(false);
+                    await ArchiveFileSafety.CompleteAsync(rootPath, archivePath, file, token).ConfigureAwait(false);
             }
             catch
             {
@@ -159,12 +183,10 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         await EnsureOperatorAsync(cancellationToken);
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("""
-            SELECT id_observation,id_project,name,content,author,version,created_utc,updated_utc
-            FROM project_observation WHERE id_project=@project ORDER BY created_utc DESC,id_observation DESC
-            """, connection);
-        command.Parameters.AddWithValue("@project", projectId);
+        await using var command = Command(connection, null, """
+            SELECT id,project_id,name,content,author,version,created_utc,updated_utc
+            FROM project_observations WHERE project_id=@project ORDER BY created_utc DESC,id DESC
+            """, ("@project", projectId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<ProjectObservation>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result.Add(ReadObservation(reader));
@@ -176,7 +198,6 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         await EnsureOperatorAsync(cancellationToken);
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await EnsureSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
         return await GetObservationAsync(connection, null, id, cancellationToken).ConfigureAwait(false);
     }
 
@@ -191,10 +212,10 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
             var projectName = await GetProjectNameAsync(connection, transaction, projectId, cancellationToken).ConfigureAwait(false)
                 ?? throw new ProjectOperationException("Proiectul nu mai există.");
             await using var command = Command(connection, transaction, """
-                INSERT INTO project_observation(id_project,name,content,author,version,created_utc,updated_utc)
+                INSERT INTO project_observations(project_id,name,content,author,version,created_utc,updated_utc)
                 VALUES(@project,@name,@content,@author,0,@created,@updated)
                 """, ("@project", projectId), ("@name", value.Name), ("@content", value.Content), ("@author", author),
-                ("@created", nowUtc), ("@updated", nowUtc));
+                ("@created", MariaTimeText.Format(nowUtc)), ("@updated", MariaTimeText.Format(nowUtc)));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return (ProjectRules.CreateObservation(checked((int)command.LastInsertedId), projectId, value, author, nowUtc), projectName);
         }, cancellationToken).ConfigureAwait(false);
@@ -216,10 +237,10 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
             ProjectRules.CheckCurrent(current, original);
             var updated = ProjectRules.EditedObservation(original, value, nowUtc);
             await using var command = Command(connection, transaction, """
-                UPDATE project_observation SET name=@name,content=@content,version=@version,updated_utc=@updated
-                WHERE id_observation=@id AND version=@oldVersion
+                UPDATE project_observations SET name=@name,content=@content,version=@version,updated_utc=@updated
+                WHERE id=@id AND version=@oldVersion
                 """, ("@name", value.Name), ("@content", value.Content), ("@version", updated.Version),
-                ("@updated", nowUtc), ("@id", original.Id), ("@oldVersion", original.Version));
+                ("@updated", MariaTimeText.Format(nowUtc)), ("@id", original.Id), ("@oldVersion", original.Version));
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                 throw new ProjectOperationException("Observația s-a schimbat între timp. Actualizează pagina.");
             return updated;
@@ -255,18 +276,17 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
                     ProjectRules.CheckCurrent(current, original);
                     await MariaArchivePersistence.InsertAsync(connection, transaction, operation, prepared, token).ConfigureAwait(false);
                     await using (var deleteFiles = Command(connection, transaction,
-                        "DELETE FROM project_observation_file WHERE id_observation=@id", ("@id", original.Id)))
+                        "DELETE FROM project_observation_files WHERE observation_id=@id", ("@id", original.Id)))
                         await deleteFiles.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                     await using var delete = Command(connection, transaction,
-                        "DELETE FROM project_observation WHERE id_observation=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
+                        "DELETE FROM project_observations WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
                     if (await delete.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)
                         throw new ProjectOperationException("Observația s-a schimbat între timp. Actualizează pagina.");
                     await MariaArchivePersistence.InsertAuditAsync(connection, transaction, operation, token).ConfigureAwait(false);
                     return true;
                 }, token).ConfigureAwait(false);
                 foreach (var file in prepared)
-                    await ArchiveFileSafety.CompleteAsync(rootPath,
-                        archivePath, file, token).ConfigureAwait(false);
+                    await ArchiveFileSafety.CompleteAsync(rootPath, archivePath, file, token).ConfigureAwait(false);
             }
             catch
             {
@@ -281,8 +301,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     {
         var prepared = new List<ArchiveFileRecord>();
         foreach (var file in observationFiles)
-            prepared.Add(await ArchiveFileSafety.PrepareAsync(rootPath,
-                archivePath, file.StoredName, operation,
+            prepared.Add(await ArchiveFileSafety.PrepareAsync(rootPath, archivePath, file.StoredName, operation,
                 AuditEntities.ProjectObservationFile, file.Id.ToString(), file.ContentType, file.OriginalName,
                 file.SizeBytes, token).ConfigureAwait(false));
         return prepared;
@@ -292,7 +311,6 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(token).ConfigureAwait(false);
-        await EnsureSchemaAsync(connection, token).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
         try
         {
@@ -307,77 +325,10 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         }
     }
 
-    private async Task EnsureSchemaAsync(MySqlConnection connection, CancellationToken token)
-    {
-        if (schemaReady) return;
-        await SchemaGate.WaitAsync(token).ConfigureAwait(false);
-        try
-        {
-            if (schemaReady) return;
-            foreach (var statement in SchemaStatements)
-            {
-                await using var command = new MySqlCommand(statement, connection);
-                await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-            }
-            schemaReady = true;
-        }
-        finally { SchemaGate.Release(); }
-    }
-
-    internal static readonly string[] SchemaStatements =
-    [
-        """
-        CREATE TABLE IF NOT EXISTS project (
-            id_project INT NOT NULL AUTO_INCREMENT,
-            id_beneficiar INT NOT NULL,
-            name VARCHAR(200) NOT NULL,
-            normalized_name VARCHAR(200) NOT NULL,
-            observations TEXT NOT NULL,
-            version BIGINT UNSIGNED NOT NULL DEFAULT 0,
-            created_utc DATETIME(6) NOT NULL,
-            updated_utc DATETIME(6) NOT NULL,
-            PRIMARY KEY(id_project),
-            UNIQUE KEY ux_project_beneficiary_name(id_beneficiar,normalized_name),
-            CONSTRAINT fk_project_beneficiar FOREIGN KEY(id_beneficiar) REFERENCES beneficiar(id_beneficiar) ON DELETE RESTRICT
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS project_observation (
-            id_observation INT NOT NULL AUTO_INCREMENT,
-            id_project INT NOT NULL,
-            name VARCHAR(200) NOT NULL,
-            content TEXT NOT NULL,
-            author VARCHAR(191) NOT NULL,
-            version BIGINT UNSIGNED NOT NULL DEFAULT 0,
-            created_utc DATETIME(6) NOT NULL,
-            updated_utc DATETIME(6) NOT NULL,
-            PRIMARY KEY(id_observation),
-            INDEX ix_project_observation_project(id_project,created_utc),
-            CONSTRAINT fk_observation_project FOREIGN KEY(id_project) REFERENCES project(id_project) ON DELETE RESTRICT
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS project_observation_file (
-            id_file INT NOT NULL AUTO_INCREMENT,
-            id_observation INT NOT NULL,
-            relative_path VARCHAR(255) NOT NULL,
-            original_name VARCHAR(255) NOT NULL,
-            content_type VARCHAR(255) NOT NULL,
-            byte_length BIGINT UNSIGNED NOT NULL,
-            sha256 CHAR(64) NOT NULL,
-            author VARCHAR(191) NOT NULL,
-            uploaded_utc DATETIME(6) NOT NULL,
-            PRIMARY KEY(id_file),
-            INDEX ix_project_observation_file_observation(id_observation),
-            CONSTRAINT fk_file_observation FOREIGN KEY(id_observation) REFERENCES project_observation(id_observation) ON DELETE RESTRICT
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        """
-    ];
-
     private static async Task<Project?> GetAsync(MySqlConnection connection, MySqlTransaction? transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction,
-            "SELECT id_project,id_beneficiar,name,observations,version,created_utc,updated_utc FROM project WHERE id_project=@id",
+            "SELECT id,beneficiary_id,name,observations,version,created_utc,updated_utc FROM projects WHERE id=@id",
             ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? Read(reader) : null;
@@ -386,7 +337,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     private static async Task<Project?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction,
-            "SELECT id_project,id_beneficiar,name,observations,version,created_utc,updated_utc FROM project WHERE id_project=@id FOR UPDATE",
+            "SELECT id,beneficiary_id,name,observations,version,created_utc,updated_utc FROM projects WHERE id=@id FOR UPDATE",
             ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? Read(reader) : null;
@@ -395,7 +346,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     private static async Task<ProjectObservation?> GetObservationAsync(MySqlConnection connection, MySqlTransaction? transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction,
-            "SELECT id_observation,id_project,name,content,author,version,created_utc,updated_utc FROM project_observation WHERE id_observation=@id",
+            "SELECT id,project_id,name,content,author,version,created_utc,updated_utc FROM project_observations WHERE id=@id",
             ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? ReadObservation(reader) : null;
@@ -404,47 +355,51 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     private static async Task<ProjectObservation?> GetObservationLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction,
-            "SELECT id_observation,id_project,name,content,author,version,created_utc,updated_utc FROM project_observation WHERE id_observation=@id FOR UPDATE",
+            "SELECT id,project_id,name,content,author,version,created_utc,updated_utc FROM project_observations WHERE id=@id FOR UPDATE",
             ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? ReadObservation(reader) : null;
     }
 
+    // `projects.beneficiary_id` references the real `beneficiaries` table (id,name,...) - see the class-level note.
     private static async Task<string?> GetBeneficiaryNameAsync(MySqlConnection connection, MySqlTransaction? transaction, int beneficiaryId, CancellationToken token)
     {
         await using var command = Command(connection, transaction,
-            "SELECT beneficiar_denumire FROM beneficiar WHERE id_beneficiar=@id", ("@id", beneficiaryId));
+            "SELECT name FROM beneficiaries WHERE id=@id", ("@id", beneficiaryId));
         return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string;
     }
 
     private static async Task<string?> GetProjectNameAsync(MySqlConnection connection, MySqlTransaction? transaction, int projectId, CancellationToken token)
     {
-        await using var command = Command(connection, transaction, "SELECT name FROM project WHERE id_project=@id", ("@id", projectId));
+        await using var command = Command(connection, transaction, "SELECT name FROM projects WHERE id=@id", ("@id", projectId));
         return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string;
     }
 
     private static async Task EnsureUniqueNameAsync(MySqlConnection connection, MySqlTransaction transaction, int beneficiaryId,
-        string name, int? excludedId, CancellationToken token)
+        string name, int? excludedId, string beneficiaryName, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT name FROM project WHERE id_beneficiar=@beneficiary AND normalized_name=@normalized
-                AND (@id IS NULL OR id_project<>@id) LIMIT 1 FOR UPDATE
+            SELECT name FROM projects WHERE beneficiary_id=@beneficiary AND normalized_name=@normalized
+                AND (@id IS NULL OR id<>@id) LIMIT 1 FOR UPDATE
             """, ("@beneficiary", beneficiaryId), ("@normalized", ProjectRules.NormalizedName(name)),
             ("@id", excludedId is null ? DBNull.Value : excludedId.Value));
         if (await command.ExecuteScalarAsync(token).ConfigureAwait(false) is string existingName)
-        {
-            var beneficiaryName = await GetBeneficiaryNameAsync(connection, transaction, beneficiaryId, token).ConfigureAwait(false) ?? "";
             throw new ProjectOperationException(ProjectRules.DuplicateMessage(existingName, beneficiaryName));
-        }
     }
 
     private static Project Read(MySqlDataReader reader) => new(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2),
-        reader.GetString(3), reader.GetInt64(4), DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc),
-        DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc));
+        reader.GetString(3), reader.GetInt64(4), MariaTimeText.Parse(reader.GetString(5)), MariaTimeText.Parse(reader.GetString(6)));
 
     private static ProjectObservation ReadObservation(MySqlDataReader reader) => new(reader.GetInt32(0), reader.GetInt32(1),
         reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt64(5),
-        DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc), DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc));
+        MariaTimeText.Parse(reader.GetString(6)), MariaTimeText.Parse(reader.GetString(7)));
+
+    // The pre-check in EnsureUniqueNameAsync (locking read inside the same SERIALIZABLE transaction) should make
+    // this unreachable in practice, but a concurrent insert racing the lock acquisition still hits
+    // uq_projects_1(beneficiary_id,normalized_name); translate it to the same Romanian message Sqlite uses.
+    private static bool IsProjectNameConflict(MySqlException exception) =>
+        exception.ErrorCode == MySqlErrorCode.DuplicateKeyEntry &&
+        exception.Message.Contains("projects", StringComparison.OrdinalIgnoreCase);
 
     private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
     {

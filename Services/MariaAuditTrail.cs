@@ -14,7 +14,9 @@ public sealed class MariaAuditTrail(IConfiguration configuration) : IAuditTrail
             VALUES(@id,@timestamp,@actor,@role,@entity,@action,@target,@details,@motif,@entityId,@archiveOperationId)
             """, connection);
         command.Parameters.AddWithValue("@id", Guid.NewGuid().ToString("D"));
-        command.Parameters.AddWithValue("@timestamp", DateTime.UtcNow);
+        // timestamp_utc is VARCHAR(40) text on the real migrated schema, not a native DATETIME (Subtask 2.6);
+        // written in the same format the database's own triggers use (MariaTimeText).
+        command.Parameters.AddWithValue("@timestamp", MariaTimeText.Format(DateTime.UtcNow));
         command.Parameters.AddWithValue("@actor", entry.ActorUsername);
         command.Parameters.AddWithValue("@role", entry.ActorRole);
         command.Parameters.AddWithValue("@entity", entry.EntityType);
@@ -43,7 +45,7 @@ public sealed class MariaAuditTrail(IConfiguration configuration) : IAuditTrail
         var events = new List<AuditEvent>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            var timestamp = DateTime.SpecifyKind(reader.GetDateTime(1), DateTimeKind.Utc);
+            var timestamp = MariaTimeText.Parse(reader.GetString(1));
             events.Add(new(Guid.Parse(reader.GetString(0)), timestamp, reader.GetString(2), reader.GetString(3),
                 reader.GetString(4), AuditActions.Normalize(reader.GetString(5)), reader.GetString(6), reader.GetString(7),
                 reader.GetString(8), reader.GetString(9), reader.IsDBNull(10) ? null : Guid.Parse(reader.GetString(10))));

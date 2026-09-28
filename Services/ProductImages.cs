@@ -82,13 +82,18 @@ public sealed class DemoProductImageStore : IProductImageStore
     }
 }
 
+// Subtask 2.7 (Task 2): this store is only used in MariaDB mode (demo mode uses SqliteProductImageStore, which
+// keeps images in the SQLite database itself). Directories come from MariaAssetPaths (Services/MariaTimeText.cs),
+// shared with MariaProjectFileStore's archive directory, so an unset key here can never silently resolve to the
+// app's own SQLite-mode "data/..." directories and the two stores never disagree about where archived files live.
 public sealed class FileProductImageStore(IWebHostEnvironment environment, IConfiguration configuration) : IProductImageStore
 {
+    // Kept for constructor-shape parity with other stores/DI even though the directories no longer derive from it
+    // (Subtask 2.7 - they come from MariaAssetPaths, never from the app's own ContentRootPath).
+    private readonly IWebHostEnvironment unusedEnvironment = environment;
     private readonly SemaphoreSlim gate = new(1, 1);
-    private readonly string root = Path.GetFullPath(configuration["App:ProductImagesPath"] ??
-        Path.Combine(environment.ContentRootPath, "data", "product-images"));
-    private readonly string archiveRoot = Path.GetFullPath(configuration["App:ArchiveFilesPath"] ??
-        Path.Combine(environment.ContentRootPath, "data", "archive", "files"));
+    private readonly string root = MariaAssetPaths.ProductImages(configuration);
+    private readonly string archiveRoot = MariaAssetPaths.ArchiveFiles(configuration);
 
     public async Task<bool> ExistsAsync(int productId, CancellationToken cancellationToken = default) =>
         await FindAsync(productId, cancellationToken).ConfigureAwait(false) is not null;

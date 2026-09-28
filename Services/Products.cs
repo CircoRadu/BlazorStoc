@@ -46,40 +46,38 @@ public sealed partial class MariaProductRepository(IConfiguration configuration,
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
-            SELECT p.id_produs, c.categorie_nume, s.subcategorie_nume,
-                   p.produs_denumire, p.produs_descriere, COALESCE(p.produs_cantitate, 0), p.produs_versiune
-            FROM produs p
-            INNER JOIN categorie c ON p.id_categorie = c.id_categorie
-            INNER JOIN subcategorie s ON p.id_subcategorie = s.id_subcategorie
-            WHERE p.id_produs = @id
+            SELECT p.id,c.name,s.name,p.name,p.description,p.quantity,p.version
+            FROM products p
+            INNER JOIN categories c ON c.id=p.category_id
+            INNER JOIN subcategories s ON s.id=p.subcategory_id
+            WHERE p.id=@id
             """, connection);
         command.Parameters.AddWithValue("@id", id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
-            ? new Product(reader.GetInt32(0), Text(reader, 1), Text(reader, 2), Text(reader, 3), Text(reader, 4), reader.GetInt32(5), reader.GetInt64(6))
-            : null;
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ? ReadProduct(reader) : null;
     }
     public async Task<IReadOnlyList<Product>> GetProductsAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        // The version is checked under a row lock before every update or deletion.
         const string sql = """
-            SELECT p.id_produs, c.categorie_nume, s.subcategorie_nume,
-                   p.produs_denumire, p.produs_descriere, COALESCE(p.produs_cantitate, 0), p.produs_versiune
-            FROM produs p
-            INNER JOIN categorie c ON p.id_categorie = c.id_categorie
-            INNER JOIN subcategorie s ON p.id_subcategorie = s.id_subcategorie
-            ORDER BY p.id_subcategorie, p.produs_denumire, p.id_produs
+            SELECT p.id,c.name,s.name,p.name,p.description,p.quantity,p.version
+            FROM products p
+            INNER JOIN categories c ON c.id=p.category_id
+            INNER JOIN subcategories s ON s.id=p.subcategory_id
+            ORDER BY s.name,p.name,p.id
             """;
         await using var command = new MySqlCommand(sql, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var products = new List<Product>();
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            products.Add(new Product(reader.GetInt32(0), Text(reader, 1), Text(reader, 2), Text(reader, 3), Text(reader, 4), reader.GetInt32(5), reader.GetInt64(6)));
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) products.Add(ReadProduct(reader));
         return products;
     }
-    private static string Text(MySqlDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? "" : reader.GetString(ordinal);
+    // id/category_id/subcategory_id/quantity/version are BIGINT on the real schema; MySqlConnector requires
+    // GetInt64 for those columns (GetInt32 throws InvalidCastException), so the public int fields are narrowed
+    // with a checked cast, matching the pattern already used elsewhere in the Maria repositories.
+    private static Product ReadProduct(MySqlDataReader reader) => new(checked((int)reader.GetInt64(0)), reader.GetString(1),
+        reader.GetString(2), reader.GetString(3), reader.GetString(4), checked((int)reader.GetInt64(5)), reader.GetInt64(6));
 }
 
 public sealed class DemoProductStore

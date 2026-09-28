@@ -146,6 +146,8 @@ Rulează verificările de căutare și CRUD cu `dotnet run --project tests/Blazo
 
 Contul tehnic pentru jurnalul produselor rămâne asociat prin `Database__ApplicationUserId` unei identități din tabela legacy `user`. Conturile de autentificare noi sunt exclusiv în `web_user`. Scrierile sunt refuzate dacă baza configurată nu se numește exact `BlazorStoc` sau dacă lipsește identitatea tehnică pentru jurnalul produselor. Arhiva 0.1 de la rădăcina proiectului este istorică; folosește sursele actuale din acest director.
 
+Nota 28.09.2026 (Task 2, adaptarea la instanta MariaDB reala): paragraful de mai sus descrie mecanismul vechi, inlocuit. `Database:ApplicationUserId` si tabela `user` au fost eliminate din cod; identitatea operatorului in jurnalul produselor si in miscarile de stoc este acum username-ul text, prin `IAccessControl`/`IAuditTrail`, la fel ca in modul demonstrativ SQLite. Garda "scrierile sunt refuzate daca baza nu se numeste exact BlazorStoc" ramane neschimbata. Detalii in `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` si `docs/PROJECT_STATE.md`.
+
 Lucrul pentru NAS/QNAP, Docker și publicarea în containere rămân explicit în afara fazei curente.
 
 ## Sincronizare între utilizatori

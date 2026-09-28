@@ -1,64 +1,57 @@
 using System.Data;
-using System.Globalization;
-using System.Text.Json;
 using MySqlConnector;
 
 namespace BlazorStoc.Services;
 
-// MariaDB mode: maps the movements onto the legacy `io` / `io_history` tables (io_tip_actiune: 1 = entry, 0 = exit,
-// id_beneficiar = 0 means none, io_data = dd-MM-yyyy) and adds the columns this module needs at first use.
-// Not exercised against a real server in the automated checks.
+// MariaDB mode (Subtask 2.4): maps the movements onto the real, migrated schema (stock_movements / stock_movement_history,
+// FK'd to products/beneficiaries/projects/vehicles - see migration\schema-mariadb.sql). Column names mirror the SQLite
+// development schema exactly, so every query here is a near-literal translation of SqliteStockMovementRepository.cs;
+// only the connection type, parameter/date-text handling (Subtask 2.6, MariaTimeText) and the locking strategy differ.
 public sealed class MariaStockMovementRepository(IConfiguration configuration, IAccessControl? accessControl = null,
     IAuditTrail? auditTrail = null, IArchiveService? archiveService = null) : IStockMovementRepository
 {
     private const string ProductMissingMessage = "Produsul nu mai există. Actualizează catalogul.";
-    private static readonly SemaphoreSlim SchemaGate = new(1, 1);
-    private static bool schemaReady;
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
     private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     private const string SelectMovement = """
-        SELECT io.id_io,io.id_produs,io.io_tip_actiune,io.io_numar_bucati,io.io_data,io.io_descriere,
-               io.id_beneficiar,b.beneficiar_denumire,io.id_project,pr.name,COALESCE(u.username,''),io.io_versiune,
-               io.io_created_utc,io.io_updated_utc,
-               EXISTS(SELECT 1 FROM io_history h WHERE h.id_io=io.id_io),
-               io.io_destinatie,io.id_vehicul,dv.vehicul_numar,io.id_vehicul_sursa,sv.vehicul_numar
-        FROM io
-        LEFT JOIN beneficiar b ON b.id_beneficiar=io.id_beneficiar AND io.id_beneficiar<>0
-        LEFT JOIN project pr ON pr.id_project=io.id_project
-        LEFT JOIN `user` u ON u.id_user=io.id_user
-        LEFT JOIN vehicul dv ON dv.id_vehicul=io.id_vehicul
-        LEFT JOIN vehicul sv ON sv.id_vehicul=io.id_vehicul_sursa
+        SELECT m.id,m.product_id,m.kind,m.quantity,m.movement_date,m.description,m.beneficiary_id,b.name,m.project_id,p.name,
+               m.operator,m.version,m.created_utc,m.updated_utc,
+               EXISTS(SELECT 1 FROM stock_movement_history h WHERE h.movement_id=m.id),
+               m.destination,m.vehicle_id,dv.plate_number,m.source_vehicle_id,sv.plate_number
+        FROM stock_movements m
+        LEFT JOIN beneficiaries b ON b.id=m.beneficiary_id
+        LEFT JOIN projects p ON p.id=m.project_id
+        LEFT JOIN vehicles dv ON dv.id=m.vehicle_id
+        LEFT JOIN vehicles sv ON sv.id=m.source_vehicle_id
         """;
 
     public async Task<StockMovementPage> GetPageAsync(int productId, StockMovementQuery query, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        int stock;
-        await using (var stockCommand = Command(connection, null,
-            "SELECT COALESCE(produs_cantitate,0) FROM produs WHERE id_produs=@id", ("@id", productId)))
-            stock = await stockCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is { } value and not DBNull
-                ? Convert.ToInt32(value)
-                : throw new StockMovementOperationException(ProductMissingMessage);
+        var stock = await GetStockAsync(connection, null, productId, cancellationToken).ConfigureAwait(false)
+                    ?? throw new StockMovementOperationException(ProductMissingMessage);
         object kind = query.Kind is null ? DBNull.Value : (int)query.Kind.Value;
         int total;
         await using (var count = Command(connection, null,
-            "SELECT COUNT(*) FROM io WHERE id_produs=@product AND (@kind IS NULL OR io_tip_actiune=@kind)",
+            "SELECT COUNT(*) FROM stock_movements WHERE product_id=@product AND (@kind IS NULL OR kind=@kind)",
             ("@product", productId), ("@kind", kind)))
             total = Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
         bool anyModified;
         await using (var modified = Command(connection, null, """
-            SELECT EXISTS(SELECT 1 FROM io_history h INNER JOIN io ON io.id_io=h.id_io WHERE io.id_produs=@product)
+            SELECT EXISTS(SELECT 1 FROM stock_movement_history h INNER JOIN stock_movements m ON m.id=h.movement_id
+                          WHERE m.product_id=@product)
             """, ("@product", productId)))
             anyModified = Convert.ToBoolean(await modified.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
         var direction = query.Descending ? "DESC" : "ASC";
+        // MySQL/MariaDB LIMIT needs a non-negative bound; long.MaxValue stands in for "no limit" (PageSize <= 0).
         var limit = query.PageSize <= 0 ? long.MaxValue : query.PageSize;
         var offset = query.PageSize <= 0 ? 0 : (long)(Math.Max(1, query.Page) - 1) * query.PageSize;
         await using var command = Command(connection, null, $"""
             {SelectMovement}
-            WHERE io.id_produs=@product AND (@kind IS NULL OR io.io_tip_actiune=@kind)
-            ORDER BY STR_TO_DATE(io.io_data,'%d-%m-%Y') {direction}, io.id_io {direction}
+            WHERE m.product_id=@product AND (@kind IS NULL OR m.kind=@kind)
+            ORDER BY m.movement_date {direction}, m.id {direction}
             LIMIT @limit OFFSET @offset
             """, ("@product", productId), ("@kind", kind), ("@limit", limit), ("@offset", offset));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -77,12 +70,13 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             .Where(entry => entry.Quantity > 0).ToDictionary(entry => entry.VehicleId, entry => entry.Quantity);
         if (held.Count == 0) return [];
         var result = new List<VehicleStock>();
-        await using var command = Command(connection, null,
-            "SELECT id_vehicul,vehicul_numar,vehicul_descriere FROM vehicul ORDER BY vehicul_numar,id_vehicul");
+        await using var command = Command(connection, null, "SELECT id,plate_number,description FROM vehicles ORDER BY plate_number,id");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            if (held.TryGetValue(reader.GetInt32(0), out var quantity))
-                result.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), quantity));
+        {
+            var id = ToInt32(reader.GetInt64(0));
+            if (held.TryGetValue(id, out var quantity)) result.Add(new(id, reader.GetString(1), reader.GetString(2), quantity));
+        }
         return result;
     }
 
@@ -94,10 +88,9 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             .Where(entry => entry.VehicleId == vehicleId && entry.Quantity > 0).ToList();
         var result = new List<VehicleEquipment>();
         foreach (var entry in held)
-        {
-            await using var codeCommand = Command(connection, null, "SELECT produs_denumire FROM produs WHERE id_produs=@id", ("@id", entry.ProductId));
-            result.Add(new(entry.ProductId, await codeCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string ?? $"#{entry.ProductId}", entry.Quantity));
-        }
+            result.Add(new(entry.ProductId,
+                await GetProductCodeAsync(connection, null, entry.ProductId, cancellationToken).ConfigureAwait(false) ?? $"#{entry.ProductId}",
+                entry.Quantity));
         return result.OrderBy(item => item.ProductCode, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.ProductId).ToList();
     }
 
@@ -105,22 +98,24 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         StockMovementRules.ValidateTransfer(transfer);
+        var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
+        var nowText = MariaTimeText.Format(now);
         var day = StockMovementRules.Today;
-        var (created, codes) = await WriteAsync(async (connection, transaction, userId) =>
+        var (movements, productCodes) = await WriteAsync(async (connection, transaction) =>
         {
             async Task<string> PlateAsync(int id)
             {
-                await using var command = Command(connection, transaction, "SELECT vehicul_numar FROM vehicul WHERE id_vehicul=@id", ("@id", id));
+                await using var command = Command(connection, transaction, "SELECT plate_number FROM vehicles WHERE id=@id", ("@id", id));
                 return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
                        ?? throw new StockMovementOperationException(StockMovementRules.VehicleMissingMessage);
             }
             var sourcePlate = await PlateAsync(transfer.SourceVehicleId).ConfigureAwait(false);
             var targetPlate = transfer.TargetVehicleId is { } targetId ? await PlateAsync(targetId).ConfigureAwait(false) : null;
-            // Products are locked in identifier order, so two transfers cannot deadlock each other.
-            var candidates = (await VehicleQuantitiesAsync(connection, transaction, null, cancellationToken).ConfigureAwait(false))
+            // Products are locked in identifier order first, so two concurrent transfers cannot deadlock each other.
+            var candidateIds = (await VehicleQuantitiesAsync(connection, transaction, null, cancellationToken).ConfigureAwait(false))
                 .Where(entry => entry.VehicleId == transfer.SourceVehicleId && entry.Quantity > 0).Select(entry => entry.ProductId);
-            var productIds = (transfer.Lines?.Select(line => line.ProductId) ?? candidates).Distinct().Order().ToList();
+            var productIds = (transfer.Lines?.Select(line => line.ProductId) ?? candidateIds).Distinct().Order().ToList();
             var productCodes = new Dictionary<int, string>();
             foreach (var productId in productIds)
                 productCodes[productId] = await LockProductAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
@@ -132,8 +127,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             if (plan.Count == 0) throw new StockMovementOperationException(StockMovementRules.NothingToTransferMessage);
             var description = TextNormalization.ForStorage(StockMovementRules.TransferDescription(sourcePlate, targetPlate, day));
             var destination = transfer.TargetVehicleId is null ? ExitDestination.WarehouseReturn : ExitDestination.Vehicle;
-            var operatorName = await UsernameAsync(connection, transaction, userId, cancellationToken).ConfigureAwait(false);
-            var movements = new List<StockMovement>();
+            var created = new List<StockMovement>();
             foreach (var line in plan)
             {
                 var productCode = productCodes.TryGetValue(line.ProductId, out var known) ? known
@@ -142,27 +136,27 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                 if (line.Quantity > available)
                     throw new StockMovementOperationException($"{productCode}: {StockMovementRules.NotEnoughInVehicleMessage(sourcePlate, available)}");
                 await using var insert = Command(connection, transaction, """
-                    INSERT INTO io(id_user,id_produs,id_beneficiar,id_project,io_tip_actiune,io_numar_bucati,io_descriere,io_data,
-                                   io_versiune,io_created_utc,io_updated_utc,io_destinatie,id_vehicul,id_vehicul_sursa)
-                    VALUES(@user,@product,0,NULL,0,@quantity,@description,@date,0,@created,@created,@destination,@vehicle,@sourceVehicle)
-                    """, ("@user", userId), ("@product", line.ProductId), ("@quantity", line.Quantity), ("@description", description),
-                    ("@date", StockMovementRules.LegacyDate(day)), ("@created", now), ("@destination", (int)destination),
-                    ("@vehicle", transfer.TargetVehicleId), ("@sourceVehicle", transfer.SourceVehicleId));
+                    INSERT INTO stock_movements
+                        (product_id,beneficiary_id,project_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc,
+                         destination,vehicle_id,source_vehicle_id)
+                    VALUES(@product,NULL,NULL,@quantity,@created,0,@date,@description,@operator,0,@created,@destination,@vehicle,@sourceVehicle)
+                    """, ("@product", line.ProductId), ("@quantity", line.Quantity), ("@created", nowText),
+                    ("@date", StockMovementRules.StorageDate(day)), ("@description", description), ("@operator", actor.Username),
+                    ("@destination", (int)destination), ("@vehicle", transfer.TargetVehicleId), ("@sourceVehicle", transfer.SourceVehicleId));
                 await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                var movement = new StockMovement(checked((int)insert.LastInsertedId), line.ProductId, StockMovementKind.Exit, line.Quantity, day,
-                    description, null, null, null, null, operatorName, 0, now, now, false, destination, transfer.TargetVehicleId, targetPlate,
-                    transfer.SourceVehicleId, sourcePlate);
-                await LogAsync(connection, transaction, userId, "create", null, movement, string.Empty, cancellationToken).ConfigureAwait(false);
+                var id = checked((int)insert.LastInsertedId);
+                var movement = new StockMovement(id, line.ProductId, StockMovementKind.Exit, line.Quantity, day, description, null, null, null, null,
+                    actor.Username, 0, now, now, false, destination, transfer.TargetVehicleId, targetPlate, transfer.SourceVehicleId, sourcePlate);
                 await EnsureVehicleStocksNotNegativeAsync(connection, transaction, line.ProductId, cancellationToken).ConfigureAwait(false);
-                movements.Add(movement);
+                created.Add(movement);
             }
-            return (movements, productCodes);
+            return (created, productCodes);
         }, cancellationToken).ConfigureAwait(false);
-        foreach (var movement in created)
+        foreach (var movement in movements)
             await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.StockMovement, movement.Id.ToString(),
-                StockMovementRules.Target(codes[movement.ProductId]), StockMovementRules.AuditIdentification(movement, codes[movement.ProductId]),
-                cancellationToken).ConfigureAwait(false);
-        return created;
+                StockMovementRules.Target(productCodes[movement.ProductId]),
+                StockMovementRules.AuditIdentification(movement, productCodes[movement.ProductId]), cancellationToken).ConfigureAwait(false);
+        return movements;
     }
 
     public async Task<IReadOnlyDictionary<int, int>> GetQuantitiesInVehiclesAsync(CancellationToken cancellationToken = default)
@@ -180,13 +174,14 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT vid,COUNT(*) FROM (
-                SELECT id_vehicul AS vid FROM io WHERE id_vehicul IS NOT NULL
-                UNION ALL SELECT id_vehicul_sursa FROM io WHERE id_vehicul_sursa IS NOT NULL) t
+                SELECT vehicle_id AS vid FROM stock_movements WHERE vehicle_id IS NOT NULL
+                UNION ALL SELECT source_vehicle_id FROM stock_movements WHERE source_vehicle_id IS NOT NULL) t
             GROUP BY vid
             """);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var counts = new Dictionary<int, int>();
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) counts[reader.GetInt32(0)] = Convert.ToInt32(reader.GetValue(1));
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            counts[ToInt32(reader.GetInt64(0))] = Convert.ToInt32(reader.GetValue(1));
         return counts;
     }
 
@@ -209,15 +204,16 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
-            SELECT io.id_io,io.id_produs,p.produs_denumire,io.io_numar_bucati,io.io_data,COALESCE(u.username,'')
-            FROM io INNER JOIN produs p ON p.id_produs=io.id_produs LEFT JOIN `user` u ON u.id_user=io.id_user
-            WHERE io.id_project=@project AND io.io_tip_actiune=0
-            ORDER BY STR_TO_DATE(io.io_data,'%d-%m-%Y') DESC,io.id_io DESC
+            SELECT m.id,m.product_id,p.name,m.quantity,m.movement_date,m.operator
+            FROM stock_movements m INNER JOIN products p ON p.id=m.product_id
+            WHERE m.project_id=@project AND m.kind=0
+            ORDER BY m.movement_date DESC,m.id DESC
             """, ("@project", projectId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<ProjectStockMovement>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new(reader.GetInt32(0), reader.GetInt32(1), Text(reader, 2), reader.GetInt32(3), ParseDate(reader.GetString(4)), reader.GetString(5)));
+            result.Add(new(ToInt32(reader.GetInt64(0)), ToInt32(reader.GetInt64(1)), reader.GetString(2), ToInt32(reader.GetInt64(3)),
+                StockMovementRules.ParseStorageDate(reader.GetString(4)), reader.GetString(5)));
         return result;
     }
 
@@ -225,8 +221,10 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         var value = StockMovementRules.Validated(input, input.Kind, false);
+        var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
-        var (movement, stock, productCode) = await WriteAsync(async (connection, transaction, userId) =>
+        var nowText = MariaTimeText.Format(now);
+        var (movement, stock, productCode) = await WriteAsync(async (connection, transaction) =>
         {
             var productCode = await LockProductAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
             var (beneficiaryName, projectName) = await ResolveRelationsAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
@@ -239,22 +237,23 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                     throw new StockMovementOperationException(StockMovementRules.NotEnoughInVehicleMessage(sourcePlate!, held));
             }
             await using var insert = Command(connection, transaction, """
-                INSERT INTO io(id_user,id_produs,id_beneficiar,id_project,io_tip_actiune,io_numar_bucati,io_descriere,io_data,
-                               io_versiune,io_created_utc,io_updated_utc,io_destinatie,id_vehicul,id_vehicul_sursa)
-                VALUES(@user,@product,@beneficiary,@project,@kind,@quantity,@description,@date,0,@created,@created,
+                INSERT INTO stock_movements
+                    (product_id,beneficiary_id,project_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc,
+                     destination,vehicle_id,source_vehicle_id)
+                VALUES(@product,@beneficiary,@project,@quantity,@created,@kind,@date,@description,@operator,0,@created,
                        @destination,@vehicle,@sourceVehicle)
-                """, ("@user", userId), ("@product", productId), ("@beneficiary", value.BeneficiaryId ?? 0),
-                ("@project", value.ProjectId), ("@kind", (int)value.Kind), ("@quantity", value.Quantity),
-                ("@description", value.Description), ("@date", StockMovementRules.LegacyDate(value.Date!.Value)), ("@created", now),
-                ("@destination", (int?)value.Destination), ("@vehicle", value.VehicleId), ("@sourceVehicle", value.SourceVehicleId));
+                """, ("@product", productId), ("@beneficiary", value.BeneficiaryId), ("@project", value.ProjectId),
+                ("@quantity", value.Quantity), ("@created", nowText), ("@kind", (int)value.Kind),
+                ("@date", StockMovementRules.StorageDate(value.Date!.Value)), ("@description", value.Description),
+                ("@operator", actor.Username), ("@destination", (int?)value.Destination), ("@vehicle", value.VehicleId),
+                ("@sourceVehicle", value.SourceVehicleId));
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var id = checked((int)insert.LastInsertedId);
             var movement = new StockMovement(id, productId, value.Kind, value.Quantity!.Value, value.Date.Value, value.Description,
-                value.BeneficiaryId, beneficiaryName, value.ProjectId, projectName, await UsernameAsync(connection, transaction, userId, cancellationToken).ConfigureAwait(false),
-                0, now, now, false, value.Destination, value.VehicleId, vehiclePlate, value.SourceVehicleId, sourcePlate);
+                value.BeneficiaryId, beneficiaryName, value.ProjectId, projectName, actor.Username, 0, now, now, false,
+                value.Destination, value.VehicleId, vehiclePlate, value.SourceVehicleId, sourcePlate);
             await EnsureVehicleStocksNotNegativeAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
             var stock = await ApplyStockAsync(connection, transaction, productId, movement.Effect, cancellationToken).ConfigureAwait(false);
-            await LogAsync(connection, transaction, userId, "create", null, movement, string.Empty, cancellationToken).ConfigureAwait(false);
             return (movement, stock, productCode);
         }, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.StockMovement, movement.Id.ToString(),
@@ -266,8 +265,10 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         var value = StockMovementRules.Validated(input, original.Kind, true, allowVehicleTransfer: original.IsVehicleTransfer);
+        var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
-        var (current, updated, stock, productCode) = await WriteAsync(async (connection, transaction, userId) =>
+        var nowText = MariaTimeText.Format(now);
+        var (current, updated, stock, productCode) = await WriteAsync(async (connection, transaction) =>
         {
             var current = await GetMovementAsync(connection, transaction, original.Id, true, cancellationToken).ConfigureAwait(false);
             StockMovementRules.CheckCurrent(current, original);
@@ -286,27 +287,25 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                 throw new StockMovementOperationException("Nu ai modificat nicio valoare a mișcării.");
             var correction = updated.Effect - current.Effect;
             await using (var update = Command(connection, transaction, """
-                UPDATE io SET io_numar_bucati=@quantity,io_data=@date,io_descriere=@description,id_beneficiar=@beneficiary,
-                    id_project=@project,io_versiune=@version,io_updated_utc=@updated,
-                    io_destinatie=@destination,id_vehicul=@vehicle,id_vehicul_sursa=@sourceVehicle
-                WHERE id_io=@id AND io_versiune=@oldVersion
-                """, ("@quantity", updated.Quantity), ("@date", StockMovementRules.LegacyDate(updated.Date)),
-                ("@description", updated.Description), ("@beneficiary", updated.BeneficiaryId ?? 0), ("@project", updated.ProjectId),
-                ("@version", updated.Version), ("@updated", now), ("@id", current.Id), ("@oldVersion", current.Version),
+                UPDATE stock_movements SET quantity=@quantity,movement_date=@date,description=@description,
+                    beneficiary_id=@beneficiary,project_id=@project,version=@version,updated_utc=@updated,
+                    destination=@destination,vehicle_id=@vehicle,source_vehicle_id=@sourceVehicle
+                WHERE id=@id AND version=@oldVersion
+                """, ("@quantity", updated.Quantity), ("@date", StockMovementRules.StorageDate(updated.Date)),
+                ("@description", updated.Description), ("@beneficiary", updated.BeneficiaryId), ("@project", updated.ProjectId),
+                ("@version", updated.Version), ("@updated", nowText), ("@id", current.Id), ("@oldVersion", current.Version),
                 ("@destination", (int?)updated.Destination), ("@vehicle", updated.VehicleId), ("@sourceVehicle", updated.SourceVehicleId)))
                 if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                     throw new StockMovementOperationException(StockMovementRules.StaleMessage);
             await using (var history = Command(connection, transaction, """
-                INSERT INTO io_history(id_user,id_io,denumire_produs,modificare,data,motiv,timestamp)
-                VALUES(@user,@movement,@product,@changes,@date,@reason,@timestamp)
-                """, ("@user", userId), ("@movement", current.Id), ("@product", productCode),
-                ("@changes", StockMovementRules.HistorySummary(current, updated, correction)),
-                ("@date", StockMovementRules.LegacyDate(DateOnly.FromDateTime(now))), ("@reason", value.Reason),
-                ("@timestamp", now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))))
+                INSERT INTO stock_movement_history(movement_id,actor,timestamp_utc,changes,stock_correction,reason)
+                VALUES(@movement,@actor,@timestamp,@changes,@correction,@reason)
+                """, ("@movement", current.Id), ("@actor", actor.Username), ("@timestamp", nowText),
+                ("@changes", StockMovementRules.HistorySummary(current, updated, correction)), ("@correction", correction),
+                ("@reason", value.Reason)))
                 await history.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             await EnsureVehicleStocksNotNegativeAsync(connection, transaction, current.ProductId, cancellationToken).ConfigureAwait(false);
             var stock = await ApplyStockAsync(connection, transaction, current.ProductId, correction, cancellationToken).ConfigureAwait(false);
-            await LogAsync(connection, transaction, userId, "update", current, updated, value.Reason, cancellationToken).ConfigureAwait(false);
             return (current, updated, stock, productCode);
         }, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.StockMovement, updated.Id.ToString(),
@@ -323,29 +322,28 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         IReadOnlyList<StockMovementHistoryEntry> history;
         await using (var lookup = await OpenAsync(cancellationToken).ConfigureAwait(false))
         {
-            await using var codeCommand = Command(lookup, null, "SELECT produs_denumire FROM produs WHERE id_produs=@id", ("@id", original.ProductId));
-            productCode = await codeCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
+            productCode = await GetProductCodeAsync(lookup, null, original.ProductId, cancellationToken).ConfigureAwait(false)
                           ?? throw new StockMovementOperationException(ProductMissingMessage);
             history = await GetHistoryAsync(lookup, null, original.Id, cancellationToken).ConfigureAwait(false);
         }
         var stock = 0;
         await archiver.ExecuteAsync(ArchiveRequests.StockMovement(original, productCode, history, motif), async (operation, token) =>
         {
-            stock = await WriteAsync(async (connection, transaction, userId) =>
+            stock = await WriteAsync(async (connection, transaction) =>
             {
                 var current = await GetMovementAsync(connection, transaction, original.Id, true, token).ConfigureAwait(false);
                 StockMovementRules.CheckCurrent(current, original);
                 await LockProductAsync(connection, transaction, current!.ProductId, token).ConfigureAwait(false);
                 await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token).ConfigureAwait(false);
-                await using (var deleteHistory = Command(connection, transaction, "DELETE FROM io_history WHERE id_io=@id", ("@id", original.Id)))
+                await using (var deleteHistory = Command(connection, transaction,
+                    "DELETE FROM stock_movement_history WHERE movement_id=@id", ("@id", original.Id)))
                     await deleteHistory.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                 await using (var delete = Command(connection, transaction,
-                    "DELETE FROM io WHERE id_io=@id AND io_versiune=@version", ("@id", original.Id), ("@version", original.Version)))
+                    "DELETE FROM stock_movements WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version)))
                     if (await delete.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)
                         throw new StockMovementOperationException(StockMovementRules.StaleMessage);
                 await EnsureVehicleStocksNotNegativeAsync(connection, transaction, current.ProductId, token).ConfigureAwait(false);
                 var newStock = await ApplyStockAsync(connection, transaction, current.ProductId, -current.Effect, token).ConfigureAwait(false);
-                await LogAsync(connection, transaction, userId, "delete", current, null, motif, token).ConfigureAwait(false);
                 await MariaArchivePersistence.InsertAuditAsync(connection, transaction, operation, token).ConfigureAwait(false);
                 return newStock;
             }, token).ConfigureAwait(false);
@@ -357,13 +355,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     internal static async Task<bool> ProjectHasMovementsAsync(MySqlConnection connection, MySqlTransaction? transaction, int projectId,
         CancellationToken token)
     {
-        await using var columns = new MySqlCommand("""
-            SELECT COUNT(*) FROM information_schema.COLUMNS
-            WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='io' AND COLUMN_NAME='id_project'
-            """, connection, transaction);
-        if (Convert.ToInt32(await columns.ExecuteScalarAsync(token).ConfigureAwait(false)) == 0) return false;
-        await using var command = new MySqlCommand("SELECT EXISTS(SELECT 1 FROM io WHERE id_project=@id)", connection, transaction);
-        command.Parameters.AddWithValue("@id", projectId);
+        await using var command = Command(connection, transaction, "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE project_id=@id)", ("@id", projectId));
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token).ConfigureAwait(false));
     }
 
@@ -371,13 +363,8 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     internal static async Task<bool> VehicleHasMovementsAsync(MySqlConnection connection, MySqlTransaction? transaction, int vehicleId,
         CancellationToken token)
     {
-        await using var columns = new MySqlCommand("""
-            SELECT COUNT(*) FROM information_schema.COLUMNS
-            WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='io' AND COLUMN_NAME IN ('id_vehicul','id_vehicul_sursa')
-            """, connection, transaction);
-        if (Convert.ToInt32(await columns.ExecuteScalarAsync(token).ConfigureAwait(false)) < 2) return false;
-        await using var command = new MySqlCommand("SELECT EXISTS(SELECT 1 FROM io WHERE id_vehicul=@id OR id_vehicul_sursa=@id)", connection, transaction);
-        command.Parameters.AddWithValue("@id", vehicleId);
+        await using var command = Command(connection, transaction,
+            "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE vehicle_id=@id OR source_vehicle_id=@id)", ("@id", vehicleId));
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token).ConfigureAwait(false));
     }
 
@@ -387,7 +374,6 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         try
         {
             await connection.OpenAsync(token).ConfigureAwait(false);
-            await EnsureSchemaAsync(connection, token).ConfigureAwait(false);
             return connection;
         }
         catch
@@ -397,24 +383,16 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         }
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, int, Task<T>> action, CancellationToken token)
+    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (!string.Equals(configuration["Database:Name"] ?? "BlazorStoc", "BlazorStoc", StringComparison.Ordinal))
+        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
             throw new StockMovementOperationException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        var userId = configuration.GetValue<int>("Database:ApplicationUserId");
-        if (userId <= 0)
-            throw new StockMovementOperationException("Salvarea nu este configurată. Administratorul trebuie să asocieze contul web cu un utilizator al bazei de date.");
         await using var connection = await OpenAsync(token).ConfigureAwait(false);
-        await using (var strict = new MySqlCommand("SET SESSION sql_mode = CONCAT_WS(',', @@sql_mode, 'STRICT_ALL_TABLES')", connection))
-            await strict.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
         try
         {
-            await using (var actor = Command(connection, transaction, "SELECT id_user FROM `user` WHERE id_user=@id FOR UPDATE", ("@id", userId)))
-                if (await actor.ExecuteScalarAsync(token).ConfigureAwait(false) is null)
-                    throw new StockMovementOperationException("Utilizatorul asociat contului web nu există în baza de date. Verifică configurarea cu administratorul.");
-            var result = await action(connection, transaction, userId).ConfigureAwait(false);
+            var result = await action(connection, transaction).ConfigureAwait(false);
             await transaction.CommitAsync(token).ConfigureAwait(false);
             return result;
         }
@@ -425,55 +403,12 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         }
     }
 
-    private static async Task EnsureSchemaAsync(MySqlConnection connection, CancellationToken token)
-    {
-        if (schemaReady) return;
-        await SchemaGate.WaitAsync(token).ConfigureAwait(false);
-        try
-        {
-            if (schemaReady) return;
-            var columns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            await using (var command = new MySqlCommand("""
-                SELECT COLUMN_NAME,DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='io'
-                """, connection))
-            await using (var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false))
-                while (await reader.ReadAsync(token).ConfigureAwait(false)) columns[reader.GetString(0)] = reader.GetString(1);
-            // The movement queries join the project table, which the project module otherwise creates lazily.
-            foreach (var projectStatement in MariaProjectRepository.SchemaStatements)
-            {
-                await using var create = new MySqlCommand(projectStatement, connection);
-                await create.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-            }
-            // The movement queries also join the vehicle table (created by the vehicle module otherwise).
-            await using (var createVehicles = new MySqlCommand(MariaVehicleRepository.CreateTableSql, connection))
-                await createVehicles.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-            var statements = new List<string>();
-            // Exit destination (1 beneficiary, 2 vehicle, 3 generic sale, 4 stock correction), destination vehicle and source
-            // vehicle (null = the warehouse). The legacy application ignores these columns.
-            if (!columns.ContainsKey("io_destinatie")) statements.Add("ALTER TABLE io ADD COLUMN io_destinatie TINYINT NULL");
-            if (!columns.ContainsKey("id_vehicul")) statements.Add("ALTER TABLE io ADD COLUMN id_vehicul INT NULL, ADD INDEX ix_io_vehicul(id_vehicul)");
-            if (!columns.ContainsKey("id_vehicul_sursa")) statements.Add("ALTER TABLE io ADD COLUMN id_vehicul_sursa INT NULL, ADD INDEX ix_io_vehicul_sursa(id_vehicul_sursa)");
-            if (!columns.ContainsKey("id_project")) statements.Add("ALTER TABLE io ADD COLUMN id_project INT NULL, ADD INDEX ix_io_project(id_project)");
-            if (!columns.ContainsKey("io_versiune")) statements.Add("ALTER TABLE io ADD COLUMN io_versiune BIGINT UNSIGNED NOT NULL DEFAULT 0");
-            if (!columns.ContainsKey("io_created_utc")) statements.Add("ALTER TABLE io ADD COLUMN io_created_utc DATETIME(6) NULL");
-            if (!columns.ContainsKey("io_updated_utc")) statements.Add("ALTER TABLE io ADD COLUMN io_updated_utc DATETIME(6) NULL");
-            // The legacy column is a tinyint; the quantity limit of this module needs a wider type.
-            if (columns.TryGetValue("io_numar_bucati", out var type) && type.Equals("tinyint", StringComparison.OrdinalIgnoreCase))
-                statements.Add("ALTER TABLE io MODIFY COLUMN io_numar_bucati INT NOT NULL DEFAULT 0");
-            foreach (var statement in statements)
-            {
-                await using var alter = new MySqlCommand(statement, connection);
-                await alter.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-            }
-            schemaReady = true;
-        }
-        finally { SchemaGate.Release(); }
-    }
-
+    // Locks the product row for the rest of the transaction: every stock/vehicle-quantity check and the final
+    // UPDATE products SET quantity=... below run under this lock, so two concurrent movements on the same product
+    // serialize instead of racing (the MariaDB equivalent of SQLite's single-writer Serializable transaction).
     private static async Task<string> LockProductAsync(MySqlConnection connection, MySqlTransaction transaction, int productId, CancellationToken token)
     {
-        await using var command = Command(connection, transaction,
-            "SELECT produs_denumire FROM produs WHERE id_produs=@id FOR UPDATE", ("@id", productId));
+        await using var command = Command(connection, transaction, "SELECT name FROM products WHERE id=@id FOR UPDATE", ("@id", productId));
         return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string
                ?? throw new StockMovementOperationException(ProductMissingMessage);
     }
@@ -484,12 +419,24 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     {
         if (delta != 0)
             await using (var update = Command(connection, transaction,
-                "UPDATE produs SET produs_cantitate=COALESCE(produs_cantitate,0)+@delta WHERE id_produs=@id",
-                ("@delta", delta), ("@id", productId)))
-                await update.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-        await using var read = Command(connection, transaction,
-            "SELECT COALESCE(produs_cantitate,0) FROM produs WHERE id_produs=@id", ("@id", productId));
-        return Convert.ToInt32(await read.ExecuteScalarAsync(token).ConfigureAwait(false));
+                "UPDATE products SET quantity=quantity+@delta WHERE id=@id", ("@delta", delta), ("@id", productId)))
+                if (await update.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)
+                    throw new StockMovementOperationException(ProductMissingMessage);
+        return await GetStockAsync(connection, transaction, productId, token).ConfigureAwait(false)
+               ?? throw new StockMovementOperationException(ProductMissingMessage);
+    }
+
+    private static async Task<int?> GetStockAsync(MySqlConnection connection, MySqlTransaction? transaction, int productId, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, "SELECT quantity FROM products WHERE id=@id", ("@id", productId));
+        var value = await command.ExecuteScalarAsync(token).ConfigureAwait(false);
+        return value is null or DBNull ? null : Convert.ToInt32(value);
+    }
+
+    private static async Task<string?> GetProductCodeAsync(MySqlConnection connection, MySqlTransaction? transaction, int productId, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, "SELECT name FROM products WHERE id=@id", ("@id", productId));
+        return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string;
     }
 
     private static async Task<(string? BeneficiaryName, string? ProjectName)> ResolveRelationsAsync(MySqlConnection connection,
@@ -498,19 +445,17 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         string? beneficiaryName = null, projectName = null;
         if (value.BeneficiaryId is { } beneficiaryId)
         {
-            await using var command = Command(connection, transaction,
-                "SELECT beneficiar_denumire FROM beneficiar WHERE id_beneficiar=@id", ("@id", beneficiaryId));
+            await using var command = Command(connection, transaction, "SELECT name FROM beneficiaries WHERE id=@id", ("@id", beneficiaryId));
             beneficiaryName = await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string
                               ?? throw new StockMovementOperationException("Beneficiarul selectat nu mai există. Actualizează lista și reia operația.");
         }
         if (value.ProjectId is { } projectId)
         {
-            await using var command = Command(connection, transaction,
-                "SELECT name,id_beneficiar FROM project WHERE id_project=@id", ("@id", projectId));
+            await using var command = Command(connection, transaction, "SELECT name,beneficiary_id FROM projects WHERE id=@id", ("@id", projectId));
             await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
             if (!await reader.ReadAsync(token).ConfigureAwait(false))
                 throw new StockMovementOperationException("Proiectul selectat nu mai există. Actualizează lista și reia operația.");
-            if (reader.GetInt32(1) != value.BeneficiaryId)
+            if (ToInt32(reader.GetInt64(1)) != value.BeneficiaryId)
                 throw new StockMovementOperationException("Proiectul selectat nu aparține beneficiarului ales.");
             projectName = reader.GetString(0);
         }
@@ -522,7 +467,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     {
         async Task<string> PlateAsync(int id)
         {
-            await using var command = Command(connection, transaction, "SELECT vehicul_numar FROM vehicul WHERE id_vehicul=@id", ("@id", id));
+            await using var command = Command(connection, transaction, "SELECT plate_number FROM vehicles WHERE id=@id", ("@id", id));
             return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string
                    ?? throw new StockMovementOperationException(StockMovementRules.VehicleMissingMessage);
         }
@@ -536,18 +481,18 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         MySqlTransaction? transaction, int? productId, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT id_produs,vid,SUM(qty) FROM (
-                SELECT id_produs,id_vehicul AS vid,io_numar_bucati AS qty FROM io
-                WHERE io_tip_actiune=0 AND io_destinatie=2 AND id_vehicul IS NOT NULL AND (@product IS NULL OR id_produs=@product)
+            SELECT product_id,vid,SUM(qty) FROM (
+                SELECT product_id,vehicle_id AS vid,quantity AS qty FROM stock_movements
+                WHERE kind=0 AND destination=2 AND vehicle_id IS NOT NULL AND (@product IS NULL OR product_id=@product)
                 UNION ALL
-                SELECT id_produs,id_vehicul_sursa,-io_numar_bucati FROM io
-                WHERE io_tip_actiune=0 AND id_vehicul_sursa IS NOT NULL AND (@product IS NULL OR id_produs=@product)) t
-            GROUP BY id_produs,vid
+                SELECT product_id,source_vehicle_id,-quantity FROM stock_movements
+                WHERE kind=0 AND source_vehicle_id IS NOT NULL AND (@product IS NULL OR product_id=@product)) t
+            GROUP BY product_id,vid
             """, ("@product", productId));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         var result = new List<(int, int, int)>();
         while (await reader.ReadAsync(token).ConfigureAwait(false))
-            result.Add((reader.GetInt32(0), reader.GetInt32(1), Convert.ToInt32(reader.GetValue(2))));
+            result.Add((ToInt32(reader.GetInt64(0)), ToInt32(reader.GetInt64(1)), Convert.ToInt32(reader.GetValue(2))));
         return result;
     }
 
@@ -558,23 +503,24 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         foreach (var entry in await VehicleQuantitiesAsync(connection, transaction, productId, token).ConfigureAwait(false))
         {
             if (entry.Quantity >= 0) continue;
-            await using var command = Command(connection, transaction, "SELECT vehicul_numar FROM vehicul WHERE id_vehicul=@id", ("@id", entry.VehicleId));
+            await using var command = Command(connection, transaction, "SELECT plate_number FROM vehicles WHERE id=@id", ("@id", entry.VehicleId));
             var plate = await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string ?? $"#{entry.VehicleId}";
             throw new StockMovementOperationException(StockMovementRules.NegativeVehicleStockMessage(plate));
         }
     }
 
-    private static async Task<string> UsernameAsync(MySqlConnection connection, MySqlTransaction transaction, int userId, CancellationToken token)
-    {
-        await using var command = Command(connection, transaction, "SELECT username FROM `user` WHERE id_user=@id", ("@id", userId));
-        return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string ?? string.Empty;
-    }
-
+    // Locks only the stock_movements row itself (not the joined beneficiary/project/vehicle rows the SELECT below
+    // also reads), so an edit/delete on one movement can never deadlock against an edit/delete on another that
+    // happens to reference the same beneficiary, project or vehicle.
     private static async Task<StockMovement?> GetMovementAsync(MySqlConnection connection, MySqlTransaction? transaction, int id,
         bool forUpdate, CancellationToken token)
     {
-        await using var command = Command(connection, transaction,
-            $"{SelectMovement} WHERE io.id_io=@id{(forUpdate ? " FOR UPDATE" : string.Empty)}", ("@id", id));
+        if (forUpdate)
+        {
+            await using var lockCommand = Command(connection, transaction, "SELECT id FROM stock_movements WHERE id=@id FOR UPDATE", ("@id", id));
+            if (await lockCommand.ExecuteScalarAsync(token).ConfigureAwait(false) is null) return null;
+        }
+        await using var command = Command(connection, transaction, $"{SelectMovement} WHERE m.id=@id", ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? ReadMovement(reader) : null;
     }
@@ -583,61 +529,40 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         MySqlTransaction? transaction, int movementId, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT h.id,h.id_io,COALESCE(u.username,''),h.timestamp,h.modificare,h.motiv
-            FROM io_history h LEFT JOIN `user` u ON u.id_user=h.id_user WHERE h.id_io=@id ORDER BY h.id
+            SELECT id,movement_id,actor,timestamp_utc,changes,stock_correction,reason
+            FROM stock_movement_history WHERE movement_id=@id ORDER BY id
             """, ("@id", movementId));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         var result = new List<StockMovementHistoryEntry>();
         while (await reader.ReadAsync(token).ConfigureAwait(false))
-        {
-            var changes = Text(reader, 4);
-            result.Add(new(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), ParseTimestamp(Text(reader, 3)),
-                changes, ParseCorrection(changes), Text(reader, 5)));
-        }
+            result.Add(new(ToInt32(reader.GetInt64(0)), ToInt32(reader.GetInt64(1)), reader.GetString(2),
+                MariaTimeText.Parse(reader.GetString(3)), reader.GetString(4), ToInt32(reader.GetInt64(5)), reader.GetString(6)));
         return result;
     }
 
-    // The correction is stored as text in the legacy `modificare` column: "...; Corecție stoc: +3".
-    private static int ParseCorrection(string changes)
-    {
-        const string marker = "Corecție stoc:";
-        var index = changes.LastIndexOf(marker, StringComparison.Ordinal);
-        return index >= 0 && int.TryParse(changes[(index + marker.Length)..].Trim(), NumberStyles.AllowLeadingSign,
-            CultureInfo.InvariantCulture, out var value) ? value : 0;
-    }
-
-    private static DateTime ParseTimestamp(string value) => DateTime.TryParseExact(value, "yyyy-MM-dd HH:mm:ss",
-        CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed)
-        ? parsed : DateTime.MinValue;
-
-    private static DateOnly ParseDate(string value) => DateOnly.TryParseExact(value.Trim(), "dd-MM-yyyy",
-        CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : DateOnly.MinValue;
-
     private static StockMovement ReadMovement(MySqlDataReader reader)
     {
-        var created = reader.IsDBNull(12) ? DateTime.MinValue : DateTime.SpecifyKind(reader.GetDateTime(12), DateTimeKind.Utc);
-        var updated = reader.IsDBNull(13) ? created : DateTime.SpecifyKind(reader.GetDateTime(13), DateTimeKind.Utc);
-        var beneficiaryId = reader.GetInt32(6);
-        return new StockMovement(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2) == 1 ? StockMovementKind.Entry : StockMovementKind.Exit,
-            reader.GetInt32(3), ParseDate(reader.GetString(4)), Text(reader, 5), beneficiaryId == 0 ? null : beneficiaryId,
-            reader.IsDBNull(7) ? null : reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetInt32(8),
-            reader.IsDBNull(9) ? null : reader.GetString(9), reader.GetString(10), reader.GetInt64(11), created, updated,
+        var created = MariaTimeText.Parse(reader.GetString(12));
+        var stored = reader.GetString(4);
+        var date = stored.Length == 0 ? DateOnly.FromDateTime(created) : StockMovementRules.ParseStorageDate(stored);
+        return new StockMovement(ToInt32(reader.GetInt64(0)), ToInt32(reader.GetInt64(1)), (StockMovementKind)ToInt32(reader.GetInt64(2)),
+            ToInt32(reader.GetInt64(3)), date, reader.GetString(5),
+            reader.IsDBNull(6) ? null : ToInt32(reader.GetInt64(6)), reader.IsDBNull(7) ? null : reader.GetString(7),
+            reader.IsDBNull(8) ? null : ToInt32(reader.GetInt64(8)), reader.IsDBNull(9) ? null : reader.GetString(9),
+            reader.GetString(10), reader.GetInt64(11), created, ReadUpdated(reader, created),
             Convert.ToBoolean(reader.GetValue(14)),
-            reader.IsDBNull(15) ? null : (ExitDestination)Convert.ToInt32(reader.GetValue(15)),
-            reader.IsDBNull(16) ? null : reader.GetInt32(16), reader.IsDBNull(17) ? null : reader.GetString(17),
-            reader.IsDBNull(18) ? null : reader.GetInt32(18), reader.IsDBNull(19) ? null : reader.GetString(19));
+            reader.IsDBNull(15) ? null : (ExitDestination)ToInt32(reader.GetInt64(15)),
+            reader.IsDBNull(16) ? null : ToInt32(reader.GetInt64(16)), reader.IsDBNull(17) ? null : reader.GetString(17),
+            reader.IsDBNull(18) ? null : ToInt32(reader.GetInt64(18)), reader.IsDBNull(19) ? null : reader.GetString(19));
     }
 
-    private static async Task LogAsync(MySqlConnection connection, MySqlTransaction transaction, int userId, string operation,
-        StockMovement? before, StockMovement? after, string reason, CancellationToken token)
+    private static DateTime ReadUpdated(MySqlDataReader reader, DateTime fallback)
     {
-        var entry = JsonSerializer.Serialize(new { Source = "BlazorStoc", Entity = "io", Operation = operation, Before = before, After = after, Reason = reason });
-        await using var command = Command(connection, transaction, "INSERT INTO log (id_user,log_command) VALUES (@user,@entry)",
-            ("@user", userId), ("@entry", entry));
-        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        var text = reader.GetString(13);
+        return text.Length == 0 ? fallback : MariaTimeText.Parse(text);
     }
 
-    private static string Text(MySqlDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+    private static int ToInt32(long value) => checked((int)value);
 
     private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql,
         params (string Name, object? Value)[] parameters)

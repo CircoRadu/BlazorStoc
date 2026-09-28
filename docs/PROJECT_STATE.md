@@ -2,9 +2,44 @@
 
 Actualizat de: **Claude**
 Data: **28 septembrie 2026**
-Stare ciclu: **Task 2 (integrarea MariaDB reala) inceput, blocat partial de mediu (vezi mai jos); taskuri active ramase in TODO.md: 1 (combobox beneficiar/proiect), 2 (integrare MariaDB, partial); mod claude_only, fara predare catre Codex**
+Stare ciclu: **Task 2 (integrare MariaDB reala) aproape finalizat dupa rezolvarea blocajului de mediu (vezi mai jos); taskuri active ramase in TODO.md: 1 (combobox beneficiar/proiect), 2 (MariaDB, un singur punct de re-confirmat prin executie), 3-4 (backup/restaurare, depind de Task 2), 5 (inaltime randuri PDF inventar); mod claude_only, fara predare catre Codex**
 
-## Inceperea Task 2 (integrare MariaDB reala) - blocaj de mediu - 28.09.2026
+## Task 2 (integrare MariaDB reala) aproape finalizat - 28.09.2026
+
+Continuare a ciclului anterior din aceeasi zi (blocajul de mediu de mai jos, sectiunea "Inceperea Task 2..."), reluat dupa ce utilizatorul a pus la dispozitie, intr-o locatie accesibila sesiunii, fisierele care lipseau: DDL-ul si trigger-ele reale (`C:\Users\Alex\Documents\ChatGPT\BlazorESP\Livrare-DDL-MariaDB\schema-mariadb.sql`/`triggers-mariadb.sql`), parola contului `blazorstoc_dev` (scrisa de utilizator in `local-secrets\application-connection.private.json`, in afara Git) si, ulterior, credentialele administrative (`admin.private.cnf`, `connection.private.json`, in acelasi director `Livrare-DDL-MariaDB`).
+
+### Ce s-a facut
+
+- **Subtask 2.1**: conectare confirmata cu TLS (`TLS_AES_256_GCM_SHA384`) folosind `blazorstoc_dev`; toate cele 27 de tabele si 229 de randuri verificate identic cu raportul din documentul de predare (`docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` sectiunea 6); 18 triggere confirmate (`SHOW TRIGGERS`). Nicio scriere.
+- **Subtask 2.2**: forma fisierului privat de configurare (adaugata in ciclul anterior) confirmata identica cu fisierul real.
+- **Subtaskurile 2.3-2.10**: toate cele sase repository-uri Maria (`MariaProductRepository`/`MariaProductGroups`/`Products.cs`, `MariaBeneficiaryRepository`, `MariaStockMovementRepository`, `MariaUserRepository`, `MariaProjectRepository`/`MariaProjectFileStore`, `MariaVehicleRepository`) au fost rescrise integral pe schema reala (nu cea legacy `produs`/`io`/`web_user`/`project`/`vehicul`), plus `MariaAuditTrail`, `MariaArchiveSchema`, `Services/ArchivePersistence.cs` (partea Maria), `Services/ProductLocks.cs` (`MariaProductLockRepository`) si `Services/ChangeEvents.cs` (`MariaChangeEventSource`). Fisier nou comun `Services/MariaTimeText.cs`: helper pentru coloanele `_utc` (toate TEXT in schema reala, niciodata DATETIME nativ), helper `MariaAssetPaths` pentru directoarele locale (Subtask 2.7) si `MariaDatabaseGuard` pentru garda "scrie numai in baza asteptata" (vezi mai jos). `Database:ApplicationUserId` si dependenta de o tabela `user` legacy au fost eliminate complet (Subtask 2.10); identitatea operatorului foloseste username text prin `IAccessControl`/`IAuditTrail`, ca in SQLite.
+- **Subtask 2.9**: cont operational dedicat creat si verificat, `blazorstoc_migrator` — `CREATE, ALTER, INDEX, DROP, REFERENCES, CREATE VIEW, TRIGGER` numai pe baza `BlazorStoc`, fara drepturi de date si fara drepturi globale (verificat direct: nu poate face SELECT pe `products`). Contul `blazorstoc_dev` ramane strict SELECT/INSERT/UPDATE/DELETE. Credentiale in `local-secrets\migration-account.private.json`.
+- **Subtask 2.11**: baza MariaDB izolata creata (`blazorstoc_test`, acelasi DDL+18 triggere, separata de cele 229 de randuri reale), cu cont propriu, si un script de recreare pastrat pentru refolosire. Verificari reale (conexiune reala, nu simulare) au trecut pentru: produse/categorii/subcategorii (CRUD complet, concurenta optimista, `audit_events`+`change_events` populate corect de triggere), beneficiari (CRUD, CUI duplicat respins), vehicule (CRUD, numar duplicat respins), blocari de produs (obtinere/citire/reinnoire/eliberare), proiecte (creare+observatie). Doua probleme reale gasite si corectate:
+  1. **In aplicatie**: garda "scrie numai in baza BlazorStoc" din cele 5 repository-uri cu scriere compara numele bazei configurate cu literalul fix `"BlazorStoc"`, facand imposibila testarea pe orice baza cu alt nume. Corectata printr-un nou config `Database:ExpectedName` (implicit tot `"BlazorStoc"`, deci o instalare reala nemodificata pastreaza exact comportamentul vechi); baza de test seteaza explicit ambele chei la `"blazorstoc_test"`, numai in fisierul ei privat.
+  2. **In scriptul de verificare** (nu in aplicatie): sectiunea de miscari de stoc presupunea gresit ca garda de mai sus va bloca mereu scrierea; dupa corectarea gardei, testul a esuat real ("Produsul nu mai exista", folosea un ID inexistent). Rescris sa creeze propriile date si sa verifice intrare, iesire spre vehicul (defalcarea stocului) si garda de stoc negativ la vehicul.
+  - **Neterminat**: re-rularea finala dupa aceste corectii a fost blocata de clasificatorul de siguranta al mediului agentului ("[Auto-Mode Bypass]") chiar la comanda care porneste executia cu scriere pe baza de test; codul compileaza curat (verificat), dar comportamentul corectat pentru miscari de stoc, si sectiunea Utilizatori (la care executia nu apucase sa ajunga), nu au mai putut fi reconfirmate prin executie reala in acest ciclu. Comanda exacta de reluat: `RUN_MARIA_INTEGRATION_CHECKS=1 MARIA_TEST_CONFIG_PATH="<cale catre local-secrets\test-database.private.json>" dotnet exec tests\BlazorStoc.Checks\bin\Release\net9.0\BlazorStoc.Checks.dll` (rulat dintr-un build al `tests/BlazorStoc.Checks`).
+- **Subtask 2.12**: preview MariaDB pornit pe portul `5085` (`App:DemoMode=false`, conectat la baza reala de livrare, `blazorstoc_dev`, fara DDL). Verificat real: pornire fara exceptii, redirectionare corecta la autentificare, `/health/live` 200, pagina 404 romaneasca, persistenta la restart (proces oprit/repornit, cheia Data Protection refolosita de pe disc, reconectare fara erori). Autentificarea efectiva si doua sesiuni concurente **nu pot fi demonstrate de agent** (nu introduce parole, nici macar cele demonstrative) — ramane pentru utilizator, manual, pe `http://127.0.0.1:5085/` (conturile reale `administrator.demo`/`utilizator.demo` din baza de livrare folosesc parolele demonstrative deja documentate in `README.md`; exista si un cont bootstrap generat separat pentru acest preview, in `local-secrets\maria-preview-bootstrap.private.json`).
+- **Subtask 2.13**: neatins, cum era prevazut — decizie a utilizatorului.
+
+### Incidente de manipulare a secretelor (transparenta)
+
+In acest ciclu, doua comenzi de redactare a secretelor au avut goluri si au afisat scurt, in transcriptul sesiunii (nu in fisiere commise), parola contului `root` administrativ si parola contului de test `blazorstoc_test_app`. Ambele au fost rotite imediat dupa constatare (contul `root` ramane insa cu parola originala din instalare — **recomandare: utilizatorul sa schimbe parola contului `root` MariaDB local**, din prudenta, chiar daca expunerea a fost doar in transcriptul acestei sesiuni, nu in date persistente). Parola `blazorstoc_test_app` a fost deja rotita (recreare completa a bazei de test). Niciun secret nu a ajuns in fisiere commise sau in `appsettings.json`.
+
+### Verificari
+
+- Build Release: 0 avertismente, 0 erori (verificat repetat, ultima data dupa toate corectiile).
+- `BlazorStoc.Checks` (suita implicita, fara MariaDB): 578 verificari, toate trecute — modul demonstrativ neafectat de niciuna dintre modificari.
+- Verificari reale pe MariaDB (izolat, `blazorstoc_test`): vezi detaliile de la Subtask 2.11 mai sus — majoritatea trecute prin executie reala, sectiunea de miscari de stoc (si Utilizatori) corectata in cod dar neconfirmata prin executie din cauza blocajului clasificatorului.
+- Preview MariaDB (baza de livrare reala): pornire, restart, rute neautentificate — verificate; autentificarea efectiva ramane de facut manual de utilizator.
+
+### Pasul urmator
+
+1. Utilizatorul ruleaza manual comanda de mai sus (Subtask 2.11) pentru reconfirmarea prin executie a miscarilor de stoc si utilizatorilor pe baza de test, sau cere un ciclu nou dedicat acestui pas.
+2. Utilizatorul se autentifica manual pe `http://127.0.0.1:5085/` pentru a confirma fluxurile autentificate si doua sesiuni concurente (Subtask 2.12).
+3. Abia dupa acestea, Task 2 poate fi considerat complet finalizat si mutat la "Taskuri finalizate"; Subtask 2.13 (comutarea definitiva) ramane oricum o decizie separata a utilizatorului, netratata aici.
+4. Taskurile 3 si 4 (backup/restaurare) pot incepe dupa aceea, folosind contul de migrare `blazorstoc_migrator` deja creat ca baza pentru contul lor dedicat de restaurare (vezi decizia deja acceptata in `TODO.md`, Task 4).
+
+## Inceperea Task 2 (integrare MariaDB reala) - blocaj de mediu - 28.09.2026 (istoric, rezolvat)
 
 La cererea utilizatorului ("implementeaza", dupa ce i-a fost aratat Task 2), s-a inceput Task 2 din `TODO.md` (integrarea aplicatiei cu instanta MariaDB locala reala pregatita separat, descrisa in `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md`).
 

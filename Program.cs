@@ -51,7 +51,12 @@ if (demo)
     builder.Services.AddSingleton<IAuditTrail, SqliteAuditTrail>();
 }
 else builder.Services.AddSingleton<IAuditTrail, MariaAuditTrail>();
-var keysPath = builder.Configuration["App:DataProtectionPath"] ?? Path.Combine(builder.Environment.ContentRootPath, "keys");
+// Subtask 2.7 (Task 2): an explicit App:DataProtectionPath always wins. Without one, demo mode keeps its existing
+// default (keys/ under the app's own tree); MariaDB mode defaults instead to the dedicated local asset directory
+// from the handoff document, never silently sharing the demo-mode directory.
+var keysPath = builder.Configuration["App:DataProtectionPath"] ?? (demo
+    ? Path.Combine(builder.Environment.ContentRootPath, "keys")
+    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "assets", "data-protection-keys"));
 Directory.CreateDirectory(keysPath);
 builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keysPath)).SetApplicationName("BlazorStoc");
 builder.Services.AddRateLimiter(options =>

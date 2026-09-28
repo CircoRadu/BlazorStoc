@@ -166,21 +166,24 @@ public sealed class SqliteProductLockRepository(SqliteLocalStore store, IAccessC
         DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 }
 
-// MariaDB: table `product_lock`, created on first use. Every statement is atomic and uses UTC_TIMESTAMP(6) of the server.
+// MariaDB (Subtask 2.8): table `product_locks`, already present on the real migrated schema (product_id references
+// products.id) - never created here, the app account has no DDL rights. All *_utc columns are TEXT on the real
+// schema (Subtask 2.6), written/read via MariaTimeText in the same format the database triggers use, and the
+// remaining-seconds figure is computed in C# from the parsed expiry instead of a SQL TIMESTAMPDIFF over text.
 public sealed class MariaProductLockRepository(IConfiguration configuration, IAccessControl? accessControl = null,
     IAuditTrail? auditTrail = null) : IProductLockRepository
 {
-    private static readonly SemaphoreSlim SchemaGate = new(1, 1);
-    private static volatile bool schemaReady;
-    private const string Columns = "id_produs,owner_username,session_id,acquired_utc,renewed_utc,expires_utc,TIMESTAMPDIFF(SECOND,UTC_TIMESTAMP(6),expires_utc)";
-    private static readonly string Expiry = $"DATE_ADD(UTC_TIMESTAMP(6), INTERVAL {ProductLockRules.LeaseSeconds} SECOND)";
+    private const string Columns = "product_id,owner_username,session_id,acquired_utc,renewed_utc,expires_utc";
 
     public async Task<LockAttempt> RenewAsync(int productId, string sessionId, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await ExecuteAsync(connection, $"UPDATE product_lock SET renewed_utc=UTC_TIMESTAMP(6),expires_utc={Expiry} WHERE id_produs=@p AND session_id=@s",
-                cancellationToken, ("@p", productId), ("@s", sessionId)).ConfigureAwait(false) > 0
+        var now = DateTime.UtcNow;
+        var expiry = now.AddSeconds(ProductLockRules.LeaseSeconds);
+        return await ExecuteAsync(connection, "UPDATE product_locks SET renewed_utc=@now,expires_utc=@expiry WHERE product_id=@p AND session_id=@s",
+                cancellationToken, ("@now", MariaTimeText.Format(now)), ("@expiry", MariaTimeText.Format(expiry)),
+                ("@p", productId), ("@s", sessionId)).ConfigureAwait(false) > 0
             ? new(true, false, await ReadAsync(connection, productId, cancellationToken).ConfigureAwait(false))
             : new(false, false, await ReadAsync(connection, productId, cancellationToken).ConfigureAwait(false));
     }
@@ -190,19 +193,28 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
         if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         var owner = accessControl is null ? "sistem" : await accessControl.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var now = DateTime.UtcNow;
+        var nowText = MariaTimeText.Format(now);
+        var expiryText = MariaTimeText.Format(now.AddSeconds(ProductLockRules.LeaseSeconds));
 
-        if (await ExecuteAsync(connection, $"UPDATE product_lock SET renewed_utc=UTC_TIMESTAMP(6),expires_utc={Expiry} WHERE id_produs=@p AND session_id=@s",
-                cancellationToken, ("@p", productId), ("@s", sessionId)).ConfigureAwait(false) > 0)
+        // 1. Renewal by the session that already holds the lock (also when it lapsed but nobody took it meanwhile).
+        if (await ExecuteAsync(connection, "UPDATE product_locks SET renewed_utc=@now,expires_utc=@expiry WHERE product_id=@p AND session_id=@s",
+                cancellationToken, ("@now", nowText), ("@expiry", expiryText), ("@p", productId), ("@s", sessionId)).ConfigureAwait(false) > 0)
             return new(true, false, await ReadAsync(connection, productId, cancellationToken).ConfigureAwait(false));
-        if (await ExecuteAsync(connection, $"""
-                UPDATE product_lock SET owner_username=@o,session_id=@s,acquired_utc=UTC_TIMESTAMP(6),renewed_utc=UTC_TIMESTAMP(6),expires_utc={Expiry}
-                WHERE id_produs=@p AND expires_utc<=UTC_TIMESTAMP(6)
-                """, cancellationToken, ("@p", productId), ("@s", sessionId), ("@o", owner)).ConfigureAwait(false) > 0)
+        // 2. Taking over a lock whose lease has expired (text comparison: fixed-width ISO-8601 sorts chronologically
+        // under utf8mb4_nopad_bin, same as native ordering).
+        if (await ExecuteAsync(connection, """
+                UPDATE product_locks SET owner_username=@o,session_id=@s,acquired_utc=@now,renewed_utc=@now,expires_utc=@expiry
+                WHERE product_id=@p AND expires_utc<=@nowCompare
+                """, cancellationToken, ("@now", nowText), ("@expiry", expiryText), ("@p", productId), ("@s", sessionId),
+                ("@o", owner), ("@nowCompare", nowText)).ConfigureAwait(false) > 0)
             return new(true, true, await ReadAsync(connection, productId, cancellationToken).ConfigureAwait(false));
-        if (await ExecuteAsync(connection, $"""
-                INSERT IGNORE INTO product_lock(id_produs,owner_username,session_id,acquired_utc,renewed_utc,expires_utc)
-                SELECT @p,@o,@s,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6),{Expiry} FROM produs WHERE id_produs=@p
-                """, cancellationToken, ("@p", productId), ("@s", sessionId), ("@o", owner)).ConfigureAwait(false) > 0)
+        // 3. First lock for this product; the primary key lets exactly one of two simultaneous requests insert.
+        if (await ExecuteAsync(connection, """
+                INSERT IGNORE INTO product_locks(product_id,owner_username,session_id,acquired_utc,renewed_utc,expires_utc)
+                SELECT @p,@o,@s,@now,@now,@expiry FROM products WHERE id=@p
+                """, cancellationToken, ("@p", productId), ("@o", owner), ("@s", sessionId), ("@now", nowText), ("@expiry", expiryText))
+                .ConfigureAwait(false) > 0)
             return new(true, true, await ReadAsync(connection, productId, cancellationToken).ConfigureAwait(false));
         return new(false, false, await ReadAsync(connection, productId, cancellationToken).ConfigureAwait(false));
     }
@@ -216,7 +228,8 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
     public async Task<IReadOnlyList<ProductLock>> GetActiveAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand($"SELECT {Columns} FROM product_lock WHERE expires_utc>UTC_TIMESTAMP(6) ORDER BY id_produs", connection);
+        await using var command = new MySqlCommand($"SELECT {Columns} FROM product_locks WHERE expires_utc>@now ORDER BY product_id", connection);
+        command.Parameters.AddWithValue("@now", MariaTimeText.Format(DateTime.UtcNow));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<ProductLock>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result.Add(Map(reader));
@@ -226,7 +239,7 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
     public async Task<bool> ReleaseAsync(int productId, string sessionId, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await ExecuteAsync(connection, "DELETE FROM product_lock WHERE id_produs=@p AND session_id=@s",
+        return await ExecuteAsync(connection, "DELETE FROM product_locks WHERE product_id=@p AND session_id=@s",
             cancellationToken, ("@p", productId), ("@s", sessionId)).ConfigureAwait(false) > 0;
     }
 
@@ -238,10 +251,10 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var held = await ReadAsync(connection, productId, cancellationToken).ConfigureAwait(false);
         if (held is null) return null;
-        if (await ExecuteAsync(connection, "DELETE FROM product_lock WHERE id_produs=@p AND session_id=@s",
+        if (await ExecuteAsync(connection, "DELETE FROM product_locks WHERE product_id=@p AND session_id=@s",
                 cancellationToken, ("@p", productId), ("@s", held.SessionId)).ConfigureAwait(false) == 0) return null;
         string code;
-        await using (var name = new MySqlCommand("SELECT produs_denumire FROM produs WHERE id_produs=@p", connection))
+        await using (var name = new MySqlCommand("SELECT name FROM products WHERE id=@p", connection))
         {
             name.Parameters.AddWithValue("@p", productId);
             code = await name.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string ?? productId.ToString(CultureInfo.InvariantCulture);
@@ -253,41 +266,8 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
     private async Task<MySqlConnection> OpenAsync(CancellationToken token)
     {
         var connection = DatabaseConnections.Create(configuration);
-        try
-        {
-            await connection.OpenAsync(token).ConfigureAwait(false);
-            if (!schemaReady)
-            {
-                await SchemaGate.WaitAsync(token).ConfigureAwait(false);
-                try
-                {
-                    if (!schemaReady)
-                    {
-                        await using var create = new MySqlCommand("""
-                            CREATE TABLE IF NOT EXISTS product_lock (
-                                id_produs INT NOT NULL,
-                                owner_username VARCHAR(191) NOT NULL,
-                                session_id VARCHAR(64) NOT NULL,
-                                acquired_utc DATETIME(6) NOT NULL,
-                                renewed_utc DATETIME(6) NOT NULL,
-                                expires_utc DATETIME(6) NOT NULL,
-                                PRIMARY KEY(id_produs),
-                                INDEX ix_product_lock_expires(expires_utc)
-                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-                            """, connection);
-                        await create.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-                        schemaReady = true;
-                    }
-                }
-                finally { SchemaGate.Release(); }
-            }
-            return connection;
-        }
-        catch
-        {
-            await connection.DisposeAsync().ConfigureAwait(false);
-            throw;
-        }
+        await connection.OpenAsync(token).ConfigureAwait(false);
+        return connection;
     }
 
     private static async Task<int> ExecuteAsync(MySqlConnection connection, string sql, CancellationToken token,
@@ -300,16 +280,20 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
 
     private static async Task<ProductLock?> ReadAsync(MySqlConnection connection, int productId, CancellationToken token)
     {
-        await using var command = new MySqlCommand($"SELECT {Columns} FROM product_lock WHERE id_produs=@p AND expires_utc>UTC_TIMESTAMP(6)", connection);
+        await using var command = new MySqlCommand($"SELECT {Columns} FROM product_locks WHERE product_id=@p AND expires_utc>@now", connection);
         command.Parameters.AddWithValue("@p", productId);
+        command.Parameters.AddWithValue("@now", MariaTimeText.Format(DateTime.UtcNow));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? Map(reader) : null;
     }
 
-    private static ProductLock Map(MySqlDataReader reader) =>
-        new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), DateTime.SpecifyKind(reader.GetDateTime(3), DateTimeKind.Utc),
-            DateTime.SpecifyKind(reader.GetDateTime(4), DateTimeKind.Utc), DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc),
-            Math.Max(0, Convert.ToInt32(reader.GetValue(6), CultureInfo.InvariantCulture)));
+    private static ProductLock Map(MySqlDataReader reader)
+    {
+        var expires = MariaTimeText.Parse(reader.GetString(5));
+        var remaining = (int)Math.Max(0, Math.Round((expires - DateTime.UtcNow).TotalSeconds));
+        return new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), MariaTimeText.Parse(reader.GetString(3)),
+            MariaTimeText.Parse(reader.GetString(4)), expires, remaining);
+    }
 }
 
 // Announces lock changes to the other sessions (so a waiting user is told at once) after the change has succeeded.
