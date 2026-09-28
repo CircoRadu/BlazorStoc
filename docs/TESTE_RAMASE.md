@@ -125,6 +125,13 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 - **Asteptat**: una singura dintre mutarile simultane reuseste; totalul (`produs_cantitate`) neschimbat; nicio masina cu cantitate negativa; nu apar blocaje (deadlock) intre operatii.
 - **Sursa**: pagina vehiculului.
 
+### A12. Conectarea la instanta MariaDB locala reala (Task 2, subtask 2.1)
+- **Verifica**: conectarea efectiva cu contul `blazorstoc_dev` la instanta locala reala descrisa in `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` (127.0.0.1:3307, SslMode=Required), citirea DDL-ului (`migration\schema-mariadb.sql`, `migration\triggers-mariadb.sql`) si a raportului (`migration\verification.json`).
+- **Motiv**: la 28.09.2026, in sesiunea agentului Claude, directorul `C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB` (parola, fisierele administrative si DDL-ul) nu a fost accesibil din sistemul de fisiere (cale inexistenta la `Test-Path`/`Get-Item`/`cmd dir`), desi procesul `mariadbd.exe` (acelasi cont Windows) rula si portul 3307 raspundea la `netstat`. Detalii complete in `TODO.md`, Task 2 (nota "BLOCAJ DE MEDIU").
+- **Pasi**: intr-o sesiune cu acces la director, ruleaza pasii din sectiunea 2 a `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` (client SQL sau cod .NET cu MySqlConnector), citeste parola din `application-connection.private.json` si confirma `SELECT` pe `products`, `stock_movements`, `web_users`, `audit_events` fara nicio scriere.
+- **Asteptat**: conectare reusita cu TLS, tabelele si numarul de randuri corespund raportului din sectiunea 6 a documentului de predare (229 total).
+- **Sursa**: Task 2.
+
 ### A10. Destinații și mașini pe MariaDB
 - **Verifică**: coloanele adăugate la `io` (`io_destinatie`, `id_vehicul`, `id_vehicul_sursa`), tabela `vehicul` creată de `MariaStockMovementRepository`, interogările cantității din mașini (`VehicleQuantitiesAsync`, subinterogare cu alias), coloanele noi din `archive_stock_movements` (`MariaArchiveSchema`, versiunea 6, `ALTER` pe o arhivă existentă) și blocarea ștergerii unui vehicul cu mișcări (`VehicleHasMovementsAsync`).
 - **Pași**: (1) pornește în modul MariaDB pe o bază cu mișcări vechi; (2) deschide un produs și verifică `SHOW COLUMNS FROM io` și `SHOW TABLES` (`vehicul`); (3) adaugă un vehicul și o intrare de 10 buc., apoi o ieșire spre autovehicul de 4 buc. → totalul (`produs_cantitate`) rămâne 10, „6 în depozit, 4 în vehicule”; (4) ieșire din mașină de 3 buc. → total 7, mașina 1; peste 1 buc. → mesajul cu cantitatea disponibilă; (5) din două tab-uri, ieșiri simultane din aceeași mașină → una singură reușește; (6) șterge o mișcare, apoi încearcă ștergerea vehiculului cu mișcări → refuz; (7) `SELECT * FROM archive_stock_movements` conține destinația și vehiculele.

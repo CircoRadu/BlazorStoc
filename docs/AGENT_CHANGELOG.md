@@ -1136,3 +1136,21 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Notă:** in docs/ existau la finalul acestui ciclu doua fisiere noi, necomise, dintr-o lucrare separata (Codex, la cererea utilizatorului) despre o instanta MariaDB locala pregatita in paralel. La cererea explicita a utilizatorului, fisierul ramas (`docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md`) a fost lasat necomis si exclus din acest commit; nu a fost modificat, mutat sau sters.
 - **Commit:** `claude: normalizeaza datele existente eliminand diacriticele (seed SQLite + migrare)`
 - **Predat către:** claude
+
+## 2026-09-28T12:13:56.2938717Z â€” claude
+
+- **Task:** Task 2 (integrare MariaDB reala): inceput subtask 2.1/2.2, blocaj de mediu gasit (directorul local cu parola/DDL inaccesibil in sesiune)
+- **Rezumat:** Inceput Task 2 (integrare MariaDB reala): gasit blocaj de mediu critic - directorul local C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB (parola blazorstoc_dev, DDL, verification.json) nu este accesibil in aceasta sesiune (Test-Path/Get-Item/cmd dir raporteaza cale inexistenta), desi procesul mariadbd.exe ruleaza (acelasi cont Windows) si portul 3307 raspunde la netstat. Parola nu a putut fi obtinuta prin niciun mijloc permis, deci subtaskurile 2.1/2.9/2.10/2.11/2.12 (conectare reala, migrari, cont operational, verificari de integrare, comutarea preview-ului) nu au putut fi efectuate. Adaptarea repository-urilor Maria legacy (2.3-2.8, 2.10) nu a fost inceputa, fiindca ar fi necesitat sa ghiceasca schema reala fara DDL sau verificare, risc considerat inacceptabil pentru un task care opereaza pe date migrate reale. S-a implementat totusi, fara sa necesite fisierele lipsa, partea sigura din subtask 2.2: Program.cs incarca acum optional un fisier JSON privat local (Database:PrivateConfigPath, implicit calea din documentul de predare) prin AddJsonFile(optional:true), care suprascrie sectiunea Database (inclusiv parola) fara ca aceasta sa ajunga in appsettings.json sau Git; appsettings.json si DatabaseConnections.cs au valorile implicite corectate (port 3307, utilizator blazorstoc_dev, CharacterSet utf8mb4). App:DemoMode ramane implicit true, neschimbat. Documentat complet in TODO.md (nota BLOCAJ DE MEDIU la Task 2), docs/PROJECT_STATE.md si docs/TESTE_RAMASE.md (test nou A12).
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `appsettings.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `Program.cs`
+  - `Services/DatabaseConnections.cs`
+  - `TODO.md`
+- **Validare:** Build Release fara avertismente/erori (verificat separat, in afara directorului bin blocat de preview-ul existent pe 5082, PID al altui proces pornit anterior). BlazorStoc.Checks: 578 verificari, toate trecute (0 esuate), rulate dintr-un build copiat manual peste bin/Release existent din cauza blocarii DLL-ului principal de catre preview-ul activ. Nu s-a putut testa nicio conectare reala la MariaDB (parola inaccesibila, vezi rezumat).
+- **Commit:** `claude: inceput Task 2 (MariaDB reala) - config privata optionala, blocaj de mediu documentat`
+- **Predat cÄƒtre:** claude

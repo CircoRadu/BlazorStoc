@@ -60,6 +60,215 @@ Inlocuieste, in formularul de iesire (`Components/Shared/ExitDestinationPicker.r
 - Mecanismul concret de pastrare a starii formularului de iesire in timpul navigarii (serviciu scoped, sessionStorage sau alta solutie), tinand cont de faptul ca Blazor Server poate reporni circuitul intre navigari.
 - Locul exact al butonului "Adauga proiect" (langa combobox sau langa caseta "Proiect") si textul exact al mesajelor noi.
 
+## Task 2 - Integrarea aplicatiei cu baza MariaDB locala permanenta (migrata din SQLite)
+
+Baza MariaDB locala permanenta a fost deja creata si populata printr-o migrare punctuala din SQLite (vezi [docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md](docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md)): server MariaDB 11.4.13 pe `127.0.0.1:3307`, baza `BlazorStoc`, 27 de tabele InnoDB, 229 de inregistrari, chei externe, constrangeri CHECK si 18 triggere, verificate integral. Instanta este pornita si isi pastreaza datele; verificarea din 28.09.2026 a confirmat ca serverul raspunde pe portul 3307 cu versiunea 11.4.13. Acest task NU recreeaza baza si NU repeta importul; adapteaza codul aplicatiei existente (implementarile MariaDB legacy) la schema reala transferata.
+
+**BLOCAJ DE MEDIU gasit la 28.09.2026 (ciclul curent Claude), neverificat de utilizator inca:** in aceasta sesiune, directorul local `C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB` (care ar trebui sa contina `application-connection.private.json`, `admin.private.cnf`, `connection.private.json`, `migration\schema-mariadb.sql`, `migration\triggers-mariadb.sql`, `migration\verification.json`) **nu exista** — verificat repetat (`Test-Path`, `Get-Item`, `cmd /c dir`, ACL), toate raporteaza calea inexistenta, nu acces interzis. In acelasi timp, procesul `mariadbd.exe` (PID confirmat, detinut de acelasi cont Windows `ESP-2-RADU\Alex` ca sesiunea curenta) **este pornit** si portul `127.0.0.1:3307` raspunde la `netstat`. Nu s-a putut obtine parola contului `blazorstoc_dev` sau fisierele administrative prin niciun mijloc permis (nu se ghiceste, nu se ocoleste). Subtaskurile 2.1, 2.9, 2.10, 2.11, 2.12 care necesita conectare/verificare reala sau acces administrativ **nu au putut fi efectuate** in acest ciclu din aceasta cauza. Pasul urmator recomandat: utilizatorul verifica de ce directorul lipseste in sesiunea agentului (posibil creat de un alt cont/sesiune izolata care nu impartaseste sistemul de fisiere cu sesiunea curenta a lui Claude, desi impartaseste reteaua si lista de procese) si fie reface directorul accesibil sesiunii Claude, fie indica explicit o alta cale/mecanism de acces la parola.
+
+### Subtask 2.1 - Confirmare conectare si validare fara modificari
+
+- [ ] Citeste integral documentul de predare, raportul de verificare din `migration\verification.json` si DDL-ul local (`migration\schema-mariadb.sql`, `migration\triggers-mariadb.sql`) — **neefectuat, fisierele nu sunt accesibile in aceasta sesiune (vezi blocajul de mediu de mai sus)**; a fost citit doar `docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md` (prezent in working tree, necomis).
+- [ ] Confirma conectarea cu contul `blazorstoc_dev` (SslMode=Required) si verifica datele existente fara sa le modifici — **neefectuat**, parola nu a putut fi citita.
+- [ ] Nu copia parola din `application-connection.private.json` in cod, mesaje, argumente de proces sau Git — respectat (nu s-a incercat obtinerea ei prin alte mijloace).
+
+### Subtask 2.2 - Configuratia aplicatiei
+
+- [x] Revizuit `Program.cs`, `Services/DatabaseConnections.cs` si `appsettings.json`.
+- [x] Corectate valorile implicite invechite din `appsettings.json`/`DatabaseConnections.cs` (port `3307` in loc de `3306`, utilizator `blazorstoc_dev` in loc de `blazorstoc_reader`, `CharacterSet=utf8mb4` explicit pe conexiune); mecanismul ramane generic (host/port/baza/utilizator raman configurabile).
+- [x] Adaugat in `Program.cs` incarcarea optionala a unui fisier JSON privat local (`Database:PrivateConfigPath`, implicit `%LOCALAPPDATA%\BlazorStoc-MariaDB\application-connection.private.json`) prin `IConfigurationBuilder.AddJsonFile(..., optional: true)`, care suprascrie sectiunea `Database` (inclusiv parola) fara sa o puna in `appsettings.json` sau Git; absenta fisierului nu opreste pornirea in mod demonstrativ.
+- [ ] **NEVERIFICAT**: forma exacta asteptata de mecanism (`{ "Database": { "Host", "Port", "User", "Password", "SslMode" } }`) nu a putut fi comparata cu fisierul real `application-connection.private.json`, fiindca acesta nu a fost accesibil in aceasta sesiune (vezi blocajul de mediu). La urmatorul ciclu cu acces la fisier, verifica/adapteaza cheile exacte inainte de a porni cu `App:DemoMode=false`.
+- [ ] Collation `utf8mb4_nopad_bin` este o proprietate a bazei/coloanelor (definita in `migration\schema-mariadb.sql`, neaccesibil acum), nu a conexiunii; nu necesita cod suplimentar in `DatabaseConnections.cs`, dar validarile din repository-urile adaptate (subtask 2.3+) trebuie sa o respecte cand fisierele DDL devin accesibile.
+
+### Subtask 2.3 - Produse, categorii, subcategorii, beneficiari
+
+- [ ] Foloseste repository-urile `Sqlite*` ca referinta semantica pentru structura transferata.
+- [ ] Adapteaza repository-urile MariaDB de la `produs`/`categorie`/`subcategorie`/`beneficiar` la tabelele reale `products`/`categories`/`subcategories`/`beneficiaries`, fara sa recreezi schema legacy peste datele migrate.
+
+### Subtask 2.4 - Miscari de stoc
+
+- [ ] Adapteaza `MariaStockMovementRepository` de la `io` si istoricul legacy la `stock_movements` si `stock_movement_history`.
+- [ ] Pastreaza identificatorii, sursa/destinatia, vehiculele si proiectele existente in miscari.
+
+### Subtask 2.5 - Autentificare
+
+- [ ] Adapteaza `MariaUserRepository` de la `web_user`/`web_role` la `web_users`, cu rolul in coloana `role`.
+- [ ] Pastreaza hashurile parolelor existente; nu recrea conturile si nu reseta parolele.
+
+### Subtask 2.6 - Audit si arhivare
+
+- [ ] Verifica `MariaAuditTrail`, `MariaArchiveSchema`, `ArchivePersistence` si tipurile de date folosite.
+- [ ] Adapteaza explicit citirile `GetDateTime` si scrierile de DATETIME la campurile UTC stocate ca text in baza migrata.
+- [ ] Nu rula schemele Maria legacy peste tabelele de audit/arhiva existente.
+
+### Subtask 2.7 - Proiecte, vehicule, imagini si atasamente
+
+- [ ] Verifica numele tabelelor, ID-urile si citirea cailor relative pentru proiecte, vehicule, imagini si atasamente.
+- [ ] Configureaza directoarele locale conform sectiunii 7 din documentul de predare (`assets\product-images`, `assets\project-files`, `assets\archive-files`, `assets\data-protection-keys`, sub radacina `C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB`).
+- [ ] Nu configura noua baza sa foloseasca din greseala directoarele SQLite active.
+
+### Subtask 2.8 - Blocari si sincronizare
+
+- [ ] Adapteaza `ProductLocks` de la `product_lock`/`produs` la `product_locks`/`products`.
+- [ ] Adapteaza `ChangeEvents` la structura actuala si la cele 18 triggere deja instalate, fara triggere suplimentare pentru tabele legacy inexistente.
+- [ ] Verifica parsarea corecta a timpilor textuali UTC.
+
+### Subtask 2.9 - Initializare, migrari si cont operational
+
+- [ ] Separa initializarea si migrarile de schema de operatiile normale ale aplicatiei.
+- [ ] Nu acorda contului `blazorstoc_dev` (sau echivalentului de productie) drepturi DDL/globale doar pentru a trece initializari vechi.
+- [ ] Defineste un mecanism de migrari si un cont operational dedicat pentru ele.
+
+### Subtask 2.10 - Identitatea tehnica a operatorului
+
+- [ ] Adapteaza dependentele MariaDB legacy de `Database:ApplicationUserId` si de o eventuala tabela `user` la schema reala (operatori/audit conform regulilor SQLite actuale), fara ID-uri fictive; defineste explicit o migrare daca este necesar.
+
+### Subtask 2.11 - Verificari de integrare
+
+- [ ] Adauga si executa verificari de integrare pe baze MariaDB locale izolate (separate de baza de predare).
+- [ ] Valideaza fluxurile prin browser dupa adaptarea codului.
+
+### Subtask 2.12 - Comutarea preview-ului
+
+- [ ] Comuta preview-ul aplicatiei pe configuratia MariaDB abia dupa verificarile de integrare.
+- [ ] Confirma persistenta datelor la restart, autentificarea si functionarea cu doua sesiuni concurente.
+
+### Subtask 2.13 - Comutarea definitiva de dezvoltare
+
+- [ ] La decizia de comutare definitiva, opreste scrierile in SQLite si stabileste explicit momentul opririi.
+- [ ] Identifica si migreaza in MariaDB eventualele date aparute in SQLite dupa snapshot-ul din 28.09.2026 13:58, printr-o migrare finala verificata.
+- [ ] Nu lasa doua baze independente sa para aceeasi sursa de adevar.
+
+### Criterii de acceptare
+
+- Aplicatia functioneaza integral (produse, categorii, beneficiari, miscari, autentificare, audit, arhivare, proiecte, vehicule, imagini, blocari, evenimente) pe baza MariaDB reala descrisa in documentul de predare, fara redenumiri artificiale de tabele si fara reschema peste datele migrate.
+- Contul aplicatiei nu are drepturi DDL in operarea curenta; migrarile de schema sunt separate si documentate.
+- Datele migrate (229 de inregistrari initiale) raman corecte si verificabile dupa adaptarea codului.
+- Persistenta, autentificarea si concurenta a doua sesiuni sunt validate pe MariaDB inainte de comutarea definitiva.
+- SQLite si MariaDB nu functioneaza simultan ca surse de adevar dupa comutarea definitiva.
+
+### Detalii de stabilit la implementare
+
+- Limitele VARCHAR si collation `utf8mb4_nopad_bin` (comparare binara, sensibila la majuscule/accente/spatii) trebuie respectate de validarile noi de cod; DDL-ul local din `migration\schema-mariadb.sql` descrie exact fiecare coloana.
+- `lower_case_table_names=1` pe instanta Windows; numele bazei poate aparea `blazorstoc` in metadate — verifica diferentele de capitalizare inainte de configurarea serverului final.
+- Compatibilitatea cheilor Data Protection copiate (`assets\data-protection-keys`) cu identitatea Windows/application name trebuie verificata la integrare; nu presupune portabilitate automata pe alta gazda.
+- Documentul [docs/CLAUDE_BACKUP_RESTAURARE.md](docs/CLAUDE_BACKUP_RESTAURARE.md) referit in sectiunea 8 a documentului de predare nu exista inca in repository; cerintele functionale pentru backup/restaurare au fost primite direct de la utilizator si sunt detaliate in Task 3 si Task 4 de mai jos.
+
+## Task 3 - Copie de siguranta a bazei de date la preluarea situatiei de inventar
+
+Depinde de Task 2 (integrarea aplicatiei cu baza MariaDB reala), deoarece backupul opereaza pe schema si contul MariaDB rezultate din acel task.
+
+### Decizie tehnica - mecanism de backup/restaurare (comuna pentru Task 3 si Task 4)
+
+- **Format fisier:** arhiva (`.zip`) continand un export SQL logic complet al bazei (generat cu utilitarul `mariadb-dump`/`mysqldump` din aceeasi distributie MariaDB locala, cu `--single-transaction`, `--routines`, `--triggers`, pentru consistenta InnoDB fara blocare exclusiva la nivel de server), un fisier `manifest.json` (data/ora, operator, rol, numarul de tabele, numarul de randuri per tabela, versiunea schemei, hash SHA-256 al dumpului) si hashul SHA-256 al arhivei insasi. Se prefera dumpul logic (nu o copie binara a directorului de date), pentru ca este portabil, verificabil rand cu rand si independent de versiunea exacta de fisiere InnoDB.
+- **Motivul folosirii `mariadb-dump`:** e deja prezent langa serverul local (acelasi pachet ca `mariadbd.exe`), e testat pe cazuri complexe (chei externe, triggere, CHECK-uri), si evita reinventarea unui exportator SQL propriu predispus la erori de escapare/tip de date.
+- **Blocarea sesiunilor:** contul aplicatiei nu are drepturi de administrare (nu poate opri conexiuni MariaDB straine, vezi Task 2 subtask 2.9), deci blocarea se face la nivelul aplicatiei, nu al serverului: un lacat (lock) partajat, persistent in baza de date (de exemplu o inregistrare dedicata cu operatie curenta, operator, identificator de proces si marca de timp/heartbeat), verificat de fiecare circuit Blazor si de fiecare operatie de scriere.
+  - Cand lacatul e activ: sesiunile existente primesc o notificare si sunt redirectionate catre un mesaj de intretinere ("Backup/restaurare in curs, reveniti mai tarziu"); sesiunile noi vad acelasi mesaj si nu pot initia operatii.
+  - Lacatul are un timp de expirare (heartbeat reimprospatat periodic in timpul operatiei); daca aplicatia se opreste neasteptat cu lacatul activ, la urmatoarea pornire lacatul este recunoscut ca orfan (heartbeat expirat) si eliberat automat, cu inregistrare in jurnal, nu lasat blocat definitiv.
+  - Eliberarea lacatului se face intotdeauna intr-un bloc final (`finally`), inclusiv la eroare.
+- **Progres pentru utilizator:** operatia ruleaza ca proces de fundal urmarit printr-un identificator de job; pagina afiseaza etapele curente (blocare sesiuni, export, verificare, salvare / dezarhivare, verificare structura, verificare continut, import, comutare) si un indicator vizual, actualizat prin re-randarea componentei Blazor (server-side), nu blocand interfata.
+- **Verificarea integritatii:** dupa export, se recalculeaza hashul arhivei si continutul e comparat cu baza vie folosind aceeasi metoda de comparare canonica tip-si-hash folosita la migrarea initiala (nu diff text brut pe fisierul SQL, care poate diferi ca ordine fara a diferi ca date).
+- **Stocare fisiere:** intr-un director dedicat, in afara `wwwroot` si a oricarei cai servite direct ca fisier static, similar cu directoarele de arhiva din Task finalizat "Arhivarea obiectelor sterse"; descarcarea se face printr-un endpoint HTTP autentificat, dedicat, restrictionat la rolul administrator, nu prin circuitul SignalR.
+- **Securitate continut:** dumpul SQL contine hashuri de parole si date de audit; directorul de backup primeste acelasi nivel de protectie ca zonele sensibile deja folosite in proiect (acces restrans, fara publicare, fara includere in raspunsuri catre utilizatori neautorizati).
+- **Jurnalizare:** crearea, listarea incercarilor de stergere, stergerea efectiva si restaurarea sunt evenimente de audit, cu operator, rol, timestamp si denumirea pachetului, fara date sensibile in `Details`/`Motif`, conform serviciului comun de jurnalizare deja existent.
+
+### Subtask 3.1 - Declansarea backupului la preluarea inventarului
+
+- [ ] Identifica punctul din pagina de preluare inventar unde utilizatorul apasa butonul de preluare si insereaza declansarea backupului ca parte a aceleiasi actiuni: preluarea se confirma utilizatorului abia dupa ce backupul este generat si verificat cu succes (varianta cu siguranta maxima, aliniata cu cerinta ca fisierul sa fie disponibil pentru restaurare imediat ce preluarea e considerata reusita).
+- [ ] Daca backupul esueaza (verificare nereusita, spatiu insuficient, eroare de export), preluarea inventarului nu este confirmata ca reusita, iar utilizatorul primeste mesajul de eroare specific backupului, cu posibilitatea de a reincerca.
+- [ ] Foloseste lacatul comun descris mai sus pentru a bloca alte sesiuni pe durata snapshotului.
+- [ ] Afiseaza utilizatorului progresul operatiei (etape + indicator vizual), fara sa blocheze restul aplicatiei mai mult decat este necesar.
+
+### Subtask 3.2 - Generarea si validarea arhivei
+
+- [ ] Genereaza dumpul SQL cu `mariadb-dump` (transactional, consistent) intr-un fisier temporar, apoi `manifest.json` cu metadatele operatiei.
+- [ ] Calculeaza hashurile SHA-256 (dump si arhiva finala) si compara continutul dumpului cu baza vie folosind comparatia canonica tip-si-hash existenta din procesul de migrare.
+- [ ] Salveaza arhiva definitiv (redenumire atomica din fisier temporar) numai dupa ce verificarea trece; daca verificarea esueaza, sterge fisierele temporare, elibereaza lacatul si informeaza utilizatorul clar despre esec, fara sa lase o arhiva partiala/nesigura pe disc.
+
+### Subtask 3.3 - Denumirea si pastrarea pachetului
+
+- [ ] Denumeste fisierul dupa modelul "Copie siguranta preluare inventar data ora user_level user_name", cu data/ora in formatul de afisare al proiectului (`dd.MM.yyyy HH:mm`) transpus intr-un nume de fisier valid (fara caractere interzise de sistemul de fisiere, fara diacritice), si cu rolul/numele utilizatorului care a declansat preluarea.
+- [ ] Pastreaza pachetul pe server, in directorul dedicat, disponibil ulterior in pagina de restaurare stoc (Task 4).
+
+### Criterii de acceptare
+
+- Fiecare preluare de inventar produce o copie de siguranta verificata, denumita conform modelului cerut, disponibila administratorului in pagina de restaurare.
+- Nicio alta sesiune nu poate scrie in baza de date in timpul generarii snapshotului.
+- O verificare esuata nu lasa pe server o arhiva nesigura si informeaza clar utilizatorul.
+- Utilizatorul vede progresul operatiei de backup.
+
+### Subtask 3.4 - Spatiu pe disc
+
+- [ ] Inainte de a incepe exportul, verifica spatiul liber disponibil in directorul de backup fata de o estimare a dimensiunii bazei (de exemplu dimensiunea ultimului export reusit, plus o marja); daca spatiul e insuficient, opreste operatia inainte de a scrie orice fisier si informeaza utilizatorul cu un mesaj clar.
+
+### Decizii acceptate (fara alte optiuni de stabilit)
+
+- Backupul face parte din aceeasi actiune cu preluarea inventarului si o conditioneaza (subtask 3.1); nu ruleaza asincron/deconectat de rezultatul preluarii.
+- Pachetele de tip "preluare inventar" nu au expirare automata si nu sunt sterse de sistem; se pastreaza pe server nelimitat si pot fi sterse numai manual de administrator, prin fluxul dual de confirmare (Task 4, subtask 4.2). Spatiul ocupat este vizibil administratorului in pagina de restaurare (Task 4, subtask 4.1).
+
+## Task 4 - Pagina de restaurare a bazei de date (meniu Inventar, exclusiv administrator)
+
+Depinde de Task 2 si de Task 3 (foloseste pachetele generate la preluarea inventarului si acelasi mecanism de backup/lacat/verificare).
+
+### Subtask 4.1 - Meniu si listare pachete
+
+- [ ] Adauga in meniul Inventar optiunea "Restaureaza stoc", vizibila numai utilizatorilor cu rol administrator.
+- [ ] Afiseaza in pagina toate pachetele disponibile pe server: cele generate la preluarea situatiei de inventar (Task 3) si cele generate automat inainte de o restaurare anterioara (subtask 4.3), intr-un tabel cu selectie unica de tip radio button per rand.
+- [ ] Distinge vizual cele doua categorii de pachete (preluare inventar / pre-restaurare), fara sa permita confuzia intre ele la selectare.
+- [ ] Afiseaza dimensiunea fiecarui pachet si spatiul total ocupat de backupuri pe server, pentru ca administratorul sa poata urmari cresterea spatiului folosit (pachetele pre-restaurare nu pot fi sterse, vezi subtask 4.2).
+
+### Subtask 4.2 - Stergerea pachetelor de tip "preluare inventar"
+
+- [ ] Permite administratorului sa stearga numai pachetele generate la preluarea inventarului, folosind acelasi flux dual de confirmare deja implementat (pagina de atentionare cu motiv + pagina cu introducerea cuvantului exact `sterge`), reutilizand componentele existente din taskul finalizat "Flux in doi pasi pentru confirmarea stergerii".
+- [ ] Nu permite stergerea pachetelor generate automat inainte de o restaurare (butonul/optiunea de stergere nu este disponibila pentru aceasta categorie), atat in interfata cat si la nivelul serviciului (respinge explicit o cerere de stergere pentru aceasta categorie, indiferent de origine).
+- [ ] Jurnalizeaza stergerea unui pachet (operator, denumire pachet, motiv).
+
+### Subtask 4.3 - Declansarea restaurarii si confirmarea
+
+- [ ] Adauga butonul "Restaureaza baza de date", activ numai cand este selectat exact un pachet din tabel.
+- [ ] La apasare, deschide un popup care avertizeaza explicit ca restaurarea aduce baza de date la o versiune anterioara si ca pot fi pierdute date introduse ulterior momentului backupului selectat.
+- [ ] Confirmarea finala se face prin introducerea cuvantului exact `confirma` (aceeasi regula de comparare stricta ca la cuvantul `sterge` din fluxul de stergere existent).
+- [ ] O confirmare gresita, incompleta sau abandonata nu declanseaza nicio modificare asupra bazei de date.
+
+### Subtask 4.4 - Pasii de restaurare (executati numai dupa confirmare)
+
+- [ ] **Pas 0 - blocare si snapshot curent.** Activeaza lacatul comun (blocheaza sesiuni noi si notifica sesiunile active, cu exceptia sesiunii care a initiat restaurarea); genereaza imediat un export/arhiva complet al bazei curente, cu hash de verificare, folosind acelasi mecanism ca la Task 3. Acest pachet este denumit dupa modelul "Copie siguranta baza de date inainte restaurare baza de date folosind backup preluare inventar, data ora user_level user_name", marcat ca nesters din categoria pre-restaurare (subtask 4.2) si pastrat pe server indiferent de rezultatul restaurarii.
+- [ ] **Pas 1 - integritatea backupului ales.** Verifica hashul arhivei si al dumpului selectat fata de `manifest.json`; daca nu corespund, opreste procesul, elibereaza lacatul si informeaza utilizatorul ca pachetul este corupt/invalid, fara sa continue.
+- [ ] **Pas 2 - diferente de structura.** Compara schema (tabele, coloane, tipuri, chei, indecsi, triggere) descrisa/derivabila din pachetul de backup cu schema vie curenta; daca exista diferente, opreste procesul, elibereaza lacatul si informeaza utilizatorul ca pachetul nu poate fi folosit din cauza incompatibilitatii de structura.
+- [ ] **Pas 3 - diferente de continut.** Compara continutul (randurile) din pachetul de backup cu baza vie curenta, cu aceeasi metoda canonica de comparare folosita la migrare/backup. Daca nu exista nicio diferenta, opreste procesul, elibereaza lacatul si informeaza utilizatorul ca backupul si baza actuala sunt identice, deci restaurarea nu este necesara.
+- [ ] **Pas 4 - import si comutare atomica.** Creeaza pe server o schema noua `<nume_baza>_bak`; importa in ea continutul pachetului de backup selectat; verifica importul (numar de randuri/hash) fata de manifestul pachetului. Daca importul este validat, comuta atomic printr-o singura instructiune `RENAME TABLE` care muta simultan toate tabelele din schema vie in `<nume_baza>_old` si toate tabelele din `<nume_baza>_bak` in numele schemei vii (MariaDB executa acest tip de comutare ca o singura operatie atomica pe mai multe tabele, fara pas intermediar vizibil aplicatiei). Daca importul in `_bak` esueaza sau nu se valideaza, sterge schema `_bak` incompleta, elibereaza lacatul si informeaza utilizatorul ca restaurarea a esuat, baza vie ramanand neschimbata.
+- [ ] **Pas final - eliberare si confirmare.** Elibereaza lacatul, informeaza utilizatorul ca restaurarea a reusit si inregistreaza evenimentul de audit complet (pachet folosit, operator, rezultatul fiecarui pas).
+- [ ] Schema `<nume_baza>_old` nu este stearsa automat de proces; ramane pe server ca plasa de siguranta suplimentara, pentru curatare manuala ulterioara.
+
+### Criterii de acceptare
+
+- Pagina "Restaureaza stoc" este vizibila numai administratorului si listeaza corect ambele categorii de pachete, cu selectie unica.
+- Pachetele de tip preluare inventar pot fi sterse numai prin fluxul dual de confirmare existent; pachetele de tip pre-restaurare nu pot fi sterse in nicio conditie din interfata sau din serviciu.
+- Restaurarea nu porneste fara selectarea exact a unui pachet si fara introducerea corecta a cuvantului `confirma`.
+- Inaintea oricarei modificari, se genereaza si pastreaza un pachet pre-restaurare al bazei curente.
+- Un pachet cu hash invalid, cu structura incompatibila sau cu continut identic bazei curente nu declanseaza modificari asupra bazei vii, iar utilizatorul primeste mesajul corespunzator fiecarui caz.
+- O restaurare validata inlocuieste atomic continutul bazei vii cu cel al pachetului ales, fara stare intermediara vizibila aplicatiei, si pastreaza schema anterioara sub `_old` pentru siguranta suplimentara.
+- Nicio sesiune, in afara celei care conduce restaurarea, nu poate scrie in baza de date in timpul procesului; sesiunile noi primesc un mesaj explicit ca o restaurare este in curs.
+
+### Riscuri identificate si masuri de preventie/remediere
+
+- **Scriere concurenta in timpul snapshotului de la o conexiune din afara aplicatiei** (client SQL direct, nu prin aplicatie): lacatul aplicatiei nu poate opri o asemenea conexiune, pentru ca acest cont nu are drepturi de administrare server (vezi Task 2). Se foloseste totusi `--single-transaction` la export pentru consistenta MVCC, iar riscul rezidual ramane un fapt documentat, nu o garantie absoluta; de discutat cu utilizatorul daca e nevoie de restrictionare suplimentara la nivel de cont MariaDB pentru accesul direct in ferestrele de backup/restaurare.
+- **Proces de backup/restaurare intrerupt** (crash aplicatie, repornire server): fisierele se scriu intai cu nume temporar si se redenumesc atomic doar dupa succes; lacatul are heartbeat si expira, fiind recunoscut si eliberat automat ca orfan la urmatoarea initializare, cu inregistrare in jurnal.
+- **Spatiu insuficient pe disc** pentru export sau pentru schema `_bak` in paralel cu schema vie (necesita temporar aproape dublul spatiului bazei): se verifica spatiul liber estimat inainte de a incepe orice pas care scrie date, cu oprire timpurie si mesaj clar daca spatiul e insuficient.
+- **Comparatie de continut cu rezultat eronat din cauza ordinii randurilor** in dumpul SQL (nu reflecta neaparat diferente reale): se foloseste comparatia canonica tip-si-hash (aceeasi metoda validata la migrare), nu un diff text brut pe fisierul SQL.
+- **Doua actiuni de backup/restaurare initiate simultan** (doi administratori, sau preluare inventar + restaurare in acelasi timp): lacatul comun unic per baza de date impiedica a doua operatie sa porneasca; a doua cerere primeste mesajul ca o operatie e deja in curs.
+- **Comutarea atomica a schemelor esueaza partial**: folosirea unei singure instructiuni `RENAME TABLE` cu toate tabelele implicate garanteaza ca operatia e completa sau nu are niciun efect; nu se foloseste o secventa de instructiuni separate pentru acest pas.
+- **Selectarea gresita a pachetului de restaurare** de catre administrator: avertismentul explicit despre pierderea de date, confirmarea prin cuvantul exact `confirma` si pachetul pre-restaurare generat automat ofera o cale de revenire chiar si dupa o alegere gresita.
+- **Cresterea necontrolata a spatiului ocupat de pachetele pre-restaurare**, care nu pot fi sterse niciodata conform cerintei: este un risc pe termen lung, semnalat aici ca decizie de business ramasa deschisa (nu s-a presupus o politica de retentie neceruta explicit); de clarificat cu utilizatorul intr-o etapa ulterioara.
+- **Expunerea pachetelor de backup** (contin hashuri de parole si date de audit): stocare in afara `wwwroot`, descarcare doar prin endpoint autentificat/autorizat pentru rol administrator, acelasi nivel de protectie ca alte zone sensibile ale proiectului.
+- **Blocarea permanenta a aplicatiei** daca lacatul nu se elibereaza corect dupa o eroare neasteptata: eliberarea lacatului se face intr-un bloc `finally` in jurul intregului proces, plus mecanismul de expirare/heartbeat descris mai sus ca a doua plasa de siguranta.
+
+### Decizii acceptate (fara alte optiuni de stabilit)
+
+- **Cont MariaDB dedicat pentru restaurare:** se defineste un cont operational separat de `blazorstoc_dev`, cu drepturi limitate strict la `CREATE`/`DROP SCHEMA` si `RENAME TABLE` pentru schemele implicate in fluxul de restaurare (schema vie, `_bak`, `_old`), fara alte drepturi globale sau de administrare a serverului. Datele lui de conectare se pastreaza dupa acelasi tipar de fisier privat protejat folosit pentru `admin.private.cnf`/`connection.private.json` (vezi documentul de predare MariaDB), niciodata in cod sau in `appsettings.json` necriptat.
+- **Notificarea sesiunilor Blazor active:** se reutilizeaza tiparul deja existent in aplicatie pentru notificarea schimbarilor de baza de date (componenta similara `FrmDatabaseChangedNotification`/mecanismul curent de "database changed"), extins pentru a afisa mesajul de intretinere si a redirectiona sesiunea catre o pagina de asteptare, fara sa introduca un mecanism nou separat.
+- **Retentia pachetelor pre-restaurare care nu pot fi sterse:** ramane fara stergere automata, conform cerintei explicite; masura de atenuare acceptata este vizibilitatea spatiului ocupat in pagina de restaurare (subtask 4.1), nu o curatare automata. O eventuala politica de arhivare externa (mutare pe alt suport) ramane o decizie ulterioara, separata de acest task.
+
 ## Observații pentru etapa de implementare
 
 - Schema bazei de date și scripturile aferente se stabilesc în etapa dedicată integrării MariaDB.

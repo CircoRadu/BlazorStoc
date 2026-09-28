@@ -10,6 +10,16 @@ using Microsoft.AspNetCore.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
+// Subtask 2.2 (Task 2): parola contului MariaDB local (blazorstoc_dev) nu se pune niciodata in appsettings.json
+// sau in Git. Se citeste, optional, dintr-un fisier JSON local, in afara repository-ului, cu forma
+// { "Database": { "Host": "...", "Port": ..., "User": "...", "Password": "...", "SslMode": "..." } } —
+// aceleasi chei ca sectiunea "Database" din appsettings.json, suprascriindu-le. Calea implicita este cea din
+// docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md (application-connection.private.json); poate fi schimbata prin
+// Database:PrivateConfigPath (variabila de mediu Database__PrivateConfigPath) fara sa schimbe mecanismul.
+// Fisierul e optional: absenta lui nu opreste pornirea in mod demonstrativ (App:DemoMode=true, implicit).
+var mariaPrivateConfigPath = builder.Configuration["Database:PrivateConfigPath"]
+    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "application-connection.private.json");
+builder.Configuration.AddJsonFile(mariaPrivateConfigPath, optional: true, reloadOnChange: false);
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
 var demo = builder.Configuration.GetValue("App:DemoMode", true);
