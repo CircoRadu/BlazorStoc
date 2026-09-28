@@ -310,17 +310,24 @@ public static class MariaIntegrationChecks
             var thisVehicleStock = vehicleStocks.SingleOrDefault(item => item.VehicleId == vehicle.Id);
             check(thisVehicleStock?.Quantity == 4, "The vehicle now holds 4 units, warehouse split reflects the transfer");
 
+            // The negative-stock guard (EnsureVehicleStocksNotNegativeAsync) only ever fires for a movement that
+            // REDUCES what a vehicle holds (kind=Exit with SourceVehicleId - a withdrawal from the vehicle, e.g. a
+            // WarehouseReturn), never for one that adds to it (Destination=Vehicle only ever increases the
+            // vehicle's total, so it can never go negative and the guard is a no-op there by design - the app
+            // deliberately allows overall/warehouse stock to go negative elsewhere, flagged rather than blocked,
+            // see "Negative stock is kept and flagged" in the default suite). Exercise the guard on the path it
+            // actually protects: returning more than the vehicle holds (4) back to the warehouse.
             try
             {
                 await movements.CreateAsync(product.Id, new StockMovementInput
                 {
                     Kind = StockMovementKind.Exit, Date = DateOnly.FromDateTime(DateTime.Now), Quantity = 100,
-                    Destination = ExitDestination.Vehicle, VehicleId = vehicle.Id,
-                    Description = "Iesire peste stocul din vehicul, verificare integrare Subtask 2.11"
+                    Destination = ExitDestination.WarehouseReturn, SourceVehicleId = vehicle.Id,
+                    Description = "Restituire peste stocul din vehicul, verificare integrare Subtask 2.11"
                 }).ConfigureAwait(false);
-                throw new Exception("An exit larger than the vehicle's stock was accepted");
+                throw new Exception("A warehouse return larger than the vehicle's stock was accepted");
             }
-            catch (StockMovementOperationException) { Console.WriteLine("PASS: An exit larger than the vehicle's stock is rejected (negative-stock guard)"); }
+            catch (StockMovementOperationException) { Console.WriteLine("PASS: A warehouse return larger than the vehicle's stock is rejected (negative-stock guard)"); }
         }
         catch (Exception exception) when (isWriteGuardBug(exception))
         {

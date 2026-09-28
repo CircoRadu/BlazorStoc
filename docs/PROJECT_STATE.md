@@ -1,8 +1,32 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **28 septembrie 2026**
-Stare ciclu: **Task 2 (integrare MariaDB reala) aproape finalizat dupa rezolvarea blocajului de mediu (vezi mai jos); taskuri active ramase in TODO.md: 1 (combobox beneficiar/proiect), 2 (MariaDB, un singur punct de re-confirmat prin executie), 3-4 (backup/restaurare, depind de Task 2), 5 (inaltime randuri PDF inventar); mod claude_only, fara predare catre Codex**
+Data: **28 septembrie 2026 (ciclu de reconfirmare prin executie)**
+Stare ciclu: **Task 2 (integrare MariaDB reala): subtask 2.4/2.5/2.11 reconfirmate prin executie reala pe `blazorstoc_test` (miscari de stoc, utilizatori); o problema noua, separata, gasita la stergerea proiectelor (vezi mai jos) - vezi TODO.md pentru detalii. Taskuri active ramase: 1 (combobox beneficiar/proiect), 2 (MariaDB, problema de stergere proiecte + subtask 2.12/2.13 care raman ale utilizatorului), 3-4 (backup/restaurare, depind de Task 2), 5 (inaltime randuri PDF inventar); mod claude_only, fara predare catre Codex**
+
+## Reconfirmare prin executie A13 si gasire noua (stergere proiecte) - 28.09.2026
+
+Ciclu scurt, dedicat exclusiv re-rularii verificarilor de integrare pe `blazorstoc_test` care fusesera blocate de clasificatorul de siguranta al mediului agentului in ciclul anterior (vezi sectiunea de mai jos, "Task 2 aproape finalizat").
+
+### Ce s-a facut
+
+1. **Build Release** (`dotnet build BlazorStoc.csproj -c Release`, intr-un folder temporar in afara repo-ului, pentru ca preview-ul de pe 5082 tine blocat executabilul din `bin\Release\net9.0`): 0 avertismente, 0 erori.
+2. **Suita implicita** (`tests/BlazorStoc.Checks`, fara MariaDB): 578 verificari, toate `PASS`. Ruleaza doar cand executabilul e copiat sub `tests\BlazorStoc.Checks\bin\Release\net9.0` (codul descopera radacina proiectului urcand din `AppContext.BaseDirectory` pana gaseste `BlazorStoc.csproj` - esueaza daca ruleaza dintr-un folder temporar din afara arborelui repo-ului).
+3. **Verificarile de integrare pe `blazorstoc_test`** (`RUN_MARIA_INTEGRATION_CHECKS=1 MARIA_TEST_CONFIG_PATH=... dotnet exec BlazorStoc.Checks.dll`): comanda **nu a mai fost blocata** de clasificatorul de siguranta (a rulat integral de doua ori in acest ciclu). Prima rulare a esuat insa cu o exceptie nemanipulata in sectiunea "Stock movements": garda de stoc negativ testata folosea o iesire CATRE vehicul (`Destination=Vehicle`), care prin design nu poate deveni niciodata negativa (doar creste cantitatea din vehicul) - garda reala (`EnsureVehicleStocksNotNegativeAsync`) se aplica doar la o retragere DIN vehicul. Corectat testul (`tests/BlazorStoc.Checks/MariaIntegrationChecks.cs`) sa foloseasca scenariul corect: o restituire in depozit (`Destination=WarehouseReturn`, `SourceVehicleId`) peste cantitatea aflata in vehicul. A doua rulare (dupa corectie): sectiunile "Stock movements" si "Users" au trecut integral prin executie reala (intrare, iesire spre vehicul cu defalcarea stocului, garda de stoc negativ la restituire, creare/autentificare/nume-duplicat/stergere utilizator) - **exact reconfirmarea ceruta la subtask 2.4/2.5/2.11**.
+4. **Problema noua, separata, gasita in aceeasi a doua rulare**: dupa ce Stock movements/Users/Product locks au trecut, sectiunea "Projects" a esuat la stergerea proiectului de test creat pentru acea sectiune - proiectul si observatia lui au ramas vii in baza dupa `DeleteObservationAsync`/`DeleteAsync(project,...)`, fara ca vreo exceptie sa fie vizibila direct (mascata de o exceptie ulterioara, in blocul `finally` de curatare a scriptului de test, la stergerea beneficiarului - blocata de FK-ul catre proiectul ramas nesters). Verificare separata (instructiuni `DELETE` brute rulate manual, in afara pasului de arhivare): stergerea propriu-zisa functioneaza structural (afecteaza exact randul asteptat), ceea ce sugereaza ca rollback-ul e cauzat de un pas ulterior din aceeasi tranzactie - insererea in arhiva (`MariaArchivePersistence.InsertAsync`/`InsertAuditAsync` pentru `archive_projects`/`archive_relations`) - dar cauza exacta nu a fost confirmata prin capturarea directa a exceptiei originale (neinstrumentata inca). Datele orfane create de test (proiectul "Integrare Test Proiect", beneficiarul "Integrare Test Proiect SRL"/`RO19998877`) au fost curatate manual din `blazorstoc_test` cu un script separat, de unica folosinta (nu a intrat in repo). Detalii si pasi de reluat in `docs/TESTE_RAMASE.md`, A15.
+5. **Previews**: `http://127.0.0.1:5082/` (SQLite) si `http://127.0.0.1:5085/` (MariaDB reala) lasate neatinse, functionale (verificat cu `Get-NetTCPConnection`).
+
+### Verificari
+
+- Build Release: 0 avertismente, 0 erori.
+- `BlazorStoc.Checks` (suita implicita): 578/578 `PASS`.
+- `blazorstoc_test` (integrare): toate sectiunile testate au trecut prin executie reala **cu exceptia** stergerii de proiecte (vezi mai sus si `docs/TESTE_RAMASE.md` A15). Datele orfane lasate de rularea esuata au fost curatate manual.
+
+### Pasul urmator
+
+1. Investigheaza si corecteaza cauza reala a esecului la stergerea proiectelor pe MariaDB (`docs/TESTE_RAMASE.md`, A15) - probabil in `MariaArchivePersistence`/`MariaProjectRepository.DeleteAsync`, sau o diferenta de schema intre `blazorstoc_test` si baza reala pentru `archive_projects`/`archive_relations`.
+2. Dupa aceea, re-ruleaza sectiunea "Projects" a verificarilor de integrare pentru confirmare finala.
+3. Subtask 2.12 (autentificare efectiva + doua sesiuni concurente pe preview-ul `5085`) si 2.13 (comutarea definitiva) raman, ca inainte, decizii/actiuni ale utilizatorului.
 
 ## Task 2 (integrare MariaDB reala) aproape finalizat - 28.09.2026
 
