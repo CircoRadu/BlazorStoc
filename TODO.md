@@ -16,6 +16,15 @@
 
 Toate taskurile anterioare sunt finalizate si arhivate la sfarsitul fisierului. Taskul activ (1) se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex).
 
+## Task 0 - Sincronizarea manuala a fisierelor de acces root MariaDB (actiune utilizator, nu cod)
+
+Dupa rotirea parolei de root a instantei locale MariaDB (efectuata la cererea utilizatorului dintr-o sesiune Claude Code care lucreaza de la distanta si nu are acces la calea reala de pe disc), fisierele `Livrare-DDL-MariaDB\admin.private.cnf` si `Livrare-DDL-MariaDB\connection.private.json` contin parola de root valida in acest moment pe server. Copiile originale de la `C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB\admin.private.cnf` si `...\connection.private.json` au ramas cu parola veche, acum invalida, pentru ca sesiunea Claude Code nu poate scrie in acel director (nu il poate vedea in sistemul de fisiere, desi procesul `mariadbd.exe` si portul 3307 raman accesibile).
+
+- [ ] Utilizatorul copiaza manual, de la calculatorul fizic, cele doua fisiere actualizate din `Livrare-DDL-MariaDB` peste cele vechi din `C:\Users\Alex\AppData\Local\BlazorStoc-MariaDB`.
+- [ ] Dupa copiere, verifica o conectare cu contul root folosind fisierele proaspat copiate.
+
+Amanat pentru "maine" (cerere explicita a utilizatorului, 28.09.2026, lucra de la distanta in acel moment). Nu afecteaza functionarea aplicatiei: conturile `blazorstoc_dev` si `blazorstoc_migrator`, folosite de aplicatie si de preview-urile de pe 5082/5085, nu au fost atinse de rotirea parolei de root.
+
 ## Task 1 - Combobox cu autocompletare pentru beneficiar si proiect la iesire, cu adaugare fara pierderea formularului
 
 Inlocuieste, in formularul de iesire (`Components/Shared/ExitDestinationPicker.razor`), campul de cautare text si dropdown-ul separat pentru beneficiar cu un singur control de tip combobox (camp de text + lista derulanta) care restrange optiunile pe masura ce utilizatorul tasteaza; foloseste acelasi mecanism si pentru selectarea proiectului beneficiarului ales. Adauga langa fiecare combobox un buton "Adauga beneficiar" / "Adauga proiect" care deschide pagina de adaugare corespunzatoare fara sa piarda datele introduse in formularul de iesire; dupa salvarea cu succes a beneficiarului/proiectului nou, aplicatia revine in formularul de iesire care a initiat cererea, cu campurile anterioare pastrate si cu beneficiarul/proiectul nou selectat.
