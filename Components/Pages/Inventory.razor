@@ -1,0 +1,268 @@
+@page "/inventar"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@using System.Globalization
+@inject IProductRepository Repository
+@inject IInventoryReportBuilder ReportBuilder
+@inject IInventoryPdfWriter PdfWriter
+@inject IAuditTrail AuditTrail
+@inject IAccessControl Access
+@inject IJSRuntime JS
+@inject ILogger<Inventory> Logger
+@implements IAsyncDisposable
+
+<PageTitle>Inventar · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">SITUAȚIE DE STOC</p><h1>Inventar</h1><p class="muted">Selectează categoriile și subcategoriile pentru care se generează situația de inventar, folosită la numărarea fizică a stocului.</p></div>
+    <div class="heading-actions">
+        <button class="primary" disabled="@(!CanGenerate)" title="@(HasSelection ? null : InventoryRules.NoSelectionMessage)" @onclick="GenerateAsync">@(generating ? "Se generează…" : "Generează situația de inventar")</button>
+    </div>
+</div>
+@if (loadError is not null) { <div class="error-banner" role="alert">@loadError <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă structura catalogului</h3></div>
+}
+else if (loadError is null && Categories.Count == 0)
+{
+    <div class="empty-state"><h3>Nu există categorii sau produse pentru inventar</h3></div>
+}
+else if (loadError is null)
+{
+    <section class="catalog inventory-options">
+        <label class="check-label">
+            <input type="checkbox" @ref="selectAllCheckboxRef" checked="@AllState.Checked" aria-label="Selectează toate categoriile" @onchange="ToggleAllAsync" />
+            Selectează toate categoriile
+        </label>
+        <label class="check-label">
+            <input type="checkbox" checked="@selection.ExcludeZeroStock" @onchange="ToggleExcludeZeroAsync" />
+            Elimină din situația de inventar produsele cu stoc 0
+        </label>
+    </section>
+
+    <div class="category-management-list inventory-category-list">
+        @foreach (var category in Categories)
+        {
+            var subcategoryNames = SubcategoryNames(category);
+            <CollapsibleSection Id="@CategoryId(category)"
+                                RootClass="catalog inventory-category-card"
+                                HeaderRowClass="catalog-heading collapsible-header"
+                                ToggleClass="category-disclosure"
+                                ContentClass="category-management-content"
+                                Expanded="@IsCategoryExpanded(category)"
+                                ExpandedChanged="@(expanded => SetCategoryExpanded(category, expanded))">
+                <Header>
+                    <span class="inventory-checkbox" @onclick:stopPropagation="true">
+                        <input type="checkbox" aria-label="@($"Selectează categoria {category}")"
+                               disabled="@(subcategoryNames.Count == 0)"
+                               checked="@selection.CategoryState(category, subcategoryNames).Checked"
+                               @ref="categoryCheckboxes[category]"
+                               @onchange="@(e => ToggleCategoryAsync(category, subcategoryNames, (bool)(e.Value ?? false)))" />
+                    </span>
+                    <span class="category-disclosure-text">
+                        <span class="category-title">@category</span>
+                        <small>@SubcategoryCountLabel(category)</small>
+                        <small>@ProductCount(category) produse asociate</small>
+                        @if (subcategoryNames.Count > 0)
+                        {
+                            <small>@SelectionCountLabel(category, subcategoryNames)</small>
+                        }
+                    </span>
+                </Header>
+                <ChildContent>
+                    @if (Subcategories(category).Count == 0)
+                    {
+                        <div class="empty-state compact"><p>Categoria nu are subcategorii.</p></div>
+                    }
+                    else
+                    {
+                        <div class="table-scroll"><table><thead><tr><th><span class="sr-only">Selectează</span></th><th>SUBCATEGORIE</th><th>PRODUSE</th></tr></thead><tbody>
+                        @foreach (var group in Subcategories(category))
+                        {
+                            <tr @key="@($"{group.Category}:{group.Subcategory}")">
+                                <td><input type="checkbox" aria-label="@($"Selectează subcategoria {group.Subcategory}")" checked="@selection.IsSelected(group.Category, group.Subcategory)" @onchange="@(e => ToggleSubcategoryAsync(group, (bool)(e.Value ?? false)))" /></td>
+                                <td><strong>@group.Subcategory</strong></td>
+                                <td>@ProductCount(group) produse</td>
+                            </tr>
+                        }
+                        </tbody></table></div>
+                    }
+                </ChildContent>
+            </CollapsibleSection>
+        }
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ProductGroup> groups = Array.Empty<ProductGroup>();
+    private IReadOnlyList<Product> products = Array.Empty<Product>();
+    private readonly InventorySelectionState selection = new();
+    private readonly HashSet<string> expandedCategories = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ElementReference> categoryCheckboxes = new(StringComparer.Ordinal);
+    private ElementReference selectAllCheckboxRef;
+    private bool loading, generating, indeterminateDirty;
+    private string? loadError, error, notice;
+    private IJSObjectReference? indeterminateModule, downloadModule;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
+        .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+    private List<ProductGroup> Subcategories(string category) => groups
+        .Where(group => string.Equals(group.Category, category, StringComparison.OrdinalIgnoreCase) && group.Subcategory.Length > 0)
+        .OrderBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase).ToList();
+    private List<string> SubcategoryNames(string category) => Subcategories(category).Select(group => group.Subcategory).ToList();
+    private List<(string Category, IReadOnlyList<string> Subcategories)> CategoryEntries =>
+        Categories.Select(category => (category, (IReadOnlyList<string>)SubcategoryNames(category))).ToList();
+    private int ProductCount(string category) => products.Count(product => string.Equals(product.Category, category, StringComparison.OrdinalIgnoreCase));
+    private int ProductCount(ProductGroup group) => products.Count(product =>
+        string.Equals(product.Category, group.Category, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(product.Subcategory, group.Subcategory, StringComparison.OrdinalIgnoreCase));
+    private string SubcategoryCountLabel(string category)
+    {
+        var count = Subcategories(category).Count;
+        return $"{count} {(count == 1 ? "subcategorie" : "subcategorii")}";
+    }
+    private string SelectionCountLabel(string category, IReadOnlyList<string> subcategoryNames)
+    {
+        var selected = subcategoryNames.Count(subcategory => selection.IsSelected(category, subcategory));
+        return $"{selected} din {subcategoryNames.Count} {(subcategoryNames.Count == 1 ? "subcategorie selectată" : "subcategorii selectate")}";
+    }
+    private static string CategoryId(string category) => $"inventory-category-{Uri.EscapeDataString(TextNormalization.UniquenessKey(category))}";
+    private bool IsCategoryExpanded(string category) => expandedCategories.Contains(TextNormalization.UniquenessKey(category));
+    private void SetCategoryExpanded(string category, bool expanded)
+    {
+        var key = TextNormalization.UniquenessKey(category);
+        if (expanded) expandedCategories.Add(key);
+        else expandedCategories.Remove(key);
+    }
+
+    private (bool Checked, bool Indeterminate) AllState => selection.AllState(CategoryEntries);
+    private bool HasSelection => selection.Count(CategoryEntries) > 0;
+    private bool CanGenerate => HasSelection && !generating && !loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Access.CanManageProductsAsync(lifetime.Token)) { loadError = "Nu ai dreptul să consulți catalogul."; return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; loadError = null;
+        try
+        {
+            var groupsTask = Repository.GetGroupsAsync(lifetime.Token);
+            var productsTask = Repository.GetProductsAsync(lifetime.Token);
+            await Task.WhenAll(groupsTask, productsTask);
+            groups = await groupsTask;
+            products = await productsTask;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Inventory catalogue loading failed ({ErrorType}).", exception.GetType().Name); loadError = "Structura catalogului nu a putut fi încărcată."; }
+        finally { loading = false; }
+    }
+
+    private Task ToggleAllAsync(ChangeEventArgs e)
+    {
+        selection.SetAll(CategoryEntries, e.Value is true);
+        indeterminateDirty = true;
+        return Task.CompletedTask;
+    }
+
+    private Task ToggleExcludeZeroAsync(ChangeEventArgs e)
+    {
+        selection.ExcludeZeroStock = e.Value is true;
+        return Task.CompletedTask;
+    }
+
+    private Task ToggleCategoryAsync(string category, IReadOnlyList<string> subcategories, bool value)
+    {
+        selection.SetCategory(category, subcategories, value);
+        indeterminateDirty = true;
+        return Task.CompletedTask;
+    }
+
+    private Task ToggleSubcategoryAsync(ProductGroup group, bool value)
+    {
+        selection.SetSubcategory(group.Category, group.Subcategory, value);
+        indeterminateDirty = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (generating) return;
+        error = null; notice = null;
+        var items = selection.ToItems(CategoryEntries);
+        if (items.Count == 0) { error = InventoryRules.NoSelectionMessage; return; }
+        generating = true;
+        try
+        {
+            var request = new InventoryRequest(items, selection.ExcludeZeroStock);
+            var report = await ReportBuilder.BuildAsync(request, lifetime.Token);
+            var generatedLocal = DateTime.Now;
+            var bytes = PdfWriter.Write(report, generatedLocal);
+            var fileName = InventoryRules.FileName(generatedLocal);
+            try { await LogGenerationAsync(request, report, fileName); }
+            catch (Exception exception) { Logger.LogError("Inventory audit logging failed ({ErrorType}).", exception.GetType().Name); }
+            await DownloadAsync(fileName, bytes);
+            notice = "Situația de inventar a fost generată.";
+        }
+        catch (InventoryOperationException exception) { error = exception.Message; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Inventory report generation failed ({ErrorType}).", exception.GetType().Name); error = "Situația de inventar nu a putut fi generată."; }
+        finally { generating = false; }
+    }
+
+    private Task LogGenerationAsync(InventoryRequest request, InventoryReport report, string fileName)
+    {
+        var details = AuditDetails.Identification(
+            ("Categorii selectate", report.SelectedCategoryCount.ToString(CultureInfo.InvariantCulture)),
+            ("Subcategorii selectate", report.SelectedSubcategoryCount.ToString(CultureInfo.InvariantCulture)),
+            ("Stoc 0 exclus", request.ExcludeZeroStock ? "da" : "nu"),
+            ("Produse în situație", report.ProductCount.ToString(CultureInfo.InvariantCulture)),
+            ("Din care cu stoc negativ", report.NegativeCount.ToString(CultureInfo.InvariantCulture)),
+            ("Fișier", fileName));
+        return AuditRecorder.RecordGenerateAsync(AuditTrail, Access, AuditEntities.Inventory, "Situație de inventar", details, lifetime.Token);
+    }
+
+    private async Task DownloadAsync(string fileName, byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        using var streamRef = new DotNetStreamReference(stream, leaveOpen: true);
+        downloadModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./inventory-download.js");
+        await downloadModule.InvokeVoidAsync("downloadFileFromStream", lifetime.Token, fileName, streamRef);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!indeterminateDirty && !firstRender) return;
+        if (Categories.Count == 0) return;
+        try
+        {
+            indeterminateModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./checkbox-indeterminate.js");
+            indeterminateDirty = false;
+            await indeterminateModule.InvokeVoidAsync("setIndeterminate", lifetime.Token, selectAllCheckboxRef, AllState.Indeterminate);
+            foreach (var category in Categories)
+            {
+                if (!categoryCheckboxes.TryGetValue(category, out var elementRef)) continue;
+                var (_, indeterminate) = selection.CategoryState(category, SubcategoryNames(category));
+                await indeterminateModule.InvokeVoidAsync("setIndeterminate", lifetime.Token, elementRef, indeterminate);
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (JSDisconnectedException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (indeterminateModule is not null) try { await indeterminateModule.DisposeAsync(); } catch (JSDisconnectedException) { }
+        if (downloadModule is not null) try { await downloadModule.DisposeAsync(); } catch (JSDisconnectedException) { }
+        lifetime.Dispose();
+    }
+}

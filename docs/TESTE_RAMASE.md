@@ -21,6 +21,7 @@ Acest fișier ține evidența verificărilor care **nu au putut fi efectuate** p
 | **M4** | Testul cere un alt browser decât cel din panou (Chromium); utilizatorul a confirmat manual numai Chrome și Brave. |
 | **M5** | Testul ar modifica ireversibil date sau ar încheia sesiunea autentificată a utilizatorului din panou; se face doar de utilizator sau pe o copie a datelor. |
 | **M6** | Testul cere timp îndelungat sau condiții greu de provocat (întreruperea rețelei, zile de funcționare, oprirea unui serviciu). |
+| **M7** | Testul cere o aplicatie externa (alt cititor PDF, o imprimanta fizica) care nu este disponibila in mediul de lucru al agentului. |
 
 ## Pregătirea mediului
 
@@ -247,6 +248,16 @@ Tot codul MariaDB este scris și compilat, iar regulile comune sunt acoperite pe
 ### F3. Ștergerea în cascadă și evenimentele derivate
 - **Pași**: șterge un proiect cu observații și fișiere, cu o a doua sesiune deschisă pe pagina proiectului și alta pe pagina beneficiarului; urmărește notificările.
 - **Așteptat**: fără notificări false pentru sesiunea care a făcut ștergerea; celelalte sesiuni se actualizează o singură dată (evenimentele derivate ale observațiilor/fișierelor pot apărea fără origine — acceptat, verifică să nu producă erori).
+
+## G. Fisierul PDF de inventar in alte medii (motiv: M7)
+
+### G1. Deschiderea situatiei de inventar in alte cititoare PDF
+- **Pasi**: genereaza situatia de inventar din `/inventar` si deschide fisierul descarcat in cititoare PDF diferite (Adobe Acrobat Reader, vizualizatorul din alt browser, aplicatia mobila de PDF).
+- **Asteptat**: continutul, diacriticele, culoarea rosie a stocului negativ si bordurile tabelului arata identic cu verificarea facuta din agent (`VALIDARE.md`).
+
+### G2. Tiparirea fizica a situatiei de inventar
+- **Pasi**: tipareste situatia de inventar generata (o pagina si un caz cu mai multe pagini) pe o imprimanta fizica, format A4.
+- **Asteptat**: paginarea, antetul repetat pe pagini si spatiul din coloana "Valoare reala" raman utilizabile pe hartie, la marimea reala.
 
 ---
 

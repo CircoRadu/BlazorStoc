@@ -999,3 +999,39 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release 0 avertismente; BlazorStoc.Checks 523 PASS (18 noi), 0 FAIL; browser pe instanta de proba (pagina vehiculului, echipamente, restituire partiala, mutare, muta tot, restituie tot, stare goala, tabelul miscarilor, editare mutare, stergere blocata, 375/768 px). Neverificat: MariaDB pe server real (TESTE_RAMASE A11).
 - **Commit:** `claude: vehicle page with equipment, return to warehouse and move between vehicles`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-28T07:32:54.5596180Z â€” claude
+
+- **Task:** Task 1: situatia de inventar (pagina Inventar si fisierul PDF)
+- **Rezumat:** Task 1 (Situatia de inventar) implementat: pagina /inventar cu selectie categorie/subcategorie (indeterminate, select all, exclude stoc 0), pagina de rezerva /inventar/preluare, meniu si dashboard noi. Domeniu nou Services/Inventory.cs (InventoryReportBuilder) si Services/InventorySelectionState.cs (logica selectiei, testata separat). PDF generat cu PDFsharp 6.2.1 (XGraphics, fara MigraDoc, care nu e inca portat pe versiunea cross-platform) si fontul PT Sans (SIL OFL, incorporat in Assets/Fonts), cu grid complet pe celulele tabelului (cerinta ulterioara a utilizatorului, dupa ce prima varianta avea doar o linie sub antet). Descarcarea foloseste DotNetStreamReference si un modul JS mic, fara endpoint HTTP nou. Jurnalizare noua (AuditEntities.Inventory, AuditActions.Generate) dupa succesul generarii, cu rezumatul cererii si fara date de produse. Adaugat si Task 1 nou (fost Task 2) in TODO.md la cererea utilizatorului: combobox cu autocompletare pentru beneficiar/proiect la iesire.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `.gitattributes`
+  - `Assets/Fonts/OFL.txt`
+  - `Assets/Fonts/PTSans-Bold.ttf`
+  - `Assets/Fonts/PTSans-Regular.ttf`
+  - `BlazorStoc.csproj`
+  - `Components/Layout/MainLayout.razor`
+  - `Components/Pages/Audit.razor`
+  - `Components/Pages/Dashboard.razor`
+  - `Components/Pages/Inventory.razor`
+  - `Components/Pages/InventoryPickup.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `Program.cs`
+  - `README.md`
+  - `Services/AuditTrail.cs`
+  - `Services/Inventory.cs`
+  - `Services/InventoryPdfWriter.cs`
+  - `Services/InventorySelectionState.cs`
+  - `tests/BlazorStoc.Checks/PdfTextExtractor.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+  - `wwwroot/checkbox-indeterminate.js`
+  - `wwwroot/inventory-download.js`
+- **Validare:** Build Release: 0 avertismente, 0 erori. BlazorStoc.Checks: 559 verificari trecute (36 noi: selectie, InventoryReportBuilder, generare PDF verificata prin extragere de text din CMap-ul ToUnicode al fontului incorporat, jurnalizare). Verificat manual in browser (cont administrator.demo, preview 5082): meniul Inventar, selectie si indeterminate, generare si descarcare PDF, bordurile complete ale celulelor (fisier descarcat deschis si confirmat), evenimentul din Jurnal, pagina de rezerva Preluare inventar, 768 si 375 px fara depasire orizontala. Neverificat: alt cititor PDF si tiparirea fizica (docs/TESTE_RAMASE.md, G1/G2); MariaDB pe server real.
+- **Commit:** `claude: situatia de inventar (pagina Inventar si PDF), plus task nou combobox beneficiar/proiect in TODO`
+- **Predat cÄƒtre:** claude

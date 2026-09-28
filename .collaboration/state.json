@@ -5,10 +5,10 @@
     "activeAgent":  null,
     "lastAgent":  "claude",
     "nextAgent":  "claude",
-    "currentTask":  "Task 2: pagina vehiculului, materiale si echipamente, restituire si mutare",
-    "startedAtUtc":  "2026-09-25T12:31:30.1760548Z",
-    "completedAtUtc":  "2026-09-25T12:41:54.7992879Z",
-    "lastSummary":  "Task 2 implementat: pagina vehiculului. Pagina /vehicule/{id} (fara observatii si fisiere; Editeaza, Sterge, intrarea Materiale si echipamente) si /vehicule/{id}/echipamente (tabel COD PRODUS / CANTITATE, restituire in depozit si mutare in alta masina pe reper cu cantitate partiala, si pentru toate reperele, atomic). Fiecare operatie este o miscare de stoc jurnalizata (ExitDestination.WarehouseReturn cu efect 0; mutarea foloseste destinatia autovehicul cu sursa masina); stocul total ramane neschimbat, iar cantitatea dintr-o masina nu poate deveni negativa. Miscarile de transfer se pot edita din pagina produsului fara a schimba destinatia si sursa. Linkurile catre vehicul (lista, miscari, jurnal) duc la pagina. Noi: VehiclePage, VehicleEquipmentPage, VehicleTransferDialog, GetVehicleEquipmentAsync, TransferFromVehicleAsync, IVehicleRepository.GetAsync. TODO: task arhivat, ramane Task 1 (inventar). Documentatie actualizata. Preview 5082 pornit.",
-    "lastCommitSubject":  "claude: vehicle page with equipment, return to warehouse and move between vehicles",
+    "currentTask":  "Task 1: situatia de inventar (pagina Inventar si fisierul PDF)",
+    "startedAtUtc":  "2026-09-28T06:40:45.1014852Z",
+    "completedAtUtc":  "2026-09-28T07:32:54.5596180Z",
+    "lastSummary":  "Task 1 (Situatia de inventar) implementat: pagina /inventar cu selectie categorie/subcategorie (indeterminate, select all, exclude stoc 0), pagina de rezerva /inventar/preluare, meniu si dashboard noi. Domeniu nou Services/Inventory.cs (InventoryReportBuilder) si Services/InventorySelectionState.cs (logica selectiei, testata separat). PDF generat cu PDFsharp 6.2.1 (XGraphics, fara MigraDoc, care nu e inca portat pe versiunea cross-platform) si fontul PT Sans (SIL OFL, incorporat in Assets/Fonts), cu grid complet pe celulele tabelului (cerinta ulterioara a utilizatorului, dupa ce prima varianta avea doar o linie sub antet). Descarcarea foloseste DotNetStreamReference si un modul JS mic, fara endpoint HTTP nou. Jurnalizare noua (AuditEntities.Inventory, AuditActions.Generate) dupa succesul generarii, cu rezumatul cererii si fara date de produse. Adaugat si Task 1 nou (fost Task 2) in TODO.md la cererea utilizatorului: combobox cu autocompletare pentru beneficiar/proiect la iesire.",
+    "lastCommitSubject":  "claude: situatia de inventar (pagina Inventar si PDF), plus task nou combobox beneficiar/proiect in TODO",
     "claudeStatus":  "active"
 }

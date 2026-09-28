@@ -1,8 +1,8 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **25 septembrie 2026**
-Stare ciclu: **Ieșirea spre vehicul (destinație, sursă, stoc în mașini) finalizată; rămân taskurile active 1 (situația de inventar) și 2 (pagina vehiculului); pregătit pentru predarea către Codex după commitul curent**
+Data: **28 septembrie 2026**
+Stare ciclu: **Situatia de inventar (Task 1) finalizata; task activ ramas: Task 1 (combobox cu autocompletare beneficiar/proiect la iesire); mod claude_only, fara predare catre Codex**
 
 ## Rezumat
 
@@ -11,6 +11,18 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs”, stocul modificabil exclusiv prin mișcări de intrare/ieșire (pagina `/produse/{id}/miscari`) și istoricul mișcărilor.
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Situatia de inventar (Task 1) - 28 septembrie 2026
+
+- Pagina noua `/inventar` (`Components/Pages/Inventory.razor`) si pagina de rezerva `/inventar/preluare` (`Components/Pages/InventoryPickup.razor`); meniul principal are elementul extensibil "Inventar" intre "Produse si stocuri" si "Administrare" (`Components/Layout/MainLayout.razor`), iar dashboard-ul (`Components/Pages/Dashboard.razor`) are un card nou.
+- Domeniu nou: `Services/Inventory.cs` (`InventoryReportBuilder`/`IInventoryReportBuilder`, `InventoryRules`, `InventoryReport` si modelele lui) si `Services/InventorySelectionState.cs` (logica selectiei categorie/subcategorie/toate, independenta de UI, testata separat). `InventoryReportBuilder` citeste un instantaneu (categorii, produse, cantitati in vehicule) prin `Task.WhenAll`, valideaza selectia fata de catalogul curent si calculeaza valoarea "in depozit" cu `StockMovementRules.WarehouseStock`.
+- PDF: `Services/InventoryPdfWriter.cs`, cu pachetul NuGet **PDFsharp 6.2.1** (licenta MIT). Decizie: versiunea curenta a PDFsharp (linia noua, cross-platform, fara System.Drawing) nu include inca MigraDoc, asa ca raportul este desenat direct cu `XGraphics` (pozitionare, paginare, antet repetat, evitarea etichetelor orfane, grid complet pe fiecare celula a tabelului pentru usurinta numararii fizice). Fontul este **PT Sans** (SIL Open Font License 1.1, familia are variantele Regular si Bold ca fisiere statice, spre deosebire de multe familii Google Fonts care au ramas doar variabile), inclus ca resursa incorporata in `Assets/Fonts/` (`PTSans-Regular.ttf`, `PTSans-Bold.ttf`, `OFL.txt`) si incarcat printr-un `IFontResolver` propriu; contine diacriticele romanesti corecte (s/t cu virgula, nu sedila), verificat direct din tabela `cmap` a fontului inainte de alegere.
+- Descarcarea PDF-ului nu foloseste un endpoint HTTP separat: butonul apeleaza direct serviciile din acelasi circuit Blazor Server (deja autentificat), iar fisierul ajunge la browser prin `DotNetStreamReference` si un modul JS mic (`wwwroot/inventory-download.js`) care creeaza un `Blob` si un link de descarcare; nu exista suprafata HTTP noua de protejat impotriva CSRF. Starea `indeterminate` a casetelor de selectie foloseste alt modul JS mic (`wwwroot/checkbox-indeterminate.js`), fiindca proprietatea `indeterminate` nu are echivalent in atribute HTML.
+- Jurnalizare: `AuditEntities.Inventory` ("Inventar") si `AuditActions.Generate` ("Generare"), adaugate si in filtrele paginii Jurnal; `AuditRecorder.RecordGenerateAsync` scrie evenimentul fara identificator de obiect si fara link, cu rezumatul cererii (categorii/subcategorii selectate, optiunea stoc 0, produse in situatie si cate au stoc negativ, numele fisierului), niciodata lista produselor. Se scrie numai dupa ce PDF-ul a fost construit cu succes; daca jurnalizarea insasi esueaza dupa aceea, eroarea este doar logata pe server si utilizatorul primeste totusi fisierul (decizie de implementare: un esec de jurnalizare nu trebuie sa anuleze o operatie de citire deja reusita).
+- Categoria cu zero subcategorii (posibila prin "Adauga categorie" din administrare, inainte de a i se adauga vreo subcategorie): caseta ei de selectie este intotdeauna debifata, fara stare `indeterminate`; nu exista nimic de selectat pentru ea.
+- Verificari noi: 36 (559 in total), inclusiv extragerea de text dintr-un PDF generat prin CMap-ul `ToUnicode` al fontului incorporat (`tests/BlazorStoc.Checks/PdfTextExtractor.cs`, folosit numai in teste). Detalii complete in `VALIDARE.md`.
+- Preview: rulat pe `http://127.0.0.1:5082/` (build Release, baza demonstrativa), verificat si in browser (selectie, `indeterminate`, generare, jurnal, pagina de rezerva, 768/375 px).
+- Taskul activ ramas: **Task 1 din TODO.md** (combobox cu autocompletare pentru beneficiar/proiect la iesire, cu adaugare fara pierderea formularului), independent de situatia de inventar.
 
 ## Noul mod de actualizare al `TODO.md`
 

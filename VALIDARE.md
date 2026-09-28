@@ -4,6 +4,15 @@
 
 > Verificările care nu au putut fi efectuate sunt urmărite, cu pașii și motivul, în `docs/TESTE_RAMASE.md`.
 
+## Situatia de inventar (Task 1) - 28 septembrie 2026
+
+- Pagina `/inventar` afiseaza categoriile si subcategoriile ca in "Categorii si subcategorii" (carduri restranse implicit), cu caseta de selectare pentru fiecare categorie/subcategorie, propagare categorie -> subcategorii, stare `indeterminate` (verificata vizual: caseta "Selecteaza toate categoriile" devine indeterminata cand doar o parte din categorii sunt selectate) si optiunea "Elimina din situatia de inventar produsele cu stoc 0".
+- Meniul principal are elementul extensibil "Inventar" (intre "Produse si stocuri" si "Administrare") cu intrarile "Generare situatie inventar" (`/inventar`) si "Preluare inventar" (`/inventar/preluare`, pagina de rezerva); "Inventar" apare si in dashboard.
+- Butonul "Genereaza situatia de inventar" este dezactivat fara selectie si genereaza un PDF descarcat direct din browser (fara sa fie pastrat pe server), folosind PDFsharp 6.2.1 si fontul PT Sans (SIL OFL) incorporat in aplicatie.
+- 36 de verificari automate noi au trecut (559 in total): logica selectiei (categorie/subcategorie/toate, indeterminate, categorie fara subcategorii), constructia situatiei (doar selectia facuta, eliminarea stocului 0 cu stocul negativ pastrat, omiterea sectiunilor goale, ordinea, stocul calculat prin `WarehouseStock` cu excluderea cantitatii din vehicule, respingerea unei selectii inexistente sau goale), generarea PDF-ului (semnatura `%PDF`, textele asteptate extrase din PDF prin CMap-ul `ToUnicode` al fontului incorporat, un cod cu diacritice, fontul bold 14 pentru categorii/subcategorii si normal 12 pentru rest, culoarea rosie a randului cu stoc negativ, un catalog de 300 de produse cu antet repetat pe mai multe pagini si subsolul "Pagina x din y") si jurnalizarea (un singur eveniment "Generare"/"Inventar" cu rezumatul cererii, fara date de produse si fara link).
+- Verificare in browser (mod demonstrativ, cont administrator.demo): selectarea unei categorii intregi propaga la subcategorii, "Selecteaza toate categoriile" devine indeterminata corect, PDF-ul generat contine tabelul asteptat cu bordurile complete ale celulelor (deschis si verificat direct din fisierul descarcat), iar evenimentul "Generare" apare in Jurnal cu rezumatul corect si fara link pe "Tinta". Pagina "Preluare inventar" afiseaza mesajul de rezerva. Verificat si la 768 si 375 px: fara derulare orizontala a paginii (aplicatia ramane, ca in restul proiectului, gandita pentru minimum 1100 px).
+- Build Release: 0 avertismente, 0 erori. Neverificat: deschiderea fisierului PDF in alte cititoare decat cel folosit la verificare (`docs/TESTE_RAMASE.md`, G1) si tiparirea fizica (G2).
+
 ## Imagini produse — 17 septembrie 2026
 
 - Formularul produsului acceptă o imagine din fișier sau clipboard și refuză salvarea unui produs nou fără imagine.

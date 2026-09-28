@@ -15,6 +15,7 @@ public static class AuditEntities
     public const string ProjectObservationFile = "FisierObservatie";
     public const string StockMovement = "MiscareStoc";
     public const string Vehicle = "Vehicul";
+    public const string Inventory = "Inventar";
 }
 
 public static class AuditActions
@@ -25,6 +26,7 @@ public static class AuditActions
     public const string Login = "Conectare";
     public const string Logout = "Deconectare";
     public const string Unlock = "Deblocare";
+    public const string Generate = "Generare";
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -218,6 +220,11 @@ public static class AuditRecorder
     public static Task RecordUnlockAsync(IAuditTrail? trail, IAccessControl? access, string entityId, string target,
         string details, string motif, CancellationToken cancellationToken) =>
         RecordEntityAsync(trail, access, AuditEntities.Product, AuditActions.Unlock, entityId, target, details, motif, cancellationToken);
+
+    // A read-only report generated on demand (the inventory PDF): no object identifier, so no link in "Țintă".
+    public static Task RecordGenerateAsync(IAuditTrail? trail, IAccessControl? access, string entityType,
+        string target, string details, CancellationToken cancellationToken) =>
+        RecordEntityAsync(trail, access, entityType, AuditActions.Generate, string.Empty, target, details, string.Empty, cancellationToken);
 
     public static Task RecordSessionAsync(IAuditTrail? trail, string actorUsername, string actorRole,
         bool connected, CancellationToken cancellationToken) => trail is null

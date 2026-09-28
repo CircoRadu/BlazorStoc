@@ -12,113 +12,53 @@
 
 # Taskuri active
 
-## Ordinea de implementare optimizată
+## Ordinea de implementare optimizata
 
-Toate taskurile anterioare sunt finalizate și arhivate la sfârșitul fișierului. Taskul activ (1) se bazeaza pe lucrari finalizate (inclusiv administrarea vehiculelor, iesirea spre vehicul si pagina vehiculului) si se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex).
+Toate taskurile anterioare sunt finalizate si arhivate la sfarsitul fisierului. Taskul activ (1) nu depinde de alt task activ si se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex).
 
-## Task 1 — Situația de inventar (pagina „Inventar” și fișierul PDF)
+## Task 1 - Combobox cu autocompletare pentru beneficiar si proiect la iesire, cu adaugare fara pierderea formularului
 
-Adaugă în meniul principal secțiunea „Inventar” și o pagină din care utilizatorul alege categoriile și subcategoriile pentru care se generează o situație de inventar în format PDF, folosită la numărarea fizică a stocului. Pagina reutilizează structura vizuală și mecanismul collapse din „Categorii și subcategorii”, dar este numai pentru consultare și selectare. Depinde de structura catalogului, de „Cod produs”, de stocul calculat din mișcări („Stoc exclusiv prin mișcări de intrare și ieșire” și „Intrări și ieșiri pentru un produs existent”) și de jurnalul de activitate (finalizate); nu depinde de alte taskuri active.
+Inlocuieste, in formularul de iesire (`Components/Shared/ExitDestinationPicker.razor`), campul de cautare text si dropdown-ul separat pentru beneficiar cu un singur control de tip combobox (camp de text + lista derulanta) care restrange optiunile pe masura ce utilizatorul tasteaza; foloseste acelasi mecanism si pentru selectarea proiectului beneficiarului ales. Adauga langa fiecare combobox un buton "Adauga beneficiar" / "Adauga proiect" care deschide pagina de adaugare corespunzatoare fara sa piarda datele introduse in formularul de iesire; dupa salvarea cu succes a beneficiarului/proiectului nou, aplicatia revine in formularul de iesire care a initiat cererea, cu campurile anterioare pastrate si cu beneficiarul/proiectul nou selectat.
 
-### Decizii stabilite cu utilizatorul (25 septembrie 2026)
+### Subtask 1.1 - Componenta combobox cu autocompletare
 
-- „Valoare reală” rămâne **goală** (se completează manual la numărare).
-- Produsele cu **stoc negativ rămân** în situație și când opțiunea „stoc 0” este bifată; textul lor din tabelul generat este scris cu **roșu**.
-- „Generat la” folosește momentul (timestamp-ul) în care se generează formularul, convertit la **ora locală**, în forma `dd.mm.aaaa` și ora (`oo:mm`).
-- Fontul este **gratuit** (licență liberă de redistribuire, cu diacritice românești). Numele categoriilor și ale subcategoriilor sunt **bold, mărime 14**; restul textului este normal, **mărime 12**.
-- Generarea situației se **jurnalizează**, cu utilizatorul care a generat-o.
-- Meniul principal: sub „Inventar” există intrarea **„Generare situație inventar”** (duce la pagina descrisă aici) și intrarea **„Preluare inventar”** (funcționalitate care se implementează ulterior; aici există doar intrarea, cu **pagină de rezervă**).
-- Stocul negativ se scrie cu roșu pe **întregul rând** al produsului (cod, valoare stoc și celula „Valoare reală”, care rămâne goală).
-- Situația de inventar folosește **numai valoarea din depozitul fizic** (stocul „în depozit”, fără produsele aflate în mașini, vezi taskul „Ieșire spre vehicul…”); regulile „stoc 0” și „stoc negativ” se aplică acestei valori (decizie a utilizatorului, 25 septembrie 2026).
-- Titlul „Inventar” și textul „Generat la” urmează regula generală: normal, mărime 12.
-- Fontul este orice font gratuit, de tip normal, care nu necesită licențiere (licență liberă de redistribuire, de exemplu o familie sub SIL Open Font License); nu se folosesc fonturi comerciale sau instalate doar pe anumite calculatoare.
-- Biblioteca PDF ramane la alegerea implementării, cu condiția unei licențe permisive fără costuri (implicit se folosește PDFsharp/MigraDoc, licență MIT).
+- [ ] Creeaza o componenta comuna reutilizabila (de exemplu `Components/Shared/SearchableSelect.razor`) care combina campul de cautare si lista de optiuni intr-un singur control accesibil (tastatura, cititor de ecran), cu restrangerea optiunilor pe masura tastarii (ca filtrul actual din `ExitDestinationPicker.razor`, dar intr-un singur control, nu doua separate).
+- [ ] Inlocuieste in `ExitDestinationPicker.razor` campul `input type="search"` si `select`-ul pentru beneficiar cu noua componenta.
+- [ ] Foloseste aceeasi componenta si pentru selectarea proiectului (`select`-ul de proiect), pastrand comportamentul actual (proiectul se goleste la schimbarea beneficiarului, lista de proiecte vine din beneficiarul ales).
+- [ ] Pastreaza validarile si mesajele actuale (proiect obligatoriu daca optiunea e bifata etc.), fara sa schimbe contractul `StockMovementInput`.
 
-### Subtask 1.1 — Pagina, ruta, meniul și dashboard-ul
+### Subtask 1.2 - Buton "Adauga beneficiar" fara pierderea formularului
 
-- [ ] Creează pagina la ruta stabilă `/inventar`, cu titlul „Inventar” (`<h1>` și titlul paginii), accesibilă utilizatorilor autentificați care pot consulta produsele (aceleași drepturi ca pentru catalog); nu cere rol de administrator.
-- [ ] Adaugă în meniul principal (bara laterală, secțiunea „Spațiu de lucru”, între „Produse și stocuri” și „Administrare”) elementul extensibil „Inventar” (aceeași componentă `CollapsibleSection` ca „Administrare”, cu pictogramă proprie), cu două intrări: **„Generare situație inventar”** → `/inventar` și **„Preluare inventar”** → `/inventar/preluare`. Elementul „Inventar” este evidențiat și rămâne extins când pagina activă este oricare dintre cele două rute.
-- [ ] „Preluare inventar” este doar o intrare de meniu cu **pagină de rezervă**: ruta `/inventar/preluare` afișează o pagină scurtă „Preluare inventar” cu mesajul că funcționalitatea va fi implementată ulterior (fără formulare sau operații); același drept de acces ca la „Generare situație inventar”. Implementarea reală este în afara acestui task.
-- [ ] Adaugă „Inventar” în dashboard (pagina principală), ca element de același tip cu cele existente, cu descriere scurtă (de exemplu „Generează situația de inventar pentru numărarea stocului.”), cu link către `/inventar`.
-- [ ] Pagina afișează stări clare: încărcare, catalog gol („Nu există categorii sau produse pentru inventar”) și eroare de încărcare cu „Reîncearcă”; nu afișează date simulate.
+- [ ] Adauga langa combobox-ul de beneficiar un buton "Adauga beneficiar" care deschide pagina de adaugare beneficiar, vizibil numai cand destinatia iesirii este Beneficiar.
+- [ ] Inainte de navigare, pastreaza starea completa a formularului de iesire (produs, tip miscare, data, cantitate, descriere, destinatie, sursa, beneficiar/proiect partial completate) intr-un mecanism care supravietuieste navigarii (de exemplu un serviciu scoped similar cu `ListNavigationContext`/`UnsavedChanges`, sau stocare in `sessionStorage` prin interop, cu o cheie legata de produs si de sesiune).
+- [ ] Dupa salvarea cu succes a beneficiarului nou (aceleasi validari ca la adaugarea oricarui beneficiar), aplicatia revine automat in pagina de miscari a produsului cu formularul de iesire redeschis si valorile anterioare restaurate, iar beneficiarul nou creat este selectat automat in combobox.
+- [ ] Anularea adaugarii beneficiarului (fara salvare) revine de asemenea in formularul de iesire, cu valorile pastrate nemodificate.
+- [ ] Daca formularul de iesire nu mai poate fi restaurat (de exemplu produsul a fost sters intre timp), utilizatorul primeste un mesaj clar si este dus in pagina produsului sau a catalogului, fara eroare nespecificata.
 
-### Subtask 1.2 — Afișarea categoriilor și subcategoriilor
+### Subtask 1.3 - Acelasi mecanism pentru proiect
 
-- [ ] Afișează categoriile și subcategoriile în același stil ca în „Categorii și subcategorii” (carduri extensibile cu `CollapsibleSection`, denumirea categoriei, numărul de subcategorii și de produse asociate, lista subcategoriilor cu numărul de produse), **fără** butoanele „Adaugă categorie”, „Adaugă subcategorie”, „Editează categoria” și „Editează / Mută”.
-- [ ] Categoriile pornesc restrânse, ca în pagina de administrare; starea extinsă/restrânsă a unui card nu se pierde la reîmprospătări ale datelor și nu modifică selecția.
-- [ ] Ordinea categoriilor și a subcategoriilor este aceeași ca în pagina de administrare (alfabetică, după regulile de comparație existente). Categoriile sau subcategoriile fără produse sunt afișate și selectabile, dar sunt omise din PDF (subtaskul 1.5).
+- [ ] Adauga langa combobox-ul de proiect un buton "Adauga proiect", vizibil numai cand un beneficiar este ales si optiunea proiect este activa.
+- [ ] Butonul deschide pagina de adaugare proiect a beneficiarului ales, cu aceeasi pastrare si restaurare a formularului de iesire ca la subtaskul 1.2.
+- [ ] Dupa salvarea cu succes a proiectului nou, formularul de iesire este restaurat cu beneficiarul deja ales si cu noul proiect selectat automat.
 
-### Subtask 1.3 — Selectarea
+### Subtask 1.4 - Verificari
 
-- [ ] Fiecare categorie și fiecare subcategorie are o casetă de selectare (`<input type="checkbox">` cu etichetă accesibilă, de exemplu „Selectează categoria Scule electrice”); selectarea unei subcategorii marchează pentru inventar toate produsele ei, iar selectarea unei categorii marchează toate produsele categoriei.
-- [ ] Selectarea sau deselectarea unei categorii se propagă asupra tuturor subcategoriilor ei. Când doar o parte din subcategoriile unei categorii sunt selectate, caseta categoriei este în stare **nedeterminată** (`indeterminate`, expusă corect accesibilității); când toate sunt selectate devine bifată, iar când niciuna nu este selectată devine debifată. Apăsarea pe o casetă nedeterminată selectează toate subcategoriile.
-- [ ] Deasupra listei de categorii există caseta „Selectează toate categoriile”, cu aceeași logică (bifată, nedeterminată, debifată) calculată din toate categoriile; apăsarea ei selectează sau deselectează toate categoriile și subcategoriile.
-- [ ] Sub caseta „Selectează toate categoriile” există caseta „Elimină din situația de inventar produsele cu stoc 0”. Când este bifată, produsele cu stoc **exact 0** nu apar în PDF; produsele cu stoc negativ **rămân** (decizie stabilită). Starea implicită este debifată.
-- [ ] Caseta din antetul cardului unei categorii și apăsarea antetului sunt acțiuni independente: bifarea nu extinde/restrânge cardul, iar extinderea nu schimbă selecția (regula din „Collapse unitar pentru elementele cu structură subordonată” pentru acțiunile din antet).
-- [ ] Toate casetele se pot folosi cu mouse, touch și tastatură (Tab, Spațiu); starea selecției este afișată și ca text pentru cititoare de ecran (de exemplu „3 din 5 subcategorii selectate”). Selecția și opțiunea „stoc 0” se păstrează pe durata sesiunii paginii, nu în baza de date.
-- [ ] Logica selecției (categorie ↔ subcategorii ↔ „toate”) este o clasă independentă de interfață, acoperită de teste (Subtask 1.8).
-
-### Subtask 1.4 — Butonul „Generează situația de inventar”
-
-- [ ] În partea de sus a paginii, în locul butonului „Adaugă categorie” din pagina de administrare, există butonul „Generează situația de inventar”.
-- [ ] Butonul este dezactivat, cu explicație („Selectează cel puțin o categorie sau subcategorie”), cât timp nu este selectat nimic; pe durata generării este dezactivat și afișează „Se generează…” pentru a preveni dubla trimitere.
-- [ ] Apăsarea generează fișierul PDF și îl oferă utilizatorului pentru descărcare (nume propus `Inventar_aaaa-ll-zz_oomm.pdf`, ora locală). Fișierul **nu** se păstrează pe server.
-- [ ] Selecția trimisă la server este validată pe server: numai identificatori valizi de categorii/subcategorii existente, fără date de produse primite de la client; o selecție care nu mai corespunde catalogului (structură modificată între timp) este semnalată clar, iar PDF-ul nu se generează parțial. Cererea este autorizată și protejată împotriva CSRF, ca celelalte operații.
-- [ ] Dacă după aplicarea opțiunii „stoc 0” nu rămâne niciun produs, utilizatorul primește un mesaj („Nu există produse de inventariat pentru selecția făcută”), nu se generează un PDF gol și nu se scrie nimic în jurnal.
-
-### Subtask 1.5 — Conținutul și aspectul fișierului PDF
-
-- [ ] Prima pagină are titlul „Inventar” și, sub el, „Generat la: zz.ll.aaaa oo:mm”, calculat din momentul generării (UTC) convertit la ora locală (aceeași convenție de timp local ca în restul aplicației, adică ora serverului).
-- [ ] Pentru fiecare categorie selectată (integral sau parțial): o etichetă cu numele categoriei; sub ea, pentru fiecare subcategorie selectată a categoriei: o etichetă cu numele subcategoriei și un tabel cu antetul **Cod produs | Valoare stoc | Valoare reală**. Secțiunile și tabelele sunt generate numai din opțiunile selectate: categoriile fără nicio subcategorie selectată nu apar, subcategoriile fără produse rămase (inclusiv după eliminarea stocului 0) sunt omise împreună cu tabelul lor, iar o categorie fără nicio subcategorie rămasă este omisă.
-- [ ] „Cod produs” conține codul produsului (fără identificatorul tehnic `#<id>`); „Valoare stoc” conține cantitatea din **depozitul fizic** la momentul generării (stocul total calculat din mișcări minus produsele aflate în mașini, așa cum este afișat „în depozit”) (număr întreg, valorile negative afișate ca atare); „Valoare reală” este **goală**, cu spațiu suficient pentru scrierea de mână.
-- [ ] Un produs cu **stoc negativ** are **întregul rând** scris cu **roșu** (codul, valoarea stocului și celula „Valoare reală”, care rămâne goală); celelalte rânduri sunt negre. Culoarea nu este singurul indicator: valoarea negativă se recunoaște și după semnul minus.
-- [ ] Fonturi: numele categoriilor și ale subcategoriilor **bold, mărime 14**; tot restul textului (titlul, „Generat la”, antetele și celulele tabelelor, subsolul) **normal, mărime 12**.
-- [ ] Ordinea: categoriile și subcategoriile ca în pagină (alfabetic); produsele fiecărui tabel sunt ordonate după codul produsului (comparație insensibilă la majuscule), cu ordine stabilă la coduri egale.
-- [ ] Aspect: format A4, orientare portret; antetul fiecărui tabel se repetă pe paginile următoare când tabelul continuă; o etichetă de categorie sau de subcategorie nu rămâne singură la finalul unei pagini (fără tabel sub ea); coduri lungi se împart pe mai multe rânduri fără să depășească marginile; număr de pagină („Pagina x din y”) în subsol; coloanele „Valoare stoc” și „Valoare reală” au lățime suficientă pentru cel puțin 6 cifre.
-- [ ] Datele sunt citite într-un singur instantaneu coerent al catalogului la momentul generării, astfel încât stocul dintr-o secțiune să nu provină din momente diferite; generarea este complet asincronă și nu blochează alte sesiuni.
-
-### Subtask 1.6 — Bibliotecă PDF și font
-
-- [ ] Folosește o bibliotecă de generare PDF fără Docker, fără servicii externe și fără costuri de licențiere: implicit PDFsharp/MigraDoc (licență MIT); QuestPDF nu se adoptă fără verificarea condițiilor lui de licență. Decizia și motivul se notează în `docs/PROJECT_STATE.md`.
-- [ ] Fontul este **gratuit**, de tip normal (fără caracter decorativ), care nu necesită licențiere: licență care permite redistribuirea și încorporarea în PDF (de exemplu o familie sub SIL Open Font License, ca Noto Sans sau Open Sans, în variantele normal și bold), conține diacriticele românești (ă, â, î, ș, ț — atenție la variantele cu virgulă, nu cu sedilă) și este inclus în aplicație; nu depinde de fonturile instalate pe server și nu are nevoie de internet la generare. Licența fontului se păstrează în proiect.
-- [ ] Generatorul este un serviciu separat (de exemplu `IInventoryReportBuilder` → model `InventoryReport` → `IInventoryPdfWriter`), astfel încât construirea datelor (selecție, filtrare, ordonare, marcarea stocului negativ) să poată fi testată fără PDF.
-
-### Subtask 1.7 — Jurnalizarea generării
-
-- [ ] Fiecare generare reușită scrie un eveniment în jurnalul de activitate cu **utilizatorul** care a generat situația (și rolul lui), tipul de obiect „Inventar”, acțiunea nouă „Generare” (adăugată și în filtrele de tip și de operație ale paginii Jurnal) și momentul UTC.
-- [ ] Detaliile evenimentului conțin doar rezumatul cererii: numărul de categorii și de subcategorii selectate, dacă a fost bifată eliminarea stocului 0, numărul de produse din situație (din care cu stoc negativ) și numele fișierului; **nu** conțin lista produselor sau valorile stocului. Evenimentul nu are identificator de obiect și nu primește link către o pagină.
-- [ ] Nu se jurnalizează cererile respinse, cele fără produse sau cele eșuate; evenimentul se scrie după ce PDF-ul a fost construit cu succes, astfel încât un eșec de jurnalizare să nu producă un fișier nejurnalizat (comportamentul la eroarea de jurnalizare se stabilește la implementare și se documentează).
-- [ ] Funcționează în modul demonstrativ (SQLite) și în modul MariaDB, prin infrastructura comună de audit; nu se adaugă fișiere SQL de upgrade separate.
-
-### Subtask 1.8 — Verificări
-
-- [ ] Teste automate pentru logica selecției: selectare/deselectare categorie ↔ subcategorii, stare nedeterminată, „toate categoriile”, apăsare pe caseta nedeterminată, categorii fără subcategorii.
-- [ ] Teste automate pentru construirea situației: doar selecția făcută, eliminarea stocului 0 (stocul negativ rămâne și este marcat pentru roșu), omiterea secțiunilor goale, ordinea categoriilor/subcategoriilor/produselor, stoc calculat din mișcări (inclusiv un produs cu mișcări), respingerea identificatorilor inexistenți, selecție goală, formatul „zz.ll.aaaa oo:mm” al momentului generării (conversie din UTC la ora locală, inclusiv schimbarea orei de vară).
-- [ ] Test de generare PDF: fișierul începe cu `%PDF`, are cel puțin o pagină, conține textele „Inventar”, „Generat la:”, numele categoriei și subcategoriei, antetul „Cod produs / Valoare stoc / Valoare reală” și un cod cu diacritice (extragere de text din PDF în test); numele de categorie/subcategorie folosesc fontul bold de 14, restul fontul normal de 12 (verificat din structura documentului generat); un catalog mare (de exemplu 300 de produse) produce mai multe pagini cu antet repetat; un rând cu stoc negativ este scris cu roșu.
-- [ ] Test pentru jurnalizare: o generare reușită scrie exact un eveniment cu utilizatorul, rezumatul cererii și numele fișierului, fără date de produse; o cerere respinsă sau fără produse nu scrie nimic.
-- [ ] Verificare în browser (mod demonstrativ): meniul „Inventar” extins cu cele două intrări și evidențierea corectă; selectarea unei categorii, a unei subcategorii, a tuturor, starea nedeterminată, opțiunea „stoc 0”, dezactivarea butonului fără selecție; descărcarea fișierului și deschiderea lui într-un cititor PDF (conținutul comparat cu pagina și cu stocul din „Produse și stocuri”, inclusiv un produs cu stoc negativ în roșu); evenimentul apare în Jurnal cu utilizatorul; „Preluare inventar” afișează pagina de „va fi implementată ulterior”; la 375 și 768 px fără depășire orizontală.
-- [ ] Actualizează `README.md`, `VALIDARE.md`, `docs/PROJECT_STATE.md` și, pentru ce nu se poate verifica (de exemplu deschiderea în alte cititoare PDF sau tipărirea), `docs/TESTE_RAMASE.md`.
+- [ ] Teste automate pentru restrangerea optiunilor in combobox (cautare insensibila la majuscule si diacritice, ca filtrul actual).
+- [ ] Teste automate pentru pastrarea si restaurarea starii formularului de iesire in jurul navigarii catre adaugare beneficiar/proiect si inapoi (valori identice inainte si dupa, inclusiv cand adaugarea e anulata).
+- [ ] Verificare in browser: adaugarea unui beneficiar nou din formularul de iesire fara sa se piarda cantitatea/data/descrierea introduse, selectarea automata a beneficiarului nou, acelasi flux pentru proiect, comportarea la anulare, tastatura si cititor de ecran pentru noul combobox.
+- [ ] Actualizeaza `README.md`, `VALIDARE.md` si `docs/PROJECT_STATE.md`.
 
 ### Criterii de acceptare
 
-- În meniul principal există „Inventar” cu intrările „Generare situație inventar” (→ `/inventar`) și „Preluare inventar” (pagină de rezervă, funcționalitate ulterioară); „Inventar” apare și în dashboard.
-- Pagina „Inventar” arată categoriile și subcategoriile ca în „Categorii și subcategorii”, fără butoane de adăugare sau editare.
-- Fiecare categorie și subcategorie are o casetă de selectare; categoria se propagă la subcategorii, iar starea parțială este nedeterminată; „Selectează toate categoriile” selectează sau deselectează tot.
-- „Elimină din situația de inventar produsele cu stoc 0” exclude din PDF produsele cu stoc zero; produsele cu stoc negativ rămân și sunt scrise cu roșu.
-- „Generează situația de inventar” este dezactivat fără selecție și generează un PDF pentru selecția făcută.
-- PDF-ul are pe prima pagină „Inventar” și „Generat la: zz.ll.aaaa oo:mm” (ora locală a momentului generării), apoi, pentru fiecare categorie selectată, eticheta categoriei, eticheta fiecărei subcategorii selectate și un tabel „Cod produs | Valoare stoc | Valoare reală”, numai cu produsele rezultate din opțiunile alese; „Valoare reală” este goală.
-- Numele categoriilor și subcategoriilor sunt bold de 14; restul textului este normal de 12; fontul este gratuit și include diacriticele românești, care se văd corect.
-- Tabelele continuă pe pagini cu antet repetat; nu rămân etichete singure la sfârșit de pagină.
-- „Valoare stoc” din PDF coincide cu valoarea „în depozit” afișată în „Produse și stocuri” la momentul generării (produsele aflate în mașini nu se numără).
-- Fiecare generare reușită este jurnalizată cu utilizatorul care a făcut-o; cererile respinse nu sunt jurnalizate.
-- Funcționalitatea este asincronă, fără Docker, fără fișiere SQL de upgrade separate și nu modifică date de inventar (numai citire, în afara evenimentului de jurnal).
+- Campul de cautare si lista de beneficiari din formularul de iesire sunt un singur control combobox cu autocompletare.
+- Acelasi tip de control este folosit pentru alegerea proiectului beneficiarului ales.
+- Un buton "Adauga beneficiar" (si, cand e cazul, "Adauga proiect") permite adaugarea unui beneficiar/proiect lipsa fara sa piarda datele introduse in formularul de iesire.
+- Dupa salvarea cu succes, aplicatia revine in formularul de iesire cu valorile anterioare si cu beneficiarul/proiectul nou selectat automat.
 
 ### Detalii de stabilit la implementare
 
-- Alegerea concretă a familiei de font liberă (Noto Sans, Open Sans sau echivalent) și a versiunii bibliotecii PDF; se notează în `docs/PROJECT_STATE.md` împreună cu licențele.
-- Comportamentul la o eroare de jurnalizare după construirea PDF-ului (Subtask 1.7); se documentează.
-- Valoarea „în depozit” este disponibilă: stocul total al produsului minus cantitatea din mașini (`StockMovementRules.WarehouseStock(total, inVehicles)`, cu `IStockMovementRepository.GetQuantitiesInVehiclesAsync`); inventarul o folosește în locul stocului total.
-- Toate celelalte detalii au fost confirmate de utilizator și sunt descrise în „Decizii stabilite cu utilizatorul”.
+- Mecanismul concret de pastrare a starii formularului de iesire in timpul navigarii (serviciu scoped, sessionStorage sau alta solutie), tinand cont de faptul ca Blazor Server poate reporni circuitul intre navigari.
+- Locul exact al butonului "Adauga proiect" (langa combobox sau langa caseta "Proiect") si textul exact al mesajelor noi.
 
 ## Observații pentru etapa de implementare
 
@@ -1098,3 +1038,19 @@ Implementat la 25 septembrie 2026 de Claude. `Components/Pages/VehiclePage.razor
 - [x] Teste automate (`BlazorStoc.Checks`, 523 trecute, 18 noi): restituire si mutare partiala si totala, respingerea peste cantitate, aceeasi masina, masina sau produs inexistente, operatie atomica cu o linie imposibila, masina goala, editarea si stergerea miscarilor, doua sesiuni concurente, jurnalul, ruta paginii.
 - [x] Verificat in browser (instanta de proba, baza separata, sesiune autentificata): pagina vehiculului cu o singura intrare, tabelul de echipamente, restituire partiala (1 din 4), mutare de 2 buc. cu alegerea masinii si mesajele fara masina, "Muta tot" si "Restituie tot", starea goala, coloana VEHICUL si etichetele in tabelul miscarilor, editarea unei mutari (dialog fara alegerea destinatiei), stergerea vehiculului blocata; la 375 si 768 px fara depasire orizontala a paginii.
 - Neverificat: MariaDB pe un server real (vezi `docs/TESTE_RAMASE.md`, A11); tastatura; ecran tactil.
+
+## Finalizat la 28.09.2026 10:25 - Situatia de inventar (pagina "Inventar" si fisierul PDF)
+
+**Data si ora implementarii:** 28.09.2026 10:25 (ora locala).
+
+Implementat la 28 septembrie 2026 de Claude. `Components/Pages/Inventory.razor` (nou), `Components/Pages/InventoryPickup.razor` (nou), `Components/Layout/MainLayout.razor`, `Components/Pages/Dashboard.razor`, `Components/Pages/Audit.razor`, `Services/Inventory.cs` (nou), `Services/InventorySelectionState.cs` (nou), `Services/InventoryPdfWriter.cs` (nou), `Services/AuditTrail.cs`, `Program.cs`, `Assets/Fonts/PTSans-Regular.ttf`, `Assets/Fonts/PTSans-Bold.ttf`, `Assets/Fonts/OFL.txt` (noi, incorporate ca resurse), `wwwroot/checkbox-indeterminate.js`, `wwwroot/inventory-download.js` (noi), `BlazorStoc.csproj`, `tests/BlazorStoc.Checks/Program.cs`, `tests/BlazorStoc.Checks/PdfTextExtractor.cs` (nou, folosit numai in teste).
+
+- [x] Pagina `/inventar` (meniu "Inventar" intre "Produse si stocuri" si "Administrare", cu intrarile "Generare situatie inventar" si "Preluare inventar"; card nou in dashboard) arata categoriile si subcategoriile ca in "Categorii si subcategorii" (restranse implicit), fara butoane de adaugare/editare, cu stari de incarcare, catalog gol si eroare cu "Reincearca".
+- [x] Fiecare categorie si subcategorie are o caseta de selectare; selectarea unei categorii se propaga la subcategoriile ei, cu stare `indeterminate` cand doar o parte sunt selectate (JS `wwwroot/checkbox-indeterminate.js`, fiindca proprietatea `indeterminate` nu are echivalent in atribute HTML); "Selecteaza toate categoriile" foloseste aceeasi logica; "Elimina din situatia de inventar produsele cu stoc 0" exclude produsele cu stoc exact 0 (stocul negativ ramane); logica selectiei este clasa independenta `InventorySelectionState`, testata separat de UI. O categorie fara subcategorii este intotdeauna debifata (nu are ce selecta).
+- [x] Butonul "Genereaza situatia de inventar" este dezactivat fara selectie ("Se genereaza..." pe durata generarii) si produce un PDF (`Inventar_aaaa-ll-zz_oomm.pdf`) descarcat direct din browser prin `DotNetStreamReference` si `wwwroot/inventory-download.js` (Blob + link de descarcare), fara sa fie pastrat pe server si fara endpoint HTTP nou de protejat impotriva CSRF (actiunea ruleaza in acelasi circuit Blazor Server autentificat). Selectia este revalidata pe server fata de catalogul curent (`InventoryReportBuilder`/`InventoryRules.Validated`); o selectie neconcordanta sau ramasa fara produse dupa filtrul de stoc 0 este semnalata, fara PDF partial si fara jurnalizare.
+- [x] PDF: titlu "Inventar" si "Generat la: zz.ll.aaaa oo:mm" (ora serverului), apoi pentru fiecare categorie/subcategorie selectata un tabel "Cod produs | Valoare stoc | Valoare reala" (grid complet pe toate laturile celulelor, pentru usurinta numararii fizice), cu "Valoare stoc" egala cu valoarea "in depozit" (`StockMovementRules.WarehouseStock`, exclude cantitatea din vehicule). Un rand cu stoc negativ este scris integral cu rosu. Numele categoriilor/subcategoriilor sunt bold 14, restul normal 12. Antetul tabelului se repeta pe paginile urmatoare; o eticheta de categorie/subcategorie nu ramane singura la finalul unei pagini; coduri lungi se impart pe mai multe randuri; subsol "Pagina x din y".
+- [x] Biblioteca PDF: **PDFsharp 6.2.1** (licenta MIT); decizie: versiunea noua, cross-platform, nu include inca MigraDoc, asa ca raportul e desenat direct cu `XGraphics` (fara MigraDoc/QuestPDF). Font: **PT Sans** (SIL Open Font License 1.1, variantele statice Regular/Bold, alese pentru ca au diacriticele romanesti corecte - virgula, nu sedila - verificat direct din tabela `cmap` inainte de alegere), incorporat ca resursa in `Assets/Fonts/` printr-un `IFontResolver` propriu.
+- [x] Generarea reusita se jurnalizeaza (`AuditEntities.Inventory` = "Inventar", `AuditActions.Generate` = "Generare", adaugate si in filtrele paginii Jurnal) cu rezumatul cererii (categorii/subcategorii selectate, optiunea stoc 0, produse in situatie si cate au stoc negativ, numele fisierului), fara lista produselor, fara identificator de obiect si fara link; scrisa numai dupa construirea cu succes a PDF-ului. Decizie: daca jurnalizarea insasi esueaza dupa aceea, eroarea e doar logata pe server, iar utilizatorul primeste totusi fisierul.
+- [x] Teste automate (`BlazorStoc.Checks`, 559 trecute, 36 noi): logica selectiei (propagare, `indeterminate`, "toate", categorie fara subcategorii), construirea situatiei (doar selectia facuta, eliminarea stocului 0, omiterea sectiunilor goale, ordinea, stocul din `WarehouseStock` cu excluderea vehiculelor, selectie invalida sau goala respinsa), generarea PDF-ului (semnatura `%PDF`, text extras printr-un extractor de test propriu care decodeaza CMap-ul `ToUnicode` al fontului incorporat, cod cu diacritice, fontul bold 14/normal 12, randul negativ rosu, 300 de produse pe mai multe pagini cu antet repetat, subsolul "Pagina x din y") si jurnalizarea (un singur eveniment, fara date de produse).
+- [x] Verificat in browser (mod demonstrativ, cont administrator.demo): meniul extins cu cele doua intrari, selectarea unei categorii intregi si `indeterminate` pe "Selecteaza toate categoriile", generarea si descarcarea PDF-ului (deschis si confirmat cu bordurile complete ale celulelor), evenimentul din Jurnal cu rezumatul corect, pagina de rezerva "Preluare inventar"; la 375 si 768 px fara depasire orizontala a paginii.
+- Neverificat: deschiderea fisierului PDF in alte cititoare decat cel folosit la verificare si tiparirea fizica; MariaDB pe un server real (`GetQuantitiesInVehiclesAsync` in modul MariaDB, deja acoperit generic de taskurile anterioare); ecran tactil.

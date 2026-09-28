@@ -279,4 +279,12 @@
 
 .lock-badge { display:block; color:#8a5a12; font-weight:600; margin-top:2px; }
 .force-unlock-dialog { width:min(560px,calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow:auto; }
+
+/* Task 1: inventory page (category/subcategory selection for the physical stock count PDF) */
+.inventory-options { display:flex; flex-wrap:wrap; gap:20px 30px; padding:20px 24px; margin-bottom:20px; }
+.inventory-category-list { margin-bottom:20px; }
+.inventory-checkbox { display:inline-flex; align-items:center; margin-right:2px; }
+.inventory-checkbox input { width:auto; margin:0; }
+.inventory-category-list table td:first-child, .inventory-category-list table th:first-child { width:1%; white-space:nowrap; }
+.inventory-category-list table td:first-child input { width:auto; margin:0; }
 .force-unlock-dialog:focus { outline:none; }

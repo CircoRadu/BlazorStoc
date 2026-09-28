@@ -39,6 +39,18 @@
             <p class="nav-label">SPAȚIU DE LUCRU</p>
             <NavLink class="nav-item" href="/" Match="NavLinkMatch.All"><span>⌂</span> Pagina principală <span class="nav-arrow">→</span></NavLink>
             <NavLink class="nav-item" href="/produse" Match="NavLinkMatch.Prefix"><span>▦</span> Produse și stocuri <span class="nav-arrow">→</span></NavLink>
+            <CollapsibleSection Id="inventory-menu"
+                                RootClass="administration-menu"
+                                HeaderRowClass="collapsible-header"
+                                ToggleClass="@($"nav-item administration-parent {(inventorySection ? "active" : "")}")"
+                                ContentClass="administration-submenu"
+                                Expanded="@inventoryExpanded">
+                <Header><span>▥</span> Inventar</Header>
+                <ChildContent>
+                    <NavLink href="/inventar" Match="NavLinkMatch.All">Generare situație inventar</NavLink>
+                    <NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix">Preluare inventar</NavLink>
+                </ChildContent>
+            </CollapsibleSection>
             <CollapsibleSection Id="administration-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
@@ -75,7 +87,7 @@
 @code {
     private IReadOnlyList<BlazorStoc.Services.ProductGroup> groups = Array.Empty<BlazorStoc.Services.ProductGroup>();
     private List<string> categories = [];
-    private bool productSection, administrationSection, administrationExpanded;
+    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded;
     private string selectedCategory = "", selectedSubcategory = "";
     private readonly CancellationTokenSource lifetime = new();
 
@@ -111,6 +123,8 @@
             uri.AbsolutePath.StartsWith("/vehicule", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase);
         if (administrationSection) administrationExpanded = true;
+        inventorySection = uri.AbsolutePath.StartsWith("/inventar", StringComparison.OrdinalIgnoreCase);
+        if (inventorySection) inventoryExpanded = true;
         var query = QueryHelpers.ParseQuery(uri.Query);
         selectedCategory = productSection && query.TryGetValue("categorie", out var categoryValue) ? categoryValue.ToString() : "";
         selectedSubcategory = productSection && query.TryGetValue("subcategorie", out var subcategoryValue) ? subcategoryValue.ToString() : "";

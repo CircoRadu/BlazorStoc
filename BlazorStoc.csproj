@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.9" />
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
+    <PackageReference Include="PDFsharp" Version="6.2.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,5 +19,9 @@
     <None Remove="tests/**" />
     <Content Remove="keys/**;keys-test/**;.env;.env.*" />
     <None Remove="keys/**;keys-test/**;.env;.env.*" />
+    <Content Remove="Assets/Fonts/**" />
+    <None Remove="Assets/Fonts/**" />
+    <EmbeddedResource Include="Assets/Fonts/PTSans-Regular.ttf" />
+    <EmbeddedResource Include="Assets/Fonts/PTSans-Bold.ttf" />
   </ItemGroup>
 </Project>

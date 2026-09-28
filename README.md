@@ -45,6 +45,18 @@ Meniul **Administrare → Vehicule** (`/vehicule`) administrează autovehiculele
 
 În modul MariaDB tabela `vehicul` este creată la prima accesare a secțiunii, numai în baza `BlazorStoc`; nu este generat un fișier SQL de upgrade.
 
+## Inventar
+
+Meniul **Inventar** (sectiunea "Spatiu de lucru", intre "Produse si stocuri" si "Administrare") are doua intrari: **Generare situatie inventar** (`/inventar`) si **Preluare inventar** (`/inventar/preluare`, pagina de rezerva, functionalitate ulterioara). "Inventar" apare si in dashboard.
+
+Pagina `/inventar` arata categoriile si subcategoriile ca in "Categorii si subcategorii" (carduri extensibile, restranse implicit), fara butoanele de adaugare/editare. Fiecare categorie si subcategorie are o caseta de selectare; selectarea unei categorii propaga la subcategoriile ei, iar starea partiala este `indeterminate`. "Selecteaza toate categoriile" selecteaza sau deselecteaza tot. "Elimina din situatia de inventar produsele cu stoc 0" exclude din PDF produsele cu stoc exact 0; produsele cu stoc negativ raman si sunt scrise cu rosu pe intregul rand.
+
+Butonul "Genereaza situatia de inventar" este dezactivat fara nicio selectie si genereaza un fisier PDF (`Inventar_aaaa-ll-zz_oomm.pdf`) descarcat direct din browser, fara sa fie pastrat pe server. PDF-ul are pe prima pagina "Inventar" si "Generat la: zz.ll.aaaa oo:mm" (ora serverului la momentul generarii), apoi pentru fiecare categorie si subcategorie selectata un tabel "Cod produs | Valoare stoc | Valoare reala" (coloana "Valoare reala" ramane goala, pentru completare manuala). Valoarea stocului este cea "in depozit" (stocul total minus cantitatea aflata in vehicule). Numele categoriilor si subcategoriilor sunt bold 14; restul textului este normal 12. Antetul tabelului se repeta pe paginile urmatoare cand tabelul continua.
+
+Fiecare generare reusita este jurnalizata (tip "Inventar", actiunea "Generare") cu utilizatorul, numarul de categorii/subcategorii selectate, optiunea stoc 0, numarul de produse (din care cu stoc negativ) si numele fisierului; nu contine lista produselor sau valorile stocului si nu are link catre o pagina. Cererile respinse sau fara produse nu sunt jurnalizate.
+
+Generarea foloseste PDFsharp 6.2.1 (licenta MIT; versiunea curenta nu include inca MigraDoc pentru API-ul cross-platform, asa ca raportul este desenat direct cu `XGraphics`) si fontul PT Sans (SIL Open Font License, `Assets/Fonts`), care contine diacriticele romanesti si este inclus in aplicatie, fara dependenta de fonturile instalate pe server.
+
 ## Administrarea utilizatorilor
 Administratorul configurat prin `Authentication__Username` și `Authentication__Password` rămâne contul de inițializare. După autentificare, pagina **Utilizatori** permite:
 
