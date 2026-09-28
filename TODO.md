@@ -14,20 +14,79 @@
 
 ## Ordinea de implementare optimizata
 
-Toate taskurile anterioare sunt finalizate si arhivate la sfarsitul fisierului. Taskul activ (1) nu depinde de alt task activ si se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex).
+Toate taskurile anterioare sunt finalizate si arhivate la sfarsitul fisierului. Taskurile active (1 si 2) nu depind unul de altul si se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex); taskul 1 are prioritatea cea mai mare.
 
-## Task 1 - Combobox cu autocompletare pentru beneficiar si proiect la iesire, cu adaugare fara pierderea formularului
+## Task 1 - Preluare inventar din formularul de service scanat (OCR)
+
+Implementeaza pagina de rezerva `/inventar/preluare` (`Components/Pages/InventoryPickup.razor`): un buton in partea de sus a paginii, "Preia inventar", permite incarcarea unui fisier PDF cu scanarea unui formular de service completat manual de utilizator, in care a fost notata "Valoare reala" (stocul constatat fizic) pentru produsele numarate. Aplicatia proceseaza fisierul prin OCR, identifica produsele si valorile reale citite, le compara cu stocul curent din baza de date si afiseaza lista produselor cu diferente de stoc, grupata pe categorii si subcategorii. Fiecare produs din lista are un checkbox pentru selectarea modificarii de trimis spre baza de date. Butonul "Trimite modificari in stoc" deschide un popup cu modificarile ce vor fi operate (cod produs, modificare stoc in bucati), grupate pe categorii si subcategorii, inainte de aplicarea lor.
+
+### Subtask 1.1 - Buton "Preia inventar" si incarcarea fisierului PDF
+
+- [ ] Adauga in partea de sus a paginii `/inventar/preluare` butonul "Preia inventar", care deschide un dialog de incarcare a unui singur fisier PDF.
+- [ ] Valideaza tipul fisierului (.pdf) si dimensiunea maxima acceptata; la un fisier respins, afiseaza un mesaj de eroare in romana, fara sa piarda restul paginii.
+- [ ] Afiseaza starea de progres pe durata incarcarii si a procesarii OCR (poate dura cateva secunde).
+
+### Subtask 1.2 - Procesare OCR si extragerea datelor din formular
+
+- [ ] Extrage din fisierul PDF, prin OCR, "Cod produs" si "Valoare reala" pentru fiecare rand recunoscut al formularului, folosind ca referinta formatul tabelului din situatia de inventar generata la pagina `/inventar` (categorie/subcategorie, Cod produs, Valoare stoc, Valoare reala).
+- [ ] Trateaza randurile la care "Valoare reala" a fost lasata necompletata de utilizator ca "neinventariate": nu genereaza pentru ele nicio modificare de stoc.
+- [ ] Semnaleaza distinct, fara sa le includa automat in lista de modificari, randurile pe care OCR nu le-a putut citi cu suficienta certitudine (cod neidentificat sau valoare neclara/nenumerica), si permite utilizatorului sa le vada separat.
+
+### Subtask 1.3 - Compararea cu stocul curent si afisarea diferentelor
+
+- [ ] Pentru fiecare produs identificat cu succes, calculeaza diferenta dintre "Valoare reala" citita si stocul curent din baza de date la momentul incarcarii.
+- [ ] Afiseaza in lista de modificari numai produsele cu diferenta de stoc; produsele la care valoarea reala este identica stocului curent nu genereaza o modificare.
+- [ ] Grupeaza afisarea produselor pe categorie si subcategorie, la fel ca in restul aplicatiei.
+- [ ] Adauga un checkbox pentru fiecare produs din lista, plus "selecteaza toate"/"deselecteaza toate"; afiseaza pentru fiecare produs cod produs, denumire, categorie/subcategorie, stoc curent, valoare reala citita si diferenta (cu semn).
+
+### Subtask 1.4 - Trimiterea modificarilor si popup de confirmare
+
+- [ ] Adauga butonul "Trimite modificari in stoc", activ numai cand cel putin un produs este bifat.
+- [ ] La apasare, afiseaza un popup cu toate modificarile care vor fi operate pentru produsele bifate: cod produs si modificare de stoc (numar de bucati, cu semn), grupate pe categorie si subcategorie.
+- [ ] Popup-ul are un buton de confirmare, care aplica modificarile in baza de date, si un buton "Anuleaza" (stil rosu), care inchide popup-ul fara nicio modificare.
+- [ ] Fiecare modificare aplicata este o miscare de stoc obisnuita (intrare sau iesire, conform diferentei), jurnalizata ca restul miscarilor, cu referinta la operatia de inventar si la fisierul incarcat.
+- [ ] Dupa confirmare, afiseaza o notificare de succes cu numarul de produse modificate.
+- [ ] O eroare la aplicarea uneia dintre modificarile confirmate nu lasa baza de date intr-o stare intermediara nespecificata (tranzactie sau raportare clara a modificarilor reusite si a celor nereusite).
+
+### Subtask 1.5 - Verificari
+
+- [ ] Teste automate pentru extragerea OCR pe fisiere PDF de test (formular completat corect, formular cu randuri necompletate, formular cu text neclar/necitibil).
+- [ ] Teste automate pentru calculul diferentelor de stoc si gruparea pe categorie si subcategorie.
+- [ ] Teste automate pentru aplicarea modificarilor selectate in baza de date si jurnalizarea lor.
+- [ ] Verificare in browser: incarcarea fisierului, afisarea diferentelor, selectarea/deselectarea produselor, popup-ul de confirmare, aplicarea modificarilor, anularea popup-ului, mesajele de eroare pentru fisiere invalide sau OCR nesigur.
+- [ ] Actualizeaza `README.md`, `VALIDARE.md` si `docs/PROJECT_STATE.md`.
+
+### Criterii de acceptare
+
+- Butonul "Preia inventar" din pagina `/inventar/preluare` permite incarcarea unui fisier PDF cu formularul de service scanat.
+- Aplicatia recunoaste prin OCR codul produsului si valoarea reala pentru fiecare rand completat si calculeaza diferenta fata de stocul curent.
+- Lista afisata contine numai produsele cu diferenta de stoc, grupate pe categorie si subcategorie, fiecare cu checkbox de selectare.
+- Butonul "Trimite modificari in stoc" deschide un popup cu modificarile selectate (cod produs, modificare stoc), grupate pe categorie si subcategorie, inainte de aplicarea lor.
+- Modificarile se aplica in baza de date numai dupa confirmarea din popup si sunt jurnalizate ca miscari de stoc.
+- Randurile necompletate sau pe care OCR nu le-a putut citi cu certitudine nu genereaza modificari automate de stoc.
+
+### Detalii de stabilit la implementare
+
+- Tehnologia OCR folosita (biblioteca .NET care functioneaza fara Docker si fara serviciu extern, in linie cu restul aplicatiei, de exemplu Tesseract, sau un serviciu extern acceptat explicit de utilizator).
+- Formatul exact al formularului scanat acceptat: se presupune situatia de inventar generata de aplicatie (pagina `/inventar`, tabel Cod produs / Valoare stoc / Valoare reala), completata de mana la "Valoare reala"; de confirmat daca trebuie acceptate si alte formate de formular.
+- Comportamentul implicit al casetelor de selectare (toate bifate implicit sau nebifate implicit).
+- Dimensiunea maxima acceptata a fisierului PDF si numarul maxim de pagini.
+- Ce se face cu produsele gasite in formular dar care nu mai exista in catalog (produs sters sau redenumit intre generarea situatiei si preluare).
+- Daca se permite incarcarea mai multor fisiere succesive inainte de trimiterea modificarilor, sau un singur fisier per sesiune de preluare.
+- Tipul exact de miscare de stoc generata pentru diferente (intrare/iesire cu sursa/destinatie "Inventar", sau un tip nou dedicat de miscare).
+
+## Task 2 - Combobox cu autocompletare pentru beneficiar si proiect la iesire, cu adaugare fara pierderea formularului
 
 Inlocuieste, in formularul de iesire (`Components/Shared/ExitDestinationPicker.razor`), campul de cautare text si dropdown-ul separat pentru beneficiar cu un singur control de tip combobox (camp de text + lista derulanta) care restrange optiunile pe masura ce utilizatorul tasteaza; foloseste acelasi mecanism si pentru selectarea proiectului beneficiarului ales. Adauga langa fiecare combobox un buton "Adauga beneficiar" / "Adauga proiect" care deschide pagina de adaugare corespunzatoare fara sa piarda datele introduse in formularul de iesire; dupa salvarea cu succes a beneficiarului/proiectului nou, aplicatia revine in formularul de iesire care a initiat cererea, cu campurile anterioare pastrate si cu beneficiarul/proiectul nou selectat.
 
-### Subtask 1.1 - Componenta combobox cu autocompletare
+### Subtask 2.1 - Componenta combobox cu autocompletare
 
 - [ ] Creeaza o componenta comuna reutilizabila (de exemplu `Components/Shared/SearchableSelect.razor`) care combina campul de cautare si lista de optiuni intr-un singur control accesibil (tastatura, cititor de ecran), cu restrangerea optiunilor pe masura tastarii (ca filtrul actual din `ExitDestinationPicker.razor`, dar intr-un singur control, nu doua separate).
 - [ ] Inlocuieste in `ExitDestinationPicker.razor` campul `input type="search"` si `select`-ul pentru beneficiar cu noua componenta.
 - [ ] Foloseste aceeasi componenta si pentru selectarea proiectului (`select`-ul de proiect), pastrand comportamentul actual (proiectul se goleste la schimbarea beneficiarului, lista de proiecte vine din beneficiarul ales).
 - [ ] Pastreaza validarile si mesajele actuale (proiect obligatoriu daca optiunea e bifata etc.), fara sa schimbe contractul `StockMovementInput`.
 
-### Subtask 1.2 - Buton "Adauga beneficiar" fara pierderea formularului
+### Subtask 2.2 - Buton "Adauga beneficiar" fara pierderea formularului
 
 - [ ] Adauga langa combobox-ul de beneficiar un buton "Adauga beneficiar" care deschide pagina de adaugare beneficiar, vizibil numai cand destinatia iesirii este Beneficiar.
 - [ ] Inainte de navigare, pastreaza starea completa a formularului de iesire (produs, tip miscare, data, cantitate, descriere, destinatie, sursa, beneficiar/proiect partial completate) intr-un mecanism care supravietuieste navigarii (de exemplu un serviciu scoped similar cu `ListNavigationContext`/`UnsavedChanges`, sau stocare in `sessionStorage` prin interop, cu o cheie legata de produs si de sesiune).
@@ -35,13 +94,13 @@ Inlocuieste, in formularul de iesire (`Components/Shared/ExitDestinationPicker.r
 - [ ] Anularea adaugarii beneficiarului (fara salvare) revine de asemenea in formularul de iesire, cu valorile pastrate nemodificate.
 - [ ] Daca formularul de iesire nu mai poate fi restaurat (de exemplu produsul a fost sters intre timp), utilizatorul primeste un mesaj clar si este dus in pagina produsului sau a catalogului, fara eroare nespecificata.
 
-### Subtask 1.3 - Acelasi mecanism pentru proiect
+### Subtask 2.3 - Acelasi mecanism pentru proiect
 
 - [ ] Adauga langa combobox-ul de proiect un buton "Adauga proiect", vizibil numai cand un beneficiar este ales si optiunea proiect este activa.
-- [ ] Butonul deschide pagina de adaugare proiect a beneficiarului ales, cu aceeasi pastrare si restaurare a formularului de iesire ca la subtaskul 1.2.
+- [ ] Butonul deschide pagina de adaugare proiect a beneficiarului ales, cu aceeasi pastrare si restaurare a formularului de iesire ca la subtaskul 2.2.
 - [ ] Dupa salvarea cu succes a proiectului nou, formularul de iesire este restaurat cu beneficiarul deja ales si cu noul proiect selectat automat.
 
-### Subtask 1.4 - Verificari
+### Subtask 2.4 - Verificari
 
 - [ ] Teste automate pentru restrangerea optiunilor in combobox (cautare insensibila la majuscule si diacritice, ca filtrul actual).
 - [ ] Teste automate pentru pastrarea si restaurarea starii formularului de iesire in jurul navigarii catre adaugare beneficiar/proiect si inapoi (valori identice inainte si dupa, inclusiv cand adaugarea e anulata).

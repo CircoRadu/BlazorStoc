@@ -5,10 +5,10 @@
     "activeAgent":  null,
     "lastAgent":  "claude",
     "nextAgent":  "claude",
-    "currentTask":  "Task 1: situatia de inventar (pagina Inventar si fisierul PDF)",
-    "startedAtUtc":  "2026-09-28T06:40:45.1014852Z",
-    "completedAtUtc":  "2026-09-28T07:32:54.5596180Z",
-    "lastSummary":  "Task 1 (Situatia de inventar) implementat: pagina /inventar cu selectie categorie/subcategorie (indeterminate, select all, exclude stoc 0), pagina de rezerva /inventar/preluare, meniu si dashboard noi. Domeniu nou Services/Inventory.cs (InventoryReportBuilder) si Services/InventorySelectionState.cs (logica selectiei, testata separat). PDF generat cu PDFsharp 6.2.1 (XGraphics, fara MigraDoc, care nu e inca portat pe versiunea cross-platform) si fontul PT Sans (SIL OFL, incorporat in Assets/Fonts), cu grid complet pe celulele tabelului (cerinta ulterioara a utilizatorului, dupa ce prima varianta avea doar o linie sub antet). Descarcarea foloseste DotNetStreamReference si un modul JS mic, fara endpoint HTTP nou. Jurnalizare noua (AuditEntities.Inventory, AuditActions.Generate) dupa succesul generarii, cu rezumatul cererii si fara date de produse. Adaugat si Task 1 nou (fost Task 2) in TODO.md la cererea utilizatorului: combobox cu autocompletare pentru beneficiar/proiect la iesire.",
-    "lastCommitSubject":  "claude: situatia de inventar (pagina Inventar si PDF), plus task nou combobox beneficiar/proiect in TODO",
+    "currentTask":  "Task nou in TODO.md (Task 1, prioritate maxima): preluare inventar prin scanare OCR a formularului de service completat",
+    "startedAtUtc":  "2026-09-28T07:48:38.6091777Z",
+    "completedAtUtc":  "2026-09-28T07:51:47.9607924Z",
+    "lastSummary":  "Adaugat in TODO.md un task nou cu prioritate maxima (Task 1): preluare inventar dintr-un formular de service scanat, cu OCR pe fisierul PDF incarcat prin butonul Preia inventar, afisarea produselor cu diferente de stoc (checkbox de selectare pe fiecare), si butonul Trimite modificari in stoc care deschide un popup cu modificarile (cod produs, modificare stoc), grupate pe categorii si subcategorii, inainte de aplicare. Fostul Task 1 (combobox beneficiar/proiect la iesire) a devenit Task 2, subtaskurile lui renumerotate 2.1-2.4. Actualizat si docs/PROJECT_STATE.md cu pregatirea taskului si deciziile ramase de confirmat. Nu s-a modificat cod.",
+    "lastCommitSubject":  "claude: task nou in TODO (preluare inventar OCR, prioritate 1); combobox beneficiar/proiect devine task 2",
     "claudeStatus":  "active"
 }

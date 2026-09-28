@@ -2,7 +2,7 @@
 
 Actualizat de: **Claude**
 Data: **28 septembrie 2026**
-Stare ciclu: **Situatia de inventar (Task 1) finalizata; task activ ramas: Task 1 (combobox cu autocompletare beneficiar/proiect la iesire); mod claude_only, fara predare catre Codex**
+Stare ciclu: **Situatia de inventar finalizata; taskuri active ramase in TODO.md: 1 (preluare inventar OCR, task nou, pregatire) si 2 (combobox cu autocompletare beneficiar/proiect la iesire); mod claude_only, fara predare catre Codex**
 
 ## Rezumat
 
@@ -11,6 +11,13 @@ BlazorStoc este o aplicație Blazor Web App .NET 9, cu mod local persistent SQLi
 Sunt implementate CRUD-urile pentru produse, beneficiari, utilizatori și, nou, proiecte asociate beneficiarilor (cu observații și fișiere), autentificarea pe roluri, administrarea categoriilor/subcategoriilor, imaginile produselor pe server, auditul persistent, arhivarea obiectelor șterse, componenta comună `CollapsibleSection` identificarea produselor prin „Cod produs”, stocul modificabil exclusiv prin mișcări de intrare/ieșire (pagina `/produse/{id}/miscari`) și istoricul mișcărilor.
 
 Proiectul folosește un repository Git local și cicluri strict secvențiale Codex–Claude. Următorul ciclu îi este predat lui Codex.
+
+## Pregatire TODO - Task 1 (preluare inventar OCR) - 28 septembrie 2026
+
+- La cererea utilizatorului, s-a adaugat in `TODO.md` un task nou cu prioritate maxima: **Task 1 - Preluare inventar din formularul de service scanat (OCR)**. Fostul Task 1 (combobox cu autocompletare beneficiar/proiect) a devenit **Task 2**; subtaskurile lui au fost renumerotate (2.1-2.4).
+- Descrierea primita de la utilizator: pagina de rezerva `/inventar/preluare` (`Components/Pages/InventoryPickup.razor`) primeste un buton "Preia inventar" sus in pagina; utilizatorul incarca un PDF cu scanarea formularului de service completat, cu "Valoare reala" scrisa de mana pentru produsele numarate; aplicatia face OCR pe fisier, afiseaza produsele cu diferente de stoc (fiecare cu checkbox de selectare), iar butonul "Trimite modificari in stoc" deschide un popup cu modificarile de operat (cod produs, modificare stoc in bucati), grupate pe categorii si subcategorii, inainte de aplicare.
+- Taskul are 5 subtaskuri (incarcare fisier, OCR si extragere date, comparare cu stocul si afisarea diferentelor, trimiterea modificarilor cu popup de confirmare, verificari), criterii de acceptare si o lista de decizii de confirmat la implementare: tehnologia OCR (fara Docker/serviciu extern, in linie cu restul aplicatiei), formatul exact al formularului acceptat (se presupune situatia de inventar generata la `/inventar`), starea implicita a casetelor de selectare, dimensiunea maxima a fisierului, tratarea produselor disparute din catalog intre generare si preluare, incarcarea mai multor fisiere succesive si tipul exact de miscare de stoc generata pentru diferente.
+- Nu s-a modificat cod; urmatorul pas este confirmarea deciziilor de mai sus si abia apoi implementarea. Preview-ul ramane cel de pe `http://127.0.0.1:5082/`, neschimbat de aceasta actualizare.
 
 ## Situatia de inventar (Task 1) - 28 septembrie 2026
 

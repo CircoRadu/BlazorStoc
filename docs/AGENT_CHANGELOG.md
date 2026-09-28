@@ -1035,3 +1035,16 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release: 0 avertismente, 0 erori. BlazorStoc.Checks: 559 verificari trecute (36 noi: selectie, InventoryReportBuilder, generare PDF verificata prin extragere de text din CMap-ul ToUnicode al fontului incorporat, jurnalizare). Verificat manual in browser (cont administrator.demo, preview 5082): meniul Inventar, selectie si indeterminate, generare si descarcare PDF, bordurile complete ale celulelor (fisier descarcat deschis si confirmat), evenimentul din Jurnal, pagina de rezerva Preluare inventar, 768 si 375 px fara depasire orizontala. Neverificat: alt cititor PDF si tiparirea fizica (docs/TESTE_RAMASE.md, G1/G2); MariaDB pe server real.
 - **Commit:** `claude: situatia de inventar (pagina Inventar si PDF), plus task nou combobox beneficiar/proiect in TODO`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-28T07:51:47.9607924Z â€” claude
+
+- **Task:** Task nou in TODO.md (Task 1, prioritate maxima): preluare inventar prin scanare OCR a formularului de service completat
+- **Rezumat:** Adaugat in TODO.md un task nou cu prioritate maxima (Task 1): preluare inventar dintr-un formular de service scanat, cu OCR pe fisierul PDF incarcat prin butonul Preia inventar, afisarea produselor cu diferente de stoc (checkbox de selectare pe fiecare), si butonul Trimite modificari in stoc care deschide un popup cu modificarile (cod produs, modificare stoc), grupate pe categorii si subcategorii, inainte de aplicare. Fostul Task 1 (combobox beneficiar/proiect la iesire) a devenit Task 2, subtaskurile lui renumerotate 2.1-2.4. Actualizat si docs/PROJECT_STATE.md cu pregatirea taskului si deciziile ramase de confirmat. Nu s-a modificat cod.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `TODO.md`
+- **Validare:** Nu s-a modificat cod, deci nu a fost necesar build sau rulare de teste. S-a verificat manual TODO.md (renumerotare corecta 1 la 2, subtaskuri 2.1-2.4, text nou fara diacritice) si docs/PROJECT_STATE.md (sectiune noua de pregatire TODO, coerenta cu restul fisierului).
+- **Commit:** `claude: task nou in TODO (preluare inventar OCR, prioritate 1); combobox beneficiar/proiect devine task 2`
+- **Predat cÄƒtre:** claude
