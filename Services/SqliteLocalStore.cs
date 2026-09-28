@@ -79,6 +79,7 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             await SeedIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
             await ImportLegacyAuditIfNeededAsync(connection, cancellationToken).ConfigureAwait(false);
             await ReconcileLegacyProductStateAsync(connection, cancellationToken).ConfigureAwait(false);
+            await NormalizeExistingDiacriticsAsync(connection, cancellationToken).ConfigureAwait(false);
             await CreateStockBaselineMovementsAsync(connection, cancellationToken).ConfigureAwait(false);
             // Created last, so the one-time seeding and migrations above do not produce change events (Task 8).
             await ExecuteAsync(connection, null, ChangeEventTriggers.SqliteSchema(), cancellationToken).ConfigureAwait(false);
@@ -414,6 +415,88 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             throw;
+        }
+    }
+
+    // One-time migration: diacritics are stripped from text before every save ("Eliminarea diacriticelor la
+    // salvare"), but two sources predate or bypass that rule - the SQLite seed data (SeedIfNeededAsync, inserted
+    // directly from DemoProductRepository.InitialProducts) and any row a database already held before the rule
+    // existed. Runs once (marker in app_metadata) and rewrites only live display text; normalized_* columns are
+    // untouched (TextNormalization.UniquenessKey already ignores diacritics, so they are still correct), and
+    // audit_events/stock_movement_history/archive_* are left as the historical record they are.
+    private static async Task NormalizeExistingDiacriticsAsync(SqliteConnection connection, CancellationToken token)
+    {
+        await using (var marker = Command(connection, null,
+            "SELECT value FROM app_metadata WHERE key='diacritics_normalized' LIMIT 1"))
+            if (await marker.ExecuteScalarAsync(token).ConfigureAwait(false) is not null) return;
+
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
+        try
+        {
+            await NormalizeColumnsAsync(connection, transaction, "products", "id",
+                [("name", TextNormalization.ForObjectNameOrCode), ("description", TextNormalization.ForStorage)], token).ConfigureAwait(false);
+            await NormalizeColumnsAsync(connection, transaction, "categories", "id",
+                [("name", TextNormalization.ForObjectNameOrCode)], token).ConfigureAwait(false);
+            await NormalizeColumnsAsync(connection, transaction, "subcategories", "id",
+                [("name", TextNormalization.ForObjectNameOrCode)], token).ConfigureAwait(false);
+            await NormalizeColumnsAsync(connection, transaction, "beneficiaries", "id",
+                [("name", TextNormalization.ForObjectNameOrCode), ("cui", TextNormalization.ForObjectNameOrCode)], token).ConfigureAwait(false);
+            await NormalizeColumnsAsync(connection, transaction, "web_users", "id",
+                [("display_name", TextNormalization.ForObjectNameOrCode)], token).ConfigureAwait(false);
+            await NormalizeColumnsAsync(connection, transaction, "vehicles", "id",
+                [("description", TextNormalization.ForObjectNameOrCode)], token).ConfigureAwait(false);
+            await NormalizeColumnsAsync(connection, transaction, "projects", "id",
+                [("name", TextNormalization.ForObjectNameOrCode), ("observations", TextNormalization.ForStorage)], token).ConfigureAwait(false);
+            await NormalizeColumnsAsync(connection, transaction, "project_observations", "id",
+                [("name", TextNormalization.ForObjectNameOrCode), ("content", TextNormalization.ForStorage)], token).ConfigureAwait(false);
+            await NormalizeColumnsAsync(connection, transaction, "stock_movements", "id",
+                [("description", TextNormalization.ForStorage)], token).ConfigureAwait(false);
+
+            await using var mark = Command(connection, transaction,
+                "INSERT INTO app_metadata(key,value) VALUES('diacritics_normalized',@value)", ("@value", DateTime.UtcNow.ToString("O")));
+            await mark.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await transaction.CommitAsync(token).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    // Rewrites only the rows whose value actually changes once normalized; a diacritics-only hygiene pass is not
+    // a user edit, so it does not touch any row's version/updated_utc.
+    private static async Task NormalizeColumnsAsync(SqliteConnection connection, SqliteTransaction transaction,
+        string table, string idColumn, (string Column, Func<string?, string> Normalize)[] columns, CancellationToken token)
+    {
+        var columnList = string.Join(",", columns.Select(c => c.Column));
+        var rows = new List<(long Id, string?[] Values)>();
+        await using (var select = Command(connection, transaction, $"SELECT {idColumn},{columnList} FROM {table}"))
+        await using (var reader = await select.ExecuteReaderAsync(token).ConfigureAwait(false))
+        {
+            while (await reader.ReadAsync(token).ConfigureAwait(false))
+            {
+                var values = new string?[columns.Length];
+                for (var i = 0; i < columns.Length; i++) values[i] = reader.IsDBNull(i + 1) ? null : reader.GetString(i + 1);
+                rows.Add((reader.GetInt64(0), values));
+            }
+        }
+        foreach (var (id, values) in rows)
+        {
+            var setClauses = new List<string>();
+            var parameters = new List<(string, object?)> { ("@id", id) };
+            for (var i = 0; i < columns.Length; i++)
+            {
+                var normalized = columns[i].Normalize(values[i]);
+                if (normalized == values[i]) continue;
+                var paramName = $"@p{i}";
+                setClauses.Add($"{columns[i].Column}={paramName}");
+                parameters.Add((paramName, normalized));
+            }
+            if (setClauses.Count == 0) continue;
+            await using var update = Command(connection, transaction,
+                $"UPDATE {table} SET {string.Join(",", setClauses)} WHERE {idColumn}=@id", parameters.ToArray());
+            await update.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         }
     }
 

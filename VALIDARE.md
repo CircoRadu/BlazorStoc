@@ -4,6 +4,14 @@
 
 > Verificările care nu au putut fi efectuate sunt urmărite, cu pașii și motivul, în `docs/TESTE_RAMASE.md`.
 
+## Normalizarea diacriticelor in datele existente - 28 septembrie 2026
+
+- Regula "eliminarea diacriticelor la salvare" era deja aplicata consecvent (SQLite si MariaDB) pentru cod produs/denumire, descriere, categorie, subcategorie, beneficiar, CUI, utilizator, vehicul, proiect, observatie, descrierea miscarii de stoc si motivari, prin metodele partajate `*Input.Validated()`/`ChangeReasonRules.Normalize`.
+- Gasita si corectata singura gaura reala: datele demonstrative initiale (`DemoProductRepository.InitialProducts()`) ocoleau aceasta regula, fiind inserate direct in baza SQLite la prima creare. Literalii corectati in cod; adaugata o migrare unica (`SqliteLocalStore.NormalizeExistingDiacriticsAsync`) care normalizeaza orice baza existenta deja creata cu diacritice.
+- 578 verificari automate trecute (3 adaptate la noile valori fara diacritice ale datelor demonstrative).
+- Verificat direct pe baza locala persistenta (interogare SQL inainte/dupa repornirea aplicatiei) si vizual in pagina `/produse` (preview port 5083): toate cele 15 valori afectate (7 produse, 2 categorii, 6 subcategorii) curatate corect, fara alterarea cantitatilor, versiunilor sau cheilor de unicitate.
+- Neverificat: o baza MariaDB reala cu date vechi dinainte de regula (`docs/TESTE_RAMASE.md`, M1); nu exista un mecanism de seed MariaDB controlat de aplicatie care sa necesite o migrare echivalenta.
+
 ## Preluare inventar (Task 1) - 28 septembrie 2026
 
 - Pagina `/inventar/preluare` are butonul "Preia inventar" (incarcare fisier PDF), acceptand exclusiv formatul generat de aplicatie la `/inventar` (structura de tabel Cod produs/Valoare stoc/Valoare reala), maximum 20 MB si 50 de pagini.

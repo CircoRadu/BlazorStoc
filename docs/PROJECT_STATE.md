@@ -2,7 +2,15 @@
 
 Actualizat de: **Claude**
 Data: **28 septembrie 2026**
-Stare ciclu: **Preluare inventar (OCR) finalizata; task activ ramas in TODO.md: 1 (combobox cu autocompletare beneficiar/proiect la iesire); mod claude_only, fara predare catre Codex**
+Stare ciclu: **Normalizarea diacriticelor in datele existente finalizata; task activ ramas in TODO.md: 1 (combobox cu autocompletare beneficiar/proiect la iesire); mod claude_only, fara predare catre Codex**
+
+## Normalizarea diacriticelor in datele existente - 28.09.2026
+
+La cererea utilizatorului, s-a verificat regula "eliminarea diacriticelor la salvare": era deja implementata consecvent (SQLite si MariaDB) pentru toate campurile relevante (cod produs/denumire, descriere, categorie, subcategorie, beneficiar, CUI, utilizator, vehicul, proiect, observatie, descrierea miscarii de stoc, motivari), prin metodele partajate `*Input.Validated()`/`ChangeReasonRules.Normalize`. Singura gaura reala: datele demonstrative initiale (`DemoProductRepository.InitialProducts()`, folosite de `SqliteLocalStore.SeedIfNeededAsync` la prima creare a bazei) erau inserate direct, ocolind normalizarea. Literalii au fost corectati, iar o migrare unica noua (`SqliteLocalStore.NormalizeExistingDiacriticsAsync`, marcaj `app_metadata`) normalizeaza retroactiv orice baza SQLite existenta creata inainte de aceasta corectie (produse, categorii, subcategorii, beneficiari, utilizatori, vehicule, proiecte, observatii, descrierile miscarilor de stoc); coloanele `normalized_*` si jurnalul/arhiva raman neschimbate. Verificat direct pe baza locala persistenta si in browser (port 5083): toate cele 15 valori afectate curatate corect. 578 teste trecute (3 adaptate la noile valori). Detalii in `TODO.md` si `VALIDARE.md`. Nu exista o migrare echivalenta pentru MariaDB (fara mecanism de seed propriu si fara server real disponibil pentru testare).
+
+## Pregatire MariaDB locala - 28.09.2026
+
+La cererea utilizatorului, Codex a pregatit separat baza permanenta MariaDB 11.4.13 locala, `BlazorStoc` pe `127.0.0.1:3307`, folosind schema reala SQLite: 27 tabele, 229 randuri, 18 triggere. Copierea integrala, relatiile, fisierele asociate, conexiunea TLS si persistenta dupa restart au fost verificate. Aplicatia ramane pe SQLite, fara modificari de cod si fara preluare de ciclu; baza MariaDB este un snapshot independent, nu o replica sincronizata. Pentru conectare si adaptarea ulterioara a repository-urilor MariaDB legacy, citeste [CLAUDE_CONECTARE_MARIADB_LOCALA.md](CLAUDE_CONECTARE_MARIADB_LOCALA.md). Nu repeta importul peste baza existenta si nu activa direct `App:DemoMode=false` inainte de adaptarea schemei asteptate de cod. Nu s-au livrat componente sursa noi pentru conectare.
 
 ## Rezumat
 

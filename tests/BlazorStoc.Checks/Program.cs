@@ -77,9 +77,9 @@ Check(DeleteConfirmationRules.IsConfirmationValid("  sterge ") &&
 
 Check(data.Count == 12, "Demonstration catalogue has 12 fictional products");
 Check(ProductSearch.Filter(data, "  POLIZOR  ", "name", "", "").Single().Id == 2, "Search is case-insensitive and trims spaces");
-Check(!ProductSearch.Filter(data, "mandrină", "name", "", "").Any(), "Name-only search excludes description matches");
-Check(ProductSearch.Filter(data, "mandrină", "description", "", "").Single().Id == 1, "Description-only search works with Romanian text");
-Check(ProductSearch.Filter(data, "", "all", "Măsurare", "zero").Single().Id == 5, "Category and stock filters combine");
+Check(!ProductSearch.Filter(data, "mandrina", "name", "", "").Any(), "Name-only search excludes description matches");
+Check(ProductSearch.Filter(data, "mandrina", "description", "", "").Single().Id == 1, "Description-only search works with normalized (diacritic-free) text");
+Check(ProductSearch.Filter(data, "", "all", "Masurare", "zero").Single().Id == 5, "Category and stock filters combine");
 Check(ProductSearch.Filter(data, "", "all", "", "negative").Single().Id == 8, "Negative stock is distinct from zero stock");
 Check(ProductSearch.Filter(data, "", "all", "", "zero").Count() == 2, "Zero stock classification");
 Check(!ProductSearch.Filter(data, "' OR 1=1 --", "all", "", "").Any(), "Search text is handled as literal text");
@@ -169,7 +169,7 @@ await Rejected(() => repository.UpdateAsync(created, duplicateRename), "Renaming
 var groupRulesRepository = new DemoProductRepository();
 var existingGroupProduct = await groupRulesRepository.CreateAsync(new ProductInput
     { Name = "Produs categorie existenta", Category = "mĂSURARE", Subcategory = "NIVÉLARE" });
-Check(existingGroupProduct.Category == "Măsurare" && existingGroupProduct.Subcategory == "Nivelare",
+Check(existingGroupProduct.Category == "Masurare" && existingGroupProduct.Subcategory == "Nivelare",
     "Existing category and subcategory are reused without case or diacritic differences");
 try
 {
