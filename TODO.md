@@ -141,7 +141,7 @@ Baza MariaDB locala permanenta a fost deja creata si populata printr-o migrare p
 
 - [x] Preview pornit pe portul `5085`, configurat cu `App:DemoMode=false` si conectat la baza reala de livrare (`blazorstoc_dev`, fara drepturi DDL). Pornire fara exceptii (verificare implicita a tabelelor reusita), redirectionare corecta la autentificare pentru cereri neautentificate, `/health/live` raspunde 200, pagina 404 romaneasca functioneaza.
 - [x] Persistenta la restart confirmata: procesul oprit si repornit, cheia Data Protection refolosita de pe disc, reconectare la MariaDB fara erori.
-- [ ] **NEVERIFICAT (asteptat)**: autentificarea efectiva si doua sesiuni concurente autentificate nu pot fi demonstrate de agent, fiindca acesta nu introduce niciodata parole (nici macar cele demonstrative), in nicio forma. Contul bootstrap generat pentru acest preview este in `local-secrets\maria-preview-bootstrap.private.json` (fisier privat); conturile reale `administrator.demo`/`utilizator.demo` din baza de livrare folosesc aceleasi parole demonstrative documentate in `README.md`. Utilizatorul trebuie sa se autentifice manual pe `http://127.0.0.1:5085/` cu oricare dintre ele pentru a confirma fluxurile autentificate si a doua sesiune concurenta.
+- [x] Autentificare confirmata de utilizator (28.09.2026) pe `http://127.0.0.1:5085/`, din doua browsere diferite simultan (panoul de browser Claude si Brave), cu conturile reale `administrator.demo`/`utilizator.demo` din baza de livrare. Doua sesiuni concurente autentificate functioneaza.
 
 ### Subtask 2.13 - Comutarea definitiva de dezvoltare
 
