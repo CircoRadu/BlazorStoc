@@ -1,14 +1,14 @@
-﻿{
+{
     "schemaVersion":  1,
     "mode":  "claude_only",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
     "nextAgent":  "claude",
-    "currentTask":  "Fereastra separata, mobila, cu fisierul PDF la preluarea inventarului (comparare cu formularul fizic)",
+    "currentTask":  "Task 3 (3.3-3.4) restaurare baza de date; tile Vehicule pe pagina principala; drag and drop la preluarea inventarului",
     "startedAtUtc":  "2026-09-29T05:44:38.0000000Z",
-    "completedAtUtc":  "2026-09-29T09:10:00.0000000Z",
-    "lastSummary":  "Implementata, la cererea utilizatorului in chat, o fereastra noua de browser (nu un modal in pagina) care afiseaza fisierul PDF incarcat in pagina Preluare inventar, ca utilizatorul sa compare vizual valorile citite de sistem cu formularul fizic. Modul nou wwwroot/inventory-pickup-pdf-viewer.js (Blob + DotNetStreamReference + window.open, acelasi tipar ca inventory-download.js existent), buton Redeschide formularul PDF, mesaj dedicat cand fereastra e blocata de politica pop-up a browserului. Build Release 0 avertismente/erori; tests/BlazorStoc.Checks 609/609 PASS. Incarcare reala confirmata de utilizator in Brave (dupa permiterea pop-up-urilor pentru site). Protocolul de dezvoltare a fost schimbat de utilizator in aceeasi sesiune (29.09.2026): Claude nu mai face commit automat la finalul fiecarui task, doar la cerere explicita (CLAUDE.md actualizat); acest commit a fost cerut explicit de utilizator pentru acest task specific, inainte de schimbarea protocolului.",
-    "lastCommitSubject":  "claude: fereastra separata pentru fisierul PDF la preluarea inventarului",
+    "completedAtUtc":  "2026-09-29T10:30:00.0000000Z",
+    "lastSummary":  "Implementate subtaskurile 3.3/3.4 (declansarea restaurarii cu popup si cuvantul confirma, cei 5 pasi de restaurare, verificate integral in mod demonstrativ; modul MariaDB real scris dar neverificat, fara instanta locala), un tile Vehicule pe pagina principala si drag and drop la incarcarea fisierului de preluare inventar. tests/BlazorStoc.Checks 630/630 PASS, build Debug 0 avertismente/erori. Commit facut la cererea explicita a utilizatorului (predare solicitata, dar mod claude_only mentinut - fara handoff real catre Codex, conform alegerii utilizatorului).",
+    "lastCommitSubject":  "claude: restaurare baza de date (3.3-3.4), tile Vehicule, drag and drop preluare inventar",
     "claudeStatus":  "active"
 }

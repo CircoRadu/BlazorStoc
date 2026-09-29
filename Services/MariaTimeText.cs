@@ -75,6 +75,13 @@ internal static class MariaAssetPaths
         configuration["Database:MariaDumpExecutablePath"] ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB",
             "mariadb-11.4.13-winx64", "bin", "mariadb-dump.exe");
+
+    // Subtask 3.4 (Task 3): the "mariadb" CLI client (same bin/ folder as mariadb-dump.exe above) used to import a
+    // package's dump.sql into the temporary restore schema by piping the file into its standard input.
+    public static string MariaClientExecutable(IConfiguration configuration) =>
+        configuration["Database:MariaClientExecutablePath"] ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB",
+            "mariadb-11.4.13-winx64", "bin", "mariadb.exe");
 }
 
 // Subtask 2.11 (Task 2): every write-capable Maria* repository refuses to write unless the configured database

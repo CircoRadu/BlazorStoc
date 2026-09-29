@@ -4,6 +4,27 @@
 
 > Verificările care nu au putut fi efectuate sunt urmărite, cu pașii și motivul, în `docs/TESTE_RAMASE.md`.
 
+## Drag and drop pentru incarcarea fisierului la preluarea inventarului - 29 septembrie 2026
+
+- Zona de continut din `/inventar/preluare` (starea fara fisier incarcat, starea de scanare si tabelul de revizuire) accepta acum si tragerea unui fisier PDF direct din sistemul de operare, nu doar apasarea butonului "Preia inventar". Implementat prin `wwwroot/inventory-pickup-dropzone.js` (script delegat pe `document`, ca `collapsible.js`): la `drop`, fisierul este atribuit direct campului `<InputFile>` ascuns existent si se declanseaza evenimentul `change`, astfel incat fluxul C# existent (`ProcessFileAsync`) ruleaza neschimbat - nicio cale noua de incarcare de mentinut in paralel.
+- Zona e dezactivata (nu reactioneaza la drop) cat timp pagina verifica drepturile de acces sau un fisier e deja in curs de citire (OCR), aceleasi conditii ca dezactivarea butonului existent.
+- Verificat direct in browser (preview demonstrativ, port 5083): evidentiere vizuala la `dragover` peste zona, disparuta la `dragleave`/`drop`; un fisier simulat (`DataTransfer`/`File` construite prin JS, cum ar primi pagina un fisier tras real din Explorer) atribuit corect campului ascuns, evenimentul `change` a declansat pipeline-ul existent, iar un continut invalid a fost respins cu acelasi mesaj ca la incarcarea prin buton ("Fisierul nu a putut fi citit ca PDF valid.") - confirma ca traseul de drag and drop trece prin exact aceeasi validare, fara ocolire.
+- `tests/BlazorStoc.Checks`: 630/630 `PASS` (nicio verificare noua dedicata - comportamentul JS de drag and drop nu poate fi acoperit de suita .NET; logica C# din spate ramane neschimbata si testata deja).
+- Build Debug: 0 avertismente, 0 erori.
+- Neverificat: o tragere reala dintr-un manager de fisiere al sistemului de operare (nu doar simularea prin JS a evenimentelor native), din cauza automatizarii panoului Browser al agentului (`docs/TESTE_RAMASE.md`, M3).
+
+## Declansarea si pasii restaurarii bazei de date (Task 3, subtaskurile 3.3-3.4) - 29 septembrie 2026
+
+- Butonul "Restaureaza baza de date" din `/inventar/restaurare` este activ numai cu exact un pachet selectat; la apasare deschide un popup (`RestoreConfirmationDialog`) cu avertizarea explicita despre pierderea de date si un camp de confirmare care accepta numai cuvantul exact `confirma` (comparare stricta, ca la `sterge`).
+- Cei 5 pasi din spatele restaurarii (`Services/DatabaseRestore.cs`): (0) blocare + generare automata a unui pachet pre-restaurare al bazei curente; (1) verificarea hash-ului pachetului ales fata de arhiva si de manifest; (2) comparare de structura; (3) comparare de continut (aceeasi metoda canonica tip-si-hash ca la backup) - o restaurare identica cu baza curenta e refuzata explicit; (4) import si comutare efectiva; final, eliberarea lacatului si un eveniment nou in jurnal ("Restaurare").
+- Mod demonstrativ (SQLite): toti cei 5 pasi ruleaza direct pe fisierul de backup (nu are nevoie de o schema de asteptare separata ca la MariaDB) - verificat integral prin executie reala.
+- Mod MariaDB real: codul pentru Pasii 1-3 exista si citeste doar cu contul obisnuit; Pasul 4 (creare schema temporara, import cu `mariadb.exe`, comutare `RENAME TABLE`) necesita un cont dedicat neconfigurat inca in acest mediu si se opreste explicit cu un mesaj clar in lipsa lui, in loc sa incerce operatii DDL fara drepturi - neverificat (`docs/TESTE_RAMASE.md`, A20).
+- Notificarea sesiunilor active: un banner de intretinere apare pe orice pagina (cu exceptia paginii de restaurare) cat timp lacatul comun de operatie e activ; nu blocheaza activ scrierile obisnuite ale altor sesiuni in timpul restaurarii (risc rezidual acceptat, ca la Task 2 subtask 2.1).
+- 630 de verificari automate au trecut in total (`tests/BlazorStoc.Checks`), inclusiv un test nou end-to-end pentru restaurarea SQLite: backup real, restaurare identica refuzata, modificare urmata de restaurare efectiva confirmata, pachet cu hash alterat refuzat fara sa atinga baza vie, pachet inexistent refuzat.
+- Verificare directa in browser (preview demonstrativ, port 5083): selectare pachet, popup cu avertizare, cuvant gresit (`Confirma`) -> buton dezactivat, cuvant exact (`confirma`) -> buton activ, restaurare reala executata cu succes, pachetul pre-restaurare aparut in lista fara buton de stergere, evenimentul "Restaurare" aparut corect in Jurnal activitate cu tinta si detaliile corecte, catalogul de produse (33 produse) intact dupa restaurare. Bannerul de intretinere verificat separat (lacat de test scris pe disc): vizibil pe pagina principala, absent pe pagina de restaurare, disparut dupa eliberarea lacatului.
+- Build Debug: 0 avertismente, 0 erori.
+- Neverificat: modul MariaDB real (Pasii 1-4), din lipsa unei instante locale MariaDB in acest mediu; afisarea paginii pentru un cont fara rol administrator (`docs/TESTE_RAMASE.md`, M1/M2, A20).
+
 ## Pagina de restaurare a bazei de date - meniu, listare, stergere (Task 3, subtaskurile 3.1-3.2) - 29 septembrie 2026
 
 - Meniul Inventar are acum optiunea "Restaurează stoc" (`/inventar/restaurare`), vizibila numai contului administrator; pagina lista toate pachetele de siguranta de pe server (tip, denumire, data, operator, dimensiune), cu selectie unica de tip radio button per rand si un rezumat (total pachete, spatiu ocupat, numar pe categorie).
@@ -367,3 +388,27 @@ Verificat la 25 septembrie 2026.
 - `tests/BlazorStoc.Checks` 609 trecute (fara regresii); build Release fara avertismente/erori.
 - Browser (previzualizare reala, `http://127.0.0.1:5082/inventar/preluare`): utilizatorul a incarcat un fisier real prin dialogul nativ al sistemului de operare, in Brave; fereastra s-a deschis dupa ce a permis explicit ferestrele pop-up pentru site (comportament asteptat al browserului, semnalat in pagina cand e blocat).
 - Neverificat: redimensionarea/repozitionarea efectiva a ferestrei si reutilizarea ei la a doua incarcare (vezi `docs/TESTE_RAMASE.md`).
+
+## Corectarea detectiei liniilor de tabel pe o scanare reala inclinata (29.09.2026)
+
+- O scanare reala furnizata de utilizator (acelasi formular, reimprimat si rescanat) era respinsa integral cu "Nu a fost gasit niciun tabel recunoscut", desi toate cele 8 tabele erau vizibil completate. Cauza: sub un grad de inclinare a colii facea ca nicio linie de tabel sa nu mai atinga pragul de 65% cerneala pe un singur rand de pixeli. Corectat cu o dilatare verticala mica, tintita, in `Services/InventoryPickupOcr.cs`.
+- `tests/BlazorStoc.Checks` 611 trecute (2 noi, pe o fixtura noua cu fisierul real al utilizatorului); niciuna nu a picat.
+- Dupa corectie, toate cele 10 produse din scanarea reala sunt gasite si citite; doua valori raman citite gresit de modelul generic de cifre (limitare deja cunoscuta, vezi `docs/TESTE_RAMASE.md` H2), una dintre ele fara semnalare de incertitudine.
+- Neverificat: alte scanere/rezolutii in afara de inclinare (`docs/TESTE_RAMASE.md`, H1).
+
+## Indreptarea (deskew) reala a paginii pentru scanari cu inclinare vizibila (29.09.2026)
+
+- O a doua scanare reala, rotita vizibil (cateva grade, nu doar sub un grad), era in continuare respinsa dupa corectia de mai sus. Adaugata indreptarea efectiva a paginii (`InventoryPickupOcrService.FindSkewDegrees`/`Rotate`) inainte de orice alta geometrie, aplicata doar peste un prag de 0,6 grade - sub prag, rotirea intregii pagini s-a dovedit ca inrautateste acuratetea cifrelor scrise de mana (confirmat comparativ), deci ramane activa doar dilatarea anterioara pentru unghiuri foarte mici.
+- `tests/BlazorStoc.Checks` 613 trecute (2 noi, pe o a doua fixtura reala); niciuna nu a picat.
+- Ambele scanari reale ale utilizatorului (usor inclinata si vizibil rotita) citesc acum toate cele 10 produse.
+- Neverificat: unghiuri peste 8 grade sau pagina rotita altfel decat o simpla inclinare de alimentare; alte scanere/rezolutii (`docs/TESTE_RAMASE.md`, H1).
+
+## Fixtura de test cu inclinare diferita pe fiecare pagina (29.09.2026)
+
+- Adaugata `tests/BlazorStoc.Checks/Fixtures/inventar-proba-multipagina.pdf` (pagina 1 = 0,3 grade, pagina 2 = 2,7 grade, din cele doua scanari reale deja folosite mai sus), pentru a bloca explicit orice regresie care ar estima inclinarea o singura data pentru tot documentul in loc de per pagina.
+- `tests/BlazorStoc.Checks` 616 trecute (3 noi); ambele pagini citite complet (10+10 produse), fiecare cu unghiul ei.
+
+## Populare catalog demonstrativ cu produse fictive (29.09.2026)
+
+- Adaugate 22 de produse fictive (denumire cu sufixul " test") prin fluxul real al aplicatiei (`SqliteProductRepository.CreateAsync` + miscare de intrare pentru stocul initial), astfel incat toate cele 8 subcategorii din catalogul demonstrativ sa aiba cel putin 4 produse (33 in total, erau 11).
+- Verificat vizual in browser (`/produse`): 33 de produse, 5 categorii, cantitati si descrieri corecte. Baza de date copiata inainte de scriere (`data/manual-backups/blazorstoc-local.pre-seed.db`).

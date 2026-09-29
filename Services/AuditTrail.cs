@@ -28,6 +28,7 @@ public static class AuditActions
     public const string Logout = "Deconectare";
     public const string Unlock = "Deblocare";
     public const string Generate = "Generare";
+    public const string Restore = "Restaurare";
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -226,6 +227,12 @@ public static class AuditRecorder
     public static Task RecordGenerateAsync(IAuditTrail? trail, IAccessControl? access, string entityType,
         string target, string details, CancellationToken cancellationToken) =>
         RecordEntityAsync(trail, access, entityType, AuditActions.Generate, string.Empty, target, details, string.Empty, cancellationToken);
+
+    // Subtask 3.4 (Task 3): the restoration itself (distinct from the automatic pre-restore snapshot, which is
+    // logged separately through RecordGenerateAsync like every other backup).
+    public static Task RecordRestoreAsync(IAuditTrail? trail, IAccessControl? access, string entityType,
+        string target, string details, CancellationToken cancellationToken) =>
+        RecordEntityAsync(trail, access, entityType, AuditActions.Restore, string.Empty, target, details, string.Empty, cancellationToken);
 
     public static Task RecordSessionAsync(IAuditTrail? trail, string actorUsername, string actorRole,
         bool connected, CancellationToken cancellationToken) => trail is null

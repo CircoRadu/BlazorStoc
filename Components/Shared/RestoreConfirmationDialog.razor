@@ -1,0 +1,62 @@
+@using BlazorStoc.Services
+
+<div class="delete-overlay">
+    <section class="delete-dialog restore-confirmation-dialog" role="dialog" aria-modal="true"
+             aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
+        <h2 id="@TitleId">Restaurezi baza de date?</h2>
+        <p id="@DescriptionId" class="delete-object"><strong>@PackageLabel</strong></p>
+        <p class="error-banner" role="alert">
+            Restaurarea aduce baza de date la versiunea din pachetul selectat. Orice date introduse dupa momentul
+            acelui pachet vor fi pierdute. Inainte de restaurare se genereaza automat o copie de siguranta a bazei
+            curente.
+        </p>
+        <label class="delete-confirmation-input" for="@ConfirmationId">
+            Introdu cuvantul <strong><code>@RestoreConfirmationRules.ConfirmationWord</code></strong> pentru a continua
+            <input id="@ConfirmationId" autocomplete="off" spellcheck="false" disabled="@Busy"
+                   @bind="confirmation" @bind:event="oninput" />
+        </label>
+        @if (Error is not null)
+        {
+            <div class="error-banner delete-error" role="alert">@Error</div>
+        }
+        @if (Busy && ProgressMessage is not null)
+        {
+            <p class="form-note" role="status">@ProgressMessage</p>
+        }
+        <div class="editor-actions">
+            <button type="button" class="danger" disabled="@(Busy || !CanConfirm)" @onclick="ConfirmAsync">
+                @(Busy ? "Se restaureaza…" : "Restaureaza baza de date")
+            </button>
+            <button type="button" class="danger" disabled="@Busy" @onclick="CancelAsync">Anuleaza</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string PackageLabel { get; set; } = string.Empty;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string? ProgressMessage { get; set; }
+    [Parameter, EditorRequired] public EventCallback Confirmed { get; set; }
+    [Parameter, EditorRequired] public EventCallback Cancelled { get; set; }
+
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private string confirmation = string.Empty;
+    private string TitleId => $"restore-title-{instanceId}";
+    private string DescriptionId => $"restore-description-{instanceId}";
+    private string ConfirmationId => $"restore-confirmation-{instanceId}";
+    private bool CanConfirm => RestoreConfirmationRules.IsConfirmationValid(confirmation);
+
+    private async Task ConfirmAsync()
+    {
+        if (Busy || !CanConfirm) return;
+        await Confirmed.InvokeAsync();
+    }
+
+    private async Task CancelAsync()
+    {
+        if (Busy) return;
+        confirmation = string.Empty;
+        await Cancelled.InvokeAsync();
+    }
+}

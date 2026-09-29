@@ -78,6 +78,13 @@ Check(DeleteConfirmationRules.IsConfirmationValid("  sterge ") &&
       !DeleteConfirmationRules.IsConfirmationValid("sterge acum"),
     "Final deletion confirmation accepts only the exact case-sensitive word sterge");
 
+// Subtask 3.3 (Task 3): same strict-comparison rule as the deletion word, but its own word.
+Check(RestoreConfirmationRules.IsConfirmationValid("  confirma ") &&
+      !RestoreConfirmationRules.IsConfirmationValid("Confirma") &&
+      !RestoreConfirmationRules.IsConfirmationValid("confirmă") &&
+      !RestoreConfirmationRules.IsConfirmationValid("confirma acum"),
+    "Restore confirmation accepts only the exact case-sensitive word confirma");
+
 Check(data.Count == 12, "Demonstration catalogue has 12 fictional products");
 Check(ProductSearch.Filter(data, "  POLIZOR  ", "name", "", "").Single().Id == 2, "Search is case-insensitive and trims spaces");
 Check(!ProductSearch.Filter(data, "mandrina", "name", "", "").Any(), "Name-only search excludes description matches");
@@ -2970,6 +2977,45 @@ InventoryPickupScanResult pickupScan;
         "A row is never silently dropped just because the digit classifier read it with (mistaken) confidence");
 }
 
+// Task 1 (preluare inventar OCR), regression: a real user scan of the same form (same products, printed and
+// scanned again) came back with zero recognized rows - the "Nu a fost gasit niciun tabel..." error - even though
+// every table's rule lines are clearly visible to the eye. The scan carried well under half a degree of paper
+// skew, enough to spread each line's ink over roughly ten image rows so no single row reached the fill-ratio
+// threshold used to detect a rule line (confirmed by instrumenting FindHorizontalLines, not guessed). Fixed with a
+// small vertical dilation before that check (InventoryPickupOcrService.FindHorizontalLines,
+// LineDetectionDilationHeight); this fixture locks the fix in.
+{
+    var projectRoot = AppContext.BaseDirectory;
+    while (projectRoot is not null && !File.Exists(Path.Combine(projectRoot, "BlazorStoc.csproj"))) projectRoot = Path.GetDirectoryName(projectRoot.TrimEnd(Path.DirectorySeparatorChar));
+    var tessdataEnv = new TestWebHostEnvironment(projectRoot!);
+    using var ocrService = new InventoryPickupOcrService(new TessdataPath(tessdataEnv));
+    await using var fixtureStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "inventar-proba-inclinata.pdf"));
+    var skewedScan = await ocrService.ScanAsync(fixtureStream);
+    Check(skewedScan.Rows.Count == 10, $"A slightly skewed real scan is still read as a table (10 rows expected, got {skewedScan.Rows.Count})");
+    Check(skewedScan.Rows.Any(row => TextNormalization.SameUniqueValue(row.RawCode, "Ciocan rotopercutor SDS Plus") && row.RecognizedValue == 1),
+        "A row from the skewed scan still reads its handwritten value correctly");
+
+    // A second real scan of the same form, rotated by a few degrees (clearly visible to the eye, not just a
+    // fraction of a degree) - the small dilation above cannot bridge a skew this large; only actively deskewing
+    // the whole page (InventoryPickupOcrService.FindSkewDegrees/Rotate) does.
+    await using var rotatedFixtureStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "inventar-proba-rotita.pdf"));
+    var rotatedScan = await ocrService.ScanAsync(rotatedFixtureStream);
+    Check(rotatedScan.Rows.Count == 10, $"A visibly rotated real scan is still read as a table after deskewing (10 rows expected, got {rotatedScan.Rows.Count})");
+    Check(rotatedScan.Rows.Any(row => TextNormalization.SameUniqueValue(row.RawCode, "Masina de gaurit cu acumulator") && row.RecognizedValue == 11),
+        "A row from the rotated scan still reads its handwritten value correctly after deskewing");
+
+    // A single PDF can have a different skew on every page (each page was fed through the scanner separately, or
+    // a multi-page situatia de inventar was assembled from several individual scans). FindSkewDegrees/Rotate must
+    // run per page, not once for the whole document - locked in here with a 2-page fixture built from the two
+    // fixtures above (page 1 keeps its ~0.3 degree skew, page 2 its ~2.7 degrees), rather than assuming the code
+    // already does this correctly from reading it.
+    await using var multiPageFixtureStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "inventar-proba-multipagina.pdf"));
+    var multiPageScan = await ocrService.ScanAsync(multiPageFixtureStream);
+    Check(multiPageScan.PageCount == 2, "The multi-page fixture has two pages");
+    Check(multiPageScan.Rows.Count(row => row.Page == 1) == 10, "Page 1 (mild skew) is fully read on its own");
+    Check(multiPageScan.Rows.Count(row => row.Page == 2) == 10, "Page 2 (visible rotation) is fully read on its own, independently of page 1's skew");
+}
+
 // Domain logic (matching, diffing, applying) is tested against fake repositories, independent of the real OCR
 // pipeline above, so these checks stay meaningful even if the sample scan or the embedded model ever change.
 {
@@ -3115,6 +3161,100 @@ InventoryPickupScanResult pickupScan;
             "The listing reflects the deletion (one InventoryPickup package left, plus the PreRestore one)");
     }
     finally { try { Directory.Delete(backupRoot, true); } catch (IOException) { } }
+}
+
+// Subtask 3.4 (Task 3): end-to-end check of the demo-mode (SQLite) restore service against a real, seeded local
+// database - snapshot, hash verification, structure/content comparison and the actual data swap. The equivalent
+// MariaDB path (MariaDatabaseRestoreService, mariadb.exe import + RENAME TABLE) needs a live local MariaDB
+// instance with a provisioned dedicated migrator account, neither of which this sandbox has (docs/TESTE_RAMASE.md).
+{
+    var restoreRoot = Path.Combine(Path.GetTempPath(), $"blazorstoc-restore-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(restoreRoot);
+    try
+    {
+        var restoreDataRoot = Path.Combine(restoreRoot, "app");
+        var restoreBackupDirectory = Path.Combine(restoreRoot, "backups");
+        var restoreConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:LocalDatabasePath"] = Path.Combine(restoreDataRoot, "app.db"),
+            ["App:ProductImagesPath"] = Path.Combine(restoreDataRoot, "product-images"),
+            ["App:ProjectFilesPath"] = Path.Combine(restoreDataRoot, "project-files"),
+            ["App:ArchiveFilesPath"] = Path.Combine(restoreDataRoot, "archive-files"),
+            ["App:AuditPath"] = Path.Combine(restoreDataRoot, "legacy-audit.jsonl"),
+            ["App:BackupFilesPath"] = restoreBackupDirectory
+        }).Build();
+        var restoreStore = new SqliteLocalStore(new TestWebHostEnvironment(restoreDataRoot), restoreConfiguration, NullLogger<SqliteLocalStore>.Instance);
+        await restoreStore.InitializeAsync();
+        async Task<int> CountCategoriesAsync()
+        {
+            await using var connection = await restoreStore.OpenConnectionAsync();
+            await using var command = TestSqliteCommand(connection, "SELECT COUNT(*) FROM categories");
+            return Convert.ToInt32(await command.ExecuteScalarAsync());
+        }
+        await using (var seedConnection = await restoreStore.OpenConnectionAsync())
+        {
+            await using var command = TestSqliteCommand(seedConnection,
+                "INSERT INTO categories(name,normalized_name) VALUES('Restore test','restore test')");
+            await command.ExecuteNonQueryAsync();
+        }
+        var restoreAccess = new TestAccessControl(true, "test.restore");
+        var restoreAuditTrail = new FileAuditTrail(new TestWebHostEnvironment(restoreDataRoot), restoreConfiguration, NullLogger<FileAuditTrail>.Instance);
+        var restoreLockService = new FileOperationLockService(Path.Combine(restoreBackupDirectory, "operation.lock.json"));
+        var restoreBackupService = new SqliteDatabaseBackupService(restoreStore, restoreConfiguration, restoreAccess, restoreLockService,
+            restoreAuditTrail, new ConsoleLogger<SqliteDatabaseBackupService>());
+        var restoreService = new SqliteDatabaseRestoreService(restoreStore, restoreConfiguration, restoreAccess, restoreLockService,
+            restoreBackupService, restoreAuditTrail, new ConsoleLogger<SqliteDatabaseRestoreService>());
+
+        var baseline = await restoreBackupService.CreateBackupAsync(BackupKind.InventoryPickup);
+        Check(baseline.Success, $"A baseline backup succeeds before exercising restore ({baseline.ErrorMessage})");
+        Check((await CountCategoriesAsync()) == 6, "Baseline: the seeded demo catalogue plus the one inserted category");
+
+        // Identical content: restoring the package just taken, with nothing changed since, is refused.
+        var identicalAttempt = await restoreService.RestoreAsync(baseline.PackageFileName!);
+        Check(!identicalAttempt.Success && identicalAttempt.ErrorMessage == RestoreRules.IdenticalContentMessage,
+            "Restoring a package identical to the live database is refused with the 'nothing to restore' message");
+        Check(identicalAttempt.PreRestorePackageFileName is not null &&
+              (await restoreBackupService.ListPackagesAsync()).Any(p => p.FileName == identicalAttempt.PreRestorePackageFileName && p.Kind == BackupKind.PreRestore),
+            "Even a refused restore already produced and kept its Pas 0 pre-restore snapshot");
+
+        // Change the live database, then restore the baseline back - the change must be undone.
+        await using (var changeConnection = await restoreStore.OpenConnectionAsync())
+        {
+            await using var command = TestSqliteCommand(changeConnection,
+                "INSERT INTO categories(name,normalized_name) VALUES('Should disappear','should disappear')");
+            await command.ExecuteNonQueryAsync();
+        }
+        Check((await CountCategoriesAsync()) == 7, "The live database now has one extra category beyond the baseline");
+
+        var stages = new List<RestoreStage>();
+        var restored = await restoreService.RestoreAsync(baseline.PackageFileName!, new Progress<RestoreProgress>(step => stages.Add(step.Stage)));
+        Check(restored.Success, $"Restoring the baseline package succeeds ({restored.ErrorMessage})");
+        Check(stages.Contains(RestoreStage.SnapshotCurrent) && stages.Contains(RestoreStage.VerifyingPackage) &&
+              stages.Contains(RestoreStage.ComparingStructure) && stages.Contains(RestoreStage.ComparingContent) &&
+              stages.Contains(RestoreStage.Importing) && stages.Contains(RestoreStage.Done),
+            "Progress is reported through every restore stage in order");
+        Check((await CountCategoriesAsync()) == 6, "After restoring the baseline, the extra category is gone again");
+        Check(await restoreLockService.GetActiveAsync() is null, "The shared lock is released again once the restore finishes");
+
+        var packagesAfterRestore = await restoreBackupService.ListPackagesAsync();
+        Check(packagesAfterRestore.Count(p => p.Kind == BackupKind.PreRestore) == 2,
+            "Every restore attempt (including the earlier refused one) leaves its own kept PreRestore snapshot behind");
+
+        // A tampered package (hash sidecar no longer matches the archive) is refused before anything is touched.
+        var tamperTarget = Path.Combine(restoreBackupDirectory, baseline.PackageFileName!);
+        await File.WriteAllTextAsync(tamperTarget + ".sha256", "0000000000000000000000000000000000000000000000000000000000000000");
+        var beforeTamperedAttempt = await CountCategoriesAsync();
+        var tamperedAttempt = await restoreService.RestoreAsync(baseline.PackageFileName!);
+        Check(!tamperedAttempt.Success && tamperedAttempt.ErrorMessage == RestoreRules.HashMismatchMessage,
+            "A package whose archive hash no longer matches its sidecar is refused with the corruption message");
+        Check((await CountCategoriesAsync()) == beforeTamperedAttempt, "The refused, corrupted restore left the live database untouched");
+
+        // An unknown package name is refused up front, without acquiring the lock or touching anything.
+        var missingAttempt = await restoreService.RestoreAsync("nu-exista.zip");
+        Check(!missingAttempt.Success && missingAttempt.ErrorMessage == RestoreRules.PackageNotFoundMessage,
+            "Restoring a package that does not exist on disk is refused with a clear message");
+    }
+    finally { try { Directory.Delete(restoreRoot, true); } catch (IOException) { } }
 }
 
 // Subtask 1.4 (Task 2): pure-logic checks for the database backup mechanism that need no MariaDB connection -

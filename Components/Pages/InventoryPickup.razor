@@ -32,6 +32,7 @@
 @if (pdfWindowNotice is not null) { <div class="error-banner" role="alert">@pdfWindowNotice</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 
+<div class="pickup-dropzone" data-pickup-dropzone="pickup-file-input" data-pickup-disabled="@((loading || scanning) ? "true" : null)">
 @if (loading)
 {
     <div class="empty-state" role="status"><div class="spinner"></div><h3>Se verifică drepturile de acces</h3></div>
@@ -42,7 +43,7 @@ else if (scanning)
 }
 else if (loadError is null && review is null)
 {
-    <div class="empty-state"><h3>Niciun formular încărcat</h3><p>Apasă „Preia inventar” și alege fișierul PDF cu formularul de service scanat.</p></div>
+    <div class="empty-state"><h3>Niciun formular încărcat</h3><p>Apasă „Preia inventar” sau trage fișierul PDF cu formularul de service scanat aici.</p></div>
 }
 else if (review is not null)
 {
@@ -128,6 +129,7 @@ else if (review is not null)
         }
     }
 }
+</div>
 
 @if (showSendPopup)
 {

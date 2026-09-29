@@ -1,8 +1,86 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **29 septembrie 2026 (Fereastra separata cu PDF-ul la preluarea inventarului)**
-Stare ciclu: **Dupa Task 2 (2.1-2.4) si Task 3 (3.1-3.2, detalii mai jos), implementata acum, la cererea directa a utilizatorului in chat (nu era in TODO.md), o fereastra noua de browser care afiseaza fisierul PDF incarcat in pagina "Preluare inventar", pentru comparare cu formularul fizic - detalii in sectiunea de mai jos. Protocolul de dezvoltare s-a schimbat pe 29.09.2026: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`, actualizarea din aceeasi data). Mod claude_only, fara predare catre Codex.**
+Data: **29 septembrie 2026 (Task 3, subtaskurile 3.3 si 3.4 - declansarea si pasii de restaurare a bazei de date)**
+Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
+
+## Task 3, subtaskurile 3.3 si 3.4 - declansarea si pasii de restaurare a bazei de date - 29.09.2026
+
+Butonul "Restaureaza baza de date" (activ numai cu un pachet selectat), popupul de avertizare cu confirmarea prin cuvantul exact `confirma` si cei 5 pasi efectivi de restaurare (blocare+snapshot, verificare hash, comparare structura, comparare continut, import+comutare).
+
+### Fisiere noi/modificate
+
+- `Services/RestoreConfirmation.cs` (nou): `RestoreConfirmationRules`, acelasi tipar strict de comparare ca `DeleteConfirmationRules`, cuvant `confirma`.
+- `Components/Shared/RestoreConfirmationDialog.razor` (nou): popup cu avertizare + camp de confirmare, un singur pas (fara motiv, spre deosebire de `DeleteConfirmationDialog`).
+- `Services/DatabaseRestore.cs` (nou): `IDatabaseRestoreService`, `SqliteDatabaseRestoreService` (mod demonstrativ), `MariaDatabaseRestoreService` + `MariaSchemaSwap` (mod real), `RestoreStage`/`RestoreProgress`/`RestoreResult`/`RestoreRules`. Modul demonstrativ mapeaza direct cei 5 pasi din TODO pe fisierul SQLite din pachet (nu are nevoie de o schema de asteptare separata, spre deosebire de MariaDB). Reutilizeaza `CanonicalRowHasher.HashRow`/`CanonicalColumn` din Task 2 si pentru SQLite, printr-un hasher dedicat `SqliteSchemaHasher` (tipuri SQLite mapate pe acelasi prefix I/R/B/T).
+- `Services/DatabaseBackup.cs`: `IDatabaseBackupService.CreateBackupAsync` primeste un parametru nou optional `existingLock` - restaurarea (care detine deja lacatul comun pentru intreg procesul) il paseaza la generarea pachetului pre-restaurare din Pasul 0, in loc sa incerce o a doua achizitie a aceluiasi lacat (ar esua mereu, lacatul nu e reentrant). Fiecare apelant vechi (preluarea inventarului) ramane neschimbat (parametrul e optional, implicit `null`).
+- `Services/MariaTimeText.cs`: `MariaAssetPaths.MariaClientExecutable` - calea catre clientul `mariadb.exe` (langa `mariadb-dump.exe`), folosit de `MariaSchemaSwap` pentru a importa `dump.sql` in schema temporara.
+- `Services/AuditTrail.cs`: actiune noua de jurnal `AuditActions.Restore` ("Restaurare") si `AuditRecorder.RecordRestoreAsync`.
+- `Components/Pages/DatabaseRestore.razor`: butonul, popupul, apelul catre `IDatabaseRestoreService.RestoreAsync` cu raportare de progres (acelasi tipar `IProgress<T>` ca la backup).
+- `Components/Layout/MainLayout.razor`: banner de intretinere afisat pe orice pagina (cu exceptia paginii de restaurare, care isi arata deja propriul progres) cat timp lacatul comun de operatie e activ.
+- `Program.cs`: inregistrare `IDatabaseRestoreService` (demo/real).
+- `tests/BlazorStoc.Checks/Program.cs`: verificari noi pentru `RestoreConfirmationRules` si un test end-to-end complet pentru `SqliteDatabaseRestoreService` (backup, restaurare identica refuzata, modificare + restaurare efectiva verificata, pachet cu hash alterat refuzat, pachet inexistent refuzat).
+
+### Decizie: MainLayout si notificarea sesiunilor active
+
+Prima incercare a folosit un `PeriodicTimer` intr-un task de fundal pornit din `MainLayout.OnInitializedAsync`, interogand lacatul la fiecare 5 secunde. Nu a functionat: verificat direct in browser (fisier de lacat scris manual pe disc, bannerul nu aparea deloc, nici dupa asteptare). Cauza: `MainLayout` nu are propriul `@rendermode` interactiv (doar paginile individuale, ca `Home.razor`/`DatabaseRestore.razor`, il au) - se randeaza static, o data per navigare/cerere HTTP, deci un task de fundal pornit acolo e distrus odata cu cererea care l-a pornit, inainte sa apuce sa ruleze vreodata primul poll util. Corectie: verificarea lacatului a fost mutata sincron in `OnInitializedAsync` si in handlerul deja existent de `LocationChanged`, care ruleaza la fiecare navigare - suficient pentru cerinta ("sesiunile noi vad mesajul"), dar nu impinge o actualizare catre un tab deja deschis si ramas inactiv. Verificat in browser: banner vizibil pe orice pagina cu lacatul activ, absent pe pagina de restaurare, disparut dupa eliberarea lacatului.
+
+### Decizie: modul MariaDB real, Pasul 4 (import + comutare)
+
+Contul existent `blazorstoc_migrator` (creat la Subtask 2.9) are drepturi DDL (`CREATE`/`ALTER`/`INDEX`/`DROP`/...) numai pe schema `BlazorStoc`, nu si pe scheme noi ca `<nume_baza>_bak`/`_old` - insuficient pentru comutarea descrisa in TODO.md. Codul (`MariaSchemaSwap`) presupune un cont separat, configurat prin `Database:MigratorUser`/`Database:MigratorPassword` (neexistent inca); fara aceasta configurare, restaurarea reala se opreste explicit la Pasul 4 cu un mesaj clar ("Restaurarea reala necesita contul MariaDB dedicat...") in loc sa incerce operatii DDL fara drepturi si sa esueze cu o eroare neclara MySQL. Pasii 1-3 (verificare hash, structura, continut) citesc doar cu contul obisnuit `blazorstoc_dev` si ar functiona real, dar nu au putut fi verificati - acest mediu nu are o instanta locala MariaDB (aceeasi limitare deja documentata la Subtask 2.2/3.1).
+
+### Verificari
+
+- `tests/BlazorStoc.Checks`: 630/630 `PASS`, inclusiv testul nou end-to-end pentru restaurare (backup real, restaurare identica refuzata cu mesajul corect, modificare urmata de restaurare efectiva confirmata prin numarul de randuri, pachet cu `.sha256` alterat refuzat fara sa atinga baza vie, pachet inexistent refuzat).
+- Browser (preview demonstrativ, port 5083 - 5082 era ocupat de o instanta veche pe care nu am putut sa o opresc, vezi predarea de mediu): flux complet - selectare pachet, popup cu avertizare, cuvant gresit (`Confirma`) -> buton dezactivat, cuvant exact (`confirma`) -> buton activ, restaurare reala executata cu succes, pachetul pre-restaurare aparut in lista (fara buton de stergere), evenimentul "Restaurare" aparut corect in Jurnal activitate, catalogul de produse (33 produse) intact dupa restaurare. Bannerul de intretinere verificat separat (lacat scris manual pe disc): vizibil pe pagina principala, absent pe pagina de restaurare, disparut dupa stergerea lacatului.
+- Neverificat: modul MariaDB real (Pasii 1-4), din lipsa unei instante locale in acest mediu; Pasul 4 necesita si contul dedicat neconfigurat (vezi mai sus). Inregistrat in `docs/TESTE_RAMASE.md`.
+
+## Fixtura multi-pagina pentru deskew si populare catalog demonstrativ - 29.09.2026
+
+Utilizatorul a intrebat explicit daca deskew-ul (sectiunea de mai jos) ruleaza per pagina, nu o singura data pentru tot documentul - codul deja facea asta corect (`ScanAsync` apeleaza `ScanPageAsync` separat per pagina), dar fara test automat dedicat. Adaugata `tests/BlazorStoc.Checks/Fixtures/inventar-proba-multipagina.pdf` (cele doua scanari reale deja folosite, combinate cu `PdfSharp`), cu verificari ca fiecare pagina isi citeste toate cele 10 produse indiferent de inclinarea celeilalte. `tests/BlazorStoc.Checks`: 616/616 `PASS`.
+
+A doua cerere a aceleiasi sesiuni: catalogul demonstrativ avea prea putine produse (11, cate 1-2 per subcategorie) pentru teste realiste. Populat cu 22 de produse fictive (sufix " test"), create prin fluxul real al aplicatiei (`SqliteProductRepository.CreateAsync` + o miscare de intrare pentru stocul initial prin `SqliteStockMovementRepository.CreateAsync`, nu INSERT direct), astfel incat toate cele 8 subcategorii sa aiba minimum 4 produse. Baza de date copiata inainte de scriere (`data/manual-backups/blazorstoc-local.pre-seed.db`); verificat vizual in browser (`/produse`, 33 de produse).
+
+### Pasul urmator
+
+Catalogul mai populat poate fi folosit acum pentru a genera o situatie de inventar multi-pagina reala, utila pentru Task 4 (marirea inaltimii randurilor din PDF pentru OCR).
+
+## Indreptarea (deskew) reala a paginii pentru scanari cu inclinare vizibila - 29.09.2026
+
+O a doua scanare reala furnizata de utilizator, rotita vizibil (cateva grade), era in continuare respinsa dupa corectia cu dilatare de mai jos.
+
+### Corectie si descoperire
+
+`InventoryPickupOcrService.FindSkewDegrees` estimeaza unghiul de inclinare prin profilul de proiectie orizontala (metoda standard: varianta profilului e maxima la unghiul corect), cautat intre -8 si +8 grade in doi pasi (grosier apoi rafinat), pe o copie miniaturizata pentru viteza; pagina e apoi rotita (`Rotate`) inainte de restul geometriei. **Descoperire importanta**: rotirea, chiar la un unghi mic (~0,3 grade, deja acoperit de dilatarea de mai jos), a inrautatit acuratetea cifrelor scrise de mana (interpolarea rotatiei "inmoaie" traseul subtire al cernelii) - confirmat comparativ pe acelasi fisier. De aceea rotirea se aplica doar peste un prag (`MinCorrectedSkewDegrees = 0.6` grade); sub prag ramane activa doar dilatarea.
+
+### Verificari
+
+`tests/BlazorStoc.Checks`: 613/613 `PASS` (611 anterioare + 2 noi, pe fixtura noua `Fixtures/inventar-proba-rotita.pdf`, a doua scanare reala a utilizatorului). Ambele scanari reale (usor inclinata si vizibil rotita) citesc acum toate cele 10 produse.
+
+### Pasul urmator
+
+Unghiuri peste 8 grade sau alta orientare (90/180 grade) nu sunt acoperite. Aspectul general "alte scanere/rezolutii" (H1) si acuratetea modelului de cifre (H2) raman deschise, neschimbate de aceasta corectie.
+
+## Corectarea detectiei liniilor de tabel pe o scanare reala inclinata - 29.09.2026
+
+La testarea ferestrei de comparare (sectiunea de mai jos), utilizatorul a incercat preluarea unei scanari reale a formularului de inventar si a primit eroarea "Nu a fost gasit niciun tabel recunoscut in fisier", desi fisierul contine vizibil toate cele 8 tabele completate de mana.
+
+### Cauza reala (confirmata prin instrumentare, nu presupusa)
+
+`InventoryPickupOcrService.FindHorizontalLines` detecteaza o linie orizontala de tabel cand un rand de pixeli atinge cel putin 65% cerneala pe latimea tabelului. Pe scanarea reala, cel mai "plin" rand atingea doar 58%. Masurand direct imaginea (harness de unica folosinta, in afara proiectului, `INVENTORY_OCR_DEBUG=1`): sub jumatate de grad de inclinare a colii (normal la orice scanare fizica) imprastie cerneala unei linii drepte din original pe aproximativ 10 randuri de imagine dupa scanare, niciunul singur atingand pragul - deci zero linii detectate pe toata pagina, zero tabele.
+
+### Corectie
+
+O dilatare verticala mica (nucleu 1x7, `LineDetectionDilationHeight`) aplicata pe o copie a imaginii binare, doar pentru testul de detectie a liniilor; restul procesarii (dividerii verticali, segmentarea cifrelor) foloseste imaginea originala. Pragul de 65% ramane neschimbat - nu creste riscul de fals-pozitiv, doar toleranta la inclinare.
+
+### Verificari
+
+- `tests/BlazorStoc.Checks`: 611/611 `PASS` (609 anterioare + 2 noi pe fixtura noua `Fixtures/inventar-proba-inclinata.pdf`, fisierul real al utilizatorului).
+- Pipeline complet rulat direct pe fisierul real: toate cele 10 produse citite; doua valori ramase gresite de modelul generic de cifre (limitare deja cunoscuta, `docs/TESTE_RAMASE.md` H2) - una fara semnalare de incertitudine, adaugata acolo ca observatie noua.
+
+### Pasul urmator
+
+Aspectul general "alte scanere/rezolutii" (H1) ramane deschis. Acuratetea modelului de cifre (H2) ramane o imbunatatire neblocanta (TODO.md, Task 1).
 
 ## Fereastra separata cu PDF-ul la preluarea inventarului - 29.09.2026
 

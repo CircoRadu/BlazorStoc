@@ -1085,3 +1085,77 @@ La cererea utilizatorului: cand un fisier PDF este incarcat in pagina de preluar
 **Verificari efectuate:** build Release fara avertismente/erori; `tests/BlazorStoc.Checks`, 609 verificari, toate `PASS` (fara regresii fata de cele 578 anterioare); modulul JS verificat direct in consola browserului real (import dinamic, apel `openPdfViewer` cu un flux simulat) - se executa fara erori. Incarcarea reala a unui fisier PDF prin `InputFile`, testata de utilizator in Brave pe previzualizarea de la `http://127.0.0.1:5082/inventar/preluare`: fereastra s-a deschis corect dupa ce utilizatorul a permis explicit ferestrele pop-up pentru site (comportament asteptat al browserului, semnalat si in pagina prin mesajul de eroare cand fereastra e blocata).
 
 **Neverificat/ramane deschis:** comportamentul exact de redimensionare/repozitionare si de reutilizare a ferestrei la o a doua incarcare consecutiva nu a fost confirmat explicit de utilizator (doar deschiderea initiala). Detalii in `docs/TESTE_RAMASE.md`.
+
+## Finalizat la 29.09.2026 09:07 — Corectarea detectiei liniilor de tabel pe o scanare reala usor inclinata
+
+**Data si ora implementarii:** 29.09.2026 09:07 (ora locala).
+
+La testarea ferestrei de comparare de mai sus, utilizatorul a incercat preluarea unei scanari reale a formularului de inventar si a primit eroarea "Nu a fost gasit niciun tabel recunoscut in fisier", desi fisierul (`D:\_BlazTest\SKM_C3320i 26092908470.pdf`) contine vizibil toate cele 8 tabele completate de mana. Investigat prin instrumentare directa (harness de unica folosinta, in afara proiectului, cu `INVENTORY_OCR_DEBUG=1`), nu prin presupunere.
+
+- [x] **Cauza reala confirmata:** `InventoryPickupOcrService.FindHorizontalLines` cauta un rand de pixeli unde cel putin 65% din latimea tabelului e cerneala, pentru a detecta o linie orizontala de tabel. Pe aceasta scanare, cel mai "plin" rand atingea doar 58%. Masurand direct imaginea: sub jumatate de grad de inclinare a colii (normal la o scanare fizica, oricat de atenta) imprastie cerneala unei linii orizontale drepte din original pe aproximativ 10 randuri de imagine dupa scanare, niciunul singur atingand pragul. Rezultatul: zero linii detectate pe intreaga pagina, deci zero tabele, desi geometria (`approxLeft`/`approxRight`, calculata din `InventoryPdfLayout.ComputeColumns`) era corecta.
+- [x] **Corectie:** o dilatare verticala mica (nucleu 1x7, `LineDetectionDilationHeight`) aplicata pe o copie a imaginii binare, doar pentru acest test de detectie a liniilor (`InventoryPickupOcrService.FindHorizontalLines`); restul procesarii (detectia dividerilor verticali, segmentarea cifrelor scrise de mana) foloseste in continuare imaginea binara originala, nemodificata. Pragul de 65% ramane neschimbat, deci riscul de fals-pozitiv pe alt continut (text, zgomot) nu creste - doar toleranta la o inclinare mica a colii creste.
+- [x] Mutat si linia de log de depanare (`INVENTORY_OCR_DEBUG`) inaintea intoarcerii timpurii cand se gasesc mai putin de 2 linii, ca sa se vada mereu geometria calculata, nu doar cand detectia reuseste - asta a facut posibila gasirea rapida a cauzei reale.
+- [x] Fisierul real furnizat de utilizator a fost adaugat ca fixtura noua (`tests/BlazorStoc.Checks/Fixtures/inventar-proba-inclinata.pdf`), cu doua verificari noi in `tests/BlazorStoc.Checks`: toate cele 10 produse din scanare sunt gasite (erau 0 inainte de corectie), iar cel putin unul dintre ele isi citeste corect valoarea scrisa de mana.
+
+**Fisiere principale:** `Services/InventoryPickupOcr.cs`, `tests/BlazorStoc.Checks/Program.cs`, `tests/BlazorStoc.Checks/Fixtures/inventar-proba-inclinata.pdf` (noua), `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`.
+
+**Decizii:** corectie minima si tintita (dilatare doar pentru testul de linii, prag neschimbat) in loc de o solutie generala de indreptare/deskew a imaginii intregi, care ar fi fost o schimbare mult mai ampla pentru un risc deja documentat ca limitat (`docs/TESTE_RAMASE.md`, fost H1).
+
+**Verificari efectuate:** cauza reala confirmata prin masurare directa a imaginii (nu presupusa); build Release 0 avertismente/erori; `tests/BlazorStoc.Checks` 611/611 `PASS` (609 anterioare + 2 noi, fara regresii, inclusiv fixtura originala `inventar-proba.pdf` neschimbata ca rezultat); pipeline-ul complet rulat direct (in afara suitei, cu acelasi serviciu) pe fisierul real al utilizatorului: toate cele 10 produse citite, cu valorile corecte pentru toate exceptand doua cazuri deja incadrate la limitarea cunoscuta a modelului de cifre (vezi mai jos).
+
+**Neverificat/ramane deschis:** pe aceeasi scanare, doua valori scrise de mana au fost citite gresit de modelul de cifre generic (limitare deja cunoscuta si documentata, nu introdusa de aceasta corectie): "Manusi de lucru" (scris "54", citit "84", semnalat corect `Uncertain=true`) si "Nivela cu bula 60 cm" (scris "3", citit "5", **fara** semnalare de incertitudine - caz nou, adaugat la `docs/TESTE_RAMASE.md` H2). Aspectul general al altor scanere/rezolutii ramane deschis (H1, restul).
+
+## Finalizat la 29.09.2026 09:15 — Indreptarea (deskew) reala a paginii pentru scanari cu inclinare vizibila
+
+**Data si ora implementarii:** 29.09.2026 09:15 (ora locala).
+
+Corectia anterioara (dilatare verticala) acoperea doar sub un grad de inclinare. Utilizatorul a furnizat o a doua scanare reala, rotita vizibil (cateva grade), care era in continuare respinsa cu "Nu a fost gasit niciun tabel recunoscut".
+
+- [x] Adaugata indreptarea efectiva a paginii inainte de orice alta geometrie: `InventoryPickupOcrService.FindSkewDegrees` estimeaza unghiul de inclinare printr-o metoda standard (profilul de proiectie orizontala - varianta e maxima la unghiul corect, pentru ca liniile de tabel/textul dau varfuri ascutite doar cand pagina e dreapta), cautat intre -8 si +8 grade, in doi pasi (grosier din grad in grad, apoi rafinat din zecime in zecime), pe o copie miniaturizata (25%) pentru viteza.
+- [x] Pagina e rotita (`Rotate`, `Cv2.WarpAffine`, fundal alb) cu unghiul gasit inainte de binarizare, detectia liniilor de tabel si calibrarea coloanelor - restul algoritmului (deja existent) ramane neschimbat, opereaza doar pe o pagina deja dreapta.
+- [x] **Descoperire importanta in acest ciclu:** rotirea intregii pagini, chiar la un unghi mic (~0,3 grade, cazul deja rezolvat de dilatare), a inrautatit acuratetea cifrelor scrise de mana (interpolarea rotatiei "inmoaie" traseul subtire al cernelii, suficient sa strice segmentarea cifrelor pe conectivitate) - confirmat direct, comparand rezultatele cu/fara rotire pe acelasi fisier deja corectat. De aceea rotirea se aplica **numai** peste un prag (`MinCorrectedSkewDegrees = 0.6` grade); sub acest prag ramane activa doar dilatarea din corectia anterioara, care nu are acest efect secundar.
+- [x] Fisierul real, mai vizibil rotit, furnizat de utilizator a fost adaugat ca fixtura noua (`tests/BlazorStoc.Checks/Fixtures/inventar-proba-rotita.pdf`), cu doua verificari noi.
+
+**Fisiere principale:** `Services/InventoryPickupOcr.cs`, `tests/BlazorStoc.Checks/Program.cs`, `tests/BlazorStoc.Checks/Fixtures/inventar-proba-rotita.pdf` (noua), `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`.
+
+**Decizii:** prag minim de rotire (0.6 grade) in loc de a roti mereu, tocmai din cauza efectului secundar gasit asupra acuratetei scrisului de mana pe unghiuri mici, deja acoperite suficient de dilatare; cautare in doi pasi (grosier apoi rafinat) pe imagine miniaturizata, pentru viteza (sub 2 secunde per fisier, nu s-a incercat o metoda mai rapida gen transformata Hough, care ar fi introdus o dependenta noua fara sa fie necesara).
+
+**Verificari efectuate:** cauza si efectul secundar confirmate prin executie reala comparativa (cu/fara rotire, pe ambele fisiere reale ale utilizatorului), nu presupuse; build Release 0 avertismente/erori; `tests/BlazorStoc.Checks` 613/613 `PASS` (611 anterioare + 2 noi, fara regresii pe niciuna dintre cele 3 fixturi reale). Pipeline complet rulat direct pe ambele fisiere reale ale utilizatorului: toate cele 10 produse citite din fiecare.
+
+**Neverificat/ramane deschis:** un unghi de inclinare mai mare de 8 grade, sau o pagina rotita in alt fel decat o simpla inclinare de alimentare (de exemplu intoarsa la 90/180 grade), nu sunt acoperite de aceasta cautare. Aspectul general al altor scanere/rezolutii ramane deschis (`docs/TESTE_RAMASE.md`, H1). Limitarile modelului de cifre (H2) sunt neschimbate de aceasta corectie.
+
+## Finalizat la 29.09.2026 09:20 — Fixtura de test cu inclinare diferita pe fiecare pagina a unui PDF
+
+**Data si ora implementarii:** 29.09.2026 09:20 (ora locala).
+
+La cererea utilizatorului: corectia de deskew de mai sus trebuie sa functioneze independent pe fiecare pagina a unui document (o pagina poate fi mai inclinata decat alta). Codul deja facea asta corect (`ScanAsync` apeleaza `ScanPageAsync` separat pentru fiecare pagina, iar `FindSkewDegrees`/`Rotate` ruleaza in interiorul ei), dar nu exista o verificare automata care sa blocheze o eventuala regresie viitoare (de exemplu, cineva mutand estimarea unghiului o singura data la nivelul intregului document, din greseala).
+
+- [x] Construita o fixtura noua cu doua pagini reale diferite (`tests/BlazorStoc.Checks/Fixtures/inventar-proba-multipagina.pdf`): pagina 1 = scanarea usor inclinata (~0,3 grade), pagina 2 = scanarea vizibil rotita (~2,7 grade), combinate intr-un singur PDF cu `PdfSharp.Pdf.PdfDocument.AddPage` (import de pagina, fara alta modificare a continutului).
+- [x] Verificare noua in `tests/BlazorStoc.Checks`: documentul are 2 pagini, fiecare pagina isi citeste toate cele 10 produse ale ei, independent de inclinarea celeilalte pagini.
+
+**Fisiere principale:** `tests/BlazorStoc.Checks/Fixtures/inventar-proba-multipagina.pdf` (nou), `tests/BlazorStoc.Checks/Program.cs`, `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`.
+
+**Decizii:** fixtura construita din cele doua scanari reale deja existente (nu un fisier sintetic nou), ca sa testeze exact aceleasi doua unghiuri reale confirmate anterior, fara sa introduca o a treia variabila necunoscuta.
+
+**Verificari efectuate:** `tests/BlazorStoc.Checks` 616/616 `PASS` (613 anterioare + 3 noi: numarul de pagini, page 1 completa, page 2 completa); pipeline rulat si direct (harness separat), confirmand unghiurile estimate separat per pagina (0,30 si respectiv 2,70 grade) si toate cele 20 de randuri citite.
+
+**Neverificat/ramane deschis:** neschimbat fata de corectiile de deskew de mai sus (unghiuri peste 8 grade, alte orientari, alte scanere/rezolutii, acuratetea modelului de cifre).
+
+## Finalizat la 29.09.2026 09:39 — Populare catalog demonstrativ cu produse fictive (minimum 4 per subcategorie)
+
+**Data si ora implementarii:** 29.09.2026 09:39 (ora locala).
+
+La cererea utilizatorului: catalogul demonstrativ (`data/blazorstoc-local.db`, folosit de preview-ul de pe 5082) avea prea putine produse pentru teste realiste (11 produse, cate 1-2 per subcategorie). Populat cu 22 de produse fictive noi, astfel incat toate cele 8 subcategorii existente sa aiba cel putin 4 produse fiecare (33 de produse in total).
+
+- [x] Produsele noi au fost create prin fluxul real al aplicatiei (`SqliteProductRepository.CreateAsync`, acelasi serviciu folosit de pagina de adaugare produs), nu prin INSERT direct in baza - normalizarea numelui, unicitatea globala si jurnalizarea (categorie/subcategorie/produs) au fost aplicate identic cu o adaugare facuta din interfata.
+- [x] Fiecare produs nou a primit un stoc initial real printr-o miscare de intrare (`SqliteStockMovementRepository.CreateAsync`, descriere "Stoc initial (date demonstrative, produs fictiv)"), respectand regula existenta ca stocul se schimba doar prin miscari, niciodata direct.
+- [x] Toate numele produselor noi contin sufixul " test" pentru a fi usor de distins vizual si de sters ulterior in bloc, daca se doreste, fara sa se confunde cu date reale introduse ulterior de utilizator.
+- [x] Baza de date a fost copiata inainte de operatie (`data/manual-backups/blazorstoc-local.pre-seed.db`), iar preview-ul a fost oprit pe durata scrierii, ca sa nu existe scrieri concurente.
+
+**Fisiere principale:** `data/blazorstoc-local.db` (date, nu cod sursa); script de unica folosinta in directorul scratchpad al sesiunii (nu a fost pastrat in proiect).
+
+**Decizii:** produsele noi respecta exact categoriile/subcategoriile existente (nu s-au creat categorii noi); denumiri si descrieri plauzibile pentru fiecare subcategorie (fixare, protectie cap/maini, masurare distante/nivelare, strangere, gaurire, taiere), cu cantitati variate (inclusiv un produs cu stoc zero, ca sa pastreze diversitatea deja prezenta in datele existente).
+
+**Verificari efectuate:** rulare reala a scriptului impotriva bazei folosite de preview; verificare directa (interogare) ca toate cele 8 subcategorii au acum exact 4 produse; verificat vizual in browser, pagina `/produse` (33 de produse, 5 categorii, cantitatile si descrierile corecte pentru produsele noi).
+
+**Neverificat/ramane deschis:** nimic specific acestui task; produsele fictive nu au fost folosite inca pentru a genera o situatie de inventar multi-pagina reala (util pentru testarea ulterioara a Task 4, marirea inaltimii randurilor din PDF).

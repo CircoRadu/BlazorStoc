@@ -113,6 +113,16 @@ builder.Services.AddScoped<IDatabaseBackupService>(services => demo
     : new MariaDatabaseBackupService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<IAuditTrail>(),
         services.GetRequiredService<ILogger<MariaDatabaseBackupService>>()));
+// Subtask 3.3/3.4 (Task 3): shares the same lock and backup service as above (the pre-restore snapshot in Pas 0
+// goes through IDatabaseBackupService.CreateBackupAsync, passing the restore's own already-held lock handle).
+builder.Services.AddScoped<IDatabaseRestoreService>(services => demo
+    ? new SqliteDatabaseRestoreService(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IConfiguration>(),
+        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IOperationLockService>(),
+        services.GetRequiredService<IDatabaseBackupService>(), services.GetRequiredService<IAuditTrail>(),
+        services.GetRequiredService<ILogger<SqliteDatabaseRestoreService>>())
+    : new MariaDatabaseRestoreService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
+        services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<IDatabaseBackupService>(),
+        services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<MariaDatabaseRestoreService>>()));
 builder.Services.AddScoped<IVehicleRepository>(services => demo
     ? new SqliteVehicleRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
     : new MariaVehicleRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));

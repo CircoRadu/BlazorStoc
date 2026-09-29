@@ -1,8 +1,10 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @using Microsoft.AspNetCore.WebUtilities
-@inject BlazorStoc.Services.AppMode Mode
-@inject BlazorStoc.Services.IProductRepository Products
+@using BlazorStoc.Services
+@inject AppMode Mode
+@inject IProductRepository Products
+@inject IOperationLockService OperationLock
 @inject NavigationManager Navigation
 
 <div class="app-shell">
@@ -70,7 +72,14 @@
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>@(Mode.IsDemo ? "Date demonstrative" : "BlazorStoc · MariaDB")</small></div>
     </aside>
-    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">@(Mode.IsDemo ? "Mod demonstrativ" : "Sesiune autentificată")</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header><main class="workspace">@Body</main></div>
+    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">@(Mode.IsDemo ? "Mod demonstrativ" : "Sesiune autentificată")</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
+        @if (activeOperation is not null && !onRestorePage)
+        {
+            <div class="error-banner" role="alert">
+                Backup/restaurare in curs (@activeOperation.OperatorName) - datele pot fi temporar indisponibile. Reveniti mai tarziu.
+            </div>
+        }
+        <main class="workspace">@Body</main></div>
 </div>
 <dialog id="logout-dialog" class="delete-dialog logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description">
     <form method="post" action="/Account/Logout">
@@ -88,8 +97,9 @@
 @code {
     private IReadOnlyList<BlazorStoc.Services.ProductGroup> groups = Array.Empty<BlazorStoc.Services.ProductGroup>();
     private List<string> categories = [];
-    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded;
+    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, onRestorePage;
     private string selectedCategory = "", selectedSubcategory = "";
+    private OperationLockInfo? activeOperation;
     private readonly CancellationTokenSource lifetime = new();
 
     protected override async Task OnInitializedAsync()
@@ -97,6 +107,17 @@
         Navigation.LocationChanged += LocationChanged;
         ReadLocation();
         if (productSection) await LoadGroupsAsync();
+        // Subtask 3.4 (Task 3), "Notificarea sesiunilor Blazor active": MainLayout has no @rendermode of its own
+        // (only individual pages like Home.razor/DatabaseRestore.razor do), so it renders once per navigation as
+        // plain server-side HTML rather than as a live interactive circuit - a background polling loop started here
+        // would be torn down with the request the moment this render finishes, never firing again. Checking the
+        // shared operation lock (Services/OperationLock.cs) here instead, on every OnInitializedAsync, means every
+        // page load/navigation picks up the current state, which is enough for "a session that is not the one
+        // driving the operation learns a backup or restoration is under way" without pretending this layout can
+        // push a live update to an already-open, otherwise-idle tab.
+        try { activeOperation = await OperationLock.GetActiveAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception) { activeOperation = null; }
     }
 
     private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => _ = RefreshNavigationAsync();
@@ -109,6 +130,9 @@
             {
                 ReadLocation();
                 if (productSection) await LoadGroupsAsync();
+                try { activeOperation = await OperationLock.GetActiveAsync(lifetime.Token); }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+                catch (Exception) { activeOperation = null; }
                 StateHasChanged();
             });
         }
@@ -126,6 +150,7 @@
         if (administrationSection) administrationExpanded = true;
         inventorySection = uri.AbsolutePath.StartsWith("/inventar", StringComparison.OrdinalIgnoreCase);
         if (inventorySection) inventoryExpanded = true;
+        onRestorePage = uri.AbsolutePath.StartsWith("/inventar/restaurare", StringComparison.OrdinalIgnoreCase);
         var query = QueryHelpers.ParseQuery(uri.Query);
         selectedCategory = productSection && query.TryGetValue("categorie", out var categoryValue) ? categoryValue.ToString() : "";
         selectedSubcategory = productSection && query.TryGetValue("subcategorie", out var subcategoryValue) ? subcategoryValue.ToString() : "";

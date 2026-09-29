@@ -1236,3 +1236,76 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Neverificat:** reutilizarea aceleiasi ferestre la o a doua incarcare consecutiva si comportamentul de redimensionare/repozitionare nu au fost confirmate explicit de utilizator (doar deschiderea initiala) - vezi `docs/TESTE_RAMASE.md`.
 - **Commit:** `claude: fereastra separata pentru fisierul PDF la preluarea inventarului`
 - **Predat catre:** claude
+
+## 2026-09-29T06:08:42.0000000Z — claude
+
+- **Task:** Corectarea detectiei liniilor de tabel pe o scanare reala usor inclinata (gasit in timpul verificarii ferestrei de comparare PDF de mai sus)
+- **Rezumat:** Utilizatorul a incercat preluarea unei scanari reale a formularului de inventar si a primit eroarea "Nu a fost gasit niciun tabel recunoscut", desi fisierul contine vizibil toate cele 8 tabele completate. Investigat prin instrumentare directa (harness de unica folosinta, in afara proiectului, `INVENTORY_OCR_DEBUG=1`): `InventoryPickupOcrService.FindHorizontalLines` cerea 65% cerneala pe un singur rand de pixeli; pe aceasta scanare cel mai plin rand atingea doar 58%, pentru ca sub jumatate de grad de inclinare a colii imprastie cerneala unei linii drepte pe aproximativ 10 randuri, niciunul singur atingand pragul - deci zero linii, zero tabele detectate pe toata pagina. Corectat cu o dilatare verticala mica (nucleu 1x7, `LineDetectionDilationHeight`) aplicata doar pentru acest test, pe o copie a imaginii binare; pragul de 65% ramane neschimbat. Mutata si linia de log de depanare inaintea intoarcerii timpurii, ca sa arate geometria calculata mereu, nu doar la succes. Fisierul real al utilizatorului adaugat ca fixtura noua (`tests/BlazorStoc.Checks/Fixtures/inventar-proba-inclinata.pdf`) cu doua verificari noi. Protocolul „commit doar la cerere” (intrarea anterioara) se aplica si aici: modificarile raman necomise pana la cererea explicita a utilizatorului.
+- **Fișiere modificate:**
+  - `Services/InventoryPickupOcr.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`
+  - `tests/BlazorStoc.Checks/Fixtures/inventar-proba-inclinata.pdf` (nou)
+  - `IMPLEMENTED.md`
+  - `VALIDARE.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `docs/AGENT_CHANGELOG.md`
+- **Validare:** cauza reala confirmata prin masurare directa a imaginii; build Release 0 avertismente/erori; `tests/BlazorStoc.Checks` 611/611 `PASS` (609 anterioare + 2 noi, fara regresii); pipeline complet rulat pe fisierul real: toate cele 10 produse citite, doua valori ramase gresite de modelul de cifre (limitare deja cunoscuta, vezi mai jos).
+- **Neverificat:** aspectul general "alte scanere/rezolutii" (H1, restul); modelul de cifre a citit gresit doua valori scrise de mana pe aceasta scanare (una semnalata corect ca nesigura, una nu - caz nou adaugat la H2, limitare deja cunoscuta, nu o regresie a acestei corectii).
+- **Commit:** neefectuat inca (protocol nou: commit doar la cererea explicita a utilizatorului)
+- **Predat catre:** claude
+
+## 2026-09-29T06:15:16.0000000Z — claude
+
+- **Task:** Indreptarea (deskew) reala a paginii pentru scanari cu inclinare vizibila (a doua scanare reala a utilizatorului, rotita cu cateva grade, respinsa dupa corectia cu dilatare de mai sus)
+- **Rezumat:** Utilizatorul a furnizat o a doua scanare reala, rotita vizibil (nu doar sub un grad ca prima), tot respinsa cu "Nu a fost gasit niciun tabel recunoscut" - dilatarea din corectia anterioara nu acopera un unghi asa de mare. Adaugat `InventoryPickupOcrService.FindSkewDegrees`: estimeaza unghiul de inclinare prin profilul de proiectie orizontala (metoda standard - varianta e maxima la unghiul corect), cautat intre -8 si +8 grade in doi pasi (grosier din grad in grad, apoi rafinat din zecime in zecime), pe o copie miniaturizata (25%) pentru viteza; pagina e rotita (`Rotate`, `Cv2.WarpAffine`) cu unghiul gasit inainte de restul geometriei. Rulat independent pentru fiecare pagina a documentului (utilizatorul a intrebat explicit despre acest aspect - `ScanAsync` apeleaza deja `ScanPageAsync` separat per pagina, iar estimarea/rotirea ruleaza in interiorul ei, deci fiecare pagina isi are propriul unghi, fara nicio schimbare de cod necesara). **Descoperire importanta**: rotirea intregii pagini, chiar la un unghi mic (~0,3 grade, cazul deja rezolvat de dilatare), a inrautatit acuratetea cifrelor scrise de mana (interpolarea rotatiei inmoaie traseul subtire al cernelii) - confirmat comparativ pe acelasi fisier, nu presupus. Corectat cu un prag minim de rotire (`MinCorrectedSkewDegrees = 0.6` grade); sub prag ramane activa doar dilatarea. Fisierul real mai vizibil rotit adaugat ca fixtura noua (`tests/BlazorStoc.Checks/Fixtures/inventar-proba-rotita.pdf`), cu doua verificari noi.
+- **Fișiere modificate:**
+  - `Services/InventoryPickupOcr.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`
+  - `tests/BlazorStoc.Checks/Fixtures/inventar-proba-rotita.pdf` (nou)
+  - `IMPLEMENTED.md`
+  - `VALIDARE.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `docs/AGENT_CHANGELOG.md`
+- **Validare:** cauza si efectul secundar (rotirea strica cifrele la unghiuri mici) confirmate prin executie reala comparativa pe ambele fisiere ale utilizatorului, nu presupuse; build Release 0 avertismente/erori; `tests/BlazorStoc.Checks` 613/613 `PASS` (611 anterioare + 2 noi, fara regresii pe niciuna dintre cele 3 fixturi reale); pipeline complet rulat pe ambele fisiere reale: toate cele 10 produse citite din fiecare.
+- **Neverificat:** unghiuri peste 8 grade sau alta orientare (90/180 grade); un document cu mai multe pagini, fiecare cu propria inclinare diferita, nu a fost testat efectiv cu un fisier real (doar rationat din cod - fiecare pagina isi calculeaza propriul unghi independent). Aspectul general "alte scanere/rezolutii" (H1) si acuratetea modelului de cifre (H2) raman deschise.
+- **Commit:** neefectuat inca (protocol: commit doar la cererea explicita a utilizatorului)
+- **Predat catre:** claude
+
+## 2026-09-29T06:39:48.0000000Z — claude
+
+- **Task:** Fixtura de test multi-pagina pentru deskew (fiecare pagina cu inclinarea ei) si populare catalog demonstrativ cu produse fictive (minimum 4 per subcategorie)
+- **Rezumat:** Utilizatorul a intrebat daca deskew-ul (corectia anterioara) ruleaza per pagina - confirmat ca da (`ScanAsync` apeleaza `ScanPageAsync` separat pentru fiecare pagina), fara nicio schimbare de cod necesara, si adaugata o fixtura noua (`inventar-proba-multipagina.pdf`, cele doua scanari reale existente combinate cu `PdfSharp`) cu verificari care blocheaza explicit o eventuala regresie viitoare. Separat, utilizatorul a cerut popularea catalogului demonstrativ (11 produse, 1-2 per subcategorie) cu produse fictive, minimum 4 per subcategorie: adaugate 22 de produse noi (sufix " test") prin fluxul real al aplicatiei (`SqliteProductRepository.CreateAsync`, cu o miscare de intrare pentru stocul initial prin `SqliteStockMovementRepository.CreateAsync`), nu prin scriere directa in baza - normalizare, unicitate si jurnalizare identice cu o adaugare din interfata. Baza de date reala (`data/blazorstoc-local.db`) copiata inainte de scriere; preview-ul oprit pe durata operatiei.
+- **Fișiere modificate:**
+  - `tests/BlazorStoc.Checks/Fixtures/inventar-proba-multipagina.pdf` (nou)
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`
+  - `data/blazorstoc-local.db` (date, nu cod - 22 produse noi + miscarile de stoc aferente)
+  - `IMPLEMENTED.md`
+  - `VALIDARE.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/AGENT_CHANGELOG.md`
+- **Validare:** `tests/BlazorStoc.Checks` 616/616 `PASS` (613 anterioare + 3 noi); pipeline OCR rulat direct pe fixtura multi-pagina (unghiuri 0,30 si 2,70 grade estimate separat, toate cele 20 de randuri citite); catalogul verificat vizual in browser (`/produse`, 33 de produse, 5 categorii).
+- **Neverificat:** produsele fictive nu au fost inca folosite pentru a genera o situatie de inventar multi-pagina reala (util pentru Task 4).
+- **Commit:** neefectuat inca (protocol: commit doar la cererea explicita a utilizatorului)
+- **Predat catre:** claude
+
+## 2026-09-29T10:30:00.0000000Z — claude
+
+- **Task:** Task 3, subtaskurile 3.3-3.4 (declansarea si pasii de restaurare a bazei de date); tile "Vehicule" pe pagina principala; drag and drop la incarcarea fisierului de preluare inventar
+- **Rezumat:** Trei cereri separate ale utilizatorului, in aceeasi sesiune. (1) Task 3.3/3.4: butonul "Restaureaza baza de date" (activ numai cu un pachet selectat), popup nou de confirmare (`RestoreConfirmationDialog`, cuvantul exact `confirma`) si cei 5 pasi de restaurare (`Services/DatabaseRestore.cs`) - blocare+snapshot pre-restaurare, verificare hash, comparare structura, comparare continut (identic = refuzat ca inutil), import+comutare. Mod demonstrativ (SQLite) verificat integral prin executie reala (restaurare efectiva confirmata in browser, catalogul de produse intact). Mod MariaDB real: cod complet scris, dar Pasul 4 (comutare de scheme) se opreste explicit cu mesaj clar in lipsa unui cont dedicat cu drepturi cross-schema, neconfigurat in acest mediu; neverificat, fara instanta locala MariaDB (vezi `docs/TESTE_RAMASE.md`, A20). Adaugat si un banner de intretinere in `MainLayout.razor` (verificare sincrona a lacatului comun la fiecare navigare, nu un timer de fundal - `MainLayout` nu are propriul `@rendermode` interactiv, un `PeriodicTimer` pornit acolo a fost incercat si nu functiona, vezi `docs/PROJECT_STATE.md`). (2) Adaugat un tile "Vehicule" pe pagina principala (`Dashboard.razor`), lipsea din grila de navigare desi pagina `/vehicule` exista deja. (3) Drag and drop la `/inventar/preluare`: fisierul poate fi tras direct peste zona de continut, nu doar ales prin buton (`wwwroot/inventory-pickup-dropzone.js`, script delegat pe `document` care atribuie fisierul campului `<InputFile>` ascuns si declanseaza `change`, refolosind neschimbat fluxul C# existent).
+- **Fișiere modificate:**
+  - `Services/DatabaseRestore.cs` (nou), `Services/RestoreConfirmation.cs` (nou), `Components/Shared/RestoreConfirmationDialog.razor` (nou)
+  - `Services/DatabaseBackup.cs` (parametru `existingLock` pe `CreateBackupAsync`), `Services/AuditTrail.cs` (actiunea `Restore`), `Services/MariaTimeText.cs` (`MariaClientExecutable`)
+  - `Components/Pages/DatabaseRestore.razor`, `Components/Layout/MainLayout.razor`, `Program.cs`
+  - `Components/Pages/Dashboard.razor` (tile Vehicule)
+  - `wwwroot/inventory-pickup-dropzone.js` (nou), `Components/Pages/InventoryPickup.razor`, `Components/App.razor`, `wwwroot/app.css`
+  - `tests/BlazorStoc.Checks/Program.cs` (verificari noi pentru restaurare si `RestoreConfirmationRules`)
+  - `TODO.md`, `VALIDARE.md`, `README.md`, `docs/PROJECT_STATE.md`, `docs/TESTE_RAMASE.md`, `docs/AGENT_CHANGELOG.md`
+- **Validare:** `tests/BlazorStoc.Checks` 630/630 `PASS` (inclusiv un test nou end-to-end pentru restaurarea SQLite); build Debug 0 avertismente/erori; verificat direct in browser (preview demonstrativ, port 5083): restaurare reala reusita cu popup de confirmare, tile Vehicule functional, drag and drop simulat cu evenimente native (`DataTransfer`/`File` prin JavaScript) trecand prin aceeasi validare ca butonul de incarcare.
+- **Neverificat:** modul MariaDB real pentru restaurare (Pasii 1-4, fara instanta locala in acest mediu - `docs/TESTE_RAMASE.md` A20); o tragere reala dintr-un manager de fisiere al sistemului de operare pentru drag and drop (doar simulata prin JS - A21); scrierile obisnuite ale altor sesiuni nu sunt blocate activ in timpul restaurarii (doar notificate, risc rezidual acceptat).
+- **Commit:** `claude: restaurare baza de date (3.3-3.4), tile Vehicule, drag and drop preluare inventar`
+- **Predat catre:** claude

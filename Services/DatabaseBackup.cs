@@ -139,8 +139,14 @@ public sealed record BackupDeleteResult(bool Success, string? ErrorMessage)
 
 public interface IDatabaseBackupService
 {
+    // Subtask 3.4 (Task 3), Pas 0: the restore flow already holds the shared operation lock (acquired once, for the
+    // whole restore) when it needs a pre-restore snapshot. TryAcquireAsync is not reentrant (one lock file for the
+    // whole app - a second acquisition attempt while the first handle is still open always fails), so a caller that
+    // already holds the lock passes its handle here instead of letting this method try to acquire a second one;
+    // this method then neither acquires nor releases it, leaving that entirely to the caller. Every other caller
+    // (the plain "preluare inventar" flow) passes null, unchanged from before this subtask.
     Task<BackupResult> CreateBackupAsync(BackupKind kind, IProgress<BackupProgress>? progress = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default, IOperationLockHandle? existingLock = null);
     Task<IReadOnlyList<BackupPackage>> ListPackagesAsync(CancellationToken cancellationToken = default);
     Task<BackupDeleteResult> DeletePackageAsync(string fileName, string reason, CancellationToken cancellationToken = default);
 }
@@ -195,7 +201,9 @@ internal static class BackupPackageStore
         return BackupDeleteResult.Ok();
     }
 
-    private static async Task<BackupManifest?> TryReadManifestAsync(string zipPath, CancellationToken token)
+    // Internal, not private: subtask 3.4 (Task 3) reads the same manifest.json entry while verifying the package
+    // selected for restore (RestoreRules' Pas 1), before anything on the live database is touched.
+    internal static async Task<BackupManifest?> TryReadManifestAsync(string zipPath, CancellationToken token)
     {
         try
         {
@@ -242,15 +250,19 @@ public sealed class SqliteDatabaseBackupService(SqliteLocalStore store, IConfigu
     private readonly string backupDirectory = Path.GetFullPath(configuration["App:BackupFilesPath"] ?? Path.Combine("data", "database-backups"));
 
     public async Task<BackupResult> CreateBackupAsync(BackupKind kind, IProgress<BackupProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, IOperationLockHandle? existingLock = null)
     {
         Directory.CreateDirectory(backupDirectory);
         var operatorName = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var operatorRole = await access.IsAdministratorAsync(cancellationToken).ConfigureAwait(false) ? AccessRoles.Administrator : AccessRoles.LimitedUser;
 
         progress?.Report(new(BackupStage.Locking, BackupRules.StageMessage(BackupStage.Locking)));
-        await using var handle = await locks.TryAcquireAsync($"backup:{kind}", operatorName, operatorRole, cancellationToken).ConfigureAwait(false);
-        if (handle is null) return BackupResult.Failed(OperationLockRules.HeldMessage);
+        var handle = existingLock;
+        if (handle is null)
+        {
+            handle = await locks.TryAcquireAsync($"backup:{kind}", operatorName, operatorRole, cancellationToken).ConfigureAwait(false);
+            if (handle is null) return BackupResult.Failed(OperationLockRules.HeldMessage);
+        }
 
         var tempDb = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.sqlite");
         var tempZip = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.zip");
@@ -313,6 +325,7 @@ public sealed class SqliteDatabaseBackupService(SqliteLocalStore store, IConfigu
         {
             TryDelete(tempDb);
             TryDelete(tempZip);
+            if (existingLock is null) await handle.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -358,15 +371,19 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
     private readonly string backupDirectory = MariaAssetPaths.DatabaseBackups(configuration);
 
     public async Task<BackupResult> CreateBackupAsync(BackupKind kind, IProgress<BackupProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, IOperationLockHandle? existingLock = null)
     {
         Directory.CreateDirectory(backupDirectory);
         var operatorName = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var operatorRole = await access.IsAdministratorAsync(cancellationToken).ConfigureAwait(false) ? AccessRoles.Administrator : AccessRoles.LimitedUser;
 
         progress?.Report(new(BackupStage.Locking, BackupRules.StageMessage(BackupStage.Locking)));
-        await using var handle = await locks.TryAcquireAsync($"backup:{kind}", operatorName, operatorRole, cancellationToken).ConfigureAwait(false);
-        if (handle is null) return BackupResult.Failed(OperationLockRules.HeldMessage);
+        var handle = existingLock;
+        if (handle is null)
+        {
+            handle = await locks.TryAcquireAsync($"backup:{kind}", operatorName, operatorRole, cancellationToken).ConfigureAwait(false);
+            if (handle is null) return BackupResult.Failed(OperationLockRules.HeldMessage);
+        }
 
         var tempSql = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.sql");
         var tempZip = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.zip");
@@ -443,6 +460,7 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
             TryDelete(tempSql);
             TryDelete(tempZip);
             if (tempCredentialsFile is not null) TryDelete(tempCredentialsFile);
+            if (existingLock is null) await handle.DisposeAsync().ConfigureAwait(false);
         }
     }
 

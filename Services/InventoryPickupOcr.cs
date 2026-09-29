@@ -50,6 +50,13 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     private const double CellPaddingPoints = 4;
     private const double DigitConfidenceThreshold = 0.80;
 
+    // Skew detection/correction (see FindSkewDegrees): angles below this are left uncorrected (rotating a
+    // perfectly straight page still blurs it slightly through interpolation, for no benefit), and the search
+    // never looks beyond this many degrees either side of upright - real paper-feed skew confirmed on user scans
+    // so far stays a few degrees at most; a page rotated further than that is not a simple feed skew any more.
+    private const double MinCorrectedSkewDegrees = 0.6;
+    private const double MaxSearchedSkewDegrees = 8.0;
+
     // A fresh TesseractEngine per cell (rather than one reused instance) - the charlesw/Tesseract wrapper's engine
     // does not reliably reset its internal state between many sequential Process() calls (later cells on the same
     // page came back as garbage in testing against the real sample form). Engine construction is not free, but
@@ -112,8 +119,17 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         var scale = RenderDpi / 72.0;
         var pageWidthPoints = page.Width / scale;
         var columns = InventoryPdfLayout.ComputeColumns(pageWidthPoints);
+        var debug = Environment.GetEnvironmentVariable("INVENTORY_OCR_DEBUG") == "1";
 
-        using var gray = ToGrayMat(page);
+        using var grayRaw = ToGrayMat(page);
+        // A real scan is never perfectly straight (paper feed skew), and confirmed real user scans went from a
+        // fraction of a degree up to a couple of degrees. Beyond a fraction of a degree, the small dilation in
+        // FindHorizontalLines below is no longer enough - the whole page is deskewed here first, before any other
+        // geometry is computed, so every downstream step (line detection, column calibration, cell cropping)
+        // works against an upright page exactly like the one FindSkewDegrees was tuned against.
+        var skewDegrees = FindSkewDegrees(grayRaw);
+        if (debug) Console.WriteLine($"[debug] estimated skew = {skewDegrees:F2} degrees");
+        using var gray = Math.Abs(skewDegrees) >= MinCorrectedSkewDegrees ? Rotate(grayRaw, skewDegrees, Scalar.White) : grayRaw.Clone();
         using var binary = new Mat();
         Cv2.Threshold(gray, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
 
@@ -123,9 +139,8 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         var approxLeft = ToPixel(columns.CodeX, scale, gray.Cols);
         var approxRight = ToPixel(columns.RightEdge, scale, gray.Cols);
         var lines = FindHorizontalLines(binary, approxLeft, approxRight);
+        if (debug) Console.WriteLine($"[debug] gray {gray.Rows}x{gray.Cols}, approxLeft={approxLeft} approxRight={approxRight}, lines ({lines.Count}): {string.Join(",", lines)}");
         if (lines.Count < 2) return [];
-        var debug = Environment.GetEnvironmentVariable("INVENTORY_OCR_DEBUG") == "1";
-        if (debug) Console.WriteLine($"[debug] gray {gray.Rows}x{gray.Cols}, lines ({lines.Count}): {string.Join(",", lines)}");
 
         var (xLeft, xStock, xReal, xRight) = CalibrateColumns(binary, columns, scale, lines[0], lines[1]);
         if (debug) Console.WriteLine($"[debug] xLeft={xLeft} xStock={xStock} xReal={xReal} xRight={xRight}");
@@ -176,6 +191,61 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         return mat.Clone();
     }
 
+    // Classic projection-profile skew estimation: at the correct upright angle, the page's horizontal rule lines
+    // and printed text lines each land on a narrow band of rows, so the ink-per-row profile alternates sharply
+    // between near-empty and near-full rows (high variance). At any other angle that same ink smears across more
+    // rows (lower variance). Searching for the angle that maximizes this variance is standard and does not depend
+    // on the table geometry at all, unlike the line/column detection below - it works the same whether the page
+    // has one table or eight scattered across it. Runs on a small downscaled copy purely for speed; the angle
+    // found is then applied to the full-resolution page once by the caller.
+    private static double FindSkewDegrees(Mat grayFullRes)
+    {
+        using var binary = new Mat();
+        Cv2.Threshold(grayFullRes, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
+        using var small = new Mat();
+        Cv2.Resize(binary, small, new Size(), 0.25, 0.25, InterpolationFlags.Area);
+
+        var bestAngle = 0.0;
+        var bestScore = -1.0;
+        foreach (var angle in SearchAngles(-MaxSearchedSkewDegrees, MaxSearchedSkewDegrees, 1.0))
+        {
+            var score = ProjectionProfileVariance(small, angle);
+            if (score > bestScore) { bestScore = score; bestAngle = angle; }
+        }
+        // Refine around the coarse best angle at a tenth of a degree; the coarse pass above only guarantees
+        // landing within half a degree of the true skew, not enough to keep the residual under the tolerance
+        // FindHorizontalLines' own dilation absorbs.
+        foreach (var angle in SearchAngles(bestAngle - 1.0, bestAngle + 1.0, 0.1))
+        {
+            var score = ProjectionProfileVariance(small, angle);
+            if (score > bestScore) { bestScore = score; bestAngle = angle; }
+        }
+        return bestAngle;
+    }
+
+    private static IEnumerable<double> SearchAngles(double from, double to, double step)
+    {
+        for (var angle = from; angle <= to + step / 2; angle += step) yield return angle;
+    }
+
+    private static double ProjectionProfileVariance(Mat binarySmall, double angleDegrees)
+    {
+        using var rotated = Rotate(binarySmall, angleDegrees, Scalar.Black);
+        using var rowSums = new Mat();
+        Cv2.Reduce(rotated, rowSums, ReduceDimension.Column, ReduceTypes.Sum, MatType.CV_32S);
+        rowSums.GetArray(out int[] sums);
+        var mean = sums.Average();
+        return sums.Average(value => (value - mean) * (double)(value - mean));
+    }
+
+    private static Mat Rotate(Mat source, double angleDegrees, Scalar borderFill)
+    {
+        using var rotationMatrix = Cv2.GetRotationMatrix2D(new Point2f(source.Cols / 2f, source.Rows / 2f), angleDegrees, 1.0);
+        var destination = new Mat();
+        Cv2.WarpAffine(source, destination, rotationMatrix, source.Size(), InterpolationFlags.Linear, BorderTypes.Constant, borderFill);
+        return destination;
+    }
+
     private static int ToPixel(double points, double scale, int max) => Math.Clamp((int)Math.Round(points * scale), 0, max - 1);
 
     // A printed-then-scanned page rarely lands pixel-exact on the geometry computed from the PDF's own point
@@ -215,18 +285,30 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         return best < 0 ? null : best;
     }
 
+    // A rule line perfectly horizontal in the printed page lands on a single image row after scanning only if the
+    // paper fed in dead straight. Even a fraction of a degree of skew (unavoidable on a real scanner/photocopier,
+    // confirmed against a real user scan where well under half a degree was enough) spreads that same line's ink
+    // over a dozen rows, none of which alone reaches the fill ratio below - the table was otherwise read correctly
+    // by eye but zero lines were detected. A small vertical dilation merges a few rows' ink together before the
+    // fill-ratio check, tolerating that spread without loosening the ratio itself (which would risk false
+    // positives from content that is not a rule line).
+    private const int LineDetectionDilationHeight = 7;
+
     // Horizontal rule lines: image rows where most pixels across the table width are ink. Adjacent ink rows
-    // (a rule is a few pixels thick after scanning) are merged into a single line at their midpoint.
+    // (a rule is a few pixels thick after scanning, or merged further by the dilation above) are merged into a
+    // single line at their midpoint.
     private static List<int> FindHorizontalLines(Mat binary, int xLeft, int xRight)
     {
         var width = xRight - xLeft;
         if (width <= 0) return [];
         var threshold = (int)(width * LineFillRatio);
+        using var dilated = new Mat();
+        Cv2.Dilate(binary, dilated, Cv2.GetStructuringElement(MorphShapes.Rect, new Size(1, LineDetectionDilationHeight)));
         var candidates = new List<int>();
-        var rows = binary.Rows;
+        var rows = dilated.Rows;
         for (var y = 0; y < rows; y++)
         {
-            using var strip = binary.SubMat(y, y + 1, xLeft, xRight);
+            using var strip = dilated.SubMat(y, y + 1, xLeft, xRight);
             if (Cv2.CountNonZero(strip) >= threshold) candidates.Add(y);
         }
         var lines = new List<int>();
