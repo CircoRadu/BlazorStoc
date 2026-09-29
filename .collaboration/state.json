@@ -7,8 +7,8 @@
     "nextAgent":  "claude",
     "currentTask":  "Fereastra separata, mobila, cu fisierul PDF la preluarea inventarului (comparare cu formularul fizic)",
     "startedAtUtc":  "2026-09-29T05:44:38.0000000Z",
-    "completedAtUtc":  "2026-09-29T05:44:38.0000000Z",
-    "lastSummary":  "Commit de recuperare pentru modificarile necomise dintr-un ciclu anterior (acelasi agent, Claude, singurul agent activ): subtask 2.1-2.4 (backup automat la preluarea inventarului) si 3.1-3.2 (pagina de restaurare - meniu, listare, stergere pachete tip preluare inventar), deja descrise ca implementate in documentatie din ciclul anterior. Niciun continut nou nu a fost adaugat in acest pas, doar commitul lipsa si inregistrarea in jurnal.",
-    "lastCommitSubject":  "claude: Task 2 (subtask 2.1-2.4) - backup automat la preluare inventar, pagina restaurare (3.1-3.2)",
+    "completedAtUtc":  "2026-09-29T09:10:00.0000000Z",
+    "lastSummary":  "Implementata, la cererea utilizatorului in chat, o fereastra noua de browser (nu un modal in pagina) care afiseaza fisierul PDF incarcat in pagina Preluare inventar, ca utilizatorul sa compare vizual valorile citite de sistem cu formularul fizic. Modul nou wwwroot/inventory-pickup-pdf-viewer.js (Blob + DotNetStreamReference + window.open, acelasi tipar ca inventory-download.js existent), buton Redeschide formularul PDF, mesaj dedicat cand fereastra e blocata de politica pop-up a browserului. Build Release 0 avertismente/erori; tests/BlazorStoc.Checks 609/609 PASS. Incarcare reala confirmata de utilizator in Brave (dupa permiterea pop-up-urilor pentru site). Protocolul de dezvoltare a fost schimbat de utilizator in aceeasi sesiune (29.09.2026): Claude nu mai face commit automat la finalul fiecarui task, doar la cerere explicita (CLAUDE.md actualizat); acest commit a fost cerut explicit de utilizator pentru acest task specific, inainte de schimbarea protocolului.",
+    "lastCommitSubject":  "claude: fereastra separata pentru fisierul PDF la preluarea inventarului",
     "claudeStatus":  "active"
 }

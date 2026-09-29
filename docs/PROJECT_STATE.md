@@ -1,8 +1,28 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **29 septembrie 2026 (Task 3 - subtaskurile 3.1-3.2, pagina de restaurare: meniu, listare, stergere)**
-Stare ciclu: **Dupa Task 2 (subtaskurile 2.1-2.4, backup la preluarea inventarului - detalii mai jos), implementate acum subtaskurile 3.1 (meniu "Restaurează stoc" admin-only, listarea pachetelor cu tip/dimensiune/operator) si 3.2 (stergerea pachetelor de tip "preluare inventar" prin fluxul dual de confirmare existent, refuzul explicit al stergerii pachetelor de tip "pre-restaurare", jurnalizare). Pagina noua `Components/Pages/DatabaseRestore.razor` (`/inventar/restaurare`). Serviciul `IDatabaseBackupService` a primit `ListPackagesAsync`/`DeletePackageAsync` (`Services/DatabaseBackup.cs`, `BackupPackageStore`). `Components/Shared/DeleteConfirmationDialog.razor` a primit un parametru nou `ConfirmationNote` (textul implicit presupunea arhivare; o stergere definitiva de fisier are nevoie de alt text, corect). Verificat integral prin executie reala, inclusiv in browser (listare, selectie radio, dialog in doi pasi, stergere efectiva de pe disc, eveniment corect in Jurnal). Raman deschise 3.3 (declansarea restaurarii cu confirmarea `confirma`) si 3.4 (cei 5 pasi efectivi de restaurare, comutare atomica de scheme) - operatii distructive asupra bazei vii, neinceput. Mod claude_only, fara predare catre Codex.**
+Data: **29 septembrie 2026 (Fereastra separata cu PDF-ul la preluarea inventarului)**
+Stare ciclu: **Dupa Task 2 (2.1-2.4) si Task 3 (3.1-3.2, detalii mai jos), implementata acum, la cererea directa a utilizatorului in chat (nu era in TODO.md), o fereastra noua de browser care afiseaza fisierul PDF incarcat in pagina "Preluare inventar", pentru comparare cu formularul fizic - detalii in sectiunea de mai jos. Protocolul de dezvoltare s-a schimbat pe 29.09.2026: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`, actualizarea din aceeasi data). Mod claude_only, fara predare catre Codex.**
+
+## Fereastra separata cu PDF-ul la preluarea inventarului - 29.09.2026
+
+La cererea utilizatorului: cand un fisier PDF este incarcat in pagina "Preluare inventar" (`/inventar/preluare`), se deschide o fereastra noua, separata de pagina (nu un modal in pagina), cu fisierul incarcat, ca utilizatorul sa compare valorile citite de sistem cu formularul fizic scanat.
+
+### Fisiere noi/modificate
+
+- `wwwroot/inventory-pickup-pdf-viewer.js` (nou): `openPdfViewer(streamRef, fileName)` creeaza un `Blob` dintr-un `DotNetStreamReference`, deschide/reutilizeaza o fereastra numita (`window.open`, `popup=yes`, dimensionata/pozitionata din ecranul disponibil) si revoca URL-ul `blob:` anterior/la inchidere; `closePdfViewer()` pentru curatare explicita.
+- `Components/Pages/InventoryPickup.razor`: `ProcessFileAsync` bufereaza fisierul incarcat intr-un `byte[]` (folosit atat pentru fereastra PDF cat si pentru OCR), deschide fereastra imediat dupa citire (inainte de rezultatul OCR); buton nou "Redeschide formularul PDF" (vizibil dupa prima incarcare reusita); mesaj de eroare dedicat daca fereastra e blocata de politica pop-up a browserului; modulul JS eliberat la `DisposeAsync`.
+
+### Verificari
+
+- Build Release: 0 avertismente, 0 erori.
+- `tests/BlazorStoc.Checks`: 609/609 `PASS` (fara regresii fata de cele 578 dinainte de Task 2/3).
+- Modulul JS verificat direct in consola browserului real (import dinamic, apel cu un flux simulat) - se executa fara erori.
+- Incarcare reala prin `InputFile`, testata de utilizator in Brave pe previzualizarea `http://127.0.0.1:5082/inventar/preluare`: fereastra s-a deschis dupa ce utilizatorul a permis ferestrele pop-up pentru site (comportament de browser asteptat, documentat si in pagina).
+
+### Neverificat/ramane deschis
+
+Reutilizarea aceleiasi ferestre la o a doua incarcare consecutiva si comportamentul de redimensionare/repozitionare nu au fost confirmate explicit de utilizator (doar deschiderea initiala). Detalii in `docs/TESTE_RAMASE.md`.
 
 ## Task 3, subtaskurile 3.1-3.2 - pagina de restaurare (meniu, listare, stergere) - 29.09.2026
 

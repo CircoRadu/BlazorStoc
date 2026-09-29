@@ -3,6 +3,8 @@
 Acest proiect folosește colaborare strict secvențială între Claude și Codex. Claude nu lucrează niciodată simultan cu Codex.
 
 > **Actualizare 25 septembrie 2026 (prevaleaza asupra restului acestui fisier):** Claude este agentul principal si singurul agent activ al proiectului; predarea catre Codex a fost eliminata. `.collaboration/state.json` are `mode: claude_only`, deci `nextAgent` ramane `claude`, iar `agent-cycle.ps1 finish` nu mai preda catre alt agent (nu mai sunt necesare commituri de schimbare a ordinii). Un task ramane un ciclu (`start` ... `finish`) care se incheie cu un commit. Referirile de mai jos la Codex, la predare si la `nextAgent: codex` sunt istorice.
+>
+> **Actualizare 29 septembrie 2026 (prevaleaza asupra sectiunii "Inainte de predare" de mai jos):** Claude nu mai face commit automat la finalul fiecarui task/ciclu. Dupa implementare, verificari si actualizarea documentatiei (`docs/PROJECT_STATE.md`, `TODO.md`/`IMPLEMENTED.md`, `docs/TESTE_RAMASE.md`, `VALIDARE.md`), Claude se opreste cu modificarile necomise si asteapta o cerere explicita a utilizatorului inainte de a rula `agent-cycle.ps1 finish` sau orice alt `git commit`. Lucrul continua normal intre task-uri fara commit intre ele (working tree-ul poate ramane cu modificari necomise de la un task la altul); verificarea "working tree curat" de la pasul 3 din "Inainte de orice modificare" se relaxeaza in mod corespunzator (modificari proprii, necomise, ale sesiunii curente/anterioare de Claude nu blocheaza inceperea unui task nou, insa nu se sterg si nu se suprascriu fara sa fie intelese intai). Commitul, cand e cerut, poate acoperi mai multe task-uri deodata.
 
 ## Înainte de orice modificare
 

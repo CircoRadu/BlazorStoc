@@ -9,6 +9,7 @@
 @inject IInventoryPickupApplier PickupApplier
 @inject IDatabaseBackupService BackupService
 @inject IAccessControl Access
+@inject IJSRuntime JS
 @inject ILogger<InventoryPickup> Logger
 @implements IAsyncDisposable
 
@@ -17,6 +18,10 @@
     <div><p class="eyebrow">SITUAȚIE DE STOC</p><h1>Preluare inventar</h1>
         <p class="muted">Încarcă formularul de service scanat, cu valorile reale completate de mână, pentru a compara stocul numărat fizic cu stocul curent.</p></div>
     <div class="heading-actions">
+        @if (lastPdfBytes is not null)
+        {
+            <button type="button" class="refresh" @onclick="ReopenPdfViewerAsync">Redeschide formularul PDF</button>
+        }
         <label class="primary file-upload-label" for="pickup-file-input">@(scanning ? "Se proceseaza…" : "Preia inventar")</label>
         <InputFile id="pickup-file-input" class="sr-only" OnChange="FileSelectedAsync" accept=".pdf" disabled="@scanning" />
     </div>
@@ -24,6 +29,7 @@
 
 @if (loadError is not null) { <div class="error-banner" role="alert">@loadError</div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (pdfWindowNotice is not null) { <div class="error-banner" role="alert">@pdfWindowNotice</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 
 @if (loading)
@@ -177,13 +183,16 @@ else if (review is not null)
 
 @code {
     private bool loading = true, scanning, sending;
-    private string? loadError, error, notice, sendError, backupProgress;
+    private string? loadError, error, notice, sendError, backupProgress, pdfWindowNotice;
     private InventoryPickupReview? review;
     private readonly HashSet<int> selectedProductIds = [];
     private readonly Dictionary<int, int?> editedValues = [];
     private bool showSendPopup;
     private ElementReference popupDialog, replaceDialog;
     private IBrowserFile? pendingFile;
+    private byte[]? lastPdfBytes;
+    private string? lastPdfName;
+    private IJSObjectReference? pdfViewerModule;
     private readonly CancellationTokenSource lifetime = new();
 
     private sealed record LineGroup(string Category, string Subcategory, IReadOnlyList<InventoryPickupLine> Lines);
@@ -268,7 +277,7 @@ else if (review is not null)
 
     private async Task ProcessFileAsync(IBrowserFile file)
     {
-        error = null; notice = null; review = null;
+        error = null; notice = null; pdfWindowNotice = null; review = null;
         selectedProductIds.Clear();
         editedValues.Clear();
         if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) { error = InventoryPickupOcrRules.NotAPdfMessage; return; }
@@ -277,8 +286,20 @@ else if (review is not null)
         scanning = true;
         try
         {
-            await using var stream = file.OpenReadStream(InventoryPickupOcrRules.MaxFileSizeBytes, lifetime.Token);
-            var scanResult = await OcrService.ScanAsync(stream, lifetime.Token);
+            byte[] bytes;
+            await using (var browserStream = file.OpenReadStream(InventoryPickupOcrRules.MaxFileSizeBytes, lifetime.Token))
+            using (var buffer = new MemoryStream())
+            {
+                await browserStream.CopyToAsync(buffer, lifetime.Token);
+                bytes = buffer.ToArray();
+            }
+
+            lastPdfBytes = bytes;
+            lastPdfName = file.Name;
+            await OpenPdfViewerAsync(bytes, file.Name);
+
+            using var scanStream = new MemoryStream(bytes, writable: false);
+            var scanResult = await OcrService.ScanAsync(scanStream, lifetime.Token);
             review = await PickupBuilder.BuildAsync(scanResult.Rows, lifetime.Token);
             if (review.Lines.Count == 0 && review.NotFound.Count == 0) notice = "Fișierul a fost citit. Nu au fost gasite diferente de stoc.";
         }
@@ -291,6 +312,29 @@ else if (review is not null)
         }
         finally { scanning = false; }
     }
+
+    private async Task OpenPdfViewerAsync(byte[] bytes, string fileName)
+    {
+        try
+        {
+            pdfViewerModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./inventory-pickup-pdf-viewer.js");
+            using var streamRef = new DotNetStreamReference(new MemoryStream(bytes, writable: false));
+            var opened = await pdfViewerModule.InvokeAsync<bool>("openPdfViewer", lifetime.Token, streamRef, fileName);
+            pdfWindowNotice = opened
+                ? null
+                : "Fereastra cu formularul PDF nu a putut fi deschisă (blocată de browser). Permite ferestrele pop-up pentru acest site și apasă „Redeschide formularul PDF”.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (JSDisconnectedException) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Inventory pickup PDF viewer window failed ({ErrorType}).", exception.GetType().Name);
+            pdfWindowNotice = "Fereastra cu formularul PDF nu a putut fi deschisă.";
+        }
+    }
+
+    private Task ReopenPdfViewerAsync() =>
+        lastPdfBytes is not null && lastPdfName is not null ? OpenPdfViewerAsync(lastPdfBytes, lastPdfName) : Task.CompletedTask;
 
     private void OpenSendPopup()
     {
@@ -340,5 +384,10 @@ else if (review is not null)
         finally { sending = false; backupProgress = null; }
     }
 
-    public ValueTask DisposeAsync() { lifetime.Cancel(); lifetime.Dispose(); return ValueTask.CompletedTask; }
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+        if (pdfViewerModule is not null) { try { await pdfViewerModule.DisposeAsync(); } catch (JSDisconnectedException) { } }
+    }
 }

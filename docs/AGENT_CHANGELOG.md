@@ -1217,3 +1217,22 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Niciuna noua efectuata in acest pas (continut nemodificat fata de ciclul anterior); validarile relevante sunt cele deja consemnate in `TODO.md` (subtask 2.1-2.4, 3.1-3.2) si `docs/TESTE_RAMASE.md` (A18 - modul MariaDB real neverificat in acest mediu).
 - **Commit:** `claude: Task 2 (subtask 2.1-2.4) - backup automat la preluare inventar, pagina restaurare (3.1-3.2)`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-29T05:56:38.0000000Z — claude
+
+- **Task:** Fereastra separata, mobila, cu fisierul PDF la preluarea inventarului (comparare cu formularul fizic) - cerere directa a utilizatorului in chat, nu era in TODO.md
+- **Rezumat:** Cand un fisier PDF este incarcat in pagina "Preluare inventar" (`/inventar/preluare`), se deschide acum o fereastra noua de browser, separata de pagina (nu un modal/overlay in pagina), cu fisierul incarcat, ca utilizatorul sa compare vizual valorile citite de sistem cu formularul fizic scanat. Fereastra este o fereastra reala (`window.open`), deci mutabila/redimensionabila de utilizator, independent de fereastra principala. Implementat in `Components/Pages/InventoryPickup.razor` (`ProcessFileAsync` bufereaza fisierul intr-un `byte[]` folosit atat pentru fereastra cat si pentru OCR, deschide fereastra imediat dupa citire) si un modul nou `wwwroot/inventory-pickup-pdf-viewer.js` (`openPdfViewer`/`closePdfViewer`, Blob + `DotNetStreamReference`, acelasi tipar ca `wwwroot/inventory-download.js` existent; fereastra numita e reutilizata la o noua incarcare, cu revocarea URL-ului `blob:` anterior). Adaugat buton "Redeschide formularul PDF" si un mesaj dedicat cand fereastra e blocata de politica pop-up a browserului. In aceeasi sesiune, utilizatorul a schimbat protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task, doar la cerere explicita (actualizat in `CLAUDE.md`); acest commit a fost cerut explicit de utilizator pentru acest task, separat de acea schimbare de protocol. Inainte de acest task, sesiunea a mai facut un commit de recuperare pentru modificari necomise dintr-un ciclu anterior (Task 2/3.1-3.2, vezi intrarea de mai sus).
+- **Fișiere modificate:**
+  - `Components/Pages/InventoryPickup.razor`
+  - `wwwroot/inventory-pickup-pdf-viewer.js`
+  - `CLAUDE.md`
+  - `.collaboration/state.json`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `IMPLEMENTED.md`
+  - `VALIDARE.md`
+- **Validare:** Build Release: 0 avertismente, 0 erori. `tests/BlazorStoc.Checks`: 609/609 `PASS` (fara regresii). Modulul JS verificat direct in consola browserului real (import dinamic, apel cu un flux simulat) - se executa fara erori. Incarcare reala a unui fisier PDF prin `InputFile`, testata de utilizator in Brave pe previzualizarea `http://127.0.0.1:5082/inventar/preluare`: fereastra s-a deschis corect dupa ce utilizatorul a permis ferestrele pop-up pentru site.
+- **Neverificat:** reutilizarea aceleiasi ferestre la o a doua incarcare consecutiva si comportamentul de redimensionare/repozitionare nu au fost confirmate explicit de utilizator (doar deschiderea initiala) - vezi `docs/TESTE_RAMASE.md`.
+- **Commit:** `claude: fereastra separata pentru fisierul PDF la preluarea inventarului`
+- **Predat catre:** claude

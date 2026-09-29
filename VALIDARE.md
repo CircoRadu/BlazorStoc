@@ -360,3 +360,10 @@ Verificat la 25 septembrie 2026.
 - Antetul coloanei din tabelul de intrări/ieșiri este „BENEFICIAR/PROIECT”; conținutul și linkurile coloanei sunt neschimbate.
 - BlazorStoc.Checks 413 trecute; browser (instanță de probă pe http://127.0.0.1:5083, modul demonstrativ, /produse/1): antetele „DATA, INTRARE/IEȘIRE, NUMĂR BUCĂȚI, DESCRIERE, BENEFICIAR/PROIECT, Acțiuni” pe un singur rând; la 768 px fără depășire orizontală, la 375 px pagina rămâne pe 375 px, iar tabelul defilează în propriul container.
 - Neverificat: preview-ul de pe 5082 până la repornirea lui.
+
+## Fereastra separata cu PDF-ul la preluarea inventarului (29.09.2026)
+
+- La incarcarea unui fisier PDF in pagina "Preluare inventar" (`/inventar/preluare`), se deschide o fereastra noua de browser, separata de pagina, cu fisierul incarcat, ca utilizatorul sa poata compara datele citite de sistem cu formularul fizic. Fereastra este o fereastra reala (nu un modal in pagina), deci se poate muta si redimensiona liber; o a doua incarcare reutilizeaza aceeasi fereastra. Buton "Redeschide formularul PDF" pentru cazul in care fereastra e inchisa din greseala.
+- `tests/BlazorStoc.Checks` 609 trecute (fara regresii); build Release fara avertismente/erori.
+- Browser (previzualizare reala, `http://127.0.0.1:5082/inventar/preluare`): utilizatorul a incarcat un fisier real prin dialogul nativ al sistemului de operare, in Brave; fereastra s-a deschis dupa ce a permis explicit ferestrele pop-up pentru site (comportament asteptat al browserului, semnalat in pagina cand e blocat).
+- Neverificat: redimensionarea/repozitionarea efectiva a ferestrei si reutilizarea ei la a doua incarcare (vezi `docs/TESTE_RAMASE.md`).

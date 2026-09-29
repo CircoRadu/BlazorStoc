@@ -1065,3 +1065,23 @@ Dupa rotirea parolei de root a instantei locale MariaDB (efectuata la cererea ut
 **Verificari efectuate:** copiere confirmata byte-cu-byte; conectare reala confirmata cu `MySqlConnector` (aceeasi biblioteca folosita de aplicatie pentru conturile `blazorstoc_dev`/`blazorstoc_migrator`). Detalii in `docs/TESTE_RAMASE.md` (A17, mutat la "Teste efectuate").
 
 **Neverificat/ramane deschis:** nimic; ambele verificari din Task 0 original sunt finalizate.
+
+## Finalizat la 29.09.2026 08:52 — Fereastra separata pentru compararea formularului PDF la preluarea inventarului
+
+**Data si ora implementarii:** 29.09.2026 08:52 (ora locala).
+
+La cererea utilizatorului: cand un fisier PDF este incarcat in pagina de preluare inventar (`/inventar/preluare`), se deschide o fereastra noua, separata de pagina de preluare stocuri (nu un modal/overlay in pagina), care afiseaza fisierul PDF incarcat, astfel incat utilizatorul sa poata compara vizual valorile citite de sistem cu formularul fizic scanat. Fereastra este o fereastra reala de browser (`window.open`), nu un element in pagina, deci utilizatorul o poate muta si redimensiona liber, independent de fereastra principala.
+
+- [x] Implementat in `Components/Pages/InventoryPickup.razor` (`ProcessFileAsync`): fisierul incarcat (`IBrowserFile`) este citit intr-un buffer de octeti; imediat dupa citire (inainte de trimiterea catre OCR) se apeleaza noul modul JS pentru deschiderea ferestrei, astfel incat fereastra sa apara rapid, indiferent de rezultatul citirii OCR ulterioare.
+- [x] Modulul nou `wwwroot/inventory-pickup-pdf-viewer.js` (`openPdfViewer`) creeaza un `Blob` din octetii primiti printr-un `DotNetStreamReference` si deschide fereastra cu `window.open`, cu un nume fix (`blazorStocPickupPdfViewer`) astfel incat o noua incarcare reutilizeaza aceeasi fereastra (revocand URL-ul `blob:` anterior) in loc sa deschida ferestre multiple; dimensiune si pozitie calculate din ecranul disponibil (aproximativ jumatate din latime, aproape toata inaltimea, aliniata in dreapta ecranului), fara bare de instrumente/adresa (`popup=yes`).
+- [x] Adaugat un buton "Redeschide formularul PDF" (vizibil dupa prima incarcare reusita, langa butonul "Preia inventar") pentru cazul in care utilizatorul inchide fereastra din greseala sau vrea sa o repozitioneze fara sa reincarce fisierul.
+- [x] Daca fereastra nu poate fi deschisa (blocata de setarile pop-up ale browserului), utilizatorul primeste un mesaj explicit in pagina, cu indicatia sa permita ferestrele pop-up pentru acest site si sa foloseasca butonul de redeschidere; fluxul de OCR/preluare continua neschimbat, indiferent de rezultatul deschiderii ferestrei.
+- [x] Modulul JS este eliberat (`DisposeAsync`) la parasirea paginii; fereastra si URL-ul temporar (`blob:`) sunt eliberate automat cand fereastra se inchide (`beforeunload`) sau cand o noua preluare o inlocuieste.
+
+**Fisiere principale:** `Components/Pages/InventoryPickup.razor`, `wwwroot/inventory-pickup-pdf-viewer.js` (nou).
+
+**Decizii:** fereastra este o fereastra reala de browser, nu un overlay/modal in pagina, ca sa fie efectiv mutabila si independenta de pagina de preluare, asa cum a cerut utilizatorul; deschiderea foloseste acelasi tipar (Blob + `DotNetStreamReference`) deja folosit in proiect pentru descarcarea PDF-ului de inventar (`wwwroot/inventory-download.js`), pentru consistenta cu restul codului.
+
+**Verificari efectuate:** build Release fara avertismente/erori; `tests/BlazorStoc.Checks`, 609 verificari, toate `PASS` (fara regresii fata de cele 578 anterioare); modulul JS verificat direct in consola browserului real (import dinamic, apel `openPdfViewer` cu un flux simulat) - se executa fara erori. Incarcarea reala a unui fisier PDF prin `InputFile`, testata de utilizator in Brave pe previzualizarea de la `http://127.0.0.1:5082/inventar/preluare`: fereastra s-a deschis corect dupa ce utilizatorul a permis explicit ferestrele pop-up pentru site (comportament asteptat al browserului, semnalat si in pagina prin mesajul de eroare cand fereastra e blocata).
+
+**Neverificat/ramane deschis:** comportamentul exact de redimensionare/repozitionare si de reutilizare a ferestrei la o a doua incarcare consecutiva nu a fost confirmat explicit de utilizator (doar deschiderea initiala). Detalii in `docs/TESTE_RAMASE.md`.
