@@ -4,6 +4,18 @@ Actualizat de: **Claude**
 Data: **29 septembrie 2026 (Task 3, subtaskurile 3.3 si 3.4 - declansarea si pasii de restaurare a bazei de date)**
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
 
+## Puncte de lucru pentru beneficiari - 29.09.2026
+
+- Implementat (vezi `IMPLEMENTED.md`): punct principal derivat din beneficiar, puncte suplimentare in `beneficiary_work_points` (SQLite + migrarea MariaDB 2), duplicate dupa adresa normalizata, editare fara motiv, stergere intr-un singur pas. Suita: 685 PASS.
+- Neverificat: interfata in browser (autentificare) si MariaDB reala. Preview cu implementarea: port 5084 (5082 si 5083 sunt instante vechi care blocheaza `bin`; verificarile s-au rulat dintr-o copie de build din scratchpad).
+
+## Combobox beneficiar/proiect la iesire cu adaugare fara pierderea formularului - 29.09.2026
+
+- Implementat complet (vezi `IMPLEMENTED.md`): `SearchableSelect` (combobox ARIA), `ExitFormDraft` (serviciu scoped care pastreaza formularul de iesire pe durata unei vizite la adaugarea de beneficiar/proiect), parametrii `adauga` / `adauga-proiect` / `inapoi` pe paginile de beneficiari, `?restaurare=1` pe pagina de miscari. TODO renumerotat: fostele Task 2-4 sunt acum Task 1-3.
+- Corectat si `MariaStockMovementRepository.GetPageAsync` (DataReader deschis la a doua comanda pe aceeasi conexiune).
+- Verificat: 13 verificari noi + suita fara FAIL; browser pe MariaDB reala (beneficiar PF nou, proiect nou, anulare, formular nerestaurabil, produs inexistent). Neverificat: cititor de ecran real, fluxul in modul demonstrativ in browser.
+- Date de test in baza de dezvoltare MariaDB: beneficiarul #7 "Maria Popescu" (PF) si proiectul "Renovare casa Deva".
+
 ## Formularul de beneficiar verificat pe MariaDB reala - 29.09.2026
 
 - Aplicatia pornita in mod MariaDB (`App:DemoMode=false`, port 5083, contul `blazorstoc_dev`, schema deja la zi) si formularul verificat in browser: lista pe datele reale; adaugare PJ cu preluare reala din ANAF (RO9178894) - rand salvat cu `anaf_verified=1`; indicatorul trece live pe "manual" la modificarea unui camp preluat si revine; adaugare PF (nume/adresa/telefon normalizate: "Ion Paun", "0744123456", fara CUI); editarea unui beneficiar existent (dialog de confirmare cu doar campurile modificate, motiv obligatoriu, jurnal cu detaliile). Randurile au fost verificate direct in baza (`beneficiaries`, `audit_events`).

@@ -63,6 +63,11 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
         {
             BeneficiaryRules.CheckCurrent(await GetAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false), original);
             await EnsureUniqueAsync(connection, transaction, value, original.Id, cancellationToken).ConfigureAwait(false);
+            await using (var clash = SqliteLocalStore.Command(connection, transaction, """
+                SELECT name FROM beneficiary_work_points WHERE beneficiary_id=@id AND normalized_address=@key LIMIT 1
+                """, ("@id", original.Id), ("@key", AddressNormalization.Key(value.Address))))
+                if (await clash.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string workPointName)
+                    throw WorkPointRules.BeneficiaryAddressTaken(workPointName);
             var version = checked(original.Version + 1);
             await using var update = SqliteLocalStore.Command(connection, transaction, """
                 UPDATE beneficiaries SET name=@name,normalized_name=@normalizedName,cui=@cui,
@@ -107,6 +112,9 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
                     BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
                 await SqliteArchivePersistence.InsertAsync(connection, transaction, operation, [], token)
                     .ConfigureAwait(false);
+                await using (var workPoints = SqliteLocalStore.Command(connection, transaction,
+                    "DELETE FROM beneficiary_work_points WHERE beneficiary_id=@id", ("@id", original.Id)))
+                    await workPoints.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                 await using var delete = SqliteLocalStore.Command(connection, transaction,
                     "DELETE FROM beneficiaries WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
                 if (await delete.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)

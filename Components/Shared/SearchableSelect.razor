@@ -1,0 +1,115 @@
+@using BlazorStoc.Services
+@* Combobox with autocompletion (WAI-ARIA combobox + listbox): one text field that narrows the options while typing.
+   Up/Down move through the options, Enter chooses, Escape closes; the browser default of those keys is suppressed by
+   wwwroot/searchable-select.js only while the list is open (so Enter does not submit the surrounding form). *@
+<div class="searchable-select @(open ? "open" : "")">
+    <div class="searchable-select-field">
+        <input type="text" role="combobox" data-searchable-select id="@Id" class="searchable-select-input" autocomplete="off"
+               aria-label="@Label" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="@(open ? "true" : "false")"
+               aria-controls="@ListId" aria-activedescendant="@ActiveDescendant" placeholder="@Placeholder" disabled="@Disabled"
+               value="@DisplayText" @oninput="OnInput" @onfocus="OnFocus" @onblur="OnBlur" @onkeydown="OnKeyDown" @onclick="OpenList" />
+        @if (SelectedId is not null && !Disabled)
+        {
+            <button type="button" class="searchable-select-clear" aria-label="Șterge selecția (@Label)" tabindex="-1"
+                    @onmousedown:preventDefault @onclick="ClearAsync">×</button>
+        }
+    </div>
+    @if (open)
+    {
+        var matches = Matches;
+        <ul id="@ListId" role="listbox" aria-label="@Label" class="searchable-select-list">
+            @if (matches.Count == 0)
+            {
+                <li class="searchable-select-empty" role="presentation">@EmptyText</li>
+            }
+            @for (var index = 0; index < matches.Count; index++)
+            {
+                var option = matches[index];
+                var position = index;
+                <li id="@OptionId(position)" role="option" aria-selected="@(option.Id == SelectedId ? "true" : "false")"
+                    class="@(position == active ? "active" : "")" @onmousedown:preventDefault @onclick="() => SelectAsync(option)">@option.Text</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public IReadOnlyList<SelectOption> Options { get; set; } = Array.Empty<SelectOption>();
+    [Parameter] public int? SelectedId { get; set; }
+    [Parameter] public EventCallback<int?> SelectedIdChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Scrie pentru a căuta…";
+    [Parameter] public string EmptyText { get; set; } = "Niciun rezultat.";
+    [Parameter] public bool Disabled { get; set; }
+
+    private bool open, editing;
+    private string query = "";
+    private int active;
+
+    private string ListId => $"{Id}-list";
+    private string OptionId(int index) => $"{Id}-option-{index}";
+    private string? ActiveDescendant => open && Matches.Count > 0 ? OptionId(Math.Clamp(active, 0, Matches.Count - 1)) : null;
+    private IReadOnlyList<SelectOption> Matches => SearchableSelectRules.Filter(Options, editing ? query : "");
+    private string SelectedText => Options.FirstOrDefault(option => option.Id == SelectedId)?.Text ?? "";
+    private string DisplayText => editing ? query : SelectedText;
+
+    private void OpenList()
+    {
+        if (Disabled || open) return;
+        open = true;
+        var matches = Matches;
+        active = Math.Max(0, matches.ToList().FindIndex(option => option.Id == SelectedId));
+    }
+
+    private void OnFocus() => OpenList();
+
+    private void OnBlur()
+    {
+        open = false; editing = false; query = "";
+    }
+
+    private void OnInput(ChangeEventArgs args)
+    {
+        editing = true;
+        query = args.Value?.ToString() ?? "";
+        open = true;
+        active = 0;
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs args)
+    {
+        var matches = Matches;
+        switch (args.Key)
+        {
+            case "ArrowDown":
+                if (!open) OpenList();
+                else if (matches.Count > 0) active = Math.Min(active + 1, matches.Count - 1);
+                break;
+            case "ArrowUp":
+                if (open && matches.Count > 0) active = Math.Max(active - 1, 0);
+                break;
+            case "Enter":
+                if (open && matches.Count > 0) await SelectAsync(matches[Math.Clamp(active, 0, matches.Count - 1)]);
+                break;
+            case "Escape":
+                open = false; editing = false; query = "";
+                break;
+            case "Tab":
+                open = false; editing = false; query = "";
+                break;
+        }
+    }
+
+    private async Task SelectAsync(SelectOption option)
+    {
+        open = false; editing = false; query = "";
+        if (option.Id != SelectedId) await SelectedIdChanged.InvokeAsync(option.Id);
+    }
+
+    private async Task ClearAsync()
+    {
+        open = false; editing = false; query = "";
+        await SelectedIdChanged.InvokeAsync(null);
+    }
+}

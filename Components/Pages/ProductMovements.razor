@@ -8,6 +8,7 @@
 @inject IBeneficiaryRepository Beneficiaries
 @inject IVehicleRepository VehicleRepository
 @inject IProjectRepository Projects
+@inject ExitFormDraft ExitDraft
 @inject IAccessControl Access
 @inject NavigationManager Navigation
 @inject IChangeFeed ChangeFeed
@@ -30,7 +31,7 @@ else if (error is not null && product is null)
 }
 else if (product is null)
 {
-    <div class="empty-state"><span class="empty-icon">▦</span><h3>Produsul nu mai există</h3><p>Produsul a fost șters sau linkul nu este valid.</p><a class="refresh" href="/produse">Înapoi la catalog</a></div>
+    <div class="empty-state"><span class="empty-icon">▦</span><h3>Produsul nu mai există</h3><p>Produsul a fost șters sau linkul nu este valid.@(restoreMessage is null ? "" : " " + restoreMessage)</p><a class="refresh" href="/produse">Înapoi la catalog</a></div>
 }
 else
 {
@@ -39,6 +40,7 @@ else
     </div>
     @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadPageAsync">Reîncearcă</button></div> }
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (restoreMessage is not null) { <div class="info-banner" role="status">@restoreMessage</div> }
     <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
     @if (holder is not null)
     {
@@ -91,6 +93,7 @@ else
                         {
                             <ExitDestinationPicker @ref="addPicker" Prefix="add" Model="form" Beneficiaries="beneficiaries" Projects="projects"
                                                    Vehicles="vehicles" VehicleStocks="vehicleStocks" Disabled="saving" UseProject="useProject"
+                                                   AllowAdd="true" AddBeneficiaryRequested="AddBeneficiaryAsync" AddProjectRequested="AddProjectAsync"
                                                    DestinationChanged="() => DestinationChangedAsync(false)"
                                                    VehicleChanged="() => { ApplySuggestion(false); return Task.CompletedTask; }"
                                                    BeneficiaryChanged="id => SelectBeneficiaryAsync(form, id, false)"
@@ -293,6 +296,10 @@ else
 
 @code {
     [Parameter] public int Id { get; set; }
+    // Set by the add-beneficiary / add-project pages when they send the user back to a half-filled exit form.
+    [SupplyParameterFromQuery(Name = "restaurare")] public string? RestoreFlag { get; set; }
+    private string? restoreMessage;
+    private bool restoreHandled;
     private static readonly int[] PageSizes = [10, 20, 50, 0];
     private Product? product;
     private StockMovementPage pageData = new([], 0, 0, false);
@@ -420,10 +427,82 @@ else
             product = await productTask; canManage = await accessTask;
             isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
             if (product is not null) { await LoadPageAsync(); await RefreshHolderAsync(); }
+            await RestoreExitFormAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Logger.LogError("Movement page loading failed ({ErrorType}).", ex.GetType().Name); error = "Pagina nu a putut fi încărcată. Verifică serverul și conexiunea la baza de date."; }
         finally { loading = false; }
+    }
+
+    // Coming back from "Adaugă beneficiar" / "Adaugă proiect" (?restaurare=1): puts the stored exit form back and selects
+    // the beneficiary / project the user just created. Any other visit forgets a stored form.
+    private async Task RestoreExitFormAsync()
+    {
+        if (restoreHandled) return;
+        if (RestoreFlag != "1") { ExitDraft.Clear(); return; }
+        restoreHandled = true;
+        var snapshot = ExitDraft.Take(Id);
+        if (product is null)
+        {
+            restoreMessage = "Formularul de ieșire nu a mai putut fi restaurat.";
+            return;
+        }
+        if (snapshot is null || !canManage)
+        {
+            restoreMessage = "Formularul de ieșire nu a mai putut fi restaurat (sesiunea a fost reîncărcată sau au trecut mai mult de 30 de minute). Introdu din nou datele mișcării.";
+            NavigateWithoutRestoreFlag();
+            return;
+        }
+        form = snapshot.Form; useProject = snapshot.UseProject; addSuggestion = snapshot.Suggestion;
+        await EnsureBeneficiariesAsync(); await EnsureVehiclesAsync();
+        if (snapshot.NewBeneficiaryId is { } newBeneficiary)
+        {
+            // The list may have been cached before the beneficiary was created.
+            beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+            await SelectBeneficiaryAsync(form, newBeneficiary, false);
+            useProject = false;
+            restoreMessage = "Formularul de ieșire a fost restaurat; beneficiarul nou este selectat.";
+        }
+        else if (form.BeneficiaryId is { } chosen)
+        {
+            if (beneficiaries.All(b => b.Id != chosen)) form.BeneficiaryId = form.ProjectId = null;
+            else
+            {
+                var keepProject = form.ProjectId;
+                await SelectBeneficiaryAsync(form, chosen, false);
+                if (snapshot.NewProjectId is { } newProject && projects.Any(p => p.Id == newProject)) { form.ProjectId = newProject; useProject = true; }
+                else if (keepProject is { } previous && projects.Any(p => p.Id == previous)) form.ProjectId = previous;
+            }
+            restoreMessage = snapshot.NewProjectId is not null
+                ? "Formularul de ieșire a fost restaurat; proiectul nou este selectat."
+                : "Formularul de ieșire a fost restaurat.";
+        }
+        else restoreMessage = "Formularul de ieșire a fost restaurat.";
+        addTracker?.Rebase();
+        NavigateWithoutRestoreFlag();
+    }
+
+    // Drops ?restaurare=1 from the address (replace, so a refresh or Back does not restore again).
+    private void NavigateWithoutRestoreFlag() => Navigation.NavigateTo($"/produse/{Id}/miscari", replace: true);
+
+    private string ReturnPath => $"/produse/{Id}/miscari?restaurare=1";
+
+    // Both buttons keep the typed form, then open the add form of the beneficiary / project with a way back.
+    private Task AddBeneficiaryAsync()
+    {
+        ExitDraft.Store(Id, form, useProject, addSuggestion);
+        addTracker?.Rebase();
+        Navigation.NavigateTo($"/beneficiari?adauga=1&{ReturnNavigation.QueryName}={Uri.EscapeDataString(ReturnPath)}");
+        return Task.CompletedTask;
+    }
+
+    private Task AddProjectAsync()
+    {
+        if (form.BeneficiaryId is not { } beneficiaryId) return Task.CompletedTask;
+        ExitDraft.Store(Id, form, useProject, addSuggestion);
+        addTracker?.Rebase();
+        Navigation.NavigateTo($"/beneficiari/{beneficiaryId}?adauga-proiect=1&{ReturnNavigation.QueryName}={Uri.EscapeDataString(ReturnPath)}");
+        return Task.CompletedTask;
     }
 
     private async Task LoadPageAsync()

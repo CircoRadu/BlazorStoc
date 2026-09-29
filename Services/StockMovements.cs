@@ -48,6 +48,8 @@ public sealed class StockMovementInput
     public int? SourceVehicleId { get; set; }
     public string Reason { get; set; } = "";
 
+    public StockMovementInput Clone() => (StockMovementInput)MemberwiseClone();
+
     // An exit recorded before destinations existed and holding a beneficiary is shown as an exit to a beneficiary;
     // one without any relation has no destination, so editing it requires choosing one.
     public static StockMovementInput From(StockMovement movement) => new()

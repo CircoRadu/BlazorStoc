@@ -91,9 +91,63 @@ Check(MariaSchemaMigrations.All.Count > 0 && MariaSchemaMigrations.All.Select(m 
           !sql.Contains("DROP", StringComparison.OrdinalIgnoreCase)) &&
           m.ExpectedColumns.All(c => m.Statements.Any(sql => sql.Contains($"`{c.Column}`") && sql.Contains($"`{c.Table}`")))),
     "MariaDB migrations are idempotent (ADD COLUMN IF NOT EXISTS), never drop, and every expected column is created by its migration");
-Check(MariaSchemaMigrations.All.SelectMany(m => m.ExpectedColumns).Select(c => c.Column).Order().SequenceEqual(
+Check(MariaSchemaMigrations.All.Single(m => m.Version == 1).ExpectedColumns.Select(c => c.Column).Order().SequenceEqual(
         new[] { "kind", "address", "phone", "registry_number", "postal_code", "caen_code", "anaf_verified" }.Order()),
     "MariaDB migration 1 covers exactly the beneficiary columns used by MariaBeneficiaryRepository");
+Check(MariaSchemaMigrations.All.Single(m => m.Version == 2).ExpectedColumns.Select(c => c.Column).Order().SequenceEqual(
+        new[] { "id", "beneficiary_id", "name", "address", "normalized_address", "phone", "contact_person", "version" }.Order()) &&
+      MariaSchemaMigrations.All.Single(m => m.Version == 2).Statements.All(sql => sql.Contains("CREATE TABLE IF NOT EXISTS `beneficiary_work_points`")),
+    "MariaDB migration 2 creates the work points table used by MariaWorkPointRepository");
+
+var comboOptions = new List<SelectOption>
+{
+    new(1, "Construct Demo SRL", "RO10000001 0721000001"), new(2, "Șantier Întâi SRL", "RO10000002"),
+    new(3, "Ion Păun", "0744123456"), new(4, "Atelier Tehnic SRL")
+};
+Check(SearchableSelectRules.Filter(comboOptions, "").Count == 4 && SearchableSelectRules.Filter(comboOptions, null).Count == 4 &&
+      SearchableSelectRules.Filter(comboOptions, "   ").Count == 4,
+    "Combobox: an empty query keeps every option");
+Check(SearchableSelectRules.Filter(comboOptions, "construct").Single().Id == 1 && SearchableSelectRules.Filter(comboOptions, "CONSTRUCT dem").Single().Id == 1,
+    "Combobox: filtering ignores letter case");
+Check(SearchableSelectRules.Filter(comboOptions, "santier intai").Single().Id == 2 && SearchableSelectRules.Filter(comboOptions, "ŞANTIER").Single().Id == 2 &&
+      SearchableSelectRules.Filter(comboOptions, "paun").Single().Id == 3,
+    "Combobox: filtering ignores Romanian diacritics in the query and in the options");
+Check(SearchableSelectRules.Filter(comboOptions, "ro10000002").Single().Id == 2 && SearchableSelectRules.Filter(comboOptions, "0744").Single().Id == 3,
+    "Combobox: the extra search text (CUI, phone) also matches");
+Check(SearchableSelectRules.Filter(comboOptions, "srl").Select(o => o.Id).SequenceEqual([1, 2, 4]) && SearchableSelectRules.Filter(comboOptions, "inexistent").Count == 0,
+    "Combobox: options narrow as more text is typed and an unknown text leaves none");
+
+var draftClock = new DateTime(2026, 9, 29, 12, 0, 0, DateTimeKind.Utc);
+var exitDraft = new ExitFormDraft { UtcNow = () => draftClock };
+var draftForm = new StockMovementInput
+{
+    Kind = StockMovementKind.Exit, Date = new DateOnly(2026, 9, 28), Quantity = 7, Description = "Livrare parțială client",
+    Destination = ExitDestination.Beneficiary, BeneficiaryId = 3, ProjectId = 9, SourceVehicleId = 2
+};
+exitDraft.Store(42, draftForm, true, "sugestie");
+draftForm.Quantity = 999; draftForm.Description = "modificat dupa salvare";
+Check(exitDraft.HasDraftFor(42) && !exitDraft.HasDraftFor(43), "Exit form draft: stored for one product only");
+var restoredAfterCancel = exitDraft.Take(42);
+Check(restoredAfterCancel is not null && restoredAfterCancel.Form.Quantity == 7 && restoredAfterCancel.Form.Description == "Livrare parțială client" && restoredAfterCancel.Form.Date == new DateOnly(2026, 9, 28) &&
+      restoredAfterCancel.Form.Kind == StockMovementKind.Exit && restoredAfterCancel.Form.Destination == ExitDestination.Beneficiary && restoredAfterCancel.Form.BeneficiaryId == 3 &&
+      restoredAfterCancel.Form.ProjectId == 9 && restoredAfterCancel.Form.SourceVehicleId == 2 && restoredAfterCancel.UseProject && restoredAfterCancel.Suggestion == "sugestie" &&
+      restoredAfterCancel.NewBeneficiaryId is null && restoredAfterCancel.NewProjectId is null,
+    "Exit form draft: a cancelled add returns exactly the values typed before (quantity, date, description, destination, source, project)");
+Check(exitDraft.Take(42) is null && !exitDraft.HasDraftFor(42), "Exit form draft: taken only once");
+exitDraft.Store(42, draftForm, false, null);
+exitDraft.SetNewBeneficiary(77);
+var withBeneficiary = exitDraft.Take(42);
+Check(withBeneficiary is { NewBeneficiaryId: 77, NewProjectId: null } && withBeneficiary.Form.Quantity == 999, "Exit form draft: the newly created beneficiary is handed back with the form");
+exitDraft.Store(42, draftForm, true, null);
+exitDraft.SetNewProject(55);
+Check(exitDraft.Take(42) is { NewProjectId: 55, NewBeneficiaryId: null }, "Exit form draft: the newly created project is handed back with the form");
+exitDraft.Store(42, draftForm, true, null);
+Check(exitDraft.Take(43) is null && !exitDraft.HasDraftFor(42), "Exit form draft: another product never receives it");
+exitDraft.Store(42, draftForm, true, null);
+draftClock = draftClock.AddMinutes(31);
+Check(exitDraft.Take(42) is null, "Exit form draft: expires after 30 minutes");
+exitDraft.SetNewBeneficiary(1); exitDraft.SetNewProject(1);
+Check(exitDraft.Take(42) is null, "Exit form draft: nothing is invented when none was stored");
 
 var anafConfig = new AnafConfig();
 Check(AnafRules.Validate(anafConfig) is null, "ANAF default configuration is valid");
@@ -1574,6 +1628,65 @@ catch (StockMovementOperationException) { Check(true, "A date far in the future 
 Check(AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Create, "t", "d", "", "5")) == "/miscari/5" &&
       AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "a", "r", AuditEntities.StockMovement, AuditActions.Delete, "t", "d", "", "5")) is null,
     "Journal links movement events to their product page and not after deletion");
+
+Check(AddressNormalization.Key("Str. Florilor, nr. 5, Bl. A2") == AddressNormalization.Key("strada FLORILOR 5 bloc a2") &&
+      AddressNormalization.Key("Șoseaua Nordului 10") == AddressNormalization.Key("Soseaua  nordului, numarul 10") &&
+      AddressNormalization.Key("Strada Florilor 5") != AddressNormalization.Key("Strada Florilor 6"),
+    "Work point address normalization ignores case, diacritics, punctuation, spacing and common abbreviations");
+var workPointRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-workpoints-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(workPointRoot);
+try
+{
+    var workPointConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["App:LocalDatabasePath"] = Path.Combine(workPointRoot, "workpoints.db"),
+        ["App:ProductImagesPath"] = Path.Combine(workPointRoot, "product-images"),
+        ["App:ArchiveFilesPath"] = Path.Combine(workPointRoot, "archive-files"),
+        ["App:AuditPath"] = Path.Combine(workPointRoot, "legacy-audit.jsonl")
+    }).Build();
+    var workPointStore = new SqliteLocalStore(new TestWebHostEnvironment(workPointRoot), workPointConfiguration, NullLogger<SqliteLocalStore>.Instance);
+    var workPointAccess = new TestAccessControl(true, "operator.puncte");
+    var workPointBeneficiaries = new SqliteBeneficiaryRepository(workPointStore, workPointAccess);
+    var workPoints = new SqliteWorkPointRepository(workPointStore, workPointAccess);
+    var owner = await workPointBeneficiaries.CreateAsync(LegalInput("Beneficiar puncte SRL", "RO70000001"));
+    Check(WorkPointRules.Primary(owner) is { IsPrimary: true, Address: "Strada Test 1, Bucuresti" } && (await workPoints.GetAsync(owner.Id)).Count == 0,
+        "The main work point is derived from the beneficiary address and is not stored as a row");
+    var wpCreated = await workPoints.CreateAsync(owner.Id, new WorkPointInput { Name = "Depozit Nord", Address = "Strada Depozitelor 3, Ilfov", Phone = "0722 111 222", ContactPerson = "Ion Popescu" });
+    Check(wpCreated.Id > 0 && wpCreated.Phone == "0722111222" && (await workPoints.GetAsync(owner.Id)).Single() == wpCreated, "An additional work point is stored with phone and contact person");
+    foreach (var (duplicateName, duplicateAddress, label) in new[]
+             {
+                 ("Alt nume", "str. depozitelor nr. 3 ilfov", "another additional work point"),
+                 ("Sediu", "STRADA TEST 1 BUCURESTI", "the main work point")
+             })
+    {
+        try { await workPoints.CreateAsync(owner.Id, new WorkPointInput { Name = duplicateName, Address = duplicateAddress }); throw new Exception("Duplicate work point persisted"); }
+        catch (WorkPointOperationException exception) { Check(exception.Message.StartsWith("Există deja un punct de lucru"), $"A work point repeating the normalized address of {label} is rejected even with a different name"); }
+    }
+    foreach (var badInput in new[] { new WorkPointInput { Address = "Strada X 1" }, new WorkPointInput { Name = "Fara adresa" }, new WorkPointInput { Name = "Tel", Address = "Strada Y 2", Phone = "12" } })
+    {
+        try { await workPoints.CreateAsync(owner.Id, badInput); throw new Exception("Invalid work point persisted"); }
+        catch (WorkPointOperationException) { }
+    }
+    Check((await workPoints.GetAsync(owner.Id)).Count == 1, "Name and address are required for a work point and a phone number must be valid");
+    var edited = await workPoints.UpdateAsync(wpCreated, new WorkPointInput { Name = "Depozit Nord 2", Address = "Strada Depozitelor 3, Ilfov", ContactPerson = "" });
+    Check(edited.Name == "Depozit Nord 2" && edited.Version == 1 && edited.ContactPerson.Length == 0 && edited.Phone.Length == 0,
+        "An additional work point is edited without any reason");
+    try { await workPoints.UpdateAsync(wpCreated, new WorkPointInput { Name = "Vechi", Address = "Strada Depozitelor 3, Ilfov" }); throw new Exception("Stale work point saved"); }
+    catch (WorkPointOperationException) { Check(true, "A stale work point edit is rejected"); }
+    var clashInput = BeneficiaryEdit(owner);
+    clashInput.Address = "Strada depozitelor 3 Ilfov";
+    try { await workPointBeneficiaries.UpdateAsync(owner, clashInput); throw new Exception("Beneficiary took a work point address"); }
+    catch (BeneficiaryOperationException exception) { Check(exception.Message.StartsWith("Adresa coincide"), "The beneficiary address cannot be changed to that of an additional work point"); }
+    await workPointBeneficiaries.DeleteAsync(owner, "Test");
+    Check((await workPoints.GetAsync(owner.Id)).Count == 0, "Deleting a beneficiary removes its additional work points");
+    var second = await workPointBeneficiaries.CreateAsync(LegalInput("Beneficiar puncte 2 SRL", "RO70000002"));
+    var point = await workPoints.CreateAsync(second.Id, new WorkPointInput { Name = "Punct", Address = "Strada Unu 1" });
+    await workPoints.DeleteAsync(point);
+    Check((await workPoints.GetAsync(second.Id)).Count == 0, "An additional work point is deleted in a single step");
+    try { await workPoints.DeleteAsync(point); throw new Exception("Deleted work point deleted twice"); }
+    catch (WorkPointOperationException) { Check(true, "Deleting an already deleted work point is reported"); }
+}
+finally { try { Directory.Delete(workPointRoot, true); } catch (IOException) { } }
 
 var movementRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-movements-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(movementRoot);

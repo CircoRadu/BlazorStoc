@@ -48,15 +48,16 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         // MySQL/MariaDB LIMIT needs a non-negative bound; long.MaxValue stands in for "no limit" (PageSize <= 0).
         var limit = query.PageSize <= 0 ? long.MaxValue : query.PageSize;
         var offset = query.PageSize <= 0 ? 0 : (long)(Math.Max(1, query.Page) - 1) * query.PageSize;
-        await using var command = Command(connection, null, $"""
+        var items = new List<StockMovement>();
+        // The reader must be closed before the next command: MySqlConnector allows one open reader per connection.
+        await using (var command = Command(connection, null, $"""
             {SelectMovement}
             WHERE m.product_id=@product AND (@kind IS NULL OR m.kind=@kind)
             ORDER BY m.movement_date {direction}, m.id {direction}
             LIMIT @limit OFFSET @offset
-            """, ("@product", productId), ("@kind", kind), ("@limit", limit), ("@offset", offset));
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        var items = new List<StockMovement>();
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) items.Add(ReadMovement(reader));
+            """, ("@product", productId), ("@kind", kind), ("@limit", limit), ("@offset", offset)))
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) items.Add(ReadMovement(reader));
         var inVehicles = (await VehicleQuantitiesAsync(connection, null, productId, cancellationToken).ConfigureAwait(false))
             .Sum(entry => Math.Max(0, entry.Quantity));
         return new StockMovementPage(items, total, stock, anyModified, inVehicles);

@@ -1,0 +1,71 @@
+@using BlazorStoc.Services
+@inject IWorkPointRepository Repository
+@inject ILogger<WorkPointEditor> Logger
+@implements IDisposable
+
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="work-point-editor-title">
+    <div class="catalog-heading"><h2 id="work-point-editor-title">@(Original is null ? "Adaugă punct de lucru" : $"Editează punctul de lucru «{Original.Name}»")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="work-point-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="work-point-name">Nume *<InputTextLive id="work-point-name" @bind-Value="input.Name" maxlength="200" autocomplete="off" /><ValidationMessage For="() => input.Name" /></label>
+                <label for="work-point-address">Adresă *<InputTextLive id="work-point-address" @bind-Value="input.Address" maxlength="300" autocomplete="off" /><small>Două puncte de lucru ale aceluiași beneficiar nu pot avea aceeași adresă, chiar dacă numele diferă.</small><ValidationMessage For="() => input.Address" /></label>
+                <label for="work-point-phone">Număr de telefon<InputTextLive id="work-point-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="off" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
+                <label for="work-point-contact">Persoană de contact<InputTextLive id="work-point-contact" @bind-Value="input.ContactPerson" maxlength="200" autocomplete="off" /><ValidationMessage For="() => input.ContactPerson" /></label>
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează punctul de lucru")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter] public WorkPoint? Original { get; set; }
+    [Parameter] public EventCallback<WorkPoint> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    private UnsavedChangesTracker? tracker;
+    private string CurrentSnapshot() => FormSnapshot.Of(input);
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private WorkPointInput input = new();
+    private bool saving;
+    private string? error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override Task OnInitializedAsync()
+    {
+        input = Original is null ? new() : WorkPointInput.From(Original);
+        return Task.CompletedTask;
+    }
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        WorkPoint? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(BeneficiaryId, input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Work point saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Punctul de lucru nu a putut fi salvat. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

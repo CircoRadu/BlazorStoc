@@ -412,3 +412,9 @@ Verificat la 25 septembrie 2026.
 
 - Adaugate 22 de produse fictive (denumire cu sufixul " test") prin fluxul real al aplicatiei (`SqliteProductRepository.CreateAsync` + miscare de intrare pentru stocul initial), astfel incat toate cele 8 subcategorii din catalogul demonstrativ sa aiba cel putin 4 produse (33 in total, erau 11).
 - Verificat vizual in browser (`/produse`): 33 de produse, 5 categorii, cantitati si descrieri corecte. Baza de date copiata inainte de scriere (`data/manual-backups/blazorstoc-local.pre-seed.db`).
+
+## Combobox beneficiar/proiect la iesire cu adaugare fara pierderea formularului (29.09.2026)
+
+- `tests/BlazorStoc.Checks`: 13 verificari noi (filtrare combobox insensibila la majuscule si diacritice, cautare dupa CUI/telefon, restrangere progresiva; `ExitFormDraft`: valori identice dupa anulare, beneficiar/proiect nou returnat, alt produs, expirare 30 de minute, o singura preluare); suita completa fara FAIL.
+- Browser pe MariaDB reala (`http://127.0.0.1:5083/`): filtrare "ELECTRIC", selectie cu Enter (formularul nu se trimite), "+ Adauga beneficiar" cu persoana fizica noua (cantitate/descriere pastrate, beneficiar selectat), "+ Adauga proiect" cu anulare (formular identic) si cu salvare (proiect selectat), mesaj pentru formular nerestaurabil (`?restaurare=1` fara formular memorat) si pentru produs inexistent.
+- Corectat pe parcurs: `MariaStockMovementRepository.GetPageAsync` (reader deschis) - pagina de miscari nu se incarca pe MariaDB.

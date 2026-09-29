@@ -575,6 +575,17 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             anaf_verified INTEGER NOT NULL DEFAULT 0,
             version INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS beneficiary_work_points (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            beneficiary_id INTEGER NOT NULL REFERENCES beneficiaries(id) ON DELETE RESTRICT,
+            name TEXT NOT NULL,
+            address TEXT NOT NULL,
+            normalized_address TEXT NOT NULL,
+            phone TEXT NOT NULL DEFAULT '',
+            contact_person TEXT NOT NULL DEFAULT '',
+            version INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(beneficiary_id, normalized_address)
+        );
         CREATE TABLE IF NOT EXISTS vehicles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             plate_number TEXT NOT NULL,

@@ -4,6 +4,9 @@
 @using BlazorStoc.Services
 @inject IBeneficiaryRepository Beneficiaries
 @inject IProjectRepository Projects
+@inject IWorkPointRepository WorkPointStore
+@inject ExitFormDraft ExitDraft
+@inject UnsavedChanges Guard
 @inject IAccessControl Access
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -55,6 +58,32 @@ else if (beneficiary is not null)
                        Saved="ProjectSavedAsync" Closed="CloseAddProjectAsync" />
     }
 
+    @if (addingWorkPoint || editingWorkPoint is not null)
+    {
+        <WorkPointEditor @key="workPointEditorKey" BeneficiaryId="Id" Original="editingWorkPoint"
+                         Saved="WorkPointSavedAsync" Closed="CloseWorkPointEditorAsync" />
+    }
+
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Puncte de lucru <span>@(workPoints.Count + 1)</span></h2>
+            @if (canManage) { <button class="refresh" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
+        </div>
+        @if (workPointError is not null) { <div class="error-banner" role="alert">@workPointError</div> }
+        <div class="table-scroll"><table><thead><tr><th>NUME</th><th>ADRESĂ</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th>@if (canManage) { <th></th> }</tr></thead><tbody>
+            <tr><td><strong>@WorkPointRules.PrimaryName</strong> <span class="anaf-source ok">Principal</span></td><td>@beneficiary.Address</td><td>@beneficiary.Phone</td><td></td>@if (canManage) { <td><small class="muted">Se modifică din editarea beneficiarului</small></td> }</tr>
+            @foreach (var workPoint in workPoints)
+            {
+                <tr @key="workPoint.Id"><td><strong>@workPoint.Name</strong></td><td>@workPoint.Address</td><td>@workPoint.Phone</td><td>@workPoint.ContactPerson</td>
+                    @if (canManage)
+                    {
+                        <td><button class="refresh" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="() => OpenEditWorkPoint(workPoint)">Editează</button>
+                            <button class="danger" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="() => DeleteWorkPointAsync(workPoint)">Șterge</button></td>
+                    }
+                </tr>
+            }
+        </tbody></table></div>
+    </section>
+
     <section class="catalog">
         <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
         <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută proiecte" placeholder="Caută după denumire…" @bind="query" @bind:event="oninput" @bind:after="QueryChanged" /></label></div>
@@ -93,10 +122,19 @@ else if (beneficiary is not null)
     [Parameter] public int Id { get; set; }
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.QueryParameter)] public string? QueryText { get; set; }
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
+    // /beneficiari/<id>?adauga-proiect=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
+    [SupplyParameterFromQuery(Name = "adauga-proiect")] public string? AddProjectFlag { get; set; }
+    [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnParameter { get; set; }
+    private string? returnTo;
     private Beneficiary? beneficiary;
     private IReadOnlyList<Project> projects = Array.Empty<Project>();
     private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage;
-    private string? error, notice;
+    private string? error, notice, workPointError;
+    // The additional work points; the main one is derived from the beneficiary itself (WorkPointRules.Primary).
+    private IReadOnlyList<WorkPoint> workPoints = Array.Empty<WorkPoint>();
+    private bool addingWorkPoint, workPointBusy;
+    private WorkPoint? editingWorkPoint;
+    private Guid workPointEditorKey;
     private string query = "";
     private int pageNumber = 1;
     private const int PageSize = 10;
@@ -147,6 +185,11 @@ else if (beneficiary is not null)
         changeSubscription = ChangeFeed.Subscribe(OnChangeAsync);
         ApplyStateFromAddress();
         await LoadAsync();
+        if (AddProjectFlag == "1" && beneficiary is not null)
+        {
+            returnTo = ReturnNavigation.Safe(ReturnParameter);
+            await OpenAddProjectAsync();
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -200,6 +243,9 @@ else if (beneficiary is not null)
             var all = await Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
             beneficiary = all.FirstOrDefault(item => item.Id == Id);
             if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }
+            workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
+            addingWorkPoint = false;
+            editingWorkPoint = null;
             await LoadProjectsAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -235,11 +281,70 @@ else if (beneficiary is not null)
         return Task.CompletedTask;
     }
 
+    private void OpenAddWorkPoint() { addingWorkPoint = true; editingWorkPoint = null; workPointEditorKey = Guid.NewGuid(); notice = workPointError = null; }
+    private void OpenEditWorkPoint(WorkPoint workPoint) { addingWorkPoint = false; editingWorkPoint = workPoint; workPointEditorKey = Guid.NewGuid(); notice = workPointError = null; }
+    private Task CloseWorkPointEditorAsync() { addingWorkPoint = false; editingWorkPoint = null; return Task.CompletedTask; }
+
+    private async Task WorkPointSavedAsync(WorkPoint saved)
+    {
+        notice = editingWorkPoint is null ? "Punctul de lucru a fost adăugat." : "Punctul de lucru a fost actualizat.";
+        addingWorkPoint = false;
+        editingWorkPoint = null;
+        await ReloadWorkPointsAsync();
+    }
+
+    // One step: no confirmation and no reason typed by the user (the audit trail records WorkPointRules.DeleteReason).
+    private async Task DeleteWorkPointAsync(WorkPoint workPoint)
+    {
+        if (workPointBusy) return;
+        workPointBusy = true;
+        notice = workPointError = null;
+        try
+        {
+            await WorkPointStore.DeleteAsync(workPoint, lifetime.Token);
+            notice = $"Punctul de lucru «{workPoint.Name}» a fost șters.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { workPointError = exception.Message; }
+        catch (AccessDeniedException exception) { workPointError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Work point deletion failed ({ErrorType}).", exception.GetType().Name);
+            workPointError = "Punctul de lucru nu a putut fi șters.";
+        }
+        finally { workPointBusy = false; }
+        await ReloadWorkPointsAsync();
+    }
+
+    private async Task ReloadWorkPointsAsync()
+    {
+        try { workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Work point list refresh failed ({ErrorType}).", exception.GetType().Name);
+            workPointError = "Lista punctelor de lucru nu a putut fi actualizată.";
+        }
+    }
+
     private Task OpenAddProjectAsync() { addingProject = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
-    private Task CloseAddProjectAsync() { addingProject = false; return Task.CompletedTask; }
+    private Task CloseAddProjectAsync()
+    {
+        addingProject = false;
+        if (returnTo is { } back && !Guard.IsDiscarding) { returnTo = null; Navigation.NavigateTo(back); }
+        return Task.CompletedTask;
+    }
     private async Task ProjectSavedAsync(Project project)
     {
         addingProject = false;
+        if (returnTo is { } back)
+        {
+            // Opened from a form: hand the new project to it (it selects it) and go back.
+            ExitDraft.SetNewProject(project.Id);
+            returnTo = null;
+            Navigation.NavigateTo(back);
+            return;
+        }
         notice = "Proiectul a fost adăugat.";
         await LoadProjectsAsync();
     }

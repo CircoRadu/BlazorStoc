@@ -30,6 +30,29 @@ public static class MariaSchemaMigrations
         [
             ("beneficiaries", "kind"), ("beneficiaries", "address"), ("beneficiaries", "phone"), ("beneficiaries", "registry_number"),
             ("beneficiaries", "postal_code"), ("beneficiaries", "caen_code"), ("beneficiaries", "anaf_verified")
+        ]),
+        new(2, "Beneficiari: puncte de lucru suplimentare",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `beneficiary_work_points` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `beneficiary_id` BIGINT NOT NULL,
+              `name` VARCHAR(200) NOT NULL,
+              `address` VARCHAR(300) NOT NULL,
+              `normalized_address` VARCHAR(400) NOT NULL,
+              `phone` VARCHAR(20) NOT NULL DEFAULT '',
+              `contact_person` VARCHAR(200) NOT NULL DEFAULT '',
+              `version` BIGINT NOT NULL DEFAULT 0,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `uq_beneficiary_work_points_0` (`beneficiary_id`, `normalized_address`),
+              CONSTRAINT `fk_beneficiary_work_points_0` FOREIGN KEY (`beneficiary_id`) REFERENCES `beneficiaries` (`id`) ON DELETE RESTRICT ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("beneficiary_work_points", "id"), ("beneficiary_work_points", "beneficiary_id"), ("beneficiary_work_points", "name"),
+            ("beneficiary_work_points", "address"), ("beneficiary_work_points", "normalized_address"),
+            ("beneficiary_work_points", "phone"), ("beneficiary_work_points", "contact_person"), ("beneficiary_work_points", "version")
         ])
     ];
 }

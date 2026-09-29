@@ -356,3 +356,9 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 
 - MariaDB: FACUT 29.09.2026 pe noua instanta `C:\Dev\BlazorStoc-MariaDB` (migrarea 1 aplicata, idempotenta confirmata, `MariaIntegrationChecks` 700 PASS). Aplicatia pornita in mod MariaDB verificata in browser la 29.09.2026 (formularul de beneficiar PJ/PF, ANAF, editare).
 - In browser, neverificate: editarea unui beneficiar existent (motiv + confirmare cu campurile noi), indicatorul care trece pe "manual" dupa modificarea unui camp preluat, mesajul pentru firma inactiva fiscal.
+
+## Combobox beneficiar/proiect la iesire (29.09.2026)
+
+- Cititor de ecran real (NVDA/JAWS): structura respecta modelul ARIA combobox + listbox (`role`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `aria-selected`), dar anuntul optiunilor nu a fost ascultat; de verificat manual pe formularul de iesire (Beneficiar si Proiect).
+- Fluxul "+ Adauga beneficiar/proiect" in modul demonstrativ (SQLite, port 5082) si pe ecran tactil: codul este comun cu modul MariaDB verificat, dar nu a fost rulat in browser.
+- Restaurarea dupa reincarcarea paginii (F5) pe pagina de adaugare beneficiar: formularul memorat traieste doar cat circuitul Blazor; de confirmat mesajul afisat la intoarcere in acel caz.

@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject UnsavedChanges Guard
+@inject ExitFormDraft ExitDraft
 @inject IBeneficiaryRepository Repository
 @inject AppMode Mode
 @inject NavigationManager Navigation
@@ -51,6 +52,11 @@
 
 @code {
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
+    // /beneficiari?adauga=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
+    [SupplyParameterFromQuery(Name = "adauga")] public string? AddFlag { get; set; }
+    [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnParameter { get; set; }
+    private string? returnTo;
+    private bool addFlagHandled;
     private IReadOnlyList<Beneficiary> beneficiaries = Array.Empty<Beneficiary>();
     private Beneficiary? editingBeneficiary, deleting;
     private string query = "";
@@ -68,6 +74,13 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (!addFlagHandled && AddFlag == "1" && loaded)
+        {
+            addFlagHandled = true;
+            returnTo = ReturnNavigation.Safe(ReturnParameter);
+            await OpenEditorAsync(null);
+            return;
+        }
         if (EditId is > 0 && loaded && (!editing || editingBeneficiary?.Id != EditId.Value))
         {
             var requested = beneficiaries.FirstOrDefault(beneficiary => beneficiary.Id == EditId.Value);
@@ -106,12 +119,15 @@
     {
         editing = false; editingBeneficiary = null;
         if (EditId is not null) { EditId = null; if (!Guard.IsDiscarding) Navigation.NavigateTo("/beneficiari"); }
+        else if (returnTo is { } back && !Guard.IsDiscarding) { returnTo = null; Navigation.NavigateTo(back); }
         return Task.CompletedTask;
     }
     private async Task BeneficiarySavedAsync(Beneficiary beneficiary)
     {
         var created = editingBeneficiary is null;
         beneficiaries = beneficiaries.Where(existing => existing.Id != beneficiary.Id).Append(beneficiary).OrderBy(existing => existing.Name).ToArray();
+        // Opened from a form: hand the new beneficiary to it (it selects it) before going back.
+        if (created && returnTo is not null) ExitDraft.SetNewBeneficiary(beneficiary.Id);
         await CloseEditorAsync();
         notice = created ? "Beneficiarul a fost adăugat." : "Beneficiarul a fost actualizat.";
     }

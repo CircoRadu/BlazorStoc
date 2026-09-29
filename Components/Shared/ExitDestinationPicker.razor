@@ -19,16 +19,14 @@
     {
         <div class="relation-row">
             <span class="relation-check">Beneficiar</span>
-            <input type="search" class="relation-filter" placeholder="Caută beneficiar…" aria-label="Caută beneficiar"
-                   value="@filter" disabled="@Disabled" @oninput="args => filter = args.Value?.ToString() ?? string.Empty" />
-            <select id="@($"{Prefix}-beneficiary")" aria-label="Beneficiar" disabled="@Disabled"
-                    @onchange="args => SelectBeneficiaryAsync(ParseId(args.Value))">
-                <option value="" selected="@(Model.BeneficiaryId is null)">— alege beneficiarul —</option>
-                @foreach (var beneficiary in Visible)
-                {
-                    <option value="@beneficiary.Id" selected="@(Model.BeneficiaryId == beneficiary.Id)">@beneficiary.Name</option>
-                }
-            </select>
+            <SearchableSelect Id="@($"{Prefix}-beneficiary")" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…"
+                              EmptyText="Niciun beneficiar găsit." Options="BeneficiaryOptions" SelectedId="Model.BeneficiaryId"
+                              SelectedIdChanged="SelectBeneficiaryAsync" Disabled="Disabled" />
+            @if (AllowAdd)
+            {
+                <button type="button" class="refresh add-related" id="@($"{Prefix}-add-beneficiary")" disabled="@Disabled"
+                        @onclick="AddBeneficiaryRequested">+ Adaugă beneficiar</button>
+            }
         </div>
         <div class="relation-row">
             <label class="relation-check" for="@($"{Prefix}-use-project")">
@@ -37,14 +35,14 @@
                        @onchange="args => ProjectToggled.InvokeAsync(args.Value is true)" /> Proiect</label>
             @if (UseProject)
             {
-                <select id="@($"{Prefix}-project")" aria-label="Proiect" disabled="@Disabled"
-                        @onchange="args => ProjectChanged.InvokeAsync(ParseId(args.Value))">
-                    <option value="" selected="@(Model.ProjectId is null)">— alege proiectul —</option>
-                    @foreach (var project in Projects)
-                    {
-                        <option value="@project.Id" selected="@(Model.ProjectId == project.Id)">@project.Name</option>
-                    }
-                </select>
+                <SearchableSelect Id="@($"{Prefix}-project")" Label="Proiect" Placeholder="Caută sau alege proiectul…"
+                                  EmptyText="Niciun proiect găsit." Options="ProjectOptions" SelectedId="Model.ProjectId"
+                                  SelectedIdChanged="ProjectChanged" Disabled="Disabled" />
+                @if (AllowAdd)
+                {
+                    <button type="button" class="refresh add-related" id="@($"{Prefix}-add-project")" disabled="@Disabled"
+                            @onclick="AddProjectRequested">+ Adaugă proiect</button>
+                }
                 @if (Projects.Count == 0) { <small class="form-note">Beneficiarul ales nu are proiecte.</small> }
             }
         </div>
@@ -137,7 +135,10 @@
     [Parameter] public EventCallback<int?> BeneficiaryChanged { get; set; }
     [Parameter] public EventCallback<bool> ProjectToggled { get; set; }
     [Parameter] public EventCallback<int?> ProjectChanged { get; set; }
-    private string filter = "";
+    // "Adaugă beneficiar" / "Adaugă proiect": the page keeps the typed form and opens the add form (only where offered).
+    [Parameter] public bool AllowAdd { get; set; }
+    [Parameter] public EventCallback AddBeneficiaryRequested { get; set; }
+    [Parameter] public EventCallback AddProjectRequested { get; set; }
     private bool sourceIsVehicle;
     private bool initialized;
 
@@ -146,10 +147,10 @@
         if (!initialized) { sourceIsVehicle = Model.SourceVehicleId is not null; initialized = true; }
     }
 
-    private IEnumerable<Beneficiary> Visible => string.IsNullOrWhiteSpace(filter)
-        ? Beneficiaries
-        : Beneficiaries.Where(beneficiary => beneficiary.Id == Model.BeneficiaryId ||
-                                             beneficiary.Name.Contains(filter.Trim(), StringComparison.CurrentCultureIgnoreCase));
+    private IReadOnlyList<SelectOption> BeneficiaryOptions =>
+        Beneficiaries.Select(beneficiary => new SelectOption(beneficiary.Id, beneficiary.Name, $"{beneficiary.Cui} {beneficiary.Phone}")).ToArray();
+
+    private IReadOnlyList<SelectOption> ProjectOptions => Projects.Select(project => new SelectOption(project.Id, project.Name)).ToArray();
 
     private int Available(int vehicleId) =>
         (VehicleStocks.FirstOrDefault(stock => stock.VehicleId == vehicleId)?.Quantity ?? 0) +

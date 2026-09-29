@@ -116,6 +116,9 @@ builder.Services.AddScoped<IStockMovementRepository>(services => demo
         services.GetRequiredService<IArchiveService>())
     : new MariaStockMovementRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
+builder.Services.AddScoped<IWorkPointRepository>(services => demo
+    ? new SqliteWorkPointRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>())
+    : new MariaWorkPointRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
 builder.Services.AddScoped<IBeneficiaryRepository>(services => demo
     ? new SqliteBeneficiaryRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
     : new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
@@ -167,6 +170,7 @@ builder.Services.AddSignalR();
 builder.Services.AddHostedService<SignalRChangeBroadcaster>();
 builder.Services.AddScoped<ChangeOrigin>();
 builder.Services.AddScoped<UnsavedChanges>();
+builder.Services.AddScoped<ExitFormDraft>();
 builder.Services.AddScoped<ListNavigationContext>();
 builder.Services.AddScoped<IProductLockRepository>(services => new ChangeNotifyingProductLockRepository(demo
     ? new SqliteProductLockRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>())
