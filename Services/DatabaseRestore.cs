@@ -30,7 +30,7 @@ public static class RestoreRules
     public const string SuccessMessage = "Restaurarea a fost finalizata cu succes.";
     // Real mode only (Pas 4): the dedicated migrator account/schema-swap prerequisites (docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md,
     // TODO.md Task 3 "Decizii acceptate") are not yet provisioned for cross-schema DDL in this environment.
-    public const string MigratorNotConfiguredMessage = "Restaurarea reala necesita contul MariaDB dedicat (schema temporara/comutare), neconfigurat inca pe acest server.";
+    public const string MigratorNotConfiguredMessage = "Restaurarea reala necesita contul MariaDB dedicat de restaurare (schema temporara/comutare), neconfigurat inca pe acest server.";
 
     public static string StageMessage(RestoreStage stage) => stage switch
     {
@@ -334,10 +334,10 @@ public sealed class MariaDatabaseRestoreService(IConfiguration configuration, IA
 
             // Pas 4 - import intr-o schema temporara si comutare atomica prin RENAME TABLE. Necesita contul dedicat
             // cu drepturi CREATE/DROP SCHEMA si RENAME TABLE peste schema vie, "_bak" si "_old" (TODO.md, Task 3,
-            // "Decizii acceptate"); acel cont nu e configurat in acest mediu (Database:MigratorUser/MigratorPassword
-            // lipsesc din configuratie) - se opreste clar aici in loc sa incerce DDL fara drepturi.
+            // "Decizii acceptate"); acel cont (blazorstoc_restore, Database:RestoreUser/RestorePassword, local-secrets/restore-account.private.json)
+            // nu e configurat - se opreste clar aici in loc sa incerce DDL fara drepturi.
             progress?.Report(new(RestoreStage.Importing, RestoreRules.StageMessage(RestoreStage.Importing)));
-            if (string.IsNullOrWhiteSpace(configuration["Database:MigratorUser"]) || string.IsNullOrWhiteSpace(configuration["Database:MigratorPassword"]))
+            if (!MariaRestoreAccount.IsConfigured(configuration))
                 return RestoreResult.Failed(RestoreRules.MigratorNotConfiguredMessage, preRestoreFileName);
 
             var swapped = await MariaSchemaSwap.ImportAndSwapAsync(configuration, packagePath, tables, cancellationToken).ConfigureAwait(false);
@@ -358,15 +358,84 @@ public sealed class MariaDatabaseRestoreService(IConfiguration configuration, IA
     }
 }
 
-// Pas 4 (MariaDB): unpacks dump.sql, imports it into a fresh "<db>_bak" schema with the mariadb.exe client (the
-// CLI, not mariadb-dump - same distribution, docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md section 3), verifies the
-// import with CanonicalRowHasher against the same table list, then swaps schemas with one RENAME TABLE statement
-// covering every table (live -> "_old", "_bak" -> live), which MariaDB executes as a single atomic operation. Any
-// failure drops the incomplete "_bak" schema and leaves the live schema untouched; "_old" is left in place on
-// success, exactly as TODO.md's Task 3 specifies, for manual cleanup later. Not executed in this environment - see
-// the class-level comment on MariaDatabaseRestoreService.
+// The dedicated restore account (blazorstoc_restore, local-secrets/create-restore-account.sql): ALL on "<db>_bak" and
+// "<db>_old", ALTER/DROP/CREATE/INSERT/TRIGGER on the live schema, nothing global. Deliberately NOT the migrator account.
+// Credentials come from Database:RestoreUser / Database:RestorePassword (private file, never appsettings.json).
+public static class MariaRestoreAccount
+{
+    public static bool IsConfigured(IConfiguration configuration) =>
+        !string.IsNullOrWhiteSpace(configuration["Database:RestoreUser"]) && !string.IsNullOrWhiteSpace(configuration["Database:RestorePassword"]);
+}
+
+// Prepares a mariadb-dump file for import by an account that is not the dump's original definer, and for a swap that
+// cannot move tables carrying triggers between schemas (MariaDB/MySQL refuse RENAME TABLE across schemas for such
+// tables: "Trigger in wrong schema"):
+//  - every DEFINER clause is removed (importing a foreign DEFINER needs the global SET USER privilege, which the
+//    restore account does not have; the triggers then belong to the account that creates them);
+//  - the trigger blocks (mariadb-dump writes each as SET ... / DELIMITER ;; / CREATE TRIGGER ... / DELIMITER ; / SET ...)
+//    go to a separate file, so the tables can be imported and swapped without triggers and the triggers created in the
+//    live schema afterwards.
+public static class RestoreDumpSplitter
+{
+    private static readonly System.Text.RegularExpressions.Regex DumpDefiner =
+        new(@"/\*!\d+\s+DEFINER\s*=\s*`[^`]*`@`[^`]*`\s*\*/\s?", System.Text.RegularExpressions.RegexOptions.Compiled);
+    private static readonly System.Text.RegularExpressions.Regex PlainDefiner =
+        new(@"DEFINER\s*=\s*`[^`]*`@`[^`]*`\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>Removes the versioned-comment DEFINER clause mariadb-dump writes ("/*!50017 DEFINER=`u`@`h`*/").</summary>
+    public static string StripDumpDefiner(string line) => DumpDefiner.Replace(line, string.Empty);
+
+    /// <summary>Removes a plain DEFINER clause, as returned by SHOW CREATE TRIGGER.</summary>
+    public static string StripPlainDefiner(string statement) => PlainDefiner.Replace(statement, string.Empty);
+
+    /// <summary>Writes the dump without trigger blocks to <paramref name="mainPath"/> and the trigger blocks to
+    /// <paramref name="triggersPath"/>; returns the number of triggers found.</summary>
+    public static async Task<int> SplitAsync(string dumpPath, string mainPath, string triggersPath, CancellationToken token)
+    {
+        var encoding = new System.Text.UTF8Encoding(false);
+        var triggerCount = 0;
+        await using var main = new StreamWriter(mainPath, false, encoding);
+        await using var triggers = new StreamWriter(triggersPath, false, encoding);
+        await triggers.WriteLineAsync("SET NAMES utf8mb4;").ConfigureAwait(false);
+        using var reader = new StreamReader(dumpPath, System.Text.Encoding.UTF8);
+        List<string>? block = null;
+        while (await reader.ReadLineAsync(token).ConfigureAwait(false) is { } rawLine)
+        {
+            var line = StripDumpDefiner(rawLine);
+            if (block is null)
+            {
+                if (line.StartsWith("/*!50003 SET @saved_cs_client", StringComparison.Ordinal)) block = [line];
+                else await main.WriteLineAsync(line).ConfigureAwait(false);
+                continue;
+            }
+            block.Add(line);
+            if (!line.StartsWith("/*!50003 SET collation_connection", StringComparison.Ordinal) ||
+                !line.Contains("@saved_col_connection", StringComparison.Ordinal)) continue;
+            var isTrigger = block.Any(item => item.Contains("/*!50003 TRIGGER", StringComparison.Ordinal));
+            var target = isTrigger ? triggers : main;
+            foreach (var item in block) await target.WriteLineAsync(item).ConfigureAwait(false);
+            if (isTrigger) triggerCount++;
+            block = null;
+        }
+        if (block is not null) foreach (var item in block) await main.WriteLineAsync(item).ConfigureAwait(false);
+        return triggerCount;
+    }
+}
+
+// Pas 4 (MariaDB): unpacks dump.sql, imports its tables into a fresh "<db>_bak" schema with the mariadb.exe client
+// (the CLI, not mariadb-dump - same distribution), verifies the import with CanonicalRowHasher against the package's
+// table list, then swaps the schemas with one RENAME TABLE statement covering every table (live -> "_old", "_bak" ->
+// live), which MariaDB executes as a single atomic operation. Because tables with triggers cannot be renamed across
+// schemas, the live triggers are dropped right before the RENAME and the package's triggers are created in the live
+// schema right after it (RestoreDumpSplitter); that short window is the one non-atomic part. The swap set is every
+// base table of the live schema plus every table of the package, so tables added by later migrations do not stay
+// behind pointing at renamed parents (a table absent from an older package is recreated by the schema migration at
+// the next start). Any failure before the RENAME drops the incomplete "_bak" schema and restores the live triggers;
+// "_old" is left in place on success, for manual cleanup later. Not yet exercised against a live MariaDB server.
 internal static class MariaSchemaSwap
 {
+    private sealed record CapturedTrigger(string Name, string SqlMode, string Statement);
+
     public static async Task<bool> ImportAndSwapAsync(IConfiguration configuration, string packagePath,
         IReadOnlyList<string> tables, CancellationToken token)
     {
@@ -381,24 +450,25 @@ internal static class MariaSchemaSwap
             ZipFile.ExtractToDirectory(packagePath, extractDir);
             var dumpPath = Path.Combine(extractDir, "dump.sql");
             if (!File.Exists(dumpPath)) return false;
+            var mainPath = Path.Combine(extractDir, "tables.sql");
+            var triggersPath = Path.Combine(extractDir, "triggers.sql");
+            var triggerCount = await RestoreDumpSplitter.SplitAsync(dumpPath, mainPath, triggersPath, token).ConfigureAwait(false);
 
-            credentialsFile = await WriteMigratorCredentialsFileAsync(configuration, token).ConfigureAwait(false);
+            credentialsFile = await WriteCredentialsFileAsync(configuration, token).ConfigureAwait(false);
 
-            await using (var migrator = CreateMigratorConnection(configuration, database: null))
+            await using (var restore = CreateConnection(configuration, database: null))
             {
-                await migrator.OpenAsync(token).ConfigureAwait(false);
-                await using var drop = new MySqlCommand($"DROP SCHEMA IF EXISTS `{stagingSchema}`", migrator);
-                await drop.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-                await using var create = new MySqlCommand($"CREATE SCHEMA `{stagingSchema}` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin", migrator);
-                await create.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                await restore.OpenAsync(token).ConfigureAwait(false);
+                await ExecuteAsync(restore, $"DROP SCHEMA IF EXISTS `{stagingSchema}`", token).ConfigureAwait(false);
+                await ExecuteAsync(restore, $"CREATE SCHEMA `{stagingSchema}` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin", token).ConfigureAwait(false);
             }
 
-            var imported = await RunMariaClientAsync(configuration, credentialsFile, stagingSchema, dumpPath, token).ConfigureAwait(false);
+            var imported = await RunMariaClientAsync(configuration, credentialsFile, stagingSchema, mainPath, token).ConfigureAwait(false);
             if (!imported) { await DropSchemaAsync(configuration, stagingSchema, token).ConfigureAwait(false); return false; }
 
             // Verify the staging import matches the package's manifest before touching the live schema.
             CanonicalSnapshot stagingSnapshot;
-            await using (var stagingConnection = CreateMigratorConnection(configuration, stagingSchema))
+            await using (var stagingConnection = CreateConnection(configuration, stagingSchema))
             {
                 await stagingConnection.OpenAsync(token).ConfigureAwait(false);
                 stagingSnapshot = await CanonicalRowHasher.ComputeAsync(stagingConnection, tables, token).ConfigureAwait(false);
@@ -409,23 +479,42 @@ internal static class MariaSchemaSwap
                 return false;
             }
 
-            // Single RENAME TABLE across all three schemas - MariaDB performs this as one atomic operation, never
-            // leaving an intermediate state visible to any other connection.
-            await using (var migrator = CreateMigratorConnection(configuration, database: null))
-            {
-                await migrator.OpenAsync(token).ConfigureAwait(false);
-                await using var dropOld = new MySqlCommand($"DROP SCHEMA IF EXISTS `{oldSchema}`", migrator);
-                await dropOld.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-                await using var createOld = new MySqlCommand($"CREATE SCHEMA `{oldSchema}` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin", migrator);
-                await createOld.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await using var connection = CreateConnection(configuration, database: null);
+            await connection.OpenAsync(token).ConfigureAwait(false);
+            var liveTables = await ListTablesAsync(connection, liveSchema, token).ConfigureAwait(false);
+            var stagingTables = await ListTablesAsync(connection, stagingSchema, token).ConfigureAwait(false);
+            var liveTriggers = await CaptureTriggersAsync(connection, liveSchema, token).ConfigureAwait(false);
 
-                var renamePairs = tables.Select(table =>
-                    $"`{liveSchema}`.`{table}` TO `{oldSchema}`.`{table}`, `{stagingSchema}`.`{table}` TO `{liveSchema}`.`{table}`");
-                await using var rename = new MySqlCommand($"RENAME TABLE {string.Join(", ", renamePairs)}", migrator);
-                rename.CommandTimeout = 60;
-                await rename.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            await ExecuteAsync(connection, $"DROP SCHEMA IF EXISTS `{oldSchema}`", token).ConfigureAwait(false);
+            await ExecuteAsync(connection, $"CREATE SCHEMA `{oldSchema}` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin", token).ConfigureAwait(false);
+
+            var swapped = false;
+            try
+            {
+                foreach (var trigger in liveTriggers)
+                    await ExecuteAsync(connection, $"DROP TRIGGER IF EXISTS `{liveSchema}`.`{trigger.Name}`", token).ConfigureAwait(false);
+                // Single RENAME TABLE across the three schemas - MariaDB performs it as one atomic operation.
+                var renamePairs = liveTables.Select(table => $"`{liveSchema}`.`{table}` TO `{oldSchema}`.`{table}`")
+                    .Concat(stagingTables.Select(table => $"`{stagingSchema}`.`{table}` TO `{liveSchema}`.`{table}`"));
+                await ExecuteAsync(connection, $"RENAME TABLE {string.Join(", ", renamePairs)}", token, 60).ConfigureAwait(false);
+                swapped = true;
+                // "_bak" is empty now (all its tables were moved to the live schema): no reason to keep it.
+                await ExecuteAsync(connection, $"DROP SCHEMA IF EXISTS `{stagingSchema}`", token).ConfigureAwait(false);
+                if (triggerCount > 0 &&
+                    !await RunMariaClientAsync(configuration, credentialsFile, liveSchema, triggersPath, token).ConfigureAwait(false))
+                    throw new InvalidOperationException("Triggerele pachetului nu au putut fi create in schema vie dupa comutare.");
+                return true;
             }
-            return true;
+            catch
+            {
+                try
+                {
+                    if (!swapped) await RecreateTriggersAsync(configuration, liveSchema, liveTriggers, token).ConfigureAwait(false);
+                    else if (triggerCount > 0) await RunMariaClientAsync(configuration, credentialsFile, liveSchema, triggersPath, token).ConfigureAwait(false);
+                }
+                catch (Exception) { /* best effort; the original failure below is what gets reported */ }
+                throw;
+            }
         }
         finally
         {
@@ -434,24 +523,73 @@ internal static class MariaSchemaSwap
         }
     }
 
-    private static async Task DropSchemaAsync(IConfiguration configuration, string schema, CancellationToken token)
+    private static async Task ExecuteAsync(MySqlConnection connection, string sql, CancellationToken token, int timeoutSeconds = 30)
     {
-        await using var migrator = CreateMigratorConnection(configuration, database: null);
-        await migrator.OpenAsync(token).ConfigureAwait(false);
-        await using var drop = new MySqlCommand($"DROP SCHEMA IF EXISTS `{schema}`", migrator);
-        await drop.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        await using var command = new MySqlCommand(sql, connection) { CommandTimeout = timeoutSeconds };
+        await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
     }
 
-    // Same shape as DatabaseConnections.Create, but for the dedicated migrator account and (when database is null)
+    private static async Task<List<string>> ListTablesAsync(MySqlConnection connection, string schema, CancellationToken token)
+    {
+        await using var command = new MySqlCommand(
+            "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=@schema AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME", connection);
+        command.Parameters.AddWithValue("@schema", schema);
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        var result = new List<string>();
+        while (await reader.ReadAsync(token).ConfigureAwait(false)) result.Add(reader.GetString(0));
+        return result;
+    }
+
+    // The live triggers as they are now (definer removed), so a failure before the RENAME can put them back.
+    private static async Task<List<CapturedTrigger>> CaptureTriggersAsync(MySqlConnection connection, string schema, CancellationToken token)
+    {
+        var names = new List<string>();
+        await using (var command = new MySqlCommand("SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=@schema", connection))
+        {
+            command.Parameters.AddWithValue("@schema", schema);
+            await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+            while (await reader.ReadAsync(token).ConfigureAwait(false)) names.Add(reader.GetString(0));
+        }
+        var result = new List<CapturedTrigger>();
+        foreach (var name in names)
+        {
+            await using var show = new MySqlCommand($"SHOW CREATE TRIGGER `{schema}`.`{name}`", connection);
+            await using var reader = await show.ExecuteReaderAsync(token).ConfigureAwait(false);
+            if (await reader.ReadAsync(token).ConfigureAwait(false))
+                result.Add(new(name, reader.GetString(1), RestoreDumpSplitter.StripPlainDefiner(reader.GetString(2))));
+        }
+        return result;
+    }
+
+    private static async Task RecreateTriggersAsync(IConfiguration configuration, string schema,
+        IReadOnlyList<CapturedTrigger> triggers, CancellationToken token)
+    {
+        await using var connection = CreateConnection(configuration, schema);
+        await connection.OpenAsync(token).ConfigureAwait(false);
+        foreach (var trigger in triggers)
+        {
+            await using (var mode = new MySqlCommand("SET SESSION sql_mode=@mode", connection)) { mode.Parameters.AddWithValue("@mode", trigger.SqlMode); await mode.ExecuteNonQueryAsync(token).ConfigureAwait(false); }
+            await ExecuteAsync(connection, trigger.Statement, token).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task DropSchemaAsync(IConfiguration configuration, string schema, CancellationToken token)
+    {
+        await using var connection = CreateConnection(configuration, database: null);
+        await connection.OpenAsync(token).ConfigureAwait(false);
+        await ExecuteAsync(connection, $"DROP SCHEMA IF EXISTS `{schema}`", token).ConfigureAwait(false);
+    }
+
+    // Same shape as DatabaseConnections.Create, but for the dedicated restore account and (when database is null)
     // without selecting a fixed schema, since Pas 4 needs to CREATE/DROP schemas at the server level.
-    private static MySqlConnection CreateMigratorConnection(IConfiguration configuration, string? database)
+    private static MySqlConnection CreateConnection(IConfiguration configuration, string? database)
     {
         var builder = new MySqlConnectionStringBuilder
         {
             Server = configuration["Database:Host"] ?? "127.0.0.1",
             Port = configuration.GetValue<uint>("Database:Port", 3307),
-            UserID = configuration["Database:MigratorUser"] ?? string.Empty,
-            Password = configuration["Database:MigratorPassword"],
+            UserID = configuration["Database:RestoreUser"] ?? string.Empty,
+            Password = configuration["Database:RestorePassword"],
             SslMode = Enum.Parse<MySqlSslMode>(configuration["Database:SslMode"] ?? "Required", true),
             CharacterSet = configuration["Database:CharSet"] ?? "utf8mb4",
             ConnectionTimeout = 10,
@@ -464,19 +602,19 @@ internal static class MariaSchemaSwap
         return new MySqlConnection(builder.ConnectionString);
     }
 
-    private static async Task<string> WriteMigratorCredentialsFileAsync(IConfiguration configuration, CancellationToken token)
+    private static async Task<string> WriteCredentialsFileAsync(IConfiguration configuration, CancellationToken token)
     {
         var path = Path.Combine(Path.GetTempPath(), $".blazorstoc-restore-{Guid.NewGuid():N}.cnf");
         var sslMode = configuration["Database:SslMode"] ?? "Required";
         var content = $"[client]\nhost={configuration["Database:Host"] ?? "127.0.0.1"}\n" +
-            $"port={configuration.GetValue("Database:Port", 3307)}\nuser={configuration["Database:MigratorUser"]}\n" +
-            $"password={configuration["Database:MigratorPassword"]}\nssl-mode={sslMode.ToUpperInvariant()}\n";
+            $"port={configuration.GetValue("Database:Port", 3307)}\nuser={configuration["Database:RestoreUser"]}\n" +
+            $"password={configuration["Database:RestorePassword"]}\n{MariaClientSsl.Options(sslMode)}";
         await File.WriteAllTextAsync(path, content, token).ConfigureAwait(false);
         return path;
     }
 
     private static async Task<bool> RunMariaClientAsync(IConfiguration configuration, string credentialsFile,
-        string database, string dumpPath, CancellationToken token)
+        string database, string sqlPath, CancellationToken token)
     {
         var executable = MariaAssetPaths.MariaClientExecutable(configuration);
         if (!File.Exists(executable)) return false;
@@ -489,12 +627,13 @@ internal static class MariaSchemaSwap
             CreateNoWindow = true
         };
         startInfo.ArgumentList.Add($"--defaults-extra-file={credentialsFile}");
+        startInfo.ArgumentList.Add("--default-character-set=utf8mb4");
         startInfo.ArgumentList.Add(database);
 
         using var process = new System.Diagnostics.Process { StartInfo = startInfo };
         process.Start();
-        await using (var dumpStream = new FileStream(dumpPath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            await dumpStream.CopyToAsync(process.StandardInput.BaseStream, token).ConfigureAwait(false);
+        await using (var sqlStream = new FileStream(sqlPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            await sqlStream.CopyToAsync(process.StandardInput.BaseStream, token).ConfigureAwait(false);
         process.StandardInput.Close();
         var errorTask = process.StandardError.ReadToEndAsync(token);
         await Task.WhenAll(errorTask, process.WaitForExitAsync(token)).ConfigureAwait(false);

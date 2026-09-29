@@ -45,6 +45,45 @@ if (migratorPrivateConfigPath is not null && File.Exists(migratorPrivateConfigPa
             ["Database:MigratorPassword"] = migratorSection.TryGetProperty("Password", out var migratorPassword) ? migratorPassword.GetString() : null
         });
 }
+// Backup account (blazorstoc_backup: SELECT, SHOW VIEW, TRIGGER, LOCK TABLES on the BlazorStoc schema, used only by
+// mariadb-dump). Same shape and lookup as the migrator file; mapped to Database:BackupUser / Database:BackupPassword
+// so it never replaces the application account. Optional: without it the dump runs as the application account.
+var backupPrivateConfigPath = builder.Configuration["Database:BackupPrivateConfigPath"] is { Length: > 0 } configuredBackupPath
+    ? configuredBackupPath
+    : new[]
+        {
+            Path.Combine(Path.GetDirectoryName(mariaPrivateConfigPath) ?? "", "backup-account.private.json"),
+            Path.Combine(builder.Environment.ContentRootPath, "local-secrets", "backup-account.private.json")
+        }.FirstOrDefault(File.Exists);
+if (backupPrivateConfigPath is not null && File.Exists(backupPrivateConfigPath))
+{
+    using var backupFile = System.Text.Json.JsonDocument.Parse(File.ReadAllText(backupPrivateConfigPath));
+    if (backupFile.RootElement.TryGetProperty("Database", out var backupSection))
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Database:BackupUser"] = backupSection.TryGetProperty("User", out var backupUser) ? backupUser.GetString() : null,
+            ["Database:BackupPassword"] = backupSection.TryGetProperty("Password", out var backupPassword) ? backupPassword.GetString() : null
+        });
+}
+// Restore account (blazorstoc_restore: schema swap for the database restoration). Same lookup, mapped to
+// Database:RestoreUser / Database:RestorePassword; without it the real restoration stops before changing anything.
+var restorePrivateConfigPath = builder.Configuration["Database:RestorePrivateConfigPath"] is { Length: > 0 } configuredRestorePath
+    ? configuredRestorePath
+    : new[]
+        {
+            Path.Combine(Path.GetDirectoryName(mariaPrivateConfigPath) ?? "", "restore-account.private.json"),
+            Path.Combine(builder.Environment.ContentRootPath, "local-secrets", "restore-account.private.json")
+        }.FirstOrDefault(File.Exists);
+if (restorePrivateConfigPath is not null && File.Exists(restorePrivateConfigPath))
+{
+    using var restoreFile = System.Text.Json.JsonDocument.Parse(File.ReadAllText(restorePrivateConfigPath));
+    if (restoreFile.RootElement.TryGetProperty("Database", out var restoreSection))
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Database:RestoreUser"] = restoreSection.TryGetProperty("User", out var restoreUser) ? restoreUser.GetString() : null,
+            ["Database:RestorePassword"] = restoreSection.TryGetProperty("Password", out var restorePassword) ? restorePassword.GetString() : null
+        });
+}
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
 var demo = builder.Configuration.GetValue("App:DemoMode", true);

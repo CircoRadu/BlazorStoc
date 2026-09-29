@@ -4,6 +4,22 @@ Actualizat de: **Claude**
 Data: **29 septembrie 2026 (Task 3, subtaskurile 3.3 si 3.4 - declansarea si pasii de restaurare a bazei de date)**
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
 
+## Backup real MariaDB: verificat partial - 29.09.2026
+
+- Backupul real (`MariaDatabaseBackupService`) rulat contra instantei `C:\Dev\BlazorStoc-MariaDB` (port 3307). Corectat: `ssl-mode` in fisierul de credentiale al `mariadb-dump`/`mariadb` (optiune necunoscuta) inlocuit cu `ssl=1` (`MariaClientSsl`), si la restaurare.
+- Ramas blocat (decizie de securitate a administratorului): `blazorstoc_dev` nu are privilegiul `TRIGGER`, deci `mariadb-dump --triggers` esueaza; restaurarea reala (Pasul 4) cere in plus contul dedicat cross-schema din "Decizii acceptate" (Task 2). Detalii si pasi in `docs/TESTE_RAMASE.md`, A18/A20.
+- Calea implicita a `mariadb-dump`/`mariadb` (`%LOCALAPPDATA%\BlazorStoc-MariaDB`) nu mai corespunde instantei din `C:\Dev`: setati `Database:MariaDumpExecutablePath` / `Database:MariaClientExecutablePath`.
+
+## Randuri mai inalte in PDF-ul de inventar - 29.09.2026
+
+- `RowHeight` = 34 pt pentru randurile de date (vezi `IMPLEMENTED.md`); suita 690 PASS; OCR-ul pe formulare tiparite cu noua inaltime si completate de mana neverificat.
+
+## Restaurare MariaDB: cont dedicat, DEFINER si triggere - 29.09.2026
+
+- Backup real verificat cu contul dedicat `blazorstoc_backup` (`Database:BackupUser/BackupPassword`, `local-secrets/backup-account.private.json`): pachet cu 27 tabele si 18 triggere, hash `.sha256` corect.
+- Pasul 4 al restaurarii rescris (`Services/DatabaseRestore.cs`, `MariaSchemaSwap`), neexecutat inca pe MariaDB reala: (1) foloseste contul separat `blazorstoc_restore` (`Database:RestoreUser/RestorePassword`, `local-secrets/restore-account.private.json`, script `local-secrets/create-restore-account.sql`), nu contul migrator; (2) `RestoreDumpSplitter` scoate toate clauzele `DEFINER` (altfel importul cere privilegiul global `SET USER`); (3) triggerele pachetului sunt separate de tabele: triggerele vii se sterg chiar inainte de `RENAME TABLE` (tabelele cu triggere nu se pot muta intre scheme), apoi se creeaza cele ale pachetului in schema vie; la esec inainte de RENAME triggerele vii se recreeaza. Setul mutat = toate tabelele vii + cele din pachet (tabelele adaugate de migrari ulterioare nu ramân in urma; un pachet vechi nu contine `beneficiary_work_points`, care se recreeaza la migrarea de la urmatoarea pornire). Fereastra dintre stergerea triggerelor si recrearea lor este singura parte neatomica; triggerele recreate apartin contului de restaurare (definer), nu lui root.
+- Suita: 689 PASS (3 verificari noi pentru splitter/DEFINER/cont).
+
 ## Puncte de lucru pentru beneficiari - 29.09.2026
 
 - Implementat (vezi `IMPLEMENTED.md`): punct principal derivat din beneficiar, puncte suplimentare in `beneficiary_work_points` (SQLite + migrarea MariaDB 2), duplicate dupa adresa normalizata, editare fara motiv, stergere intr-un singur pas. Suita: 685 PASS.

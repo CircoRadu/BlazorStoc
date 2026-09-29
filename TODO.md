@@ -16,7 +16,7 @@ Din 28.09.2026, taskurile finalizate nu mai stau in acest fisier: ele se muta in
 
 ## Ordinea de implementare optimizata
 
-Toate taskurile anterioare sunt finalizate si arhivate in `IMPLEMENTED.md`. Taskul activ (1) se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex).
+Toate taskurile anterioare sunt finalizate si arhivate in `IMPLEMENTED.md`. Taskurile active (1-2) sunt implementate la nivel de cod si asteapta verificari; ele se implementeaza intr-un ciclu condus de Claude (agent principal, fara predare catre Codex).
 
 ## Task 1 - Copie de siguranta a bazei de date la preluarea situatiei de inventar
 
@@ -138,24 +138,6 @@ Depinde de integrarea MariaDB reala (finalizata) si de Task 1 (foloseste pachete
 - **Cont MariaDB dedicat pentru restaurare:** se defineste un cont operational separat de `blazorstoc_dev`, cu drepturi limitate strict la `CREATE`/`DROP SCHEMA` si `RENAME TABLE` pentru schemele implicate in fluxul de restaurare (schema vie, `_bak`, `_old`), fara alte drepturi globale sau de administrare a serverului. Datele lui de conectare se pastreaza dupa acelasi tipar de fisier privat protejat folosit pentru `admin.private.cnf`/`connection.private.json` (vezi documentul de predare MariaDB), niciodata in cod sau in `appsettings.json` necriptat.
 - **Notificarea sesiunilor Blazor active:** se reutilizeaza tiparul deja existent in aplicatie pentru notificarea schimbarilor de baza de date (componenta similara `FrmDatabaseChangedNotification`/mecanismul curent de "database changed"), extins pentru a afisa mesajul de intretinere si a redirectiona sesiunea catre o pagina de asteptare, fara sa introduca un mecanism nou separat.
 - **Retentia pachetelor pre-restaurare care nu pot fi sterse:** ramane fara stergere automata, conform cerintei explicite; masura de atenuare acceptata este vizibilitatea spatiului ocupat in pagina de restaurare (subtask 2.1), nu o curatare automata. O eventuala politica de arhivare externa (mutare pe alt suport) ramane o decizie ulterioara, separata de acest task.
-
-## Task 3 - Mareste inaltimea randurilor din tabelul situatiei de inventar pentru OCR
-
-La cererea utilizatorului: in formularul PDF de inventar generat (`Services/InventoryPdfWriter.cs`, constanta `LineHeight`, folosita si de `Services/InventoryPdfLayout.cs` pentru geometria comuna cu pipeline-ul OCR), inaltimea randurilor/celulelor tabelului este prea mica pentru ca utilizatorii sa scrie lizibil valoarea reala de mana, ceea ce reduce fiabilitatea recunoasterii OCR ulterioare (`Services/InventoryPickupOcr.cs`, folosit de fluxul de preluare inventar).
-
-### Subtask 3.1 - Marirea inaltimii randurilor tabelului
-
-- [ ] Mareste `LineHeight` (sau introdu o inaltime dedicata pentru randurile de date ale tabelului, distincta de titlu/antet daca e nevoie) in `Services/InventoryPdfWriter.cs`, pastrand restul geometriei (coloanele din `InventoryPdfLayout.ComputeColumns`, paginarea, antetul repetat) neschimbate.
-- [ ] Nu modifica logica de layout partajata cu OCR-ul (`InventoryPdfLayout`) decat daca marirea inaltimii o cere explicit; coloanele (Cod produs / Valoare stoc / Valoare reala) raman aceleasi.
-
-### Subtask 3.2 - Actualizarea testelor existente
-
-- [ ] Testele din `tests/BlazorStoc.Checks` care verifica layout-ul/continutul exact al PDF-ului generat (pozitii, numarul de pagini pentru un catalog mare, grila celulelor) trebuie actualizate sa reflecte noua inaltime; verifica ce teste devin nepotrivite dupa modificare si corecteaza-le sa continue sa verifice ceva relevant (nu doar sa treaca).
-
-### Criterii de acceptare
-
-- Randurile tabelului din PDF-ul de inventar au mai mult spatiu vertical pentru scris de mana, fara sa schimbe coloanele sau restul logicii de layout partajate cu OCR.
-- Testele din `tests/BlazorStoc.Checks` trec dupa actualizare, verificand efectiv noua geometrie.
 
 ## Observații pentru etapa de implementare
 

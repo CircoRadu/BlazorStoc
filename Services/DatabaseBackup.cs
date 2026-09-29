@@ -473,13 +473,21 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
     // A "defaults-extra-file" keeps the account password out of the process command line (visible to any other
     // process listing) and out of environment variables; it is written to a private temp path and deleted in the
     // outer finally, regardless of outcome.
+    // mariadb-dump needs the TRIGGER privilege to export the triggers, which the application account deliberately lacks:
+    // the dedicated backup account (Database:BackupUser/BackupPassword, both set) is used when configured.
+    public static (string User, string? Password) DumpAccount(IConfiguration configuration) =>
+        !string.IsNullOrWhiteSpace(configuration["Database:BackupUser"]) && !string.IsNullOrWhiteSpace(configuration["Database:BackupPassword"])
+            ? (configuration["Database:BackupUser"]!, configuration["Database:BackupPassword"])
+            : (configuration["Database:User"] ?? "blazorstoc_dev", configuration["Database:Password"]);
+
     private static async Task<string> WriteCredentialsFileAsync(IConfiguration configuration, CancellationToken token)
     {
         var path = Path.Combine(Path.GetTempPath(), $".blazorstoc-dump-{Guid.NewGuid():N}.cnf");
         var sslMode = configuration["Database:SslMode"] ?? "Required";
+        var (user, password) = DumpAccount(configuration);
         var content = $"[client]\nhost={configuration["Database:Host"] ?? "127.0.0.1"}\n" +
-            $"port={configuration.GetValue("Database:Port", 3307)}\nuser={configuration["Database:User"] ?? "blazorstoc_dev"}\n" +
-            $"password={configuration["Database:Password"]}\nssl-mode={sslMode.ToUpperInvariant()}\n";
+            $"port={configuration.GetValue("Database:Port", 3307)}\nuser={user}\n" +
+            $"password={password}\n{MariaClientSsl.Options(sslMode)}";
         await File.WriteAllTextAsync(path, content, token).ConfigureAwait(false);
         return path;
     }
@@ -515,4 +523,16 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
     }
 
     private static void TryDelete(string path) { try { if (File.Exists(path)) File.Delete(path); } catch (IOException) { } }
+}
+
+// The MariaDB command-line clients (mariadb-dump, mariadb) do not know the MySQL option "ssl-mode"; they use "ssl"
+// (enable TLS) and "ssl-verify-server-cert". Maps the connection's SslMode setting to those options.
+internal static class MariaClientSsl
+{
+    public static string Options(string sslMode) => sslMode.ToUpperInvariant() switch
+    {
+        "NONE" or "DISABLED" => "ssl=0\n",
+        "VERIFYFULL" or "VERIFYCA" => "ssl=1\nssl-verify-server-cert=1\n",
+        _ => "ssl=1\nssl-verify-server-cert=0\n"
+    };
 }

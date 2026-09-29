@@ -99,6 +99,37 @@ Check(MariaSchemaMigrations.All.Single(m => m.Version == 2).ExpectedColumns.Sele
       MariaSchemaMigrations.All.Single(m => m.Version == 2).Statements.All(sql => sql.Contains("CREATE TABLE IF NOT EXISTS `beneficiary_work_points`")),
     "MariaDB migration 2 creates the work points table used by MariaWorkPointRepository");
 
+var dumpApp = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Database:User"] = "app", ["Database:Password"] = "p1" }).Build();
+var dumpBackup = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Database:User"] = "app", ["Database:Password"] = "p1", ["Database:BackupUser"] = "bk", ["Database:BackupPassword"] = "p2" }).Build();
+var dumpHalf = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Database:User"] = "app", ["Database:Password"] = "p1", ["Database:BackupUser"] = "bk" }).Build();
+Check(MariaDatabaseBackupService.DumpAccount(dumpApp) == ("app", "p1") && MariaDatabaseBackupService.DumpAccount(dumpBackup) == ("bk", "p2") &&
+      MariaDatabaseBackupService.DumpAccount(dumpHalf) == ("app", "p1"),
+    "mariadb-dump uses the dedicated backup account only when both its user and password are configured");
+var splitRoot = Path.Combine(Path.GetTempPath(), "blazorstoc-split-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(splitRoot);
+try
+{
+    var dumpText = string.Join(Environment.NewLine,
+        "CREATE TABLE `t` (id int);", "INSERT INTO `t` VALUES (1);", "UNLOCK TABLES;",
+        "/*!50003 SET @saved_cs_client      = @@character_set_client */ ;", "/*!50003 SET character_set_client  = utf8mb4 */ ;",
+        "/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;", "DELIMITER ;;",
+        "/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`127.0.0.1`*/ /*!50003 TRIGGER trg_a AFTER INSERT ON t FOR EACH ROW BEGIN", "INSERT INTO log VALUES (1); END */;;", "DELIMITER ;",
+        "/*!50003 SET collation_connection  = @saved_col_connection */ ;", "CREATE TABLE `u` (id int);", "-- done") + Environment.NewLine;
+    var dumpFile = Path.Combine(splitRoot, "d.sql");
+    await File.WriteAllTextAsync(dumpFile, dumpText);
+    var splitCount = await RestoreDumpSplitter.SplitAsync(dumpFile, Path.Combine(splitRoot, "m.sql"), Path.Combine(splitRoot, "t.sql"), CancellationToken.None);
+    var splitMain = await File.ReadAllTextAsync(Path.Combine(splitRoot, "m.sql"));
+    var splitTriggers = await File.ReadAllTextAsync(Path.Combine(splitRoot, "t.sql"));
+    Check(splitCount == 1 && splitMain.Contains("CREATE TABLE `t`") && splitMain.Contains("CREATE TABLE `u`") && !splitMain.Contains("TRIGGER") &&
+          splitTriggers.Contains("TRIGGER trg_a") && splitTriggers.Contains("DELIMITER ;;") && splitTriggers.Contains("INSERT INTO log VALUES (1); END */;;") &&
+          !splitMain.Contains("DEFINER") && !splitTriggers.Contains("DEFINER"),
+        "The restore dump splitter moves trigger blocks to a separate file and removes every DEFINER clause");
+    Check(RestoreDumpSplitter.StripPlainDefiner("CREATE DEFINER=`root`@`127.0.0.1` TRIGGER x AFTER INSERT ON t FOR EACH ROW SET @a=1") == "CREATE TRIGGER x AFTER INSERT ON t FOR EACH ROW SET @a=1",
+        "A plain DEFINER clause is removed from a trigger definition");
+    Check(!MariaRestoreAccount.IsConfigured(dumpApp) && MariaRestoreAccount.IsConfigured(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Database:RestoreUser"] = "r", ["Database:RestorePassword"] = "p" }).Build()),
+        "The real restoration needs the dedicated restore account (not the application or migrator account)");
+}
+finally { try { Directory.Delete(splitRoot, true); } catch (IOException) { } }
 var comboOptions = new List<SelectOption>
 {
     new(1, "Construct Demo SRL", "RO10000001 0721000001"), new(2, "Șantier Întâi SRL", "RO10000002"),
@@ -3091,6 +3122,12 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
         Check(pdfDocument.PageCount > 1, "A catalogue of 300 products spans more than one page");
         Check(Enumerable.Range(0, pdfDocument.PageCount).Count(index => PdfTextExtractor.ExtractText(pdfDocument.Pages[index]).Contains("Cod produs")) > 1,
             "The table header is repeated on the pages that continue the table");
+        // Data rows are InventoryPdfWriter.RowHeight tall (room for handwriting), so a page holds far fewer rows than at
+        // the old single-line height (16pt: about 45 rows on an A4 page); the rows are still all there.
+        var rowsPerPage = Enumerable.Range(0, pdfDocument.PageCount).Select(index => System.Text.RegularExpressions.Regex.Matches(PdfTextExtractor.ExtractText(pdfDocument.Pages[index]), "Produs [0-9]{3}").Count).ToArray();
+        var pageCapacity = (int)((842 - 2 * 40 - 30) / InventoryPdfWriter.RowHeight);
+        Check(InventoryPdfWriter.RowHeight >= 30 && rowsPerPage.Sum() == 300 && rowsPerPage.Max() <= pageCapacity && pdfDocument.PageCount >= 300 / pageCapacity,
+            "Table rows are tall enough for handwriting: a page holds at most " + pageCapacity + " of them and none is lost across pages");
         Check($"Pagina {pdfDocument.PageCount} din {pdfDocument.PageCount}" is { } lastPageLabel &&
               PdfTextExtractor.ExtractText(pdfDocument.Pages[pdfDocument.PageCount - 1]).Contains(lastPageLabel),
             "Each page has a \"Pagina x din y\" footer");

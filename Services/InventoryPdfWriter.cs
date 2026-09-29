@@ -19,6 +19,9 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
     internal const string FamilyName = "PT Sans";
     private const double PageMargin = 40;
     private const double LineHeight = 16;
+    // Height of a data row of the table: room for a handwritten "Valoare reala" that the scan/OCR can read (the text
+    // lines themselves keep LineHeight, a row taller than its text is centered vertically).
+    public const double RowHeight = 34;
     private const double HeadingLineHeight = 20;
     private const double SectionGap = 10;
     private const double CategoryGap = 12;
@@ -112,26 +115,27 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
         {
             // A category label never ends up alone at the bottom of a page: reserve room for it, the first
             // subcategory label, the table header and at least one row before drawing it.
-            EnsureSpace(HeadingLineHeight + HeadingLineHeight + LineHeight * 2);
+            EnsureSpace(HeadingLineHeight + HeadingLineHeight + LineHeight + RowHeight);
             y += CategoryGap;
             DrawLine(category.Category, HeadingFont, BlackBrush, HeadingLineHeight);
 
             foreach (var subcategory in category.Subcategories)
             {
-                EnsureSpace(HeadingLineHeight + LineHeight * 2);
+                EnsureSpace(HeadingLineHeight + LineHeight + RowHeight);
                 DrawLine(subcategory.Subcategory, HeadingFont, BlackBrush, HeadingLineHeight);
                 DrawTableHeader();
 
                 foreach (var line in subcategory.Lines)
                 {
                     var codeLines = WrapText(gfx, line.Code, NormalFont, codeColumnWidth - 2 * CellPadding);
-                    var rowHeight = Math.Max(LineHeight, codeLines.Count * LineHeight);
+                    var textHeight = codeLines.Count * LineHeight;
+                    var rowHeight = Math.Max(RowHeight, textHeight + 2 * CellPadding);
                     if (EnsureSpace(rowHeight)) DrawTableHeader();
                     var brush = line.IsNegative ? RedBrush : BlackBrush;
                     var top = y;
                     for (var i = 0; i < codeLines.Count; i++)
-                        gfx.DrawString(codeLines[i], NormalFont, brush, new XRect(codeX + CellPadding, top + i * LineHeight, codeColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
-                    gfx.DrawString(line.Quantity.ToString(CultureInfo.InvariantCulture), NormalFont, brush, new XRect(stockX + CellPadding, top, stockColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
+                        gfx.DrawString(codeLines[i], NormalFont, brush, new XRect(codeX + CellPadding, top + (rowHeight - textHeight) / 2 + i * LineHeight, codeColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
+                    gfx.DrawString(line.Quantity.ToString(CultureInfo.InvariantCulture), NormalFont, brush, new XRect(stockX + CellPadding, top + (rowHeight - LineHeight) / 2, stockColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
                     DrawRowGrid(top, rowHeight);
                     y += rowHeight;
                 }
