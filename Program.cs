@@ -99,6 +99,20 @@ builder.Services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
 builder.Services.AddSingleton<IInventoryPickupOcrService, InventoryPickupOcrService>();
 builder.Services.AddScoped<IInventoryPickupBuilder, InventoryPickupBuilder>();
 builder.Services.AddScoped<IInventoryPickupApplier, InventoryPickupApplier>();
+// Subtask 2.1/2.2 (Task 2): one shared lock file per mode (demo/SQLite vs real/MariaDB never share a backup
+// directory), singleton because the lock and its heartbeat must be the same instance across the whole app, not
+// re-created per request.
+builder.Services.AddSingleton<IOperationLockService>(services => new FileOperationLockService(
+    Path.Combine(demo ? Path.GetFullPath(builder.Configuration["App:BackupFilesPath"] ?? Path.Combine("data", "database-backups"))
+        : MariaAssetPaths.DatabaseBackups(services.GetRequiredService<IConfiguration>()), "operation.lock.json"),
+    services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<FileOperationLockService>>()));
+builder.Services.AddScoped<IDatabaseBackupService>(services => demo
+    ? new SqliteDatabaseBackupService(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IConfiguration>(),
+        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IOperationLockService>(),
+        services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<SqliteDatabaseBackupService>>())
+    : new MariaDatabaseBackupService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
+        services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<IAuditTrail>(),
+        services.GetRequiredService<ILogger<MariaDatabaseBackupService>>()));
 builder.Services.AddScoped<IVehicleRepository>(services => demo
     ? new SqliteVehicleRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
     : new MariaVehicleRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));

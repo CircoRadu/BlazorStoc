@@ -7,6 +7,7 @@
 @inject IInventoryPickupOcrService OcrService
 @inject IInventoryPickupBuilder PickupBuilder
 @inject IInventoryPickupApplier PickupApplier
+@inject IDatabaseBackupService BackupService
 @inject IAccessControl Access
 @inject ILogger<InventoryPickup> Logger
 @implements IAsyncDisposable
@@ -147,6 +148,10 @@ else if (review is not null)
                     </tbody>
                 </table>
             </div>
+            @if (backupProgress is not null)
+            {
+                <div class="empty-state" role="status"><div class="spinner"></div><p>@backupProgress</p></div>
+            }
             @if (sendError is not null) { <div class="validation-message" role="alert">@sendError</div> }
             <div class="editor-actions">
                 <button type="button" class="primary" disabled="@sending" @onclick="ConfirmSendAsync">@(sending ? "Se trimite…" : "Confirmă")</button>
@@ -172,7 +177,7 @@ else if (review is not null)
 
 @code {
     private bool loading = true, scanning, sending;
-    private string? loadError, error, notice, sendError;
+    private string? loadError, error, notice, sendError, backupProgress;
     private InventoryPickupReview? review;
     private readonly HashSet<int> selectedProductIds = [];
     private readonly Dictionary<int, int?> editedValues = [];
@@ -302,8 +307,20 @@ else if (review is not null)
         if (sending || review is null) return;
         sending = true;
         sendError = null;
+        backupProgress = null;
         try
         {
+            // Subtask 2.1 (Task 2): the pickup is confirmed only after a verified database backup succeeds - the
+            // backup runs first, and any failure stops here without touching stock (movements are never applied).
+            var progress = new Progress<BackupProgress>(step => { backupProgress = step.Message; StateHasChanged(); });
+            var backup = await BackupService.CreateBackupAsync(BackupKind.InventoryPickup, progress, lifetime.Token);
+            backupProgress = null;
+            if (!backup.Success)
+            {
+                sendError = backup.ErrorMessage ?? BackupRules.GenericFailedMessage;
+                return;
+            }
+
             var selectedLines = review.Lines.Where(IsSelected)
                 .Select(line => line with { RecognizedValue = EditedValue(line) }).ToList();
             var result = await PickupApplier.ApplyAsync(selectedLines, lifetime.Token);
@@ -320,7 +337,7 @@ else if (review is not null)
             Logger.LogError("Inventory pickup apply failed ({ErrorType}).", exception.GetType().Name);
             sendError = "Modificările nu au putut fi trimise.";
         }
-        finally { sending = false; }
+        finally { sending = false; backupProgress = null; }
     }
 
     public ValueTask DisposeAsync() { lifetime.Cancel(); lifetime.Dispose(); return ValueTask.CompletedTask; }

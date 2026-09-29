@@ -149,6 +149,20 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 - **Așteptat**: totalul = suma efectelor; nicio mașină cu cantitate negativă; mișcările vechi (fără destinație) rămân neschimbate; aplicația veche nu este afectată de coloanele noi (o ieșire spre mașină apare în ea ca ieșire obișnuită — de ținut minte la folosirea în paralel).
 - **Sursă**: ieșire spre vehicul, vânzare generică și corecție de stoc.
 
+### A19. Verificare in browser a butonului "Preia inventar" cu noul backup (Task 2, subtask 2.1)
+- **Verifica**: fluxul complet in `/inventar/preluare` — incarcarea unui PDF scanat, indicatorul de progres al backupului (`backupProgress`, `Components/Pages/InventoryPickup.razor`) si confirmarea preluarii numai dupa backup reusit, prin panoul Browser al agentului.
+- **Motiv**: M3 — campul de incarcare fisier (`<InputFile>`) deschide un dialog nativ de sistem de operare pentru alegerea fisierului; automatizarea panoului Browser nu poate seta valoarea unui `<input type="file">` din JavaScript (blocat explicit de browser) si nu poate interactiona cu dialogul nativ Windows de deschidere fisier.
+- **Pasi**: din panoul Browser (sau manual de catre utilizator), autentifica-te, deschide `/inventar/preluare`, apasa "Preia inventar", alege `tests/BlazorStoc.Checks/Fixtures/inventar-proba.pdf` (sau alt formular scanat), selecteaza cateva produse cu diferente, apasa "Trimite modificari in stoc" → "Confirma"; urmareste mesajele de progres ("Se blocheaza...", "Se exporta...", "Se verifica...", "Se salveaza...") si confirma ca modificarile de stoc apar abia dupa finalizarea backupului.
+- **Asteptat**: comportamentul descris in criteriile de acceptare ale subtask-ului 2.1; pachetul de backup apare in directorul configurat dupa confirmare.
+- **Sursa**: Task 2, subtask 2.1 (acest ciclu, 29.09.2026); mecanismul a fost verificat direct (fara panoul Browser) prin `tests/BlazorStoc.Checks` (vezi `docs/PROJECT_STATE.md`).
+
+### A18. Backup real prin mariadb-dump la preluarea inventarului (Task 2, subtask 2.1/2.2)
+- **Verifică**: `MariaDatabaseBackupService` (`Services/DatabaseBackup.cs`) — rularea reală a `mariadb-dump.exe`, verificarea canonică (`CanonicalRowHasher`) înainte/după export pe baza vie, salvarea pachetului `.zip` + `manifest.json` + fișierul `.sha256`, declanșarea din `Components/Pages/InventoryPickup.razor` (`ConfirmSendAsync`) cu blocarea confirmării preluării până la un backup verificat.
+- **Motiv**: M1 — mediul agentului (această sesiune) nu are instanța locală MariaDB (`%LOCALAPPDATA%\BlazorStoc-MariaDB\mariadb-11.4.13-winx64\bin\mariadb-dump.exe`) și nici `application-connection.private.json`; directorul exista doar cu `admin.private.cnf`/`connection.private.json` și cheia Data Protection, fără server/binare. Calea de demo (SQLite, `SqliteDatabaseBackupService`) a fost verificată integral prin execuție reală (vezi `docs/PROJECT_STATE.md`), inclusiv end-to-end prin `tests/BlazorStoc.Checks`.
+- **Pași**: pe mașina cu instanța MariaDB reală (`docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md`), pornește aplicația cu `App:DemoMode=false`; deschide `/inventar/preluare`, încarcă un formular scanat cu diferențe, confirmă trimiterea; verifică: (1) fișierul `.zip` apare în `Database:MariaBackupFilesPath` (implicit `...\assets\database-backups`) cu numele conform modelului; (2) conține `dump.sql` și `manifest.json` cu numărul de tabele/rânduri corect; (3) există fișierul `<nume>.zip.sha256`; (4) preluarea nu se confirmă dacă `mariadb-dump.exe` lipsește sau baza e ocupată de o altă operație (mesajul de lacăt); (5) spațiul insuficient pe disc oprește operația înainte de a scrie vreun fișier.
+- **Așteptat**: comportamentul descris în TODO.md, „Decizie tehnica” (Task 2) și criteriile de acceptare ale subtask-urilor 2.1/2.2.
+- **Sursă**: Task 2, subtask 2.1/2.2 (acest ciclu, 29.09.2026).
+
 ## B. Mai mulți utilizatori și mai multe calculatoare (motiv: M2, M6)
 
 ### B1. Două calculatoare, două conturi distincte

@@ -49,6 +49,7 @@
                 <ChildContent>
                     <NavLink href="/inventar" Match="NavLinkMatch.All">Generare situație inventar</NavLink>
                     <NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix">Preluare inventar</NavLink>
+                    <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/inventar/restaurare" Match="NavLinkMatch.Prefix">Restaurează stoc</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection>
             <CollapsibleSection Id="administration-menu"

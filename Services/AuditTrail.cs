@@ -16,6 +16,7 @@ public static class AuditEntities
     public const string StockMovement = "MiscareStoc";
     public const string Vehicle = "Vehicul";
     public const string Inventory = "Inventar";
+    public const string DatabaseBackup = "CopieSiguranta";
 }
 
 public static class AuditActions

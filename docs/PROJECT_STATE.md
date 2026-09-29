@@ -1,8 +1,66 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **28 septembrie 2026 (rezolvarea A15, Task 2 mutat la "Taskuri finalizate")**
-Stare ciclu: **Bugul A15 (stergerea proiectelor pe MariaDB) a fost investigat pana la cauza reala si corectat: `MariaProjectRepository` construia timpul `CreatedAtUtc`/`UpdatedAtUtc` din `DateTime.UtcNow` neschimbat, cu precizie mai mare decat ce `MariaTimeText.Format` scrie in baza (milisecunda); la re-citirea din baza in aceeasi tranzactie de Update/Delete, `ProjectRules.CheckCurrent` respingea fals operatia ca "modificat/sters intre timp". Corectat cu `MariaTimeText.Now()`. Cu A15 rezolvat, toate subtaskurile 2.1-2.13 sunt finalizate si verificate real; Task 2 a fost mutat integral in TODO.md la "Taskuri finalizate" ("Integrare MariaDB reala si comutarea definitiva de dezvoltare"), iar taskurile active ramase au fost renumerotate: 1 (combobox beneficiar/proiect), 2 (backup la preluare inventar, fost 3), 3 (pagina de restaurare, fost 4), 4 (inaltime randuri PDF inventar, fost 5); mod claude_only, fara predare catre Codex.**
+Data: **29 septembrie 2026 (Task 3 - subtaskurile 3.1-3.2, pagina de restaurare: meniu, listare, stergere)**
+Stare ciclu: **Dupa Task 2 (subtaskurile 2.1-2.4, backup la preluarea inventarului - detalii mai jos), implementate acum subtaskurile 3.1 (meniu "Restaurează stoc" admin-only, listarea pachetelor cu tip/dimensiune/operator) si 3.2 (stergerea pachetelor de tip "preluare inventar" prin fluxul dual de confirmare existent, refuzul explicit al stergerii pachetelor de tip "pre-restaurare", jurnalizare). Pagina noua `Components/Pages/DatabaseRestore.razor` (`/inventar/restaurare`). Serviciul `IDatabaseBackupService` a primit `ListPackagesAsync`/`DeletePackageAsync` (`Services/DatabaseBackup.cs`, `BackupPackageStore`). `Components/Shared/DeleteConfirmationDialog.razor` a primit un parametru nou `ConfirmationNote` (textul implicit presupunea arhivare; o stergere definitiva de fisier are nevoie de alt text, corect). Verificat integral prin executie reala, inclusiv in browser (listare, selectie radio, dialog in doi pasi, stergere efectiva de pe disc, eveniment corect in Jurnal). Raman deschise 3.3 (declansarea restaurarii cu confirmarea `confirma`) si 3.4 (cei 5 pasi efectivi de restaurare, comutare atomica de scheme) - operatii distructive asupra bazei vii, neinceput. Mod claude_only, fara predare catre Codex.**
+
+## Task 3, subtaskurile 3.1-3.2 - pagina de restaurare (meniu, listare, stergere) - 29.09.2026
+
+### Fisiere noi/modificate
+
+- `Components/Pages/DatabaseRestore.razor` (nou, `/inventar/restaurare`, `[Authorize(Roles = AccessRoles.Administrator)]`): rezumat (total pachete, spatiu ocupat, numar per categorie), tabel cu selectie radio unica per rand, coloana "TIP" cu eticheta distincta ("Preluare inventar"/"Pre-restaurare"), buton de stergere vizibil numai pentru pachetele care se pot sterge.
+- `Components/Layout/MainLayout.razor`: intrare noua "Restaurează stoc" in submeniul Inventar, vizibila numai administratorului (`<AuthorizeView Roles="Administrator">`, acelasi tipar ca "Utilizatori" din submeniul Administrare).
+- `Services/DatabaseBackup.cs`: `BackupPackage` (record cu `CanDelete`), `BackupDeleteResult`, `IDatabaseBackupService.ListPackagesAsync`/`DeletePackageAsync`, si `BackupPackageStore` (clasa interna comuna ambelor implementari - demo si real - care scaneaza directorul de backup, citeste `manifest.json` din fiecare `.zip` si aplica regula de refuz pentru pachetele "pre-restaurare" independent de UI).
+- `Components/Shared/DeleteConfirmationDialog.razor`: parametru nou `ConfirmationNote` (implicit textul existent "Operația va muta obiectul în arhivă...", pastrat pentru toti apelantii vechi); pagina de restaurare il suprascrie cu un text corect ("Fisierul va fi sters definitiv de pe server..."), pentru ca un pachet de backup nu e arhivat la stergere, e sters efectiv.
+
+### Verificari
+
+- `tests/BlazorStoc.Checks`: **609/609 `PASS`**, exit code 0. Verificari noi: listarea gaseste pachetele reale create la subtask 2.1/2.2 (tip, dimensiune corecta); un pachet de tip "pre-restaurare" construit direct (manifest + zip) e listat corect si nu poate fi sters, nici prin serviciu (nu doar ascuns in UI); stergerea unui pachet real de tip "preluare inventar" elimina atat arhiva cat si fisierul `.sha256`, iar listarea reflecta imediat schimbarea.
+- Verificare directa in browser (preview demonstrativ, `http://127.0.0.1:5082/inventar/restaurare`): construit manual un pachet `.zip` + `manifest.json` (acelasi format ca cel produs de serviciu) in directorul de backup al preview-ului, verificat ca apare corect in tabel (tip, denumire, data, operator, dimensiune); parcurs fluxul complet de stergere (selectare motiv implicit → introducerea cuvantului `sterge` → confirmare) - pachetul a disparut de pe disc si din tabel, iar in Jurnal activitate a aparut evenimentul corect (`ȘtergereCopieSiguranta`, tinta = denumirea pachetului, motivul ales).
+- Meniul "Restaurează stoc" verificat vizibil in submeniul Inventar pentru contul administrator.
+- Neverificat: afisarea paginii pentru un cont fara rol administrator (`docs/TESTE_RAMASE.md`, M2 - o singura sesiune autentificata disponibila in acest mediu).
+
+### Pasul urmator
+
+Subtaskurile 3.3 (buton "Restaureaza baza de date" + popup de avertizare + confirmarea prin cuvantul `confirma`) si 3.4 (cei 5 pasi efectivi de restaurare: verificare integritate, diferente de structura, diferente de continut, import si comutare atomica `RENAME TABLE`, eliberare/confirmare finala) raman neinceput - implica operatii distructive asupra bazei vii si un cont MariaDB dedicat de restaurare (decizie acceptata in TODO.md, neprovizionat inca).
+
+## Task 2, subtaskurile 2.1-2.4 - backup la preluarea inventarului - 29.09.2026
+
+## Task 2, subtaskurile 2.1-2.4 - backup la preluarea inventarului - 29.09.2026
+
+Ciclu dedicat implementarii mecanismului de backup descris in TODO.md, "Decizie tehnica - mecanism de backup/restaurare" (comuna pentru Task 2 si Task 3), pentru subtaskurile 2.1 (declansare), 2.2 (generare/validare), 2.3 (denumire/pastrare) si 2.4 (spatiu pe disc).
+
+### Fisiere noi
+
+- `Services/OperationLock.cs` - `IOperationLockService`/`FileOperationLockService`: lacat comun de operatie (backup/restaurare), persistent pe disc (fisier JSON langa pachetele de backup), cu heartbeat, expirare si recunoasterea/eliberarea automata a unui lacat orfan. Nu este o inregistrare in baza de date, cum descria initial TODO.md - contul aplicatiei (`blazorstoc_dev`) nu are drepturi DDL pentru a adauga o tabela noua (`MariaArchiveSchema.RequiredTables` confirma cele 27 de tabele existente, fara niciuna pentru acest scop); adaugarea uneia ar fi o migrare separata cu contul `blazorstoc_migrator`, nefacuta in acest ciclu.
+- `Services/CanonicalRowHasher.cs` - comparatia canonica tip-si-hash (prefixe I:/R:/T:/B:/NULL per coloana, SHA-256 per rand, combinate in ordinea cheii primare) mentionata in TODO.md ca reutilizata de la migrare, dar care nu exista ca serviciu reutilizabil in `Services/` inainte de acest ciclu (era doar un instrument scratch nedocumentat, conform propriilor note ale migrarii). Scrisa acum peste `information_schema` (MariaDB), testabila fara conexiune la baza pentru partea de canonicalizare a valorilor.
+- `Services/DatabaseBackup.cs` - `IDatabaseBackupService` cu doua implementari:
+  - `SqliteDatabaseBackupService` (mod demonstrativ): copie online a bazei SQLite (`SqliteConnection.BackupDatabase`, nu o copiere brutala de fisier care ar putea prinde o scriere la mijloc), impachetata in `.zip` cu `manifest.json`.
+  - `MariaDatabaseBackupService` (mod real): ruleaza `mariadb-dump.exe` (`--single-transaction --routines --triggers --hex-blob`), cu credentialele intr-un fisier `--defaults-extra-file` temporar (niciodata in argumentele procesului); verifica stabilitatea bazei in fereastra de export printr-un hash canonic (`CanonicalRowHasher`) calculat inainte si dupa dump; nu compara direct continutul dumpului SQL cu baza vie (ar necesita reimport intr-o schema separata, care cere drepturi DDL/CREATE SCHEMA neexistente pentru contul curent - ramane pentru Task 3, care introduce contul dedicat cu aceste drepturi).
+  - `BackupNaming` (model de denumire cerut de subtask 2.3, cu rezolvare de coliziune de nume) si `BackupDiskSpace` (estimare/verificare spatiu liber, subtask 2.4).
+- `MariaAssetPaths.DatabaseBackups`/`MariaAssetPaths.MariaDumpExecutable` (`Services/MariaTimeText.cs`) - director dedicat pentru pachete (in afara `wwwroot`, ca celelalte directoare de asset MariaDB) si calea implicita catre `mariadb-dump.exe`, langa `mariadbd.exe` (`docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md`).
+- `AuditEntities.DatabaseBackup` (`Services/AuditTrail.cs`) - tip nou de entitate pentru evenimentele de audit ale backupului (generare reusita, eliberare de lacat orfan).
+
+### Integrare in fluxul de preluare inventar
+
+`Components/Pages/InventoryPickup.razor` (`ConfirmSendAsync`): backupul ruleaza inaintea `PickupApplier.ApplyAsync`; daca backupul esueaza, miscarile de stoc nu sunt aplicate deloc, iar utilizatorul vede mesajul de eroare specific (lacat ocupat, spatiu insuficient, export/verificare esuate). In timpul backupului, popup-ul de confirmare afiseaza mesajul etapei curente (`IProgress<BackupProgress>`).
+
+### Verificari
+
+- `tests/BlazorStoc.Checks`: **603/603 `PASS`**, exit code 0 (build `tests/BlazorStoc.Checks/bin/Release/net9.0`), fara nicio regresie fata de rularea anterioara (578 + verificarile noi). Verificari noi: denumirea pachetelor (`BackupNaming`), blocurile canonicalizarii (`CanonicalRowHasher`), lacatul pe fisier (`FileOperationLockService`, inclusiv preluarea concurentei si eliberarea) si un test de integrare end-to-end pentru `SqliteDatabaseBackupService` contra unei baze SQLite seed reale (export, `.zip`, `manifest.json`, hash `.sha256`, eliberarea lacatului, a doua rulare fara coliziune de nume).
+- Doua bug-uri reale gasite si corectate in timpul verificarii prin executie (nu doar prin citirea codului): (1) `Microsoft.Data.Sqlite` pastreaza conexiunile in pool implicit - o conexiune de destinatie folosita o singura data pentru `BackupDatabase` bloca fisierul la hash-uire ulterioara; corectat cu `Pooling=False` pe acea conexiune. (2) Doua backup-uri declansate in aceeasi secunda de acelasi operator produceau acelasi nume de fisier (model cu precizie de secunda) si `File.Move` esua; corectat cu `BackupNaming.ResolveUniquePath` (sufix numeric, ca la Windows Explorer).
+- Verificare in browser (panoul agentului) a fluxului complet din `/inventar/preluare` **nu a putut fi efectuata**: campul de incarcare fisier deschide un dialog nativ Windows, pe care automatizarea panoului Browser nu il poate controla (nu poate seta valoarea unui `<input type="file">` din JavaScript). Vezi `docs/TESTE_RAMASE.md`, A19.
+- Modul MariaDB real (`mariadb-dump.exe` efectiv) **nu a putut fi verificat**: mediul agentului (aceasta sesiune) nu are instanta locala MariaDB - directorul `%LOCALAPPDATA%\BlazorStoc-MariaDB` contine doar `admin.private.cnf`/`connection.private.json` si cheia Data Protection, fara server/binare/date. Vezi `docs/TESTE_RAMASE.md`, A18.
+- Preview demonstrativ repornit si verificat functional (`http://127.0.0.1:5082/health/live` → 200) dupa modificari.
+
+### Documentatie actualizata
+
+- `TODO.md`: subtaskurile 2.1-2.4 marcate `[x]` cu note de implementare; criteriile de acceptare adnotate (partea dependenta de Task 3 ramane deschisa); Task 2 ramane activ (nu mutat in `IMPLEMENTED.md`) pentru ca propriile criterii de acceptare depind de pagina de restaurare (Task 3, neinceput).
+- `docs/TESTE_RAMASE.md`: A18 (backup real prin `mariadb-dump`, mediul agentului nu are MariaDB local) si A19 (verificare in browser a fluxului de preluare, dialog nativ de fisier neautomatizabil).
+
+### Pasul urmator
+
+Task 3 - pagina de restaurare a bazei de date (meniu Inventar, exclusiv administrator): listarea pachetelor generate acum, stergerea celor de tip "preluare inventar", declansarea restaurarii cu confirmare, cei 5 pasi de restaurare, contul MariaDB dedicat pentru restaurare si notificarea sesiunilor active. Dupa Task 3, ramane de verificat efectiv modul MariaDB real (A18) si fluxul complet in browser (A19), pe o masina cu instanta locala MariaDB si posibilitatea de a alege fisiere in dialogul nativ.
 
 ## Rezolvarea A15 (stergerea proiectelor pe MariaDB) si finalizarea Task 2 - 28.09.2026 (ciclu final)
 

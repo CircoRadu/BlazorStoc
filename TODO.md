@@ -79,35 +79,38 @@ Depinde de integrarea aplicatiei cu baza MariaDB reala (finalizata — vezi "Int
 - **Stocare fisiere:** intr-un director dedicat, in afara `wwwroot` si a oricarei cai servite direct ca fisier static, similar cu directoarele de arhiva din Task finalizat "Arhivarea obiectelor sterse"; descarcarea se face printr-un endpoint HTTP autentificat, dedicat, restrictionat la rolul administrator, nu prin circuitul SignalR.
 - **Securitate continut:** dumpul SQL contine hashuri de parole si date de audit; directorul de backup primeste acelasi nivel de protectie ca zonele sensibile deja folosite in proiect (acces restrans, fara publicare, fara includere in raspunsuri catre utilizatori neautorizati).
 - **Jurnalizare:** crearea, listarea incercarilor de stergere, stergerea efectiva si restaurarea sunt evenimente de audit, cu operator, rol, timestamp si denumirea pachetului, fara date sensibile in `Details`/`Motif`, conform serviciului comun de jurnalizare deja existent.
+- **Actualizare 29.09.2026 (subtask 2.1/2.2 implementate):** lacatul comun a fost implementat ca fisier local (`Services/OperationLock.cs`), nu ca inregistrare in baza de date — contul aplicatiei nu are drepturi DDL pentru a adauga o tabela noua (confirmat explicit in acest ciclu, `MariaArchiveSchema.RequiredTables`), iar adaugarea uneia ar necesita o migrare separata cu contul `blazorstoc_migrator`. Comparatia canonica tip-si-hash a fost scrisa acum ca serviciu reutilizabil (`Services/CanonicalRowHasher.cs`), pe baza `information_schema`, nu exista inca in `Services/` inainte de acest ciclu. Notificarea/redirectionarea sesiunilor active si endpoint-ul de descarcare dedicat raman de construit la Task 3.
 
-### Subtask 2.1 - Declansarea backupului la preluarea inventarului
+### Subtask 2.1 - Declansarea backupului la preluarea inventarului (implementat 29.09.2026)
 
-- [ ] Identifica punctul din pagina de preluare inventar unde utilizatorul apasa butonul de preluare si insereaza declansarea backupului ca parte a aceleiasi actiuni: preluarea se confirma utilizatorului abia dupa ce backupul este generat si verificat cu succes (varianta cu siguranta maxima, aliniata cu cerinta ca fisierul sa fie disponibil pentru restaurare imediat ce preluarea e considerata reusita).
-- [ ] Daca backupul esueaza (verificare nereusita, spatiu insuficient, eroare de export), preluarea inventarului nu este confirmata ca reusita, iar utilizatorul primeste mesajul de eroare specific backupului, cu posibilitatea de a reincerca.
-- [ ] Foloseste lacatul comun descris mai sus pentru a bloca alte sesiuni pe durata snapshotului.
-- [ ] Afiseaza utilizatorului progresul operatiei (etape + indicator vizual), fara sa blocheze restul aplicatiei mai mult decat este necesar.
+- [x] Identifica punctul din pagina de preluare inventar unde utilizatorul apasa butonul de preluare si insereaza declansarea backupului ca parte a aceleiasi actiuni: preluarea se confirma utilizatorului abia dupa ce backupul este generat si verificat cu succes (varianta cu siguranta maxima, aliniata cu cerinta ca fisierul sa fie disponibil pentru restaurare imediat ce preluarea e considerata reusita). Implementat in `Components/Pages/InventoryPickup.razor` (`ConfirmSendAsync`): `IDatabaseBackupService.CreateBackupAsync` ruleaza inaintea `PickupApplier.ApplyAsync`.
+- [x] Daca backupul esueaza (verificare nereusita, spatiu insuficient, eroare de export), preluarea inventarului nu este confirmata ca reusita, iar utilizatorul primeste mesajul de eroare specific backupului, cu posibilitatea de a reincerca.
+- [x] Foloseste lacatul comun descris mai sus pentru a bloca alte sesiuni pe durata snapshotului. Implementat ca lacat pe fisier (`Services/OperationLock.cs`, `FileOperationLockService`), nu ca inregistrare in baza de date — contul aplicatiei (`blazorstoc_dev`) nu are drepturi DDL pentru a adauga o tabela noua (`MariaArchiveSchema.RequiredTables`), asa cum a fost confirmat explicit in acest ciclu; adaugarea unei tabele dedicate ramane o migrare separata, cu contul `blazorstoc_migrator`, daca se doreste ulterior varianta stocata in baza de date. Blocarea acopera doar operatiile de backup/restaurare intre ele, nu scrierile obisnuite ale aplicatiei in timpul ferestrei de export (`--single-transaction` da o imagine MVCC consistenta; blocarea completa a sesiunilor ramane in sarcina Task 3, care introduce notificarea sesiunilor active).
+- [x] Afiseaza utilizatorului progresul operatiei (etape + indicator vizual), fara sa blocheze restul aplicatiei mai mult decat este necesar.
+- [x] Declansarea backupului foloseste acelasi mecanism si inainte de momentul restaurarii unei copii mai vechi de catre administrator (vezi Task 3, subtask 3.4, Pas 0 - blocare si snapshot curent), nu doar la preluarea inventarului. `IDatabaseBackupService.CreateBackupAsync(BackupKind, ...)` accepta deja `BackupKind.PreRestore`; Task 3 va apela acelasi serviciu.
 
-### Subtask 2.2 - Generarea si validarea arhivei
+### Subtask 2.2 - Generarea si validarea arhivei (implementat 29.09.2026)
 
-- [ ] Genereaza dumpul SQL cu `mariadb-dump` (transactional, consistent) intr-un fisier temporar, apoi `manifest.json` cu metadatele operatiei.
-- [ ] Calculeaza hashurile SHA-256 (dump si arhiva finala) si compara continutul dumpului cu baza vie folosind comparatia canonica tip-si-hash existenta din procesul de migrare.
-- [ ] Salveaza arhiva definitiv (redenumire atomica din fisier temporar) numai dupa ce verificarea trece; daca verificarea esueaza, sterge fisierele temporare, elibereaza lacatul si informeaza utilizatorul clar despre esec, fara sa lase o arhiva partiala/nesigura pe disc.
+- [x] Genereaza dumpul SQL cu `mariadb-dump` (transactional, consistent) intr-un fisier temporar, apoi `manifest.json` cu metadatele operatiei. Implementat in `Services/DatabaseBackup.cs` (`MariaDatabaseBackupService`); credentialele trec printr-un fisier `--defaults-extra-file` temporar, niciodata in argumentele procesului.
+- [x] Calculeaza hashurile SHA-256 (dump si arhiva finala) si compara continutul dumpului cu baza vie folosind comparatia canonica tip-si-hash existenta din procesul de migrare. Comparatia canonica tip-si-hash a fost scrisa acum ca serviciu reutilizabil (`Services/CanonicalRowHasher.cs`) — nu exista inca in `Services/` inainte de acest ciclu (era doar un instrument scratch nedocumentat la migrare); verificarea compara un hash canonic al bazei vii calculat inainte si dupa export (confirma ca baza nu s-a schimbat in fereastra de export), nu o comparare directa cu textul dumpului SQL (ar necesita reimport intr-o schema separata, care cere drepturi DDL/CREATE SCHEMA neexistente pentru contul curent — ramane pentru Task 3, care introduce un cont dedicat cu aceste drepturi).
+- [x] Salveaza arhiva definitiv (redenumire atomica din fisier temporar) numai dupa ce verificarea trece; daca verificarea esueaza, sterge fisierele temporare, elibereaza lacatul si informeaza utilizatorul clar despre esec, fara sa lase o arhiva partiala/nesigura pe disc.
+- [x] Verificat integral prin executie reala (nu doar teste unitare) pentru modul demonstrativ (SQLite): `tests/BlazorStoc.Checks` ruleaza `SqliteDatabaseBackupService` contra unei baze SQLite reale, seed, verifica pachetul `.zip`, `manifest.json`, hash-ul `.sha256` si eliberarea lacatului. Modul MariaDB (`mariadb-dump` real) nu a putut fi rulat in acest ciclu — vezi `docs/TESTE_RAMASE.md`, A18 (mediul agentului nu are instanta locala MariaDB).
 
-### Subtask 2.3 - Denumirea si pastrarea pachetului
+### Subtask 2.3 - Denumirea si pastrarea pachetului (implementat 29.09.2026, ca parte a 2.1/2.2)
 
-- [ ] Denumeste fisierul dupa modelul "Copie siguranta preluare inventar data ora user_level user_name", cu data/ora in formatul de afisare al proiectului (`dd.MM.yyyy HH:mm`) transpus intr-un nume de fisier valid (fara caractere interzise de sistemul de fisiere, fara diacritice), si cu rolul/numele utilizatorului care a declansat preluarea.
-- [ ] Pastreaza pachetul pe server, in directorul dedicat, disponibil ulterior in pagina de restaurare stoc (Task 3).
+- [x] Denumeste fisierul dupa modelul "Copie siguranta preluare inventar data ora user_level user_name", cu data/ora in formatul de afisare al proiectului (`dd.MM.yyyy HH:mm`) transpus intr-un nume de fisier valid (fara caractere interzise de sistemul de fisiere, fara diacritice), si cu rolul/numele utilizatorului care a declansat preluarea. Implementat in `Services/DatabaseBackup.cs` (`BackupNaming.BuildFileName`), cu o coliziune de nume (doua backup-uri in aceeasi secunda) rezolvata printr-un sufix numeric, ca la Windows Explorer.
+- [x] Pastreaza pachetul pe server, in directorul dedicat, disponibil ulterior in pagina de restaurare stoc (Task 3). Director dedicat: `data/database-backups` (demo) / `Database:MariaBackupFilesPath` sub `MariaAssetPaths` (real), in afara `wwwroot`. Disponibilitatea efectiva in pagina de restaurare ramane de construit la Task 3 (care doar listeaza acest director).
 
 ### Criterii de acceptare
 
-- Fiecare preluare de inventar produce o copie de siguranta verificata, denumita conform modelului cerut, disponibila administratorului in pagina de restaurare.
-- Nicio alta sesiune nu poate scrie in baza de date in timpul generarii snapshotului.
-- O verificare esuata nu lasa pe server o arhiva nesigura si informeaza clar utilizatorul.
-- Utilizatorul vede progresul operatiei de backup.
+- Fiecare preluare de inventar produce o copie de siguranta verificata, denumita conform modelului cerut, disponibila administratorului in pagina de restaurare. *(Copia verificata si denumita conform modelului: implementat. Pagina de restaurare: Task 3, neinceput.)*
+- Nicio alta sesiune nu poate scrie in baza de date in timpul generarii snapshotului. *(Partial: lacatul comun previne o a doua operatie de backup/restaurare simultana; blocarea tuturor scrierilor aplicatiei in timpul ferestrei de export ramane la Task 3 — vezi nota de la subtask 2.1.)*
+- O verificare esuata nu lasa pe server o arhiva nesigura si informeaza clar utilizatorul. *(Implementat.)*
+- Utilizatorul vede progresul operatiei de backup. *(Implementat.)*
 
-### Subtask 2.4 - Spatiu pe disc
+### Subtask 2.4 - Spatiu pe disc (implementat 29.09.2026, ca parte a 2.1/2.2)
 
-- [ ] Inainte de a incepe exportul, verifica spatiul liber disponibil in directorul de backup fata de o estimare a dimensiunii bazei (de exemplu dimensiunea ultimului export reusit, plus o marja); daca spatiul e insuficient, opreste operatia inainte de a scrie orice fisier si informeaza utilizatorul cu un mesaj clar.
+- [x] Inainte de a incepe exportul, verifica spatiul liber disponibil in directorul de backup fata de o estimare a dimensiunii bazei (de exemplu dimensiunea ultimului export reusit, plus o marja); daca spatiul e insuficient, opreste operatia inainte de a scrie orice fisier si informeaza utilizatorul cu un mesaj clar. Implementat in `Services/DatabaseBackup.cs` (`BackupDiskSpace`): estimeaza cerinta din cel mai mare pachet `.zip` existent (sau o valoare implicita pentru primul backup), cu o marja x4 pentru fisierul temporar de export si arhiva finala coexistente.
 
 ### Decizii acceptate (fara alte optiuni de stabilit)
 
@@ -118,18 +121,21 @@ Depinde de integrarea aplicatiei cu baza MariaDB reala (finalizata — vezi "Int
 
 Depinde de integrarea MariaDB reala (finalizata) si de Task 2 (foloseste pachetele generate la preluarea inventarului si acelasi mecanism de backup/lacat/verificare).
 
-### Subtask 3.1 - Meniu si listare pachete
+**Progres 29.09.2026:** subtaskurile 3.1 (meniu si listare) si 3.2 (stergerea pachetelor de tip preluare inventar) sunt implementate si verificate. Raman 3.3 (declansarea restaurarii, cu confirmarea prin cuvantul `confirma`) si 3.4 (cei 5 pasi efectivi de restaurare, inclusiv comutarea atomica de scheme `RENAME TABLE`) - operatii distructive asupra bazei vii, care nu au fost inca implementate.
 
-- [ ] Adauga in meniul Inventar optiunea "Restaureaza stoc", vizibila numai utilizatorilor cu rol administrator.
-- [ ] Afiseaza in pagina toate pachetele disponibile pe server: cele generate la preluarea situatiei de inventar (Task 2) si cele generate automat inainte de o restaurare anterioara (subtask 3.3), intr-un tabel cu selectie unica de tip radio button per rand.
-- [ ] Distinge vizual cele doua categorii de pachete (preluare inventar / pre-restaurare), fara sa permita confuzia intre ele la selectare.
-- [ ] Afiseaza dimensiunea fiecarui pachet si spatiul total ocupat de backupuri pe server, pentru ca administratorul sa poata urmari cresterea spatiului folosit (pachetele pre-restaurare nu pot fi sterse, vezi subtask 3.2).
+### Subtask 3.1 - Meniu si listare pachete (implementat 29.09.2026)
 
-### Subtask 3.2 - Stergerea pachetelor de tip "preluare inventar"
+- [x] Adauga in meniul Inventar optiunea "Restaureaza stoc", vizibila numai utilizatorilor cu rol administrator. Implementat: `Components/Layout/MainLayout.razor` (`<AuthorizeView Roles="Administrator">`), intrare "Restaurează stoc" catre `/inventar/restaurare`.
+- [x] Afiseaza in pagina toate pachetele disponibile pe server: cele generate la preluarea situatiei de inventar (Task 2) si cele generate automat inainte de o restaurare anterioara (subtask 3.3), intr-un tabel cu selectie unica de tip radio button per rand. Implementat: `Components/Pages/DatabaseRestore.razor` + `IDatabaseBackupService.ListPackagesAsync`/`Services/DatabaseBackup.cs` (`BackupPackageStore.ListAsync`, citeste `manifest.json` din fiecare `.zip`).
+- [x] Distinge vizual cele doua categorii de pachete (preluare inventar / pre-restaurare), fara sa permita confuzia intre ele la selectare. Coloana "TIP" cu eticheta distincta per categorie.
+- [x] Afiseaza dimensiunea fiecarui pachet si spatiul total ocupat de backupuri pe server, pentru ca administratorul sa poata urmari cresterea spatiului folosit (pachetele pre-restaurare nu pot fi sterse, vezi subtask 3.2).
 
-- [ ] Permite administratorului sa stearga numai pachetele generate la preluarea inventarului, folosind acelasi flux dual de confirmare deja implementat (pagina de atentionare cu motiv + pagina cu introducerea cuvantului exact `sterge`), reutilizand componentele existente din taskul finalizat "Flux in doi pasi pentru confirmarea stergerii".
-- [ ] Nu permite stergerea pachetelor generate automat inainte de o restaurare (butonul/optiunea de stergere nu este disponibila pentru aceasta categorie), atat in interfata cat si la nivelul serviciului (respinge explicit o cerere de stergere pentru aceasta categorie, indiferent de origine).
-- [ ] Jurnalizeaza stergerea unui pachet (operator, denumire pachet, motiv).
+### Subtask 3.2 - Stergerea pachetelor de tip "preluare inventar" (implementat 29.09.2026)
+
+- [x] Permite administratorului sa stearga numai pachetele generate la preluarea inventarului, folosind acelasi flux dual de confirmare deja implementat (pagina de atentionare cu motiv + pagina cu introducerea cuvantului exact `sterge`), reutilizand componentele existente din taskul finalizat "Flux in doi pasi pentru confirmarea stergerii". Reutilizat `Components/Shared/DeleteConfirmationDialog.razor` (extins cu parametrul `ConfirmationNote`, ca textul implicit "va muta obiectul in arhiva" sa nu fie afisat la o stergere definitiva de fisier, care nu are arhivare).
+- [x] Nu permite stergerea pachetelor generate automat inainte de o restaurare (butonul/optiunea de stergere nu este disponibila pentru aceasta categorie), atat in interfata cat si la nivelul serviciului (respinge explicit o cerere de stergere pentru aceasta categorie, indiferent de origine). Implementat in UI (`BackupPackage.CanDelete`) si independent in `BackupPackageStore.DeleteAsync` (verifica tipul din manifest, nu se bazeaza pe UI).
+- [x] Jurnalizeaza stergerea unui pachet (operator, denumire pachet, motiv). Tip de entitate nou `AuditEntities.DatabaseBackup` ("CopieSiguranta"), actiunea "Ștergere".
+- [x] Verificat integral prin executie: `tests/BlazorStoc.Checks` (listare, refuzul stergerii unui pachet de tip pre-restaurare, stergerea reala a unui pachet de tip preluare inventar) si direct in browser (preview demonstrativ): listare, selectie radio, dialog in doi pasi, stergere efectiva de pe disc, eveniment corect in Jurnal activitate.
 
 ### Subtask 3.3 - Declansarea restaurarii si confirmarea
 

@@ -63,6 +63,18 @@ internal static class MariaAssetPaths
     // never one per store, so ArchiveFileSafety's cleanup-marker retry logic always looks in the same place.
     public static string ArchiveFiles(IConfiguration configuration) => Path.GetFullPath(
         configuration["Database:MariaArchiveFilesPath"] ?? Path.Combine(AssetsRoot(configuration), "archive-files"));
+
+    // Subtask 2.1/2.2 (Task 2): database backup packages (.zip + manifest) and the shared operation lock file live
+    // here, outside wwwroot and outside every path served as a static file, like every other asset directory above.
+    public static string DatabaseBackups(IConfiguration configuration) => Path.GetFullPath(
+        configuration["Database:MariaBackupFilesPath"] ?? Path.Combine(AssetsRoot(configuration), "database-backups"));
+
+    // Distribution installed next to this asset root (docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md section 3); the
+    // "mariadb-dump" executable used to export the live database (Subtask 2.2) ships in its bin/ folder.
+    public static string MariaDumpExecutable(IConfiguration configuration) =>
+        configuration["Database:MariaDumpExecutablePath"] ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB",
+            "mariadb-11.4.13-winx64", "bin", "mariadb-dump.exe");
 }
 
 // Subtask 2.11 (Task 2): every write-capable Maria* repository refuses to write unless the configured database

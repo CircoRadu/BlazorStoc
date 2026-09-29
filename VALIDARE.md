@@ -4,6 +4,29 @@
 
 > Verificările care nu au putut fi efectuate sunt urmărite, cu pașii și motivul, în `docs/TESTE_RAMASE.md`.
 
+## Pagina de restaurare a bazei de date - meniu, listare, stergere (Task 3, subtaskurile 3.1-3.2) - 29 septembrie 2026
+
+- Meniul Inventar are acum optiunea "Restaurează stoc" (`/inventar/restaurare`), vizibila numai contului administrator; pagina lista toate pachetele de siguranta de pe server (tip, denumire, data, operator, dimensiune), cu selectie unica de tip radio button per rand si un rezumat (total pachete, spatiu ocupat, numar pe categorie).
+- Pachetele de tip "preluare inventar" au buton de stergere; cele de tip "pre-restaurare" nu, nici in interfata, nici la nivel de serviciu (verificat prin apel direct la serviciu, ocolind UI-ul).
+- Stergerea foloseste fluxul dual de confirmare existent (motiv + cuvantul exact `sterge`); un text nou, corect, explica faptul ca fisierul se sterge definitiv (nu se arhiveaza) - `DeleteConfirmationDialog` a primit parametrul `ConfirmationNote` pentru asta, fara sa afecteze celelalte utilizari ale dialogului.
+- 6 verificari automate noi au trecut (609 in total, `tests/BlazorStoc.Checks`): listarea pachetelor reale, refuzul stergerii unui pachet "pre-restaurare" (construit direct pentru test), stergerea reala a unui pachet "preluare inventar" (arhiva + `.sha256`), actualizarea listei dupa stergere.
+- Verificare directa in browser (preview demonstrativ): pachet de test construit manual in directorul de backup, listat corect, sters complet prin fluxul din interfata (selectare motiv, cuvantul `sterge`, confirmare) - fisierul a disparut de pe disc, tabelul s-a actualizat imediat, iar in Jurnal activitate a aparut evenimentul "Ștergere"/"CopieSiguranta" cu tinta si motivul corecte.
+- Build Release: 0 avertismente, 0 erori.
+- Neverificat: afisarea paginii pentru un cont fara rol administrator (`docs/TESTE_RAMASE.md`, M2).
+
+## Backup automat la preluarea inventarului (Task 2, subtaskurile 2.1-2.4) - 29 septembrie 2026
+
+- Preluarea inventarului (`/inventar/preluare`, buton "Trimite modificari in stoc" -> "Confirma") declanseaza acum, inaintea aplicarii miscarilor de stoc, o copie de siguranta completa a bazei de date, verificata prin hash inainte de a fi salvata; miscarile de stoc nu sunt aplicate daca backupul esueaza.
+- Serviciu nou `IDatabaseBackupService` (`Services/DatabaseBackup.cs`): mod demonstrativ (SQLite) foloseste copierea online `SqliteConnection.BackupDatabase`; mod real (MariaDB) ruleaza `mariadb-dump` (`--single-transaction --routines --triggers --hex-blob`), cu parola intr-un fisier temporar `--defaults-extra-file`, niciodata in argumentele procesului.
+- Lacat comun de operatie (`Services/OperationLock.cs`), pe fisier (nu in baza de date - contul aplicatiei nu are drepturi DDL pentru o tabela noua, confirmat in acest ciclu), cu heartbeat si eliberare automata a unui lacat orfan.
+- Comparatie canonica tip-si-hash reutilizabila (`Services/CanonicalRowHasher.cs`), scrisa acum ca serviciu propriu (nu exista inainte); verifica stabilitatea bazei vii in fereastra de export (hash inainte/dupa export identic).
+- Denumirea pachetului (`BackupNaming.BuildFileName`) urmeaza modelul "Copie siguranta preluare inventar data ora rol nume", cu rezolvarea coliziunii de nume (doua backup-uri in aceeasi secunda) printr-un sufix numeric.
+- Verificarea spatiului pe disc (`BackupDiskSpace`) opreste operatia inainte de a scrie orice fisier daca spatiul liber e sub estimarea necesara (bazata pe cel mai mare pachet existent, cu marja).
+- 25 de verificari automate noi au trecut (603 in total, `tests/BlazorStoc.Checks`): denumirea pachetelor, blocurile de canonicalizare, lacatul pe fisier (preluare, refuz concurent, eliberare, reluare) si un test de integrare end-to-end pentru modul demonstrativ contra unei baze SQLite reale seed (export, `.zip`, `manifest.json`, hash `.sha256`, eliberarea lacatului, a doua rulare fara coliziune de nume).
+- Doua probleme reale gasite si corectate prin executie: conexiunea SQLite de destinatie bloca fisierul la hash-uire (pooling implicit al `Microsoft.Data.Sqlite`, corectat cu `Pooling=False`); doua backup-uri in aceeasi secunda produceau acelasi nume de fisier (corectat cu rezolvarea de coliziune).
+- Build Release: 0 avertismente, 0 erori.
+- Neverificat: modul MariaDB real (`mariadb-dump.exe` efectiv) - mediul agentului nu are instanta locala MariaDB (`docs/TESTE_RAMASE.md`, A18); fluxul complet in browser (incarcarea fisierului PDF de preluare) - campul de fisier deschide un dialog nativ Windows, neautomatizabil din panoul Browser (`docs/TESTE_RAMASE.md`, A19).
+
 ## Normalizarea diacriticelor in datele existente - 28 septembrie 2026
 
 - Regula "eliminarea diacriticelor la salvare" era deja aplicata consecvent (SQLite si MariaDB) pentru cod produs/denumire, descriere, categorie, subcategorie, beneficiar, CUI, utilizator, vehicul, proiect, observatie, descrierea miscarii de stoc si motivari, prin metodele partajate `*Input.Validated()`/`ChangeReasonRules.Normalize`.

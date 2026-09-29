@@ -13,7 +13,10 @@ namespace BlazorStoc.Services;
 // it is scoped to), never to this startup path.
 public static class MariaArchiveSchema
 {
-    private static readonly string[] RequiredTables =
+    // Internal, not private: Subtask 2.2 (Task 2) reuses this exact table list as the scope of the canonical
+    // row-hash comparison run around the mariadb-dump export (CanonicalRowHasher), so both checks always agree on
+    // what "the whole live database" means.
+    internal static readonly string[] RequiredTables =
     [
         "app_metadata", "audit_events", "archive_operations", "archive_beneficiaries", "archive_files",
         "archive_products", "archive_project_observation_files", "archive_project_observations", "archive_projects",

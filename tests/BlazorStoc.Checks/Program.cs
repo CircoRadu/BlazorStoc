@@ -3,8 +3,11 @@ using BlazorStoc.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PdfSharp.Pdf.IO;
+using System.IO.Compression;
+using System.Text.Json;
 
 var data = await new DemoProductRepository().GetProductsAsync();
 void Check(bool condition, string message)
@@ -3017,6 +3020,149 @@ InventoryPickupScanResult pickupScan;
         "A failure applying one line does not prevent the others from being applied, and is reported back explicitly");
 }
 
+// Subtask 2.1/2.2 (Task 2): end-to-end check of the demo-mode (SQLite) backup service against a real, seeded local
+// database - export, manifest, zip, hash sidecar, and the lock being free again afterwards. The equivalent MariaDB
+// path (MariaDatabaseBackupService, real mariadb-dump) needs a live local MariaDB instance with its bin/ tools
+// present, which this sandbox does not have (docs/TESTE_RAMASE.md records this as not run in this session).
+{
+    var backupRoot = Path.Combine(Path.GetTempPath(), $"blazorstoc-backup-{Guid.NewGuid():N}");
+    Directory.CreateDirectory(backupRoot);
+    try
+    {
+        var backupDataRoot = Path.Combine(backupRoot, "app");
+        var backupDirectory = Path.Combine(backupRoot, "backups");
+        var backupConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:LocalDatabasePath"] = Path.Combine(backupDataRoot, "app.db"),
+            ["App:ProductImagesPath"] = Path.Combine(backupDataRoot, "product-images"),
+            ["App:ProjectFilesPath"] = Path.Combine(backupDataRoot, "project-files"),
+            ["App:ArchiveFilesPath"] = Path.Combine(backupDataRoot, "archive-files"),
+            ["App:AuditPath"] = Path.Combine(backupDataRoot, "legacy-audit.jsonl"),
+            ["App:BackupFilesPath"] = backupDirectory
+        }).Build();
+        var backupStore = new SqliteLocalStore(new TestWebHostEnvironment(backupDataRoot), backupConfiguration, NullLogger<SqliteLocalStore>.Instance);
+        await backupStore.InitializeAsync();
+        await using (var seedConnection = await backupStore.OpenConnectionAsync())
+        {
+            await using var command = TestSqliteCommand(seedConnection,
+                "INSERT INTO categories(name,normalized_name) VALUES('Backup test','backup test')");
+            await command.ExecuteNonQueryAsync();
+        }
+        var backupAccess = new TestAccessControl(true, "test.backup");
+        var lockPath = Path.Combine(backupDirectory, "operation.lock.json");
+        var lockService = new FileOperationLockService(lockPath);
+        var backupService = new SqliteDatabaseBackupService(backupStore, backupConfiguration, backupAccess, lockService,
+            new FileAuditTrail(new TestWebHostEnvironment(backupDataRoot), backupConfiguration, NullLogger<FileAuditTrail>.Instance),
+            new ConsoleLogger<SqliteDatabaseBackupService>());
+
+        var stages = new List<BackupStage>();
+        var result = await backupService.CreateBackupAsync(BackupKind.InventoryPickup, new Progress<BackupProgress>(step => stages.Add(step.Stage)));
+        Check(result.Success, $"The demo backup succeeds against a real seeded database ({result.ErrorMessage})");
+        Check(result.PackagePath is not null && File.Exists(result.PackagePath), "The backup package file exists on disk after a successful run");
+        Check(File.Exists(result.PackagePath + ".sha256"), "A SHA-256 sidecar file is written next to the package");
+        Check(stages.Contains(BackupStage.Exporting) && stages.Contains(BackupStage.Verifying) && stages.Contains(BackupStage.Done),
+            "Progress is reported through the export, verification and completion stages");
+
+        using (var archive = ZipFile.OpenRead(result.PackagePath!))
+        {
+            Check(archive.GetEntry("backup.sqlite") is not null, "The package contains the exported database file");
+            var manifestEntry = archive.GetEntry("manifest.json");
+            Check(manifestEntry is not null, "The package contains manifest.json");
+            using var manifestStream = manifestEntry!.Open();
+            var manifest = await JsonSerializer.DeserializeAsync<BackupManifest>(manifestStream, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            Check(manifest is not null && manifest.OperatorName == "test.backup" && manifest.RowCounts.GetValueOrDefault("categories") >= 1,
+                "The manifest records the operator and a row count for the seeded table");
+        }
+
+        Check(await lockService.GetActiveAsync() is null, "The shared lock is released again once the backup finishes");
+
+        var secondResult = await backupService.CreateBackupAsync(BackupKind.InventoryPickup);
+        Check(secondResult.Success && secondResult.PackageFileName != result.PackageFileName,
+            "A second backup a moment later gets its own, differently-named package rather than overwriting the first");
+        Check(!Directory.EnumerateFiles(backupDirectory).Any(path => Path.GetFileName(path).StartsWith(".tmp-", StringComparison.Ordinal)),
+            "No temporary export files are left behind after a successful backup");
+
+        // Subtask 3.1/3.2 (Task 3): listing and deletion, exercised against the two real packages just created.
+        var listed = await backupService.ListPackagesAsync();
+        Check(listed.Count == 2 && listed.All(package => package.Kind == BackupKind.InventoryPickup && package.CanDelete),
+            "Listing finds every real package on disk, all deletable (both are InventoryPickup)");
+        Check(listed[0].SizeBytes > 0, "The listed size matches a real, non-empty file");
+
+        // A PreRestore package is built directly (BackupNaming/manifest), not through CreateBackupAsync (which
+        // does not produce that kind yet, Task 3's own restore flow will) - enough to exercise the refusal path.
+        var preRestoreName = BackupNaming.BuildFileName(BackupKind.PreRestore, DateTime.Now, AccessRoles.Administrator, "test.backup");
+        var preRestorePath = Path.Combine(backupDirectory, preRestoreName);
+        var preRestoreManifest = new BackupManifest(DateTime.UtcNow, "test.backup", AccessRoles.Administrator,
+            BackupKind.PreRestore.ToString(), 1, new Dictionary<string, int> { ["categories"] = 1 }, "test", "deadbeef", "deadbeef");
+        using (var archive = ZipFile.Open(preRestorePath, ZipArchiveMode.Create))
+        {
+            var entry = archive.CreateEntry("manifest.json");
+            using var entryStream = entry.Open();
+            await JsonSerializer.SerializeAsync(entryStream, preRestoreManifest, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        }
+        var listedWithPreRestore = await backupService.ListPackagesAsync();
+        Check(listedWithPreRestore.Single(package => package.FileName == preRestoreName) is { Kind: BackupKind.PreRestore, CanDelete: false },
+            "A PreRestore package is listed as its own kind and never marked deletable");
+
+        var refusedDelete = await backupService.DeletePackageAsync(preRestoreName, "Motiv test");
+        Check(!refusedDelete.Success && File.Exists(preRestorePath),
+            "Deleting a PreRestore package is refused at the service level too, not only hidden in the UI");
+
+        var acceptedDelete = await backupService.DeletePackageAsync(result.PackageFileName!, "Motiv test");
+        Check(acceptedDelete.Success && !File.Exists(result.PackagePath) && !File.Exists(result.PackagePath + ".sha256"),
+            "Deleting an InventoryPickup package removes both the archive and its hash sidecar");
+        Check((await backupService.ListPackagesAsync()).Count == 2,
+            "The listing reflects the deletion (one InventoryPickup package left, plus the PreRestore one)");
+    }
+    finally { try { Directory.Delete(backupRoot, true); } catch (IOException) { } }
+}
+
+// Subtask 1.4 (Task 2): pure-logic checks for the database backup mechanism that need no MariaDB connection -
+// package naming, the canonical row-hash building blocks, and the file-based operation lock's heartbeat/expiry.
+Check(BackupNaming.BuildFileName(BackupKind.InventoryPickup, new DateTime(2026, 9, 29, 14, 5, 30), AccessRoles.Administrator, "Ionescu Ștefan")
+        == "Copie siguranta preluare inventar 29.09.2026 14-05-30 Administrator Ionescu Stefan.zip",
+    "Backup file names follow the required model, in dd.MM.yyyy HH-mm-ss local time, without diacritics");
+Check(BackupNaming.SanitizeToken("a/b:c*d") == "a b c d", "Filesystem-invalid characters in operator name/role become spaces, never break the file name");
+Check(BackupNaming.SanitizeToken("  ") == "necunoscut", "An empty operator token still produces a valid, non-empty file name segment");
+
+Check(CanonicalRowHasher.CanonicalizeValue(null, 'I') == "NULL", "A null value canonicalizes the same regardless of column type");
+Check(CanonicalRowHasher.CanonicalizeValue(42L, 'I') == "I:42" && CanonicalRowHasher.CanonicalizeValue(42, 'I') == "I:42",
+    "Integer values canonicalize identically whether read back as int or long");
+Check(CanonicalRowHasher.CanonicalizeValue(3.5m, 'R') == "R:3.5", "Decimal values canonicalize with an invariant-culture textual form");
+Check(CanonicalRowHasher.CanonicalizeValue("abc", 'T') == "T:abc", "Text values keep a distinct prefix from numeric ones");
+Check(CanonicalRowHasher.PrefixForDataType("int") == 'I' && CanonicalRowHasher.PrefixForDataType("bigint") == 'I' &&
+      CanonicalRowHasher.PrefixForDataType("decimal") == 'R' && CanonicalRowHasher.PrefixForDataType("varchar") == 'T' &&
+      CanonicalRowHasher.PrefixForDataType("longtext") == 'T' && CanonicalRowHasher.PrefixForDataType("blob") == 'B',
+    "Every MariaDB column type used by the migrated schema maps to the expected canonical prefix");
+var sameRowColumns = new[] { new CanonicalColumn("id", 'I'), new CanonicalColumn("name", 'T') };
+var hashA = CanonicalRowHasher.HashRow(sameRowColumns, [1, "Test"]);
+var hashB = CanonicalRowHasher.HashRow(sameRowColumns, [1, "Test"]);
+var hashC = CanonicalRowHasher.HashRow(sameRowColumns, [1, "Different"]);
+Check(hashA == hashB, "The same row always canonicalizes to the same hash");
+Check(hashA != hashC, "A single changed column value changes the row's hash");
+
+await RunOperationLockChecksAsync();
+async Task RunOperationLockChecksAsync()
+{
+    var lockPath = Path.Combine(Path.GetTempPath(), $"blazorstoc-lock-check-{Guid.NewGuid():N}", "operation.lock.json");
+    var service = new FileOperationLockService(lockPath);
+    try
+    {
+        var firstHandle = await service.TryAcquireAsync("backup:test", "ionescu", AccessRoles.Administrator);
+        Check(firstHandle is not null, "Acquiring a free lock succeeds");
+        var secondHandle = await service.TryAcquireAsync("backup:test", "popescu", AccessRoles.LimitedUser);
+        Check(secondHandle is null, "A second concurrent request is refused while the lock is held");
+        var active = await service.GetActiveAsync();
+        Check(active is { OperatorName: "ionescu" }, "The active lock reports the operator that holds it");
+        await firstHandle!.DisposeAsync();
+        Check(await service.GetActiveAsync() is null, "Releasing the lock (disposing the handle) clears it immediately");
+        var thirdHandle = await service.TryAcquireAsync("backup:test", "vasilescu", AccessRoles.Administrator);
+        Check(thirdHandle is not null, "The lock can be acquired again once released");
+        await thirdHandle!.DisposeAsync();
+    }
+    finally { try { Directory.Delete(Path.GetDirectoryName(lockPath)!, true); } catch (IOException) { } }
+}
+
 // Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped
 // entirely (no-op, prints nothing extra) unless RUN_MARIA_INTEGRATION_CHECKS=1, so the default dotnet run/CI
 // experience (the checks above, no network, no MariaDB needed) is unchanged.
@@ -3026,6 +3172,17 @@ if (Environment.GetEnvironmentVariable("RUN_MARIA_INTEGRATION_CHECKS") == "1")
         ?? throw new InvalidOperationException("Set MARIA_TEST_CONFIG_PATH to the test database's private config JSON.");
     var mariaConfiguration = new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddJsonFile(mariaConfigPath).Build();
     await BlazorStoc.Checks.MariaIntegrationChecks.RunAsync(mariaConfiguration);
+}
+
+sealed class ConsoleLogger<T> : ILogger<T>
+{
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public bool IsEnabled(LogLevel logLevel) => true;
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        Console.WriteLine($"[{logLevel}] {formatter(state, exception)}");
+        if (exception is not null) Console.WriteLine(exception);
+    }
 }
 
 sealed class ManualTimeProvider : TimeProvider

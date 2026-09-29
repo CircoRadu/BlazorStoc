@@ -54,7 +54,7 @@
                 <input id="@ConfirmationId" autocomplete="off" spellcheck="false" disabled="@Busy"
                        @bind="confirmation" @bind:event="oninput" />
             </label>
-            <p class="form-note">Operația va muta obiectul în arhivă și va fi înregistrată în jurnal.</p>
+            <p class="form-note">@ConfirmationNote</p>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@(Busy || !CanConfirm)" @onclick="ConfirmAsync">
                     @(Busy ? "Se șterge…" : "Confirmă ștergerea")
@@ -70,6 +70,10 @@
     [Parameter, EditorRequired] public string Subject { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string ObjectLabel { get; set; } = string.Empty;
     [Parameter] public string Description { get; set; } = string.Empty;
+    // Most callers archive the object (the default text below stays accurate for them); a caller whose deletion is
+    // not an archive - a backup package removed outright from disk (Task 3, subtask 3.2) - overrides this instead
+    // of leaving the operator with an inaccurate promise of recoverability.
+    [Parameter] public string ConfirmationNote { get; set; } = "Operația va muta obiectul în arhivă și va fi înregistrată în jurnal.";
     [Parameter] public bool Busy { get; set; }
     [Parameter] public string? Error { get; set; }
     [Parameter, EditorRequired] public EventCallback<string> Confirmed { get; set; }
