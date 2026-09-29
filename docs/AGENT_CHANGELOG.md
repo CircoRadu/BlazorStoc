@@ -1190,3 +1190,30 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Validare:** Build Release: 0 avertismente, 0 erori (verificat repetat). BlazorStoc.Checks (suita implicita): 578 verificari, toate trecute, neafectata de MariaDB. Verificari reale de integrare pe baza MariaDB izolata (blazorstoc_test): PASS pentru conectivitate, produse (CRUD+audit+evenimente), beneficiari, vehicule, blocari de produs, proiecte; sectiunea miscari de stoc corectata in cod dar neconfirmata prin executie finala (blocaj clasificator mediu). Preview MariaDB (port 5085, baza reala de livrare): pornire fara exceptii, redirectionare la autentificare, /health/live 200, persistenta la restart - toate verificate manual in browser de agent; autentificarea efectiva neverificata (agentul nu introduce parole).
 - **Commit:** `claude: Task 2 (MariaDB reala) - toate repository-urile rescrise pe schema reala, verificate integral`
 - **Predat cÄƒtre:** claude
+
+## 2026-09-29T05:44:38.0000000Z — claude
+
+- **Task:** Commit de recuperare pentru Task 2 (subtask 2.1-2.4) si inceputul Task 3 (3.1-3.2), lucrate intr-un ciclu anterior neterminat (fara commit)
+- **Rezumat:** La deschiderea sesiunii, working tree-ul continea modificari necomise dintr-un ciclu anterior (acelasi agent, Claude, singurul agent activ conform `mode: claude_only`), corespunzatoare subtaskurilor 2.1-2.4 (backup automat la preluarea inventarului) si 3.1-3.2 (pagina de restaurare - meniu, listare, stergere pachete tip preluare inventar), deja descrise ca implementate in `TODO.md`/`docs/PROJECT_STATE.md`/`docs/TESTE_RAMASE.md` din ciclul anterior. Conform procedurii de recuperare dupa intrerupere (`docs/SEQUENTIAL_COLLABORATION.md`), agentul unic activ a inspectat diff-ul, a confirmat ca fisierele de documentatie erau deja actualizate coerent, si a creat commitul de recuperare cu propriul prefix, fara alte modificari de continut. Un director strain `bin_verify 2Release/` (artefact de build, nu sursa) a fost lasat necomis/netrackuit, in afara acestui commit. Dupa acest commit, sesiunea revine la taskul nou cerut de utilizator (fereastra separata, mobila, cu fisierul PDF la preluarea inventarului).
+- **Fișiere modificate:**
+  - `Components/Layout/MainLayout.razor`
+  - `Components/Pages/DatabaseRestore.razor`
+  - `Components/Pages/InventoryPickup.razor`
+  - `Components/Shared/DeleteConfirmationDialog.razor`
+  - `Program.cs`
+  - `README.md`
+  - `Services/AuditTrail.cs`
+  - `Services/CanonicalRowHasher.cs`
+  - `Services/DatabaseBackup.cs`
+  - `Services/MariaArchiveSchema.cs`
+  - `Services/MariaTimeText.cs`
+  - `Services/OperationLock.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `appsettings.json`
+  - `docs/PROJECT_STATE.md`
+  - `docs/TESTE_RAMASE.md`
+  - `tests/BlazorStoc.Checks/Program.cs`
+- **Validare:** Niciuna noua efectuata in acest pas (continut nemodificat fata de ciclul anterior); validarile relevante sunt cele deja consemnate in `TODO.md` (subtask 2.1-2.4, 3.1-3.2) si `docs/TESTE_RAMASE.md` (A18 - modul MariaDB real neverificat in acest mediu).
+- **Commit:** `claude: Task 2 (subtask 2.1-2.4) - backup automat la preluare inventar, pagina restaurare (3.1-3.2)`
+- **Predat cÄƒtre:** claude
