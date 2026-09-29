@@ -197,6 +197,8 @@ public static class MariaIntegrationChecks
 
     // ---- Beneficiaries --------------------------------------------------------------------------------------
 
+    private static BeneficiaryInput LegalInput(string name, string cui) => new() { Name = name, Cui = cui, Address = "Strada Test 1, Bucuresti", Phone = "0721000111" };
+
     private static async Task CheckBeneficiariesAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit,
         Action<bool, string> check, Action<string, string> blocked, Func<Exception, bool> isWriteGuardBug)
     {
@@ -204,14 +206,14 @@ public static class MariaIntegrationChecks
         var repository = new MariaBeneficiaryRepository(configuration, admin, audit);
         try
         {
-            var beneficiary = await repository.CreateAsync(new BeneficiaryInput { Name = "Integrare Test Beneficiar SRL", Cui = "RO19998811" })
+            var beneficiary = await repository.CreateAsync(LegalInput("Integrare Test Beneficiar SRL", "RO19998811"))
                 .ConfigureAwait(false);
             try
             {
                 check(beneficiary.Id > 0, "A new beneficiary is created in blazorstoc_test");
                 try
                 {
-                    await repository.CreateAsync(new BeneficiaryInput { Name = "Alt Nume SRL", Cui = "RO19998811" }).ConfigureAwait(false);
+                    await repository.CreateAsync(LegalInput("Alt Nume SRL", "RO19998811")).ConfigureAwait(false);
                     throw new Exception("A duplicate CUI was accepted");
                 }
                 catch (BeneficiaryOperationException) { Console.WriteLine("PASS: A duplicate beneficiary CUI is rejected"); }

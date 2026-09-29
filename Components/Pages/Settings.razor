@@ -1,0 +1,42 @@
+@page "/setari"
+@attribute [Authorize(Roles = AccessRoles.Administrator)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+
+<PageTitle>Setări · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">ADMINISTRARE</p><h1>Setări</h1><p class="muted">Configurări și operații rezervate administratorului.</p></div></div>
+<section class="catalog settings-panel">
+    <div class="settings-tabs" role="tablist" aria-label="Secțiuni setări" @onkeydown="OnTabKeyDown">
+        @foreach (var tab in Tabs)
+        {
+            var selected = tab.Id == activeTab;
+            <button type="button" role="tab" id="tab-@tab.Id" class="settings-tab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" aria-controls="panel-@tab.Id" tabindex="@(selected ? 0 : -1)" @onclick="() => activeTab = tab.Id">@tab.Title</button>
+        }
+    </div>
+    @if (activeTab == AnafTab)
+    {
+        <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
+            <AnafConfigurator />
+        </div>
+    }
+</section>
+
+@code {
+    private const string AnafTab = "anaf";
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF")];
+    private string activeTab = AnafTab;
+
+    private void OnTabKeyDown(KeyboardEventArgs args)
+    {
+        var index = Array.FindIndex(Tabs, tab => tab.Id == activeTab);
+        index = args.Key switch
+        {
+            "ArrowRight" => (index + 1) % Tabs.Length,
+            "ArrowLeft" => (index - 1 + Tabs.Length) % Tabs.Length,
+            "Home" => 0,
+            "End" => Tabs.Length - 1,
+            _ => index
+        };
+        activeTab = Tabs[index].Id;
+    }
+}

@@ -20,7 +20,7 @@ public sealed class MariaBeneficiaryRepository(
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
-            SELECT id, name, cui, version FROM beneficiaries ORDER BY name, id
+            SELECT id, name, cui, version, kind, address, phone, registry_number, postal_code, caen_code, anaf_verified FROM beneficiaries ORDER BY name, id
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<Beneficiary>();
@@ -36,16 +36,16 @@ public sealed class MariaBeneficiaryRepository(
         {
             await EnsureUniqueAsync(connection, transaction, value, null, cancellationToken).ConfigureAwait(false);
             await using var command = Command(connection, transaction, """
-                INSERT INTO beneficiaries (name, normalized_name, cui, normalized_cui, version)
-                VALUES (@name, @normalizedName, @cui, @normalizedCui, 0)
-                """, ("@name", value.Name), ("@normalizedName", TextNormalization.UniquenessKey(value.Name)),
-                ("@cui", value.Cui), ("@normalizedCui", TextNormalization.UniquenessKey(value.Cui)));
+                INSERT INTO beneficiaries (name, normalized_name, cui, normalized_cui, kind, address, phone, registry_number,
+                    postal_code, caen_code, anaf_verified, version)
+                VALUES (@name, @normalizedName, @cui, @normalizedCui, @kind, @address, @phone, @registryNumber,
+                    @postalCode, @caenCode, @anafVerified, 0)
+                """, Fields(value));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            return new Beneficiary(checked((int)command.LastInsertedId), value.Name, value.Cui);
+            return Build(checked((int)command.LastInsertedId), value, 0);
         }, cancellationToken, value).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
-            $"#{beneficiary.Id} · {beneficiary.Name}", AuditDetails.Identification(
-                ("Denumire", beneficiary.Name), ("CUI", beneficiary.Cui)), cancellationToken).ConfigureAwait(false);
+            $"#{beneficiary.Id} · {beneficiary.Name}", BeneficiaryRules.Identification(beneficiary), cancellationToken).ConfigureAwait(false);
         return beneficiary;
     }
 
@@ -60,18 +60,17 @@ public sealed class MariaBeneficiaryRepository(
             var version = checked(original.Version + 1);
             await using var command = Command(connection, transaction, """
                 UPDATE beneficiaries SET name=@name, normalized_name=@normalizedName, cui=@cui,
-                    normalized_cui=@normalizedCui, version=@version WHERE id=@id AND version=@oldVersion
-                """, ("@name", value.Name), ("@normalizedName", TextNormalization.UniquenessKey(value.Name)),
-                ("@cui", value.Cui), ("@normalizedCui", TextNormalization.UniquenessKey(value.Cui)),
-                ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version));
+                    normalized_cui=@normalizedCui, kind=@kind, address=@address, phone=@phone, registry_number=@registryNumber,
+                    postal_code=@postalCode, caen_code=@caenCode, anaf_verified=@anafVerified,
+                    version=@version WHERE id=@id AND version=@oldVersion
+                """, [.. Fields(value), ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version)]);
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                 throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
-            return new Beneficiary(original.Id, value.Name, value.Cui, version);
+            return Build(original.Id, value, version);
         }, cancellationToken, value, original.Id).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
             $"#{beneficiary.Id} · {beneficiary.Name}",
-            [new("Denumire", original.Name, beneficiary.Name), new("CUI", original.Cui, beneficiary.Cui)],
-            value.Reason, cancellationToken).ConfigureAwait(false);
+            BeneficiaryRules.Changes(original, beneficiary), value.Reason, cancellationToken).ConfigureAwait(false);
         return beneficiary;
     }
 
@@ -128,13 +127,26 @@ public sealed class MariaBeneficiaryRepository(
     private static async Task<Beneficiary?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction,
-            "SELECT id, name, cui, version FROM beneficiaries WHERE id=@id FOR UPDATE", ("@id", id));
+            "SELECT id, name, cui, version, kind, address, phone, registry_number, postal_code, caen_code, anaf_verified FROM beneficiaries WHERE id=@id FOR UPDATE", ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? Read(reader) : null;
     }
 
     private static Beneficiary Read(MySqlDataReader reader) =>
-        new(checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2), reader.GetInt64(3));
+        new(checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2), reader.GetInt64(3), reader.GetString(4),
+            reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9),
+            reader.GetInt64(10) != 0);
+
+    private static Beneficiary Build(int id, BeneficiaryInput value, long version) => new(id, value.Name, value.Cui, version,
+        value.Kind, value.Address, value.Phone, value.RegistryNumber, value.PostalCode, value.CaenCode, value.AnafVerified);
+
+    private static (string, object)[] Fields(BeneficiaryInput value) =>
+    [
+        ("@name", value.Name), ("@normalizedName", TextNormalization.UniquenessKey(value.Name)), ("@cui", value.Cui),
+        ("@normalizedCui", BeneficiaryRules.IdentityKey(value)), ("@kind", value.Kind), ("@address", value.Address),
+        ("@phone", value.Phone), ("@registryNumber", value.RegistryNumber), ("@postalCode", value.PostalCode),
+        ("@caenCode", value.CaenCode), ("@anafVerified", value.AnafVerified ? 1 : 0)
+    ];
 
     private static async Task EnsureUniqueAsync(MySqlConnection connection, MySqlTransaction transaction,
         BeneficiaryInput value, int? excludedId, CancellationToken token)
@@ -142,11 +154,11 @@ public sealed class MariaBeneficiaryRepository(
         await using (var cui = Command(connection, transaction, """
             SELECT name FROM beneficiaries
             WHERE normalized_cui=@normalized AND (@id IS NULL OR id<>@id) LIMIT 1
-            """, ("@normalized", TextNormalization.UniquenessKey(value.Cui)),
+            """, ("@normalized", BeneficiaryRules.IdentityKey(value)),
             ("@id", excludedId is null ? DBNull.Value : excludedId.Value)))
         {
             if (await cui.ExecuteScalarAsync(token).ConfigureAwait(false) is string existingName)
-                throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateCuiMessage(existingName));
+                throw BeneficiaryRules.DuplicateIdentity(value, existingName);
         }
         await using var name = Command(connection, transaction, """
             SELECT name, cui FROM beneficiaries
@@ -155,7 +167,7 @@ public sealed class MariaBeneficiaryRepository(
             ("@id", excludedId is null ? DBNull.Value : excludedId.Value));
         await using var reader = await name.ExecuteReaderAsync(token).ConfigureAwait(false);
         if (await reader.ReadAsync(token).ConfigureAwait(false))
-            throw new BeneficiaryOperationException($"Beneficiarul «{reader.GetString(0)}» există deja și are CUI «{reader.GetString(1)}».");
+            throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateNameMessage(reader.GetString(0), reader.GetString(1)));
     }
 
     // A concurrent save can pass the checks above and still hit uq_beneficiaries_0/uq_beneficiaries_1; report the
@@ -169,11 +181,11 @@ public sealed class MariaBeneficiaryRepository(
             await using (var cui = Command(connection, null, """
                 SELECT name FROM beneficiaries
                 WHERE normalized_cui=@normalized AND (@id IS NULL OR id<>@id) LIMIT 1
-                """, ("@normalized", TextNormalization.UniquenessKey(value.Cui)),
+                """, ("@normalized", BeneficiaryRules.IdentityKey(value)),
                 ("@id", excludedId is null ? DBNull.Value : excludedId.Value)))
             {
                 if (await cui.ExecuteScalarAsync(token).ConfigureAwait(false) is string existingName)
-                    return new(BeneficiaryRules.DuplicateCuiMessage(existingName));
+                    return BeneficiaryRules.DuplicateIdentity(value, existingName);
             }
             await using var name = Command(connection, null, """
                 SELECT name, cui FROM beneficiaries
@@ -182,12 +194,12 @@ public sealed class MariaBeneficiaryRepository(
                 ("@id", excludedId is null ? DBNull.Value : excludedId.Value));
             await using var reader = await name.ExecuteReaderAsync(token).ConfigureAwait(false);
             return await reader.ReadAsync(token).ConfigureAwait(false)
-                ? new($"Beneficiarul «{reader.GetString(0)}» există deja și are CUI «{reader.GetString(1)}».")
-                : new(BeneficiaryRules.DuplicateCuiMessage(null));
+                ? new(BeneficiaryRules.DuplicateNameMessage(reader.GetString(0), reader.GetString(1)))
+                : BeneficiaryRules.DuplicateIdentity(value, null);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            return new(BeneficiaryRules.DuplicateCuiMessage(null));
+            return BeneficiaryRules.DuplicateIdentity(value, null);
         }
     }
 

@@ -11,7 +11,7 @@
 
 <PageTitle>Beneficiari · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button></div></div>
+<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele fizice și juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button></div></div>
 @if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Mod demonstrativ.</strong> Modificările beneficiarilor sunt salvate în baza de date locală și rămân disponibile după repornire.</div></div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -19,22 +19,22 @@
 
 <section class="metrics users-metrics" aria-label="Rezumat beneficiari">
     <article><span>Total beneficiari</span><strong>@(loaded ? beneficiaries.Count.ToString() : "—")</strong><small>În registrul disponibil</small><i>♧</i></article>
-    <article><span>Înregistrați în România</span><strong>@(loaded ? beneficiaries.Count(beneficiary => beneficiary.Cui.StartsWith("RO", StringComparison.OrdinalIgnoreCase)).ToString() : "—")</strong><small>CUI cu prefix RO</small><i>◆</i></article>
-    <article><span>Fără prefix RO</span><strong>@(loaded ? beneficiaries.Count(beneficiary => !beneficiary.Cui.StartsWith("RO", StringComparison.OrdinalIgnoreCase)).ToString() : "—")</strong><small>Identificare numerică</small><i>◇</i></article>
+    <article><span>Persoane juridice</span><strong>@(loaded ? beneficiaries.Count(beneficiary => !beneficiary.IsIndividual).ToString() : "—")</strong><small>Identificate prin CUI</small><i>◆</i></article>
+    <article><span>Persoane fizice</span><strong>@(loaded ? beneficiaries.Count(beneficiary => beneficiary.IsIndividual).ToString() : "—")</strong><small>Identificate prin nume complet</small><i>◇</i></article>
     <article><span>Actualizare</span><strong>15s</strong><small>Sincronizare automată</small><i>◷</i></article>
 </section>
 
 <section class="catalog">
-    <div class="catalog-heading"><h2>Registru beneficiari <span>@Filtered.Count</span></h2><small>CUI-ul identifică în mod unic fiecare beneficiar</small></div>
-    <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută beneficiari" placeholder="Caută după nume sau CUI…" @bind="query" @bind:event="oninput" /></label></div>
+    <div class="catalog-heading"><h2>Registru beneficiari <span>@Filtered.Count</span></h2><small>CUI-ul (persoană juridică) sau numele complet (persoană fizică) identifică în mod unic fiecare beneficiar</small></div>
+    <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută beneficiari" placeholder="Caută după nume, CUI, adresă sau telefon…" @bind="query" @bind:event="oninput" /></label></div>
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă beneficiarii</h3></div> }
     else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">♧</span><h3>Nu există beneficiari pentru căutarea curentă</h3><p>Adaugă primul beneficiar sau șterge textul din câmpul de căutare.</p></div> }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>CUI</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TIP / CUI</th><th>ADRESĂ</th><th>TELEFON</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var beneficiary in Filtered)
         {
-            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Cui</span></td><td><div class="row-buttons"><button class="row-action edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)">✎</button><button class="row-action delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)">×</button></div></td></tr>
+            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Identifier</span></td><td>@(beneficiary.Address.Length == 0 ? "—" : beneficiary.Address)</td><td>@(beneficiary.Phone.Length == 0 ? "—" : beneficiary.Phone)</td><td><div class="row-buttons"><button class="row-action edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)">✎</button><button class="row-action delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)">×</button></div></td></tr>
         }
         </tbody></table></div>
     }
@@ -43,7 +43,7 @@
 @if (deleting is not null)
 {
     <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi beneficiarul?" Subject="Beneficiarul"
-                              ObjectLabel="@($"{deleting.Name} · {deleting.Cui}")"
+                              ObjectLabel="@($"{deleting.Name} · {deleting.Identifier}")"
                               Description="Beneficiarii care au proiecte sau mișcări de stoc asociate nu pot fi șterși."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteBeneficiaryAsync"
                               Cancelled="CancelDeleteAsync" />

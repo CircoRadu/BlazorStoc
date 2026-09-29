@@ -69,6 +69,7 @@
                 </ChildContent>
             </CollapsibleSection>
             <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>@(Mode.IsDemo ? "Date demonstrative" : "BlazorStoc · MariaDB")</small></div>
     </aside>

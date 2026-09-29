@@ -25,6 +25,7 @@ Microsoft.Data.Sqlite.SqliteCommand TestSqliteCommand(Microsoft.Data.Sqlite.Sqli
 }
 ProductInput ProductEdit(Product product, string reason = "Test automat") { var input = ProductInput.From(product); input.Reason = reason; return input; }
 WebUserInput UserEdit(WebUser user, string reason = "Test automat") { var input = WebUserInput.From(user); input.Reason = reason; return input; }
+BeneficiaryInput LegalInput(string name, string cui) => new() { Name = name, Cui = cui, Address = "Strada Test 1, Bucuresti", Phone = "0721 000 111" };
 BeneficiaryInput BeneficiaryEdit(Beneficiary beneficiary, string reason = "Test automat") { var input = BeneficiaryInput.From(beneficiary); input.Reason = reason; return input; }
 
 var archiveAccess = new TestAccessControl(true, "archive.admin");
@@ -84,6 +85,54 @@ Check(RestoreConfirmationRules.IsConfirmationValid("  confirma ") &&
       !RestoreConfirmationRules.IsConfirmationValid("confirmă") &&
       !RestoreConfirmationRules.IsConfirmationValid("confirma acum"),
     "Restore confirmation accepts only the exact case-sensitive word confirma");
+
+Check(MariaSchemaMigrations.All.Count > 0 && MariaSchemaMigrations.All.Select(m => m.Version).Distinct().Count() == MariaSchemaMigrations.All.Count &&
+      MariaSchemaMigrations.All.All(m => m.Statements.All(sql => sql.Split("ADD COLUMN").Length - 1 == sql.Split("ADD COLUMN IF NOT EXISTS").Length - 1 &&
+          !sql.Contains("DROP", StringComparison.OrdinalIgnoreCase)) &&
+          m.ExpectedColumns.All(c => m.Statements.Any(sql => sql.Contains($"`{c.Column}`") && sql.Contains($"`{c.Table}`")))),
+    "MariaDB migrations are idempotent (ADD COLUMN IF NOT EXISTS), never drop, and every expected column is created by its migration");
+Check(MariaSchemaMigrations.All.SelectMany(m => m.ExpectedColumns).Select(c => c.Column).Order().SequenceEqual(
+        new[] { "kind", "address", "phone", "registry_number", "postal_code", "caen_code", "anaf_verified" }.Order()),
+    "MariaDB migration 1 covers exactly the beneficiary columns used by MariaBeneficiaryRepository");
+
+var anafConfig = new AnafConfig();
+Check(AnafRules.Validate(anafConfig) is null, "ANAF default configuration is valid");
+Check(AnafRules.NormalizeCui(anafConfig, " ro9178894 ") == "9178894" && AnafRules.NormalizeCui(anafConfig, "28996610") == "28996610" &&
+      AnafRules.NormalizeCui(anafConfig, "0123") is null && AnafRules.NormalizeCui(anafConfig, "RO") is null && AnafRules.NormalizeCui(anafConfig, "12345678901") is null,
+    "ANAF CUI normalization strips RO and spaces and rejects invalid values");
+var anafRequest = AnafRules.Prepare(anafConfig, "RO9178894", new DateOnly(2026, 9, 29));
+Check(anafRequest.Cui == "9178894" && anafRequest.Body.Replace(" ", "") == "[{\"cui\":9178894,\"data\":\"2026-09-29\"}]",
+    "ANAF request template substitutes CUI and ISO date");
+var badTemplate = anafConfig.Clone(); badTemplate.Template = "[{\"cui\": {{cui}}, \"x\": {{altceva}}}]";
+var brokenJson = anafConfig.Clone(); brokenJson.Template = "[{\"cui\": {{cui}}";
+var otherHost = anafConfig.Clone(); otherHost.Url = "https://example.com/api";
+var httpUrl = anafConfig.Clone(); httpUrl.Url = "http://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva";
+var fastInterval = anafConfig.Clone(); fastInterval.Interval = 200;
+var badPath = anafConfig.Clone(); badPath.Mappings[1].Path = "$.a[*].b";
+var reservedHeader = anafConfig.Clone(); reservedHeader.Headers.Add(new AnafHeader { Name = "Authorization", Value = "x" });
+Check(AnafRules.Validate(otherHost) is not null && AnafRules.Validate(httpUrl) is not null && AnafRules.Validate(fastInterval) is not null &&
+      AnafRules.Validate(badPath) is not null && AnafRules.Validate(reservedHeader) is not null,
+    "ANAF validation rejects foreign hosts, plain HTTP, too-fast intervals, unsupported paths and reserved headers");
+foreach (var broken in new[] { badTemplate, brokenJson })
+{
+    try { AnafRules.Prepare(broken, "9178894", new DateOnly(2026, 9, 29)); Check(false, "ANAF invalid template must be rejected"); }
+    catch (AnafException) { Check(true, "ANAF unknown variable and invalid JSON templates are rejected"); }
+}
+var anafSample = AnafRules.Interpret(anafConfig, anafRequest, 200, 10,
+    "{\"found\":[{\"date_generale\":{\"cui\":9178894,\"denumire\":\"FIRMA SRL\",\"statusRO_e_Factura\":true},\"inregistrare_scop_Tva\":{\"scpTVA\":false}}],\"notFound\":[]}");
+string? AnafValue(string label) => anafSample.Mapped.Single(m => m.Label == label).Value;
+Check(anafSample.Ok && AnafValue("Denumire") == "FIRMA SRL" && AnafValue("Plătitor TVA") == "Nu" && AnafValue("RO e-Factura") == "Da" &&
+      AnafValue("Telefon") is null && AnafValue("Inactiv fiscal") is null,
+    "ANAF response mapping keeps false distinct from absent fields");
+Check(!AnafRules.Interpret(anafConfig, anafRequest, 200, 1, "{\"found\":[],\"notFound\":[9178894]}").Ok &&
+      !AnafRules.Interpret(anafConfig, anafRequest, 200, 1, "not json").Ok,
+    "ANAF unknown CUI and invalid JSON are reported as failures");
+var requiredMissing = anafConfig.Clone(); requiredMissing.Mappings[2].Missing = "error";
+Check(!AnafRules.Interpret(requiredMissing, anafRequest, 200, 1,
+    "{\"found\":[{\"date_generale\":{\"cui\":9178894,\"denumire\":\"X\"}}],\"notFound\":[]}").Ok,
+    "ANAF missing-field policy 'error' blocks a successful test");
+Check(AnafRules.Fingerprint(anafConfig) == AnafRules.Fingerprint(anafConfig.Clone()) && AnafRules.Fingerprint(anafConfig) != AnafRules.Fingerprint(fastInterval),
+    "ANAF configuration fingerprint follows content");
 
 Check(data.Count == 12, "Demonstration catalogue has 12 fictional products");
 Check(ProductSearch.Filter(data, "  POLIZOR  ", "name", "", "").Single().Id == 2, "Search is case-insensitive and trims spaces");
@@ -559,10 +608,10 @@ finally
 
 var demoBeneficiaries = new DemoBeneficiaryRepository(limitedAccess, null, auditTrail);
 Check((await demoBeneficiaries.GetBeneficiariesAsync()).Count == 3, "Demo beneficiary register is available to limited users");
-var beneficiary = await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "  Beneficiár   nou   SRL  ", Cui = "  ro12345678  " });
+var beneficiary = await demoBeneficiaries.CreateAsync(LegalInput("  Beneficiár   nou   SRL  ", "  ro12345678  "));
 Check(beneficiary.Name == "Beneficiar nou SRL" && beneficiary.Cui == "ro12345678", "Beneficiary values keep letter case and remove diacritics");
 Check(BeneficiarySearch.Filter(await demoBeneficiaries.GetBeneficiariesAsync(), "12345678").Single().Id == beneficiary.Id, "Beneficiaries can be searched by CUI");
-try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Duplicat", Cui = "RO12345678" }); throw new Exception("Duplicate CUI accepted"); }
+try { await demoBeneficiaries.CreateAsync(LegalInput("Duplicat", "RO12345678")); throw new Exception("Duplicate CUI accepted"); }
 catch (BeneficiaryOperationException exception)
 {
     Check(exception.Message == BeneficiaryRules.DuplicateCuiMessage("Beneficiar nou SRL"),
@@ -584,10 +633,44 @@ Check(unchangedCuiSaved.Cui == "RO10000001" && unchangedCuiSaved.Name == unchang
 Check(BeneficiaryRules.DuplicateCuiMessage(null) == "Există deja un beneficiar cu acest CUI." &&
       BeneficiaryRules.DuplicateCuiMessage("  ") == "Există deja un beneficiar cu acest CUI.",
     "Duplicate CUI message without a known owner falls back to the plain wording");
-try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "BENEFICIÁR NOU SRL", Cui = "RO87654321" }); throw new Exception("Duplicate beneficiary name accepted"); }
+try { await demoBeneficiaries.CreateAsync(LegalInput("BENEFICIÁR NOU SRL", "RO87654321")); throw new Exception("Duplicate beneficiary name accepted"); }
 catch (BeneficiaryOperationException exception) { Check(exception.Message.Contains("ro12345678", StringComparison.Ordinal), "Duplicate beneficiary name is rejected and reports its CUI"); }
-try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "CUI invalid", Cui = "RO-ABC" }); throw new Exception("Invalid CUI accepted"); }
+try { await demoBeneficiaries.CreateAsync(LegalInput("CUI invalid", "RO-ABC")); throw new Exception("Invalid CUI accepted"); }
 catch (BeneficiaryOperationException) { Check(true, "Invalid beneficiary CUI is rejected"); }
+var individual = await demoBeneficiaries.CreateAsync(new BeneficiaryInput
+    { Kind = BeneficiaryKinds.Individual, Name = "  Ion   Popescu ", Address = " Strada  Păcii 5 ", Phone = "0744 123.456", Cui = "RO999", RegistryNumber = "J1/2/3" });
+Check(individual.Kind == BeneficiaryKinds.Individual && individual.Name == "Ion Popescu" && individual.Address == "Strada Pacii 5" &&
+      individual.Phone == "0744123456" && individual.Cui == "" && individual.RegistryNumber == "" && !individual.AnafVerified,
+    "Individual beneficiary is normalized (spaces, diacritics, phone digits) and company fields are dropped");
+foreach (var (broken, label) in new (BeneficiaryInput, string)[]
+         {
+             (new() { Kind = BeneficiaryKinds.Individual, Name = "", Address = "A", Phone = "0744123456" }, "full name"),
+             (new() { Kind = BeneficiaryKinds.Individual, Name = "Ana Test", Address = "", Phone = "0744123456" }, "address"),
+             (new() { Kind = BeneficiaryKinds.Individual, Name = "Ana Test", Address = "A", Phone = "" }, "phone"),
+             (new() { Kind = BeneficiaryKinds.Individual, Name = "Ana Test", Address = "A", Phone = "12ab" }, "phone format"),
+             (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "RO123456", Address = "", Phone = "0744123456" }, "legal address"),
+             (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "RO123456", Address = "A", Phone = "" }, "legal phone"),
+             (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "", Address = "A", Phone = "0744123456" }, "legal CUI"),
+             (new() { Kind = BeneficiaryKinds.Legal, Name = "", Cui = "RO123456", Address = "A", Phone = "0744123456" }, "legal name"),
+             (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "RO123456", Address = "A", Phone = "0744123456", CaenCode = "12" }, "CAEN"),
+             (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "RO123456", Address = "A", Phone = "0744123456", PostalCode = "12" }, "postal code"),
+             (new() { Kind = "XX", Name = "Firma", Address = "A", Phone = "0744123456" }, "kind")
+         })
+{
+    try { await demoBeneficiaries.CreateAsync(broken); throw new Exception("Incomplete beneficiary accepted: " + label); }
+    catch (BeneficiaryOperationException) { Check(true, "Required/invalid beneficiary field rejected: " + label); }
+}
+try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Kind = BeneficiaryKinds.Individual, Name = "ion POPESCU", Address = "B", Phone = "0755123456" }); throw new Exception("Duplicate individual accepted"); }
+catch (BeneficiaryOperationException exception) { Check(exception.Message.Contains("persoană fizică") && exception.Message.Contains("Ion Popescu"), "A duplicate individual is detected by full name"); }
+var legalFull = await demoBeneficiaries.CreateAsync(new BeneficiaryInput
+    { Kind = BeneficiaryKinds.Legal, Name = " Firma  Completă SRL ", Cui = " RO 55 44 33 ", Address = "Str. Test 2", Phone = "+40 721 000 222",
+      RegistryNumber = " j40/12/2020 ", PostalCode = "012345", CaenCode = "4321", AnafVerified = true });
+Check(legalFull.Cui == "RO554433" && legalFull.Phone == "+40721000222" && legalFull.RegistryNumber == "J40/12/2020" && legalFull.PostalCode == "012345" &&
+      legalFull.CaenCode == "4321" && legalFull.AnafVerified && legalFull.Name == "Firma Completa SRL",
+    "Legal-person beneficiary keeps and normalizes the company fields and the ANAF flag");
+Check(BeneficiarySearch.Filter(await demoBeneficiaries.GetBeneficiariesAsync(), "0744 123456").Single().Id == individual.Id,
+    "Beneficiaries can be searched by phone number");
+
 Check(ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?categorie=Scule&subcategorie=Găurire", "/produse?subcategorie=G%C4%83urire&categorie=scule") &&
       ProductMenuSelection.IsSameSelection("http://localhost:5082/produse", "/produse/") &&
       ProductMenuSelection.IsSameSelection("http://localhost:5082/produse?edit=3", "/produse"),
@@ -624,7 +707,7 @@ catch (BeneficiaryOperationException) { Check(true, "Beneficiary deletion requir
 Check((await demoBeneficiaries.GetBeneficiariesAsync()).Any(item => item.Id == updatedBeneficiary.Id), "Rejected beneficiary deletion preserves the object");
 await demoBeneficiaries.DeleteAsync(updatedBeneficiary, "Test automat");
 Check(!(await demoBeneficiaries.GetBeneficiariesAsync()).Any(item => item.Id == updatedBeneficiary.Id), "Beneficiary can be deleted");
-Check(auditTrail.Entries.Count(entry => entry.EntityType == AuditEntities.Beneficiary) == 4, "Beneficiary changes are written to the audit trail");
+Check(auditTrail.Entries.Count(entry => entry.EntityType == AuditEntities.Beneficiary) == 6, "Beneficiary changes are written to the audit trail");
 
 var sqliteTestRoot = Path.Combine(Path.GetTempPath(), $"blazorstoc-sqlite-{Guid.NewGuid():N}");
 Directory.CreateDirectory(sqliteTestRoot);
@@ -721,8 +804,19 @@ try
     }
 
     var firstBeneficiaries = new SqliteBeneficiaryRepository(firstStore, administrator);
-    var persistentBeneficiary = await firstBeneficiaries.CreateAsync(new BeneficiaryInput
-        { Name = "Beneficiar persistent", Cui = "RO19999999" });
+    var persistentBeneficiary = await firstBeneficiaries.CreateAsync(LegalInput("Beneficiar persistent", "RO19999999"));
+    var sqliteIndividual = await firstBeneficiaries.CreateAsync(new BeneficiaryInput
+        { Kind = BeneficiaryKinds.Individual, Name = "Maria Ionescu", Address = "Str. Lalelelor 3", Phone = "0722333444" });
+    var sqliteLegal = await firstBeneficiaries.CreateAsync(new BeneficiaryInput
+        { Kind = BeneficiaryKinds.Legal, Name = "Firma Anaf SRL", Cui = "9178894", Address = "Str. Test 9", Phone = "0722333555",
+          RegistryNumber = "J40/1/2020", PostalCode = "010101", CaenCode = "4321", AnafVerified = true });
+    var reloadedNew = (await firstBeneficiaries.GetBeneficiariesAsync()).ToDictionary(item => item.Id);
+    Check(reloadedNew[sqliteIndividual.Id] == sqliteIndividual && reloadedNew[sqliteLegal.Id] == sqliteLegal &&
+          sqliteIndividual.IsIndividual && sqliteLegal.AnafVerified && sqliteLegal.CaenCode == "4321",
+        "SQLite stores and reloads individual and legal-person beneficiaries with all fields");
+    try { await firstBeneficiaries.CreateAsync(new BeneficiaryInput { Kind = BeneficiaryKinds.Individual, Name = "MARIA IONESCU", Address = "x", Phone = "0722333000" }); throw new Exception("SQLite duplicate individual accepted"); }
+    catch (BeneficiaryOperationException exception) { Check(exception.Message.Contains("persoană fizică"), "SQLite detects a duplicate individual by full name"); }
+
     var firstUsers = new SqliteUserRepository(firstStore, administrator);
     var persistentUser = await firstUsers.CreateAsync(new WebUserInput
     {
@@ -925,7 +1019,7 @@ try
 
     try
     {
-        await firstBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Alt beneficiar", Cui = persistentBeneficiary.Cui });
+        await firstBeneficiaries.CreateAsync(LegalInput("Alt beneficiar", persistentBeneficiary.Cui));
         throw new Exception("Duplicate persistent beneficiary CUI accepted");
     }
     catch (BeneficiaryOperationException exception)
@@ -934,7 +1028,7 @@ try
             "SQLite duplicate CUI validation reports the existing beneficiary name");
     }
 
-    var otherPersistentBeneficiary = await firstBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar cu alt CUI", Cui = "RO55667788" });
+    var otherPersistentBeneficiary = await firstBeneficiaries.CreateAsync(LegalInput("Beneficiar cu alt CUI", "RO55667788"));
     var cuiTakenEdit = BeneficiaryEdit(otherPersistentBeneficiary); cuiTakenEdit.Cui = persistentBeneficiary.Cui.ToLowerInvariant();
     try
     {
@@ -1530,8 +1624,8 @@ try
     await RejectedMovement(() => stockMovements.CreateAsync(9999, MovementInput(StockMovementKind.Entry, 1)), "A missing product is rejected");
     Check((await movementProducts.GetProductAsync(product.Id))!.Quantity == -2, "Rejected movements do not change the stock");
 
-    var movementBeneficiary = await movementBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar miscari", Cui = "RO18888881" });
-    var otherBeneficiary = await movementBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Alt beneficiar", Cui = "RO18888882" });
+    var movementBeneficiary = await movementBeneficiaries.CreateAsync(LegalInput("Beneficiar miscari", "RO18888881"));
+    var otherBeneficiary = await movementBeneficiaries.CreateAsync(LegalInput("Alt beneficiar", "RO18888882"));
     var movementProject = await movementProjects.CreateAsync(new ProjectInput { BeneficiaryId = movementBeneficiary.Id, Name = "Proiect miscari", Observations = "" });
     await RejectedMovement(() => stockMovements.CreateAsync(product.Id, MovementInput(StockMovementKind.Exit, 1, beneficiaryId: otherBeneficiary.Id, projectId: movementProject.Id)),
         "A project must belong to the chosen beneficiary");
@@ -1700,7 +1794,7 @@ finally
         var otherProduct = await CreateProductAsync(vsProducts, new ProductInput { Name = "Alt produs in masini", Category = "Masini", Subcategory = "Test" });
         var van = await vsVehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-01-FDG", Description = "Dacia Dokker" });
         var truck = await vsVehicles.CreateAsync(new VehicleInput { PlateNumber = "B-123-ABC", Description = "Autoutilitara" });
-        var xBeneficiary = await vsBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar masini", Cui = "RO17777771" });
+        var xBeneficiary = await vsBeneficiaries.CreateAsync(LegalInput("Beneficiar masini", "RO17777771"));
         var allMovements = new StockMovementQuery(null, false, 1, 0);
         StockMovementInput InputOf(StockMovementKind kind, int quantity, ExitDestination? destination = null, int? vehicleId = null, int? sourceId = null,
             string description = "Test", int? beneficiaryId = null, string reason = "") =>
@@ -2043,8 +2137,8 @@ try
     var received = new List<ChangeEvent>();
     using var subscription = feed.Subscribe(change => { received.Add(change); return Task.CompletedTask; });
 
-    var feedBeneficiary = await feedBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar feed", Cui = "RO18777771" });
-    var feedOtherBeneficiary = await feedBeneficiaries.CreateAsync(new BeneficiaryInput { Name = "Beneficiar feed doi", Cui = "RO18777772" });
+    var feedBeneficiary = await feedBeneficiaries.CreateAsync(LegalInput("Beneficiar feed", "RO18777771"));
+    var feedOtherBeneficiary = await feedBeneficiaries.CreateAsync(LegalInput("Beneficiar feed doi", "RO18777772"));
     var feedProject = await feedProjects.CreateAsync(new ProjectInput { BeneficiaryId = feedBeneficiary.Id, Name = "Proiect feed", Observations = "" });
     Check(received.Count == 1 && received[0].EntityType == AuditEntities.Project && received[0].Action == AuditActions.Create &&
           received[0].EntityId == feedProject.Id.ToString() && received[0].ProjectId == feedProject.Id &&

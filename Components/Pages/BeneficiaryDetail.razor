@@ -28,7 +28,15 @@ else if (error is not null)
 else if (beneficiary is not null)
 {
     <div class="page-heading">
-        <div><p class="eyebrow">BENEFICIAR</p><h1>@beneficiary.Name</h1><p class="muted">CUI @beneficiary.Cui</p></div>
+        <div><p class="eyebrow">BENEFICIAR</p><h1>@beneficiary.Name</h1><p class="muted">@(beneficiary.IsIndividual ? "Persoană fizică" : $"CUI {beneficiary.Cui}")@(beneficiary.Address.Length > 0 ? $" · {beneficiary.Address}" : "")@(beneficiary.Phone.Length > 0 ? $" · tel. {beneficiary.Phone}" : "")</p>
+            @if (!beneficiary.IsIndividual && (beneficiary.RegistryNumber.Length > 0 || beneficiary.PostalCode.Length > 0 || beneficiary.CaenCode.Length > 0))
+            {
+                <p class="muted">@string.Join(" · ", new[] { beneficiary.RegistryNumber.Length > 0 ? $"Reg. Com. {beneficiary.RegistryNumber}" : null, beneficiary.PostalCode.Length > 0 ? $"Cod poștal {beneficiary.PostalCode}" : null, beneficiary.CaenCode.Length > 0 ? $"CAEN {beneficiary.CaenCode}" : null }.Where(part => part is not null))</p>
+            }
+            @if (!beneficiary.IsIndividual)
+            {
+                <p><span class="anaf-source @(beneficiary.AnafVerified ? "ok" : "warn")"><span aria-hidden="true">@(beneficiary.AnafVerified ? "✓" : "⚠")</span> @(beneficiary.AnafVerified ? "Date preluate din ANAF" : "Date introduse manual")</span></p>
+            }</div>
         <div class="heading-actions">
             @if (canManage) { <button class="refresh" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenEditBeneficiaryAsync">Editează</button> }
             <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button>

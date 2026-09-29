@@ -1,4 +1,4 @@
-using BlazorStoc.Components;
+﻿using BlazorStoc.Components;
 using BlazorStoc.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -24,6 +24,27 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 var mariaPrivateConfigPath = builder.Configuration["Database:PrivateConfigPath"]
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "application-connection.private.json");
 builder.Configuration.AddJsonFile(mariaPrivateConfigPath, optional: true, reloadOnChange: false);
+// Schema-migration account (blazorstoc_migrator). Its private file has the same shape as the application one
+// ({ "Database": { "User", "Password" } }) but must NOT override the application account, so it is mapped explicitly to
+// Database:MigratorUser / Database:MigratorPassword. Default: next to the application file; the project's
+// local-secrets folder is the fallback. Optional: without it the schema is only checked, never changed.
+var migratorPrivateConfigPath = builder.Configuration["Database:MigratorPrivateConfigPath"] is { Length: > 0 } configuredMigratorPath
+    ? configuredMigratorPath
+    : new[]
+        {
+            Path.Combine(Path.GetDirectoryName(mariaPrivateConfigPath) ?? "", "migration-account.private.json"),
+            Path.Combine(builder.Environment.ContentRootPath, "local-secrets", "migration-account.private.json")
+        }.FirstOrDefault(File.Exists);
+if (migratorPrivateConfigPath is not null && File.Exists(migratorPrivateConfigPath))
+{
+    using var migratorFile = System.Text.Json.JsonDocument.Parse(File.ReadAllText(migratorPrivateConfigPath));
+    if (migratorFile.RootElement.TryGetProperty("Database", out var migratorSection))
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Database:MigratorUser"] = migratorSection.TryGetProperty("User", out var migratorUser) ? migratorUser.GetString() : null,
+            ["Database:MigratorPassword"] = migratorSection.TryGetProperty("Password", out var migratorPassword) ? migratorPassword.GetString() : null
+        });
+}
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
 var demo = builder.Configuration.GetValue("App:DemoMode", true);
@@ -31,6 +52,7 @@ if (!demo && (string.IsNullOrWhiteSpace(builder.Configuration["Database:Password
               (builder.Configuration["Authentication:Password"]?.Length ?? 0) < 12))
     throw new InvalidOperationException("Configurați Database__Password și Authentication__Password (minimum 12 caractere) pentru modul MariaDB.");
 builder.Services.AddSingleton(new AppMode(demo));
+builder.Services.AddSingleton<MariaSchemaMigrator>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddRazorPages();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
@@ -48,6 +70,10 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IAccessControl, CurrentUserAccess>();
+builder.Services.AddHttpClient(AnafService.ClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<AnafStore>();
+builder.Services.AddScoped<IAnafService, AnafService>();
 builder.Services.AddScoped<IArchiveService, ArchiveService>();
 if (demo)
 {
@@ -209,5 +235,31 @@ app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileS
 app.MapHub<ChangesHub>(ChangesHub.Path);
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+// MariaDB mode: bring the schema up to date with the migrator account before serving requests (idempotent). Without
+// that account only a warning is logged. "--migrate-schema" applies the migrations and exits (0 = schema is current).
+var migrateOnly = args.Contains("--migrate-schema");
+if (!demo || migrateOnly)
+{
+    var migrator = app.Services.GetRequiredService<MariaSchemaMigrator>();
+    try
+    {
+        var report = await migrator.MigrateAsync();
+        if (report.MissingColumns.Count > 0)
+            app.Logger.LogError("MariaDB schema is behind the application: missing {Columns}. {Hint}", string.Join(", ", report.MissingColumns),
+                report.MigratorConfigured ? "The migration ran but the columns are still missing." : "Configure Database:MigratorUser/MigratorPassword (migration-account.private.json) and restart, or run --migrate-schema.");
+        else app.Logger.LogInformation("MariaDB schema is current ({Applied} migration(s) applied now).", report.Applied.Count);
+        if (migrateOnly) return report.MissingColumns.Count == 0 ? 0 : 1;
+    }
+    catch (Exception exception) when (!migrateOnly)
+    {
+        app.Logger.LogError("MariaDB schema check/migration failed ({ErrorType}); the application starts without it.", exception.GetType().Name);
+    }
+    catch (Exception exception)
+    {
+        app.Logger.LogError("MariaDB schema migration failed ({ErrorType}): {Message}", exception.GetType().Name, exception.Message);
+        return 1;
+    }
+}
 app.Run();
+return 0;
 public partial class Program { }

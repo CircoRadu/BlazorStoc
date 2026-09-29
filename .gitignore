@@ -11,3 +11,6 @@ artifacts/
 data/
 *.user
 *.log
+
+# Credentiale MariaDB (nu se comit)
+*.private.*

@@ -13,7 +13,7 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = SqliteLocalStore.Command(connection, null,
-            "SELECT id,name,cui,version FROM beneficiaries ORDER BY name,id");
+            "SELECT id,name,cui,version,kind,address,phone,registry_number,postal_code,caen_code,anaf_verified FROM beneficiaries ORDER BY name,id");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var beneficiaries = new List<Beneficiary>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) beneficiaries.Add(Read(reader));
@@ -31,16 +31,16 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
         {
             await EnsureUniqueAsync(connection, transaction, value, null, cancellationToken).ConfigureAwait(false);
             await using var insert = SqliteLocalStore.Command(connection, transaction, """
-                INSERT INTO beneficiaries(name,normalized_name,cui,normalized_cui,version)
-                VALUES(@name,@normalizedName,@cui,@normalizedCui,0); SELECT last_insert_rowid();
-                """, ("@name", value.Name), ("@normalizedName", TextNormalization.UniquenessKey(value.Name)),
-                ("@cui", value.Cui), ("@normalizedCui", TextNormalization.UniquenessKey(value.Cui)));
+                INSERT INTO beneficiaries(name,normalized_name,cui,normalized_cui,kind,address,phone,registry_number,
+                    postal_code,caen_code,anaf_verified,version)
+                VALUES(@name,@normalizedName,@cui,@normalizedCui,@kind,@address,@phone,@registryNumber,
+                    @postalCode,@caenCode,@anafVerified,0); SELECT last_insert_rowid();
+                """, Fields(value));
             var id = checked((int)(long)(await insert.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!);
-            var beneficiary = new Beneficiary(id, value.Name, value.Cui);
+            var beneficiary = Build(id, value, 0);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
                 AuditEntities.Beneficiary, AuditActions.Create, $"#{id} · {beneficiary.Name}",
-                AuditDetails.Identification(("Denumire", beneficiary.Name), ("CUI", beneficiary.Cui)),
-                string.Empty, id.ToString()), cancellationToken).ConfigureAwait(false);
+                BeneficiaryRules.Identification(beneficiary), string.Empty, id.ToString()), cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return beneficiary;
         }
@@ -66,17 +66,16 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
             var version = checked(original.Version + 1);
             await using var update = SqliteLocalStore.Command(connection, transaction, """
                 UPDATE beneficiaries SET name=@name,normalized_name=@normalizedName,cui=@cui,
-                    normalized_cui=@normalizedCui,version=@version WHERE id=@id AND version=@oldVersion
-                """, ("@name", value.Name), ("@normalizedName", TextNormalization.UniquenessKey(value.Name)),
-                ("@cui", value.Cui), ("@normalizedCui", TextNormalization.UniquenessKey(value.Cui)),
-                ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version));
+                    normalized_cui=@normalizedCui,kind=@kind,address=@address,phone=@phone,registry_number=@registryNumber,
+                    postal_code=@postalCode,caen_code=@caenCode,anaf_verified=@anafVerified,
+                    version=@version WHERE id=@id AND version=@oldVersion
+                """, [.. Fields(value), ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version)]);
             if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                 throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
-            var beneficiary = new Beneficiary(original.Id, value.Name, value.Cui, version);
+            var beneficiary = Build(original.Id, value, version);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
                 AuditEntities.Beneficiary, AuditActions.Edit, $"#{beneficiary.Id} · {beneficiary.Name}",
-                AuditDetails.Changes(new AuditChange("Denumire", original.Name, beneficiary.Name),
-                    new AuditChange("CUI", original.Cui, beneficiary.Cui)), value.Reason, beneficiary.Id.ToString()),
+                AuditDetails.Changes(BeneficiaryRules.Changes(original, beneficiary).ToArray()), value.Reason, beneficiary.Id.ToString()),
                 cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return beneficiary;
@@ -129,24 +128,37 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
         int id, CancellationToken token)
     {
         await using var command = SqliteLocalStore.Command(connection, transaction,
-            "SELECT id,name,cui,version FROM beneficiaries WHERE id=@id", ("@id", id));
+            "SELECT id,name,cui,version,kind,address,phone,registry_number,postal_code,caen_code,anaf_verified FROM beneficiaries WHERE id=@id", ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false) ? Read(reader) : null;
     }
 
     private static Beneficiary Read(SqliteDataReader reader) =>
-        new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3));
+        new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3), reader.GetString(4),
+            reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9),
+            reader.GetInt64(10) != 0);
+
+    private static Beneficiary Build(int id, BeneficiaryInput value, long version) => new(id, value.Name, value.Cui, version,
+        value.Kind, value.Address, value.Phone, value.RegistryNumber, value.PostalCode, value.CaenCode, value.AnafVerified);
+
+    private static (string, object?)[] Fields(BeneficiaryInput value) =>
+    [
+        ("@name", value.Name), ("@normalizedName", TextNormalization.UniquenessKey(value.Name)), ("@cui", value.Cui),
+        ("@normalizedCui", BeneficiaryRules.IdentityKey(value)), ("@kind", value.Kind), ("@address", value.Address),
+        ("@phone", value.Phone), ("@registryNumber", value.RegistryNumber), ("@postalCode", value.PostalCode),
+        ("@caenCode", value.CaenCode), ("@anafVerified", value.AnafVerified ? 1 : 0)
+    ];
 
     private static async Task EnsureUniqueAsync(SqliteConnection connection, SqliteTransaction transaction,
         BeneficiaryInput value, int? excludedId, CancellationToken token)
     {
-        await using (var cui = SqliteLocalStore.Command(connection, transaction, """
+        await using (var identity = SqliteLocalStore.Command(connection, transaction, """
             SELECT name FROM beneficiaries
             WHERE normalized_cui=@normalized AND (@id IS NULL OR id<>@id) LIMIT 1
-            """, ("@normalized", TextNormalization.UniquenessKey(value.Cui)), ("@id", excludedId)))
+            """, ("@normalized", BeneficiaryRules.IdentityKey(value)), ("@id", excludedId)))
         {
-            if (await cui.ExecuteScalarAsync(token).ConfigureAwait(false) is string existingName)
-                throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateCuiMessage(existingName));
+            if (await identity.ExecuteScalarAsync(token).ConfigureAwait(false) is string existingName)
+                throw BeneficiaryRules.DuplicateIdentity(value, existingName);
         }
         await using var name = SqliteLocalStore.Command(connection, transaction, """
             SELECT name,cui FROM beneficiaries
@@ -154,7 +166,7 @@ public sealed class SqliteBeneficiaryRepository(SqliteLocalStore store, IAccessC
             """, ("@normalized", TextNormalization.UniquenessKey(value.Name)), ("@id", excludedId));
         await using var reader = await name.ExecuteReaderAsync(token).ConfigureAwait(false);
         if (await reader.ReadAsync(token).ConfigureAwait(false))
-            throw new BeneficiaryOperationException($"Beneficiarul «{reader.GetString(0)}» există deja și are CUI «{reader.GetString(1)}».");
+            throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateNameMessage(reader.GetString(0), reader.GetString(1)));
     }
 
     private Task EnsureOperatorAsync(CancellationToken token) =>

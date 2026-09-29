@@ -38,6 +38,15 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             await ConfigureConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
             await ExecuteAsync(connection, null, SchemaSql, cancellationToken).ConfigureAwait(false);
             await EnsureAuditArchiveOperationColumnAsync(connection, cancellationToken).ConfigureAwait(false);
+            // Individual / legal person beneficiaries: older databases receive the new columns here.
+            foreach (var (column, definition) in new[]
+                     {
+                         ("kind", "TEXT NOT NULL DEFAULT 'PJ'"), ("address", "TEXT NOT NULL DEFAULT ''"), ("phone", "TEXT NOT NULL DEFAULT ''"),
+                         ("registry_number", "TEXT NOT NULL DEFAULT ''"), ("postal_code", "TEXT NOT NULL DEFAULT ''"),
+                         ("caen_code", "TEXT NOT NULL DEFAULT ''"), ("anaf_verified", "INTEGER NOT NULL DEFAULT 0")
+                     })
+                await EnsureColumnAsync(connection, "beneficiaries", column,
+                    $"ALTER TABLE beneficiaries ADD COLUMN {column} {definition}", cancellationToken).ConfigureAwait(false);
             await EnsureColumnAsync(connection, "stock_movements", "project_id",
                 "ALTER TABLE stock_movements ADD COLUMN project_id INTEGER NULL REFERENCES projects(id) ON DELETE RESTRICT",
                 cancellationToken).ConfigureAwait(false);
@@ -226,15 +235,16 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
 
             foreach (var beneficiary in new[]
                      {
-                         new Beneficiary(1, "Construct Demo SRL", "RO10000001"),
-                         new Beneficiary(2, "Atelier Tehnic SRL", "RO10000002"),
-                         new Beneficiary(3, "Servicii Industriale SA", "10000003")
+                         new Beneficiary(1, "Construct Demo SRL", "RO10000001", 0, BeneficiaryKinds.Legal, "Strada Demo 1, Bucuresti", "0721000001"),
+                         new Beneficiary(2, "Atelier Tehnic SRL", "RO10000002", 0, BeneficiaryKinds.Legal, "Strada Demo 2, Cluj-Napoca", "0721000002"),
+                         new Beneficiary(3, "Servicii Industriale SA", "10000003", 0, BeneficiaryKinds.Legal, "Strada Demo 3, Timisoara", "0721000003")
                      })
             {
                 await using var insert = Command(connection, transaction, """
-                    INSERT INTO beneficiaries(id,name,normalized_name,cui,normalized_cui,version)
-                    VALUES(@id,@name,@normalizedName,@cui,@normalizedCui,0)
-                    """, ("@id", beneficiary.Id), ("@name", beneficiary.Name),
+                    INSERT INTO beneficiaries(id,name,normalized_name,cui,normalized_cui,kind,address,phone,version)
+                    VALUES(@id,@name,@normalizedName,@cui,@normalizedCui,@kind,@address,@phone,0)
+                    """, ("@id", beneficiary.Id), ("@name", beneficiary.Name), ("@kind", beneficiary.Kind),
+                    ("@address", beneficiary.Address), ("@phone", beneficiary.Phone),
                     ("@normalizedName", TextNormalization.UniquenessKey(beneficiary.Name)), ("@cui", beneficiary.Cui),
                     ("@normalizedCui", TextNormalization.UniquenessKey(beneficiary.Cui)));
                 await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
@@ -556,6 +566,13 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             normalized_name TEXT NOT NULL UNIQUE,
             cui TEXT NOT NULL,
             normalized_cui TEXT NOT NULL UNIQUE,
+            kind TEXT NOT NULL DEFAULT 'PJ',
+            address TEXT NOT NULL DEFAULT '',
+            phone TEXT NOT NULL DEFAULT '',
+            registry_number TEXT NOT NULL DEFAULT '',
+            postal_code TEXT NOT NULL DEFAULT '',
+            caen_code TEXT NOT NULL DEFAULT '',
+            anaf_verified INTEGER NOT NULL DEFAULT 0,
             version INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS vehicles (

@@ -296,3 +296,48 @@
 .uncertain-badge { display:inline-block; margin-left:8px; padding:2px 7px; border-radius:5px; background:#fbf4e6; color:#a78135; font-size:10px; font-weight:600; white-space:nowrap; }
 .pickup-value-input { width:90px; }
 .negative-stock { color:#b3675a; font-weight:650; }
+.settings-tabs { display:flex; gap:4px; padding:0 24px; border-bottom:1px solid var(--line); overflow-x:auto; }
+.settings-tab { border:0; border-bottom:3px solid transparent; background:none; padding:18px 16px 14px; font-size:13px; font-weight:650; color:#5c706d; white-space:nowrap; }
+.settings-tab:hover { color:var(--green); }
+.settings-tab.active { color:var(--green); border-bottom-color:var(--green); }
+.settings-body { padding:24px; }
+.settings-body > p { max-width:720px; line-height:1.7; }
+.settings-form { margin:18px 0 24px; max-width:520px; }
+.settings-form label { display:block; font-size:12px; font-weight:600; margin-bottom:8px; }
+.settings-form-row { display:flex; gap:10px; margin-bottom:8px; }
+.settings-form-row input { flex:1; min-width:0; }
+.settings-result td:first-child { width:220px; font-weight:600; color:#526561; }
+.anaf-section { border:1px solid var(--line); border-radius:8px; margin:0 0 20px; padding:14px 18px 18px; min-width:0; }
+.anaf-section legend { font-weight:650; padding:0 8px; }
+.anaf-section h3 { font-size:14px; margin:18px 0 6px; }
+.anaf-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:10px; }
+.anaf-grid label, .anaf-block { display:flex; flex-direction:column; gap:6px; font-size:12px; font-weight:600; }
+.anaf-grid .anaf-wide { grid-column:1 / -1; }
+.anaf-grid label.anaf-check, label.anaf-check { flex-direction:row; align-items:center; gap:8px; }
+.anaf-grid input:not([type=checkbox]), .anaf-block textarea { width:100%; }
+.anaf-block textarea { font-family:Consolas,monospace; font-size:12px; border:1px solid #e0e7e3; border-radius:6px; padding:10px; }
+.anaf-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.anaf-row input:not([type=checkbox]) { flex:1; min-width:0; }
+.anaf-mappings input:not([type=checkbox]), .anaf-mappings select { width:100%; min-width:120px; }
+.anaf-status { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin:0 0 18px; font-size:12px; }
+.anaf-badge { padding:5px 9px; border-radius:5px; font-size:11px; font-weight:650; }
+.anaf-badge.ok, .anaf-message.ok { background:#eaf5ee; color:#337a59; }
+.anaf-badge.warn, .anaf-message.warn { background:#fbf4e6; color:#a78135; }
+.anaf-message { padding:11px 14px; border-radius:7px; margin:0 0 14px; font-size:12px; }
+.anaf-message.error { background:#fff0eb; color:#a9564d; border:1px solid #eacbc0; }
+.anaf-errors { color:#a9564d; font-size:12px; line-height:1.7; }
+.anaf-pre { background:#f8faf9; border:1px solid var(--line); border-radius:6px; padding:12px; font-size:11px; overflow:auto; max-height:320px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.settings-form { max-width:none; }
+.settings-body details { margin-top:12px; font-size:12px; }
+.beneficiary-kind { border:1px solid var(--line); border-radius:8px; margin:0 0 18px; padding:8px 16px 12px; display:flex; gap:22px; flex-wrap:wrap; }
+.beneficiary-kind legend { font-size:12px; font-weight:650; padding:0 6px; }
+.beneficiary-kind label { display:flex; align-items:center; gap:8px; font-size:13px; }
+.beneficiary-cui-row { grid-column:1 / -1; display:flex; flex-direction:column; gap:6px; font-size:12px; font-weight:600; }
+.beneficiary-cui-row small { font-weight:400; color:var(--muted); }
+.beneficiary-cui-line { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.beneficiary-cui-line input { width:100%; max-width:320px; }
+.anaf-source-cell { grid-column:1 / -1; }
+.beneficiary-anaf-message { grid-column:1 / -1; margin:0; }
+.anaf-source { display:inline-flex; align-items:center; gap:7px; padding:6px 11px; border-radius:6px; font-size:12px; font-weight:650; }
+.anaf-source.ok { background:#eaf5ee; color:#2f7d55; }
+.anaf-source.warn { background:#fbf4e6; color:#9a7420; }

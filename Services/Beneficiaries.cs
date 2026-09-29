@@ -3,28 +3,92 @@ using System.Text.RegularExpressions;
 
 namespace BlazorStoc.Services;
 
-public sealed record Beneficiary(int Id, string Name, string Cui, long Version = 0);
-
-public sealed class BeneficiaryInput
+public static class BeneficiaryKinds
 {
-    [Required(ErrorMessage = "Completează numele beneficiarului.")]
+    public const string Individual = "PF";
+    public const string Legal = "PJ";
+    public static bool IsValid(string? kind) => kind is Individual or Legal;
+}
+
+// Kind PF: Name is the full name (the identity), Cui and the company fields are empty. Kind PJ: Cui is the identity and
+// Name is the company name. AnafVerified records that the company data was taken from ANAF and left unchanged.
+public sealed record Beneficiary(int Id, string Name, string Cui, long Version = 0, string Kind = BeneficiaryKinds.Legal,
+    string Address = "", string Phone = "", string RegistryNumber = "", string PostalCode = "", string CaenCode = "",
+    bool AnafVerified = false)
+{
+    public bool IsIndividual => Kind == BeneficiaryKinds.Individual;
+    public string Identifier => IsIndividual ? "Persoană fizică" : Cui;
+}
+
+public sealed class BeneficiaryInput : IValidatableObject
+{
+    public string Kind { get; set; } = BeneficiaryKinds.Legal;
+
     [StringLength(200, ErrorMessage = "Numele poate avea cel mult 200 de caractere.")]
     public string Name { get; set; } = "";
 
-    [Required(ErrorMessage = "Completează CUI-ul beneficiarului.")]
     [StringLength(12, ErrorMessage = "CUI-ul poate avea cel mult 12 caractere.")]
-    [RegularExpression(@"^(?i:RO)?[0-9]{2,10}$", ErrorMessage = "CUI-ul trebuie să conțină 2–10 cifre, opțional precedate de RO.")]
     public string Cui { get; set; } = "";
+
+    [StringLength(300, ErrorMessage = "Adresa poate avea cel mult 300 de caractere.")]
+    public string Address { get; set; } = "";
+
+    [StringLength(20, ErrorMessage = "Numărul de telefon poate avea cel mult 20 de caractere.")]
+    public string Phone { get; set; } = "";
+
+    [StringLength(40, ErrorMessage = "Numărul din Registrul Comerțului poate avea cel mult 40 de caractere.")]
+    public string RegistryNumber { get; set; } = "";
+
+    [StringLength(10, ErrorMessage = "Codul poștal poate avea cel mult 10 caractere.")]
+    public string PostalCode { get; set; } = "";
+
+    [StringLength(4, ErrorMessage = "Codul CAEN poate avea cel mult 4 caractere.")]
+    public string CaenCode { get; set; } = "";
+
+    public bool AnafVerified { get; set; }
 
     [StringLength(ChangeReasonRules.MaximumLength, ErrorMessage = ChangeReasonRules.TooLongMessage)]
     public string Reason { get; set; } = "";
 
+    public bool IsIndividual => Kind == BeneficiaryKinds.Individual;
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!BeneficiaryKinds.IsValid(Kind))
+        {
+            yield return new("Alege persoană fizică sau persoană juridică.", [nameof(Kind)]);
+            yield break;
+        }
+        if (string.IsNullOrWhiteSpace(Name))
+            yield return new(IsIndividual ? "Completează numele complet." : "Completează denumirea.", [nameof(Name)]);
+        if (string.IsNullOrWhiteSpace(Address)) yield return new("Completează adresa.", [nameof(Address)]);
+        if (string.IsNullOrWhiteSpace(Phone)) yield return new("Completează numărul de telefon.", [nameof(Phone)]);
+        else if (!BeneficiaryRules.PhonePattern.IsMatch(BeneficiaryRules.NormalizePhone(Phone)))
+            yield return new("Numărul de telefon trebuie să conțină 7–15 cifre, opțional precedate de +.", [nameof(Phone)]);
+        if (IsIndividual) yield break;
+        if (string.IsNullOrWhiteSpace(Cui)) yield return new("Completează CUI-ul.", [nameof(Cui)]);
+        else if (!BeneficiaryRules.CuiPattern.IsMatch(BeneficiaryRules.CompactValue(Cui)))
+            yield return new("CUI-ul trebuie să conțină 2–10 cifre, opțional precedate de RO.", [nameof(Cui)]);
+        if (PostalCode.Length > 0 && !BeneficiaryRules.PostalCodePattern.IsMatch(BeneficiaryRules.CompactValue(PostalCode)))
+            yield return new("Codul poștal trebuie să conțină 5 sau 6 cifre.", [nameof(PostalCode)]);
+        if (CaenCode.Length > 0 && !BeneficiaryRules.CaenPattern.IsMatch(BeneficiaryRules.CompactValue(CaenCode)))
+            yield return new("Codul CAEN trebuie să conțină 3 sau 4 cifre.", [nameof(CaenCode)]);
+    }
+
     public BeneficiaryInput Validated(bool requiresReason = false)
     {
+        var individual = IsIndividual;
         var normalized = new BeneficiaryInput
         {
+            Kind = Kind,
             Name = TextNormalization.ForObjectNameOrCode(Name),
-            Cui = TextNormalization.ForObjectNameOrCode(Cui),
+            Cui = individual ? "" : BeneficiaryRules.CompactValue(Cui),
+            Address = TextNormalization.ForObjectNameOrCode(Address),
+            Phone = BeneficiaryRules.NormalizePhone(Phone),
+            RegistryNumber = individual ? "" : TextNormalization.ForObjectNameOrCode(RegistryNumber).ToUpperInvariant(),
+            PostalCode = individual ? "" : BeneficiaryRules.CompactValue(PostalCode),
+            CaenCode = individual ? "" : BeneficiaryRules.CompactValue(CaenCode),
+            AnafVerified = !individual && AnafVerified,
             Reason = ChangeReasonRules.Normalize(Reason)
         };
         var results = new List<ValidationResult>();
@@ -35,7 +99,12 @@ public sealed class BeneficiaryInput
         return normalized;
     }
 
-    public static BeneficiaryInput From(Beneficiary beneficiary) => new() { Name = beneficiary.Name, Cui = beneficiary.Cui };
+    public static BeneficiaryInput From(Beneficiary beneficiary) => new()
+    {
+        Kind = beneficiary.Kind, Name = beneficiary.Name, Cui = beneficiary.Cui, Address = beneficiary.Address,
+        Phone = beneficiary.Phone, RegistryNumber = beneficiary.RegistryNumber, PostalCode = beneficiary.PostalCode,
+        CaenCode = beneficiary.CaenCode, AnafVerified = beneficiary.AnafVerified
+    };
 }
 
 public sealed class BeneficiaryOperationException(string message) : Exception(message);
@@ -55,12 +124,61 @@ public static class BeneficiarySearch
         query = query.Trim();
         return query.Length == 0 ? beneficiaries : beneficiaries.Where(beneficiary =>
             beneficiary.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-            beneficiary.Cui.Contains(query.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
+            beneficiary.Cui.Contains(query.Replace(" ", ""), StringComparison.OrdinalIgnoreCase) ||
+            beneficiary.Address.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            (BeneficiaryRules.NormalizePhone(query) is { Length: > 0 } phone && beneficiary.Phone.Contains(phone, StringComparison.Ordinal)));
     }
 }
 
 public static class BeneficiaryRules
 {
+    public static readonly Regex CuiPattern = new(@"^(?i:RO)?[0-9]{2,10}$", RegexOptions.Compiled);
+    public static readonly Regex PhonePattern = new(@"^\+?[0-9]{7,15}$", RegexOptions.Compiled);
+    public static readonly Regex PostalCodePattern = new(@"^[0-9]{5,6}$", RegexOptions.Compiled);
+    public static readonly Regex CaenPattern = new(@"^[0-9]{3,4}$", RegexOptions.Compiled);
+
+    /// <summary>Removes every whitespace character (CUI, postal code, CAEN).</summary>
+    public static string CompactValue(string? value) => string.Concat(TextNormalization.ForObjectNameOrCode(value).Where(c => !char.IsWhiteSpace(c)));
+
+    /// <summary>Keeps digits and a leading +: "0744 123.456" and "0744-123-456" both become "0744123456".</summary>
+    public static string NormalizePhone(string? value)
+    {
+        var text = CompactValue(value);
+        var digits = new string(text.Where(char.IsDigit).ToArray());
+        return text.StartsWith('+') ? "+" + digits : digits;
+    }
+
+    // The stored uniqueness key: the CUI for a legal person, the full name (prefixed, so it can never equal a CUI) for an individual.
+    public static string IdentityKey(BeneficiaryInput value) => value.IsIndividual
+        ? "PF:" + TextNormalization.UniquenessKey(value.Name)
+        : TextNormalization.UniquenessKey(value.Cui);
+
+    public static BeneficiaryOperationException DuplicateIdentity(BeneficiaryInput value, string? existingName) => new(value.IsIndividual
+        ? (string.IsNullOrWhiteSpace(existingName) ? "Există deja o persoană fizică cu acest nume." : $"Există deja o persoană fizică cu acest nume: «{existingName}».")
+        : DuplicateCuiMessage(existingName));
+
+    public static string DuplicateNameMessage(string existingName, string existingCui) => string.IsNullOrWhiteSpace(existingCui)
+        ? $"Beneficiarul «{existingName}» există deja."
+        : $"Beneficiarul «{existingName}» există deja și are CUI «{existingCui}».";
+
+    public static IReadOnlyList<AuditChange> Changes(Beneficiary before, Beneficiary after) =>
+    [
+        new("Tip", KindLabel(before.Kind), KindLabel(after.Kind)), new("Denumire", before.Name, after.Name), new("CUI", before.Cui, after.Cui),
+        new("Adresă", before.Address, after.Address), new("Telefon", before.Phone, after.Phone),
+        new("Nr. Registrul Comerțului", before.RegistryNumber, after.RegistryNumber), new("Cod poștal", before.PostalCode, after.PostalCode),
+        new("Cod CAEN", before.CaenCode, after.CaenCode), new("Date ANAF", YesNo(before.AnafVerified), YesNo(after.AnafVerified))
+    ];
+
+    public static string Identification(Beneficiary value) => AuditDetails.Identification(new (string Field, string Value)[]
+    {
+        ("Tip", KindLabel(value.Kind)), ("Denumire", value.Name), ("CUI", value.Cui), ("Adresă", value.Address), ("Telefon", value.Phone),
+        ("Nr. Registrul Comerțului", value.RegistryNumber), ("Cod poștal", value.PostalCode), ("Cod CAEN", value.CaenCode),
+        ("Date ANAF", YesNo(value.AnafVerified))
+    }.Where(item => item.Value.Length > 0).ToArray());
+
+    public static string KindLabel(string kind) => kind == BeneficiaryKinds.Individual ? "Persoană fizică" : "Persoană juridică";
+    private static string YesNo(bool value) => value ? "preluate din ANAF" : "introduse manual";
+
     public static void CheckCurrent(Beneficiary? current, Beneficiary original)
     {
         if (current is null || current != original)
@@ -94,9 +212,9 @@ public sealed class DemoBeneficiaryStore
     internal readonly object Gate = new();
     internal readonly List<Beneficiary> Beneficiaries =
     [
-        new(1, "Construct Demo SRL", "RO10000001"),
-        new(2, "Atelier Tehnic SRL", "RO10000002"),
-        new(3, "Servicii Industriale SA", "10000003")
+        new(1, "Construct Demo SRL", "RO10000001", 0, BeneficiaryKinds.Legal, "Strada Demo 1, Bucuresti", "0721000001"),
+        new(2, "Atelier Tehnic SRL", "RO10000002", 0, BeneficiaryKinds.Legal, "Strada Demo 2, Cluj-Napoca", "0721000002"),
+        new(3, "Servicii Industriale SA", "10000003", 0, BeneficiaryKinds.Legal, "Strada Demo 3, Timisoara", "0721000003")
     ];
     internal int NextId = 4;
 }
@@ -125,12 +243,11 @@ public sealed class DemoBeneficiaryRepository(
         lock (store.Gate)
         {
             EnsureUniqueBeneficiary(value, null);
-            beneficiary = new(store.NextId++, value.Name, value.Cui);
+            beneficiary = Build(store.NextId++, value, 0);
             store.Beneficiaries.Add(beneficiary);
         }
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
-            $"#{beneficiary.Id} · {beneficiary.Name}", AuditDetails.Identification(
-                ("Denumire", beneficiary.Name), ("CUI", beneficiary.Cui)), cancellationToken);
+            $"#{beneficiary.Id} · {beneficiary.Name}", BeneficiaryRules.Identification(beneficiary), cancellationToken);
         return beneficiary;
     }
 
@@ -146,13 +263,12 @@ public sealed class DemoBeneficiaryRepository(
             var current = index < 0 ? null : store.Beneficiaries[index];
             BeneficiaryRules.CheckCurrent(current, original);
             EnsureUniqueBeneficiary(value, original.Id);
-            updated = new(original.Id, value.Name, value.Cui, checked(original.Version + 1));
+            updated = Build(original.Id, value, checked(original.Version + 1));
             store.Beneficiaries[index] = updated;
         }
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Beneficiary, updated.Id.ToString(),
             $"#{updated.Id} · {updated.Name}",
-            [new("Denumire", original.Name, updated.Name), new("CUI", original.Cui, updated.Cui)],
-            value.Reason, cancellationToken);
+            BeneficiaryRules.Changes(original, updated), value.Reason, cancellationToken);
         return updated;
     }
 
@@ -174,16 +290,19 @@ public sealed class DemoBeneficiaryRepository(
         }, cancellationToken);
     }
 
+    private static Beneficiary Build(int id, BeneficiaryInput value, long version) => new(id, value.Name, value.Cui, version, value.Kind,
+        value.Address, value.Phone, value.RegistryNumber, value.PostalCode, value.CaenCode, value.AnafVerified);
+
     private void EnsureUniqueBeneficiary(BeneficiaryInput value, int? excludedId)
     {
-        var duplicateCui = store.Beneficiaries.FirstOrDefault(beneficiary =>
-            beneficiary.Id != excludedId && TextNormalization.SameUniqueValue(beneficiary.Cui, value.Cui));
-        if (duplicateCui is not null)
-            throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateCuiMessage(duplicateCui.Name));
+        var key = BeneficiaryRules.IdentityKey(value);
+        var duplicate = store.Beneficiaries.FirstOrDefault(beneficiary => beneficiary.Id != excludedId &&
+            string.Equals(BeneficiaryRules.IdentityKey(BeneficiaryInput.From(beneficiary)), key, StringComparison.Ordinal));
+        if (duplicate is not null) throw BeneficiaryRules.DuplicateIdentity(value, duplicate.Name);
         var duplicateName = store.Beneficiaries.FirstOrDefault(beneficiary =>
             beneficiary.Id != excludedId && TextNormalization.SameUniqueValue(beneficiary.Name, value.Name));
         if (duplicateName is not null)
-            throw new BeneficiaryOperationException($"Beneficiarul «{duplicateName.Name}» există deja și are CUI «{duplicateName.Cui}».");
+            throw new BeneficiaryOperationException(BeneficiaryRules.DuplicateNameMessage(duplicateName.Name, duplicateName.Cui));
     }
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;

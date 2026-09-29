@@ -1,5 +1,6 @@
 @using BlazorStoc.Services
 @inject IBeneficiaryRepository Repository
+@inject IAnafService Anaf
 @inject ILogger<BeneficiaryEditor> Logger
 @implements IDisposable
 
@@ -11,9 +12,44 @@
         <DataAnnotationsValidator />
         <ValidationSummary />
         <fieldset disabled="@saving">
+            <fieldset class="beneficiary-kind" disabled="@(saving || Original is not null)">
+                <legend>Tip beneficiar</legend>
+                <InputRadioGroup Name="beneficiary-kind" @bind-Value="input.Kind">
+                    <label class="anaf-check"><InputRadio Value="@BeneficiaryKinds.Individual" id="beneficiary-kind-pf" aria-label="Persoană fizică" /> Persoană fizică</label>
+                    <label class="anaf-check"><InputRadio Value="@BeneficiaryKinds.Legal" id="beneficiary-kind-pj" aria-label="Persoană juridică" /> Persoană juridică</label>
+                </InputRadioGroup>
+            </fieldset>
             <div class="editor-grid">
-                <label for="beneficiary-name">Nume beneficiar *<InputText id="beneficiary-name" @bind-Value="input.Name" maxlength="200" autocomplete="organization" /><ValidationMessage For="() => input.Name" /></label>
-                <label for="beneficiary-cui">CUI *<InputText id="beneficiary-cui" @bind-Value="input.Cui" maxlength="12" autocomplete="off" /><small>2–10 cifre, opțional precedate de RO.</small><ValidationMessage For="() => input.Cui" /></label>
+                @if (input.IsIndividual)
+                {
+                    <label for="beneficiary-name">Nume complet *<InputTextLive id="beneficiary-name" @bind-Value="input.Name" maxlength="200" autocomplete="name" /><small>Numele complet identifică persoana fizică.</small><ValidationMessage For="() => input.Name" /></label>
+                    <label for="beneficiary-address">Adresă *<InputTextLive id="beneficiary-address" @bind-Value="input.Address" maxlength="300" autocomplete="street-address" /><ValidationMessage For="() => input.Address" /></label>
+                    <label for="beneficiary-phone">Număr de telefon *<InputTextLive id="beneficiary-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="tel" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
+                }
+                else
+                {
+                    <div class="beneficiary-cui-row">
+                        <label for="beneficiary-cui">CUI *</label>
+                        <div class="beneficiary-cui-line">
+                            <InputTextLive id="beneficiary-cui" @bind-Value="input.Cui" maxlength="12" autocomplete="off" />
+                            <button type="button" class="refresh" disabled="@(fetching || input.Cui.Trim().Length == 0)" @onclick="FetchFromAnafAsync">@(fetching ? "Se interoghează ANAF…" : "Preia date din ANAF")</button>
+                        </div>
+                        <small>2–10 cifre, opțional precedate de RO. CUI-ul identifică persoana juridică.</small>
+                        <ValidationMessage For="() => input.Cui" />
+                    </div>
+                    <div class="anaf-source-cell" role="status" aria-live="polite">
+                        @if (FromAnaf) { <span class="anaf-source ok"><span aria-hidden="true">✓</span> Date preluate din ANAF</span> }
+                        else { <span class="anaf-source warn"><span aria-hidden="true">⚠</span> Date introduse manual</span> }
+                    </div>
+                    @if (anafMessage is not null) { <div class="anaf-message @(anafMessageIsError ? "error" : "ok") beneficiary-anaf-message" role="@(anafMessageIsError ? "alert" : "status")">@anafMessage</div> }
+                    @if (anafWarning is not null) { <div class="anaf-message warn beneficiary-anaf-message" role="status">@anafWarning</div> }
+                    <label for="beneficiary-name">Denumire *<InputTextLive id="beneficiary-name" @bind-Value="input.Name" maxlength="200" autocomplete="organization" /><ValidationMessage For="() => input.Name" /></label>
+                    <label for="beneficiary-address">Adresă *<InputTextLive id="beneficiary-address" @bind-Value="input.Address" maxlength="300" autocomplete="street-address" /><ValidationMessage For="() => input.Address" /></label>
+                    <label for="beneficiary-registry">Nr. Registrul Comerțului<InputTextLive id="beneficiary-registry" @bind-Value="input.RegistryNumber" maxlength="40" autocomplete="off" /><small>De exemplu J40/1234/2020.</small><ValidationMessage For="() => input.RegistryNumber" /></label>
+                    <label for="beneficiary-phone">Număr de telefon *<InputTextLive id="beneficiary-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="tel" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
+                    <label for="beneficiary-postal">Cod poștal<InputTextLive id="beneficiary-postal" @bind-Value="input.PostalCode" maxlength="10" autocomplete="postal-code" inputmode="numeric" /><small>5 sau 6 cifre.</small><ValidationMessage For="() => input.PostalCode" /></label>
+                    <label for="beneficiary-caen">Cod CAEN<InputTextLive id="beneficiary-caen" @bind-Value="input.CaenCode" maxlength="4" autocomplete="off" inputmode="numeric" /><small>3 sau 4 cifre.</small><ValidationMessage For="() => input.CaenCode" /></label>
+                }
                 @if (Original is not null)
                 {
                     <ChangeReasonField Id="beneficiary-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
@@ -38,15 +74,77 @@
     // "Părăsește editarea": the leave warning closes the form without saving (Task 1).
     private Task DiscardAsync() => Closed.InvokeAsync();
     private BeneficiaryInput input = new();
-    private bool saving;
+    private bool saving, fetching, anafMessageIsError;
     private IReadOnlyList<AuditChange>? pendingChanges;
-    private string? error, reasonError;
+    private string? error, reasonError, anafMessage, anafWarning;
+    // The company data as ANAF returned it (or as stored, for a record saved earlier from ANAF): the data counts as
+    // "preluate din ANAF" only while every value ANAF supplied is still unchanged in the form.
+    private AnafCompany? anafSnapshot;
     private readonly CancellationTokenSource lifetime = new();
 
     protected override Task OnInitializedAsync()
     {
         input = Original is null ? new() : BeneficiaryInput.From(Original);
+        if (Original is { AnafVerified: true })
+            anafSnapshot = new(Original.Cui, Original.Name, Original.Address, Original.RegistryNumber, Original.Phone, Original.PostalCode, Original.CaenCode);
         return Task.CompletedTask;
+    }
+
+    private static string Norm(string? value) => TextNormalization.ForObjectNameOrCode(value);
+
+    private static string Digits(string? cui)
+    {
+        var compact = BeneficiaryRules.CompactValue(cui);
+        return compact.StartsWith("RO", StringComparison.OrdinalIgnoreCase) ? compact[2..] : compact;
+    }
+
+    private bool FromAnaf => !input.IsIndividual && anafSnapshot is { } snapshot &&
+        Digits(input.Cui) == Digits(snapshot.Cui) &&
+        Same(snapshot.Name, input.Name) && Same(snapshot.Address, input.Address) &&
+        Same(snapshot.RegistryNumber, input.RegistryNumber) && Same(BeneficiaryRules.NormalizePhone(snapshot.Phone), BeneficiaryRules.NormalizePhone(input.Phone)) &&
+        Same(BeneficiaryRules.CompactValue(snapshot.PostalCode), BeneficiaryRules.CompactValue(input.PostalCode)) &&
+        Same(BeneficiaryRules.CompactValue(snapshot.CaenCode), BeneficiaryRules.CompactValue(input.CaenCode));
+
+    // Values ANAF did not supply (empty) may be typed by hand without turning the data into "manual".
+    private static bool Same(string snapshotValue, string current) =>
+        snapshotValue.Length == 0 || string.Equals(Norm(snapshotValue), Norm(current), StringComparison.OrdinalIgnoreCase);
+
+    private async Task FetchFromAnafAsync()
+    {
+        if (fetching || saving) return;
+        fetching = true;
+        anafMessage = anafWarning = null;
+        try
+        {
+            var result = await Anaf.LookupCompanyAsync(input.Cui, lifetime.Token);
+            if (result.Company is { } company)
+            {
+                input.Name = Norm(company.Name);
+                if (company.Address.Length > 0) input.Address = Norm(company.Address);
+                if (company.RegistryNumber.Length > 0) input.RegistryNumber = Norm(company.RegistryNumber).ToUpperInvariant();
+                if (company.Phone.Length > 0) input.Phone = BeneficiaryRules.NormalizePhone(company.Phone);
+                if (company.PostalCode.Length > 0) input.PostalCode = BeneficiaryRules.CompactValue(company.PostalCode);
+                if (company.CaenCode.Length > 0) input.CaenCode = BeneficiaryRules.CompactValue(company.CaenCode);
+                anafSnapshot = company with { Cui = input.Cui };
+                anafMessageIsError = false;
+                anafMessage = "Datele au fost preluate din ANAF. Completează manual câmpurile obligatorii pe care ANAF nu le-a returnat (de exemplu telefonul).";
+                anafWarning = result.Warning;
+            }
+            else
+            {
+                anafMessageIsError = true;
+                anafMessage = result.Error ?? "Datele nu au putut fi preluate din ANAF.";
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { anafMessageIsError = true; anafMessage = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("ANAF lookup for a beneficiary failed ({ErrorType}).", exception.GetType().Name);
+            anafMessageIsError = true;
+            anafMessage = "Datele nu au putut fi preluate din ANAF. Le poți introduce manual.";
+        }
+        finally { fetching = false; }
     }
 
     private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
@@ -56,6 +154,7 @@
         if (saving) return;
         reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
         if (reasonError is not null) return;
+        input.AnafVerified = FromAnaf;
         if (Original is not null)
         {
             // Saving over existing data needs an explicit confirmation of the changed fields.
@@ -63,7 +162,9 @@
             try
             {
                 var value = input.Validated(true);
-                pendingChanges = SaveSummary.Changed(new("Nume beneficiar", Original.Name, value.Name), new("CUI", Original.Cui, value.Cui));
+                var preview = new Beneficiary(Original.Id, value.Name, value.Cui, Original.Version, value.Kind, value.Address, value.Phone,
+                    value.RegistryNumber, value.PostalCode, value.CaenCode, value.AnafVerified);
+                pendingChanges = SaveSummary.Changed(BeneficiaryRules.Changes(Original, preview).ToArray());
             }
             catch (BeneficiaryOperationException exception) { error = exception.Message; }
             return;

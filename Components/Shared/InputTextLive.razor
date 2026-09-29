@@ -1,0 +1,5 @@
+@inherits InputText
+@* InputText that updates the model on every keystroke (oninput) instead of on blur (onchange). Validation and the
+   EditContext keep working; a click on a neighbouring button is no longer swallowed by the blur re-render. *@
+<input @attributes="AdditionalAttributes" class="@CssClass" value="@CurrentValue"
+       @oninput="EventCallback.Factory.CreateBinder<string?>(this, value => CurrentValueAsString = value, CurrentValueAsString)" />

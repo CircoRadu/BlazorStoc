@@ -1,0 +1,235 @@
+@using BlazorStoc.Services
+@inject IAnafService Anaf
+@implements IDisposable
+
+<h2>Preluare date ANAF</h2>
+<p class="muted">Configurează interogarea serviciului public ANAF (registrul TVA) după CUI: conexiunea, cererea, maparea răspunsului, testarea și versiunile activate. Testele trimit cereri reale la ANAF și nu modifică datele niciunei firme.</p>
+
+@if (loadError is not null) { <div class="error-banner" role="alert">@loadError</div> }
+@if (config is null)
+{
+    @if (loadError is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă configurația</h3></div> }
+}
+else
+{
+    @if (message is not null) { <div class="anaf-message @(messageIsError ? "error" : "ok")" role="@(messageIsError ? "alert" : "status")">@message</div> }
+    <div class="anaf-status">
+        <span>Versiune activă: <strong>@(state?.Active is { } active ? $"#{active.Id} · {active.At:dd.MM.yyyy HH:mm} · {active.Admin}" : "nicio versiune activată")</strong></span>
+        <span class="anaf-badge @(tested ? "ok" : "warn")">@(tested ? "Testată cu succes" : "Netestată (sau modificată după test)")</span>
+    </div>
+
+    <fieldset class="anaf-section"><legend>1. Conexiune</legend>
+        <div class="anaf-grid">
+            <label>Denumire integrare<input @bind="config.Name" @bind:after="Edited" maxlength="100" /></label>
+            <label class="anaf-check"><input type="checkbox" @bind="config.Enabled" @bind:after="Edited" /> Integrare activată</label>
+            <label class="anaf-wide">Adresă serviciu (HTTPS, @AnafRules.ApprovedHost)<input @bind="config.Url" @bind:after="Edited" /></label>
+            <label>Metodă HTTP<select @bind="config.Method" @bind:after="Edited">@foreach (var m in AnafRules.Methods) { <option value="@m">@m</option> }</select></label>
+            <label>Timeout (secunde, 1–60)<input type="number" min="1" max="60" @bind="config.Timeout" @bind:after="Edited" /></label>
+            <label>Interval între cereri (ms, 1000–60000)<input type="number" min="1000" max="60000" step="100" @bind="config.Interval" @bind:after="Edited" /></label>
+            <label>Lot maxim de CUI (1–100)<input type="number" min="1" max="100" @bind="config.MaxBatch" @bind:after="Edited" /></label>
+        </div>
+        <h3>Antete HTTP</h3>
+        <p class="muted"><small>Autentificarea este cea publică, fără token; antetele Host, Authorization, Cookie, Content-Length, Connection și Transfer-Encoding sunt rezervate.</small></p>
+        @for (var i = 0; i < config.Headers.Count; i++)
+        {
+            var header = config.Headers[i];
+            var index = i;
+            <div class="anaf-row">
+                <label class="anaf-check"><input type="checkbox" aria-label="Antet activ" @bind="header.Enabled" @bind:after="Edited" /></label>
+                <input aria-label="Nume antet" placeholder="Nume" @bind="header.Name" @bind:after="Edited" />
+                <input aria-label="Valoare antet" placeholder="Valoare" @bind="header.Value" @bind:after="Edited" />
+                <button type="button" class="danger" aria-label="Șterge antetul @header.Name" @onclick="() => { config.Headers.RemoveAt(index); Edited(); }">Șterge</button>
+            </div>
+        }
+        <button type="button" class="refresh" @onclick="() => { config.Headers.Add(new AnafHeader()); Edited(); }">+ Adaugă antet</button>
+    </fieldset>
+
+    <fieldset class="anaf-section"><legend>2. Cerere</legend>
+        <div class="anaf-grid">
+            <label class="anaf-check"><input type="checkbox" @bind="config.Trim" @bind:after="Edited" /> Elimină spațiile din CUI</label>
+            <label class="anaf-check"><input type="checkbox" @bind="config.StripRO" @bind:after="Edited" /> Elimină prefixul RO</label>
+            <label>Format dată interogare<select @bind="config.DateFormat" @bind:after="Edited">@foreach (var f in AnafRules.DateFormats) { <option value="@f">@f</option> }</select></label>
+        </div>
+        <label class="anaf-block">Șablon cerere (listă JSON; variabile <code>{{cui}}</code> și <code>{{data_interogare}}</code>)
+            <textarea rows="7" spellcheck="false" @bind="config.Template" @bind:event="oninput" @bind:after="Edited"></textarea></label>
+    </fieldset>
+
+    <fieldset class="anaf-section"><legend>3. Mapare răspuns</legend>
+        <p class="muted"><small>Căi acceptate: <code>$.camp.subcamp</code> și indici <code>[0]</code>. Câmpurile absente rămân necunoscute (nu false). Politicile „la lipsă” și „la actualizare” se păstrează ca metadate pentru actualizarea viitoare a firmelor. Butonul „Preia date din ANAF” din formularul de beneficiar folosește configurația activă și completează câmpurile după denumirea lor: CUI, Denumire, Adresă fiscală, Nr. Registrul Comerțului, Telefon, Cod poștal, Cod CAEN și Inactiv fiscal; nu redenumi aceste câmpuri.</small></p>
+        <div class="anaf-grid">
+            <label>Lista găsiților<input @bind="config.Found" @bind:after="Edited" /></label>
+            <label>Lista negăsiților<input @bind="config.NotFound" @bind:after="Edited" /></label>
+            <label>Identificarea CUI în fiecare element<input @bind="config.Identity" @bind:after="Edited" /></label>
+        </div>
+        <div class="table-scroll"><table class="anaf-mappings"><thead><tr><th>DENUMIRE</th><th>CALE</th><th>TIP</th><th>OBLIGATORIU</th><th>LA LIPSĂ</th><th>LA ACTUALIZARE</th><th></th></tr></thead><tbody>
+        @for (var i = 0; i < config.Mappings.Count; i++)
+        {
+            var mapping = config.Mappings[i];
+            var index = i;
+            <tr>
+                <td><input aria-label="Denumire câmp" @bind="mapping.Label" @bind:after="Edited" /></td>
+                <td><input aria-label="Cale câmp" @bind="mapping.Path" @bind:after="Edited" /></td>
+                <td><select aria-label="Tip" @bind="mapping.Type" @bind:after="Edited"><option value="text">Text</option><option value="boolean">Da/Nu</option></select></td>
+                <td><input type="checkbox" aria-label="Obligatoriu" @bind="mapping.Required" @bind:after="Edited" /></td>
+                <td><select aria-label="Politică la lipsă" @bind="mapping.Missing" @bind:after="Edited"><option value="keep">Păstrează</option><option value="clear">Golește</option><option value="error">Raportează eroare</option></select></td>
+                <td><select aria-label="Politică la actualizare" @bind="mapping.Update" @bind:after="Edited"><option value="empty">Doar dacă e gol</option><option value="overwrite">Suprascrie</option><option value="confirm">Cere confirmare</option></select></td>
+                <td><button type="button" class="danger" aria-label="Șterge maparea @mapping.Label" @onclick="() => { config.Mappings.RemoveAt(index); Edited(); }">Șterge</button></td>
+            </tr>
+        }
+        </tbody></table></div>
+        <button type="button" class="refresh" @onclick="() => { config.Mappings.Add(new AnafMapping()); Edited(); }">+ Adaugă câmp</button>
+    </fieldset>
+
+    <fieldset class="anaf-section"><legend>4. Testare</legend>
+        <form class="settings-form" @onsubmit="TestAsync" @onsubmit:preventDefault>
+            <label for="anaf-cui">CUI de test (de exemplu RO9178894 sau 28996610)</label>
+            <div class="settings-form-row">
+                <input id="anaf-cui" @bind="cui" @bind:event="oninput" maxlength="14" autocomplete="off" />
+                <button type="button" class="refresh" disabled="@busy" @onclick="PreviewAsync">Previzualizează cererea</button>
+                <button type="submit" class="primary" disabled="@(busy || cui.Trim().Length == 0)">@(busy ? "Se interoghează…" : "Testează")</button>
+            </div>
+        </form>
+        @if (preview is not null)
+        {
+            <h3>Cerere efectivă</h3>
+            <pre class="anaf-pre">@RequestText(preview)</pre>
+        }
+        @if (busy) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se interoghează ANAF</h3></div> }
+        else if (test is not null)
+        {
+            @if (testStale) { <div class="anaf-message warn" role="status">Rezultat vechi: configurația a fost modificată după acest test.</div> }
+            <div class="anaf-message @(test.Ok ? "ok" : "error")" role="status">@(test.Ok ? "Test reușit" : "Test cu erori") · @(test.StatusCode is { } code ? $"HTTP {code} · " : "")@test.DurationMs ms · @test.At.ToString("dd.MM.yyyy HH:mm:ss")</div>
+            @if (test.Errors.Count > 0) { <ul class="anaf-errors">@foreach (var e in test.Errors) { <li>@e</li> }</ul> }
+            @if (test.Mapped.Count > 0)
+            {
+                <div class="table-scroll"><table class="settings-result"><thead><tr><th>CÂMP</th><th>VALOARE INTERPRETATĂ</th><th>CALE</th></tr></thead><tbody>
+                @foreach (var value in test.Mapped) { <tr><td>@value.Label</td><td>@(value.Value ?? "necunoscut")</td><td><code>@value.Path</code></td></tr> }
+                </tbody></table></div>
+            }
+            <details><summary>Cerere trimisă</summary><pre class="anaf-pre">@(test.Request is null ? "" : RequestText(test.Request))</pre></details>
+            <details><summary>Răspuns brut</summary><pre class="anaf-pre">@test.Raw</pre></details>
+        }
+    </fieldset>
+
+    <fieldset class="anaf-section"><legend>5. Versiuni</legend>
+        <div class="editor-actions">
+            <button type="button" class="refresh" disabled="@busy" @onclick="SaveDraftAsync">Salvează ciorna</button>
+            <button type="button" class="primary" disabled="@(busy || !tested)" title="@(tested ? "" : "Testează cu succes configurația înainte de activare")" @onclick="ActivateAsync">Activează configurația testată</button>
+            <button type="button" class="danger" disabled="@(busy || (state?.History.Count ?? 0) < 2)" @onclick="RollbackAsync">Revino la activarea precedentă</button>
+        </div>
+        @if (state is { History.Count: > 0 })
+        {
+            <div class="table-scroll"><table class="settings-result"><thead><tr><th>VERSIUNE</th><th>DATA</th><th>ADMINISTRATOR</th><th>ORIGINE</th><th></th></tr></thead><tbody>
+            @foreach (var version in state.History.AsEnumerable().Reverse())
+            {
+                <tr>
+                    <td>#@version.Id @(state.Active?.Id == version.Id ? "(activă)" : "")</td>
+                    <td>@version.At.ToString("dd.MM.yyyy HH:mm")</td>
+                    <td>@version.Admin</td>
+                    <td>@(version.RestoredFrom is { } from ? $"revenire la #{from}" : "activare")</td>
+                    <td><button type="button" class="refresh" @onclick="() => LoadVersion(version)">Încarcă în editor</button></td>
+                </tr>
+            }
+            </tbody></table></div>
+        }
+        else { <p class="muted">Nicio versiune activată încă.</p> }
+    </fieldset>
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private AnafState? state;
+    private AnafConfig? config;
+    private AnafRequest? preview;
+    private AnafTestResult? test;
+    private string cui = "RO9178894";
+    private string? loadError, message;
+    private bool busy, tested, testStale, messageIsError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            state = await Anaf.GetStateAsync(lifetime.Token);
+            config = state.Draft;
+            tested = Anaf.WasTestedSuccessfully(config);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is AnafException or AccessDeniedException) { loadError = ex.Message; }
+        catch (Exception) { loadError = "Configurația ANAF nu a putut fi încărcată."; }
+    }
+
+    private void Edited()
+    {
+        preview = null;
+        if (test is not null) testStale = true;
+        tested = config is not null && Anaf.WasTestedSuccessfully(config);
+        message = null;
+    }
+
+    private void Say(string text, bool error = false) { message = text; messageIsError = error; }
+
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true;
+        message = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is AnafException or AccessDeniedException) { Say(ex.Message, true); }
+        catch (Exception) { Say("Operația nu a putut fi efectuată.", true); }
+        finally { busy = false; }
+    }
+
+    private Task PreviewAsync() => Run(async () => preview = await Anaf.PreviewAsync(config!, cui, lifetime.Token));
+
+    private Task TestAsync() => Run(async () =>
+    {
+        preview = null;
+        test = null;
+        test = await Anaf.TestAsync(config!, cui, lifetime.Token);
+        testStale = false;
+        tested = Anaf.WasTestedSuccessfully(config!);
+    });
+
+    private Task SaveDraftAsync() => Run(async () =>
+    {
+        await Anaf.SaveDraftAsync(config!, lifetime.Token);
+        state = await Anaf.GetStateAsync(lifetime.Token);
+        Say("Ciorna a fost salvată.");
+    });
+
+    private Task ActivateAsync() => Run(async () =>
+    {
+        state = await Anaf.ActivateAsync(config!, lifetime.Token);
+        Say($"Configurația a fost activată ca versiunea #{state.Active!.Id}.");
+    });
+
+    private Task RollbackAsync() => Run(async () =>
+    {
+        state = await Anaf.RollbackAsync(lifetime.Token);
+        config = state.Draft;
+        test = null;
+        preview = null;
+        tested = Anaf.WasTestedSuccessfully(config);
+        Say($"S-a revenit la configurația versiunii precedente (activă acum: #{state.Active!.Id}).");
+    });
+
+    private void LoadVersion(AnafVersion version)
+    {
+        config = version.Config.Clone();
+        test = null;
+        preview = null;
+        tested = Anaf.WasTestedSuccessfully(config);
+        Say($"Versiunea #{version.Id} a fost încărcată în editor; testează și activează-o pentru a o aplica.");
+    }
+
+    private static string RequestText(AnafRequest request) =>
+        $"{request.Method} {request.Url}\n{string.Join("\n", request.Headers.Select(h => $"{h.Key}: {h.Value}"))}\n\n{request.Body}";
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}
