@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
     <PackageReference Include="PDFsharp" Version="6.2.1" />
     <PackageReference Include="PDFtoImage" Version="5.4.0" />
     <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
@@ -33,6 +34,11 @@
     <Content Remove="Assets/Tessdata/**" />
     <None Remove="Assets/Tessdata/**" />
     <Content Include="Assets/Tessdata/eng.traineddata">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <!-- Romanian data for reading invoices (Tesseract tessdata_fast, same source and licence as eng): with it OCR reads ro + eng together. -->
+    <Content Include="Assets/Tessdata/ron.traineddata">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

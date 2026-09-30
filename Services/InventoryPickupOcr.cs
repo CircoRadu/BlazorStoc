@@ -300,7 +300,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
             hasNumberColumn && offsets.TryGetValue(row.Block, out var offset) && row.Index + offset > 0 ? row.Index + offset : null)).ToList();
     }
 
-    private static Mat ToGrayMat(SKBitmap bitmap)
+    internal static Mat ToGrayMat(SKBitmap bitmap)
     {
         using var normalized = bitmap.ColorType == SKColorType.Gray8 ? null : bitmap.Copy(SKColorType.Gray8);
         var source = normalized ?? bitmap;
@@ -315,7 +315,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     // on the table geometry at all, unlike the line/column detection below - it works the same whether the page
     // has one table or eight scattered across it. Runs on a small downscaled copy purely for speed; the angle
     // found is then applied to the full-resolution page once by the caller.
-    private static double FindSkewDegrees(Mat grayFullRes)
+    internal static double FindSkewDegrees(Mat grayFullRes)
     {
         using var binary = new Mat();
         Cv2.Threshold(grayFullRes, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
@@ -355,7 +355,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         return sums.Average(value => (value - mean) * (double)(value - mean));
     }
 
-    private static Mat Rotate(Mat source, double angleDegrees, Scalar borderFill)
+    internal static Mat Rotate(Mat source, double angleDegrees, Scalar borderFill)
     {
         using var rotationMatrix = Cv2.GetRotationMatrix2D(new Point2f(source.Cols / 2f, source.Rows / 2f), angleDegrees, 1.0);
         var destination = new Mat();

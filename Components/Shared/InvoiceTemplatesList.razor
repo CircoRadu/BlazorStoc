@@ -1,0 +1,195 @@
+@using System.Globalization
+@using BlazorStoc.Services
+@inject IInvoiceTemplateService Service
+@inject IJSRuntime JS
+@inject ILogger<InvoiceTemplatesList> Logger
+@implements IDisposable
+
+<h2>Șabloane de facturi salvate</h2>
+<p class="muted">Fiecare furnizor poate avea mai multe șabloane (de exemplu pentru un PDF din program și pentru unul scanat). La analiza unei facturi, aplicația propune șabloanele care se potrivesc, după CUI-ul furnizorului și după aspectul facturii. Un șablon se modifică din pagina „Analiza unui fișier”, cu o factură încărcată; fiecare salvare creează o versiune nouă.</p>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (FocusTemplateId is { } wanted && !loading && templates.All(item => item.Info.Id != wanted)) { <div class="error-banner" role="status">Șablonul #@wanted nu mai există (a fost șters).</div> }
+
+@if (editing is not null)
+{
+    <section class="product-editor" aria-labelledby="invoice-details-title">
+        <div class="catalog-heading"><h3 id="invoice-details-title">Modifică datele șablonului „@editing.Name”</h3></div>
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="invoice-edit-name">Denumire *<input id="invoice-edit-name" @bind="editName" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxNameLength" autocomplete="off" /></label>
+                <label for="invoice-edit-supplier">Furnizor<input id="invoice-edit-supplier" @bind="editSupplier" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxSupplierNameLength" autocomplete="off" /></label>
+                <label for="invoice-edit-cui">CUI furnizor<input id="invoice-edit-cui" @bind="editCui" @bind:event="oninput" maxlength="20" autocomplete="off" /></label>
+            </div>
+            <div class="editor-actions">
+                <button class="primary" type="button" @onclick="SaveDetailsAsync">@(saving ? "Se salvează…" : "Salvează")</button>
+                <button class="danger" type="button" @onclick="() => editing = null">Anulează</button>
+            </div>
+        </fieldset>
+    </section>
+}
+
+<section class="catalog">
+    <div class="catalog-heading"><h3>Șabloane <span>@templates.Count</span></h3><button type="button" class="refresh" disabled="@loading" @onclick="LoadAsync">Actualizează</button></div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă șabloanele</h3></div> }
+    else if (templates.Count == 0) { <div class="empty-state"><div class="empty-icon" aria-hidden="true">▤</div><h3>Nu există șabloane salvate</h3><p>Încarcă o factură în pagina „Analiza unui fișier” și salvează șablonul creat.</p></div> }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>ȘABLON</th><th>FURNIZOR</th><th>CUI</th><th>SURSĂ</th><th class="number">VERSIUNE</th><th>CONȚINUT</th><th>ACTUALIZAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var template in templates)
+        {
+            var info = template.Info;
+            var focused = info.Id == FocusTemplateId;
+            var open = expanded == info.Id;
+            <tr @key="info.Id" id="invoice-template-@info.Id" class="@(focused ? "row-focus" : null)">
+                <td><strong>@info.Name</strong></td>
+                <td>@(info.SupplierName.Length > 0 ? info.SupplierName : "—")</td>
+                <td>@(info.SupplierCui.Length > 0 ? info.SupplierCui : "—")</td>
+                <td>@(info.SourceKind == InvoiceSources.Ocr ? "Scanat (OCR)" : "PDF cu text")</td>
+                <td class="number">@info.VersionNumber</td>
+                <td><small>@template.Definition.UsedFieldCount câmpuri · @template.Definition.UsedColumnCount coloane</small></td>
+                <td><small>@Stamp(info.UpdatedUtc)<br />@info.UpdatedBy</small></td>
+                <td class="row-actions">
+                    <button type="button" class="refresh" @onclick="() => ToggleDetailsAsync(info.Id)">@(open ? "Ascunde" : "Detalii")</button>
+                    <button type="button" class="refresh" disabled="@saving" @onclick="() => OnEditWithFile.InvokeAsync(template)">Editează cu un fișier</button>
+                    <button type="button" class="refresh" disabled="@saving" @onclick="() => OpenDetails(info)">Redenumește</button>
+                    <button type="button" class="danger" disabled="@saving" @onclick="() => deleting = info">Șterge</button>
+                </td>
+            </tr>
+            @if (open)
+            {
+                <tr class="invoice-details-row"><td colspan="8">
+                    <div class="invoice-details">
+                        <div><strong>Câmpuri folosite</strong>
+                            <ul>@foreach (var field in template.Definition.Fields.Where(field => field.Use)) { <li>@(field.Name.Length > 0 ? field.Name : InvoiceVocabulary.FieldTitle(field.Meaning))@if (field.Name != InvoiceVocabulary.FieldTitle(field.Meaning)) { <span class="muted"> · @InvoiceVocabulary.FieldTitle(field.Meaning)</span> }</li> }
+                                @if (template.Definition.UsedFieldCount == 0) { <li class="muted">niciunul</li> }</ul></div>
+                        <div><strong>Coloanele tabelului</strong>
+                            <ul>@foreach (var column in template.Definition.Table?.Columns.Where(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore) ?? [])
+                                { <li>@(column.Label.Length > 0 ? column.Label : "(fără denumire)") <span class="muted">· @InvoiceVocabulary.ColumnTitle(column.Meaning)</span></li> }
+                                @if (template.Definition.UsedColumnCount == 0) { <li class="muted">niciuna</li> }</ul>
+                            @if (template.Definition.Table?.NameCodeSeparator is { Length: > 0 } separator) { <small class="muted">Codul produsului se ia din denumire, înaintea separatorului „@separator”.</small> }</div>
+                        <div><strong>Versiuni salvate</strong>
+                            @if (versions is null) { <p class="muted">Se încarcă…</p> }
+                            else { <ul>@foreach (var version in versions) { <li>v@(version.VersionNumber) · @Stamp(version.CreatedUtc) · @version.CreatedBy @if (version.Note.Length > 0) { <span class="muted">· @version.Note</span> }</li> }</ul> }</div>
+                    </div>
+                </td></tr>
+            }
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi șablonul?" Subject="Șablonul de factură" ObjectLabel="@deleting.Name"
+                              Description="Șablonul și toate versiunile lui salvate dispar. Facturile deja importate nu sunt afectate."
+                              ConfirmationNote="Șablonul nu se arhivează: se șterge definitiv, iar operația este înregistrată în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDelete" />
+}
+
+@code {
+    [Parameter] public int? FocusTemplateId { get; set; }
+    [Parameter] public EventCallback<InvoiceTemplateRecord> OnEditWithFile { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<InvoiceTemplateRecord> templates = [];
+    private IReadOnlyList<InvoiceTemplateVersionInfo>? versions;
+    private InvoiceTemplateInfo? editing, deleting;
+    private string editName = "", editSupplier = "", editCui = "";
+    private string? error, notice, deleteError;
+    private int? expanded, scrolledTo;
+    private bool loading, saving, deleteBusy;
+
+    private static string Stamp(DateTime utc) => StockMovementRules.DisplayDate(DateOnly.FromDateTime(utc.ToLocalTime())) + " " + utc.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (loading || FocusTemplateId is not { } id || scrolledTo == id || templates.All(item => item.Info.Id != id)) return;
+        scrolledTo = id;
+        try { await JS.InvokeVoidAsync("blazorStocScrollTo", $"invoice-template-{id}"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { templates = await Service.GetAllAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Invoice templates loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Șabloanele nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task ToggleDetailsAsync(int id)
+    {
+        if (expanded == id) { expanded = null; return; }
+        expanded = id; versions = null;
+        try { versions = await Service.GetVersionsAsync(id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Invoice template versions loading failed ({ErrorType}).", exception.GetType().Name);
+            versions = [];
+        }
+    }
+
+    private void OpenDetails(InvoiceTemplateInfo info)
+    {
+        notice = null; error = null;
+        editing = info; editName = info.Name; editSupplier = info.SupplierName; editCui = info.SupplierCui;
+    }
+
+    private async Task SaveDetailsAsync()
+    {
+        if (saving || editing is null) return;
+        saving = true; error = null;
+        try
+        {
+            await Service.UpdateDetailsAsync(editing, new InvoiceTemplateInput { Name = editName, SupplierName = editSupplier, SupplierCui = editCui }, lifetime.Token);
+            editing = null;
+            notice = "Datele șablonului au fost modificate.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (InvoiceTemplateOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Invoice template details saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Datele șablonului nu au putut fi salvate. Reîncearcă.";
+        }
+        finally { saving = false; }
+    }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleting is null || deleteBusy) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            await Service.DeleteAsync(deleting, reason, lifetime.Token);
+            deleting = null;
+            notice = "Șablonul a fost șters.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (InvoiceTemplateOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Invoice template deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Șablonul nu a putut fi șters. Reîncearcă.";
+        }
+        finally { deleteBusy = false; }
+    }
+
+    private void CancelDelete() { deleting = null; deleteError = null; }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

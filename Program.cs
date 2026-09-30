@@ -158,6 +158,11 @@ builder.Services.AddScoped<IInventoryReportBuilder, InventoryReportBuilder>();
 builder.Services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();
 builder.Services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
 builder.Services.AddSingleton<IInventoryPickupOcrService, InventoryPickupOcrService>();
+builder.Services.AddSingleton<IInvoicePdfReader, InvoicePdfReader>();
+builder.Services.AddSingleton<IInvoiceAnalysisStore, InvoiceAnalysisStore>();
+builder.Services.AddScoped<IInvoiceAnalysisService, InvoiceAnalysisService>();
+builder.Services.AddScoped<IInvoiceTemplateStore>(services => new MariaInvoiceTemplateStore(services.GetRequiredService<IConfiguration>()));
+builder.Services.AddScoped<IInvoiceTemplateService, InvoiceTemplateService>();
 builder.Services.AddScoped<IInventoryPickupBuilder, InventoryPickupBuilder>();
 builder.Services.AddScoped<IInventoryPickupApplier, InventoryPickupApplier>();
 // One shared lock file in the MariaDB backup directory; singleton because the lock and its heartbeat must be the same instance across the whole app, not
@@ -275,6 +280,15 @@ app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileS
     return file is null
         ? Results.NotFound()
         : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
+}).RequireAuthorization();
+// A page picture of the invoice under analysis (Settings -> Facturi): kept in memory, served only to the administrator who uploaded the file.
+app.MapGet("/media/invoice-analysis/{id:guid}/{page:int}", (Guid id, int page, HttpContext context, IInvoiceAnalysisStore store) =>
+{
+    if (!context.User.IsInRole(AccessRoles.Administrator)) return Results.Forbid();
+    var session = store.Get(id, context.User.Identity?.Name ?? "necunoscut");
+    if (session is null || page < 1 || page > session.Previews.Count) return Results.NotFound();
+    context.Response.Headers.CacheControl = "no-store";
+    return Results.File(session.Previews[page - 1], "image/png");
 }).RequireAuthorization();
 app.MapGet("/media/service-photos/{photoId:int}", async (int photoId, IServicePhotoStore photos, CancellationToken token) =>
 {

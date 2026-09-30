@@ -518,3 +518,29 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 ### N27. Tipuri de pinuri pe ecran ingust si culorile predefinite
 - **Motiv**: M4. **Pasi**: deschide Setari → Harta → Overlay si harta pe telefon; compara culorile simbolurilor pe pinii predefiniti.
 - **Asteptat**: lista si formularul raman utilizabile pe ecran ingust; simbolurile sunt lizibile pe toate culorile (alb sau inchis, dupa contrast); daca aspectul dinainte (simboluri albe pe gri si portocaliu) este preferat, se schimba culorile predefinite in `MapPinRules.Defaults`.
+
+## Sabloane de facturi (30.09.2026)
+
+### N28. Facturi scanate reale (scaner sau telefon)
+- **Motiv**: M4 (nu exista scanari reale de facturi; testele folosesc pagini generate si rasterizate, cu inclinare si rotire simulate). **Pasi**: in Setari → Facturi incarca 3-4 facturi scanate reale (de pe scanerul Konica Minolta, poze de pe telefon, o factura cu stampila peste text, una cu contrast slab); verifica „Citit prin recunoasterea imaginii (OCR)", tabelul, valorile si campurile; ruleaza si `dotnet run --project tests/BlazorStoc.InvoiceCorpus -- <director>`.
+- **Asteptat**: tabelul si cel putin campurile principale (numar, data, CUI, total) se gasesc; valorile incerte se corecteaza in sablon; o factura care esueaza se salveaza (anonimizata) ca fixtura si devine test inainte de corectarea motorului.
+
+### N29. Desenarea cu mouse-ul pe pagina
+- **Motiv**: M4 (verificat in browser numai cu evenimente de pointer sintetice). **Pasi**: apasa „Adauga camp desenand pe pagina", trage un dreptunghi peste o valoare, apoi „Adauga coloana desenand"; incearca si pe ecran tactil.
+- **Asteptat**: dreptunghiul apare in timpul tragerii, campul/coloana se adauga si valoarea citita apare in panou; pe ecran tactil pagina nu deruleaza cat timp modul de desenare este pornit.
+
+### N30. Banca de lucru pe ecran ingust
+- **Motiv**: M4. **Pasi**: deschide Setari → Facturi → Analiza pe telefon sau in emulare 375 px, incarca o factura.
+- **Asteptat**: pagina si panoul se aseaza una sub alta, lista si formularele raman utilizabile, tabelul de previzualizare deruleaza pe orizontala.
+
+### N31. Facturi reale de alte tipuri
+- **Motiv**: M1 (corpusul real are trei facturi e-Factura). **Pasi**: adauga in corpus facturi din alte programe de facturare (nu e-Factura), in valuta, cu storno (cantitati negative), cu TVA pe mai multe cote, cu antet care se repeta, cu tabel fara linii; ruleaza raportul de corpus si `--transfer`.
+- **Asteptat**: fiecare produce un sablon utilizabil cu cel mult corectii minore; ce nu se citeste corect devine test in `InvoiceChecks.cs` si se corecteaza in dictionar sau in motor.
+
+### N32. Durata pentru fisiere scanate mari
+- **Motiv**: M4 (un OCR de 30 de pagini dureaza cateva minute si nu exista indicator de progres). **Pasi**: incarca un PDF scanat de 20-30 de pagini.
+- **Asteptat**: analiza se termina fara sa se piarda sesiunea; daca durata este prea mare se adauga indicator de progres sau o limita mai mica de pagini pentru OCR.
+
+### N33. Restaurare dintr-un backup anterior migrarii 10 si ciocniri intre administratori
+- **Motiv**: M2 (un singur administrator; restaurarea pe baza reala nu se ruleaza in verificari). **Pasi**: restaureaza un backup facut inainte de migrarea 10 si reporneste aplicatia (tabelele de sabloane se recreeaza prin migrare); in doua ferestre editeaza acelasi sablon si salveaza pe rand ca versiune noua.
+- **Asteptat**: dupa restaurare Setari → Facturi functioneaza (lista poate fi goala); a doua salvare primeste „Sablonul a fost modificat sau sters intre timp".

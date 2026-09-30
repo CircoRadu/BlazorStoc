@@ -17,6 +17,13 @@ void Check(bool condition, string message)
     if (!condition) throw new Exception(message);
     Console.WriteLine("PASS: " + message);
 }
+// INVOICE_CHECKS_ONLY=1 runs only the invoice template checks (fast loop while working on them).
+if (Environment.GetEnvironmentVariable("INVOICE_CHECKS_ONLY") == "1")
+{
+    await InvoiceChecks.RunAsync(Check);
+    Console.WriteLine("Invoice checks finished.");
+    return;
+}
 ProductInput ProductEdit(Product product, string reason = "Test automat") { var input = ProductInput.From(product); input.Reason = reason; return input; }
 WebUserInput UserEdit(WebUser user, string reason = "Test automat") { var input = WebUserInput.From(user); input.Reason = reason; return input; }
 BeneficiaryInput LegalInput(string name, string cui) => new() { Name = name, Cui = cui, Address = "Strada Test 1, Bucuresti", Phone = "0721 000 111" };
@@ -2330,6 +2337,8 @@ async Task RunMaintenanceGateChecksAsync()
           new MapOptions { MinZoom = 25, MaxZoom = 2 }.Normalized() is { MinZoom: 18, MaxZoom: 18 } && new MapOptions { CenterLatitude = 200 }.Normalized().CenterLatitude == 90,
         "The tile provider comes from the configuration (only https with {z}/{x}/{y}); anything unusable falls back to the default, the zoom range is kept valid");
 }
+
+await InvoiceChecks.RunAsync(Check);
 
 // Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped
 // entirely (no-op, prints nothing extra) unless RUN_MARIA_INTEGRATION_CHECKS=1, so the default dotnet run/CI

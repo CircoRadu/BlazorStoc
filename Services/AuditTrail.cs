@@ -35,6 +35,8 @@ public static class AuditEntities
     // Settings → Hartă: the tile provider (one object, id 1) and the pin types of the overlay.
     public const string MapEngine = "FurnizorHarta";
     public const string MapPinType = "TipPinHarta";
+    // Settings -> Facturi: the saved invoice templates (layouts used to read supplier invoices).
+    public const string InvoiceTemplate = "SablonFactura";
 }
 
 public static class AuditActions
@@ -102,6 +104,15 @@ public static class AuditActions
     public const string RecordOnDemand = "Înregistrare intervenție la cerere";
     public const string EditOnDemandIntervention = "Modificare intervenție la cerere";
     public const string AddInterventionPhoto = "Adăugare fotografie intervenție";
+    // Invoice templates: a new version of the layout and a change of only the name/supplier are different operations. A deleted
+    // template has no page to link to (see IsDeletion).
+    public const string CreateInvoiceTemplate = "Adăugare șablon factură";
+    public const string EditInvoiceTemplate = "Modificare șablon factură";
+    public const string EditInvoiceTemplateDetails = "Modificare date șablon factură";
+    public const string DeleteInvoiceTemplate = "Ștergere șablon factură";
+
+    // Operations that remove their object: earlier events about it stop linking to its page.
+    public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
 
     // Events whose object still has a live page (a plain edit or one of the specific edit operations).
     public static bool IsCreateOrEdit(string? action) =>
@@ -112,7 +123,8 @@ public static class AuditActions
             or CreateServiceContract or EditServiceContract or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
-            or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType;
+            or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
+            or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -171,7 +183,9 @@ public static class AuditNavigation
         [AuditEntities.NotificationSettings] = _ => SettingsNavigation.NotificationSettingsUrl,
         // Map settings: the engine sub-tab, or the overlay sub-tab with the pin type highlighted.
         [AuditEntities.MapEngine] = _ => SettingsNavigation.MapEngineUrl,
-        [AuditEntities.MapPinType] = SettingsNavigation.MapPinTypeUrl
+        [AuditEntities.MapPinType] = SettingsNavigation.MapPinTypeUrl,
+        // The saved templates sub-tab of Settings -> Facturi, the template highlighted.
+        [AuditEntities.InvoiceTemplate] = SettingsNavigation.InvoiceTemplateUrl
     };
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)
@@ -194,7 +208,7 @@ public static class AuditNavigation
         var removals = new Dictionary<string, DateTime>(StringComparer.Ordinal);
         foreach (var entry in events)
         {
-            if (entry.Action != AuditActions.Delete || entry.EntityId.Length == 0) continue;
+            if (!AuditActions.IsDeletion(entry.Action) || entry.EntityId.Length == 0) continue;
             var key = ObjectKey(entry.EntityType, entry.EntityId);
             if (!removals.TryGetValue(key, out var known) || entry.TimestampUtc > known) removals[key] = entry.TimestampUtc;
         }
@@ -234,6 +248,14 @@ public static class SettingsNavigation
 
     public static string MapEngineUrl => $"/setari?{TabParameter}={MapTab}&{SubtabParameter}={MapEngineSubtab}";
     public static string MapPinTypeUrl(int pinTypeId) => $"/setari?{TabParameter}={MapTab}&{SubtabParameter}={MapOverlaySubtab}&{PinParameter}={pinTypeId}";
+
+    public const string InvoicesTab = "facturi";
+    public const string InvoiceAnalysisSubtab = "analiza";
+    public const string InvoiceTemplatesSubtab = "sabloane";
+    public const string InvoiceTemplateParameter = "sablonfactura";
+
+    public static string InvoiceTemplateUrl(int templateId) =>
+        $"/setari?{TabParameter}={InvoicesTab}&{SubtabParameter}={InvoiceTemplatesSubtab}&{InvoiceTemplateParameter}={templateId}";
 
     public static string NotificationSettingsUrl => $"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
 }

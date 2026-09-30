@@ -23,7 +23,8 @@ public static class AuditFilterOptions
         (AuditEntities.Notification, "Notificări"), (AuditEntities.NotificationSettings, "Setări notificări"),
         (AuditEntities.WorkPoint, "Puncte de lucru (ștergeri)"), (AuditEntities.ServicePhoto, "Fotografii puncte de lucru (ștergeri)"),
         (AuditEntities.ServiceContract, "Contracte mentenanță (ștergeri)"), (AuditEntities.ServiceIntervention, "Intervenții mentenanță (ștergeri)"),
-        (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă")
+        (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă"),
+        (AuditEntities.InvoiceTemplate, "Șabloane facturi")
     ];
 
     public static readonly IReadOnlyList<(string Value, string Label)> Actions =
@@ -51,7 +52,9 @@ public static class AuditFilterOptions
         (AuditActions.RescheduleMaintenance, AuditActions.RescheduleMaintenance), (AuditActions.MoveContractPoint, AuditActions.MoveContractPoint),
         (AuditActions.RecordMaintenance, AuditActions.RecordMaintenance), (AuditActions.EditMaintenanceIntervention, AuditActions.EditMaintenanceIntervention),
         (AuditActions.RecordOnDemand, AuditActions.RecordOnDemand), (AuditActions.EditOnDemandIntervention, AuditActions.EditOnDemandIntervention),
-        (AuditActions.AddInterventionPhoto, AuditActions.AddInterventionPhoto)
+        (AuditActions.AddInterventionPhoto, AuditActions.AddInterventionPhoto),
+        (AuditActions.CreateInvoiceTemplate, AuditActions.CreateInvoiceTemplate), (AuditActions.EditInvoiceTemplate, AuditActions.EditInvoiceTemplate),
+        (AuditActions.EditInvoiceTemplateDetails, AuditActions.EditInvoiceTemplateDetails), (AuditActions.DeleteInvoiceTemplate, AuditActions.DeleteInvoiceTemplate)
     ];
 }
 

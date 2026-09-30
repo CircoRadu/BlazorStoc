@@ -40,6 +40,7 @@ public static class MariaExtendedChecks
             await Section("Change events", () => ChangeEventsAsync(configuration, admin, audit));
             await Section("Expiry notifications: templates, engine, take over, reminder", () => NotificationsAsync(configuration, admin, audit, probe));
             await Section("Notification settings: clean-up of old resolved notifications", () => NotificationSettingsAsync(configuration, admin, audit, probe));
+            await Section("Invoice templates: create, versions, unique names, concurrency, delete, journal", () => InvoiceTemplatesAsync(configuration, admin, audit, probe));
         }
         finally
         {
@@ -47,6 +48,65 @@ public static class MariaExtendedChecks
         }
         if (failures > 0) throw new Exception($"{failures} extended MariaDB section(s) failed.");
         Console.WriteLine("=== Extended MariaDB checks: all sections passed. ===");
+    }
+
+    // ---- Invoice templates (Settings -> Facturi) ---------------------------------------------------------------------------------
+
+    private static InvoiceTemplateDefinition InvoiceDefinition(string source = InvoiceSources.Text) =>
+        new(InvoiceTemplateDefinition.CurrentSchema, source, 842, 595,
+            [new InvoiceTemplateAnchor("factura", 1, 0.1, 0.1, InvoiceAnchorGroups.Page)],
+            [new InvoiceTemplateField("f1", InvoiceFieldMeanings.InvoiceNumber, "Număr factură", true, 1, 0.1, 0.1, 0.1, 0.02, "Nr. factura", "text", false, InvoiceFieldModes.Right, 0.05, 0.1)],
+            new InvoiceTemplateTable(1, 0.3, 0.32, InvoiceRowSplit.Top, true, ";",
+                [new InvoiceTemplateColumn("c1", "Denumire", InvoiceColumnMeanings.Name, true, 0.1, 0.5, InvoiceRowMapping.Band, false)]));
+
+    private static async Task InvoiceTemplatesAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var suffix = Suffix();
+        var store = new MariaInvoiceTemplateStore(configuration);
+        var service = new InvoiceTemplateService(store, admin, audit);
+        var cui = "9" + new Random().Next(1000000, 9999999).ToString();
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        try
+        {
+            var first = await service.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon {suffix}", SupplierName = $"Furnizor {suffix}", SupplierCui = "RO" + cui, Note = "prima", Definition = InvoiceDefinition() });
+            Check(first.Info.Id > 0 && first.Info.SupplierCui == cui && first.Info.VersionNumber == 1 && first.Info.CreatedBy == "integration.tester", "A template is saved with its supplier's tax id reduced to digits and the actor");
+            var loaded = await store.GetAsync(first.Info.Id);
+            Check(loaded is not null && loaded.Definition.Fields[0].LabelText == "Nr. factura" && loaded.Definition.Fields[0].Mode == InvoiceFieldModes.Right && loaded.Definition.Table!.NameCodeSeparator == ";" &&
+                  loaded.Definition.Anchors.Count == 1 && loaded.Info.UpdatedUtc.Kind == DateTimeKind.Utc, "The definition (with diacritics, label anchors, table) is stored and read back unchanged");
+            await Rejects<InvoiceTemplateOperationException>(() => service.CreateAsync(new InvoiceTemplateInput { Name = $"SABLON {suffix}", SupplierName = "x", SupplierCui = cui, Definition = InvoiceDefinition() }), "The same name for the same supplier is refused (also in another letter case)");
+            // The database's own unique key refuses it too, even when the application check is bypassed.
+            await Rejects<InvoiceTemplateOperationException>(() => store.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon {suffix}", SupplierName = "x", SupplierCui = cui, Definition = InvoiceDefinition() }, "raw"), "The unique key (supplier, name) refuses a duplicate that bypasses the service");
+            var scanned = await service.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon scanat {suffix}", SupplierName = $"Furnizor {suffix}", SupplierCui = cui, Definition = InvoiceDefinition(InvoiceSources.Ocr) });
+            Check(scanned.Info.SourceKind == InvoiceSources.Ocr && (await store.ListAsync()).Count(item => item.SupplierCui == cui) == 2, "A supplier has several templates");
+
+            var second = await service.SaveNewVersionAsync(first.Info, new InvoiceTemplateInput { Name = first.Info.Name, SupplierName = first.Info.SupplierName, SupplierCui = cui, Note = "a doua", Definition = InvoiceDefinition() with { PageWidth = 600 } });
+            var versions = await store.GetVersionsAsync(first.Info.Id);
+            Check(second.Info.VersionNumber == 2 && second.Info.Version == first.Info.Version + 1 && versions.Select(item => item.VersionNumber).SequenceEqual([2, 1]) && versions[1].Note == "prima" && (await store.GetAsync(first.Info.Id))!.Definition.PageWidth == 600,
+                "A new version becomes the current definition and keeps the earlier one with its note");
+            await Rejects<InvoiceTemplateOperationException>(() => service.SaveNewVersionAsync(first.Info, new InvoiceTemplateInput { Name = first.Info.Name, SupplierCui = cui, Definition = InvoiceDefinition() }), "Saving over a template changed in the meantime (stale version) is refused");
+            Check((await store.GetVersionsAsync(first.Info.Id)).Count == 2, "A refused save leaves no version behind");
+            var renamed = await service.UpdateDetailsAsync(second.Info, new InvoiceTemplateInput { Name = $"Redenumit {suffix}", SupplierName = $"Furnizor nou {suffix}", SupplierCui = cui });
+            Check(renamed.Name == $"Redenumit {suffix}" && renamed.VersionNumber == 2 && renamed.Version == second.Info.Version + 1 && (await store.GetVersionsAsync(first.Info.Id)).Count == 2, "Renaming changes the details without creating a version");
+            await Rejects<InvoiceTemplateOperationException>(() => service.UpdateDetailsAsync(renamed, new InvoiceTemplateInput { Name = scanned.Info.Name, SupplierName = "x", SupplierCui = cui }), "Renaming to another template's name of the same supplier is refused");
+
+            var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.InvoiceTemplate && item.EntityId == first.Info.Id.ToString()).Select(item => item.Action).ToList();
+            Check(events.Contains(AuditActions.CreateInvoiceTemplate) && events.Contains(AuditActions.EditInvoiceTemplate) && events.Contains(AuditActions.EditInvoiceTemplateDetails), "Each operation is in the journal under its own exact action");
+
+            await service.DeleteAsync(renamed, "Motiv de test");
+            Check(await store.GetAsync(first.Info.Id) is null && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM invoice_template_versions WHERE template_id=@id", ("@id", first.Info.Id)) == 0, "Deleting a template removes its versions with it");
+            var deleted = (await audit.GetEventsAsync()).FirstOrDefault(item => item.TimestampUtc >= started && item.Action == AuditActions.DeleteInvoiceTemplate && item.EntityId == first.Info.Id.ToString());
+            Check(deleted is not null && deleted.Motif == "Motiv de test" && deleted.Details.Contains("Versiuni salvate: 2", StringComparison.Ordinal), "The deletion is journaled with its reason");
+            var createdEvent = (await audit.GetEventsAsync()).First(item => item.TimestampUtc >= started && item.Action == AuditActions.CreateInvoiceTemplate && item.EntityId == first.Info.Id.ToString());
+            var removals = await audit.RemovalTimesAsync([createdEvent]);
+            Check(removals.ContainsKey(AuditNavigation.ObjectKey(AuditEntities.InvoiceTemplate, first.Info.Id.ToString())) && AuditNavigation.TargetUrl(createdEvent, removals) is null && AuditNavigation.TargetUrl(createdEvent) is not null,
+                "The database journal reports the deletion of a template, so the earlier events about it stop linking to its page");
+            await Rejects<InvoiceTemplateOperationException>(() => service.DeleteAsync(renamed, "din nou"), "Deleting a template that is already gone is refused");
+            await Rejects<AccessDeniedException>(() => new InvoiceTemplateService(store, new TestAccessControl(false, "limitat"), audit).DeleteAsync(scanned.Info, "x"), "A user who is not an administrator cannot change templates");
+        }
+        finally
+        {
+            await ExecuteAsync(probe, "DELETE FROM invoice_templates WHERE supplier_cui=@cui", ("@cui", cui));
+        }
     }
 
     private static async Task Section(string name, Func<Task> body)

@@ -473,3 +473,10 @@ Verificat la 25 septembrie 2026.
 - Nu s-a modificat schema. Leaflet si markercluster au fost descarcate cu acordul utilizatorului in `wwwroot/lib/leaflet`.
 - Browser (baza de test, port 5088): harta cu dale reale, marker-e si insigne, panou de detalii, filtru, link catre formularul de interventie cu punctul preselectat.
 - Neverificat: ecran ingust, furnizor de dale indisponibil, multe puncte (clusterizare), termenii serverului public OSM; vezi `docs/TESTE_RAMASE.md` (N19-N21).
+
+## Sabloane de facturi in Setari (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 1000 PASS, cu integrare MariaDB pe `blazorstoc_test` (`RUN_MARIA_INTEGRATION_CHECKS=1`); 77 verificari noi de facturi (valori, vocabular, facturi generate in mai multe layout-uri, scanari cu OCR, sabloane aplicate pe alte facturi, cele 3 facturi reale din `INVOICE_CORPUS_DIR`, sesiuni, serviciu si jurnal) si sectiunea MariaDB „Invoice templates" (16 verificari). Rapid, fara restul suitei: `INVOICE_CHECKS_ONLY=1 dotnet run --project tests/BlazorStoc.Checks`.
+- Migrarea 10 aplicata pe `blazorstoc_test` (`--migrate-schema`) si, la pornirea preview-ului 5087, pe baza reala `BlazorStoc`. Nimic nu a fost creat manual pe baza reala.
+- Browser (baza de test, port 5088): incarcarea unei facturi, suprapunerea, editarea, desenarea unui camp, salvarea, propunerea si aplicarea unui sablon pe factura altui furnizor, versiune noua, stergere cu motiv, jurnal.
+- Neverificat: scanari reale, desenare reala cu mouse-ul, ecran ingust, facturi reale de alte tipuri; vezi `docs/TESTE_RAMASE.md` (N28-N33).

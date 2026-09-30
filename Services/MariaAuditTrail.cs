@@ -151,7 +151,9 @@ public sealed class MariaAuditTrail(IConfiguration configuration) : IAuditTrail
             command.Parameters.AddWithValue($"@i{index}", objects[index].EntityId);
         }
         command.Parameters.AddWithValue("@delete", AuditActions.Delete);
-        command.CommandText = $"SELECT entity_type,entity_id,MAX(timestamp_utc) FROM audit_events WHERE action=@delete AND ({string.Join(" OR ", conditions)}) GROUP BY entity_type,entity_id";
+        // The deletions that have their own exact action (AuditActions.IsDeletion) count as removals too.
+        command.Parameters.AddWithValue("@deleteInvoiceTemplate", AuditActions.DeleteInvoiceTemplate);
+        command.CommandText = $"SELECT entity_type,entity_id,MAX(timestamp_utc) FROM audit_events WHERE action IN (@delete, @deleteInvoiceTemplate) AND ({string.Join(" OR ", conditions)}) GROUP BY entity_type,entity_id";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             result[AuditNavigation.ObjectKey(reader.GetString(0), reader.GetString(1))] = MariaTimeText.Parse(reader.GetString(2));

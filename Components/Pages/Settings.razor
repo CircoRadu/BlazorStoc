@@ -33,6 +33,22 @@
             }
         </div>
     }
+    else if (activeTab == InvoicesTab)
+    {
+        <div role="tabpanel" id="panel-@InvoicesTab" aria-labelledby="tab-@InvoicesTab" class="settings-body">
+            @SubtabBar(InvoiceSubtabs, "Secțiuni facturi")
+            @* The analysis stays mounted (hidden) when the saved templates are shown, so switching sub-tabs does not lose the file being worked on. *@
+            <div role="tabpanel" id="subpanel-@InvoiceAnalysisSubtab" aria-labelledby="subtab-@InvoiceAnalysisSubtab" hidden="@(invoiceSubtab != InvoiceAnalysisSubtab)">
+                <InvoiceTemplateWorkbench EditTemplateId="editTemplate?.Info.Id" EditTemplateName="@(editTemplate?.Info.Name)" Saved="OnTemplateSaved" />
+            </div>
+            @if (invoiceSubtab == InvoiceTemplatesSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@InvoiceTemplatesSubtab" aria-labelledby="subtab-@InvoiceTemplatesSubtab">
+                    <InvoiceTemplatesList @key="templatesVersion" FocusTemplateId="InvoiceTemplateParameter" OnEditWithFile="EditWithFile" />
+                </div>
+            }
+        </div>
+    }
     else if (activeTab == MapTab)
     {
         <div role="tabpanel" id="panel-@MapTab" aria-labelledby="tab-@MapTab" class="settings-body">
@@ -53,7 +69,8 @@
     private const string AnafTab = "anaf";
     private const string NotificationsTab = SettingsNavigation.NotificationsTab;
     private const string MapTab = SettingsNavigation.MapTab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă")];
+    private const string InvoicesTab = SettingsNavigation.InvoicesTab;
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi")];
     private string activeTab = AnafTab;
 
     private const string TemplatesSubtab = SettingsNavigation.TemplatesSubtab;
@@ -66,26 +83,50 @@
     private static readonly (string Id, string Title)[] MapSubtabs = [(MapEngineSubtab, "Motor hartă"), (MapOverlaySubtab, "Overlay (tipuri de pinuri)")];
     private string mapSubtab = MapEngineSubtab;
 
+    private const string InvoiceAnalysisSubtab = SettingsNavigation.InvoiceAnalysisSubtab;
+    private const string InvoiceTemplatesSubtab = SettingsNavigation.InvoiceTemplatesSubtab;
+    private static readonly (string Id, string Title)[] InvoiceSubtabs = [(InvoiceAnalysisSubtab, "Analiza unui fișier"), (InvoiceTemplatesSubtab, "Șabloane salvate")];
+    private string invoiceSubtab = InvoiceAnalysisSubtab;
+    private InvoiceTemplateRecord? editTemplate;
+    private int templatesVersion;
+
+    private void EditWithFile(InvoiceTemplateRecord template)
+    {
+        editTemplate = template;
+        invoiceSubtab = InvoiceAnalysisSubtab;
+    }
+
+    private void OnTemplateSaved()
+    {
+        editTemplate = null;
+        templatesVersion++;
+    }
+
+    private string CurrentSubtab((string Id, string Title)[] subtabs) =>
+        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : notificationSubtab;
+
     // Deep links (for example from the Journal) open the named tab, sub-tab and object; later clicks on the tabs win.
     [SupplyParameterFromQuery(Name = SettingsNavigation.TabParameter)] public string? TabQuery { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.SubtabParameter)] public string? SubtabQuery { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.TemplateParameter)] public int? TemplateParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.PinParameter)] public int? PinParameter { get; set; }
+    [SupplyParameterFromQuery(Name = SettingsNavigation.InvoiceTemplateParameter)] public int? InvoiceTemplateParameter { get; set; }
     private string? appliedLink;
 
     protected override void OnParametersSet()
     {
-        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}";
+        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}";
         if (link == appliedLink) return;
         appliedLink = link;
         if (Tabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
+        if (InvoiceSubtabs.Any(tab => tab.Id == SubtabQuery)) invoiceSubtab = SubtabQuery!;
     }
 
     private RenderFragment SubtabBar((string Id, string Title)[] subtabs, string label) => builder =>
     {
-        var current = subtabs == MapSubtabs ? mapSubtab : notificationSubtab;
+        var current = CurrentSubtab(subtabs);
         var seq = 0;
         builder.OpenElement(seq++, "div");
         builder.AddAttribute(seq++, "class", "settings-subtabs");
@@ -113,12 +154,14 @@
 
     private void SelectSubtab((string Id, string Title)[] subtabs, string id)
     {
-        if (subtabs == MapSubtabs) mapSubtab = id; else notificationSubtab = id;
+        if (subtabs == MapSubtabs) mapSubtab = id;
+        else if (subtabs == InvoiceSubtabs) invoiceSubtab = id;
+        else notificationSubtab = id;
     }
 
     private void OnSubtabKeyDown((string Id, string Title)[] subtabs, KeyboardEventArgs args)
     {
-        var current = subtabs == MapSubtabs ? mapSubtab : notificationSubtab;
+        var current = CurrentSubtab(subtabs);
         var index = Array.FindIndex(subtabs, tab => tab.Id == current);
         index = args.Key switch
         {

@@ -388,6 +388,50 @@ public static class MariaSchemaMigrations
             ("archive_service_interventions", "performed_on"), ("archive_service_interventions", "planned_due"), ("archive_service_interventions", "next_due_basis"),
             ("archive_service_interventions", "next_due_set"), ("archive_service_interventions", "notes"), ("archive_service_interventions", "recorded_by"),
             ("archive_service_interventions", "recorded_utc"), ("archive_service_interventions", "version")
+        ]),
+        // Templates that read supplier invoices (Settings -> Facturi): the current definition (JSON, positions as fractions of the page) and
+        // every saved version of it. A name is unique per supplier tax id (the application also compares without letter case).
+        new(10, "Sabloane de facturi: sabloane (furnizor, definitie JSON) si versiunile lor salvate",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `invoice_templates` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `name` VARCHAR(120) NOT NULL,
+              `supplier_name` VARCHAR(200) NOT NULL DEFAULT '',
+              `supplier_cui` VARCHAR(20) NOT NULL DEFAULT '',
+              `source_kind` VARCHAR(10) NOT NULL DEFAULT 'text',
+              `version_number` INT NOT NULL DEFAULT 1,
+              `definition` LONGTEXT NOT NULL,
+              `created_by` VARCHAR(100) NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              `updated_by` VARCHAR(100) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              `version` BIGINT NOT NULL DEFAULT 0,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `uq_invoice_templates_name` (`supplier_cui`, `name`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS `invoice_template_versions` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `template_id` BIGINT NOT NULL,
+              `version_number` INT NOT NULL,
+              `definition` LONGTEXT NOT NULL,
+              `note` VARCHAR(300) NOT NULL DEFAULT '',
+              `created_by` VARCHAR(100) NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `uq_invoice_template_versions_number` (`template_id`, `version_number`),
+              CONSTRAINT `fk_invoice_template_versions_template` FOREIGN KEY (`template_id`) REFERENCES `invoice_templates` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("invoice_templates", "id"), ("invoice_templates", "name"), ("invoice_templates", "supplier_name"), ("invoice_templates", "supplier_cui"),
+            ("invoice_templates", "source_kind"), ("invoice_templates", "version_number"), ("invoice_templates", "definition"), ("invoice_templates", "created_by"),
+            ("invoice_templates", "created_utc"), ("invoice_templates", "updated_by"), ("invoice_templates", "updated_utc"), ("invoice_templates", "version"),
+            ("invoice_template_versions", "id"), ("invoice_template_versions", "template_id"), ("invoice_template_versions", "version_number"),
+            ("invoice_template_versions", "definition"), ("invoice_template_versions", "note"), ("invoice_template_versions", "created_by"), ("invoice_template_versions", "created_utc")
         ])
     ];
 }
