@@ -85,6 +85,8 @@ public sealed class SqliteDatabaseRestoreService(SqliteLocalStore store, IConfig
         progress?.Report(new(RestoreStage.Locking, RestoreRules.StageMessage(RestoreStage.Locking)));
         await using var handle = await locks.TryAcquireAsync("restore", operatorName, operatorRole, cancellationToken).ConfigureAwait(false);
         if (handle is null) return RestoreResult.Failed(OperationLockRules.HeldMessage);
+        // This flow holds the lock: its own data access must pass the write freeze that refuses every other session.
+        using var maintenanceScope = MaintenanceGate.EnterOwnerScope();
 
         string? preRestoreFileName = null;
         var extractDir = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}");
@@ -292,6 +294,8 @@ public sealed class MariaDatabaseRestoreService(IConfiguration configuration, IA
         progress?.Report(new(RestoreStage.Locking, RestoreRules.StageMessage(RestoreStage.Locking)));
         await using var handle = await locks.TryAcquireAsync("restore", operatorName, operatorRole, cancellationToken).ConfigureAwait(false);
         if (handle is null) return RestoreResult.Failed(OperationLockRules.HeldMessage);
+        // This flow holds the lock: its own data access must pass the write freeze that refuses every other session.
+        using var maintenanceScope = MaintenanceGate.EnterOwnerScope();
 
         string? preRestoreFileName = null;
         try

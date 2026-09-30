@@ -109,6 +109,8 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
 
     public async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
     {
+        // Refused for every session but the one running a backup/restore while the operation lock is held.
+        MaintenanceGate.ThrowIfBlocked();
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
         var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);

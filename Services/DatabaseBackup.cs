@@ -264,6 +264,8 @@ public sealed class SqliteDatabaseBackupService(SqliteLocalStore store, IConfigu
             if (handle is null) return BackupResult.Failed(OperationLockRules.HeldMessage);
         }
 
+        // This flow holds the lock: its own data access must pass the write freeze that refuses every other session.
+        using var maintenanceScope = MaintenanceGate.EnterOwnerScope();
         var tempDb = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.sqlite");
         var tempZip = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.zip");
         try
@@ -385,6 +387,8 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
             if (handle is null) return BackupResult.Failed(OperationLockRules.HeldMessage);
         }
 
+        // This flow holds the lock: its own data access must pass the write freeze that refuses every other session.
+        using var maintenanceScope = MaintenanceGate.EnterOwnerScope();
         var tempSql = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.sql");
         var tempZip = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.zip");
         string? tempCredentialsFile = null;

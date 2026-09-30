@@ -4,6 +4,10 @@ Actualizat de: **Claude**
 Data: **29 septembrie 2026 (Task 3, subtaskurile 3.3 si 3.4 - declansarea si pasii de restaurare a bazei de date)**
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
 
+## Blocarea sesiunilor si notificare live la backup/restaurare - 30.09.2026
+
+- Cat timp lacatul de backup/restaurare este activ, orice alt acces la date este refuzat (`MaintenanceGate`, in `DatabaseConnections.Create` si `SqliteLocalStore.OpenConnectionAsync`), iar tab-urile deschise sunt mutate live pe `/intretinere` (script `maintenance-watch.js`, endpoint `/api/maintenance`) si revin singure la final; paginile care conduc operatia raman pe loc. Suita: 743 PASS. Verificat in browser pe MariaDB reala (trei taburi, backup si restaurari reale sub blocare). Detalii si limite in `IMPLEMENTED.md`.
+
 ## Verificare MariaDB reala si OCR reproiectat - 30.09.2026
 
 - Backup (A18) si restaurare (A20) verificate pe instanta reala `C:\Dev\BlazorStoc-MariaDB` (port 3307), inclusiv doua refuzuri (hash alterat, structura); `beneficiary_work_points` adaugata in `MariaArchiveSchema.RequiredTables` (lista pentru backup/restaurare, separata de tabelele de baza verificate la pornire). Detalii in `docs/TESTE_RAMASE.md`. Pornire preview MariaDB: `Database__PrivateConfigPath` catre `local-secrets\application-connection.private.json`, `Database__MariaDumpExecutablePath`/`Database__MariaClientExecutablePath` catre `C:\Dev\...\bin`, `App__DemoMode=false`, port 5083.
@@ -14,7 +18,7 @@ Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subt
 
 ## Taburi vehicul si date de expirare - 29.09.2026
 
-Pagina vehiculului are taburile Informatii autovehicul (numar, descriere, date expirare ITP/asigurare/rovinieta, obligatorii, fara restrictie de data viitoare) si Echipamente aflate in masina. Vehiculele existente au date implicite din 2027 (valoarea implicita a coloanelor SQLite si migrarea MariaDB 3). Detalii in IMPLEMENTED.md; neverificat in browser si pe MariaDB reala (vezi docs/TESTE_RAMASE.md). Preview: http://127.0.0.1:5085/.
+Pagina vehiculului are taburile Informatii autovehicul (numar, descriere, date expirare ITP/asigurare/rovinieta, obligatorii, fara restrictie de data viitoare) si Echipamente aflate in masina. Vehiculele existente au date implicite din 2027 (valoarea implicita a coloanelor SQLite si migrarea MariaDB 3). Detalii in IMPLEMENTED.md. Verificat la 30.09.2026 in browser pe MariaDB reala (5083) si migrarea 3 aplicata pe instanta reala (vezi docs/TESTE_RAMASE.md, sectiunea inchisa).
 
 ## Backup real MariaDB: verificat partial - 29.09.2026
 

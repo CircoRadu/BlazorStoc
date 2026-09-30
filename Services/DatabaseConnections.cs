@@ -6,6 +6,8 @@ internal static class DatabaseConnections
 {
     public static MySqlConnection Create(IConfiguration configuration)
     {
+        // Refused for every session but the one running a backup/restore while the operation lock is held.
+        MaintenanceGate.ThrowIfBlocked();
         var builder = new MySqlConnectionStringBuilder
         {
             Server = configuration["Database:Host"] ?? "127.0.0.1",

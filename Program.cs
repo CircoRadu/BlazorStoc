@@ -170,10 +170,13 @@ builder.Services.AddScoped<IInventoryPickupApplier, InventoryPickupApplier>();
 // Subtask 2.1/2.2 (Task 2): one shared lock file per mode (demo/SQLite vs real/MariaDB never share a backup
 // directory), singleton because the lock and its heartbeat must be the same instance across the whole app, not
 // re-created per request.
-builder.Services.AddSingleton<IOperationLockService>(services => new FileOperationLockService(
-    Path.Combine(demo ? Path.GetFullPath(builder.Configuration["App:BackupFilesPath"] ?? Path.Combine("data", "database-backups"))
-        : MariaAssetPaths.DatabaseBackups(services.GetRequiredService<IConfiguration>()), "operation.lock.json"),
+var operationLockPath = Path.Combine(demo ? Path.GetFullPath(builder.Configuration["App:BackupFilesPath"] ?? Path.Combine("data", "database-backups"))
+    : MariaAssetPaths.DatabaseBackups(builder.Configuration), "operation.lock.json");
+builder.Services.AddSingleton<IOperationLockService>(services => new FileOperationLockService(operationLockPath,
     services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<FileOperationLockService>>()));
+// While that lock is held, every session but the one holding it is refused at the data-access layer and redirected to
+// the waiting page (MaintenanceGate, MaintenanceSupport).
+MaintenanceGate.Configure(operationLockPath);
 builder.Services.AddScoped<IDatabaseBackupService>(services => demo
     ? new SqliteDatabaseBackupService(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IConfiguration>(),
         services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IOperationLockService>(),
@@ -259,8 +262,25 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
+// A page navigation made while a backup/restore is running goes to the waiting page instead of a half-loaded page.
+app.Use(async (context, next) =>
+{
+    if (MaintenanceSupport.ShouldRedirect(context.Request, MaintenanceGate.Active))
+    {
+        context.Response.Redirect(MaintenanceSupport.WaitingUrl(context.Request));
+        return;
+    }
+    await next();
+});
 app.MapStaticAssets().AllowAnonymous();
 app.MapGet("/health/live", () => Results.Text("healthy")).AllowAnonymous();
+// Polled by every open page (wwwroot/maintenance-watch.js): tells an already-open tab that a backup/restore has
+// started or ended, so it can be moved to the waiting page and brought back. Carries no names or details.
+app.MapGet("/api/maintenance", (HttpContext context) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    return Results.Json(new { active = MaintenanceGate.Active is not null });
+}).RequireAuthorization();
 app.MapGet("/media/products/{productId:int}", async (int productId, IProductImageStore images, CancellationToken token) =>
 {
     var image = await images.GetAsync(productId, token);

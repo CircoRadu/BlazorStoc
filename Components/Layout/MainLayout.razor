@@ -74,9 +74,9 @@
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>@(Mode.IsDemo ? "Date demonstrative" : "BlazorStoc · MariaDB")</small></div>
     </aside>
     <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">@(Mode.IsDemo ? "Mod demonstrativ" : "Sesiune autentificată")</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
-        @if (activeOperation is not null && !onRestorePage)
+        @if (activeOperation is not null && !onRestorePage && !onWaitingPage)
         {
-            <div class="error-banner" role="alert">
+            <div class="error-banner" role="alert" id="maintenance-banner">
                 Backup/restaurare in curs (@activeOperation.OperatorName) - datele pot fi temporar indisponibile. Reveniti mai tarziu.
             </div>
         }
@@ -98,7 +98,7 @@
 @code {
     private IReadOnlyList<BlazorStoc.Services.ProductGroup> groups = Array.Empty<BlazorStoc.Services.ProductGroup>();
     private List<string> categories = [];
-    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, onRestorePage;
+    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, onRestorePage, onWaitingPage;
     private string selectedCategory = "", selectedSubcategory = "";
     private OperationLockInfo? activeOperation;
     private readonly CancellationTokenSource lifetime = new();
@@ -152,6 +152,7 @@
         inventorySection = uri.AbsolutePath.StartsWith("/inventar", StringComparison.OrdinalIgnoreCase);
         if (inventorySection) inventoryExpanded = true;
         onRestorePage = uri.AbsolutePath.StartsWith("/inventar/restaurare", StringComparison.OrdinalIgnoreCase);
+        onWaitingPage = uri.AbsolutePath.StartsWith(MaintenanceSupport.WaitingPath, StringComparison.OrdinalIgnoreCase);
         var query = QueryHelpers.ParseQuery(uri.Query);
         selectedCategory = productSection && query.TryGetValue("categorie", out var categoryValue) ? categoryValue.ToString() : "";
         selectedSubcategory = productSection && query.TryGetValue("subcategorie", out var subcategoryValue) ? subcategoryValue.ToString() : "";

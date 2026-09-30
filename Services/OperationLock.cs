@@ -72,6 +72,7 @@ public sealed class FileOperationLockService(string lockFilePath, IAuditTrail? a
                 // Another request won the race to create the file first.
                 return null;
             }
+            MaintenanceGate.Invalidate();
             return new Handle(this, entry);
         }
         finally { gate.Release(); }
@@ -83,6 +84,25 @@ public sealed class FileOperationLockService(string lockFilePath, IAuditTrail? a
         if (existing is null) return null;
         if (DateTime.UtcNow - existing.HeartbeatUtc > TimeSpan.FromSeconds(OperationLockRules.LeaseSeconds)) return null;
         return new(existing.Operation, existing.OperatorName, existing.OperatorRole, existing.AcquiredUtc, existing.HeartbeatUtc);
+    }
+
+    // Synchronous read for MaintenanceGate (called from places that open a database connection and cannot await):
+    // the active, non-expired operation recorded in the lock file at the given path, or null.
+    internal static OperationLockInfo? ReadActive(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return null;
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var existing = JsonSerializer.Deserialize<LockFile>(stream, JsonOptions);
+            if (existing is null) return null;
+            if (DateTime.UtcNow - existing.HeartbeatUtc > TimeSpan.FromSeconds(OperationLockRules.LeaseSeconds)) return null;
+            return new(existing.Operation, existing.OperatorName, existing.OperatorRole, existing.AcquiredUtc, existing.HeartbeatUtc);
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private async Task RenewAsync(LockFile entry, CancellationToken cancellationToken)
@@ -122,6 +142,7 @@ public sealed class FileOperationLockService(string lockFilePath, IAuditTrail? a
         {
             logger?.LogWarning("Stergerea fisierului de lacat a esuat ({ErrorType}).", exception.GetType().Name);
         }
+        MaintenanceGate.Invalidate();
     }
 
     private sealed class Handle : IOperationLockHandle

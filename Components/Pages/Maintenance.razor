@@ -1,0 +1,21 @@
+@page "/intretinere"
+@attribute [Authorize]
+@using BlazorStoc.Services
+
+<PageTitle>Întreținere · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">ÎNTREȚINERE</p><h1>Backup sau restaurare în curs</h1>
+        <p class="muted">Baza de date este temporar indisponibilă, pentru a nu se pierde sau amesteca date. Pagina revine automat la ce făceai imediat ce operația se încheie.</p></div>
+</div>
+<div class="empty-state" role="status" id="maintenance-wait" data-return-url="@ReturnTarget">
+    <div class="spinner"></div>
+    <h3>Te rugăm să aștepți</h3>
+    <p>De obicei durează câteva secunde.</p>
+    <a class="refresh" href="@ReturnTarget">Reîncearcă acum</a>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
+
+    private string ReturnTarget => MaintenanceSupport.SafeReturnUrl(ReturnUrl);
+}

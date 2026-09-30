@@ -3672,6 +3672,175 @@ async Task RunOperationLockChecksAsync()
     finally { try { Directory.Delete(Path.GetDirectoryName(lockPath)!, true); } catch (IOException) { } }
 }
 
+// Write freeze of a backup/restore (MaintenanceGate): while the shared operation lock is held, every session but the
+// operation itself is refused at the data-access layer; a page navigation is sent to the waiting page.
+await RunMaintenanceGateChecksAsync();
+async Task RunMaintenanceGateChecksAsync()
+{
+    var gateRoot = Path.Combine(Path.GetTempPath(), $"blazorstoc-gate-{Guid.NewGuid():N}");
+    var gateDataRoot = Path.Combine(gateRoot, "app");
+    var gateBackups = Path.Combine(gateRoot, "backups");
+    Directory.CreateDirectory(gateBackups);
+    var gateLockPath = Path.Combine(gateBackups, "operation.lock.json");
+    try
+    {
+        var gateConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["App:LocalDatabasePath"] = Path.Combine(gateDataRoot, "app.db"),
+            ["App:ProductImagesPath"] = Path.Combine(gateDataRoot, "product-images"),
+            ["App:ProjectFilesPath"] = Path.Combine(gateDataRoot, "project-files"),
+            ["App:ArchiveFilesPath"] = Path.Combine(gateDataRoot, "archive-files"),
+            ["App:AuditPath"] = Path.Combine(gateDataRoot, "legacy-audit.jsonl"),
+            ["App:BackupFilesPath"] = gateBackups
+        }).Build();
+        var gateStore = new SqliteLocalStore(new TestWebHostEnvironment(gateDataRoot), gateConfiguration, NullLogger<SqliteLocalStore>.Instance);
+        await gateStore.InitializeAsync();
+        var gateAccess = new TestAccessControl(true, "test.gate");
+        var gateAudit = new FileAuditTrail(new TestWebHostEnvironment(gateDataRoot), gateConfiguration, NullLogger<FileAuditTrail>.Instance);
+        var gateLocks = new FileOperationLockService(gateLockPath);
+        var gateBackup = new SqliteDatabaseBackupService(gateStore, gateConfiguration, gateAccess, gateLocks, gateAudit, new ConsoleLogger<SqliteDatabaseBackupService>());
+        var gateRestore = new SqliteDatabaseRestoreService(gateStore, gateConfiguration, gateAccess, gateLocks, gateBackup, gateAudit, new ConsoleLogger<SqliteDatabaseRestoreService>());
+
+        // Another "session": a flow that does NOT inherit the caller's execution context, like a separate request/circuit.
+        string OtherSession()
+        {
+            Task<string> attempt;
+            using (ExecutionContext.SuppressFlow())
+                attempt = Task.Run(async () =>
+                {
+                    try { await using var connection = await gateStore.OpenConnectionAsync(); return "opened"; }
+                    catch (MaintenanceInProgressException) { return "blocked"; }
+                });
+            return attempt.GetAwaiter().GetResult();
+        }
+
+        // Not configured: no restriction at all, even with a lock file present.
+        MaintenanceGate.Configure(null);
+        Check(OtherSession() == "opened", "Without a configured lock path the write freeze never restricts anything");
+
+        MaintenanceGate.Configure(gateLockPath);
+        Check(OtherSession() == "opened", "With no operation running, other sessions use the database normally");
+
+        var held = await gateLocks.TryAcquireAsync("backup:test", "administrator", AccessRoles.Administrator);
+        Check(held is not null, "The test operation acquires the shared lock");
+        Check(OtherSession() == "blocked", "While an operation holds the lock, another session is refused at the data-access layer");
+        var refusal = await Assert.ThrowsAsync<MaintenanceInProgressException>(async () => { await using var c = await gateStore.OpenConnectionAsync(); });
+        Check(refusal is { Message: MaintenanceGate.BlockedMessage }, "The refusal carries the maintenance message");
+
+        // The owner flow passes, without letting other flows through, and its scope ends with the operation.
+        using (MaintenanceGate.EnterOwnerScope())
+        {
+            await using (var ownerConnection = await gateStore.OpenConnectionAsync()) { }
+            Check(OtherSession() == "blocked", "An owner scope does not leak to a parallel session");
+        }
+        Check(OtherSession() == "blocked" && await Assert.ThrowsAsync<MaintenanceInProgressException>(async () => { await using var c = await gateStore.OpenConnectionAsync(); }) is not null,
+            "After the owner scope ends, the same flow is refused again");
+
+        await held!.DisposeAsync();
+        Check(OtherSession() == "opened", "Releasing the lock reopens the database to every session at once");
+
+        // An orphan lock (heartbeat long expired) never freezes anything.
+        var stale = DateTime.UtcNow.AddMinutes(-10);
+        await File.WriteAllTextAsync(gateLockPath, JsonSerializer.Serialize(new
+        {
+            operation = "backup:test", operatorName = "orfan", operatorRole = AccessRoles.Administrator, processId = 0,
+            acquiredUtc = stale.AddMinutes(-2), heartbeatUtc = stale
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        MaintenanceGate.Invalidate();
+        Check(OtherSession() == "opened", "An expired (orphan) lock does not freeze the database");
+        File.Delete(gateLockPath);
+        MaintenanceGate.Invalidate();
+
+        // A REAL backup: it passes its own freeze, and a parallel session is refused while it exports.
+        string? duringBackup = null;
+        var backup = await gateBackup.CreateBackupAsync(BackupKind.InventoryPickup, new SyncProgress<BackupProgress>(step =>
+        {
+            if (step.Stage == BackupStage.Exporting) duringBackup = OtherSession();
+        }));
+        Check(backup.Success, $"A real backup still succeeds under the write freeze ({backup.ErrorMessage})");
+        Check(duringBackup == "blocked", $"During a real backup export another session is refused (got {duringBackup ?? "no export stage"})");
+        Check(OtherSession() == "opened", "After the backup ends other sessions use the database again");
+
+        // A REAL restore: same, through every stage including the snapshot and the import.
+        await using (var change = await gateStore.OpenConnectionAsync())
+        {
+            await using var command = TestSqliteCommand(change, "INSERT INTO categories(name,normalized_name) VALUES('Gate change','gate change')");
+            await command.ExecuteNonQueryAsync();
+        }
+        var duringRestore = new List<string>();
+        var restore = await gateRestore.RestoreAsync(backup.PackageFileName!, new SyncProgress<RestoreProgress>(step =>
+        {
+            if (step.Stage is RestoreStage.SnapshotCurrent or RestoreStage.ComparingContent or RestoreStage.Importing) duringRestore.Add(OtherSession());
+        }));
+        Check(restore.Success, $"A real restore still succeeds under the write freeze ({restore.ErrorMessage})");
+        Check(duringRestore.Count == 3 && duringRestore.All(outcome => outcome == "blocked"),
+            $"During a real restore every other session is refused ({string.Join(",", duringRestore)})");
+        Check(OtherSession() == "opened", "After the restore ends other sessions use the database again");
+    }
+    finally
+    {
+        MaintenanceGate.Configure(null);
+        try { Directory.Delete(gateRoot, true); } catch (IOException) { }
+    }
+
+    // The MariaDB chokepoint (DatabaseConnections.Create, internal): refused for a non-owner while the lock is held, allowed
+    // otherwise and for the owner. Creating the connection object opens nothing, so no database is needed.
+    {
+        var mariaGateRoot = Path.Combine(Path.GetTempPath(), $"blazorstoc-gate-maria-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(mariaGateRoot);
+        var mariaGateLockPath = Path.Combine(mariaGateRoot, "operation.lock.json");
+        var mariaGateLocks = new FileOperationLockService(mariaGateLockPath);
+        var createConnection = typeof(FileOperationLockService).Assembly.GetType("BlazorStoc.Services.DatabaseConnections")!
+            .GetMethod("Create", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
+        var mariaGateConfiguration = new ConfigurationBuilder().Build();
+        string TryCreate()
+        {
+            try { using var connection = (IDisposable)createConnection.Invoke(null, [mariaGateConfiguration])!; return "created"; }
+            catch (System.Reflection.TargetInvocationException exception) when (exception.InnerException is MaintenanceInProgressException) { return "blocked"; }
+        }
+        try
+        {
+            MaintenanceGate.Configure(mariaGateLockPath);
+            Check(TryCreate() == "created", "MariaDB connections are created normally while no operation runs");
+            var mariaHeld = await mariaGateLocks.TryAcquireAsync("backup:test", "administrator", AccessRoles.Administrator);
+            Check(TryCreate() == "blocked", "A MariaDB connection is refused for a non-owner while an operation holds the lock");
+            using (MaintenanceGate.EnterOwnerScope())
+                Check(TryCreate() == "created", "The operation that holds the lock still gets its own MariaDB connections");
+            await mariaHeld!.DisposeAsync();
+            Check(TryCreate() == "created", "MariaDB connections are created again once the operation ends");
+        }
+        finally
+        {
+            MaintenanceGate.Configure(null);
+            try { Directory.Delete(mariaGateRoot, true); } catch (IOException) { }
+        }
+    }
+
+    // Page navigations while an operation runs go to the waiting page; the running page's own traffic does not.
+    var activeOperation = new OperationLockInfo("backup:test", "administrator", AccessRoles.Administrator, DateTime.UtcNow, DateTime.UtcNow);
+    static Microsoft.AspNetCore.Http.HttpRequest PageRequest(string path, string method = "GET", string accept = "text/html,application/xhtml+xml")
+    {
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.Request.Method = method;
+        context.Request.Path = path;
+        context.Request.QueryString = new Microsoft.AspNetCore.Http.QueryString("?categorie=Scule");
+        context.Request.Headers.Accept = accept;
+        return context.Request;
+    }
+    Check(MaintenanceSupport.ShouldRedirect(PageRequest("/produse"), activeOperation), "A page navigation during an operation is redirected");
+    Check(!MaintenanceSupport.ShouldRedirect(PageRequest("/produse"), null), "Nothing is redirected when no operation runs");
+    Check(!MaintenanceSupport.ShouldRedirect(PageRequest("/produse", method: "POST"), activeOperation), "Only GET navigations are redirected");
+    Check(!MaintenanceSupport.ShouldRedirect(PageRequest("/produse", accept: "application/json"), activeOperation), "A request that does not ask for HTML is not redirected");
+    foreach (var passThrough in new[] { "/intretinere", "/api/maintenance", "/Account/Login", "/_blazor", "/_framework/blazor.web.js", "/hubs/changes", "/app.css", "/media/products/3" })
+        Check(!MaintenanceSupport.ShouldRedirect(PageRequest(passThrough), activeOperation), $"{passThrough} is never redirected to the waiting page");
+    Check(MaintenanceSupport.WaitingUrl(PageRequest("/produse")) == "/intretinere?returnUrl=%2Fproduse%3Fcategorie%3DScule",
+        "The waiting page URL remembers where to come back to");
+    Check(MaintenanceSupport.SafeReturnUrl("/produse?categorie=Scule") == "/produse?categorie=Scule" &&
+          MaintenanceSupport.SafeReturnUrl("//evil.example") == "/" && MaintenanceSupport.SafeReturnUrl("https://evil.example") == "/" &&
+          MaintenanceSupport.SafeReturnUrl("/intretinere?returnUrl=/x") == "/" && MaintenanceSupport.SafeReturnUrl(null) == "/",
+        "The return address is always a local path, never another site or the waiting page itself");
+}
+
 // Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped
 // entirely (no-op, prints nothing extra) unless RUN_MARIA_INTEGRATION_CHECKS=1, so the default dotnet run/CI
 // experience (the checks above, no network, no MariaDB needed) is unchanged.
@@ -3681,6 +3850,23 @@ if (Environment.GetEnvironmentVariable("RUN_MARIA_INTEGRATION_CHECKS") == "1")
         ?? throw new InvalidOperationException("Set MARIA_TEST_CONFIG_PATH to the test database's private config JSON.");
     var mariaConfiguration = new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddJsonFile(mariaConfigPath).Build();
     await BlazorStoc.Checks.MariaIntegrationChecks.RunAsync(mariaConfiguration);
+}
+
+// Reports synchronously in the reporter's own execution context (Progress<T> would post to the thread pool).
+sealed class SyncProgress<T>(Action<T> handler) : IProgress<T>
+{
+    public void Report(T value) => handler(value);
+}
+
+static class Assert
+{
+    // Runs the action and returns the expected exception (null when none, or a different one, was raised).
+    public static async Task<TException?> ThrowsAsync<TException>(Func<Task> action) where TException : Exception
+    {
+        try { await action(); return null; }
+        catch (TException exception) { return exception; }
+        catch (Exception) { return null; }
+    }
 }
 
 sealed class ConsoleLogger<T> : ILogger<T>
