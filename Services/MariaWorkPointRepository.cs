@@ -89,7 +89,10 @@ public sealed class MariaWorkPointRepository(
             cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
+
+    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
     {
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
             throw new WorkPointOperationException("Modificările sunt permise numai în baza BlazorStoc.");

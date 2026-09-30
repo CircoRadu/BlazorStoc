@@ -2,7 +2,6 @@ using MySqlConnector;
 
 namespace BlazorStoc.Services;
 
-public sealed record AppMode(bool IsDemo);
 public sealed record Product(int Id, string Category, string Subcategory, string Name, string Description, int Quantity, long Version = 0);
 public sealed record ProductGroup(string Category, string Subcategory);
 public interface IProductRepository

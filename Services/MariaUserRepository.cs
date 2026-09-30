@@ -210,7 +210,10 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         new("Stare", before.IsActive ? "activ" : "inactiv", after.IsActive ? "activ" : "inactiv")
     ];
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
+
+    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))

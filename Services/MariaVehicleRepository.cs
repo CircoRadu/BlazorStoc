@@ -62,7 +62,7 @@ public sealed class MariaVehicleRepository(
                 value.ItpExpiry, value.InsuranceExpiry, value.RovinietaExpiry);
         }, cancellationToken, value.PlateNumber).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Vehicle, vehicle.Id.ToString(),
-            SqliteVehicleRepository.Target(vehicle), VehicleRules.AuditIdentification(vehicle), cancellationToken).ConfigureAwait(false);
+            VehicleRules.Target(vehicle), VehicleRules.AuditIdentification(vehicle), cancellationToken).ConfigureAwait(false);
         return vehicle;
     }
 
@@ -88,7 +88,7 @@ public sealed class MariaVehicleRepository(
                 value.ItpExpiry, value.InsuranceExpiry, value.RovinietaExpiry);
         }, cancellationToken, value.PlateNumber, original.Id).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Vehicle, vehicle.Id.ToString(),
-            SqliteVehicleRepository.Target(vehicle),
+            VehicleRules.Target(vehicle),
             VehicleRules.Changes(original, vehicle),
             value.Reason, cancellationToken, auditAction).ConfigureAwait(false);
         return vehicle;
@@ -125,8 +125,12 @@ public sealed class MariaVehicleRepository(
 
     private static object SqlDate(DateOnly? date) => date is { } value ? value.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
-        string? savedPlate = null, int? savedId = null)
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
+        string? savedPlate = null, int? savedId = null) =>
+        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token, savedPlate, savedId), token);
+
+    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
+        string? savedPlate, int? savedId)
     {
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
             throw new VehicleOperationException("Modificările sunt permise numai în baza BlazorStoc.");

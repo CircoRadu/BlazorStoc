@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
 using MySqlConnector;
 
 namespace BlazorStoc.Services;
@@ -30,7 +29,7 @@ public static class ChangeEventTriggers
 {
     public const string EventTable = "change_events";
 
-    public static readonly IReadOnlyList<WatchedTable> Sqlite =
+    public static readonly IReadOnlyList<WatchedTable> Maria =
     [
         new("products", AuditEntities.Product, "id"),
         // Stock movements change the product's stock and movement list: reported as a change of that product.
@@ -40,11 +39,6 @@ public static class ChangeEventTriggers
         new("project_observations", AuditEntities.ProjectObservation, "id", ProjectColumn: "project_id", ObservationColumn: "id"),
         new("project_observation_files", AuditEntities.ProjectObservationFile, "id", ObservationColumn: "observation_id")
     ];
-
-    // Subtask 2.8 (Task 2): the real migrated schema uses the exact same table/column names as SQLite (it was
-    // migrated from it), and the 18 triggers already installed on the delivered database (verified in this cycle:
-    // SHOW TRIGGERS returns exactly 18) already match this list. There is no separate legacy naming to adapt to.
-    public static readonly IReadOnlyList<WatchedTable> Maria = Sqlite;
 
     private static readonly (string Suffix, string Timing, string Row, string Action)[] Operations =
     [
@@ -68,72 +62,7 @@ public static class ChangeEventTriggers
                $"{Column(row, table.ProjectColumn)},{Column(row, table.ObservationColumn)},{Column(row, table.BeneficiaryColumn)},{now})";
     }
 
-    public static string SqliteSchema()
-    {
-        var sql = new System.Text.StringBuilder();
-        sql.AppendLine($"""
-            CREATE TABLE IF NOT EXISTS {EventTable} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                entity_type TEXT NOT NULL,
-                action TEXT NOT NULL,
-                entity_id TEXT NOT NULL,
-                project_id INTEGER NULL,
-                observation_id INTEGER NULL,
-                beneficiary_id INTEGER NULL,
-                created_utc TEXT NOT NULL
-            );
-            """);
-        foreach (var table in Sqlite)
-            foreach (var (suffix, timing, row, action) in Operations)
-                sql.AppendLine($"CREATE TRIGGER IF NOT EXISTS {TriggerName(table, suffix)} AFTER {timing} ON {table.Table} " +
-                               $"BEGIN {InsertStatement(table, row, action, "strftime('%Y-%m-%dT%H:%M:%fZ','now')")}; END;");
-        return sql.ToString();
-    }
-
     public static IEnumerable<string> Suffixes => Operations.Select(operation => operation.Suffix);
-}
-
-public sealed class SqliteChangeEventSource(SqliteLocalStore store) : IChangeEventSource
-{
-    // The triggers are created together with the rest of the local schema (SqliteLocalStore.InitializeAsync).
-    public async Task EnsureAsync(CancellationToken cancellationToken)
-    {
-        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task<long> LatestIdAsync(CancellationToken cancellationToken)
-    {
-        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = SqliteLocalStore.Command(connection, null,
-            $"SELECT COALESCE(MAX(id), 0) FROM {ChangeEventTriggers.EventTable}");
-        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
-    }
-
-    public async Task<IReadOnlyList<StoredChange>> ReadAfterAsync(long afterId, int limit, CancellationToken cancellationToken)
-    {
-        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = SqliteLocalStore.Command(connection, null, $"""
-            SELECT id,entity_type,action,entity_id,project_id,observation_id,beneficiary_id,created_utc
-            FROM {ChangeEventTriggers.EventTable} WHERE id>@after ORDER BY id LIMIT @limit
-            """, ("@after", afterId), ("@limit", limit));
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        var result = new List<StoredChange>();
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetInt32(4), reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                reader.IsDBNull(6) ? null : reader.GetInt32(6),
-                DateTime.Parse(reader.GetString(7), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)));
-        return result;
-    }
-
-    public async Task PurgeAsync(long throughId, DateTime olderThanUtc, CancellationToken cancellationToken)
-    {
-        await using var connection = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = SqliteLocalStore.Command(connection, null,
-            $"DELETE FROM {ChangeEventTriggers.EventTable} WHERE id<=@through AND created_utc<@older",
-            ("@through", throughId), ("@older", olderThanUtc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture)));
-        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-    }
 }
 
 // MariaDB (Subtask 2.8): the event table and its 18 triggers already exist on the real migrated schema (verified

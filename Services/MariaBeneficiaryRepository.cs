@@ -109,8 +109,12 @@ public sealed class MariaBeneficiaryRepository(
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
-        BeneficiaryInput? savedValue = null, int? savedId = null)
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
+        BeneficiaryInput? savedValue = null, int? savedId = null) =>
+        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token, savedValue, savedId), token);
+
+    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
+        BeneficiaryInput? savedValue, int? savedId)
     {
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
             throw new BeneficiaryOperationException("Modificările sunt permise numai în baza BlazorStoc.");

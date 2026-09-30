@@ -11,12 +11,11 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace BlazorStoc.Pages.Account;
 [AllowAnonymous]
 public class LoginModel(IConfiguration configuration, IUserAuthenticator authenticator, IAuditTrail auditTrail,
-    AppMode mode, ILogger<LoginModel> logger) : PageModel
+    ILogger<LoginModel> logger) : PageModel
 {
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
-    public bool IsDemo => mode.IsDemo;
     public string? Error { get; private set; }
 
     public IActionResult OnGet()

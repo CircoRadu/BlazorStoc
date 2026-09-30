@@ -4,6 +4,14 @@ Actualizat de: **Claude**
 Data: **29 septembrie 2026 (Task 3, subtaskurile 3.3 si 3.4 - declansarea si pasii de restaurare a bazei de date)**
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
 
+## Notificari de expirare - 30.09.2026
+
+Implementate (vezi `IMPLEMENTED.md`): registru de surse de expirare, sabloane (Setari -> Notificari), motor de evaluare, pagina `/notificari` cu triunghi rosu in meniu, preluare si amanare cu jurnal. Migrarea 4 este aplicata pe baza reala `BlazorStoc` si pe `blazorstoc_test`. Suita completa cu integrare: 570 PASS. Preview cu implementarea pe baza reala: `http://127.0.0.1:5087/`. Sursa urmatoare planificata: analiza de risc a obiectivelor (creare + 3 ani).
+
+## Eliminarea SQLite si a modului demonstrativ - 30.09.2026
+
+Aplicatia ruleaza numai pe MariaDB (`Program.cs` fara ramura demo, fara `AppMode`, fara `Microsoft.Data.Sqlite`). Detalii, fisiere si limite in `IMPLEMENTED.md`. Acoperirea a fost refacuta pe MariaDB (`MariaExtendedChecks`): suita completa cu integrare are 517 PASS, stabila in 4 rulari; `MariaStockMovementRepository` reia tranzactiile la deadlock. Preview cu implementarea: `http://127.0.0.1:5087/` (MariaDB reala). Referintele mai vechi la SQLite/modul demo din restul acestui fisier si din `README.md` sunt istorice.
+
 ## Blocarea sesiunilor si notificare live la backup/restaurare - 30.09.2026
 
 - Cat timp lacatul de backup/restaurare este activ, orice alt acces la date este refuzat (`MaintenanceGate`, in `DatabaseConnections.Create` si `SqliteLocalStore.OpenConnectionAsync`), iar tab-urile deschise sunt mutate live pe `/intretinere` (script `maintenance-watch.js`, endpoint `/api/maintenance`) si revin singure la final; paginile care conduc operatia raman pe loc. Suita: 743 PASS. Verificat in browser pe MariaDB reala (trei taburi, backup si restaurari reale sub blocare). Detalii si limite in `IMPLEMENTED.md`.

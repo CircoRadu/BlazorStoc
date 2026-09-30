@@ -162,7 +162,7 @@ public static class ArchiveRequests
     {
         var details = AuditDetails.Identification(("Număr de înmatriculare", value.PlateNumber), ("Descriere", value.Description));
         return new(ArchiveSnapshot.Create(AuditEntities.Vehicle, value.Id.ToString(), value.Version, value),
-            SqliteVehicleRepository.Target(value), details, motif);
+            VehicleRules.Target(value), details, motif);
     }
 
     public static ArchiveRequest User(WebUser value, string motif,

@@ -4,7 +4,6 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
 using MySqlConnector;
 
 namespace BlazorStoc.Services;
@@ -235,130 +234,6 @@ file static class BackupManifestIo
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         return Convert.ToHexString(await SHA256.HashDataAsync(stream, token).ConfigureAwait(false)).ToLowerInvariant();
     }
-}
-
-// Demo mode (App:DemoMode=true) has no MariaDB to dump; the backup here is an online copy of the local SQLite file
-// (SqliteConnection.BackupDatabase, safe to run against a live connection - never a raw file copy of a database
-// that might be mid-write) plus the same manifest/zip/hash shape as the real mode, so the eventual restore page
-// (Task 3) can treat both the same way. The canonical row-hash comparison in "Decizie tehnica" is written against
-// MariaDB's information_schema (CanonicalRowHasher) and does not apply here; SQLite's own online-backup consistency
-// stands in for it in demo mode.
-public sealed class SqliteDatabaseBackupService(SqliteLocalStore store, IConfiguration configuration,
-    IAccessControl access, IOperationLockService locks, IAuditTrail? auditTrail, ILogger<SqliteDatabaseBackupService> logger)
-    : IDatabaseBackupService
-{
-    private readonly string backupDirectory = Path.GetFullPath(configuration["App:BackupFilesPath"] ?? Path.Combine("data", "database-backups"));
-
-    public async Task<BackupResult> CreateBackupAsync(BackupKind kind, IProgress<BackupProgress>? progress = null,
-        CancellationToken cancellationToken = default, IOperationLockHandle? existingLock = null)
-    {
-        Directory.CreateDirectory(backupDirectory);
-        var operatorName = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
-        var operatorRole = await access.IsAdministratorAsync(cancellationToken).ConfigureAwait(false) ? AccessRoles.Administrator : AccessRoles.LimitedUser;
-
-        progress?.Report(new(BackupStage.Locking, BackupRules.StageMessage(BackupStage.Locking)));
-        var handle = existingLock;
-        if (handle is null)
-        {
-            handle = await locks.TryAcquireAsync($"backup:{kind}", operatorName, operatorRole, cancellationToken).ConfigureAwait(false);
-            if (handle is null) return BackupResult.Failed(OperationLockRules.HeldMessage);
-        }
-
-        // This flow holds the lock: its own data access must pass the write freeze that refuses every other session.
-        using var maintenanceScope = MaintenanceGate.EnterOwnerScope();
-        var tempDb = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.sqlite");
-        var tempZip = Path.Combine(backupDirectory, $".tmp-{Guid.NewGuid():N}.zip");
-        try
-        {
-            progress?.Report(new(BackupStage.CheckingSpace, BackupRules.StageMessage(BackupStage.CheckingSpace)));
-            if (!BackupDiskSpace.HasEnoughFreeSpace(backupDirectory, out _, out _))
-                return BackupResult.Failed(BackupRules.DiskSpaceMessage);
-
-            progress?.Report(new(BackupStage.Exporting, BackupRules.StageMessage(BackupStage.Exporting)));
-            // Pooling=False: Microsoft.Data.Sqlite pools connections by default, so a disposed pooled connection
-            // keeps the underlying file handle open for reuse - hashing tempDb right afterwards would then fail
-            // with "file in use". This one-off destination connection is never reused, so pooling only gets in the way.
-            await using (var source = await store.OpenConnectionAsync(cancellationToken).ConfigureAwait(false))
-            await using (var destination = new SqliteConnection($"Data Source={tempDb};Pooling=False"))
-            {
-                destination.Open();
-                source.BackupDatabase(destination);
-            }
-
-            var rowCounts = await CountRowsAsync(tempDb, cancellationToken).ConfigureAwait(false);
-            var contentHash = await BackupManifestIo.HashFileAsync(tempDb, cancellationToken).ConfigureAwait(false);
-
-            progress?.Report(new(BackupStage.Verifying, BackupRules.StageMessage(BackupStage.Verifying)));
-            if (rowCounts.Count == 0 || new FileInfo(tempDb).Length == 0) return BackupResult.Failed(BackupRules.VerificationFailedMessage);
-
-            var manifest = new BackupManifest(DateTime.UtcNow, operatorName, operatorRole, kind.ToString(),
-                rowCounts.Count, rowCounts, "SQLite (demo)", contentHash, string.Empty);
-
-            progress?.Report(new(BackupStage.Saving, BackupRules.StageMessage(BackupStage.Saving)));
-            var tempManifest = tempDb + ".manifest.json";
-            await BackupManifestIo.WriteAsync(tempManifest, manifest, cancellationToken).ConfigureAwait(false);
-            using (var archive = ZipFile.Open(tempZip, ZipArchiveMode.Create))
-            {
-                archive.CreateEntryFromFile(tempDb, "backup.sqlite", CompressionLevel.Optimal);
-                archive.CreateEntryFromFile(tempManifest, "manifest.json", CompressionLevel.Optimal);
-            }
-            File.Delete(tempManifest);
-
-            var fileName = BackupNaming.BuildFileName(kind, DateTime.Now, operatorRole, operatorName);
-            var finalPath = BackupNaming.ResolveUniquePath(backupDirectory, fileName);
-            fileName = Path.GetFileName(finalPath);
-            File.Move(tempZip, finalPath);
-            var archiveHash = await BackupManifestIo.HashFileAsync(finalPath, cancellationToken).ConfigureAwait(false);
-            await File.WriteAllTextAsync(finalPath + ".sha256", archiveHash, cancellationToken).ConfigureAwait(false);
-
-            await AuditRecorder.RecordGenerateAsync(auditTrail, access, AuditEntities.DatabaseBackup, fileName,
-                $"Pachet: {fileName}; tabele: {rowCounts.Count}", cancellationToken).ConfigureAwait(false);
-
-            progress?.Report(new(BackupStage.Done, BackupRules.StageMessage(BackupStage.Done)));
-            return BackupResult.Ok(finalPath, fileName);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            logger.LogError(exception, "Database backup (demo) failed ({ErrorType}).", exception.GetType().Name);
-            progress?.Report(new(BackupStage.Failed, BackupRules.StageMessage(BackupStage.Failed)));
-            return BackupResult.Failed(BackupRules.GenericFailedMessage);
-        }
-        finally
-        {
-            TryDelete(tempDb);
-            TryDelete(tempZip);
-            if (existingLock is null) await handle.DisposeAsync().ConfigureAwait(false);
-        }
-    }
-
-    public Task<IReadOnlyList<BackupPackage>> ListPackagesAsync(CancellationToken cancellationToken = default) =>
-        BackupPackageStore.ListAsync(backupDirectory, cancellationToken);
-
-    public Task<BackupDeleteResult> DeletePackageAsync(string fileName, string reason, CancellationToken cancellationToken = default) =>
-        BackupPackageStore.DeleteAsync(backupDirectory, fileName, reason, auditTrail, access, cancellationToken);
-
-    private static async Task<Dictionary<string, int>> CountRowsAsync(string dbPath, CancellationToken token)
-    {
-        await using var connection = new SqliteConnection($"Data Source={dbPath};Pooling=False");
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        var tables = new List<string>();
-        await using (var command = connection.CreateCommand())
-        {
-            command.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
-            await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
-            while (await reader.ReadAsync(token).ConfigureAwait(false)) tables.Add(reader.GetString(0));
-        }
-        var counts = new Dictionary<string, int>();
-        foreach (var table in tables)
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = $"SELECT COUNT(*) FROM \"{table.Replace("\"", "\"\"")}\"";
-            counts[table] = Convert.ToInt32(await command.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture);
-        }
-        return counts;
-    }
-
-    private static void TryDelete(string path) { try { if (File.Exists(path)) File.Delete(path); } catch (IOException) { } }
 }
 
 // Real mode: exports with mariadb-dump (the same distribution as mariadbd.exe, docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md

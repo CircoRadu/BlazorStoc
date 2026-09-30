@@ -2,7 +2,6 @@
 @inject IProductRepository Repository
 @inject IStockMovementRepository Movements
 @inject IProductImageStore ImageStore
-@inject AppMode Mode
 @inject ILogger<ProductEditor> Logger
 @inject IJSRuntime JS
 @implements IAsyncDisposable
@@ -10,7 +9,6 @@
 <UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="editor-title">
     <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? "Adaugă produs" : $"Editează produsul {Original.Name}")</h2><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></div>
-    @if (Mode.IsDemo) { <p class="form-note">Mod demo: modificările sunt salvate în baza de date locală și rămân disponibile după repornirea aplicației.</p> }
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="product-editor">
         <DataAnnotationsValidator />

@@ -4,7 +4,6 @@
 @inject IProductRepository Repository
 @inject IStockMovementRepository Movements
 @inject IProductImageStore ImageStore
-@inject AppMode Mode
 @inject IAccessControl Access
 @inject NavigationManager Navigation
 @inject ILogger<Home> Logger
@@ -18,7 +17,6 @@
 <PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
 <div class="page-heading"><div><p class="eyebrow">INVENTAR CENTRALIZAT</p><h1>Produse și stocuri</h1><p class="muted">Găsește rapid produsele și verifică disponibilitatea lor.</p></div><div class="heading-actions"><a class="refresh" href="/">← Meniu principal</a>@if (canManage) { <a class="refresh" href="/categorii">Administrează categorii</a><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă produs</button> }<button class="refresh" disabled="@(loading || editing || deleting is not null)" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
-@if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Explorezi o colecție demonstrativă.</strong> Produsele de mai jos sunt exemple, fără legătură cu stocul real.</div></div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
@@ -37,7 +35,7 @@
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
 else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td><button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)">↗</button></td></tr> }</tbody></table></div> }
 <footer class="table-footer"><span>@Filtered.Count @(Filtered.Count == 1 ? "rezultat" : "rezultate")</span><div class="pagination"><button disabled="@(page <= 1)" @onclick="() => page--" aria-label="Pagina anterioară">‹</button><span>Pagina @(page) din @Pages</span><button disabled="@(page >= Pages)" @onclick="() => page++" aria-label="Pagina următoare">›</button></div></footer></section>
-<p class="workspace-note"><span class="status-dot"></span> @(Mode.IsDemo ? "Date demonstrative" : "Date din BlazorStoc") <span>·</span> Catalog și gestiune produse</p>
+<p class="workspace-note"><span class="status-dot"></span> Date din BlazorStoc <span>·</span> Catalog și gestiune produse</p>
 
 @if (imagePreview is not null)
 {

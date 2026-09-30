@@ -5,7 +5,6 @@
 @inject UnsavedChanges Guard
 @inject IUserRepository Repository
 @inject IAccessControl Access
-@inject AppMode Mode
 @inject NavigationManager Navigation
 @inject ILogger<Users> Logger
 @inject IChangeFeed ChangeFeed
@@ -15,7 +14,6 @@
 <PageTitle>Utilizatori · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
 <div class="page-heading"><div><p class="eyebrow">ADMINISTRARE ACCES</p><h1>Utilizatori</h1><p class="muted">Gestionează persoanele care se pot autentifica și nivelul lor de acces.</p></div>@if (authorized) { <div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă utilizator</button></div> }</div>
-@if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Mod demonstrativ.</strong> Modificările utilizatorilor sunt salvate în baza de date locală și rămân disponibile după repornire.</div></div> }
 @if (!authorized && !loading) { <div class="error-banner" role="alert">Nu ai drepturi de administrator. Conturile cu acces limitat pot consulta numai catalogul.</div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }

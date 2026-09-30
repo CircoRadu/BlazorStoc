@@ -307,7 +307,10 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         return prepared;
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
+
+    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(token).ConfigureAwait(false);

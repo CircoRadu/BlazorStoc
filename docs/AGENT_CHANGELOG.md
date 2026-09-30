@@ -1309,3 +1309,81 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`
 - **Neverificat:** modul MariaDB real pentru restaurare (Pasii 1-4, fara instanta locala in acest mediu - `docs/TESTE_RAMASE.md` A20); o tragere reala dintr-un manager de fisiere al sistemului de operare pentru drag and drop (doar simulata prin JS - A21); scrierile obisnuite ale altor sesiuni nu sunt blocate activ in timpul restaurarii (doar notificate, risc rezidual acceptat).
 - **Commit:** `claude: restaurare baza de date (3.3-3.4), tile Vehicule, drag and drop preluare inventar`
 - **Predat catre:** claude
+
+## 2026-09-30T10:09:59.7760809Z â€” claude
+
+- **Task:** Eliminare SQLite, teste MariaDB, notificari de expirare
+- **Rezumat:** Eliminarea completa a SQLite si a modului demonstrativ (aplicatia lucreaza numai pe MariaDB); acoperirea de teste refacuta pe MariaDB (MariaExtendedChecks) cu reluarea tranzactiilor la deadlock; sistem de notificari de expirare (registru de surse, sabloane in Setari, motor, pagina Notificari cu triunghi rosu, preluare si amanare, jurnal cu operatiile specifice si Notificare creata); Docker permis in dezvoltare. Pe baza reala migrarea 4 este aplicata.
+- **FiÈ™iere modificate:**
+  - `.collaboration/state.json`
+  - `.gitignore`
+  - `AGENTS.md`
+  - `appsettings.json`
+  - `BlazorStoc.csproj`
+  - `CLAUDE.md`
+  - `Components/App.razor`
+  - `Components/Layout/MainLayout.razor`
+  - `Components/Pages/Audit.razor`
+  - `Components/Pages/Beneficiaries.razor`
+  - `Components/Pages/Home.razor`
+  - `Components/Pages/Notifications.razor`
+  - `Components/Pages/ProductEditor.razor`
+  - `Components/Pages/Settings.razor`
+  - `Components/Pages/Users.razor`
+  - `Components/Shared/NotificationTemplatesEditor.razor`
+  - `docs/AGENT_CHANGELOG.md`
+  - `docs/PROJECT_STATE.md`
+  - `docs/PROPUNERE_HARTA_MENTENANTA.md`
+  - `docs/TESTE_RAMASE.md`
+  - `IMPLEMENTED.md`
+  - `Pages/Account/Login.cshtml`
+  - `Pages/Account/Login.cshtml.cs`
+  - `Program.cs`
+  - `README.md`
+  - `Services/ArchivePersistence.cs`
+  - `Services/Archiving.cs`
+  - `Services/AuditTrail.cs`
+  - `Services/ChangeEvents.cs`
+  - `Services/DatabaseBackup.cs`
+  - `Services/DatabaseRestore.cs`
+  - `Services/ExpiryNotifications.cs`
+  - `Services/MaintenanceGate.cs`
+  - `Services/MariaArchiveSchema.cs`
+  - `Services/MariaBeneficiaryRepository.cs`
+  - `Services/MariaExpiryNotificationRepository.cs`
+  - `Services/MariaProductRepository.Crud.cs`
+  - `Services/MariaProjectRepository.cs`
+  - `Services/MariaSchemaMigrations.cs`
+  - `Services/MariaStockMovementRepository.cs`
+  - `Services/MariaTransactions.cs`
+  - `Services/MariaUserRepository.cs`
+  - `Services/MariaVehicleRepository.cs`
+  - `Services/MariaWorkPointRepository.cs`
+  - `Services/ProductLocks.cs`
+  - `Services/Products.cs`
+  - `Services/RepositoryAudit.cs`
+  - `Services/SqliteAuditTrail.cs`
+  - `Services/SqliteBeneficiaryRepository.cs`
+  - `Services/SqliteLocalStore.cs`
+  - `Services/SqliteProductGroups.cs`
+  - `Services/SqliteProductImageStore.cs`
+  - `Services/SqliteProductRepository.cs`
+  - `Services/SqliteProjectFileStore.cs`
+  - `Services/SqliteProjectRepository.cs`
+  - `Services/SqliteStockMovementRepository.cs`
+  - `Services/SqliteUserRepository.cs`
+  - `Services/SqliteVehicleRepository.cs`
+  - `Services/SqliteWorkPointRepository.cs`
+  - `Services/Vehicles.cs`
+  - `tests/BlazorStoc.Checks/BlazorStoc.Checks.csproj`
+  - `tests/BlazorStoc.Checks/MariaExtendedChecks.cs`
+  - `tests/BlazorStoc.Checks/Program.cs`
+  - `TODO.md`
+  - `VALIDARE.md`
+  - `wwwroot/app.css`
+  - `wwwroot/notification-watch.js`
+- **Validare:** tests/BlazorStoc.Checks cu RUN_MARIA_INTEGRATION_CHECKS=1 pe blazorstoc_test: 570 PASS, 0 esecuri, rulari consecutive repetate; verificat in browser pe baza de test (sablon, notificare, popup, amanare, jurnal).
+- **Commit:** `claude: eliminare SQLite, teste pe MariaDB, notificari de expirare
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
+- **Predat cÄƒtre:** claude

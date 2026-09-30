@@ -134,6 +134,8 @@ public static class VehicleNavigation
 
 public static class VehicleRules
 {
+    public static string Target(Vehicle vehicle) => $"#{vehicle.Id} · {vehicle.PlateNumber}";
+
     public const string ChangedMessage = "Vehiculul a fost modificat sau șters între timp. Actualizează lista și reia operația.";
     public const string ConcurrentMessage = "Vehiculul s-a schimbat între timp. Actualizează lista.";
 

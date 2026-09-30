@@ -1,14 +1,14 @@
-{
+﻿{
     "schemaVersion":  1,
     "mode":  "claude_only",
     "status":  "ready_for_handoff",
     "activeAgent":  null,
     "lastAgent":  "claude",
     "nextAgent":  "claude",
-    "currentTask":  "Task 3 (3.3-3.4) restaurare baza de date; tile Vehicule pe pagina principala; drag and drop la preluarea inventarului",
+    "currentTask":  "Eliminare SQLite, teste MariaDB, notificari de expirare",
     "startedAtUtc":  "2026-09-29T05:44:38.0000000Z",
-    "completedAtUtc":  "2026-09-29T10:30:00.0000000Z",
-    "lastSummary":  "Implementate subtaskurile 3.3/3.4 (declansarea restaurarii cu popup si cuvantul confirma, cei 5 pasi de restaurare, verificate integral in mod demonstrativ; modul MariaDB real scris dar neverificat, fara instanta locala), un tile Vehicule pe pagina principala si drag and drop la incarcarea fisierului de preluare inventar. tests/BlazorStoc.Checks 630/630 PASS, build Debug 0 avertismente/erori. Commit facut la cererea explicita a utilizatorului (predare solicitata, dar mod claude_only mentinut - fara handoff real catre Codex, conform alegerii utilizatorului).",
-    "lastCommitSubject":  "claude: restaurare baza de date (3.3-3.4), tile Vehicule, drag and drop preluare inventar",
+    "completedAtUtc":  "2026-09-30T10:09:59.7760809Z",
+    "lastSummary":  "Eliminarea completa a SQLite si a modului demonstrativ (aplicatia lucreaza numai pe MariaDB); acoperirea de teste refacuta pe MariaDB (MariaExtendedChecks) cu reluarea tranzactiilor la deadlock; sistem de notificari de expirare (registru de surse, sabloane in Setari, motor, pagina Notificari cu triunghi rosu, preluare si amanare, jurnal cu operatiile specifice si Notificare creata); Docker permis in dezvoltare. Pe baza reala migrarea 4 este aplicata.",
+    "lastCommitSubject":  "claude: eliminare SQLite, teste pe MariaDB, notificari de expirare\n\nCo-Authored-By: Claude Sonnet 5.5 \u003cnoreply@anthropic.com\u003e",
     "claudeStatus":  "active"
 }

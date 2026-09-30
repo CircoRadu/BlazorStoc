@@ -16,11 +16,11 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 // aceleasi chei ca sectiunea "Database" din appsettings.json, suprascriindu-le. Calea implicita este cea din
 // docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md (application-connection.private.json); poate fi schimbata prin
 // Database:PrivateConfigPath (variabila de mediu Database__PrivateConfigPath) fara sa schimbe mecanismul.
-// Fisierul e optional: absenta lui nu opreste pornirea in mod demonstrativ (App:DemoMode=true, implicit).
+// Fisierul e optional daca parolele sunt date prin variabile de mediu.
 // Follow-up Task 2 (28.09.2026, dupa comutarea 2.13): acelasi fisier poate contine si o sectiune
 // "Authentication": { "Username": "...", "Password": "..." }, incarcata generic de acelasi AddJsonFile
-// (nu e nevoie de cod separat) — asta permite pornirea reala (App:DemoMode=false) fara nicio parola in
-// appsettings.json sau in argumente de proces, in loc de variabile de mediu setate manual ca la preview-ul 5085.
+// (nu e nevoie de cod separat) — asta permite pornirea reala (fara nicio parola in
+// appsettings.json sau in argumente de proces, in loc de variabile de mediu setate manual.
 var mariaPrivateConfigPath = builder.Configuration["Database:PrivateConfigPath"]
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "application-connection.private.json");
 builder.Configuration.AddJsonFile(mariaPrivateConfigPath, optional: true, reloadOnChange: false);
@@ -86,11 +86,9 @@ if (restorePrivateConfigPath is not null && File.Exists(restorePrivateConfigPath
 }
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
-var demo = builder.Configuration.GetValue("App:DemoMode", true);
-if (!demo && (string.IsNullOrWhiteSpace(builder.Configuration["Database:Password"]) ||
-              (builder.Configuration["Authentication:Password"]?.Length ?? 0) < 12))
-    throw new InvalidOperationException("Configurați Database__Password și Authentication__Password (minimum 12 caractere) pentru modul MariaDB.");
-builder.Services.AddSingleton(new AppMode(demo));
+if (string.IsNullOrWhiteSpace(builder.Configuration["Database:Password"]) ||
+    (builder.Configuration["Authentication:Password"]?.Length ?? 0) < 12)
+    throw new InvalidOperationException("Configurați Database__Password și Authentication__Password (minimum 12 caractere) pentru conexiunea MariaDB.");
 builder.Services.AddSingleton<MariaSchemaMigrator>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddRazorPages();
@@ -114,18 +112,10 @@ builder.Services.AddHttpClient(AnafService.ClientName, client => client.Timeout 
 builder.Services.AddSingleton<AnafStore>();
 builder.Services.AddScoped<IAnafService, AnafService>();
 builder.Services.AddScoped<IArchiveService, ArchiveService>();
-if (demo)
-{
-    builder.Services.AddSingleton<SqliteLocalStore>();
-    builder.Services.AddSingleton<IAuditTrail, SqliteAuditTrail>();
-}
-else builder.Services.AddSingleton<IAuditTrail, MariaAuditTrail>();
-// Subtask 2.7 (Task 2): an explicit App:DataProtectionPath always wins. Without one, demo mode keeps its existing
-// default (keys/ under the app's own tree); MariaDB mode defaults instead to the dedicated local asset directory
-// from the handoff document, never silently sharing the demo-mode directory.
-var keysPath = builder.Configuration["App:DataProtectionPath"] ?? (demo
-    ? Path.Combine(builder.Environment.ContentRootPath, "keys")
-    : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "assets", "data-protection-keys"));
+builder.Services.AddSingleton<IAuditTrail, MariaAuditTrail>();
+// An explicit App:DataProtectionPath always wins; otherwise the dedicated local asset directory from the handoff document.
+var keysPath = builder.Configuration["App:DataProtectionPath"]
+    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "assets", "data-protection-keys");
 Directory.CreateDirectory(keysPath);
 builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keysPath)).SetApplicationName("BlazorStoc");
 builder.Services.AddRateLimiter(options =>
@@ -140,71 +130,48 @@ builder.Services.AddRateLimiter(options =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
-builder.Services.AddScoped<IUserRepository>(services => demo
-    ? new SqliteUserRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
-    : new MariaUserRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
+builder.Services.AddScoped<IUserRepository>(services => new MariaUserRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddScoped<IUserAuthenticator>(services => (IUserAuthenticator)services.GetRequiredService<IUserRepository>());
-builder.Services.AddScoped<IProductRepository>(services => demo
-    ? new SqliteProductRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(),
-        services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProductImageStore>())
-    : new MariaProductRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
+builder.Services.AddScoped<IProductRepository>(services => new MariaProductRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>(),
         services.GetRequiredService<IProductImageStore>()));
-builder.Services.AddScoped<IStockMovementRepository>(services => demo
-    ? new SqliteStockMovementRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(),
-        services.GetRequiredService<IArchiveService>())
-    : new MariaStockMovementRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
+builder.Services.AddScoped<IStockMovementRepository>(services => new MariaStockMovementRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
-builder.Services.AddScoped<IWorkPointRepository>(services => demo
-    ? new SqliteWorkPointRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>())
-    : new MariaWorkPointRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IBeneficiaryRepository>(services => demo
-    ? new SqliteBeneficiaryRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
-    : new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
+builder.Services.AddScoped<IWorkPointRepository>(services => new MariaWorkPointRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
+builder.Services.AddScoped<IBeneficiaryRepository>(services => new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<IExpiryNotificationRepository>(services => new MariaExpiryNotificationRepository(services.GetRequiredService<IConfiguration>()));
+builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Itp, ExpirySourceKeys.VehicleItp, "ITP"));
+builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Insurance, ExpirySourceKeys.VehicleInsurance, "Asigurare"));
+builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Rovinieta, ExpirySourceKeys.VehicleRovinieta, "Rovinietă"));
+builder.Services.AddScoped<IExpiryNotificationService, ExpiryNotificationService>();
 builder.Services.AddScoped<IInventoryReportBuilder, InventoryReportBuilder>();
 builder.Services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();
 builder.Services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
 builder.Services.AddSingleton<IInventoryPickupOcrService, InventoryPickupOcrService>();
 builder.Services.AddScoped<IInventoryPickupBuilder, InventoryPickupBuilder>();
 builder.Services.AddScoped<IInventoryPickupApplier, InventoryPickupApplier>();
-// Subtask 2.1/2.2 (Task 2): one shared lock file per mode (demo/SQLite vs real/MariaDB never share a backup
-// directory), singleton because the lock and its heartbeat must be the same instance across the whole app, not
+// One shared lock file in the MariaDB backup directory; singleton because the lock and its heartbeat must be the same instance across the whole app, not
 // re-created per request.
-var operationLockPath = Path.Combine(demo ? Path.GetFullPath(builder.Configuration["App:BackupFilesPath"] ?? Path.Combine("data", "database-backups"))
-    : MariaAssetPaths.DatabaseBackups(builder.Configuration), "operation.lock.json");
+var operationLockPath = Path.Combine( MariaAssetPaths.DatabaseBackups(builder.Configuration), "operation.lock.json");
 builder.Services.AddSingleton<IOperationLockService>(services => new FileOperationLockService(operationLockPath,
     services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<FileOperationLockService>>()));
 // While that lock is held, every session but the one holding it is refused at the data-access layer and redirected to
 // the waiting page (MaintenanceGate, MaintenanceSupport).
 MaintenanceGate.Configure(operationLockPath);
-builder.Services.AddScoped<IDatabaseBackupService>(services => demo
-    ? new SqliteDatabaseBackupService(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IConfiguration>(),
-        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IOperationLockService>(),
-        services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<SqliteDatabaseBackupService>>())
-    : new MariaDatabaseBackupService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
+builder.Services.AddScoped<IDatabaseBackupService>(services => new MariaDatabaseBackupService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<IAuditTrail>(),
         services.GetRequiredService<ILogger<MariaDatabaseBackupService>>()));
 // Subtask 3.3/3.4 (Task 3): shares the same lock and backup service as above (the pre-restore snapshot in Pas 0
 // goes through IDatabaseBackupService.CreateBackupAsync, passing the restore's own already-held lock handle).
-builder.Services.AddScoped<IDatabaseRestoreService>(services => demo
-    ? new SqliteDatabaseRestoreService(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IConfiguration>(),
-        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IOperationLockService>(),
-        services.GetRequiredService<IDatabaseBackupService>(), services.GetRequiredService<IAuditTrail>(),
-        services.GetRequiredService<ILogger<SqliteDatabaseRestoreService>>())
-    : new MariaDatabaseRestoreService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
+builder.Services.AddScoped<IDatabaseRestoreService>(services => new MariaDatabaseRestoreService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<IDatabaseBackupService>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<MariaDatabaseRestoreService>>()));
-builder.Services.AddScoped<IVehicleRepository>(services => demo
-    ? new SqliteVehicleRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
-    : new MariaVehicleRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
-builder.Services.AddSingleton<IProductImageStore>(services => demo
-    ? new SqliteProductImageStore(services.GetRequiredService<SqliteLocalStore>())
-    : new FileProductImageStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>()));
+builder.Services.AddScoped<IVehicleRepository>(services => new MariaVehicleRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
+builder.Services.AddSingleton<IProductImageStore>(services => new FileProductImageStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<InProcessChangeFeed>();
 builder.Services.AddSingleton<IChangeFeed>(services => services.GetRequiredService<InProcessChangeFeed>());
-builder.Services.AddSingleton<IChangeEventSource>(services => demo
-    ? new SqliteChangeEventSource(services.GetRequiredService<SqliteLocalStore>())
-    : new MariaChangeEventSource(services.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<IChangeEventSource>(services => new MariaChangeEventSource(services.GetRequiredService<IConfiguration>()));
 builder.Services.AddHostedService(services => new ChangeEventRelay(services.GetRequiredService<IChangeEventSource>(),
     services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ILogger<ChangeEventRelay>>(),
     services.GetRequiredService<IConfiguration>()));
@@ -214,25 +181,17 @@ builder.Services.AddScoped<ChangeOrigin>();
 builder.Services.AddScoped<UnsavedChanges>();
 builder.Services.AddScoped<ExitFormDraft>();
 builder.Services.AddScoped<ListNavigationContext>();
-builder.Services.AddScoped<IProductLockRepository>(services => new ChangeNotifyingProductLockRepository(demo
-    ? new SqliteProductLockRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>())
-    : new MariaProductLockRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()),
+builder.Services.AddScoped<IProductLockRepository>(services => new ChangeNotifyingProductLockRepository( new MariaProductLockRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()),
     services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
-builder.Services.AddScoped<IProjectFileStore>(services => new ChangeNotifyingProjectFileStore(demo
-    ? new SqliteProjectFileStore(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>())
-    : new MariaProjectFileStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>(),
+builder.Services.AddScoped<IProjectFileStore>(services => new ChangeNotifyingProjectFileStore( new MariaProjectFileStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>(),
         services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IAuditTrail>()),
     services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
-builder.Services.AddScoped<IProjectRepository>(services => new ChangeNotifyingProjectRepository(demo
-    ? new SqliteProjectRepository(services.GetRequiredService<SqliteLocalStore>(), services.GetRequiredService<IAccessControl>(),
-        services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProjectFileStore>())
-    : new MariaProjectRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IWebHostEnvironment>(),
+builder.Services.AddScoped<IProjectRepository>(services => new ChangeNotifyingProjectRepository( new MariaProjectRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IWebHostEnvironment>(),
         services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(),
         services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProjectFileStore>()),
     services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
 var app = builder.Build();
-if (demo) await app.Services.GetRequiredService<SqliteLocalStore>().InitializeAsync();
-else await MariaArchiveSchema.InitializeAsync(app.Configuration);
+await MariaArchiveSchema.InitializeAsync(app.Configuration);
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/Error", createScopeForErrors: true);
 // Romanian culture for every request and circuit: framework texts and number formats follow it (Task 1).
 app.UseRequestLocalization(new RequestLocalizationOptions
@@ -281,6 +240,19 @@ app.MapGet("/api/maintenance", (HttpContext context) =>
     context.Response.Headers.CacheControl = "no-store";
     return Results.Json(new { active = MaintenanceGate.Active is not null });
 }).RequireAuthorization();
+// Polled by wwwroot/notification-watch.js: the number of notifications that warn now (also re-evaluates the templates
+// at most every few minutes, so a session left open still learns about new notifications).
+app.MapGet("/api/notifications/alerts", async (HttpContext context, IExpiryNotificationService notifications, CancellationToken token) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    try
+    {
+        await notifications.EvaluateAsync(TimeSpan.FromMinutes(5), token);
+        return Results.Json(new { count = await notifications.AlertCountAsync(token) });
+    }
+    catch (OperationCanceledException) when (token.IsCancellationRequested) { return Results.StatusCode(499); }
+    catch (Exception) { return Results.Json(new { count = -1 }); }
+}).RequireAuthorization();
 app.MapGet("/media/products/{productId:int}", async (int productId, IProductImageStore images, CancellationToken token) =>
 {
     var image = await images.GetAsync(productId, token);
@@ -301,7 +273,6 @@ app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 // MariaDB mode: bring the schema up to date with the migrator account before serving requests (idempotent). Without
 // that account only a warning is logged. "--migrate-schema" applies the migrations and exits (0 = schema is current).
 var migrateOnly = args.Contains("--migrate-schema");
-if (!demo || migrateOnly)
 {
     var migrator = app.Services.GetRequiredService<MariaSchemaMigrator>();
     try

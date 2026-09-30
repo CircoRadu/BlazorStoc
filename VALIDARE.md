@@ -418,3 +418,9 @@ Verificat la 25 septembrie 2026.
 - `tests/BlazorStoc.Checks`: 13 verificari noi (filtrare combobox insensibila la majuscule si diacritice, cautare dupa CUI/telefon, restrangere progresiva; `ExitFormDraft`: valori identice dupa anulare, beneficiar/proiect nou returnat, alt produs, expirare 30 de minute, o singura preluare); suita completa fara FAIL.
 - Browser pe MariaDB reala (`http://127.0.0.1:5083/`): filtrare "ELECTRIC", selectie cu Enter (formularul nu se trimite), "+ Adauga beneficiar" cu persoana fizica noua (cantitate/descriere pastrate, beneficiar selectat), "+ Adauga proiect" cu anulare (formular identic) si cu salvare (proiect selectat), mesaj pentru formular nerestaurabil (`?restaurare=1` fara formular memorat) si pentru produs inexistent.
 - Corectat pe parcurs: `MariaStockMovementRepository.GetPageAsync` (reader deschis) - pagina de miscari nu se incarca pe MariaDB.
+
+## Notificari de expirare (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 570 PASS (394 fara baza + integrare MariaDB), 5 rulari consecutive fara esec; sectiunea "Expiry notifications" acopera sabloane, motor, preluare concurenta, amanare si jurnal.
+- Browser (baza de test, port 5088): sablon creat din exemplul implicit, notificare cu triunghi rosu in meniu, popup, limita amanarii, amanare de 3 zile, jurnal cu operatiile "Adaugare sablon notificare" si "Amanare notificare".
+- Preview pe baza reala: `http://127.0.0.1:5087/` (migrarea 4 aplicata la pornire).

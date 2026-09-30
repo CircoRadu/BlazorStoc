@@ -381,3 +381,18 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 - MariaDB reala: migrarea 3 este aplicata (coloanele `itp_expiry`, `insurance_expiry`, `rovinieta_expiry`, `DATE NOT NULL`, cu valorile implicite 15.03.2027 / 30.06.2027 / 30.09.2027), iar vehiculele existente (HD-03-ESP, HD-04-ESP) le au; coloanele au supravietuit restaurarilor.
 - Suita completa din `tests/BlazorStoc.Checks`: 743 PASS, 0 esecuri.
 - Ramane neconfirmat doar ca arhiva vehiculelor sterse nu are coloane pentru date (raman doar in instantaneul JSON al arhivei), decizie deja consemnata in `IMPLEMENTED.md`.
+
+## Eliminarea SQLite (30.09.2026)
+
+- **REZOLVAT 30.09.2026 12:30:** datele din `blazorstoc_test` au fost golite (la cererea utilizatorului) si `MariaIntegrationChecks` au rulat complet: exit 0, 435 PASS in total (394 fara baza + verificarile de integrare), fara FAIL/BUG-BLOCKED. Istoric:
+- **Actualizare 30.09.2026 12:15:** schema `blazorstoc_test` a fost adusa la zi (root a acordat contului `blazorstoc_migrator` drepturi DDL pe `blazorstoc\_test`; `--migrate-schema` a aplicat migrarile 1-3). Rularea urmatoare a trecut de beneficiari (406 PASS) si s-a oprit la `Exista deja un beneficiar cu acest CUI` din cauza unui rest de date lasat de rularea intrerupta anterioara; ramane de golit datele din `blazorstoc_test` (nu si schema) si de reluat suita.
+- **Neefectuat - MariaIntegrationChecks (motivul initial):** rularea cu `RUN_MARIA_INTEGRATION_CHECKS=1` si `MARIA_TEST_CONFIG_PATH=local-secrets	est-database.private.json` s-a oprit la beneficiari cu eroarea `Table 'blazorstoc_test.beneficiary_work_points' doesn't exist`: schema bazei izolate `blazorstoc_test` (27 de tabele) este mai veche decat migrarile curente. Pasi: aducerea schemei la zi (Task 2, 2.1, cere cont administrativ sau de migrare cu drepturi pe `blazorstoc_test`), apoi rularea comenzii de mai sus si verificarea ca toate sectiunile trec.
+- **Neefectuat - verificare vizuala:** pagina de login fara conturile demo si bannerele scoase din Home, Beneficiari, Utilizatori, Editor produs; autentificarea nu a fost facuta de agent (se face de utilizator pe `http://127.0.0.1:5087/`).
+- **Acoperire scoasa:** verificarile SQLite pentru concurenta a doua sesiuni, arhivare la stergere, jurnal, stocuri pe vehicule, blocari, evenimente de schimbare si lacatul de intretinere pe backup/restaurare reale nu mai exista pana la refacerea lor pe MariaDB (Task 2, 2.2).
+- **Acoperire refacuta (30.09.2026 13:00):** concurenta, arhivarea, jurnalul, miscarile/stocurile pe vehicule, blocarile si evenimentele de schimbare sunt din nou verificate, pe MariaDB, in `MariaExtendedChecks` (517 PASS in 4 rulari). Ramase neverificate automat: lacatul de intretinere cu backup/restaurare reale si comutarea de scheme la restaurare (necesita instanta cu conturile de backup/restaurare pe schema `BlazorStoc`); se verifica manual din pagina `/inventar/restaurare` cand utilizatorul o cere.
+
+## Notificari de expirare (30.09.2026)
+
+- Neverificat vizual: aspectul pe ecran ingust (telefon) al tabelului si al popup-ului, si comportamentul pentru un utilizator cu rol limitat (preluarea si amanarea sunt permise oricarui utilizator autentificat, sabloanele doar administratorului; testat automat, nu in browser).
+- Neverificat: reavertizarea reala la sfarsitul unei amanari (testata automat cu ceas simulat, nu asteptand zilele), si actualizarea triunghiului dintr-o a doua fereastra dupa preluarea din prima (interogare la 60 s, neasteptata in browser).
+- Verificare manuala recomandata pe baza reala: creeaza un sablon pentru un eveniment cu expirare apropiata (Setari -> Notificari), deschide `/notificari`, preia si amana o notificare, apoi verifica intrarile din Jurnal activitate.

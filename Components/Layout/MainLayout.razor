@@ -2,9 +2,9 @@
 @implements IDisposable
 @using Microsoft.AspNetCore.WebUtilities
 @using BlazorStoc.Services
-@inject AppMode Mode
 @inject IProductRepository Products
 @inject IOperationLockService OperationLock
+@inject IExpiryNotificationService Notifications
 @inject NavigationManager Navigation
 
 <div class="app-shell">
@@ -68,12 +68,13 @@
                     <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection>
+            <NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink>
             <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
         }
-        <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>@(Mode.IsDemo ? "Date demonstrative" : "BlazorStoc · MariaDB")</small></div>
+        <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>BlazorStoc · MariaDB</small></div>
     </aside>
-    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">@(Mode.IsDemo ? "Mod demonstrativ" : "Sesiune autentificată")</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
+    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">Sesiune autentificată</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
         @if (activeOperation is not null && !onRestorePage && !onWaitingPage)
         {
             <div class="error-banner" role="alert" id="maintenance-banner">
@@ -101,6 +102,7 @@
     private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, onRestorePage, onWaitingPage;
     private string selectedCategory = "", selectedSubcategory = "";
     private OperationLockInfo? activeOperation;
+    private int alertCount;
     private readonly CancellationTokenSource lifetime = new();
 
     protected override async Task OnInitializedAsync()
@@ -119,6 +121,20 @@
         try { activeOperation = await OperationLock.GetActiveAsync(lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception) { activeOperation = null; }
+        await LoadAlertCountAsync();
+    }
+
+    // Entering the application (and every navigation) checks whether a template fires; the number of warning
+    // notifications drives the red triangle next to the "Notificări" entry.
+    private async Task LoadAlertCountAsync()
+    {
+        try
+        {
+            await Notifications.EvaluateAsync(TimeSpan.FromMinutes(5), lifetime.Token);
+            alertCount = await Notifications.AlertCountAsync(lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception) { alertCount = 0; }
     }
 
     private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => _ = RefreshNavigationAsync();
@@ -134,6 +150,7 @@
                 try { activeOperation = await OperationLock.GetActiveAsync(lifetime.Token); }
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
                 catch (Exception) { activeOperation = null; }
+                await LoadAlertCountAsync();
                 StateHasChanged();
             });
         }

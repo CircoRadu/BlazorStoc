@@ -1,0 +1,196 @@
+@using BlazorStoc.Services
+@inject IExpiryNotificationService Service
+@inject ILogger<NotificationTemplatesEditor> Logger
+@implements IDisposable
+
+<h2>Șabloane notificări</h2>
+<p class="muted">Definește pentru ce expirări se creează notificări, cu câte zile înainte și cu ce text. În subiect și în text poți folosi marcaje de forma <code>&lt;numar autovehicul&gt;</code>, înlocuite automat cu valorile obiectului. Categoriile și evenimentele disponibile vin din registrul de expirări al aplicației; un eveniment nou (de exemplu analiza de risc a unui obiectiv) apare aici de îndată ce este înregistrat.</p>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (editing)
+{
+    <section class="product-editor" aria-labelledby="template-editor-title">
+        <div class="catalog-heading"><h3 id="template-editor-title">@(original is null ? "Adaugă șablon" : "Editează șablonul")</h3></div>
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="template-category">Categorie *
+                    <select id="template-category" value="@category" @onchange="CategoryChanged">
+                        <option value="">Alege categoria…</option>
+                        @foreach (var name in Categories) { <option value="@name">@name</option> }
+                    </select></label>
+                <label for="template-event">Eveniment de expirare *
+                    <select id="template-event" value="@input.SourceKey" @onchange="EventChanged" disabled="@(category.Length == 0)">
+                        <option value="">Alege evenimentul…</option>
+                        @foreach (var source in SourcesOfCategory) { <option value="@source.Key">@source.EventName</option> }
+                    </select></label>
+                <label for="template-days">Cu câte zile înainte de expirare *<input id="template-days" type="number" min="1" max="@ExpiryTemplateRules.MaxThreshold" step="1" @bind="input.ThresholdDays" /></label>
+                <label class="anaf-check"><input type="checkbox" @bind="input.Active" /> Șablon activ</label>
+                <label for="template-subject" class="anaf-wide">Subiect *<input id="template-subject" @bind="input.Subject" @bind:event="oninput" maxlength="@ExpiryTemplateRules.MaxSubject" autocomplete="off" /></label>
+                <label for="template-body" class="anaf-wide">Text *<textarea id="template-body" rows="6" maxlength="@ExpiryTemplateRules.MaxBody" @bind="input.Body" @bind:event="oninput"></textarea></label>
+            </div>
+            @if (SelectedSource is { } selectedSource)
+            {
+                <div class="placeholder-list" aria-label="Marcaje disponibile">
+                    <span class="muted small">Marcaje disponibile (clic pentru a le adăuga la sfârșitul textului):</span>
+                    @foreach (var placeholder in ExpiryTemplateRules.AllPlaceholders(selectedSource))
+                    {
+                        <button type="button" class="placeholder-chip" title="@placeholder.Description" @onclick="() => Append(placeholder.Name)">&lt;@placeholder.Name&gt;</button>
+                    }
+                </div>
+                <div class="notification-preview" aria-live="polite">
+                    <strong>Previzualizare</strong>
+                    <p><b>@ExpiryTemplateRules.RenderSample(input.Subject, selectedSource)</b></p>
+                    <p class="notification-body">@ExpiryTemplateRules.RenderSample(input.Body, selectedSource)</p>
+                </div>
+                <div class="editor-actions"><button type="button" class="refresh" @onclick="FillExample">Completează un text-exemplu</button></div>
+            }
+            <div class="editor-actions">
+                <button class="primary" type="button" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează șablonul")</button>
+                <button class="danger" type="button" @onclick="CloseEditor">Anulează</button>
+            </div>
+        </fieldset>
+    </section>
+}
+else
+{
+    <div class="editor-actions"><button class="primary" type="button" disabled="@loading" @onclick="() => OpenEditor(null)">+ Adaugă șablon</button></div>
+}
+
+<section class="catalog">
+    <div class="catalog-heading"><h3>Șabloane definite <span>@templates.Count</span></h3></div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă șabloanele</h3></div> }
+    else if (templates.Count == 0) { <div class="empty-state"><span class="empty-icon">✉</span><h3>Nu există șabloane</h3><p>Adaugă un șablon pentru a începe să primești notificări de expirare.</p></div> }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>CATEGORIE · EVENIMENT</th><th>SUBIECT</th><th class="number">ZILE ÎNAINTE</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var template in templates)
+        {
+            var source = Service.Sources.FirstOrDefault(item => item.Key == template.SourceKey);
+            <tr @key="template.Id">
+                <td>@(source is null ? template.SourceKey : $"{source.Category} · {source.EventName}")</td>
+                <td>@template.Subject</td>
+                <td class="number">@template.ThresholdDays</td>
+                <td><span class="notification-state @(template.Active ? "done" : "")">@(template.Active ? "Activ" : "Inactiv")</span></td>
+                <td class="row-actions"><button type="button" class="refresh" disabled="@(editing || saving)" @onclick="() => OpenEditor(template)">Editează</button>
+                    <button type="button" class="danger" disabled="@(editing || saving)" @onclick="() => deleting = template">Șterge</button></td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi șablonul?" Subject="Șablonul" ObjectLabel="@deleting.Subject"
+                              Description="Notificările create din acest șablon sunt șterse odată cu el."
+                              ConfirmationNote="Operația șterge șablonul și notificările lui și va fi înregistrată în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDelete" />
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<NotificationTemplate> templates = Array.Empty<NotificationTemplate>();
+    private NotificationTemplate? original, deleting;
+    private NotificationTemplateInput input = new();
+    private string category = "";
+    private bool loading, editing, saving, deleteBusy;
+    private string? error, notice, deleteError;
+
+    private IEnumerable<string> Categories => Service.Sources.Select(source => source.Category).Distinct().Order(StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<IExpirySource> SourcesOfCategory => Service.Sources.Where(source => source.Category == category);
+    private IExpirySource? SelectedSource => Service.Sources.FirstOrDefault(source => source.Key == input.SourceKey);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { templates = await Service.GetTemplatesAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Template loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Șabloanele nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private void OpenEditor(NotificationTemplate? template)
+    {
+        original = template; notice = null; error = null;
+        input = template is null ? new NotificationTemplateInput() : NotificationTemplateInput.From(template);
+        category = Service.Sources.FirstOrDefault(source => source.Key == input.SourceKey)?.Category ?? "";
+        editing = true;
+    }
+
+    private void CloseEditor() { editing = false; original = null; }
+
+    private void CategoryChanged(ChangeEventArgs args)
+    {
+        category = args.Value?.ToString() ?? "";
+        var only = SourcesOfCategory.ToArray();
+        input.SourceKey = only.Length == 1 ? only[0].Key : "";
+    }
+
+    private void EventChanged(ChangeEventArgs args) => input.SourceKey = args.Value?.ToString() ?? "";
+
+    private void Append(string name) => input.Body += $"<{name}>";
+
+    private void FillExample()
+    {
+        input.Subject = ExpiryTemplateRules.DefaultSubject;
+        input.Body = ExpiryTemplateRules.DefaultBody;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        saving = true; error = null;
+        try
+        {
+            if (original is null) await Service.CreateTemplateAsync(input, lifetime.Token);
+            else await Service.UpdateTemplateAsync(original, input, lifetime.Token);
+            notice = original is null ? "Șablonul a fost adăugat." : "Șablonul a fost modificat.";
+            CloseEditor();
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (NotificationOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Template saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Șablonul nu a putut fi salvat. Reîncearcă.";
+        }
+        finally { saving = false; }
+    }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleting is null || deleteBusy) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            await Service.DeleteTemplateAsync(deleting, reason, lifetime.Token);
+            deleting = null;
+            notice = "Șablonul a fost șters.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (NotificationOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Template deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Șablonul nu a putut fi șters. Reîncearcă.";
+        }
+        finally { deleteBusy = false; }
+    }
+
+    private void CancelDelete() { deleting = null; deleteError = null; }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

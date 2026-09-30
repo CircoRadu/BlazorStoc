@@ -1,0 +1,181 @@
+@page "/notificari"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IExpiryNotificationService Service
+@inject ILogger<Notifications> Logger
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Notificări · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">AVERTIZĂRI</p><h1>Notificări</h1><p class="muted">Expirări apropiate, după șabloanele definite de administrator. O notificare preluată nu mai avertizează; dacă o amâni, avertizează din nou la sfârșitul perioadei.</p></div>
+    <div class="heading-actions"><button class="refresh" type="button" disabled="@loading" @onclick="() => LoadAsync(true)">↻ Actualizează</button></div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Lista notificărilor <span>@views.Count</span></h2><small>@AlertCount necesită atenție</small></div>
+    @if (loading && !loaded) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă notificările</h3></div> }
+    else if (loaded && views.Count == 0) { <div class="empty-state"><span class="empty-icon">✉</span><h3>Nu există notificări</h3><p>Notificările apar când o expirare intră în perioada stabilită într-un șablon (Setări → Notificări → Șabloane notificări).</p></div> }
+    else if (loaded)
+    {
+        <div class="table-scroll"><table class="notification-table"><thead><tr><th>STARE</th><th>TITLU</th><th>OBIECT</th><th>EXPIRĂ LA</th><th class="number">ZILE RĂMASE</th></tr></thead><tbody>
+        @foreach (var view in views)
+        {
+            <tr @key="view.Notification.Id" class="notification-row @(view.IsAlert ? "notification-unread" : "")" tabindex="0" role="button"
+                aria-label="Deschide notificarea @view.Subject" @onclick="() => Open(view)" @onkeydown="args => KeyDown(args, view)">
+                <td><span class="notification-state @(view.IsAlert ? "alert" : "done")">@StateText(view)</span></td>
+                <td>@view.Subject</td>
+                <td>@view.ObjectLabel</td>
+                <td>@StockMovementRules.DisplayDate(view.Notification.ExpiryDate)</td>
+                <td class="number">@view.DaysLeft</td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (selected is not null)
+{
+    <div class="delete-overlay" @onkeydown="DialogKeyDown">
+        <section class="delete-dialog notification-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="notification-title">
+            <h2 id="notification-title">@selected.Subject</h2>
+            <p class="delete-object"><strong>@selected.Category · @selected.EventName · @selected.ObjectLabel</strong></p>
+            <p class="notification-body">@selected.Body</p>
+            <p class="muted small">Expiră la @StockMovementRules.DisplayDate(selected.Notification.ExpiryDate) · @selected.DaysLeft zile rămase · @StateDetail(selected)</p>
+            @if (dialogError is not null) { <div class="error-banner" role="alert">@dialogError</div> }
+            @if (selected.IsAlert)
+            {
+                <div class="notification-snooze">
+                    @if (selected.MaxSnoozeDays >= 1)
+                    {
+                        <label for="snooze-days">Amintește-mi peste (zile, cel mult @selected.MaxSnoozeDays)<input id="snooze-days" type="number" min="1" max="@selected.MaxSnoozeDays" step="1" @bind="snoozeDays" disabled="@busy" /></label>
+                        <button type="button" class="refresh" disabled="@busy" @onclick="SnoozeAsync">Amână</button>
+                    }
+                    else { <small class="muted">Amânarea nu mai este posibilă: expirarea este prea aproape (limita este numărul de zile rămase minus 2).</small> }
+                </div>
+            }
+            <div class="editor-actions">
+                @if (selected.IsAlert) { <button type="button" class="primary" disabled="@busy" @onclick="AcknowledgeAsync">@(busy ? "Se salvează…" : "Preiau notificarea")</button> }
+                <button type="button" class="danger" disabled="@busy" @onclick="Close">Închide</button>
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<NotificationView> views = Array.Empty<NotificationView>();
+    private NotificationView? selected;
+    private bool loading, loaded, busy;
+    private string? error, notice, dialogError;
+    private int snoozeDays = 1;
+    private readonly CancellationTokenSource lifetime = new();
+    private int AlertCount => views.Count(view => view.IsAlert);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(true);
+        _ = RefreshPeriodicallyAsync();
+    }
+
+    private async Task LoadAsync(bool evaluate)
+    {
+        loading = true; error = null;
+        try
+        {
+            if (evaluate) await Service.EvaluateAsync(null, lifetime.Token);
+            views = await Service.GetViewsAsync(lifetime.Token);
+            loaded = true;
+            if (selected is not null) selected = views.FirstOrDefault(view => view.Notification.Id == selected.Notification.Id);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Notification loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Notificările nu au putut fi încărcate. Reîncearcă peste câteva momente.";
+        }
+        finally { loading = false; }
+    }
+
+    // Another user may take a notification over: the list follows without a manual refresh (never while a popup is open).
+    private async Task RefreshPeriodicallyAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(async () => { if (selected is null && !busy) { await LoadAsync(false); StateHasChanged(); } });
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void Open(NotificationView view)
+    {
+        selected = view; dialogError = null; notice = null;
+        snoozeDays = Math.Clamp(snoozeDays, 1, Math.Max(1, view.MaxSnoozeDays));
+    }
+
+    private void KeyDown(KeyboardEventArgs args, NotificationView view)
+    {
+        if (args.Key is "Enter" or " ") Open(view);
+    }
+
+    private void DialogKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && !busy) Close();
+    }
+
+    private void Close() { selected = null; dialogError = null; }
+
+    private async Task AcknowledgeAsync()
+    {
+        if (selected is null || busy) return;
+        await RunAsync(async view => { await Service.AcknowledgeAsync(view, lifetime.Token); return "Notificarea a fost preluată."; });
+    }
+
+    private async Task SnoozeAsync()
+    {
+        if (selected is null || busy) return;
+        var days = snoozeDays;
+        await RunAsync(async view =>
+        {
+            await Service.SnoozeAsync(view, days, lifetime.Token);
+            return $"Notificarea a fost preluată și va avertiza din nou peste {days} zile.";
+        });
+    }
+
+    private async Task RunAsync(Func<NotificationView, Task<string>> operation)
+    {
+        var view = selected!;
+        busy = true; dialogError = null;
+        try
+        {
+            notice = await operation(view);
+            selected = null;
+            await LoadAsync(false);
+            // The menu warning follows immediately (the layout itself is not re-rendered by this page).
+            try { await JS.InvokeVoidAsync("refreshNotificationAlerts"); } catch (Exception) { }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (NotificationOperationException exception) { dialogError = exception.Message; await LoadAsync(false); }
+        catch (Exception exception)
+        {
+            Logger.LogError("Notification operation failed ({ErrorType}).", exception.GetType().Name);
+            dialogError = "Operația nu a putut fi efectuată. Actualizează lista și reîncearcă.";
+        }
+        finally { busy = false; }
+    }
+
+    private static string StateText(NotificationView view) =>
+        view.IsAlert ? (view.Notification.AcknowledgedBy is null ? "Nouă" : "Amânare încheiată") : view.Notification.SnoozeUntil is not null ? "Amânată" : "Preluată";
+
+    private static string StateDetail(NotificationView view) => view.IsAlert
+        ? (view.Notification.AcknowledgedBy is null ? "nepreluată" : $"amânarea cerută de {view.Notification.AcknowledgedBy} s-a încheiat")
+        : view.Notification.SnoozeUntil is { } until
+            ? $"preluată de {view.Notification.AcknowledgedBy}, amânată până la {StockMovementRules.DisplayDate(until)}"
+            : $"preluată de {view.Notification.AcknowledgedBy}";
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

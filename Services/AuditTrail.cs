@@ -17,6 +17,8 @@ public static class AuditEntities
     public const string Vehicle = "Vehicul";
     public const string Inventory = "Inventar";
     public const string DatabaseBackup = "CopieSiguranta";
+    public const string NotificationTemplate = "SablonNotificare";
+    public const string Notification = "Notificare";
 }
 
 public static class AuditActions
@@ -35,10 +37,19 @@ public static class AuditActions
     public const string ExpiryRovinieta = "Modificare expirare rovinietă";
     public const string MoveEquipment = "Mutare echipament";
     public const string ReturnEquipment = "Returnare echipament în depozit";
+    // Expiry notifications: each operation names exactly what happened.
+    public const string CreateNotificationTemplate = "Adăugare șablon notificare";
+    public const string EditNotificationTemplate = "Modificare șablon notificare";
+    public const string DeleteNotificationTemplate = "Ștergere șablon notificare";
+    // Written by the system itself when the engine creates a notification (actor "sistem"), so the creation can be followed.
+    public const string NotificationCreated = "Notificare creată";
+    public const string AcknowledgeNotification = "Preluare notificare";
+    public const string SnoozeNotification = "Amânare notificare";
 
     // Events whose object still has a live page (a plain edit or one of the specific edit operations).
     public static bool IsCreateOrEdit(string? action) =>
-        action is Create or Edit or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment;
+        action is Create or Edit or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
+            or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -89,7 +100,10 @@ public static class AuditNavigation
         // The event stores the movement id; /miscari/{id} resolves it to the product's movements page.
         [AuditEntities.StockMovement] = StockMovementNavigation.MovementUrl,
         // The vehicle page (its equipment, edit and delete actions).
-        [AuditEntities.Vehicle] = VehicleNavigation.PageUrl
+        [AuditEntities.Vehicle] = VehicleNavigation.PageUrl,
+        // Templates live in Settings, notifications on their own page (neither has a page per object).
+        [AuditEntities.NotificationTemplate] = _ => "/setari",
+        [AuditEntities.Notification] = _ => "/notificari"
     };
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)

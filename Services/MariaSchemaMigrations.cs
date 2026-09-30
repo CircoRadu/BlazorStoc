@@ -63,7 +63,49 @@ public static class MariaSchemaMigrations
                 ADD COLUMN IF NOT EXISTS `rovinieta_expiry` DATE NOT NULL DEFAULT '2027-09-30' AFTER `insurance_expiry`
             """
         ],
-        [("vehicles", "itp_expiry"), ("vehicles", "insurance_expiry"), ("vehicles", "rovinieta_expiry")])
+        [("vehicles", "itp_expiry"), ("vehicles", "insurance_expiry"), ("vehicles", "rovinieta_expiry")]),
+        new(4, "Notificari de expirare: sabloane si notificari (starea preluat/amanat este globala)",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `notification_templates` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `source_key` VARCHAR(60) NOT NULL,
+              `subject` VARCHAR(200) NOT NULL,
+              `body` VARCHAR(2000) NOT NULL,
+              `threshold_days` INT NOT NULL,
+              `is_active` TINYINT NOT NULL DEFAULT 1,
+              `version` BIGINT NOT NULL DEFAULT 0,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS `expiry_notifications` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `template_id` BIGINT NOT NULL,
+              `source_key` VARCHAR(60) NOT NULL,
+              `object_id` BIGINT NOT NULL,
+              `expiry_date` DATE NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              `acknowledged_by` VARCHAR(100) NULL,
+              `acknowledged_utc` VARCHAR(40) NULL,
+              `snooze_until` DATE NULL,
+              `snooze_days` INT NULL,
+              `version` BIGINT NOT NULL DEFAULT 0,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `uq_expiry_notifications_0` (`template_id`, `object_id`, `expiry_date`),
+              CONSTRAINT `fk_expiry_notifications_0` FOREIGN KEY (`template_id`) REFERENCES `notification_templates` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("notification_templates", "id"), ("notification_templates", "source_key"), ("notification_templates", "subject"),
+            ("notification_templates", "body"), ("notification_templates", "threshold_days"), ("notification_templates", "is_active"),
+            ("notification_templates", "version"),
+            ("expiry_notifications", "id"), ("expiry_notifications", "template_id"), ("expiry_notifications", "source_key"),
+            ("expiry_notifications", "object_id"), ("expiry_notifications", "expiry_date"), ("expiry_notifications", "created_utc"),
+            ("expiry_notifications", "acknowledged_by"), ("expiry_notifications", "acknowledged_utc"), ("expiry_notifications", "snooze_until"),
+            ("expiry_notifications", "snooze_days"), ("expiry_notifications", "version")
+        ])
     ];
 }
 

@@ -5,7 +5,6 @@
 @inject UnsavedChanges Guard
 @inject ExitFormDraft ExitDraft
 @inject IBeneficiaryRepository Repository
-@inject AppMode Mode
 @inject NavigationManager Navigation
 @inject ILogger<Beneficiaries> Logger
 @implements IDisposable
@@ -13,7 +12,6 @@
 <PageTitle>Beneficiari · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
 <div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele fizice și juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button></div></div>
-@if (Mode.IsDemo) { <div class="demo-banner"><span>◈</span><div><strong>Mod demonstrativ.</strong> Modificările beneficiarilor sunt salvate în baza de date locală și rămân disponibile după repornire.</div></div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 @if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBeneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditorAsync" /> }

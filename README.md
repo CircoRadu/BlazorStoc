@@ -14,7 +14,7 @@ Faza curentă acoperă dezvoltarea și verificarea locală. Integrarea, configur
 
 ## Ce este inclus
 
-- Mod demonstrativ cu exemple fictive, fără acces SQL, activat implicit.
+- Fără mod demonstrativ și fără SQLite (eliminate la 30.09.2026): aplicația lucrează numai pe MariaDB.
 - CRUD MariaDB pentru produse, cu categorii/subcategorii create din formular, tranzacții, jurnal și verificarea modificărilor simultane.
 - Imagine obligatorie la crearea produsului, selectabilă din fișier sau din clipboard, cu thumbnail în catalog și vizualizare mărită.
 - Autentificare web cu un cont configurabil, cookie de sesiune, protecție antiforgery și limitarea cererilor de login.

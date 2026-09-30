@@ -136,7 +136,10 @@ public sealed partial class MariaProductRepository
     private readonly record struct GroupResolution(int CategoryId, int SubcategoryId, string Category, string Subcategory,
         bool CategoryCreated, bool SubcategoryCreated);
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
+
+    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))

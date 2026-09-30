@@ -99,7 +99,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         StockMovementRules.ValidateTransfer(transfer);
-        var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
+        var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var nowText = MariaTimeText.Format(now);
         var day = StockMovementRules.Today;
@@ -223,7 +223,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         var value = StockMovementRules.Validated(input, input.Kind, false);
-        var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
+        var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var nowText = MariaTimeText.Format(now);
         var (movement, stock, productCode) = await WriteAsync(async (connection, transaction) =>
@@ -267,7 +267,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         var value = StockMovementRules.Validated(input, original.Kind, true, allowVehicleTransfer: original.IsVehicleTransfer);
-        var actor = await SqliteRepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
+        var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var nowText = MariaTimeText.Format(now);
         var (current, updated, stock, productCode) = await WriteAsync(async (connection, transaction) =>
@@ -385,7 +385,10 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         }
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
+
+    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))

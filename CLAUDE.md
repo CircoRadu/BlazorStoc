@@ -22,7 +22,7 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
 
 - Respectă prompturile utilizatorului și limitează modificările la taskul activ.
 - Nu rescrie și nu anula modificările Codex fără o cerere explicită.
-- Păstrează implementarea asincronă, fără Docker și fără integrare NAS în această etapă.
+- Păstrează implementarea asincronă, fara integrare NAS in aceasta etapa. Docker este PERMIS (decizia utilizatorului, 30.09.2026) pentru mediul de dezvoltare si testare, in special o instanta MariaDB pentru teste; aplicatia in sine ramane rulabila direct cu .NET, iar publicarea in containere/QNAP ramane in afara fazei curente.
 - Nu genera fișiere SQL de upgrade separate; modificările de schemă sunt gestionate în proiect.
 - Toate datele calendaristice afișate utilizatorului au forma `dd.mm.yyyy` (de exemplu `25.09.2026`; cu oră: `25.09.2026 14:08`), în orice pagină, dialog, jurnal, mesaj sau document generat. Formatele interne (`yyyy-MM-dd` în SQLite, `dd-MM-yyyy` în coloana existentă `io_data` din MariaDB, adresele URL) nu se afișează; se folosesc `StockMovementRules.DisplayDate` și formatul `dd.MM.yyyy`.
 - După modificări funcționale, actualizează preview-ul local la `http://127.0.0.1:5082/`.

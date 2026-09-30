@@ -14,3 +14,5 @@ data/
 
 # Credentiale MariaDB (nu se comit)
 *.private.*
+
+bin_verify*/

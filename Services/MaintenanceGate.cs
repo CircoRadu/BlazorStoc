@@ -6,7 +6,7 @@ public sealed class MaintenanceInProgressException(string message) : Exception(m
 
 // The write freeze of a backup export / database restoration. While the shared operation lock is active, every other
 // connection to the application's data is refused at the two central places that open one (DatabaseConnections.Create
-// for MariaDB, SqliteLocalStore.OpenConnectionAsync for the demo database), so no session - and no request that slipped
+// for MariaDB), so no session - and no request that slipped
 // in before its page was redirected - can write (or read a half-swapped schema) while the snapshot is taken or the
 // schemas are swapped. Only the operation that holds the lock passes: it marks its own asynchronous flow with
 // EnterOwnerScope right after acquiring the lock.

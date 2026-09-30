@@ -19,11 +19,21 @@
             <AnafConfigurator />
         </div>
     }
+    else if (activeTab == NotificationsTab)
+    {
+        <div role="tabpanel" id="panel-@NotificationsTab" aria-labelledby="tab-@NotificationsTab" class="settings-body">
+            <div class="settings-subtabs" role="tablist" aria-label="Secțiuni notificări">
+                <button type="button" role="tab" id="subtab-templates" class="settings-subtab active" aria-selected="true" aria-controls="subpanel-templates">Șabloane notificări</button>
+            </div>
+            <div role="tabpanel" id="subpanel-templates" aria-labelledby="subtab-templates"><NotificationTemplatesEditor /></div>
+        </div>
+    }
 </section>
 
 @code {
     private const string AnafTab = "anaf";
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF")];
+    private const string NotificationsTab = "notificari";
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări")];
     private string activeTab = AnafTab;
 
     private void OnTabKeyDown(KeyboardEventArgs args)

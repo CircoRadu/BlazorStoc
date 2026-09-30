@@ -14,7 +14,7 @@ Din 28.09.2026, taskurile finalizate nu mai stau in acest fisier: ele se muta in
 
 # Taskuri active
 
-Nu exista taskuri active: cele doua taskuri anterioare (copia de siguranta la preluarea inventarului si pagina de restaurare a bazei de date) sunt finalizate si arhivate in `IMPLEMENTED.md` (30.09.2026). Verificarile ramase pentru ele sunt in `docs/TESTE_RAMASE.md` (A18, A20, F2).
+Nu exista taskuri active. Ultimele taskuri (eliminarea SQLite, refacerea testelor pe MariaDB, notificarile de expirare) sunt finalizate si arhivate in `IMPLEMENTED.md` (30.09.2026). Verificarile ramase sunt in `docs/TESTE_RAMASE.md`.
 
 ## Observații pentru etapa de implementare
 
