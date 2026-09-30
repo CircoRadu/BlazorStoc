@@ -195,6 +195,191 @@ Check(exitDraft.Take(42) is null, "Exit form draft: expires after 30 minutes");
 exitDraft.SetNewBeneficiary(1); exitDraft.SetNewProject(1);
 Check(exitDraft.Take(42) is null, "Exit form draft: nothing is invented when none was stored");
 
+Check(AnafRules.HttpErrorMessage(404).Contains("HTTP 404") && AnafRules.HttpErrorMessage(404).Contains("Nu este vorba despre CUI") && AnafRules.HttpErrorMessage(404).Contains("administrator") &&
+      AnafRules.HttpErrorMessage(500).Contains("HTTP 500") && AnafRules.HttpErrorMessage(429).Contains("HTTP 429") && AnafRules.HttpErrorMessage(418).Contains("HTTP 418"),
+    "ANAF HTTP errors explain the cause and what to do (a 404 points at the configured address, not at the CUI)");
+
+// Journal on the server: windows, filters, paging, exact operation names, the CSV, the address state of the complete journal.
+{
+    var journalBase = new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc);
+    var journal = Enumerable.Range(1, 60).Select(index => new AuditEvent(Guid.NewGuid(), journalBase.AddHours(index), index % 2 == 0 ? "Ana" : "bob",
+        AccessRoles.Administrator, index % 3 == 0 ? AuditEntities.Beneficiary : AuditEntities.Product,
+        index % 5 == 0 ? AuditActions.Delete : index == 7 ? "Modificare" : AuditActions.Edit, $"Obiect {index}", index == 12 ? "100% sigur" : $"detaliu {index}", "motiv", index.ToString())).ToList();
+    var journalPage = AuditQueryRules.Page(journal, new(), 1, 10, null);
+    Check(journalPage.Total == 60 && journalPage.Events.Count == 10 && journalPage.JournalTotal == 60 && journalPage.Events[0].Target == "Obiect 60" &&
+          AuditQueryRules.Page(journal, new(), 99, 10, null).Page == 6, "The journal page is newest first, counts all matches and clamps the page");
+    var recentJournal = AuditQueryRules.Page(journal, new(Actor: "ANA"), 1, 100, 20);
+    Check(recentJournal.Total == 10 && recentJournal.JournalTotal == 60 && recentJournal.Events.All(entry => entry.ActorUsername == "Ana" && entry.TimestampUtc > journalBase.AddHours(40)),
+        "A window looks only at the latest events of the journal, and the operator filter ignores letter case");
+    Check(AuditQueryRules.Page(journal, new(Action: AuditActions.Edit), 1, 100, null).Events.Any(entry => entry.Target == "Obiect 7") &&
+          AuditQueryRules.Page(journal, new(Action: AuditActions.Delete), 1, 100, null).Total == 12, "A legacy \"Modificare\" counts as an edit");
+    Check(AuditQueryRules.Page(journal, new(Text: "100%"), 1, 10, null).Total == 1 && AuditQueryRules.Page(journal, new(Text: "OBIECT 3"), 1, 10, null).Total == 11,
+        "Search ignores letter case and looks in target, details and reason");
+    Check(AuditQueryRules.Page(journal, new(FromUtc: journalBase.AddHours(10), ToUtc: journalBase.AddHours(20)), 1, 100, null).Total == 10 &&
+          AuditQueryRules.Page(journal, new(), 1, 0, null).Events.Count == 60, "The range includes its start and excludes its end; page size 0 returns everything");
+    Check(AuditQueryRules.Summary(journal, journalBase.AddHours(50)) == new AuditSummary(60, 11, 2, journal.Count(entry => entry.EntityType == AuditEntities.Product)), "The summary counts events, today, operators and products");
+    var deletedObject = journal.Single(entry => entry.Target == "Obiect 10");
+    var removalMap = AuditQueryRules.Removals(journal, [deletedObject, journal[0]]);
+    Check(removalMap.Count == 1 && removalMap.ContainsKey(AuditNavigation.ObjectKey(deletedObject.EntityType, deletedObject.EntityId)),
+        "Removal times are limited to the objects of the shown events");
+    Check(AuditQueryRules.RecentWindow == 500 && AuditQueryRules.MaxRows >= 10_000 && AuditQueryRules.CompletePageSizes.SequenceEqual([25, 50, 100]) &&
+          !AuditActions.IsCreateOrEdit(AuditActions.ExportJournal) && AuditActions.ExportJournal == "Export jurnal" && new AuditQuery().IsEmpty && !new AuditQuery(Text: "x").IsEmpty,
+        "The latest-events window is 500; the export has its own exact operation name and no link to an object");
+    var csv = AuditQueryRules.Csv([journal[0] with { Details = "=SUM(1;2)", Motif = "a \"b\"\nc" }]);
+    Check(csv.StartsWith("Data și ora (UTC);Operator;") && csv.Contains("\"'=SUM(1;2)\"") && csv.Contains("\"a \"\"b\"\" c\"") && csv.Contains("01.09.2026 09:00:00") && csv.EndsWith("\r\n"),
+        "The CSV quotes values, neutralizes formulas and writes UTC times as dd.MM.yyyy");
+    Check(AuditQueryRules.Describe(new(Actor: "ana", FromUtc: journalBase), d => d.ToString("dd.MM.yyyy")) == "operator: ana; de la 01.09.2026" && AuditQueryRules.Describe(new(), d => "") == "fără filtre",
+        "The export is recorded with the filters that were used");
+    var browserRange = new AuditUtcRange("2026-08-31T21:00:00.000Z", "2026-09-30T21:00:00.000Z");
+    Check(browserRange.From == new DateTime(2026, 8, 31, 21, 0, 0, DateTimeKind.Utc) && browserRange.To?.Kind == DateTimeKind.Utc && new AuditUtcRange(null, null).From is null && new AuditUtcRange("nu", "").To is null,
+        "The day range sent by the browser is read as UTC instants (and nothing when absent)");
+    var journalToday = new DateOnly(2026, 9, 30);
+    Check(AuditCompleteState.Parse(journalToday, null, null, null, null, null, null, null, null, null).Url() == "/jurnal/complet?de-la=2026-08-30" &&
+          AuditCompleteState.Parse(journalToday, null, null, null, null, "2026-09-05", "2026-09-01", null, 100, 3).Url() == "/jurnal/complet?de-la=2026-09-01&pana-la=2026-09-05&pe-pagina=100&pagina=3" &&
+          AuditCompleteState.Parse(journalToday, "a b", "Produs", null, "ana", null, null, "1", 7, 0).Url() == "/jurnal/complet?q=a%20b&tip=Produs&operator=ana&tot=1",
+        "The complete journal shows the last month by default, keeps a swapped range in order, accepts only its page sizes and asks for the whole journal with tot=1");
+    var journalFile = Path.Combine(Path.GetTempPath(), "blazorstoc-journal-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(journalFile);
+    try
+    {
+        var fileTrail = new FileAuditTrail(new TestWebHostEnvironment(journalFile), new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?> { ["App:AuditPath"] = Path.Combine(journalFile, "audit.jsonl") }).Build(), NullLogger<FileAuditTrail>.Instance);
+        for (var index = 1; index <= 5; index++) await fileTrail.RecordAsync(new("ana", AccessRoles.Administrator, AuditEntities.Product, index == 4 ? AuditActions.Delete : AuditActions.Edit, $"Fisier {index}", "d", "", index.ToString()));
+        var filePage = await fileTrail.QueryAsync(new(Text: "fisier"), 2, 2);
+        var fileRemovals = await fileTrail.RemovalTimesAsync(filePage.Events.Concat((await fileTrail.QueryAsync(new(), 1, 10)).Events));
+        Check(filePage.Total == 5 && filePage.Events.Count == 2 && filePage.Page == 2 && (await fileTrail.SummaryAsync(DateTime.UtcNow.Date)).Total == 5 && fileRemovals.Count == 1,
+            "The file journal answers the same queries, summary and removals");
+    }
+    finally { Directory.Delete(journalFile, true); }
+}
+
+// Maintenance map: the separate window and the refresh compare the rows by value.
+{
+    var mapDay = new DateOnly(2026, 9, 30);
+    ServiceDueRow MapRow(int id, DateOnly due) => new(5, "Ben", new ServiceContract(1, 5, "C1", mapDay, 12, null, true, "", 0),
+        new ServiceContractPointView(new ServiceContractPoint(id, 1, 7, null, due, 0), "Punct", "Adresa", true), 45.1m, 25.6m, null);
+    var shownRows = new[] { MapRow(1, mapDay), MapRow(2, mapDay) };
+    Check(MaintenanceMapRules.ChangedRows(shownRows, [MapRow(1, mapDay), MapRow(2, mapDay)]) == 0 &&
+          MaintenanceMapRules.ChangedRows(shownRows, [MapRow(1, mapDay), MapRow(2, mapDay.AddDays(1))]) == 1 &&
+          MaintenanceMapRules.ChangedRows(shownRows, [MapRow(1, mapDay), MapRow(2, mapDay), MapRow(3, mapDay)]) == 1 &&
+          MaintenanceMapRules.ChangedRows(shownRows, [MapRow(1, mapDay)]) == 0,
+        "The automatic refresh counts the rows that are new or changed, and none when nothing differs");
+    Check(MaintenanceMapRules.WindowUrl == "/mentenanta/harta/fereastra" && MaintenanceMapRules.WindowName == "blazorstoc-harta" && MaintenanceMapRules.AutoRefreshSeconds is >= 15 and <= 120,
+        "The map window has a fixed address and name (one reused window) and refreshes at a moderate pace");
+}
+
+// Settings → Hartă: the tile provider and the pin types of the overlay.
+{
+    var engine = new MapEngineSettings();
+    Check(MapEngineRules.Validate(engine) is null && MapEngineRules.Validate(new MapEngineSettings { TileUrl = "http://t.example/{z}/{x}/{y}.png" }) is not null &&
+          MapEngineRules.Validate(new MapEngineSettings { TileUrl = "https://t.example/{z}/{x}.png" }) is not null && MapEngineRules.Validate(new MapEngineSettings { TileUrl = "https://u:p@t.example/{z}/{x}/{y}.png" }) is not null &&
+          MapEngineRules.Validate(new MapEngineSettings { TileUrl = "https://t.example/{z}/{x}/{y}.png?k={key}" }) is { } missingKey && missingKey.Contains("Cheie furnizor") &&
+          MapEngineRules.Validate(new MapEngineSettings { TileUrl = "https://t.example/{z}/{x}/{y}.png?k={key}", ApiKey = "abc" }) is null,
+        "The tile address must be https with {z}/{x}/{y}, no credentials, and {key} needs a key");
+    Check(MapEngineRules.Validate(new MapEngineSettings { MinZoom = 10, MaxZoom = 5 }) is not null && MapEngineRules.Validate(new MapEngineSettings { StartZoom = 1, MinZoom = 3 }) is not null &&
+          MapEngineRules.Validate(new MapEngineSettings { CenterLatitude = 100 }) is not null && MapEngineRules.Validate(new MapEngineSettings { AttributionText = " " }) is not null &&
+          MapEngineRules.Validate(new MapEngineSettings { AttributionUrl = "http://x.example" }) is not null, "The zoom range, the centre and the attribution are validated");
+    var keyed = new MapEngineSettings { TileUrl = "https://t.example/{z}/{x}/{y}.png?k={key}", ApiKey = "a b&c" }.ToOptions();
+    Check(keyed.TileUrl == "https://t.example/{z}/{x}/{y}.png?k=a%20b%26c", "The key is put into the address (escaped) for the map page only");
+    var attribution = MapEngineRules.AttributionHtml("<b>x</b> & y", "https://example.org/a?b=1&c=2");
+    Check(!attribution.Contains("<b>") && attribution.Contains("&lt;b&gt;x&lt;/b&gt; &amp; y") && attribution.StartsWith("<a href=\"https://example.org/a?b=1&amp;c=2\"") && MapEngineRules.AttributionHtml("x", "javascript:alert(1)") == "x",
+        "The attribution is text that becomes safe markup (an https link, everything else encoded)");
+    var fromDefaults = MapEngineSettings.FromOptions(new MapOptions());
+    Check(fromDefaults.AttributionText == "© OpenStreetMap contributors" && fromDefaults.AttributionUrl == "https://www.openstreetmap.org/copyright" && fromDefaults.ToOptions().TileUrl == MapOptions.DefaultTileUrl,
+        "The starting values are those of appsettings.json");
+    var keyChanges = MapEngineRules.Changes(new MapEngineSettings(), new MapEngineSettings { ApiKey = "secret-key-1" }).Where(change => change.Before != change.After).ToList();
+    Check(keyChanges.Count == 1 && keyChanges[0].Field == "Cheie furnizor" && !keyChanges[0].After.Contains("secret") && keyChanges[0].After == "schimbată",
+        "The journal never holds the key itself");
+
+    var defaults = MapPinRules.Defaults();
+    Check(defaults.Count == 6 && defaults.Count(type => type.IsFill) == 4 && defaults.All(type => type.BuiltIn) && defaults.Select(type => type.Id).Distinct().Count() == 6 && defaults.All(type => type.Id < MapPinRules.FirstCustomId),
+        "Six built-in types: four fills and two badges, with ids below the ones of custom types");
+    Check(MapPinRules.Foreground("#ffffff") == "#1d2b2e" && MapPinRules.Foreground("#000000") == "#ffffff" && MapPinRules.Foreground("#d99a1f") == "#1d2b2e" && MapPinRules.Foreground("#c0392b") == "#ffffff" && MapPinRules.Foreground("nope") == "#ffffff",
+        "The glyph colour is the one that reads better on the pin colour");
+    var edited = defaults.Select(type => type.Clone()).ToList();
+    edited[0].Name = "Depășit"; edited[0].Color = "#FF0000"; edited[4].Active = false; edited[3].Active = false;
+    var merged = MapPinRules.Effective(edited);
+    Check(merged.Count == 6 && merged.Single(type => type.Key == "overdue").Name == "Depășit" && merged.Single(type => type.Key == "overdue").Color == "#ff0000" && !merged.Single(type => type.Kind == "badge" && type.Key == "expired").Active &&
+          merged.Single(type => type.Key == "off").Active && MapPinRules.Effective(null).Count == 6, "Stored edits are merged over the built-in types; a fill type can never be switched off");
+    var custom = new MapPinType { Id = 1000, Key = "c1000", Kind = "badge", Rule = MapPinType.RuleNoIntervention, Months = 6, Name = "Fără vizită", Color = "#7a4fb5", Glyph = "V", Active = true };
+    Check(MapPinRules.Validate(custom, defaults) is null && MapPinRules.Validate(custom.With(type => type.Name = "La zi"), defaults) is { } dup && dup.Contains("Există deja") &&
+          MapPinRules.Validate(defaults[0].With(type => type.Color = defaults[2].Color), defaults.Skip(1)) is { } sameColor && sameColor.Contains("folosită deja") &&
+          MapPinRules.Validate(custom.With(type => type.Glyph = "<b"), defaults) is not null && MapPinRules.Validate(custom.With(type => type.Color = "red"), defaults) is not null &&
+          MapPinRules.Validate(custom.With(type => type.Months = 0), defaults) is not null && MapPinRules.Validate(custom.With(type => { type.Id = 0; type.Name = "D"; }), defaults.Concat([custom.With(t => t.Id = 1001), custom.With(t => { t.Id = 1002; t.Name = "B"; }), custom.With(t => { t.Id = 1003; t.Name = "C"; })])) is { } tooMany && tooMany.Contains("cel mult"),
+        "Pin types are validated: name, colour, glyph, months, unique names and fill colours, at most three custom badges");
+
+    var day = new DateOnly(2026, 9, 30);
+    ServiceDueRow PinRow(DateOnly? last, bool active = true) => new(5, "Ben", new ServiceContract(1, 5, "C1", day, 12, null, active, "", 0),
+        new ServiceContractPointView(new ServiceContractPoint(1, 1, 7, null, day.AddDays(40), 0), "Punct", "Adresa", true), 45.1m, 25.6m, last);
+    var customTypes = merged.Concat([custom]).ToList();
+    Check(MapPinRules.ExtraBadges(PinRow(null), day, customTypes).SequenceEqual(["c1000"]) && MapPinRules.ExtraBadges(PinRow(day.AddMonths(-6)), day, customTypes).Count == 1 &&
+          MapPinRules.ExtraBadges(PinRow(day.AddMonths(-5)), day, customTypes).Count == 0 && MapPinRules.ExtraBadges(PinRow(null, false), day, customTypes).Count == 0 &&
+          MapPinRules.ExtraBadges(PinRow(null), day, customTypes.Select(type => type.Id == 1000 ? type.With(t => t.Active = false) : type).ToList()).Count == 0 && MapPinRules.ExtraBadges(PinRow(null), day, null).Count == 0,
+        "A custom badge follows its rule (N months or never), only for contracts that are On and only while active");
+    Check(MaintenanceMapRules.Marker(PinRow(null), day, 30, 30, customTypes)?.Extra?.Single() == "c1000" && MaintenanceMapRules.Marker(PinRow(null), day, 30, 30)?.Extra is { Count: 0 },
+        "The marker carries the keys of its custom badges");
+    Check(SettingsNavigation.MapEngineUrl == "/setari?tab=harta&subtab=motor" && SettingsNavigation.MapPinTypeUrl(1000) == "/setari?tab=harta&subtab=overlay&pin=1000" &&
+          new[] { AuditActions.EditMapEngine, AuditActions.ResetMapEngine, AuditActions.CreateMapPinType, AuditActions.EditMapPinType }.All(AuditActions.IsCreateOrEdit) && !AuditActions.IsCreateOrEdit(AuditActions.DeleteMapPinType) &&
+          new[] { AuditActions.EditMapEngine, AuditActions.ResetMapEngine, AuditActions.CreateMapPinType, AuditActions.EditMapPinType, AuditActions.DeleteMapPinType }.Distinct().Count() == 5 &&
+          AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "ana", AccessRoles.Administrator, AuditEntities.MapPinType, AuditActions.EditMapPinType, "Tip pin: X", "d", "", "1000")) == "/setari?tab=harta&subtab=overlay&pin=1000" &&
+          AuditNavigation.TargetUrl(new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "ana", AccessRoles.Administrator, AuditEntities.MapEngine, AuditActions.EditMapEngine, "Furnizor hartă", "d", "", "1")) == "/setari?tab=harta&subtab=motor" &&
+          AuditFilterOptions.Actions.Any(option => option.Value == AuditActions.CreateMapPinType) && AuditFilterOptions.Entities.Any(option => option.Value == AuditEntities.MapEngine),
+        "Each map settings operation has its own journal action, linked to its sub-tab (the pin type highlighted)");
+
+    var mapDirectory = Path.Combine(Path.GetTempPath(), "blazorstoc-map-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(mapDirectory);
+    try
+    {
+        var mapConfig = new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Map:ConfigurationPath"] = Path.Combine(mapDirectory, "map.json") }).Build();
+        var mapTrail = new TestAuditTrail();
+        MapConfigurationService MapService(bool admin = true) => new(new MapConfigStore(mapConfig), Microsoft.Extensions.Options.Options.Create(new MapOptions()), new TestAccessControl(admin, "ana"), mapTrail);
+        var mapService = MapService();
+        var viewBefore = await mapService.GetViewAsync();
+        Check(viewBefore.Version == 0 && viewBefore.Engine.TileUrl == MapOptions.DefaultTileUrl && viewBefore.PinTypes.Count == 6, "Without saved settings the map uses appsettings.json and the built-in pin types");
+        var stateBefore = await mapService.GetStateAsync();
+        Check(!stateBefore.EngineSaved && stateBefore.Version == 0, "The settings page starts from the defaults");
+        var newEngine = stateBefore.Engine.Clone(); newEngine.TileUrl = "https://tiles.example/{z}/{x}/{y}.png"; newEngine.MaxZoom = 17;
+        await mapService.SaveEngineAsync(newEngine, 0);
+        var afterEngine = await mapService.GetViewAsync();
+        Check(afterEngine.Version == 1 && afterEngine.Engine.TileUrl == "https://tiles.example/{z}/{x}/{y}.png" && afterEngine.Engine.MaxZoom == 17 &&
+              mapTrail.Entries.Last() is { Action: var engineAction, EntityType: var engineEntity, Details: var engineDetails } && engineAction == AuditActions.EditMapEngine && engineEntity == AuditEntities.MapEngine &&
+              engineDetails.Contains("Adresa dalelor: https://tile.openstreetmap.org/{z}/{x}/{y}.png → https://tiles.example/{z}/{x}/{y}.png") && engineDetails.Contains("Zoom maxim: 19 → 17"),
+            "Saving the engine is journaled with the exact operation and the old and the new values");
+        await RejectedMap(() => mapService.SaveEngineAsync(newEngine, 0), "A save on an outdated version is refused");
+        await RejectedMap(() => mapService.SaveEngineAsync(newEngine, 1), "A save without changes is refused");
+        await RejectedMap(() => mapService.SaveEngineAsync(new MapEngineSettings { TileUrl = "http://x/{z}/{x}/{y}" }, 1), "An invalid address is refused");
+        await RejectedMap(() => MapService(false).SaveEngineAsync(newEngine, 1), "Only an administrator changes the engine");
+        var createdPin = await mapService.SavePinTypeAsync(new MapPinType { Name = "Fără vizită", Color = "#7a4fb5", Glyph = "V", Months = 6, Active = true, Order = 5 }, 1);
+        Check(createdPin.Id == MapPinRules.FirstCustomId && createdPin.Key == "c1000" && createdPin.Kind == "badge" && createdPin.Rule == "no-intervention" && !createdPin.BuiltIn &&
+              mapTrail.Entries.Last().Action == AuditActions.CreateMapPinType && mapTrail.Entries.Last().EntityId == "1000", "A custom badge is added with its own id, key and journal action");
+        var builtIn = (await mapService.GetStateAsync()).PinTypes.Single(type => type.Key == "overdue").Clone();
+        builtIn.Name = "Depășită"; builtIn.Color = "#AA0000"; builtIn.Active = false; builtIn.Kind = "badge"; builtIn.Key = "hacked";
+        await mapService.SavePinTypeAsync(builtIn, 2);
+        var afterBuiltIn = (await mapService.GetViewAsync()).PinTypes;
+        Check(afterBuiltIn.Single(type => type.Key == "overdue") is { Name: "Depășită", Color: "#aa0000", Active: true, Kind: "fill" } && afterBuiltIn.All(type => type.Key != "hacked") &&
+              mapTrail.Entries.Last().Action == AuditActions.EditMapPinType && mapTrail.Entries.Last().Details.Contains("Culoare: #c0392b → #aa0000"),
+            "A built-in type keeps its kind, key and rule (and stays on when it is a fill); the edit is journaled with old and new values");
+        await RejectedMap(() => mapService.SavePinTypeAsync(new MapPinType { Name = "fără vizită", Color = "#123456", Months = 3, Active = true }, 3), "Pin type names are unique without regard to letter case");
+        await RejectedMap(() => mapService.DeletePinTypeAsync(1, "motiv", 3), "A built-in type cannot be deleted");
+        await RejectedMap(() => mapService.DeletePinTypeAsync(MapPinRules.FirstCustomId, "", 3), "A deletion needs a reason");
+        await mapService.DeletePinTypeAsync(MapPinRules.FirstCustomId, "nu mai e nevoie", 3);
+        Check((await mapService.GetViewAsync()).PinTypes.All(type => type.BuiltIn) && mapTrail.Entries.Last().Action == AuditActions.DeleteMapPinType && mapTrail.Entries.Last().Motif == "nu mai e nevoie", "A custom badge can be deleted with a reason, and the deletion is journaled");
+        await mapService.ResetEngineAsync(4);
+        var afterReset = await mapService.GetViewAsync();
+        Check(afterReset.Engine.TileUrl == MapOptions.DefaultTileUrl && !(await mapService.GetStateAsync()).EngineSaved && mapTrail.Entries.Last().Action == AuditActions.ResetMapEngine && afterReset.PinTypes.Single(type => type.Key == "overdue").Name == "Depășită",
+            "Going back to appsettings.json resets the engine only (journaled); the pin types stay");
+        File.WriteAllText(Path.Combine(mapDirectory, "map.json"), "{ not json");
+        Check((await mapService.GetViewAsync()).PinTypes.Count == 6, "A damaged file falls back to the defaults instead of breaking the map");
+    }
+    finally { Directory.Delete(mapDirectory, true); }
+    async Task RejectedMap(Func<Task> operation, string message)
+    {
+        try { await operation(); Check(false, message); }
+        catch (MapOperationException) { Check(true, message); }
+        catch (AccessDeniedException) { Check(true, message); }
+    }
+}
+
 var anafConfig = new AnafConfig();
 Check(AnafRules.Validate(anafConfig) is null, "ANAF default configuration is valid");
 Check(AnafRules.NormalizeCui(anafConfig, " ro9178894 ") == "9178894" && AnafRules.NormalizeCui(anafConfig, "28996610") == "28996610" &&
@@ -508,6 +693,13 @@ Check((await demoUsers.AuthenticateAsync("ion.popescu", "parola-demo-123")).User
 await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "ION.POPESCU", DisplayName = "Duplicat", Role = AccessRoles.LimitedUser, Password = "parola-demo-123" }), "Usernames are unique without case sensitivity");
 await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "ab", DisplayName = "Invalid", Role = AccessRoles.LimitedUser, Password = "parola-demo-123" }), "Short username is rejected");
 await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "user-valid", DisplayName = "Invalid", Role = AccessRoles.LimitedUser, Password = "scurta" }), "Short password is rejected");
+await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "user-sapte", DisplayName = "Invalid", Role = AccessRoles.LimitedUser, Password = "1234567" }), "A 7-character password is rejected");
+var eightCharUser = await demoUsers.CreateAsync(new WebUserInput { Username = "user-opt", DisplayName = "Opt Caractere", Role = AccessRoles.LimitedUser, Password = "12345678" });
+Check(WebUserInput.MinimumPasswordLength == 8 && (await demoUsers.AuthenticateAsync("user-opt", "12345678")).User?.Id == eightCharUser.Id, "A password of 8 characters is accepted (the minimum)");
+Check(new WebUserInput { Password = "abcdefgh", PasswordConfirmation = "abcdefgh" }.PasswordConfirmationError() is null &&
+      new WebUserInput { Password = "abcdefgh", PasswordConfirmation = "abcdefgH" }.PasswordConfirmationError() is { } mismatch && mismatch.Contains("nu coincide") &&
+      new WebUserInput { Password = "abcdefgh" }.PasswordConfirmationError() is not null && new WebUserInput().PasswordConfirmationError() is null,
+    "The password must be repeated identically in the form; an unchanged (empty) password on edit needs no confirmation");
 var userEdit = UserEdit(newUser); userEdit.DisplayName = "  Ion   Popescu   Editat  "; userEdit.IsActive = false;
 var userWithoutReason = WebUserInput.From(newUser); userWithoutReason.DisplayName = "Editare fără motiv";
 await RejectedUser(() => demoUsers.UpdateAsync(newUser, userWithoutReason), "User edits require a reason");
@@ -1774,7 +1966,10 @@ async Task RunMaintenanceGateChecksAsync()
           !AuditActions.IsCreateOrEdit(AuditActions.DeleteNotificationTemplate), "The notification operations keep their link to the object, except the deletion");
     var snoozeEvent = new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "ana", AccessRoles.LimitedUser, AuditEntities.Notification, AuditActions.SnoozeNotification, "ITP · TS-01-ABC", "d", "", "5");
     var templateEvent = snoozeEvent with { EntityType = AuditEntities.NotificationTemplate, Action = AuditActions.CreateNotificationTemplate };
-    Check(AuditNavigation.TargetUrl(snoozeEvent) == "/notificari" && AuditNavigation.TargetUrl(templateEvent) == "/setari", "Journal entries of notifications link to the notifications page and of templates to Settings");
+    Check(AuditNavigation.TargetUrl(snoozeEvent) == "/notificari" && AuditNavigation.TargetUrl(templateEvent) == "/setari?tab=notificari&subtab=templates&sablon=5", "Journal entries of notifications link to the notifications page and of templates to their Settings row");
+    Check(AuditNavigation.TargetUrl(templateEvent with { EntityId = "7" }) == "/setari?tab=notificari&subtab=templates&sablon=7" &&
+          AuditNavigation.TargetUrl(templateEvent with { EntityId = "7", Action = AuditActions.EditNotificationTemplate }) == "/setari?tab=notificari&subtab=templates&sablon=7",
+        "A journal entry of a template links to that template in Settings, not to the ANAF tab");
 
     // The clean-up of old resolved notifications: period limits, limit date, texts, and when the daily run is due.
     Check(NotificationPurgeRules.IsValidMonths(1) && NotificationPurgeRules.IsValidMonths(60) && !NotificationPurgeRules.IsValidMonths(0) && !NotificationPurgeRules.IsValidMonths(61) &&
@@ -1802,8 +1997,8 @@ async Task RunMaintenanceGateChecksAsync()
     Check(AuditActions.IsCreateOrEdit(AuditActions.EditNotificationSettings) && !AuditActions.IsCreateOrEdit(AuditActions.PurgeResolvedNotifications) &&
           AuditActions.EditNotificationSettings != AuditActions.PurgeResolvedNotifications,
         "The setting change and the clean-up are named exactly; the clean-up has no object to link to");
-    Check(AuditNavigation.TargetUrl(snoozeEvent with { EntityType = AuditEntities.NotificationSettings, Action = AuditActions.EditNotificationSettings, EntityId = "1" }) == "/setari",
-        "A journal entry of the clean-up setting links to Settings");
+    Check(AuditNavigation.TargetUrl(snoozeEvent with { EntityType = AuditEntities.NotificationSettings, Action = AuditActions.EditNotificationSettings, EntityId = "1" }) == "/setari?tab=notificari&subtab=settings",
+        "A journal entry of the clean-up setting links to the notification settings sub-tab");
 }
 
 // Extended work points: coordinates, journal names, photo rules, schema and archive registry.
@@ -2085,6 +2280,57 @@ async Task RunMaintenanceGateChecksAsync()
         "A source without its own proposed text keeps the vehicle one");
 }
 
+// Maintenance map (pure): the state of the contract term, the fill (due state) and the badge (contract state) that never share a colour,
+// the markers and the rows without coordinates, the provider configuration and its fallbacks.
+{
+    var today = new DateOnly(2026, 9, 30);
+    ServiceContract Contract(DateOnly? validUntil, bool active = true) => new(1, 1, "26", new DateOnly(2025, 9, 23), 3, validUntil, active, "", 0);
+    Check(ServiceDueRules.ExpiryState(Contract(null), today) == ServiceExpiryState.NoTerm && ServiceDueRules.ExpiryState(Contract(today.AddDays(-1)), today) == ServiceExpiryState.Expired &&
+          ServiceDueRules.ExpiryState(Contract(today), today) == ServiceExpiryState.ExpiresSoon && ServiceDueRules.ExpiryState(Contract(today.AddDays(30)), today) == ServiceExpiryState.ExpiresSoon &&
+          ServiceDueRules.ExpiryState(Contract(today.AddDays(31)), today) == ServiceExpiryState.Valid && ServiceDueRules.ExpiryState(Contract(today.AddDays(31)), today, 45) == ServiceExpiryState.ExpiresSoon,
+        "The contract term is expired before today, expiring within the threshold (30 days by default), valid after it, or without a term");
+    Check(ServiceDueRules.ExpiryText(Contract(null), today) == "Fără termen" && ServiceDueRules.ExpiryText(Contract(today.AddDays(-1)), today) == "Expirat de o zi" &&
+          ServiceDueRules.ExpiryText(Contract(today.AddDays(-12)), today) == "Expirat de 12 zile" && ServiceDueRules.ExpiryText(Contract(today), today) == "Expiră astăzi" &&
+          ServiceDueRules.ExpiryText(Contract(today.AddDays(1)), today) == "Expiră mâine" && ServiceDueRules.ExpiryText(Contract(today.AddDays(9)), today) == "Expiră în 9 zile" &&
+          ServiceDueRules.ExpiryText(Contract(new DateOnly(2027, 5, 1)), today) == "Valabil până la 01.05.2027",
+        "The contract term is written out (\"Expirat de N zile\", \"Expiră în N zile\", \"Fără termen\")");
+
+    ServiceDueRow Row(int id, DateOnly nextDue, ServiceContract contract, decimal? latitude = 45.75m, decimal? longitude = 21.22m) =>
+        new(3, "Demo SRL", contract, new(new(id, 1, 5, null, nextDue, 0), "Sediu", "Str. A 1", false), latitude, longitude, new DateOnly(2026, 8, 1));
+    var overdueExpired = Row(1, today.AddDays(-5), Contract(today.AddDays(-2)));
+    var soonExpiring = Row(2, today.AddDays(10), Contract(today.AddDays(12)));
+    var okNoTerm = Row(3, today.AddDays(90), Contract(null));
+    var off = Row(4, today.AddDays(-50), Contract(today.AddDays(-9), active: false));
+    Check(MaintenanceMapRules.Fill(overdueExpired, today, 30) == "overdue" && MaintenanceMapRules.Fill(soonExpiring, today, 30) == "soon" && MaintenanceMapRules.Fill(okNoTerm, today, 30) == "ok" &&
+          MaintenanceMapRules.Fill(off, today, 30) == "off" && MaintenanceMapRules.Fill(soonExpiring, today, 5) == "ok",
+        "The fill of a marker shows the due state only (grey for a contract switched Off, whatever its dates); the threshold is the one given");
+    Check(MaintenanceMapRules.Badge(overdueExpired, today, 30) == "expired" && MaintenanceMapRules.Badge(soonExpiring, today, 30) == "soon" && MaintenanceMapRules.Badge(okNoTerm, today, 30) == "" &&
+          MaintenanceMapRules.Badge(off, today, 30) == "" && MaintenanceMapRules.Badge(soonExpiring, today, 5) == "",
+        "The badge shows the contract term only: expired, expiring soon, or nothing (also nothing for a contract Off)");
+    Check(MaintenanceMapRules.Fill(overdueExpired, today, 30) != MaintenanceMapRules.Badge(overdueExpired, today, 30) && MaintenanceMapRules.Fill(overdueExpired, today, 30) == "overdue" && MaintenanceMapRules.Badge(overdueExpired, today, 30) == "expired",
+        "An overdue point of an expired contract shows both states, each in its own place");
+    var marker = MaintenanceMapRules.Marker(overdueExpired, today, 30, 30);
+    Check(marker is { Id: 1, Lat: 45.75, Lng: 21.22, Fill: "overdue", Contract: "expired", Title: "Demo SRL · Sediu" } && MaintenanceMapRules.Marker(Row(5, today, Contract(null), null, null), today, 30, 30) is null &&
+          MaintenanceMapRules.Marker(Row(6, today, Contract(null), 45.75m, null), today, 30, 30) is null && !Row(5, today, Contract(null), null, null).HasCoordinates && overdueExpired.HasCoordinates,
+        "A row with both coordinates becomes a marker with plain fields; one without them (or with only one) gets none and is listed apart");
+    Check(MaintenanceMapRules.CoordinatesText(overdueExpired) == "45.75, 21.22" && MaintenanceMapRules.CoordinatesText(Row(5, today, Contract(null), null, null)) == "" &&
+          MaintenanceMapRules.AddInterventionUrl(3, 17) == "/beneficiari/3?adauga-interventie=17",
+        "The panel shows the coordinates and links to the form of a new intervention on the point");
+    var sameBuilding = new[] { overdueExpired, Row(7, today.AddDays(3), Contract(null)), Row(8, today.AddDays(3), Contract(null), 46m, 22m), Row(9, today.AddDays(3), Contract(null), null, null) };
+    Check(MaintenanceMapRules.SameLocation(sameBuilding, overdueExpired).Select(row => row.Point.Point.Id).SequenceEqual([7]) && MaintenanceMapRules.SameLocation(sameBuilding, sameBuilding[3]).Count == 0,
+        "The other points at the same coordinates are listed with the selected one");
+
+    var defaults = new MapOptions().Normalized();
+    Check(defaults.TileUrl == MapOptions.DefaultTileUrl && defaults.MinZoom == 3 && defaults.MaxZoom == 19 && defaults.Attribution.Contains("OpenStreetMap") &&
+          new MapOptions { TileUrl = "http://tiles.example/{z}/{x}/{y}.png" }.Normalized().TileUrl == MapOptions.DefaultTileUrl &&
+          new MapOptions { TileUrl = "https://tiles.example/{z}/{x}.png" }.Normalized().TileUrl == MapOptions.DefaultTileUrl &&
+          new MapOptions { TileUrl = "https://tiles.example/{z}/{x}/{y}.png" }.Normalized().TileUrl == "https://tiles.example/{z}/{x}/{y}.png" &&
+          new MapOptions { TileUrl = "https://{s}.tiles.example/{z}/{x}/{y}{r}.png" }.Normalized().TileUrl == "https://{s}.tiles.example/{z}/{x}/{y}{r}.png" &&
+          new MapOptions { Attribution = " " }.Normalized().Attribution == MapOptions.DefaultAttribution &&
+          new MapOptions { MinZoom = 25, MaxZoom = 2 }.Normalized() is { MinZoom: 18, MaxZoom: 18 } && new MapOptions { CenterLatitude = 200 }.Normalized().CenterLatitude == 90,
+        "The tile provider comes from the configuration (only https with {z}/{x}/{y}); anything unusable falls back to the default, the zoom range is kept valid");
+}
+
 // Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped
 // entirely (no-op, prints nothing extra) unless RUN_MARIA_INTEGRATION_CHECKS=1, so the default dotnet run/CI
 // experience (the checks above, no network, no MariaDB needed) is unchanged.
@@ -2223,6 +2469,9 @@ sealed class TestAuditTrail : IAuditTrail
     public List<AuditWrite> Entries { get; } = [];
     public Task RecordAsync(AuditWrite entry, CancellationToken cancellationToken = default) { Entries.Add(entry); return Task.CompletedTask; }
     public Task<IReadOnlyList<AuditEvent>> GetEventsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<AuditEvent>>(Array.Empty<AuditEvent>());
+    public Task<AuditPage> QueryAsync(AuditQuery query, int page, int pageSize, int? window = null, CancellationToken cancellationToken = default) => Task.FromResult(AuditQueryRules.Page([], query, page, pageSize, window));
+    public Task<AuditSummary> SummaryAsync(DateTime todayStartUtc, CancellationToken cancellationToken = default) => Task.FromResult(AuditQueryRules.Summary([], todayStartUtc));
+    public Task<IReadOnlyDictionary<string, DateTime>> RemovalTimesAsync(IEnumerable<AuditEvent> events, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyDictionary<string, DateTime>>(new Dictionary<string, DateTime>());
 }
 
 sealed class TestWebHostEnvironment(string contentRootPath) : IWebHostEnvironment
@@ -2251,4 +2500,9 @@ sealed class FakeMaintenanceReader(IReadOnlyList<MaintenanceDueItem> due, IReadO
 {
     public Task<IReadOnlyList<MaintenanceDueItem>> GetDueAsync(CancellationToken cancellationToken = default) => Task.FromResult(due);
     public Task<IReadOnlyList<ContractExpiryItem>> GetContractExpiriesAsync(CancellationToken cancellationToken = default) => Task.FromResult(expiries);
+}
+
+static class MapPinTestExtensions
+{
+    public static MapPinType With(this MapPinType type, Action<MapPinType> change) { var copy = type.Clone(); change(copy); return copy; }
 }

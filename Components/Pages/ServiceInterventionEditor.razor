@@ -123,6 +123,8 @@
     // Every intervention of the beneficiary: the latest due-moving one of a point decides whether a new or corrected one moves the due date.
     [Parameter, EditorRequired] public IReadOnlyList<ServiceIntervention> Interventions { get; set; } = Array.Empty<ServiceIntervention>();
     [Parameter] public ServiceIntervention? Original { get; set; }
+    // A work point to start a new intervention on (the link of the map); an on-demand one when the point is not under an active contract.
+    [Parameter] public int InitialWorkPointId { get; set; }
     [Parameter] public EventCallback<ServiceInterventionSaved> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
     // Raised after a photo was added or deleted (the list shows the number of photos).
@@ -205,7 +207,12 @@
     protected override async Task OnInitializedAsync()
     {
         input = Original is null ? new() { Kind = CoveredPoints.Count > 0 ? ServiceInterventionKind.Maintenance : ServiceInterventionKind.OnDemand } : ServiceInterventionInput.From(Original);
-        if (Original is null) input.PerformedOn = Today;
+        if (Original is null)
+        {
+            input.PerformedOn = Today;
+            if (InitialWorkPointId > 0 && Choices.Any(point => point.Id == InitialWorkPointId)) input.WorkPointId = InitialWorkPointId;
+            else if (InitialWorkPointId > 0 && WorkPoints.Any(point => point.Id == InitialWorkPointId)) { input.Kind = ServiceInterventionKind.OnDemand; input.WorkPointId = InitialWorkPointId; }
+        }
         if (Original is { Id: > 0 }) await LoadPhotosAsync();
     }
 

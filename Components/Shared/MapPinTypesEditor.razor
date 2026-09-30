@@ -1,0 +1,186 @@
+@using System.Globalization
+@using BlazorStoc.Services
+@inject IMapConfigurationService Service
+@inject IJSRuntime JS
+@inject ILogger<MapPinTypesEditor> Logger
+@implements IDisposable
+
+<h2>Overlay: tipuri de pinuri</h2>
+<p class="muted">Cum arată pe hartă fiecare tip de pin și ce apare în legendă. Tipurile de <strong>umplere</strong> arată scadența punctului (un punct are întotdeauna unul); <strong>insignele</strong> sunt marcajele mici din colțul pinului. Tipurile predefinite își pot schimba denumirea, culoarea, simbolul și ordinea (insignele se pot și dezactiva), dar nu se pot șterge. Poți adăuga cel mult @MapPinRules.MaxCustom insigne proprii, cu regula „nicio intervenție de mentenanță de N luni”. Hărțile deschise preiau modificările în cel mult 30 de secunde.</p>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (FocusPinTypeId is { } wanted && !loading && state is not null && state.PinTypes.All(item => item.Id != wanted)) { <div class="error-banner" role="status">Tipul de pin #@wanted nu mai există (a fost șters).</div> }
+
+@if (editing)
+{
+    <section class="product-editor" aria-labelledby="pin-editor-title">
+        <div class="catalog-heading"><h3 id="pin-editor-title">@(input.Id == 0 ? "Adaugă insignă proprie" : $"Editează „{originalName}”")</h3></div>
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="pin-name">Denumire (legendă) * <input id="pin-name" @bind="input.Name" @bind:event="oninput" maxlength="@MapPinRules.MaxName" autocomplete="off" /></label>
+                <label for="pin-color">Culoare * <span class="pin-color-row"><input id="pin-color" type="color" value="@input.Color" @onchange="args => input.Color = args.Value?.ToString() ?? input.Color" />
+                    <input aria-label="Cod culoare" class="pin-color-text" value="@input.Color" maxlength="7" @onchange="args => input.Color = args.Value?.ToString() ?? input.Color" /></span></label>
+                <label for="pin-glyph">Simbol (cel mult 2 caractere) <input id="pin-glyph" @bind="input.Glyph" @bind:event="oninput" maxlength="2" autocomplete="off" /></label>
+                <label for="pin-order">Ordine în legendă <input id="pin-order" type="number" min="0" max="1000" step="1" @bind="input.Order" /></label>
+                @if (input.Id == 0 || !input.BuiltIn)
+                {
+                    <label for="pin-months">Luni fără intervenție de mentenanță (@MapPinRules.MinMonths–@MapPinRules.MaxMonths) <input id="pin-months" type="number" min="@MapPinRules.MinMonths" max="@MapPinRules.MaxMonths" step="1" @bind="input.Months" />
+                        <small>Insigna apare pe punctele unui contract pornit (On) la care ultima intervenție de mentenanță a fost acum cel puțin atâtea luni sau nu a fost niciuna.</small></label>
+                }
+                @if (!input.IsFill && input.Id != 0 || input.Id == 0)
+                {
+                    <label class="toggle-switch" for="pin-active"><input id="pin-active" type="checkbox" role="switch" @bind="input.Active" /><span class="toggle-track" aria-hidden="true"></span><span>Activ (apare pe hartă și în legendă)</span></label>
+                }
+            </div>
+            <div class="pin-preview" aria-label="Previzualizare"><strong>Previzualizare</strong>
+                @if (input.IsFill) { <span class="mm-pin-sample" style="background:@input.Color;color:@input.Foreground">@input.Glyph</span> }
+                else { <span class="mm-pin-sample" style="background:#8a969a;color:#fff">✓<span class="mm-badge mm-badge-top" style="background:@input.Color;color:@input.Foreground">@input.Glyph</span></span> }
+                <span>@input.Name</span></div>
+            <div class="editor-actions">
+                <button class="primary" type="button" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează tipul de pin")</button>
+                <button class="danger" type="button" @onclick="CloseEditor">Anulează</button>
+            </div>
+        </fieldset>
+    </section>
+}
+else
+{
+    <div class="editor-actions"><button class="primary" type="button" disabled="@(loading || state is null || CustomCount >= MapPinRules.MaxCustom)" @onclick="() => OpenEditor(null)">+ Adaugă insignă proprie</button>
+        @if (CustomCount >= MapPinRules.MaxCustom) { <span class="muted">Limita de @MapPinRules.MaxCustom insigne proprii a fost atinsă.</span> }</div>
+}
+
+<section class="catalog">
+    <div class="catalog-heading"><h3>Tipuri de pinuri <span>@(state?.PinTypes.Count ?? 0)</span></h3></div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă tipurile</h3></div> }
+    else if (state is not null)
+    {
+        <div class="table-scroll"><table><thead><tr><th>PIN</th><th>DENUMIRE</th><th>TIP · CÂND APARE</th><th class="number">ORDINE</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var type in state.PinTypes)
+        {
+            var focused = type.Id == FocusPinTypeId;
+            <tr @key="type.Id" id="pin-@type.Id" class="@(focused ? "row-focus" : null)">
+                <td>@if (type.IsFill) { <span class="mm-pin-sample" style="background:@type.Color;color:@type.Foreground">@type.Glyph</span> }
+                    else { <span class="mm-pin-sample" style="background:#8a969a;color:#fff">✓<span class="mm-badge mm-badge-top" style="background:@type.Color;color:@type.Foreground">@type.Glyph</span></span> }</td>
+                <td><strong>@type.Name</strong><br /><small class="muted">@type.Color@(type.BuiltIn ? " · predefinit" : " · propriu")</small></td>
+                <td>@(type.IsFill ? "Umplere" : "Insignă") · <small>@DescribeRule(type)</small></td>
+                <td class="number">@type.Order</td>
+                <td><span class="notification-state @(type.Active ? "done" : "")">@(type.Active ? "Activ" : "Inactiv")</span></td>
+                <td class="row-actions"><button type="button" class="refresh" disabled="@(editing || saving)" @onclick="() => OpenEditor(type)">Editează</button>
+                    @if (!type.BuiltIn) { <button type="button" class="danger" disabled="@(editing || saving)" @onclick="() => deleting = type">Șterge</button> }</td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi tipul de pin?" Subject="Tipul de pin" ObjectLabel="@deleting.Name"
+                              Description="Insigna dispare de pe hartă și din legendă. Se poate adăuga din nou oricând."
+                              ConfirmationNote="Operația va fi înregistrată în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDelete" />
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private MapSettingsState? state;
+    private MapPinType input = new();
+    private MapPinType? deleting;
+    private string originalName = "";
+    private bool loading, editing, saving, deleteBusy;
+    private string? error, notice, deleteError;
+    private int? scrolledTo;
+
+    // Set by a link from the Journal: that type's row is highlighted and scrolled into view once the list is loaded.
+    [Parameter] public int? FocusPinTypeId { get; set; }
+
+    private int CustomCount => state?.PinTypes.Count(item => !item.BuiltIn) ?? 0;
+
+    private static string DescribeRule(MapPinType type) => type.IsFill
+        ? type.Key switch { "overdue" => "scadența a trecut", "soon" => "scadența este în pragul șablonului „Mentenanță scadentă”", "ok" => "scadența este departe", "off" => "contractul este oprit (Off)", _ => "" }
+        : MapPinRules.RuleText(type);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (loading || FocusPinTypeId is not { } id || scrolledTo == id || state is null || state.PinTypes.All(item => item.Id != id)) return;
+        scrolledTo = id;
+        try { await JS.InvokeVoidAsync("blazorStocScrollTo", $"pin-{id}"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { state = await Service.GetStateAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Pin types loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Tipurile de pinuri nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private void OpenEditor(MapPinType? type)
+    {
+        notice = null; error = null;
+        input = type?.Clone() ?? new MapPinType { Active = true, Months = 12, Color = "#7a4fb5", Glyph = "⚒", Order = 10, Rule = MapPinType.RuleNoIntervention, Kind = MapPinType.KindBadge };
+        originalName = type?.Name ?? "";
+        editing = true;
+    }
+
+    private void CloseEditor() => editing = false;
+
+    private async Task SaveAsync()
+    {
+        if (saving || state is null) return;
+        saving = true; error = null;
+        try
+        {
+            var created = input.Id == 0;
+            await Service.SavePinTypeAsync(input, state.Version, lifetime.Token);
+            notice = created ? "Insigna a fost adăugată." : "Tipul de pin a fost modificat.";
+            editing = false;
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (MapOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Pin type saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Tipul de pin nu a putut fi salvat. Reîncearcă.";
+        }
+        finally { saving = false; }
+    }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleting is null || deleteBusy || state is null) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            await Service.DeletePinTypeAsync(deleting.Id, reason, state.Version, lifetime.Token);
+            deleting = null;
+            notice = "Insigna a fost ștearsă.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (MapOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Pin type deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Tipul de pin nu a putut fi șters. Reîncearcă.";
+        }
+        finally { deleteBusy = false; }
+    }
+
+    private void CancelDelete() { deleting = null; deleteError = null; }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

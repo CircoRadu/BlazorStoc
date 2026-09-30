@@ -109,7 +109,7 @@ else if (beneficiary is not null)
 
     <ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
-    <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" Changed="ReloadContractsAsync" />
+    <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" />
 
     <section class="catalog">
         <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
@@ -151,6 +151,8 @@ else if (beneficiary is not null)
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
     // /beneficiari/<id>?adauga-proiect=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
     [SupplyParameterFromQuery(Name = "adauga-proiect")] public string? AddProjectFlag { get; set; }
+    // /beneficiari/<id>?adauga-interventie=<work point id>: opened from the maintenance map, with the form of a new intervention on that point.
+    [SupplyParameterFromQuery(Name = MaintenanceMapRules.AddInterventionQuery)] public int? AddInterventionPoint { get; set; }
     [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnParameter { get; set; }
     private string? returnTo;
     private Beneficiary? beneficiary;

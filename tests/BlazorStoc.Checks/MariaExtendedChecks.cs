@@ -36,6 +36,7 @@ public static class MariaExtendedChecks
             await Section("Maintenance contracts: coverage, one active contract per point, On/Off, moves, archive", () => ServiceContractsAsync(configuration, admin, audit, probe));
             await Section("Maintenance interventions: register, due date choices, corrections, photos, archive, guards", () => ServiceInterventionsAsync(configuration, admin, audit, probe, assets));
             await Section("Maintenance notifications: due dates and contract expiry sources, automatic close and reopen, threshold", () => MaintenanceNotificationsAsync(configuration, admin, audit, probe));
+            await Section("Journal: server-side filtering, paging, window, ranges, removals, summary", () => AuditQueryAsync(configuration, audit, probe));
             await Section("Change events", () => ChangeEventsAsync(configuration, admin, audit));
             await Section("Expiry notifications: templates, engine, take over, reminder", () => NotificationsAsync(configuration, admin, audit, probe));
             await Section("Notification settings: clean-up of old resolved notifications", () => NotificationSettingsAsync(configuration, admin, audit, probe));
@@ -960,6 +961,14 @@ public static class MariaExtendedChecks
             Check(dueList.Where(row => row.BeneficiaryId == owner.Id).Select(row => row.Point.WorkPointName).Order().SequenceEqual(new[] { depozit.Name, WorkPointRules.PrimaryName }.Order()) &&
                   dueList.Zip(dueList.Skip(1)).All(pair => pair.First.Point.Point.NextDue <= pair.Second.Point.Point.NextDue),
                 "The due list has every point of the active contracts, earliest due date first");
+            var depozitInput = WorkPointInput.From(depozit); depozitInput.UseCoordinates = true; depozitInput.CoordinatesText = "45.7489, 21.2087";
+            await workPoints.UpdateAsync(depozit, depozitInput);
+            var mapRows = (await contracts.GetDueListAsync(false)).Where(row => row.BeneficiaryId == owner.Id).ToList();
+            var depozitRow = mapRows.Single(row => row.Point.WorkPointName == depozit.Name);
+            var mainRow = mapRows.Single(row => row.Point.WorkPointName == main.Name);
+            Check(depozitRow.HasCoordinates && depozitRow.Latitude == 45.7489m && depozitRow.Longitude == 21.2087m && !mainRow.HasCoordinates && mainRow.Latitude is null &&
+                  depozitRow.LastIntervention == new DateOnly(2026, 6, 10) && mainRow.LastIntervention == new DateOnly(2026, 9, 22),
+                "The due list carries the coordinates of the work point (none when it has none) and the date of its latest maintenance intervention, for the map");
 
             // Two sessions at once on the same point: they are serialized and the last date performed decides the due date.
             var c1Fresh = await Contract(owner.Id, c1.Contract.Id);
@@ -1145,6 +1154,56 @@ public static class MariaExtendedChecks
     }
 
     // ---- Change events ---------------------------------------------------------------------------------------------------------------
+
+    private static async Task AuditQueryAsync(IConfiguration configuration, IAuditTrail audit, MySqlConnection probe)
+    {
+        // The plain journal page: no filters, the latest 500 events (and the whole journal), then the removal times of that page.
+        var plain = await audit.QueryAsync(new(), 1, 10, AuditQueryRules.RecentWindow);
+        var plainAll = await audit.QueryAsync(new(), 1, 25);
+        _ = await audit.RemovalTimesAsync(plain.Events);
+        _ = await audit.RemovalTimesAsync(plainAll.Events);
+        Check(plain.Events.Count == Math.Min(10, plain.Total) && plainAll.Total == plainAll.JournalTotal, "The unfiltered journal page is answered by the server");
+        var suffix = Suffix();
+        var target = $"Ext Jurnal {suffix}";
+        var before = await audit.SummaryAsync(DateTime.UtcNow.Date);
+        var start = DateTime.UtcNow.AddMinutes(-1);
+        for (var index = 1; index <= 7; index++)
+            await audit.RecordAsync(new($"Ext.Ana{suffix}", AccessRoles.Administrator, index % 2 == 0 ? AuditEntities.Beneficiary : AuditEntities.Product,
+                index % 3 == 0 ? AuditActions.Delete : AuditActions.Edit, $"{target} #{index}", index == 5 ? $"100% sigur_{suffix}" : $"detaliu {index}", "motiv", (900000 + index).ToString()));
+        await audit.RecordAsync(new($"ext.ana{suffix}".ToUpperInvariant(), AccessRoles.LimitedUser, AuditEntities.Product, AuditActions.Create, $"{target} #8", "d8", "", "900008"));
+        try
+        {
+            var all = await audit.QueryAsync(new(Text: suffix), 1, 3);
+            Check(all.Total == 8 && all.Events.Count == 3 && all.PageSize == 3 && all.Page == 1 && all.JournalTotal >= 8, "The server counts the matches and returns only one page");
+            Check(all.Events.Zip(all.Events.Skip(1)).All(pair => pair.First.TimestampUtc >= pair.Second.TimestampUtc), "The page is newest first");
+            var last = await audit.QueryAsync(new(Text: suffix), 99, 3);
+            Check(last.Page == 3 && last.Events.Count == 2, "A page past the end is brought back to the last page");
+            var everything = await audit.QueryAsync(new(Text: suffix), 1, 0);
+            Check(everything.Events.Count == 8 && everything.PageSize == 0, "Page size 0 returns every match");
+            Check((await audit.QueryAsync(new(Text: suffix, Actor: $"EXT.ANA{suffix}"), 1, 50)).Total == 8, "The operator filter ignores letter case");
+            Check((await audit.QueryAsync(new(Text: suffix, Entity: AuditEntities.Beneficiary), 1, 50)).Total == 3, "The type filter is applied on the server");
+            Check((await audit.QueryAsync(new(Text: suffix, Action: AuditActions.Delete), 1, 50)).Total == 2 && (await audit.QueryAsync(new(Text: suffix, Action: AuditActions.Edit), 1, 50)).Total == 5,
+                "The operation filter is applied on the server");
+            Check((await audit.QueryAsync(new(Text: "100%"), 1, 50)).Events.Count(entry => entry.Target.StartsWith(target)) == 1 &&
+                  (await audit.QueryAsync(new(Text: $"100% sigur_{suffix}"), 1, 50)).Total == 1 && (await audit.QueryAsync(new(Text: $"sigur_{suffix.ToUpperInvariant()}"), 1, 50)).Total == 1,
+                "The search text is literal (% and _ are not wildcards) and ignores letter case");
+            Check((await audit.QueryAsync(new(Text: suffix, FromUtc: start, ToUtc: DateTime.UtcNow.AddMinutes(1)), 1, 50)).Total == 8 &&
+                  (await audit.QueryAsync(new(Text: suffix, FromUtc: DateTime.UtcNow.AddMinutes(1)), 1, 50)).Total == 0 &&
+                  (await audit.QueryAsync(new(Text: suffix, ToUtc: start), 1, 50)).Total == 0, "The date range includes its start and excludes its end");
+            var window = await audit.QueryAsync(new(Text: suffix), 1, 50, window: 3);
+            Check(window.Total == 3 && window.JournalTotal >= 8, "The window limits the search to the latest events of the whole journal");
+            Check((await audit.QueryAsync(new(Text: suffix), 1, 50, window: AuditQueryRules.RecentWindow)).Total == 8, "The default window of 500 covers the recent events");
+            var deleted = all.Events.Concat(everything.Events).First(entry => entry.Action == AuditActions.Delete);
+            var removals = await audit.RemovalTimesAsync(everything.Events);
+            Check(removals.ContainsKey(AuditNavigation.ObjectKey(deleted.EntityType, deleted.EntityId)) && removals.Count == 2, "The removal times are asked for the objects of the page only");
+            var summary = await audit.SummaryAsync(DateTime.UtcNow.Date);
+            Check(summary.Total == before.Total + 8 && summary.Today >= before.Today + 8 && summary.Actors >= before.Actors, "The summary counts the journal on the server");
+        }
+        finally
+        {
+            try { await ExecuteAsync(probe, "DELETE FROM audit_events WHERE target LIKE @t", ("@t", "Ext Jurnal %")); } catch (MySqlException) { }
+        }
+    }
 
     private static async Task ChangeEventsAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit)
     {

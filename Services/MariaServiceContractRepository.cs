@@ -48,7 +48,9 @@ public sealed class MariaServiceContractRepository(
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT c.id, c.beneficiary_id, c.contract_number, c.contract_date, c.cycle_months, c.valid_until, c.is_active, c.notes, c.version,
-                   p.id, p.contract_id, p.work_point_id, p.cycle_months, p.next_due, p.version, w.name, w.address, w.is_primary, b.name
+                   p.id, p.contract_id, p.work_point_id, p.cycle_months, p.next_due, p.version, w.name, w.address, w.is_primary, b.name,
+                   w.latitude, w.longitude,
+                   (SELECT MAX(i.performed_on) FROM service_interventions i WHERE i.work_point_id = p.work_point_id AND i.kind = 'M')
             FROM service_contract_points p
             JOIN service_contracts c ON c.id = p.contract_id
             JOIN beneficiary_work_points w ON w.id = p.work_point_id
@@ -62,7 +64,8 @@ public sealed class MariaServiceContractRepository(
             rows.Add(new(checked((int)reader.GetInt64(1)), reader.GetString(18), ReadContract(reader),
                 new(new(checked((int)reader.GetInt64(9)), checked((int)reader.GetInt64(10)), checked((int)reader.GetInt64(11)),
                         reader.IsDBNull(12) ? null : reader.GetInt32(12), ReadDate(reader, 13), reader.GetInt64(14)),
-                    reader.GetString(15), reader.GetString(16), reader.GetInt32(17) != 0)));
+                    reader.GetString(15), reader.GetString(16), reader.GetInt32(17) != 0),
+                reader.IsDBNull(19) ? null : reader.GetDecimal(19), reader.IsDBNull(20) ? null : reader.GetDecimal(20), reader.IsDBNull(21) ? null : ReadDate(reader, 21)));
         return rows;
     }
 

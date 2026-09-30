@@ -109,6 +109,17 @@ public static partial class AnafRules
     private static AnafMapping Map(string label, string path, string type, bool required = false) =>
         new() { Label = label, Path = "$." + path, Type = type, Required = required };
 
+    // What the user (and the administrator testing the configuration) reads when ANAF answers with an error status.
+    public static string HttpErrorMessage(int status) => status switch
+    {
+        400 => "ANAF a respins interogarea (HTTP 400): cererea nu este în formatul așteptat sau CUI-ul este invalid. Verifică CUI-ul; dacă este corect, administratorul trebuie să verifice șablonul cererii din Setări → Preluare date ANAF. Datele se pot completa și manual.",
+        401 or 403 => $"ANAF a refuzat accesul (HTTP {status}). Serviciul nu poate fi folosit momentan de aplicație; anunță administratorul. Datele se pot completa manual.",
+        404 => "Serviciul ANAF nu a fost găsit la adresa configurată (HTTP 404). Nu este vorba despre CUI-ul introdus: adresa serviciului din Setări → Preluare date ANAF este greșită sau ANAF a mutat/retras serviciul. Anunță administratorul; între timp datele se pot completa manual.",
+        429 => "ANAF a limitat numărul de interogări (HTTP 429). Așteaptă câteva secunde și încearcă din nou.",
+        >= 500 => $"Serviciul ANAF are momentan o problemă (HTTP {status}). Încearcă din nou peste câteva minute sau completează datele manual.",
+        _ => $"ANAF a răspuns cu HTTP {status}. Încearcă din nou sau completează datele manual; dacă se repetă, anunță administratorul."
+    };
+
     public static bool IsValidPath(string? path) => path is not null && PathPattern().IsMatch(path);
 
     public static JsonElement? Pick(JsonElement element, string path)
@@ -376,7 +387,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
                 }
                 var raw = Encoding.UTF8.GetString(buffer.ToArray()).TrimStart('﻿');
                 if (!response.IsSuccessStatusCode)
-                    return new(false, status, watch.ElapsedMilliseconds, request, raw, [], [$"ANAF a răspuns cu HTTP {status}."], DateTimeOffset.Now);
+                    return new(false, status, watch.ElapsedMilliseconds, request, raw, [], [AnafRules.HttpErrorMessage(status)], DateTimeOffset.Now);
                 return AnafRules.Interpret(config, request, status, watch.ElapsedMilliseconds, raw);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

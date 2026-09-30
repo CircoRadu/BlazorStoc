@@ -9,84 +9,32 @@
 @implements IAsyncDisposable
 
 <PageTitle>Jurnal activitate · BlazorStoc</PageTitle>
-<div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal activitate</h1><p class="muted">Acțiunile operate în sistem, în ordine cronologică.</p></div></div>
+<div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal activitate</h1><p class="muted">Acțiunile operate în sistem, în ordine cronologică.</p></div>
+    <div class="heading-actions"><a class="refresh" href="@AuditCompleteState.Path">Jurnal complet (toate evenimentele) →</a></div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 <section class="metrics audit-metrics" aria-label="Rezumat activitate">
-    <article><span>Evenimente</span><strong>@(loaded ? events.Count.ToString("N0") : "—")</strong><small>În jurnalul disponibil</small><i>≡</i></article>
-    <article><span>Astăzi</span><strong>@(loaded ? events.Count(entry => entry.TimestampUtc.Date == DateTime.UtcNow.Date).ToString("N0") : "—")</strong><small>Operații UTC</small><i>◷</i></article>
-    <article><span>Operatori</span><strong>@(loaded ? events.Select(entry => entry.ActorUsername).Distinct(StringComparer.OrdinalIgnoreCase).Count().ToString() : "—")</strong><small>Utilizatori distincți</small><i>♙</i></article>
-    <article><span>Produse</span><strong>@(loaded ? events.Count(entry => entry.EntityType == AuditEntities.Product).ToString("N0") : "—")</strong><small>Editări produse</small><i>▦</i></article>
+    <article><span>Evenimente</span><strong>@(summary is null ? "—" : summary.Total.ToString("N0"))</strong><small>În tot jurnalul</small><i>≡</i></article>
+    <article><span>Astăzi</span><strong>@(summary is null ? "—" : summary.Today.ToString("N0"))</strong><small>Operații UTC</small><i>◷</i></article>
+    <article><span>Operatori</span><strong>@(summary is null ? "—" : summary.Actors.ToString("N0"))</strong><small>Utilizatori distincți</small><i>♙</i></article>
+    <article><span>Produse</span><strong>@(summary is null ? "—" : summary.Products.ToString("N0"))</strong><small>Editări produse</small><i>▦</i></article>
 </section>
 <section class="catalog">
-    <div class="catalog-heading"><h2>Istoric operații <span>@Filtered.Count</span></h2><small>Sincronizare automată la 15 secunde · afișare în ora locală · stocare UTC</small></div>
-    <div class="filters audit-filters">
-        <label class="search-box"><span>⌕</span><input aria-label="Caută în jurnal" placeholder="Utilizator, țintă sau detalii…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label>
-        <label><span class="sr-only">Tip înregistrare</span><select @bind="entity" @bind:after="ResetPage"><option value="">Toate tipurile</option><option value="@AuditEntities.Product">Produse</option><option value="@AuditEntities.Beneficiary">Beneficiari</option><option value="@AuditEntities.Vehicle">Vehicule</option><option value="@AuditEntities.User">Utilizatori</option><option value="@AuditEntities.Inventory">Inventar</option><option value="@AuditEntities.NotificationTemplate">Șabloane notificări</option><option value="@AuditEntities.Notification">Notificări</option><option value="@AuditEntities.NotificationSettings">Setări notificări</option><option value="@AuditEntities.WorkPoint">Puncte de lucru (ștergeri)</option><option value="@AuditEntities.ServicePhoto">Fotografii puncte de lucru (ștergeri)</option><option value="@AuditEntities.ServiceContract">Contracte mentenanță (ștergeri)</option><option value="@AuditEntities.ServiceIntervention">Intervenții mentenanță (ștergeri)</option></select></label>
-        <label><span class="sr-only">Operație</span><select @bind="action" @bind:after="ResetPage"><option value="">Toate operațiile</option><option value="@AuditActions.Create">Adăugare</option><option value="@AuditActions.Edit">Editare</option><option value="@AuditActions.Delete">Ștergere</option><option value="@AuditActions.Login">Conectare</option><option value="@AuditActions.Logout">Deconectare</option><option value="@AuditActions.Unlock">Deblocare</option><option value="@AuditActions.Generate">Generare</option><option value="@AuditActions.ExpiryItp">@AuditActions.ExpiryItp</option><option value="@AuditActions.ExpiryInsurance">@AuditActions.ExpiryInsurance</option><option value="@AuditActions.ExpiryRovinieta">@AuditActions.ExpiryRovinieta</option><option value="@AuditActions.MoveEquipment">@AuditActions.MoveEquipment</option><option value="@AuditActions.ReturnEquipment">@AuditActions.ReturnEquipment</option><option value="@AuditActions.CreateNotificationTemplate">@AuditActions.CreateNotificationTemplate</option><option value="@AuditActions.EditNotificationTemplate">@AuditActions.EditNotificationTemplate</option><option value="@AuditActions.DeleteNotificationTemplate">@AuditActions.DeleteNotificationTemplate</option><option value="@AuditActions.NotificationCreated">@AuditActions.NotificationCreated</option><option value="@AuditActions.AcknowledgeNotification">@AuditActions.AcknowledgeNotification</option><option value="@AuditActions.SnoozeNotification">@AuditActions.SnoozeNotification</option><option value="@AuditActions.ResolveNotification">@AuditActions.ResolveNotification</option><option value="@AuditActions.AutoResolveNotification">@AuditActions.AutoResolveNotification</option><option value="@AuditActions.ReopenNotification">@AuditActions.ReopenNotification</option><option value="@AuditActions.EditNotificationSettings">@AuditActions.EditNotificationSettings</option><option value="@AuditActions.PurgeResolvedNotifications">@AuditActions.PurgeResolvedNotifications</option><option value="@AuditActions.CreateWorkPoint">@AuditActions.CreateWorkPoint</option><option value="@AuditActions.EditWorkPoint">@AuditActions.EditWorkPoint</option><option value="@AuditActions.EditWorkPointDescription">@AuditActions.EditWorkPointDescription</option><option value="@AuditActions.EditWorkPointCoordinates">@AuditActions.EditWorkPointCoordinates</option><option value="@AuditActions.AddWorkPointPhoto">@AuditActions.AddWorkPointPhoto</option><option value="@AuditActions.CreateServiceContract">@AuditActions.CreateServiceContract</option><option value="@AuditActions.EditServiceContract">@AuditActions.EditServiceContract</option><option value="@AuditActions.EditServiceContractExpiry">@AuditActions.EditServiceContractExpiry</option><option value="@AuditActions.ActivateServiceContract">@AuditActions.ActivateServiceContract</option><option value="@AuditActions.DeactivateServiceContract">@AuditActions.DeactivateServiceContract</option><option value="@AuditActions.AddContractPoint">@AuditActions.AddContractPoint</option><option value="@AuditActions.RemoveContractPoint">@AuditActions.RemoveContractPoint</option><option value="@AuditActions.EditMaintenanceCycle">@AuditActions.EditMaintenanceCycle</option><option value="@AuditActions.RescheduleMaintenance">@AuditActions.RescheduleMaintenance</option><option value="@AuditActions.MoveContractPoint">@AuditActions.MoveContractPoint</option><option value="@AuditActions.RecordMaintenance">@AuditActions.RecordMaintenance</option><option value="@AuditActions.EditMaintenanceIntervention">@AuditActions.EditMaintenanceIntervention</option><option value="@AuditActions.RecordOnDemand">@AuditActions.RecordOnDemand</option><option value="@AuditActions.EditOnDemandIntervention">@AuditActions.EditOnDemandIntervention</option><option value="@AuditActions.AddInterventionPhoto">@AuditActions.AddInterventionPhoto</option></select></label>
-    </div>
-    @if (HasFilters)
+    <div class="catalog-heading"><h2>Istoric operații <span>@(result?.Total ?? 0)</span></h2><small>Ultimele @AuditQueryRules.RecentWindow de evenimente · sincronizare automată la 15 secunde · afișare în ora locală · stocare UTC</small></div>
+    @if (result is not null && result.JournalTotal > AuditQueryRules.RecentWindow)
     {
-        <div class="audit-active-filters" role="status">
-            <span>Filtre active:</span>
-            @if (actor.Length > 0) { <strong class="audit-filter-chip">operator: @actor <button type="button" aria-label="Elimină filtrul operator" title="Elimină filtrul operator" @onclick="RemoveActorFilter">×</button></strong> }
-            @if (action.Length > 0) { <strong class="audit-filter-chip">operație: @action <button type="button" aria-label="Elimină filtrul operație" title="Elimină filtrul operație" @onclick="RemoveActionFilter">×</button></strong> }
-            @if (selectedDateKey is not null) { <strong class="audit-filter-chip">data: @selectedDateLabel <button type="button" aria-label="Elimină filtrul dată" title="Elimină filtrul dată" @onclick="RemoveDateFilter">×</button></strong> }
-            @if (entity.Length > 0) { <strong class="audit-filter-chip">tip: @entity <button type="button" aria-label="Elimină filtrul tip" title="Elimină filtrul tip" @onclick="RemoveEntityFilter">×</button></strong> }
-            @if (query.Trim().Length > 0) { <strong class="audit-filter-chip">căutare: „@query.Trim()” <button type="button" aria-label="Elimină filtrul de căutare" title="Elimină filtrul de căutare" @onclick="RemoveQueryFilter">×</button></strong> }
-            <button type="button" class="audit-clear-filters danger" @onclick="ClearFilters">Șterge filtrele</button>
-        </div>
+        <p class="form-note audit-window-note" role="status">Această pagină lucrează pe cele mai recente @AuditQueryRules.RecentWindow de evenimente din @result.JournalTotal.ToString("N0"). Pentru evenimente mai vechi folosește <a href="@CompleteUrl">Jurnal complet</a>@(values.Any || dateKey is not null ? " (filtrele alese se păstrează)" : "").</p>
     }
-    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă jurnalul</h3></div> }
-    else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">≡</span><h3>Nu există evenimente pentru filtrul selectat</h3><p>Jurnalul se completează automat după adăugări, editări și ștergeri.</p></div> }
-    else
+    <AuditFilterBar Values="values" Changed="FiltersChangedAsync" DateChip="@selectedDateLabel" DateRemoved="RemoveDateAsync" Cleared="ClearAsync" />
+    @if (loading && result is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă jurnalul</h3></div> }
+    else if (result is not null && result.Total == 0) { <div class="empty-state"><span class="empty-icon">≡</span><h3>Nu există evenimente pentru filtrul selectat</h3><p>Jurnalul se completează automat după adăugări, editări și ștergeri.</p></div> }
+    else if (result is not null)
     {
-        <div class="table-scroll"><table><thead><tr><th>DATA ȘI ORA</th><th>OPERATOR</th><th>OPERAȚIE</th><th>ȚINTĂ</th><th>DETALII</th></tr></thead><tbody>
-        @foreach (var entry in VisibleEvents)
-        {
-            var localTimestamp = LocalTimestamp(entry);
-            <tr @key="entry.Id">
-                <td class="audit-time"><button type="button" class="audit-filter-link" title="Filtrează după această dată locală" @onclick="() => FilterByDate(entry)">@localTimestamp.Date</button> <time datetime="@entry.TimestampUtc.ToString("O")">@localTimestamp.Time</time> <small>local</small></td>
-                <td><button type="button" class="audit-filter-link" title="Filtrează după acest operator" @onclick="() => FilterByActor(entry.ActorUsername)">@entry.ActorUsername</button><small class="user-id">@entry.ActorRole</small></td>
-                <td><button type="button" class="audit-action audit-filter-link @ActionClass(entry.Action)" title="Filtrează după această operație" @onclick="() => FilterByAction(entry.Action)">@entry.Action</button><small class="user-id">@entry.EntityType</small></td>
-                <td>
-                    @{ var target = AuditNavigation.DisplayTarget(entry); }
-                    @if (AuditNavigation.TargetUrl(entry, removals) is { } targetUrl)
-                    {
-                        <a class="audit-target-link" data-restore-scroll href="@targetUrl" title="Deschide pagina obiectului: @target"><strong>@target</strong></a>
-                    }
-                    else
-                    {
-                        <strong>@target</strong>
-                    }
-                </td><td class="audit-details"><span>Descriere modificare: <em>@(entry.EntityType == AuditEntities.StockMovement ? StockMovementRules.NormalizeDisplayDates(entry.Details) : entry.Details)</em></span><span>Motiv: <em>@(string.IsNullOrWhiteSpace(entry.Motif) ? "—" : entry.Motif)</em></span></td>
-            </tr>
-        }
-        </tbody></table></div>
-        <div class="table-footer audit-table-footer">
-            <div class="audit-page-size">
-                <label for="audit-page-size">Evenimente pe pagină</label>
-                <select id="audit-page-size" @bind="pageSize" @bind:after="ResetPage">
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
-                    <option value="0">Toate</option>
-                </select>
-                <span>@ResultSummary</span>
-            </div>
-            @if (pageSize > 0)
-            {
-                <nav class="pagination" aria-label="Paginare jurnal">
-                    <button type="button" aria-label="Pagina anterioară" title="Pagina anterioară" disabled="@(currentPage <= 1)" @onclick="PreviousPage">‹</button>
-                    <span>Pagina <strong>@currentPage</strong> din <strong>@TotalPages</strong></span>
-                    <button type="button" aria-label="Pagina următoare" title="Pagina următoare" disabled="@(currentPage >= TotalPages)" @onclick="NextPage">›</button>
-                </nav>
-            }
-        </div>
+        <AuditEventsTable Events="result.Events" Removals="removals" DateChosen="FilterByDateAsync" ActorChosen="FilterByActorAsync" ActionChosen="FilterByActionAsync" />
+        <AuditPager PageSize="pageSize" Page="currentPage" Total="result.Total" PageChanged="GoToPageAsync" PageSizeChanged="PageSizeChangedAsync" />
     }
 </section>
 
 @code {
-    private IReadOnlyList<AuditEvent> events = Array.Empty<AuditEvent>();
     [SupplyParameterFromQuery(Name = "q")] public string? QueryText { get; set; }
     [SupplyParameterFromQuery(Name = "tip")] public string? EntityParameter { get; set; }
     [SupplyParameterFromQuery(Name = "operatie")] public string? ActionParameter { get; set; }
@@ -94,82 +42,36 @@
     [SupplyParameterFromQuery(Name = "data")] public string? DateParameter { get; set; }
     [SupplyParameterFromQuery(Name = "pe-pagina")] public int? PageSizeParameter { get; set; }
     [SupplyParameterFromQuery(Name = "pagina")] public int? PageParameter { get; set; }
-    private string query = "", entity = "", action = "", actor = "";
+
+    private readonly AuditFilterValues values = new();
+    private AuditPage? result;
+    private AuditSummary? summary;
     private IReadOnlyDictionary<string, DateTime> removals = new Dictionary<string, DateTime>();
-    private bool scrollRestorePending = true;
-    private string? syncedUrl;
-    private string? selectedDateKey, selectedDateLabel;
-    private string? error;
-    private bool loading, loaded, syncing;
-    private bool timestampsDirty;
-    private int pageSize = 10, currentPage = 1;
+    private string? syncedUrl, selectedDateLabel, dateKey, error;
+    private bool loading;
+    private int pageSize = AuditListState.DefaultPageSize, currentPage = 1, loadVersion;
     private IJSObjectReference? timeModule;
-    private Dictionary<Guid, LocalAuditTime> localTimes = [];
+    private CancellationTokenSource? loadCts, debounce;
     private readonly CancellationTokenSource lifetime = new();
-    private List<AuditEvent> Filtered => events.Where(entry =>
-        (entity.Length == 0 || entry.EntityType == entity) &&
-        (action.Length == 0 || entry.Action == action) &&
-        (actor.Length == 0 || string.Equals(entry.ActorUsername, actor, StringComparison.OrdinalIgnoreCase)) &&
-        (selectedDateKey is null || LocalTimestamp(entry).DateKey == selectedDateKey) &&
-        (query.Trim().Length == 0 || entry.ActorUsername.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
-         AuditNavigation.DisplayTarget(entry).Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) || entry.Details.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase) ||
-         entry.Motif.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase)))
-        .ToList();
-    private int TotalPages => pageSize == 0 ? 1 : Math.Max(1, (Filtered.Count + pageSize - 1) / pageSize);
-    private List<AuditEvent> VisibleEvents => pageSize == 0
-        ? Filtered
-        : Filtered.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
-    private string ResultSummary
-    {
-        get
-        {
-            var count = Filtered.Count;
-            if (pageSize == 0 || count == 0) return $"{count} rezultate";
-            var first = (currentPage - 1) * pageSize + 1;
-            var last = Math.Min(currentPage * pageSize, count);
-            return $"{first}–{last} din {count} rezultate";
-        }
-    }
-    private bool HasFilters => query.Trim().Length > 0 || entity.Length > 0 || action.Length > 0 || actor.Length > 0 || selectedDateKey is not null;
 
-    private void FilterByActor(string value) { actor = value; ResetPage(); }
-    private void FilterByAction(string value) { action = value; ResetPage(); }
-    private void FilterByDate(AuditEvent entry)
-    {
-        var value = LocalTimestamp(entry);
-        selectedDateKey = value.DateKey;
-        selectedDateLabel = value.Date;
-        ResetPage();
-    }
-    private void RemoveActorFilter() { actor = ""; ResetPage(); }
-    private void RemoveActionFilter() { action = ""; ResetPage(); }
-    private void RemoveDateFilter() { (selectedDateKey, selectedDateLabel) = (null, null); ResetPage(); }
-    private void RemoveEntityFilter() { entity = ""; ResetPage(); }
-    private void RemoveQueryFilter() { query = ""; ResetPage(); }
-    private void ClearFilters()
-    {
-        query = entity = action = actor = "";
-        (selectedDateKey, selectedDateLabel) = (null, null);
-        ResetPage();
-    }
+    // The complete journal opens with the same filters (the date of a single day becomes a one-day range).
+    private string CompleteUrl => new AuditCompleteState(values.Query.Trim(), values.Entity, values.Action, values.Actor, dateKey, dateKey, dateKey is null && !values.Any, AuditQueryRules.DefaultCompletePageSize, 1).Url();
 
-    private void ResetPage() { currentPage = 1; SyncState(); }
-    private void PreviousPage() { currentPage = Math.Max(1, currentPage - 1); SyncState(); }
-    private void NextPage() { currentPage = Math.Min(TotalPages, currentPage + 1); SyncState(); }
-    private void NormalizePage()
-    {
-        var page = Math.Clamp(currentPage, 1, TotalPages);
-        if (page == currentPage) return;
-        currentPage = page;
-        SyncState();
-    }
+    private Task FiltersChangedAsync(bool typing) { currentPage = 1; SyncState(); return ReloadAsync(typing ? 350 : 0); }
+    private Task FilterByActorAsync(string value) { values.Actor = value; return FiltersChangedAsync(false); }
+    private Task FilterByActionAsync(string value) { values.Action = value; return FiltersChangedAsync(false); }
+    private Task FilterByDateAsync(string key) { dateKey = AuditListState.ValidDateKey(key); selectedDateLabel = dateKey is null ? null : AuditListState.DateLabel(dateKey); return FiltersChangedAsync(false); }
+    private Task RemoveDateAsync() { dateKey = selectedDateLabel = null; return FiltersChangedAsync(false); }
+    private Task ClearAsync() { dateKey = selectedDateLabel = null; return FiltersChangedAsync(false); }
+    private Task GoToPageAsync(int page) { currentPage = Math.Max(1, page); SyncState(); return ReloadAsync(0); }
+    private Task PageSizeChangedAsync(int size) { pageSize = size; currentPage = 1; SyncState(); return ReloadAsync(0); }
 
     // Filters and page live in the address (replaced in place, so Back from an object page restores them). They are
     // read from the address only when the page is opened, so that a delayed location update cannot overwrite typed text.
     private void ApplyStateFromAddress()
     {
         var state = AuditListState.From(QueryText, EntityParameter, ActionParameter, ActorParameter, DateParameter, PageSizeParameter, PageParameter);
-        (query, entity, action, actor, selectedDateKey, pageSize, currentPage) =
+        (values.Query, values.Entity, values.Action, values.Actor, dateKey, pageSize, currentPage) =
             (state.Query, state.Entity, state.Action, state.Actor, state.DateKey, state.PageSize, state.Page);
         selectedDateLabel = state.DateKey is null ? null : AuditListState.DateLabel(state.DateKey);
         syncedUrl = state.Url();
@@ -177,7 +79,7 @@
 
     private void SyncState()
     {
-        var url = new AuditListState(query.Trim(), entity, action, actor, selectedDateKey, pageSize, currentPage).Url();
+        var url = new AuditListState(values.Query.Trim(), values.Entity, values.Action, values.Actor, dateKey, pageSize, currentPage).Url();
         if (url == syncedUrl) return;
         syncedUrl = url;
         Navigation.NavigateTo(url, replace: true);
@@ -190,23 +92,52 @@
         _ = SynchronizePeriodicallyAsync();
     }
 
+    // Typing waits a moment (a new keystroke cancels the wait), so the server is asked once per pause, not once per letter.
+    private async Task ReloadAsync(int delayMilliseconds)
+    {
+        debounce?.Cancel();
+        var source = debounce = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        try
+        {
+            if (delayMilliseconds > 0) await Task.Delay(delayMilliseconds, source.Token);
+            await LoadAsync(false);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task<AuditUtcRange> RangeAsync()
+    {
+        if (dateKey is null) return new(null, null);
+        timeModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./audit-time.js");
+        return await timeModule.InvokeAsync<AuditUtcRange>("localRangeUtc", lifetime.Token, dateKey, dateKey);
+    }
+
+    // Every load asks the server for one page of the latest events; a load that is overtaken by a newer one is dropped.
     private async Task LoadAsync(bool showLoading)
     {
-        if (syncing) return;
-        syncing = true;
+        loadCts?.Cancel();
+        var source = loadCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        var version = ++loadVersion;
         if (showLoading) loading = true;
         try
         {
-            events = await AuditTrail.GetEventsAsync(lifetime.Token);
-            removals = AuditNavigation.RemovalTimes(events);
-            loaded = true;
-            timestampsDirty = true;
-            NormalizePage();
+            var range = await RangeAsync();
+            var query = new AuditQuery(values.Query, values.Entity, values.Action, values.Actor, range.From, range.To);
+            var page = await AuditTrail.QueryAsync(query, currentPage, pageSize, AuditQueryRules.RecentWindow, source.Token);
+            var removed = await AuditTrail.RemovalTimesAsync(page.Events, source.Token);
+            var totals = await AuditTrail.SummaryAsync(DateTime.UtcNow.Date, source.Token);
+            if (version != loadVersion) return;
+            result = page; removals = removed; summary = totals;
+            if (page.Page != currentPage) { currentPage = page.Page; SyncState(); }
             error = null;
         }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (Exception exception) { Logger.LogError("Audit loading failed ({ErrorType}).", exception.GetType().Name); error = "Jurnalul nu a putut fi încărcat."; }
-        finally { loading = false; syncing = false; }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) when (version == loadVersion)
+        {
+            Logger.LogError("Audit loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Jurnalul nu a putut fi încărcat.";
+        }
+        finally { if (version == loadVersion) loading = false; }
     }
 
     private async Task SynchronizePeriodicallyAsync()
@@ -215,44 +146,11 @@
         try
         {
             while (await timer.WaitForNextTickAsync(lifetime.Token))
-                await InvokeAsync(async () => { await LoadAsync(false); StateHasChanged(); });
+                await InvokeAsync(async () => { if (!loading) await LoadAsync(false); StateHasChanged(); });
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (scrollRestorePending && loaded && !timestampsDirty && localTimes.Count > 0)
-        {
-            scrollRestorePending = false;
-            try { await JS.InvokeVoidAsync("blazorStocNavigationContext.restoreScroll"); }
-            catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
-        }
-        if (!timestampsDirty || !loaded || lifetime.IsCancellationRequested) return;
-        timestampsDirty = false;
-        try
-        {
-            timeModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./audit-time.js");
-            var values = await timeModule.InvokeAsync<LocalAuditTime[]>("formatAuditTimestamps", lifetime.Token,
-                events.Select(entry => new { id = entry.Id, timestampUtc = entry.TimestampUtc.ToString("O") }));
-            localTimes = values.ToDictionary(value => value.Id);
-            NormalizePage();
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (JSDisconnectedException) { }
-        catch (Exception exception)
-        {
-            Logger.LogWarning("Local audit timestamp formatting failed ({ErrorType}).", exception.GetType().Name);
-        }
-    }
-
-    private LocalAuditTime LocalTimestamp(AuditEvent entry) => localTimes.TryGetValue(entry.Id, out var value)
-        ? value
-        : new(entry.Id, entry.TimestampUtc.ToString("dd.MM.yyyy"), entry.TimestampUtc.ToString("HH:mm:ss"),
-            entry.TimestampUtc.ToString("yyyy-MM-dd"));
-
-    private static string ActionClass(string value) => value == AuditActions.Delete ? "delete" : value == AuditActions.Create ? "create" : "update";
     public async ValueTask DisposeAsync()
     {
         lifetime.Cancel();
@@ -261,6 +159,4 @@
             catch (JSDisconnectedException) { }
         lifetime.Dispose();
     }
-
-    private sealed record LocalAuditTime(Guid Id, string Date, string Time, string DateKey);
 }

@@ -22,16 +22,10 @@
     else if (activeTab == NotificationsTab)
     {
         <div role="tabpanel" id="panel-@NotificationsTab" aria-labelledby="tab-@NotificationsTab" class="settings-body">
-            <div class="settings-subtabs" role="tablist" aria-label="Secțiuni notificări" @onkeydown="OnSubtabKeyDown">
-                @foreach (var subtab in Subtabs)
-                {
-                    var selected = subtab.Id == activeSubtab;
-                    <button type="button" role="tab" id="subtab-@subtab.Id" class="settings-subtab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" aria-controls="subpanel-@subtab.Id" tabindex="@(selected ? 0 : -1)" @onclick="() => activeSubtab = subtab.Id">@subtab.Title</button>
-                }
-            </div>
-            @if (activeSubtab == TemplatesSubtab)
+            @SubtabBar(NotificationSubtabs, "Secțiuni notificări")
+            @if (notificationSubtab == TemplatesSubtab)
             {
-                <div role="tabpanel" id="subpanel-@TemplatesSubtab" aria-labelledby="subtab-@TemplatesSubtab"><NotificationTemplatesEditor /></div>
+                <div role="tabpanel" id="subpanel-@TemplatesSubtab" aria-labelledby="subtab-@TemplatesSubtab"><NotificationTemplatesEditor FocusTemplateId="TemplateParameter" /></div>
             }
             else
             {
@@ -39,29 +33,100 @@
             }
         </div>
     }
+    else if (activeTab == MapTab)
+    {
+        <div role="tabpanel" id="panel-@MapTab" aria-labelledby="tab-@MapTab" class="settings-body">
+            @SubtabBar(MapSubtabs, "Secțiuni hartă")
+            @if (mapSubtab == MapEngineSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@MapEngineSubtab" aria-labelledby="subtab-@MapEngineSubtab"><MapEngineEditor /></div>
+            }
+            else
+            {
+                <div role="tabpanel" id="subpanel-@MapOverlaySubtab" aria-labelledby="subtab-@MapOverlaySubtab"><MapPinTypesEditor FocusPinTypeId="PinParameter" /></div>
+            }
+        </div>
+    }
 </section>
 
 @code {
     private const string AnafTab = "anaf";
-    private const string NotificationsTab = "notificari";
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări")];
+    private const string NotificationsTab = SettingsNavigation.NotificationsTab;
+    private const string MapTab = SettingsNavigation.MapTab;
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă")];
     private string activeTab = AnafTab;
 
-    private const string TemplatesSubtab = "templates";
-    private const string SettingsSubtab = "settings";
-    private static readonly (string Id, string Title)[] Subtabs = [(TemplatesSubtab, "Șabloane notificări"), (SettingsSubtab, "Setări notificări")];
-    private string activeSubtab = TemplatesSubtab;
+    private const string TemplatesSubtab = SettingsNavigation.TemplatesSubtab;
+    private const string SettingsSubtab = SettingsNavigation.SettingsSubtab;
+    private static readonly (string Id, string Title)[] NotificationSubtabs = [(TemplatesSubtab, "Șabloane notificări"), (SettingsSubtab, "Setări notificări")];
+    private string notificationSubtab = TemplatesSubtab;
 
-    private void OnSubtabKeyDown(KeyboardEventArgs args)
+    private const string MapEngineSubtab = SettingsNavigation.MapEngineSubtab;
+    private const string MapOverlaySubtab = SettingsNavigation.MapOverlaySubtab;
+    private static readonly (string Id, string Title)[] MapSubtabs = [(MapEngineSubtab, "Motor hartă"), (MapOverlaySubtab, "Overlay (tipuri de pinuri)")];
+    private string mapSubtab = MapEngineSubtab;
+
+    // Deep links (for example from the Journal) open the named tab, sub-tab and object; later clicks on the tabs win.
+    [SupplyParameterFromQuery(Name = SettingsNavigation.TabParameter)] public string? TabQuery { get; set; }
+    [SupplyParameterFromQuery(Name = SettingsNavigation.SubtabParameter)] public string? SubtabQuery { get; set; }
+    [SupplyParameterFromQuery(Name = SettingsNavigation.TemplateParameter)] public int? TemplateParameter { get; set; }
+    [SupplyParameterFromQuery(Name = SettingsNavigation.PinParameter)] public int? PinParameter { get; set; }
+    private string? appliedLink;
+
+    protected override void OnParametersSet()
     {
-        var index = Array.FindIndex(Subtabs, tab => tab.Id == activeSubtab);
+        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}";
+        if (link == appliedLink) return;
+        appliedLink = link;
+        if (Tabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
+        if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
+        if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
+    }
+
+    private RenderFragment SubtabBar((string Id, string Title)[] subtabs, string label) => builder =>
+    {
+        var current = subtabs == MapSubtabs ? mapSubtab : notificationSubtab;
+        var seq = 0;
+        builder.OpenElement(seq++, "div");
+        builder.AddAttribute(seq++, "class", "settings-subtabs");
+        builder.AddAttribute(seq++, "role", "tablist");
+        builder.AddAttribute(seq++, "aria-label", label);
+        builder.AddAttribute(seq++, "onkeydown", EventCallback.Factory.Create<KeyboardEventArgs>(this, args => OnSubtabKeyDown(subtabs, args)));
+        foreach (var subtab in subtabs)
+        {
+            var selected = subtab.Id == current;
+            var id = subtab.Id;
+            builder.OpenElement(seq++, "button");
+            builder.AddAttribute(seq++, "type", "button");
+            builder.AddAttribute(seq++, "role", "tab");
+            builder.AddAttribute(seq++, "id", "subtab-" + id);
+            builder.AddAttribute(seq++, "class", "settings-subtab " + (selected ? "active" : ""));
+            builder.AddAttribute(seq++, "aria-selected", selected ? "true" : "false");
+            builder.AddAttribute(seq++, "aria-controls", "subpanel-" + id);
+            builder.AddAttribute(seq++, "tabindex", selected ? "0" : "-1");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => SelectSubtab(subtabs, id)));
+            builder.AddContent(seq++, subtab.Title);
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
+    private void SelectSubtab((string Id, string Title)[] subtabs, string id)
+    {
+        if (subtabs == MapSubtabs) mapSubtab = id; else notificationSubtab = id;
+    }
+
+    private void OnSubtabKeyDown((string Id, string Title)[] subtabs, KeyboardEventArgs args)
+    {
+        var current = subtabs == MapSubtabs ? mapSubtab : notificationSubtab;
+        var index = Array.FindIndex(subtabs, tab => tab.Id == current);
         index = args.Key switch
         {
-            "ArrowRight" => (index + 1) % Subtabs.Length,
-            "ArrowLeft" => (index - 1 + Subtabs.Length) % Subtabs.Length,
+            "ArrowRight" => (index + 1) % subtabs.Length,
+            "ArrowLeft" => (index - 1 + subtabs.Length) % subtabs.Length,
             _ => index
         };
-        activeSubtab = Subtabs[index].Id;
+        SelectSubtab(subtabs, subtabs[index].Id);
     }
 
     private void OnTabKeyDown(KeyboardEventArgs args)

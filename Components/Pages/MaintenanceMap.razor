@@ -1,0 +1,6 @@
+@page "/mentenanta/harta"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+
+<MaintenanceMapView />

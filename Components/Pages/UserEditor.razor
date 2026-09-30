@@ -14,8 +14,11 @@
             <div class="editor-grid">
                 <label for="user-username">Nume utilizator *<InputText id="user-username" @bind-Value="input.Username" maxlength="100" autocomplete="off" /><ValidationMessage For="() => input.Username" /></label>
                 <label for="user-display-name">Nume afișat *<InputText id="user-display-name" @bind-Value="input.DisplayName" maxlength="150" autocomplete="off" /><ValidationMessage For="() => input.DisplayName" /></label>
+                <label class="password-field" for="user-password">@(Original is null ? "Parolă *" : "Parolă nouă")<InputTextLive id="user-password" type="@PasswordType" @bind-Value="input.Password" maxlength="200" autocomplete="new-password" /><small>@(Original is null ? $"Minimum {WebUserInput.MinimumPasswordLength} caractere." : "Lasă necompletat pentru a păstra parola actuală.")</small><ValidationMessage For="() => input.Password" /></label>
+                <label class="password-field" for="user-password-confirmation">@(Original is null ? "Confirmă parola *" : "Confirmă parola nouă")<InputTextLive id="user-password-confirmation" type="@PasswordType" @bind-Value="input.PasswordConfirmation" maxlength="200" autocomplete="new-password" /><small>Repetă parola pentru verificare.</small>
+                    <span class="password-match @(ConfirmationMatches ? "ok" : "bad")" role="status" aria-live="polite">@ConfirmationText</span></label>
+                <label class="toggle-switch full-width" for="user-password-show"><input id="user-password-show" type="checkbox" role="switch" @bind="showPassword" /><span class="toggle-track" aria-hidden="true"></span><span>Arată parola</span></label>
                 <label for="user-role">Nivel de acces *<InputSelect id="user-role" @bind-Value="input.Role"><option value="@AccessRoles.LimitedUser">Utilizator — gestiune produse</option><option value="@AccessRoles.Administrator">Administrator — acces complet</option></InputSelect></label>
-                <label for="user-password">@(Original is null ? "Parolă *" : "Parolă nouă")<InputText id="user-password" type="password" @bind-Value="input.Password" maxlength="200" autocomplete="new-password" /><small>@(Original is null ? "Minimum 12 caractere." : "Lasă necompletat pentru a păstra parola actuală.")</small><ValidationMessage For="() => input.Password" /></label>
                 @if (Original is not null)
                 {
                     <label class="check-label full-width" for="user-active"><InputCheckbox id="user-active" @bind-Value="input.IsActive" /> Cont activ</label>
@@ -43,7 +46,15 @@
     private WebUserInput input = new();
     private bool saving;
     private IReadOnlyList<AuditChange>? pendingChanges;
-    private string? error, reasonError;
+    private string? error, reasonError, confirmationError;
+    private bool showPassword;
+
+    private string PasswordType => showPassword ? "text" : "password";
+    private bool ConfirmationMatches => input.PasswordConfirmation.Length > 0 && string.Equals(input.Password, input.PasswordConfirmation, StringComparison.Ordinal);
+
+    // Checked while typing in either field (both update on every keystroke); the message after a refused save stays until they match.
+    private string ConfirmationText => input.PasswordConfirmation.Length == 0 ? (confirmationError ?? "")
+        : ConfirmationMatches ? "Parolele coincid." : "Parolele nu coincid.";
     private readonly CancellationTokenSource lifetime = new();
 
     protected override Task OnInitializedAsync()
@@ -58,7 +69,8 @@
     {
         if (saving) return;
         reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
-        if (reasonError is not null) return;
+        confirmationError = input.PasswordConfirmationError();
+        if (reasonError is not null || confirmationError is not null) return;
         if (Original is not null)
         {
             // Saving over existing data needs an explicit confirmation of the changed fields (never the password itself).

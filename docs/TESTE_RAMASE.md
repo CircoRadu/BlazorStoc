@@ -480,3 +480,41 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 ### N18. Evaluarea la interval real cu doua sesiuni
 - **Motiv**: M2 (o singura sesiune autentificata; evaluarea ruleaza la 5 minute). **Pasi**: cu un sablon `mentenanta.scadenta` activ, inregistreaza o interventie de mentenanta dintr-o sesiune, apoi asteapta cel mult 5 minute cu `/notificari` deschis in alta sesiune (un utilizator fara drept de operator de beneficiari) si reincarca.
 - **Asteptat**: notificarea veche a punctului apare la "Rezolvate" cu motivul "Scadenta interventiei de mentenanta s-a modificat de la ... la ... (ultima interventie de mentenanta: ...)" (jurnal "Rezolvare automata notificare", actor `sistem`); una noua apare doar cand noua scadenta intra in prag.
+
+## Harta de mentenanta (30.09.2026)
+
+### N19. Aspectul hartii si al panoului pe ecran ingust
+- **Motiv**: M3 (redimensionarea la dispozitive reale nu este acoperita de panoul Browser). **Pasi**: pe telefon sau in emulare 375 px deschide `/mentenanta/harta`, filtreaza, apasa un marker si un cluster.
+- **Asteptat**: harta are latimea ecranului (420 px inaltime), panoul de detalii apare sub ea, filtrele se rup pe randuri, legenda nu iese din ecran, marker-ele se pot atinge.
+
+### N20. Furnizorul de dale indisponibil
+- **Motiv**: M4 (nu s-a simulat caderea furnizorului). **Pasi**: seteaza `Map:TileUrl` catre o adresa https inexistenta (sau opreste conexiunea la internet), deschide harta, apoi restabileste conexiunea si apasa "Reincearca".
+- **Asteptat**: dupa cel putin 6 dale esuate apare mesajul "Fundalul hartii nu poate fi incarcat", punctele raman afisate si utilizabile; "Reincearca" reincarca dalele, iar mesajul dispare cand o dala se incarca.
+
+### N21. Multe puncte, clusterizare si termenii serverului public OSM
+- **Motiv**: M4 (volum real indisponibil) si M6 (termenii unui serviciu extern se verifica de proprietar). **Pasi**: cu 50+ puncte cu coordonate (unele la aceleasi coordonate) deschide harta la zoom mic, apasa un cluster, apoi un grup de puncte de la aceeasi adresa; verifica termenii de utilizare ai furnizorului configurat (OpenStreetMap public: utilizare interna limitata, atribuire, cerere de Referer valid).
+- **Asteptat**: clusterele se desfac la apasare, punctele de la aceeasi adresa se desfac in evantai, panoul listeaza celelalte puncte de la aceeasi locatie; termenii permit utilizarea interna preconizata (altfel se schimba `Map:TileUrl` cu un alt furnizor).
+
+### N22. Fereastra separata a hartii pe doua monitoare
+- **Motiv**: M4 (un singur monitor si panou de browser in verificare; panoul ascuns nu raporteaza vizibilitatea). **Pasi**: din `/mentenanta/harta` apasa „Fereastra separata", muta fereastra pe al doilea monitor, foloseste aplicatia in fereastra principala (inregistreaza o interventie, modifica un contract sau un punct), apoi apasa un link din panoul ferestrei (fisa beneficiarului) si inchide fereastra principala inainte de un al doilea clic.
+- **Asteptat**: in cel mult 30 s harta din fereastra separata reflecta modificarea (antetul „Actualizat la ...", marker-ul pulseaza 8 s), linkurile se deschid in fereastra principala (in tab nou daca a fost inchisa), un al doilea clic pe buton reutilizeaza aceeasi fereastra, iar cu fereastra minimizata nu se fac interogari (se vede in jurnalul serverului) pana la revenire.
+
+### N23. Actualizarea hartii: esec, sesiune expirata si trecerea in ziua urmatoare
+- **Motiv**: M4 (nu s-a simulat). **Pasi**: opreste scurt baza de date sau serverul in timp ce harta este deschisa; lasa o harta deschisa peste miezul noptii; lasa fereastra separata deschisa dupa expirarea cookie-ului de autentificare.
+- **Asteptat**: la esec harta ramane neschimbata si antetul spune „Actualizarea automata a esuat, se reincearca"; dupa ziua noua culorile se recalculeaza; dupa expirarea sesiunii (sau retragerea accesului) apare mesajul de acces refuzat cu indemnul de a te autentifica din nou.
+
+### N24. Jurnalul complet pe un jurnal foarte mare
+- **Motiv**: M4 (volum real indisponibil; baza de test are ~9.400 de evenimente). **Pasi**: populeaza `audit_events` cu 200.000 de randuri (in baza de test), deschide `/jurnal/complet?tot=1`, cauta un text rar si un text frecvent, filtreaza pe operator si tip, mergi la ultima pagina si exporta.
+- **Asteptat**: fiecare interogare raspunde in mai putin de ~1-2 s; daca cautarea de text sau numaratoarea depasesc acest prag, se adauga indecsi (prefix pe `entity_type`, `action`, `actor_username`) printr-o migrare cu contul de migrare, sau `FULLTEXT` pentru text.
+
+### N25. Descarcarea fisierului CSV si aspectul jurnalelor pe ecran ingust
+- **Motiv**: M4 (panoul de browser nu salveaza fisiere). **Pasi**: exporta din `/jurnal/complet`, deschide fisierul in Excel (setari regionale romanesti); deschide ambele jurnale pe telefon.
+- **Asteptat**: diacriticele se citesc corect (UTF-8 cu BOM), coloanele se separa cu `;`, o valoare care incepe cu `=` apare cu apostrof si nu se calculeaza; paginile raman utilizabile pe ecran ingust.
+
+### N26. Schimbarea furnizorului de harta pe o harta deschisa, cu cheie
+- **Motiv**: M4 (panoul de verificare ascuns nu ruleaza reincarcarea automata; nu exista cheie de furnizor de test). **Pasi**: deschide harta (si fereastra separata), in Setari → Harta → Motor harta schimba adresa dalelor intr-un furnizor cu `{key}` si cheie, „Testeaza furnizorul", salveaza; asteapta 30 s fara sa reincarci harta.
+- **Asteptat**: fundalul se schimba pe harta deschisa (atribuirea si limitele de zoom se actualizeaza, pozitia si punctul selectat raman), cheia nu apare nicaieri in pagina de setari, in jurnal sau in sursa paginii setarilor; cu o cheie gresita apare mesajul de dale indisponibile.
+
+### N27. Tipuri de pinuri pe ecran ingust si culorile predefinite
+- **Motiv**: M4. **Pasi**: deschide Setari → Harta → Overlay si harta pe telefon; compara culorile simbolurilor pe pinii predefiniti.
+- **Asteptat**: lista si formularul raman utilizabile pe ecran ingust; simbolurile sunt lizibile pe toate culorile (alb sau inchis, dupa contrast); daca aspectul dinainte (simboluri albe pe gri si portocaliu) este preferat, se schimba culorile predefinite in `MapPinRules.Defaults`.

@@ -23,8 +23,18 @@ public sealed class WebUserInput
 
     public bool IsActive { get; set; } = true;
 
+    public const int MinimumPasswordLength = 8;
+
     [StringLength(200, ErrorMessage = "Parola poate avea cel mult 200 de caractere.")]
     public string Password { get; set; } = "";
+
+    // Typed a second time in the form only, to catch typing mistakes; never stored, journaled or sent to the repository.
+    public string PasswordConfirmation { get; set; } = "";
+
+    public string? PasswordConfirmationError() =>
+        Password.Length > 0 && !string.Equals(Password, PasswordConfirmation ?? "", StringComparison.Ordinal)
+            ? "Parola de confirmare nu coincide cu parola introdusă."
+            : null;
 
     [StringLength(ChangeReasonRules.MaximumLength, ErrorMessage = ChangeReasonRules.TooLongMessage)]
     public string Reason { get; set; } = "";
@@ -45,8 +55,8 @@ public sealed class WebUserInput
             throw new UserOperationException(string.Join(" ", results.Select(result => result.ErrorMessage)));
         if (!AccessRoles.All.Contains(normalized.Role))
             throw new UserOperationException("Nivelul de acces selectat nu este valid.");
-        if ((isNew || normalized.Password.Length > 0) && normalized.Password.Length < 12)
-            throw new UserOperationException("Parola trebuie să aibă minimum 12 caractere.");
+        if ((isNew || normalized.Password.Length > 0) && normalized.Password.Length < MinimumPasswordLength)
+            throw new UserOperationException($"Parola trebuie să aibă minimum {MinimumPasswordLength} caractere.");
         if (isNew && !normalized.IsActive)
             throw new UserOperationException("Un utilizator nou trebuie creat activ; îl poți dezactiva ulterior.");
         if (!isNew && ChangeReasonRules.ValidationError(normalized.Reason) is { } reasonError)

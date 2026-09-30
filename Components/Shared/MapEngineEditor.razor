@@ -1,0 +1,188 @@
+@using System.Globalization
+@using BlazorStoc.Services
+@inject IMapConfigurationService Service
+@inject IJSRuntime JS
+@inject ILogger<MapEngineEditor> Logger
+@implements IAsyncDisposable
+
+<h2>Motor hartă</h2>
+<p class="muted">Furnizorul fundalului hărții de mentenanță: adresa dalelor, atribuirea cerută de furnizor, limitele de zoom și punctul de pornire. Browserul cere dalele direct de la furnizor; numele beneficiarilor, contractele și scadențele nu părăsesc aplicația. Modificările se văd pe hărțile deschise în cel mult 30 de secunde.</p>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă setările</h3></div>
+}
+else if (state is not null)
+{
+    <section class="product-editor" aria-labelledby="map-engine-title">
+        <div class="catalog-heading"><h3 id="map-engine-title">Furnizor de hartă</h3>
+            <small>@(state.EngineSaved ? "Setări salvate din această pagină" : "Se folosesc valorile din configurația aplicației (secțiunea „Map”)")</small></div>
+        <fieldset disabled="@(saving || confirming is not null)">
+            <div class="editor-grid">
+                <label for="map-tile-url" class="anaf-wide">Adresa dalelor * <input id="map-tile-url" @bind="edit.TileUrl" @bind:event="oninput" maxlength="@MapEngineRules.MaxTileUrl" autocomplete="off" spellcheck="false" />
+                    <small>https, cu <code>{z}</code>, <code>{x}</code>, <code>{y}</code> (opțional <code>{s}</code>, <code>{r}</code> și <code>{key}</code> pentru cheia furnizorului). Exemplu: https://tile.openstreetmap.org/{z}/{x}/{y}.png</small></label>
+                <label for="map-attribution">Text atribuire * <input id="map-attribution" @bind="edit.AttributionText" maxlength="@MapEngineRules.MaxAttribution" autocomplete="off" /></label>
+                <label for="map-attribution-url">Adresa atribuirii (https, opțional) <input id="map-attribution-url" @bind="edit.AttributionUrl" maxlength="300" autocomplete="off" /></label>
+                <label for="map-min-zoom">Zoom minim <input id="map-min-zoom" type="number" min="0" max="18" step="1" @bind="edit.MinZoom" /></label>
+                <label for="map-max-zoom">Zoom maxim <input id="map-max-zoom" type="number" min="0" max="20" step="1" @bind="edit.MaxZoom" /></label>
+                <label for="map-start-zoom">Zoom de pornire <input id="map-start-zoom" type="number" min="0" max="20" step="1" @bind="edit.StartZoom" /></label>
+                <label for="map-lat">Latitudine centru <input id="map-lat" type="number" min="-90" max="90" step="any" @bind="edit.CenterLatitude" /></label>
+                <label for="map-lng">Longitudine centru <input id="map-lng" type="number" min="-180" max="180" step="any" @bind="edit.CenterLongitude" /></label>
+                <label for="map-key">Cheie furnizor (opțional) <input id="map-key" type="password" @bind="newKey" @bind:event="oninput" maxlength="200" autocomplete="new-password" placeholder="@(state.Engine.ApiKey.Length > 0 && !clearKey ? "cheie salvată (nu se afișează)" : "")" />
+                    <small>@(state.Engine.ApiKey.Length > 0 ? "Există o cheie salvată; completează câmpul pentru a o înlocui. Cheia nu se afișează și nu apare în jurnal." : "Se pune în adresă acolo unde scrie {key}. Nu apare în jurnal.")</small></label>
+                @if (state.Engine.ApiKey.Length > 0)
+                {
+                    <label class="toggle-switch" for="map-clear-key"><input id="map-clear-key" type="checkbox" role="switch" @bind="clearKey" /><span class="toggle-track" aria-hidden="true"></span><span>Șterge cheia salvată</span></label>
+                }
+            </div>
+            <div class="editor-actions">
+                <button class="refresh" type="button" disabled="@testing" @onclick="TestAsync">@(testing ? "Se testează…" : "Testează furnizorul")</button>
+                <button class="primary" type="button" @onclick="BeginSave">Salvează setările</button>
+                <button class="refresh" type="button" disabled="@(!Changed)" @onclick="Discard">Renunță la modificări</button>
+                @if (state.EngineSaved) { <button class="danger" type="button" @onclick="BeginReset">Revino la valorile din configurația aplicației</button> }
+            </div>
+            @if (testMessage is not null)
+            {
+                <div class="@(testOk ? "success-banner" : "error-banner")" role="status">@testMessage
+                    @if (testOk && testUrl is not null) { <img class="map-test-tile" src="@testUrl" alt="Dală de test de la furnizor" width="128" height="128" /> }</div>
+            }
+        </fieldset>
+    </section>
+}
+
+@if (confirming is not null)
+{
+    <SaveConfirmationDialog Title="@confirming.Title" Changes="@confirming.Changes" Message="@confirming.Message" ConfirmLabel="Confirmă"
+                            Note="Operația va fi înregistrată în jurnal." Confirmed="ConfirmAsync" Cancelled="CancelConfirmation" />
+}
+
+@code {
+    private sealed record Confirmation(string Title, string Message, IReadOnlyList<AuditChange> Changes, bool Reset);
+
+    private readonly CancellationTokenSource lifetime = new();
+    private MapSettingsState? state;
+    private MapEngineSettings edit = new();
+    private Confirmation? confirming;
+    private IJSObjectReference? module;
+    private bool loading, saving, testing, testOk, clearKey;
+    private string newKey = "";
+    private string? error, notice, testMessage, testUrl;
+
+    private MapEngineSettings Candidate
+    {
+        get
+        {
+            var value = edit.Clone();
+            value.ApiKey = clearKey ? "" : newKey.Trim().Length > 0 ? newKey.Trim() : state?.Engine.ApiKey ?? "";
+            return MapEngineRules.Normalize(value);
+        }
+    }
+
+    private bool Changed => state is not null && MapEngineRules.Changes(state.Engine, Candidate).Any(change => change.Before != change.After);
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            state = await Service.GetStateAsync(lifetime.Token);
+            Discard();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Map settings loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Setările hărții nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private void Discard()
+    {
+        if (state is null) return;
+        edit = state.Engine.Clone();
+        edit.ApiKey = "";
+        newKey = ""; clearKey = false; testMessage = testUrl = null;
+    }
+
+    // The test loads one tile of Europe (zoom 3) in the browser, exactly like the map will: what works here works on the map.
+    private async Task TestAsync()
+    {
+        testing = true; testMessage = testUrl = null; error = null; notice = null;
+        try
+        {
+            var candidate = Candidate;
+            if (MapEngineRules.Validate(candidate) is { } problem) { testOk = false; testMessage = problem; return; }
+            var url = candidate.TileUrl.Replace("{key}", Uri.EscapeDataString(candidate.ApiKey), StringComparison.Ordinal).Replace("{s}", "a").Replace("{r}", "")
+                .Replace("{z}", "3").Replace("{x}", "4").Replace("{y}", "2");
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./map-settings.js");
+            var result = await module.InvokeAsync<TileTest>("testTile", lifetime.Token, url, 10000);
+            testOk = result.Ok;
+            testMessage = result.Ok ? $"Furnizorul a răspuns cu o dală validă în {result.Milliseconds} ms." : "Furnizorul nu a livrat o dală: adresa este greșită, cheia lipsește sau este invalidă, furnizorul nu răspunde ori nu există conexiune la internet.";
+            testUrl = result.Ok ? url : null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (JSException) { testOk = false; testMessage = "Testul nu a putut rula în browser."; }
+        finally { testing = false; }
+    }
+
+    private void BeginSave()
+    {
+        error = null; notice = null;
+        var candidate = Candidate;
+        if (MapEngineRules.Validate(candidate) is { } problem) { error = problem; return; }
+        var changes = SaveSummary.Changed(MapEngineRules.Changes(state!.Engine, candidate).ToArray());
+        if (changes.Count == 0) { error = "Nu ai modificat nimic."; return; }
+        confirming = new("Salvezi setările hărții?", "Hărțile deschise vor folosi noul furnizor în cel mult 30 de secunde.", changes, false);
+    }
+
+    private void BeginReset()
+    {
+        error = null; notice = null;
+        var defaults = SaveSummary.Changed(MapEngineRules.Changes(state!.Engine, state.Defaults).ToArray());
+        confirming = new("Revii la setările din aplicație?", "Setările salvate din această pagină se elimină; se folosesc din nou valorile din configurația aplicației.", defaults, true);
+    }
+
+    private void CancelConfirmation() => confirming = null;
+
+    private async Task ConfirmAsync()
+    {
+        if (confirming is null || saving) return;
+        var reset = confirming.Reset;
+        saving = true; error = null;
+        try
+        {
+            if (reset) await Service.ResetEngineAsync(state!.Version, lifetime.Token);
+            else await Service.SaveEngineAsync(Candidate, state!.Version, lifetime.Token);
+            confirming = null;
+            notice = reset ? "S-a revenit la setările din configurația aplicației." : "Setările hărții au fost salvate.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (MapOperationException exception) { error = exception.Message; confirming = null; }
+        catch (AccessDeniedException exception) { error = exception.Message; confirming = null; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Map settings saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Setările hărții nu au putut fi salvate. Reîncearcă."; confirming = null;
+        }
+        finally { saving = false; }
+    }
+
+    private sealed record TileTest(bool Ok, int Milliseconds);
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (module is not null)
+            try { await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        lifetime.Dispose();
+    }
+}

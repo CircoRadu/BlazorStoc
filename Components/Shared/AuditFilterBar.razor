@@ -1,0 +1,54 @@
+@using BlazorStoc.Services
+
+@* Search text, type and operation of the journal filters, plus the chips of the active filters (shared by the journal and the complete
+   journal). The values live in the page; Changed(true) is raised by typing (the page waits a moment before asking the server),
+   Changed(false) by every other change. Date filters are the page's own: it passes the chip text and the removal callback. *@
+<div class="filters audit-filters">
+    <label class="search-box"><span>⌕</span><input aria-label="Caută în jurnal" placeholder="Utilizator, țintă, detalii sau motiv…" @bind="Values.Query" @bind:event="oninput" @bind:after="TextChangedAsync" /></label>
+    <label><span class="sr-only">Tip înregistrare</span>
+        <select @bind="Values.Entity" @bind:after="SelectChangedAsync">
+            <option value="">Toate tipurile</option>
+            @foreach (var option in AuditFilterOptions.Entities) { <option value="@option.Value">@option.Label</option> }
+        </select></label>
+    <label><span class="sr-only">Operație</span>
+        <select @bind="Values.Action" @bind:after="SelectChangedAsync">
+            <option value="">Toate operațiile</option>
+            @foreach (var option in AuditFilterOptions.Actions) { <option value="@option.Value">@option.Label</option> }
+        </select></label>
+    @ChildContent
+</div>
+@if (Values.Any || DateChip is not null)
+{
+    <div class="audit-active-filters" role="status">
+        <span>Filtre active:</span>
+        @if (Values.Actor.Length > 0) { <strong class="audit-filter-chip">operator: @Values.Actor <button type="button" aria-label="Elimină filtrul operator" title="Elimină filtrul operator" @onclick="RemoveActor">×</button></strong> }
+        @if (Values.Action.Length > 0) { <strong class="audit-filter-chip">operație: @Values.Action <button type="button" aria-label="Elimină filtrul operație" title="Elimină filtrul operație" @onclick="RemoveAction">×</button></strong> }
+        @if (DateChip is not null) { <strong class="audit-filter-chip">data: @DateChip <button type="button" aria-label="Elimină filtrul dată" title="Elimină filtrul dată" @onclick="DateRemoved">×</button></strong> }
+        @if (Values.Entity.Length > 0) { <strong class="audit-filter-chip">tip: @Values.Entity <button type="button" aria-label="Elimină filtrul tip" title="Elimină filtrul tip" @onclick="RemoveEntity">×</button></strong> }
+        @if (Values.Query.Trim().Length > 0) { <strong class="audit-filter-chip">căutare: „@Values.Query.Trim()” <button type="button" aria-label="Elimină filtrul de căutare" title="Elimină filtrul de căutare" @onclick="RemoveQuery">×</button></strong> }
+        <button type="button" class="audit-clear-filters danger" @onclick="ClearAsync">Șterge filtrele</button>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public AuditFilterValues Values { get; set; } = new();
+    [Parameter] public EventCallback<bool> Changed { get; set; }
+    [Parameter] public string? DateChip { get; set; }
+    [Parameter] public EventCallback DateRemoved { get; set; }
+    [Parameter] public EventCallback Cleared { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private Task TextChangedAsync() => Changed.InvokeAsync(true);
+    private Task SelectChangedAsync() => Changed.InvokeAsync(false);
+
+    private Task RemoveActor() { Values.Actor = ""; return Changed.InvokeAsync(false); }
+    private Task RemoveAction() { Values.Action = ""; return Changed.InvokeAsync(false); }
+    private Task RemoveEntity() { Values.Entity = ""; return Changed.InvokeAsync(false); }
+    private Task RemoveQuery() { Values.Query = ""; return Changed.InvokeAsync(false); }
+
+    private async Task ClearAsync()
+    {
+        Values.Clear();
+        await Cleared.InvokeAsync();
+    }
+}

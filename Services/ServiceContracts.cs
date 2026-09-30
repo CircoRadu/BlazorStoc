@@ -20,7 +20,12 @@ public sealed record ServiceContractPoint(int Id, int ContractId, int WorkPointI
 public sealed record ServiceContractPointView(ServiceContractPoint Point, string WorkPointName, string WorkPointAddress, bool WorkPointIsPrimary);
 
 // One covered work point on the "Scadente" list of /mentenanta, with its beneficiary and contract.
-public sealed record ServiceDueRow(int BeneficiaryId, string BeneficiaryName, ServiceContract Contract, ServiceContractPointView Point);
+// Latitude/Longitude are those of the work point (both or none); LastIntervention is the date of its latest maintenance intervention.
+public sealed record ServiceDueRow(int BeneficiaryId, string BeneficiaryName, ServiceContract Contract, ServiceContractPointView Point,
+    decimal? Latitude = null, decimal? Longitude = null, DateOnly? LastIntervention = null)
+{
+    public bool HasCoordinates => Latitude is not null && Longitude is not null;
+}
 
 public sealed record ServiceContractDetails(ServiceContract Contract, IReadOnlyList<ServiceContractPointView> Points)
 {
@@ -173,6 +178,8 @@ public static class ServiceContractNumber
 
 public enum ServiceDueState { OnTime, DueSoon, Overdue }
 
+public enum ServiceExpiryState { NoTerm, Valid, ExpiresSoon, Expired }
+
 // The displayed state of a due date (derived, never stored): Depasita when the date is before today, In curand within the threshold.
 // The threshold is the one of the active notification template of the maintenance source (mentenanta.scadenta); this is the default used when it has none.
 public static class ServiceDueRules
@@ -201,6 +208,25 @@ public static class ServiceDueRules
     public static int EffectiveCycle(int? individualCycle, int contractCycle) => individualCycle ?? contractCycle;
 
     public static bool IsExpired(ServiceContract contract, DateOnly today) => contract.ValidUntil is { } validUntil && validUntil < today;
+
+    // The state of the contract term, shown next to (never instead of) the due state: an expired contract that is still On keeps producing due dates.
+    public static ServiceExpiryState ExpiryState(ServiceContract contract, DateOnly today, int thresholdDays = DefaultThresholdDays) =>
+        contract.ValidUntil is not { } validUntil ? ServiceExpiryState.NoTerm
+        : validUntil < today ? ServiceExpiryState.Expired
+        : validUntil.DayNumber - today.DayNumber <= thresholdDays ? ServiceExpiryState.ExpiresSoon
+        : ServiceExpiryState.Valid;
+
+    public static string ExpiryText(ServiceContract contract, DateOnly today, int thresholdDays = DefaultThresholdDays)
+    {
+        if (contract.ValidUntil is not { } validUntil) return "Fără termen";
+        var days = validUntil.DayNumber - today.DayNumber;
+        return ExpiryState(contract, today, thresholdDays) switch
+        {
+            ServiceExpiryState.Expired => days == -1 ? "Expirat de o zi" : $"Expirat de {-days} zile",
+            ServiceExpiryState.ExpiresSoon => days == 0 ? "Expiră astăzi" : days == 1 ? "Expiră mâine" : $"Expiră în {days} zile",
+            _ => $"Valabil până la {StockMovementRules.DisplayDate(validUntil)}"
+        };
+    }
 }
 
 public interface IServiceContractRepository

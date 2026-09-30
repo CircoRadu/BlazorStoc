@@ -1,0 +1,216 @@
+@page "/jurnal/complet"
+@attribute [Authorize(Roles = AccessRoles.Administrator)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Globalization
+@using System.Text
+@using BlazorStoc.Services
+@inject IAuditTrail AuditTrail
+@inject IAccessControl Access
+@inject TimeProvider Clock
+@inject ILogger<AuditFull> Logger
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Jurnal complet · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal complet</h1><p class="muted">Toate evenimentele din jurnal, căutate direct pe server, pe pagini. Se afișează implicit ultima lună; alege alt interval sau tot jurnalul.</p></div>
+    <div class="heading-actions">
+        <a class="refresh" href="@AuditListState.Default.Url()">← Jurnal activitate (ultimele @AuditQueryRules.RecentWindow)</a>
+        <button type="button" class="refresh" disabled="@(loading || exporting)" @onclick="() => ReloadAsync(0)">↻ Actualizează</button>
+    </div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+<section class="catalog">
+    <div class="catalog-heading"><h2>Evenimente <span>@(result?.Total ?? 0)</span></h2><small>@RangeText · afișare în ora locală · stocare UTC · fără actualizare automată</small></div>
+    <AuditFilterBar Values="values" Changed="FiltersChangedAsync" Cleared="ClearAsync">
+        <label class="period-field">De la <PickOnlyDate Id="audit-from" Value="fromDate" ValueChanged="FromChangedAsync" /></label>
+        <label class="period-field">până la <PickOnlyDate Id="audit-to" Value="toDate" ValueChanged="ToChangedAsync" /></label>
+        <button type="button" class="refresh" @onclick="() => PresetAsync(1)">Ultima lună</button>
+        <button type="button" class="refresh" @onclick="() => PresetAsync(3)">Ultimele 3 luni</button>
+        <button type="button" class="refresh" @onclick="() => PresetAsync(0)">Tot jurnalul</button>
+        <button type="button" class="primary" disabled="@(loading || exporting || result is null || result.Total == 0)" @onclick="ExportAsync">@(exporting ? "Se exportă…" : "Exportă CSV")</button>
+    </AuditFilterBar>
+    @if (loading && result is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă jurnalul</h3></div> }
+    else if (result is not null && result.Total == 0) { <div class="empty-state"><span class="empty-icon">≡</span><h3>Nu există evenimente pentru filtrul și intervalul alese</h3><p>Schimbă intervalul sau alege „Tot jurnalul”.</p></div> }
+    else if (result is not null)
+    {
+        <AuditEventsTable Events="result.Events" Removals="removals" DateChosen="FilterByDateAsync" ActorChosen="FilterByActorAsync" ActionChosen="FilterByActionAsync" />
+        <AuditPager Id="audit-full-page-size" PageSizes="AuditQueryRules.CompletePageSizes" PageSize="pageSize" Page="currentPage" Total="result.Total" PageChanged="GoToPageAsync" PageSizeChanged="PageSizeChangedAsync" />
+        @if (result.Total > AuditQueryRules.MaxRows) { <p class="form-note">Exportul cuprinde cel mult @AuditQueryRules.MaxRows.ToString("N0") de evenimente (cele mai recente dintre cele găsite); restrânge intervalul pentru a le exporta pe toate.</p> }
+    }
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")] public string? QueryText { get; set; }
+    [SupplyParameterFromQuery(Name = "tip")] public string? EntityParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "operatie")] public string? ActionParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "operator")] public string? ActorParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "de-la")] public string? FromParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "pana-la")] public string? ToParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "tot")] public string? AllParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "pe-pagina")] public int? PageSizeParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "pagina")] public int? PageParameter { get; set; }
+
+    private readonly AuditFilterValues values = new();
+    private AuditPage? result;
+    private IReadOnlyDictionary<string, DateTime> removals = new Dictionary<string, DateTime>();
+    private DateOnly? fromDate, toDate;
+    private string? syncedUrl, error, notice;
+    private bool loading, exporting;
+    private int pageSize = AuditQueryRules.DefaultCompletePageSize, currentPage = 1, loadVersion;
+    private IJSObjectReference? timeModule;
+    private CancellationTokenSource? loadCts, debounce;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    private static string Key(DateOnly? date) => date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+    private static DateOnly? ParseKey(string? key) =>
+        DateOnly.TryParseExact(key, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : null;
+
+    private string RangeText => (fromDate, toDate) switch
+    {
+        (null, null) => "Tot jurnalul",
+        ({ } from, null) => $"De la {from:dd.MM.yyyy}",
+        (null, { } to) => $"Până la {to:dd.MM.yyyy}",
+        ({ } from, { } to) => $"{from:dd.MM.yyyy} – {to:dd.MM.yyyy}"
+    };
+
+    private Task FiltersChangedAsync(bool typing) { currentPage = 1; SyncState(); return ReloadAsync(typing ? 350 : 0); }
+    private Task FilterByActorAsync(string value) { values.Actor = value; return FiltersChangedAsync(false); }
+    private Task FilterByActionAsync(string value) { values.Action = value; return FiltersChangedAsync(false); }
+    private Task FilterByDateAsync(string key) { fromDate = toDate = ParseKey(key); return FiltersChangedAsync(false); }
+    private Task FromChangedAsync(DateOnly? value) { fromDate = value; if (value is { } from && toDate is { } to && to < from) toDate = from; return FiltersChangedAsync(false); }
+    private Task ToChangedAsync(DateOnly? value) { toDate = value; if (value is { } to && fromDate is { } from && to < from) fromDate = to; return FiltersChangedAsync(false); }
+    private Task ClearAsync() => PresetAsync(1);
+    private Task GoToPageAsync(int page) { currentPage = Math.Max(1, page); SyncState(); return ReloadAsync(0); }
+    private Task PageSizeChangedAsync(int size) { pageSize = size; currentPage = 1; SyncState(); return ReloadAsync(0); }
+
+    // 0 months = the whole journal.
+    private Task PresetAsync(int months)
+    {
+        fromDate = months == 0 ? null : Today.AddMonths(-months);
+        toDate = null;
+        return FiltersChangedAsync(false);
+    }
+
+    private bool WholeJournal => fromDate is null && toDate is null;
+
+    private AuditCompleteState State => new(values.Query.Trim(), values.Entity, values.Action, values.Actor, Key(fromDate).Length == 0 ? null : Key(fromDate),
+        Key(toDate).Length == 0 ? null : Key(toDate), WholeJournal, pageSize, currentPage);
+
+    // Filters, range and page live in the address (replaced in place, so Back from an object page restores them); read from it only
+    // when the page is opened.
+    private void ApplyStateFromAddress()
+    {
+        var state = AuditCompleteState.Parse(Today, QueryText, EntityParameter, ActionParameter, ActorParameter, FromParameter, ToParameter, AllParameter, PageSizeParameter, PageParameter);
+        (values.Query, values.Entity, values.Action, values.Actor, pageSize, currentPage) = (state.Query, state.Entity, state.Action, state.Actor, state.PageSize, state.Page);
+        (fromDate, toDate) = (ParseKey(state.From), ParseKey(state.To));
+        syncedUrl = state.Url();
+    }
+
+    private void SyncState()
+    {
+        var url = State.Url();
+        if (url == syncedUrl) return;
+        syncedUrl = url;
+        Navigation.NavigateTo(url, replace: true);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ApplyStateFromAddress();
+        await LoadAsync(true);
+    }
+
+    // Typing waits a moment (a new keystroke cancels the wait), so the server is asked once per pause, not once per letter.
+    private async Task ReloadAsync(int delayMilliseconds)
+    {
+        debounce?.Cancel();
+        var source = debounce = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        try
+        {
+            if (delayMilliseconds > 0) await Task.Delay(delayMilliseconds, source.Token);
+            await LoadAsync(false);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task<AuditQuery> BuildQueryAsync(CancellationToken token)
+    {
+        AuditUtcRange range = new(null, null);
+        if (fromDate is not null || toDate is not null)
+        {
+            timeModule ??= await JS.InvokeAsync<IJSObjectReference>("import", token, "./audit-time.js");
+            range = await timeModule.InvokeAsync<AuditUtcRange>("localRangeUtc", token, Key(fromDate) is { Length: > 0 } f ? f : null, Key(toDate) is { Length: > 0 } t ? t : null);
+        }
+        return new AuditQuery(values.Query, values.Entity, values.Action, values.Actor, range.From, range.To);
+    }
+
+    // Every load asks the server for one page only; a load that is overtaken by a newer one is dropped.
+    private async Task LoadAsync(bool showLoading)
+    {
+        loadCts?.Cancel();
+        var source = loadCts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        var version = ++loadVersion;
+        if (showLoading || result is null) loading = true;
+        notice = null;
+        try
+        {
+            var query = await BuildQueryAsync(source.Token);
+            var page = await AuditTrail.QueryAsync(query, currentPage, pageSize, null, source.Token);
+            var removed = await AuditTrail.RemovalTimesAsync(page.Events, source.Token);
+            if (version != loadVersion) return;
+            result = page; removals = removed;
+            if (page.Page != currentPage) { currentPage = page.Page; SyncState(); }
+            error = null;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) when (version == loadVersion)
+        {
+            Logger.LogError("Complete audit loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Jurnalul nu a putut fi încărcat.";
+        }
+        finally { if (version == loadVersion) loading = false; }
+    }
+
+    // The export is recorded first (with the filters used and the number of events): if that fails, nothing is downloaded.
+    private async Task ExportAsync()
+    {
+        if (exporting) return;
+        exporting = true; error = null; notice = null;
+        try
+        {
+            await Access.EnsureAdministratorAsync(lifetime.Token);
+            var query = await BuildQueryAsync(lifetime.Token);
+            var all = await AuditTrail.QueryAsync(query, 1, 0, null, lifetime.Token);
+            var count = all.Events.Count;
+            var limited = all.Total > count ? $" (limitat la {count:N0} din {all.Total:N0} găsite)" : "";
+            var filters = AuditQueryRules.Describe(query, date => date.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) + " UTC");
+            await AuditRecorder.RecordActionAsync(AuditTrail, Access, AuditEntities.Journal, AuditActions.ExportJournal, "", "Jurnal complet",
+                $"{count:N0} evenimente exportate în CSV{limited}; filtre: {filters}", "", lifetime.Token);
+            timeModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./audit-time.js");
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(AuditQueryRules.Csv(all.Events)));
+            using var reference = new DotNetStreamReference(stream);
+            await timeModule.InvokeVoidAsync("downloadFile", lifetime.Token, $"jurnal-{Clock.GetLocalNow():yyyyMMdd-HHmm}.csv", reference, "text/csv;charset=utf-8");
+            notice = $"Au fost exportate {count:N0} evenimente{limited}. Exportul a fost înregistrat în jurnal.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Journal export failed ({ErrorType}).", exception.GetType().Name);
+            error = "Exportul nu a putut fi realizat. Reîncearcă.";
+        }
+        finally { exporting = false; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (timeModule is not null)
+            try { await timeModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        lifetime.Dispose();
+    }
+}

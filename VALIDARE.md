@@ -466,3 +466,10 @@ Verificat la 25 septembrie 2026.
 - Nu s-a modificat schema. Pe baza reala nu s-a creat niciun sablon.
 - Browser (baza de test, port 5088): sablon nou pe categoria "Mentenanta" (text-exemplu, marcaje), notificarile aparute pe `/notificari`, starea "In curand" din `/mentenanta` dupa pragul sablonului.
 - Neverificat: ecran ingust, rularea la interval real cu mai multe sesiuni; vezi `docs/TESTE_RAMASE.md` (N17-N18).
+
+## Harta de mentenanta (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 845 PASS (835 inainte), 3 rulari consecutive fara esec, cu integrare MariaDB pe `blazorstoc_test`; verificari pure pentru termenul contractului, umplerea si insigna marker-ului, marker-e si puncte fara coordonate, configuratia furnizorului de dale, si o verificare de integrare pentru coordonatele si ultima interventie din lista de scadente.
+- Nu s-a modificat schema. Leaflet si markercluster au fost descarcate cu acordul utilizatorului in `wwwroot/lib/leaflet`.
+- Browser (baza de test, port 5088): harta cu dale reale, marker-e si insigne, panou de detalii, filtru, link catre formularul de interventie cu punctul preselectat.
+- Neverificat: ecran ingust, furnizor de dale indisponibil, multe puncte (clusterizare), termenii serverului public OSM; vezi `docs/TESTE_RAMASE.md` (N19-N21).

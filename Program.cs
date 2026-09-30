@@ -147,6 +147,9 @@ builder.Services.AddScoped<IExpiryNotificationRepository>(services => new MariaE
 builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Itp, ExpirySourceKeys.VehicleItp, "ITP"));
 builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Insurance, ExpirySourceKeys.VehicleInsurance, "Asigurare"));
 builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Rovinieta, ExpirySourceKeys.VehicleRovinieta, "Rovinietă"));
+builder.Services.Configure<MapOptions>(builder.Configuration.GetSection(MapOptions.SectionName));
+builder.Services.AddSingleton<MapConfigStore>();
+builder.Services.AddScoped<IMapConfigurationService, MapConfigurationService>();
 builder.Services.AddScoped<IMaintenanceNotificationReader, MariaMaintenanceNotificationReader>();
 builder.Services.AddScoped<IExpirySource>(services => new MaintenanceDueSource(services.GetRequiredService<IMaintenanceNotificationReader>()));
 builder.Services.AddScoped<IExpirySource>(services => new ContractExpirySource(services.GetRequiredService<IMaintenanceNotificationReader>()));

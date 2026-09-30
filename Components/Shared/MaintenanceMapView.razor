@@ -1,0 +1,408 @@
+@using BlazorStoc.Services
+@using Microsoft.Extensions.Options
+@inject IServiceContractRepository Contracts
+@inject IExpiryNotificationService NotificationService
+@inject IMapConfigurationService MapConfig
+@inject TimeProvider Clock
+@inject IJSRuntime JS
+@inject ILogger<MaintenanceMapView> Logger
+@implements IAsyncDisposable
+
+<PageTitle>@(Popout ? "Harta mentenanței (fereastră) · BlazorStoc" : "Harta mentenanței · BlazorStoc")</PageTitle>
+<div @ref="rootElement" class="map-view @(Popout ? "map-popout" : null)">
+@if (Popout)
+{
+    <div class="page-heading map-popout-heading">
+        <div><h1>Harta mentenanței</h1><p class="muted map-updated @(refreshFailed ? "failed" : null)" role="status" aria-live="polite">@UpdateText</p></div>
+        <div class="heading-actions">
+            <a class="refresh" href="/mentenanta">Deschide aplicația</a>
+            <button class="refresh" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="page-heading">
+        <div><p class="eyebrow">SERVICE</p><h1>Harta mentenanței</h1><p class="muted">Punctele de lucru acoperite de contracte, la coordonatele lor. Culoarea marker-ului arată scadența, insigna arată contractul.</p>
+            <p class="muted map-updated @(refreshFailed ? "failed" : null)" role="status" aria-live="polite">@UpdateText</p></div>
+        <div class="heading-actions">
+            <a class="refresh" href="/mentenanta">← Scadențe și registru</a>
+            <a class="refresh" href="@MaintenanceMapRules.WindowUrl" target="@MaintenanceMapRules.WindowName" data-map-popout title="Deschide harta într-o fereastră separată, care poate rămâne deschisă pe alt monitor cât folosești aplicația">⧉ Fereastră separată</a>
+            <button class="refresh" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button>
+        </div>
+    </div>
+}
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (libraryError is not null) { <div class="error-banner" role="alert">@libraryError</div> }
+
+<section class="catalog map-filters-section">
+    <div class="filters map-filters">
+        <label class="search-box"><span>⌕</span><input aria-label="Caută pe hartă" placeholder="Beneficiar, punct de lucru sau contract…" @bind="text" @bind:event="oninput" @bind:after="FiltersChangedAsync" /></label>
+        <select aria-label="Filtrează după scadență" @bind="dueFilter" @bind:after="FiltersChangedAsync">
+            <option value="">Toate scadențele</option>
+            <option value="overdue">Depășite</option>
+            <option value="soon">În curând</option>
+            <option value="ok">La zi</option>
+        </select>
+        <select aria-label="Filtrează după contract" @bind="contractFilter" @bind:after="FiltersChangedAsync">
+            <option value="">Toate contractele</option>
+            <option value="Expired">Expirate</option>
+            <option value="ExpiresSoon">Expiră în curând</option>
+            <option value="Valid">Cu termen valabil</option>
+            <option value="NoTerm">Fără termen</option>
+        </select>
+        <label class="period-field">Scadență de la <PickOnlyDate Id="map-from" @bind-Value="from" @bind-Value:after="FiltersChangedAsync" /></label>
+        <label class="period-field">până la <PickOnlyDate Id="map-to" @bind-Value="to" @bind-Value:after="FiltersChangedAsync" /></label>
+        <button type="button" class="refresh" disabled="@(from is null && to is null)" @onclick="ClearPeriodAsync">Fără perioadă</button>
+        @if (offCount > 0) { <label class="check-label"><input type="checkbox" checked="@showOff" @onchange="ToggleOffAsync" /> Arată și contractele Off (@offCount)</label> }
+    </div>
+</section>
+
+<div class="map-layout">
+    <div class="map-column">
+        <div class="map-legend" aria-label="Legenda hărții">
+            @foreach (var type in view.ActiveTypes.Where(type => type.IsFill))
+            {
+                <span><i class="mm-key" style="background:@type.Color;color:@type.Foreground">@type.Glyph</i> @type.Name</span>
+            }
+            @foreach (var type in view.ActiveTypes.Where(type => !type.IsFill))
+            {
+                <span><i class="mm-key-badge" style="background:@type.Color;color:@type.Foreground">@type.Glyph</i> @type.Name</span>
+            }
+            <button type="button" class="refresh" disabled="@(Markers.Count == 0)" @onclick="FitAsync">Încadrează rezultatele</button>
+        </div>
+        @if (tilesFailed)
+        {
+            <div class="error-banner" role="alert">Fundalul hărții nu poate fi încărcat (furnizorul de hărți nu răspunde sau nu există conexiune la internet). Punctele rămân afișate.
+                <button type="button" class="refresh" @onclick="RetryTilesAsync">Reîncearcă</button></div>
+        }
+        <div class="map-canvas-wrap">
+            <div @ref="mapElement" class="map-canvas" role="application" aria-label="Harta punctelor de lucru cu mentenanță"></div>
+            @if (loaded && Markers.Count == 0) { <div class="map-empty">@(rows.Count == 0 ? "Nu există puncte acoperite de contracte." : "Niciun punct cu coordonate pentru filtrele alese.")</div> }
+        </div>
+        <p class="muted map-count">@Markers.Count @(Markers.Count == 1 ? "punct afișat" : "puncte afișate")@(Unplaced.Count > 0 ? $" · {Unplaced.Count} fără coordonate" : "")</p>
+    </div>
+
+    <aside class="map-panel" aria-label="Detalii punct" aria-live="polite">
+        @if (Selected is { } row)
+        {
+            var today = Today;
+            var due = row.Point.Point.NextDue;
+            var dueState = ServiceDueRules.State(due, today, dueThreshold);
+            <div class="map-panel-heading"><h2>@row.Point.WorkPointName</h2><button type="button" class="link-button" aria-label="Închide detaliile" @onclick="ClearSelectionAsync">×</button></div>
+            <p><a class="category-table-link" href="@($"/beneficiari/{row.BeneficiaryId}")"><strong>@row.BeneficiaryName</strong></a></p>
+            <p class="muted">@row.Point.WorkPointAddress<br />Coordonate: @MaintenanceMapRules.CoordinatesText(row)</p>
+            <dl class="map-facts">
+                <dt>Contract</dt><dd>@row.Contract.Label @if (!row.Contract.IsActive) { <span class="contract-state off">Off</span> } else { <span class="contract-state on">On</span> }</dd>
+                <dt>Termen contract</dt>
+                <dd>@ServiceDueRules.ExpiryText(row.Contract, today, expiryThreshold)@if (row.Contract.IsActive && ServiceDueRules.ExpiryState(row.Contract, today, expiryThreshold) is ServiceExpiryState.Expired or ServiceExpiryState.ExpiresSoon) { <text> <span class="contract-state expired">@(ServiceDueRules.IsExpired(row.Contract, today) ? "Expirat" : "Expiră în curând")</span></text> }
+                    @if (row.Contract.ValidUntil is { } validUntil) { <br /><small class="muted">Valabil până la @StockMovementRules.DisplayDate(validUntil)</small> }</dd>
+                <dt>Ciclicitate</dt><dd>@ServiceContractRules.CycleText(ServiceDueRules.EffectiveCycle(row.Point.Point.CycleMonths, row.Contract.CycleMonths))</dd>
+                <dt>Următoarea scadență</dt>
+                <dd>@StockMovementRules.DisplayDate(due)@if (row.Contract.IsActive) { <text> <span class="due-chip @ServiceDueRules.CssClass(dueState)">@ServiceDueRules.Label(dueState)</span></text> }</dd>
+                <dt>Ultima intervenție de mentenanță</dt><dd>@(row.LastIntervention is { } last ? StockMovementRules.DisplayDate(last) : "nicio intervenție")</dd>
+            </dl>
+            <div class="map-panel-actions">
+                <a class="refresh" href="@($"/beneficiari/{row.BeneficiaryId}")">Fișa beneficiarului</a>
+                <a class="primary" href="@MaintenanceMapRules.AddInterventionUrl(row.BeneficiaryId, row.Point.Point.WorkPointId)">+ Înregistrează intervenție</a>
+            </div>
+            @if (sameLocation.Count > 0)
+            {
+                <h3>Alte puncte la aceeași locație</h3>
+                <ul class="map-same">
+                    @foreach (var other in sameLocation)
+                    {
+                        <li><button type="button" class="link-button" @onclick="() => SelectAsync(other.Point.Point.Id, false)">@other.BeneficiaryName · @other.Point.WorkPointName</button>
+                            <small class="muted">@StockMovementRules.DisplayDate(other.Point.Point.NextDue)</small></li>
+                    }
+                </ul>
+            }
+        }
+        else
+        {
+            <p class="muted">Alege un punct pe hartă ca să vezi beneficiarul, contractul, scadența și legăturile către fișe.</p>
+        }
+    </aside>
+</div>
+
+<section class="catalog map-unplaced">
+    <div class="catalog-heading"><h2>Puncte fără coordonate <span>@Unplaced.Count</span></h2></div>
+    @if (Unplaced.Count == 0)
+    {
+        <p class="muted map-none">Toate punctele afișate au coordonate.</p>
+    }
+    else
+    {
+        <p class="form-note">Aceste puncte de lucru nu pot fi puse pe hartă. Deschide fișa beneficiarului și adaugă coordonatele în editarea punctului („Coordonate”). Nu se face geocodare automată: adresele nu se trimit niciunui serviciu extern.</p>
+        <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>SCADENȚĂ</th><th></th></tr></thead><tbody>
+        @foreach (var item in Unplaced)
+        {
+            <tr @key="item.Point.Point.Id" class="@(item.Contract.IsActive ? null : "contract-row-off")">
+                <td><strong>@item.BeneficiaryName</strong></td>
+                <td><strong>@item.Point.WorkPointName</strong><br /><small class="muted">@item.Point.WorkPointAddress</small></td>
+                <td>@item.Contract.Label</td>
+                <td>@StockMovementRules.DisplayDate(item.Point.Point.NextDue)</td>
+                <td><a class="refresh" href="@($"/beneficiari/{item.BeneficiaryId}")">Deschide fișa pentru coordonate</a></td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+<p class="muted map-attribution-note">Fundalul hărții vine de la furnizorul configurat (Setările „Map”); browserul cere doar dalele zonei vizibile, iar numele beneficiarilor, contractele și scadențele nu părăsesc aplicația.</p>
+</div>
+
+@code {
+    private IReadOnlyList<ServiceDueRow> rows = Array.Empty<ServiceDueRow>();
+    private ElementReference mapElement;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<MaintenanceMapView>? self;
+    [Parameter] public bool Popout { get; set; }
+
+    private ElementReference rootElement;
+    private bool loading = true, loaded, mapReady, showOff, tilesFailed, firstFitDone, refreshing, refreshFailed;
+    private DateTimeOffset? lastUpdate;
+    private int changedCount;
+    private DateOnly shownDay;
+    private int offCount, dueThreshold = ServiceDueRules.DefaultThresholdDays, expiryThreshold = ServiceDueRules.DefaultThresholdDays;
+    private int? selectedId;
+    private string text = "", dueFilter = "", contractFilter = "";
+    private DateOnly? from, to;
+    private string? error, libraryError;
+    private IReadOnlyList<ServiceDueRow> sameLocation = Array.Empty<ServiceDueRow>();
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    private string UpdateText => lastUpdate is not { } at ? "" :
+        refreshFailed ? $"Actualizarea automată a eșuat, se reîncearcă (ultima actualizare reușită: {at:HH:mm:ss})."
+        : changedCount > 0 ? $"Actualizat la {at:HH:mm:ss} · {changedCount} {(changedCount == 1 ? "punct nou sau modificat" : "puncte noi sau modificate")}"
+        : $"Actualizat la {at:HH:mm:ss}";
+
+    private IReadOnlyList<ServiceDueRow> Filtered
+    {
+        get
+        {
+            var today = Today;
+            var query = text.Trim();
+            return rows.Where(row =>
+                (query.Length == 0 || Contains(row.BeneficiaryName, query) || Contains(row.Point.WorkPointName, query) || Contains(row.Point.WorkPointAddress, query) || Contains(row.Contract.Label, query)) &&
+                (dueFilter.Length == 0 || MaintenanceMapRules.Fill(row, today, dueThreshold) == dueFilter) &&
+                (contractFilter.Length == 0 || (row.Contract.IsActive && ServiceDueRules.ExpiryState(row.Contract, today, expiryThreshold).ToString() == contractFilter)) &&
+                (from is null || row.Point.Point.NextDue >= from) && (to is null || row.Point.Point.NextDue <= to)).ToList();
+        }
+    }
+
+    private MapView view = new(new MapOptions().Normalized(), MapPinRules.Effective(null), 0);
+
+    private IReadOnlyList<MapMarker> Markers => Filtered.Select(row => MaintenanceMapRules.Marker(row, Today, dueThreshold, expiryThreshold, view.PinTypes)).OfType<MapMarker>().ToList();
+
+    // What the script needs to draw the pins and the background: the types that are on (inactive badges are not drawn) and the engine.
+    private static object Styles(MapView current) => new
+    {
+        fills = current.ActiveTypes.Where(type => type.IsFill).ToDictionary(type => type.Key, type => new { color = type.Color, fg = type.Foreground, glyph = type.Glyph, name = type.Name }),
+        badges = current.ActiveTypes.Where(type => !type.IsFill).ToDictionary(type => type.Key, type => new { color = type.Color, fg = type.Foreground, glyph = type.Glyph, name = type.Name })
+    };
+
+    private static object EngineOptions(MapOptions options) => new
+    {
+        tileUrl = options.TileUrl, attribution = options.Attribution, minZoom = options.MinZoom, maxZoom = options.MaxZoom,
+        centerLatitude = options.CenterLatitude, centerLongitude = options.CenterLongitude, startZoom = options.StartZoom
+    };
+    private IReadOnlyList<ServiceDueRow> Unplaced => Filtered.Where(row => !row.HasCoordinates).ToList();
+    private ServiceDueRow? Selected => selectedId is { } id ? Filtered.FirstOrDefault(row => row.Point.Point.Id == id) : null;
+
+    private static bool Contains(string value, string query) => System.Globalization.CultureInfo.InvariantCulture.CompareInfo
+        .IndexOf(value, query, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace) >= 0;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            self = DotNetObjectReference.Create(this);
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./maintenance-map.js");
+            await module.InvokeVoidAsync("create", mapElement, self, EngineOptions(view.Engine), Styles(view));
+            mapReady = true;
+            await PushMarkersAsync(fit: true);
+            if (Popout) await module.InvokeVoidAsync("openLinksInMainWindow", rootElement);
+            await module.InvokeVoidAsync("watch", mapElement, self, MaintenanceMapRules.AutoRefreshSeconds * 1000);
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException)
+        {
+            Logger.LogWarning("Map initialisation failed ({ErrorType}).", exception.GetType().Name);
+            libraryError = "Harta nu a putut fi pornită (biblioteca de hărți nu s-a încărcat). Lista punctelor fără coordonate rămâne disponibilă; reîncarcă pagina.";
+            StateHasChanged();
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            view = await MapConfig.GetViewAsync(lifetime.Token);
+            dueThreshold = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.MaintenanceDue, ServiceDueRules.DefaultThresholdDays, lifetime.Token);
+            expiryThreshold = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.ContractExpiry, ServiceDueRules.DefaultThresholdDays, lifetime.Token);
+            var all = await Contracts.GetDueListAsync(true, lifetime.Token);
+            offCount = all.Count(row => !row.Contract.IsActive);
+            rows = showOff ? all : all.Where(row => row.Contract.IsActive).ToList();
+            loaded = true;
+            shownDay = Today;
+            lastUpdate = Clock.GetLocalNow();
+            refreshFailed = false; changedCount = 0;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Map data loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Punctele nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    // Called by the script every AutoRefreshSeconds while the map is visible (never while the window or tab is hidden) and at once when
+    // it becomes visible again. Only the points are reloaded: the tiles are requested by the map itself when it moves or zooms. Position,
+    // zoom, filters, the selected point and its panel stay as they are; a failure keeps the map as it was and is reported in the heading.
+    [JSInvokable]
+    public Task OnAutoRefresh() => InvokeAsync(async () =>
+    {
+        if (refreshing || loading || !loaded) return;
+        refreshing = true;
+        try
+        {
+            var freshView = await MapConfig.GetViewAsync(lifetime.Token);
+            var due = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.MaintenanceDue, ServiceDueRules.DefaultThresholdDays, lifetime.Token);
+            var expiry = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.ContractExpiry, ServiceDueRules.DefaultThresholdDays, lifetime.Token);
+            var all = await Contracts.GetDueListAsync(true, lifetime.Token);
+            var fresh = showOff ? all : all.Where(row => row.Contract.IsActive).ToList();
+            var today = Today;
+            var changed = MaintenanceMapRules.ChangedRows(rows, fresh);
+            var settingsChanged = freshView.Version != view.Version;
+            var different = settingsChanged || changed > 0 || fresh.Count != rows.Count || due != dueThreshold || expiry != expiryThreshold || today != shownDay;
+            lastUpdate = Clock.GetLocalNow();
+            refreshFailed = false;
+            error = null;
+            if (!different) { StateHasChanged(); return; }
+            offCount = all.Count(row => !row.Contract.IsActive);
+            view = freshView;
+            // The map settings (tile provider, pin types) were changed in Setări: the background and the pins are redrawn now.
+            if (settingsChanged && mapReady && module is not null)
+                await module.InvokeVoidAsync("configure", mapElement, EngineOptions(view.Engine), Styles(view));
+            rows = fresh; dueThreshold = due; expiryThreshold = expiry; shownDay = today;
+            changedCount = changed;
+            sameLocation = Selected is { } current ? MaintenanceMapRules.SameLocation(Filtered, current) : [];
+            await FiltersChangedAsync(announce: true);
+            StateHasChanged();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { refreshFailed = true; error = exception.Message + " Dacă sesiunea a expirat, autentifică-te din nou."; StateHasChanged(); }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Map automatic refresh failed ({ErrorType}).", exception.GetType().Name);
+            refreshFailed = true;
+            StateHasChanged();
+        }
+        finally { refreshing = false; }
+    });
+
+    private async Task PushMarkersAsync(bool fit, bool announce = false)
+    {
+        if (!mapReady || module is null) return;
+        try
+        {
+            await module.InvokeVoidAsync("setMarkers", mapElement, Markers, fit && !firstFitDone, announce);
+            if (fit) firstFitDone = true;
+            if (selectedId is { } id) await module.InvokeVoidAsync("select", mapElement, id, false);
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+    }
+
+    private Task FiltersChangedAsync() => FiltersChangedAsync(false);
+
+    private async Task FiltersChangedAsync(bool announce)
+    {
+        if (selectedId is not null && Selected is null) { selectedId = null; sameLocation = []; }
+        await PushMarkersAsync(fit: false, announce);
+    }
+
+    private async Task ClearPeriodAsync() { from = to = null; await FiltersChangedAsync(); }
+
+    private async Task ToggleOffAsync(ChangeEventArgs args)
+    {
+        showOff = args.Value is true;
+        await LoadAsync();
+        await FiltersChangedAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadAsync();
+        await FiltersChangedAsync();
+    }
+
+    private async Task FitAsync()
+    {
+        if (module is null) return;
+        try { await module.InvokeVoidAsync("fitAll", mapElement); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+    }
+
+    private async Task SelectAsync(int id, bool zoomTo)
+    {
+        selectedId = id;
+        sameLocation = Selected is { } row ? MaintenanceMapRules.SameLocation(Filtered, row) : [];
+        if (module is null) return;
+        try { await module.InvokeVoidAsync("select", mapElement, id, zoomTo); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+    }
+
+    private async Task ClearSelectionAsync()
+    {
+        var previous = selectedId;
+        selectedId = null;
+        sameLocation = [];
+        if (module is null || previous is null) return;
+        try { await module.InvokeVoidAsync("select", mapElement, -1, false); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+    }
+
+    private async Task RetryTilesAsync()
+    {
+        tilesFailed = false;
+        if (module is null) return;
+        try { await module.InvokeVoidAsync("retryTiles", mapElement); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+    }
+
+    // Called by the script when the marker of a point is chosen.
+    [JSInvokable]
+    public async Task OnMarkerSelected(int id)
+    {
+        await InvokeAsync(async () => { await SelectAsync(id, false); StateHasChanged(); });
+    }
+
+    // Several tiles failed in a short while (the provider is down or there is no internet); reported once until a tile loads again.
+    [JSInvokable]
+    public Task OnTilesFailed() => InvokeAsync(() => { tilesFailed = true; StateHasChanged(); });
+
+    [JSInvokable]
+    public Task OnTilesRecovered() => InvokeAsync(() => { tilesFailed = false; StateHasChanged(); });
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+        if (module is not null)
+        {
+            try { await module.InvokeVoidAsync("dispose", mapElement); await module.DisposeAsync(); }
+            catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+        }
+        self?.Dispose();
+    }
+}

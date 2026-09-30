@@ -1,5 +1,7 @@
 # Propunere tehnica: harta interventiilor de mentenanta
 
+**Stare: IMPLEMENTATA la 30.09.2026** (vezi `IMPLEMENTED.md`), cu evaluarea de la sfarsitul documentului: un singur provider din configuratie (fara fallback automat), harta ca vedere doar-citire peste lista de scadente.
+
 Document de evaluare pentru Claude. Descrie o propunere de implementare, nu o decizie aprobata si nici o implementare functionala. Registrul de contracte si regulile de recurenta sunt presupuse existente.
 
 ## Obiectiv si limite

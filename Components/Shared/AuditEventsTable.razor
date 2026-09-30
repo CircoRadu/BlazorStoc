@@ -1,0 +1,87 @@
+@using BlazorStoc.Services
+@inject IJSRuntime JS
+@inject ILogger<AuditEventsTable> Logger
+@implements IAsyncDisposable
+
+@* The rows of the journal (shared by the journal and the complete journal). Times are stored in UTC and shown in the browser's time
+   zone (wwwroot/audit-time.js); a click on a date, operator or operation asks the page to filter by it. *@
+<div class="table-scroll"><table><thead><tr><th>DATA ȘI ORA</th><th>OPERATOR</th><th>OPERAȚIE</th><th>ȚINTĂ</th><th>DETALII</th></tr></thead><tbody>
+@foreach (var entry in Events)
+{
+    var localTimestamp = LocalTimestamp(entry);
+    <tr @key="entry.Id">
+        <td class="audit-time"><button type="button" class="audit-filter-link" title="Filtrează după această dată locală" @onclick="() => DateChosen.InvokeAsync(localTimestamp.DateKey)">@localTimestamp.Date</button> <time datetime="@entry.TimestampUtc.ToString("O")">@localTimestamp.Time</time> <small>local</small></td>
+        <td><button type="button" class="audit-filter-link" title="Filtrează după acest operator" @onclick="() => ActorChosen.InvokeAsync(entry.ActorUsername)">@entry.ActorUsername</button><small class="user-id">@entry.ActorRole</small></td>
+        <td><button type="button" class="audit-action audit-filter-link @ActionClass(entry.Action)" title="Filtrează după această operație" @onclick="() => ActionChosen.InvokeAsync(entry.Action)">@entry.Action</button><small class="user-id">@entry.EntityType</small></td>
+        <td>
+            @{ var target = AuditNavigation.DisplayTarget(entry); }
+            @if (AuditNavigation.TargetUrl(entry, Removals) is { } targetUrl)
+            {
+                <a class="audit-target-link" data-restore-scroll href="@targetUrl" title="Deschide pagina obiectului: @target"><strong>@target</strong></a>
+            }
+            else
+            {
+                <strong>@target</strong>
+            }
+        </td><td class="audit-details"><span>Descriere modificare: <em>@(entry.EntityType == AuditEntities.StockMovement ? StockMovementRules.NormalizeDisplayDates(entry.Details) : entry.Details)</em></span><span>Motiv: <em>@(string.IsNullOrWhiteSpace(entry.Motif) ? "—" : entry.Motif)</em></span></td>
+    </tr>
+}
+</tbody></table></div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AuditEvent> Events { get; set; } = Array.Empty<AuditEvent>();
+    [Parameter] public IReadOnlyDictionary<string, DateTime> Removals { get; set; } = new Dictionary<string, DateTime>();
+    [Parameter] public EventCallback<string> DateChosen { get; set; }
+    [Parameter] public EventCallback<string> ActorChosen { get; set; }
+    [Parameter] public EventCallback<string> ActionChosen { get; set; }
+
+    private IJSObjectReference? timeModule;
+    private Dictionary<Guid, LocalAuditTime> localTimes = [];
+    private IReadOnlyList<AuditEvent>? formatted;
+    private bool scrollRestorePending = true;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private LocalAuditTime LocalTimestamp(AuditEvent entry) => localTimes.TryGetValue(entry.Id, out var value)
+        ? value
+        : new(entry.Id, entry.TimestampUtc.ToString("dd.MM.yyyy"), entry.TimestampUtc.ToString("HH:mm:ss"), entry.TimestampUtc.ToString("yyyy-MM-dd"));
+
+    private static string ActionClass(string value) => value == AuditActions.Delete ? "delete" : value == AuditActions.Create ? "create" : "update";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (lifetime.IsCancellationRequested) return;
+        if (!ReferenceEquals(formatted, Events) && Events.Count > 0)
+        {
+            formatted = Events;
+            try
+            {
+                timeModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./audit-time.js");
+                var values = await timeModule.InvokeAsync<LocalAuditTime[]>("formatAuditTimestamps", lifetime.Token,
+                    Events.Select(entry => new { id = entry.Id, timestampUtc = entry.TimestampUtc.ToString("O") }));
+                localTimes = values.ToDictionary(value => value.Id);
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+            catch (JSDisconnectedException) { }
+            catch (Exception exception) { Logger.LogWarning("Local audit timestamp formatting failed ({ErrorType}).", exception.GetType().Name); }
+            return;
+        }
+        if (scrollRestorePending && localTimes.Count > 0)
+        {
+            scrollRestorePending = false;
+            try { await JS.InvokeVoidAsync("blazorStocNavigationContext.restoreScroll"); }
+            catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (timeModule is not null)
+            try { await timeModule.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        lifetime.Dispose();
+    }
+
+    private sealed record LocalAuditTime(Guid Id, string Date, string Time, string DateKey);
+}

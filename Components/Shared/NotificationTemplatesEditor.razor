@@ -1,6 +1,7 @@
 @using BlazorStoc.Services
 @inject IExpiryNotificationService Service
 @inject ILogger<NotificationTemplatesEditor> Logger
+@inject IJSRuntime JS
 @implements IDisposable
 
 <h2>Șabloane notificări</h2>
@@ -8,6 +9,7 @@
 
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (FocusTemplateId is { } wanted && !loading && templates.All(item => item.Id != wanted)) { <div class="error-banner" role="status">Șablonul #@wanted nu mai există (a fost șters).</div> }
 
 @if (editing)
 {
@@ -68,7 +70,8 @@ else
         @foreach (var template in templates)
         {
             var source = Service.Sources.FirstOrDefault(item => item.Key == template.SourceKey);
-            <tr @key="template.Id">
+            var focused = template.Id == FocusTemplateId;
+            <tr @key="template.Id" id="template-@template.Id" class="@(focused ? "row-focus" : null)">
                 <td>@(source is null ? template.SourceKey : $"{source.Category} · {source.EventName}")</td>
                 <td>@template.Subject</td>
                 <td class="number">@template.ThresholdDays</td>
@@ -98,12 +101,26 @@ else
     private bool loading, editing, saving, deleteBusy, subjectActive;
     private int openCount;
     private string? error, notice, deleteError;
+    private int? scrolledTo;
+
+    // Set by a link from the Journal: that template's row is highlighted and scrolled into view once the list is loaded.
+    [Parameter] public int? FocusTemplateId { get; set; }
 
     private IEnumerable<string> Categories => Service.Sources.Select(source => source.Category).Distinct().Order(StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<IExpirySource> SourcesOfCategory => Service.Sources.Where(source => source.Category == category);
     private IExpirySource? SelectedSource => Service.Sources.FirstOrDefault(source => source.Key == input.SourceKey);
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (loading || FocusTemplateId is not { } id || scrolledTo == id || templates.All(item => item.Id != id)) return;
+        scrolledTo = id;
+        try { await JS.InvokeVoidAsync("blazorStocScrollTo", $"template-{id}"); }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+        catch (TaskCanceledException) { }
+    }
 
     private async Task LoadAsync()
     {

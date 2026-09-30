@@ -6,7 +6,7 @@
 
 @if (adding || editing is not null)
 {
-    <ServiceInterventionEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Interventions="interventions" Original="editing"
+    <ServiceInterventionEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Interventions="interventions" Original="editing" InitialWorkPointId="initialWorkPointId"
                                Saved="SavedAsync" Closed="CloseEditorAsync" PhotosChanged="ReloadCountsAsync" />
 }
 
@@ -74,6 +74,8 @@
     [Parameter, EditorRequired] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
     [Parameter, EditorRequired] public IReadOnlyList<ServiceContractDetails> Contracts { get; set; } = Array.Empty<ServiceContractDetails>();
     [Parameter] public bool CanManage { get; set; }
+    // Opens the form of a new intervention on this work point when the page is opened (the link of the map: ?adauga-interventie=<id>).
+    [Parameter] public int OpenForWorkPointId { get; set; }
     // The parent reloads the contracts (and the work point list) after a change: a maintenance intervention moves due dates.
     [Parameter] public EventCallback Changed { get; set; }
 
@@ -82,6 +84,7 @@
     private bool adding, busy, loading = true;
     private ServiceIntervention? editing, deleting;
     private Guid editorKey;
+    private int initialWorkPointId;
     private string kindFilter = "";
     private string? notice, error, deleteError;
     private readonly CancellationTokenSource lifetime = new();
@@ -93,7 +96,11 @@
         ? "Intervenția se arhivează împreună cu fotografiile ei. Dacă este ultima intervenție de mentenanță a punctului, scadența punctului revine la cea pe care a închis-o."
         : "Intervenția se arhivează împreună cu fotografiile ei; nu modifică scadențele punctului.";
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        if (CanManage && OpenForWorkPointId > 0 && WorkPoints.Any(point => point.Id == OpenForWorkPointId)) { initialWorkPointId = OpenForWorkPointId; OpenAdd(); }
+    }
 
     private async Task LoadAsync()
     {
@@ -119,7 +126,7 @@
     }
 
     private void OpenAdd() { adding = true; editing = null; editorKey = Guid.NewGuid(); notice = error = null; }
-    private void OpenEdit(ServiceIntervention item) { adding = false; editing = item; editorKey = Guid.NewGuid(); notice = error = null; }
+    private void OpenEdit(ServiceIntervention item) { initialWorkPointId = 0; adding = false; editing = item; editorKey = Guid.NewGuid(); notice = error = null; }
     private Task CloseEditorAsync() { adding = false; editing = null; return Task.CompletedTask; }
 
     private async Task SavedAsync(ServiceInterventionSaved saved)

@@ -30,6 +30,11 @@ public static class AuditEntities
     // Only the deletion of an intervention (either kind) is recorded under this type (it is archived); the other operations on
     // interventions are recorded under the beneficiary they belong to.
     public const string ServiceIntervention = "InterventieMentenanta";
+    // The journal itself: only its export is recorded under this type.
+    public const string Journal = "Jurnal";
+    // Settings → Hartă: the tile provider (one object, id 1) and the pin types of the overlay.
+    public const string MapEngine = "FurnizorHarta";
+    public const string MapPinType = "TipPinHarta";
 }
 
 public static class AuditActions
@@ -42,6 +47,14 @@ public static class AuditActions
     public const string Unlock = "Deblocare";
     public const string Generate = "Generare";
     public const string Restore = "Restaurare";
+    // The complete journal exported to a file (the filters used and the number of events are in the details).
+    public const string ExportJournal = "Export jurnal";
+    // Map settings: each operation names exactly what happened.
+    public const string EditMapEngine = "Modificare furnizor hartă";
+    public const string ResetMapEngine = "Resetare furnizor hartă";
+    public const string CreateMapPinType = "Adăugare tip pin hartă";
+    public const string EditMapPinType = "Modificare tip pin hartă";
+    public const string DeleteMapPinType = "Ștergere tip pin hartă";
     // Specific operations of the vehicle module: the action names the exact kind of change in the journal.
     public const string ExpiryItp = "Modificare expirare ITP";
     public const string ExpiryInsurance = "Modificare expirare asigurare";
@@ -98,7 +111,8 @@ public static class AuditActions
             or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto
             or CreateServiceContract or EditServiceContract or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
-            or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto;
+            or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
+            or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -150,10 +164,14 @@ public static class AuditNavigation
         [AuditEntities.StockMovement] = StockMovementNavigation.MovementUrl,
         // The vehicle page (its equipment, edit and delete actions).
         [AuditEntities.Vehicle] = VehicleNavigation.PageUrl,
-        // Templates live in Settings, notifications on their own page (neither has a page per object).
-        [AuditEntities.NotificationTemplate] = _ => "/setari",
+        // Templates and the clean-up setting live in the Notifications tab of Settings (the template row is highlighted);
+        // notifications have their own page.
+        [AuditEntities.NotificationTemplate] = SettingsNavigation.TemplateUrl,
         [AuditEntities.Notification] = _ => "/notificari",
-        [AuditEntities.NotificationSettings] = _ => "/setari"
+        [AuditEntities.NotificationSettings] = _ => SettingsNavigation.NotificationSettingsUrl,
+        // Map settings: the engine sub-tab, or the overlay sub-tab with the pin type highlighted.
+        [AuditEntities.MapEngine] = _ => SettingsNavigation.MapEngineUrl,
+        [AuditEntities.MapPinType] = SettingsNavigation.MapPinTypeUrl
     };
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)
@@ -183,7 +201,7 @@ public static class AuditNavigation
         return removals;
     }
 
-    private static string ObjectKey(string entityType, string entityId) => $"{entityType}:{entityId}";
+    public static string ObjectKey(string entityType, string entityId) => $"{entityType}:{entityId}";
 }
 
 public static class ProductNavigation
@@ -197,10 +215,137 @@ public static class UserNavigation
     public static string UserUrl(int userId) => $"/utilizatori/{userId}";
 }
 
+public static class SettingsNavigation
+{
+    public const string TabParameter = "tab";
+    public const string SubtabParameter = "subtab";
+    public const string TemplateParameter = "sablon";
+    public const string NotificationsTab = "notificari";
+    public const string TemplatesSubtab = "templates";
+    public const string SettingsSubtab = "settings";
+
+    public static string TemplateUrl(int templateId) =>
+        $"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={TemplatesSubtab}&{TemplateParameter}={templateId}";
+
+    public const string MapTab = "harta";
+    public const string MapEngineSubtab = "motor";
+    public const string MapOverlaySubtab = "overlay";
+    public const string PinParameter = "pin";
+
+    public static string MapEngineUrl => $"/setari?{TabParameter}={MapTab}&{SubtabParameter}={MapEngineSubtab}";
+    public static string MapPinTypeUrl(int pinTypeId) => $"/setari?{TabParameter}={MapTab}&{SubtabParameter}={MapOverlaySubtab}&{PinParameter}={pinTypeId}";
+
+    public static string NotificationSettingsUrl => $"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
+}
+
+// Filters of the journal, applied on the server. Dates are UTC instants: From included, To excluded (the caller converts the local
+// days the user chose). Text searches the operator, target, details and reason, without regard to letter case.
+public sealed record AuditQuery(string Text = "", string Entity = "", string Action = "", string Actor = "",
+    DateTime? FromUtc = null, DateTime? ToUtc = null)
+{
+    public bool IsEmpty => Text.Trim().Length == 0 && Entity.Length == 0 && Action.Length == 0 && Actor.Length == 0 && FromUtc is null && ToUtc is null;
+}
+
+// One page of results. Total is the number of events that match (inside the window, when there is one); JournalTotal is the size of
+// the whole journal, so a page limited to the latest events can say that there are more.
+public sealed record AuditPage(IReadOnlyList<AuditEvent> Events, int Total, int Page, int PageSize, int JournalTotal);
+
+public sealed record AuditSummary(int Total, int Today, int Actors, int Products);
+
 public interface IAuditTrail
 {
     Task RecordAsync(AuditWrite entry, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AuditEvent>> GetEventsAsync(CancellationToken cancellationToken = default);
+
+    // Filtering, search and paging on the server. window: only the latest N events of the journal are considered (null = all of it).
+    // pageSize 0 returns every match of the window (never more than AuditQueryRules.MaxRows).
+    Task<AuditPage> QueryAsync(AuditQuery query, int page, int pageSize, int? window = null, CancellationToken cancellationToken = default);
+    Task<AuditSummary> SummaryAsync(DateTime todayStartUtc, CancellationToken cancellationToken = default);
+
+    // The latest recorded deletion of each object that the given events are about (the events after it keep their links, see
+    // AuditNavigation.TargetUrl); the deletions may be older than the page or outside the window.
+    Task<IReadOnlyDictionary<string, DateTime>> RemovalTimesAsync(IEnumerable<AuditEvent> events, CancellationToken cancellationToken = default);
+}
+
+public static class AuditQueryRules
+{
+    // The default view of the journal page: the latest events only; the complete journal has its own page.
+    public const int RecentWindow = 500;
+    // The most rows one query (or one export) returns.
+    public const int MaxRows = 50_000;
+    public static readonly IReadOnlyList<int> CompletePageSizes = [25, 50, 100];
+    public const int DefaultCompletePageSize = 50;
+
+    // The events that answer the question "does it match?" in memory (the file journal and the tests). The database applies the same
+    // rules in SQL (MariaAuditTrail): a legacy "Modificare" counts as an edit, the operator is compared without letter case.
+    public static bool Matches(AuditEvent entry, AuditQuery query)
+    {
+        var text = query.Text.Trim();
+        return (query.Entity.Length == 0 || entry.EntityType == query.Entity) &&
+               (query.Action.Length == 0 || AuditActions.Normalize(entry.Action) == AuditActions.Normalize(query.Action)) &&
+               (query.Actor.Length == 0 || string.Equals(entry.ActorUsername, query.Actor, StringComparison.OrdinalIgnoreCase)) &&
+               (query.FromUtc is null || entry.TimestampUtc >= query.FromUtc) &&
+               (query.ToUtc is null || entry.TimestampUtc < query.ToUtc) &&
+               (text.Length == 0 || entry.ActorUsername.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                entry.Target.Contains(text, StringComparison.OrdinalIgnoreCase) || entry.Details.Contains(text, StringComparison.OrdinalIgnoreCase) ||
+                entry.Motif.Contains(text, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static AuditPage Page(IEnumerable<AuditEvent> all, AuditQuery query, int page, int pageSize, int? window)
+    {
+        var ordered = all.OrderByDescending(entry => entry.TimestampUtc).ToList();
+        var inWindow = window is { } limit ? ordered.Take(limit).ToList() : ordered;
+        var matching = inWindow.Where(entry => Matches(entry, query)).ToList();
+        var size = pageSize <= 0 ? Math.Min(MaxRows, Math.Max(1, matching.Count)) : pageSize;
+        var current = Math.Clamp(page, 1, Math.Max(1, (matching.Count + size - 1) / size));
+        return new(matching.Skip((current - 1) * size).Take(size).ToList(), matching.Count, current, pageSize <= 0 ? 0 : size, ordered.Count);
+    }
+
+    public static AuditSummary Summary(IEnumerable<AuditEvent> all, DateTime todayStartUtc)
+    {
+        var list = all as IReadOnlyCollection<AuditEvent> ?? all.ToList();
+        return new(list.Count, list.Count(entry => entry.TimestampUtc >= todayStartUtc),
+            list.Select(entry => entry.ActorUsername).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            list.Count(entry => entry.EntityType == AuditEntities.Product));
+    }
+
+    public static IReadOnlyDictionary<string, DateTime> Removals(IEnumerable<AuditEvent> all, IEnumerable<AuditEvent> shown)
+    {
+        var wanted = shown.Select(entry => AuditNavigation.ObjectKey(entry.EntityType, entry.EntityId)).ToHashSet(StringComparer.Ordinal);
+        return AuditNavigation.RemovalTimes(all).Where(item => wanted.Contains(item.Key)).ToDictionary(item => item.Key, item => item.Value);
+    }
+
+    // A short description of the filters, for the journal of an export ("operator: ana; tip: Produs; de la 01.09.2026 ...").
+    public static string Describe(AuditQuery query, Func<DateTime, string> date)
+    {
+        var parts = new List<string>();
+        if (query.Text.Trim().Length > 0) parts.Add($"căutare: „{query.Text.Trim()}”");
+        if (query.Entity.Length > 0) parts.Add($"tip: {query.Entity}");
+        if (query.Action.Length > 0) parts.Add($"operație: {query.Action}");
+        if (query.Actor.Length > 0) parts.Add($"operator: {query.Actor}");
+        if (query.FromUtc is { } from) parts.Add($"de la {date(from)}");
+        if (query.ToUtc is { } to) parts.Add($"înainte de {date(to)}");
+        return parts.Count == 0 ? "fără filtre" : string.Join("; ", parts);
+    }
+
+    // CSV (semicolon-separated, as Excel in Romanian expects; quoted values; a value that a spreadsheet could read as a formula is
+    // prefixed with an apostrophe). Times are UTC, written dd.MM.yyyy HH:mm:ss.
+    public static string Csv(IEnumerable<AuditEvent> events)
+    {
+        static string Cell(string value)
+        {
+            var text = value.Replace("\r", " ").Replace("\n", " ");
+            if (text.Length > 0 && "=+-@\t".Contains(text[0])) text = "'" + text;
+            return "\"" + text.Replace("\"", "\"\"") + "\"";
+        }
+        var builder = new StringBuilder();
+        builder.Append("Data și ora (UTC);Operator;Rol;Tip;Operație;Țintă;Detalii;Motiv\r\n");
+        foreach (var entry in events)
+            builder.Append(string.Join(';', Cell(entry.TimestampUtc.ToString("dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)),
+                Cell(entry.ActorUsername), Cell(entry.ActorRole), Cell(entry.EntityType), Cell(entry.Action),
+                Cell(AuditNavigation.DisplayTarget(entry)), Cell(entry.Details), Cell(entry.Motif))).Append("\r\n");
+        return builder.ToString();
+    }
 }
 
 public sealed class FileAuditTrail(IWebHostEnvironment environment, IConfiguration configuration, ILogger<FileAuditTrail> logger) : IAuditTrail
@@ -241,6 +386,27 @@ public sealed class FileAuditTrail(IWebHostEnvironment environment, IConfigurati
         }
         finally { gate.Release(); }
     }
+
+    private async Task<IReadOnlyList<AuditEvent>> ReadAllAsync(CancellationToken cancellationToken)
+    {
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!File.Exists(path)) return Array.Empty<AuditEvent>();
+            var lines = await File.ReadAllLinesAsync(path, cancellationToken).ConfigureAwait(false);
+            return lines.Select(Parse).Where(entry => entry is not null).Cast<AuditEvent>().ToArray();
+        }
+        finally { gate.Release(); }
+    }
+
+    public async Task<AuditPage> QueryAsync(AuditQuery query, int page, int pageSize, int? window = null, CancellationToken cancellationToken = default) =>
+        AuditQueryRules.Page(await ReadAllAsync(cancellationToken).ConfigureAwait(false), query, page, pageSize, window);
+
+    public async Task<AuditSummary> SummaryAsync(DateTime todayStartUtc, CancellationToken cancellationToken = default) =>
+        AuditQueryRules.Summary(await ReadAllAsync(cancellationToken).ConfigureAwait(false), todayStartUtc);
+
+    public async Task<IReadOnlyDictionary<string, DateTime>> RemovalTimesAsync(IEnumerable<AuditEvent> events, CancellationToken cancellationToken = default) =>
+        AuditQueryRules.Removals(await ReadAllAsync(cancellationToken).ConfigureAwait(false), events);
 
     private static AuditEvent? Parse(string line)
     {
