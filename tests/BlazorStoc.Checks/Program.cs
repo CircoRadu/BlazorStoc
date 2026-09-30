@@ -2218,11 +2218,22 @@ finally
         }));
         Check(raced.Count(done => done) == 1, "Two sessions cannot move the same equipment twice");
 
-        var events = (await pgAudit.GetEventsAsync()).Where(entry => entry.EntityType == AuditEntities.StockMovement && entry.Action == AuditActions.Create).ToArray();
+        var events = (await pgAudit.GetEventsAsync()).Where(entry => entry.EntityType == AuditEntities.StockMovement && entry.Action is AuditActions.Create or AuditActions.MoveEquipment or AuditActions.ReturnEquipment).ToArray();
         Check(events.Any(entry => entry.EntityId == returnedMovement.Id.ToString() && entry.Details.Contains("Destinație: Restituire în depozit") &&
                                   entry.Details.Contains("Sursă: Mașina HD-01-FDG") && entry.ActorUsername == "operator.pagina") &&
               events.Any(entry => entry.EntityId == moved.Id.ToString() && entry.Details.Contains("Vehicul: B-123-ABC")),
             "Each return and move is journalled with the operator, the destination, the vehicle and the source");
+        {
+            var expiryInput = VehicleInput.From(carOne);
+            VehicleRules.SetExpiry(expiryInput, VehicleExpiryKind.Rovinieta, TestExpiry!.Value.AddYears(1));
+            expiryInput.Reason = "Modificare data expirare rovinietă";
+            await pgVehicles.UpdateAsync(carOne, expiryInput, default, VehicleRules.ExpiryAuditAction(VehicleExpiryKind.Rovinieta));
+            var vehicleEvents = (await pgAudit.GetEventsAsync()).Where(entry => entry.EntityType == AuditEntities.Vehicle).ToArray();
+            Check(vehicleEvents.Any(entry => entry.Action == AuditActions.ExpiryRovinieta && entry.EntityId == carOne.Id.ToString() &&
+                                             entry.Details.Contains("Expirare rovinietă") && entry.Motif.Contains("rovinieta")),
+                "An expiry change is journalled with its specific operation, the old and new value and a generated reason");
+            carOne = (await pgVehicles.GetAsync(carOne.Id))!;
+        }
         try { await pgVehicles.DeleteAsync(carOne, "Motiv"); throw new Exception("Vehicle with transfers deleted"); }
         catch (VehicleOperationException) { Check(true, "A vehicle with transfer movements cannot be deleted"); }
     }

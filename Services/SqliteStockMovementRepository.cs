@@ -137,8 +137,8 @@ public sealed class SqliteStockMovementRepository(SqliteLocalStore store, IAcces
                 var movement = new StockMovement(id, line.ProductId, StockMovementKind.Exit, line.Quantity, day, description, null, null, null, null,
                     actor.Username, 0, now, now, false, destination, transfer.TargetVehicleId, targetPlate, transfer.SourceVehicleId, sourcePlate);
                 await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
-                    AuditEntities.StockMovement, AuditActions.Create, StockMovementRules.Target(productCode),
-                    StockMovementRules.AuditIdentification(movement, productCode), string.Empty, id.ToString()), cancellationToken).ConfigureAwait(false);
+                    AuditEntities.StockMovement, transfer.TargetVehicleId is null ? AuditActions.ReturnEquipment : AuditActions.MoveEquipment, StockMovementRules.Target(productCode),
+                    StockMovementRules.AuditIdentification(movement, productCode), description, id.ToString()), cancellationToken).ConfigureAwait(false);
                 await EnsureVehicleStocksNotNegativeAsync(connection, transaction, line.ProductId, cancellationToken).ConfigureAwait(false);
                 created.Add(movement);
             }

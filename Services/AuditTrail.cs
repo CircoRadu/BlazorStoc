@@ -29,6 +29,16 @@ public static class AuditActions
     public const string Unlock = "Deblocare";
     public const string Generate = "Generare";
     public const string Restore = "Restaurare";
+    // Specific operations of the vehicle module: the action names the exact kind of change in the journal.
+    public const string ExpiryItp = "Modificare expirare ITP";
+    public const string ExpiryInsurance = "Modificare expirare asigurare";
+    public const string ExpiryRovinieta = "Modificare expirare rovinietă";
+    public const string MoveEquipment = "Mutare echipament";
+    public const string ReturnEquipment = "Returnare echipament în depozit";
+
+    // Events whose object still has a live page (a plain edit or one of the specific edit operations).
+    public static bool IsCreateOrEdit(string? action) =>
+        action is Create or Edit or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -84,7 +94,7 @@ public static class AuditNavigation
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)
     {
-        if (entry.Action is not (AuditActions.Create or AuditActions.Edit) ||
+        if (!AuditActions.IsCreateOrEdit(entry.Action) ||
             !int.TryParse(entry.EntityId, out var entityId) || entityId <= 0 ||
             !Routes.TryGetValue(entry.EntityType, out var route))
             return null;
@@ -200,9 +210,14 @@ public static class AuditRecorder
         RecordEntityAsync(trail, access, entityType, AuditActions.Create, entityId, target, details, string.Empty, cancellationToken);
 
     public static Task RecordEditAsync(IAuditTrail? trail, IAccessControl? access, string entityType,
-        string entityId, string target, IEnumerable<AuditChange> changes, string motif, CancellationToken cancellationToken) =>
-        RecordEntityAsync(trail, access, entityType, AuditActions.Edit, entityId, target,
+        string entityId, string target, IEnumerable<AuditChange> changes, string motif, CancellationToken cancellationToken,
+        string? action = null) =>
+        RecordEntityAsync(trail, access, entityType, action ?? AuditActions.Edit, entityId, target,
             AuditDetails.Changes(changes.ToArray()), motif, cancellationToken);
+
+    public static Task RecordActionAsync(IAuditTrail? trail, IAccessControl? access, string entityType, string action,
+        string entityId, string target, string details, string motif, CancellationToken cancellationToken) =>
+        RecordEntityAsync(trail, access, entityType, action, entityId, target, details, motif, cancellationToken);
 
     public static Task RecordDeleteAsync(IAuditTrail? trail, IAccessControl? access, string entityType,
         string entityId, string target, string details, string motif, CancellationToken cancellationToken,

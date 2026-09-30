@@ -66,7 +66,7 @@ public sealed class MariaVehicleRepository(
         return vehicle;
     }
 
-    public async Task<Vehicle> UpdateAsync(Vehicle original, VehicleInput input, CancellationToken cancellationToken = default)
+    public async Task<Vehicle> UpdateAsync(Vehicle original, VehicleInput input, CancellationToken cancellationToken = default, string? auditAction = null)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         var value = input.Validated(true);
@@ -90,7 +90,7 @@ public sealed class MariaVehicleRepository(
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Vehicle, vehicle.Id.ToString(),
             SqliteVehicleRepository.Target(vehicle),
             VehicleRules.Changes(original, vehicle),
-            value.Reason, cancellationToken).ConfigureAwait(false);
+            value.Reason, cancellationToken, auditAction).ConfigureAwait(false);
         return vehicle;
     }
 

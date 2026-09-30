@@ -1,0 +1,62 @@
+@using BlazorStoc.Services
+@inject IVehicleRepository Repository
+@inject ILogger<VehicleExpiryDialog> Logger
+@implements IDisposable
+
+<div class="delete-overlay" @onkeydown="KeyDownAsync">
+    <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="vehicle-expiry-title">
+        <h2 id="vehicle-expiry-title">Modifică @Field.Label.ToLowerInvariant()</h2>
+        <p class="delete-object"><strong>@Vehicle.PlateNumber · @Vehicle.Description</strong></p>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        <label for="vehicle-expiry-date">@Field.Label *<PickOnlyDate Id="vehicle-expiry-date" @bind-Value="date" Min="@MinDate" Disabled="saving" /></label>
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@(saving || date is null)" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează")</button>
+            <button type="button" class="danger" disabled="@saving" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Vehicle Vehicle { get; set; } = default!;
+    [Parameter, EditorRequired] public VehicleExpiryField Field { get; set; }
+    [Parameter] public EventCallback<Vehicle> Saved { get; set; }
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private static readonly string MinDate = StockMovementRules.StorageDate(StockMovementRules.EarliestDate);
+    private readonly CancellationTokenSource lifetime = new();
+    private DateOnly? date;
+    private bool saving;
+    private string? error;
+
+    protected override void OnInitialized() => date = VehicleRules.GetExpiry(Vehicle, Field.Kind);
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" && !saving ? Cancelled.InvokeAsync() : Task.CompletedTask;
+
+    private async Task SaveAsync()
+    {
+        if (saving || date is null) return;
+        if (date == VehicleRules.GetExpiry(Vehicle, Field.Kind)) { await Cancelled.InvokeAsync(); return; }
+        saving = true; error = null;
+        Vehicle? saved = null;
+        try
+        {
+            // The reason is generated (the journal still records it); the audit trail logs the old and new value.
+            var input = VehicleInput.From(Vehicle);
+            VehicleRules.SetExpiry(input, Field.Kind, date);
+            input.Reason = $"Modificare {Field.Label.ToLowerInvariant()}";
+            saved = await Repository.UpdateAsync(Vehicle, input, lifetime.Token, VehicleRules.ExpiryAuditAction(Field.Kind));
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (VehicleOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Vehicle expiry saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Data de expirare nu a putut fi salvată. Actualizează pagina și reîncearcă.";
+        }
+        finally { saving = false; }
+        if (saved is not null) await Saved.InvokeAsync(saved);
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

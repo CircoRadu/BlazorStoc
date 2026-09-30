@@ -89,6 +89,11 @@ public sealed class VehicleInput
     };
 }
 
+public enum VehicleExpiryKind { Itp, Insurance, Rovinieta }
+
+// One editable expiry row of the vehicle page; the label is also used to generate the change reason.
+public sealed record VehicleExpiryField(VehicleExpiryKind Kind, string Label);
+
 public sealed class VehicleOperationException(string message) : Exception(message);
 
 // The choice made in the transfer dialog of the vehicle page: quantity (0 for whole-vehicle operations) and target vehicle.
@@ -99,7 +104,8 @@ public interface IVehicleRepository
     Task<IReadOnlyList<Vehicle>> GetVehiclesAsync(CancellationToken cancellationToken = default);
     Task<Vehicle?> GetAsync(int id, CancellationToken cancellationToken = default);
     Task<Vehicle> CreateAsync(VehicleInput input, CancellationToken cancellationToken = default);
-    Task<Vehicle> UpdateAsync(Vehicle original, VehicleInput input, CancellationToken cancellationToken = default);
+    // auditAction names the exact operation in the journal (null = a plain "Editare").
+    Task<Vehicle> UpdateAsync(Vehicle original, VehicleInput input, CancellationToken cancellationToken = default, string? auditAction = null);
     Task DeleteAsync(Vehicle original, string reason, CancellationToken cancellationToken = default);
 }
 
@@ -137,6 +143,26 @@ public static class VehicleRules
     public static readonly DateOnly DefaultRovinietaExpiry = new(2027, 9, 30);
     // Expiry dates may lie in the future; only an absurd year is rejected.
     public static readonly DateOnly LatestExpiry = new(2100, 12, 31);
+
+    public static DateOnly? GetExpiry(Vehicle vehicle, VehicleExpiryKind kind) => kind switch
+    {
+        VehicleExpiryKind.Itp => vehicle.ItpExpiry, VehicleExpiryKind.Insurance => vehicle.InsuranceExpiry, _ => vehicle.RovinietaExpiry
+    };
+
+    public static void SetExpiry(VehicleInput input, VehicleExpiryKind kind, DateOnly? date)
+    {
+        switch (kind)
+        {
+            case VehicleExpiryKind.Itp: input.ItpExpiry = date; break;
+            case VehicleExpiryKind.Insurance: input.InsuranceExpiry = date; break;
+            default: input.RovinietaExpiry = date; break;
+        }
+    }
+
+    public static string ExpiryAuditAction(VehicleExpiryKind kind) => kind switch
+    {
+        VehicleExpiryKind.Itp => AuditActions.ExpiryItp, VehicleExpiryKind.Insurance => AuditActions.ExpiryInsurance, _ => AuditActions.ExpiryRovinieta
+    };
 
     public static string DisplayExpiry(DateOnly? date) => date is { } value ? StockMovementRules.DisplayDate(value) : "—";
     public static string StorageExpiry(DateOnly? date) => date is { } value ? StockMovementRules.StorageDate(value) : string.Empty;

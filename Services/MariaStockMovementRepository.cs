@@ -154,9 +154,10 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             return (created, productCodes);
         }, cancellationToken).ConfigureAwait(false);
         foreach (var movement in movements)
-            await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.StockMovement, movement.Id.ToString(),
+            await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.StockMovement,
+                transfer.TargetVehicleId is null ? AuditActions.ReturnEquipment : AuditActions.MoveEquipment, movement.Id.ToString(),
                 StockMovementRules.Target(productCodes[movement.ProductId]),
-                StockMovementRules.AuditIdentification(movement, productCodes[movement.ProductId]), cancellationToken).ConfigureAwait(false);
+                StockMovementRules.AuditIdentification(movement, productCodes[movement.ProductId]), movement.Description, cancellationToken).ConfigureAwait(false);
         return movements;
     }
 

@@ -356,3 +356,13 @@
 
 .vehicle-tabs a.settings-tab { display:inline-block; text-decoration:none; }
 .pdf-preview-dialog{width:min(960px,96vw);max-width:none;height:min(92vh,1000px);display:flex;flex-direction:column;gap:6px;box-sizing:border-box;padding:22px 26px}.pdf-preview-dialog h2,.pdf-preview-dialog p{margin:0}.pdf-preview-frame{flex:1;min-height:0;width:100%;border:1px solid var(--line);border-radius:6px;background:#fff}
+
+/* Browser-style tabs (rounded top, curved flares on the active tab, no close button); the app's own colours. */
+.settings-tabs { gap:0; padding:10px 24px 0; overflow:visible; align-items:flex-end; background:var(--paper); border-radius:10px 10px 0 0; }
+.settings-tab { position:relative; margin-bottom:-1px; padding:10px 26px; border:1px solid transparent; border-bottom:0; border-radius:12px 12px 0 0; background:none; color:#5c706d; font-size:13px; font-weight:650; }
+.settings-tab:hover { color:var(--green); background:#ebf1ef; }
+.settings-tab.active { background:white; color:var(--green); border-color:var(--line); z-index:1; }
+.settings-tab.active::before, .settings-tab.active::after { content:""; position:absolute; bottom:0; width:12px; height:12px; pointer-events:none; }
+.settings-tab.active::before { left:-12px; background:radial-gradient(circle at 0 0, transparent 11px, var(--line) 11px, var(--line) 12px, white 12px); }
+.settings-tab.active::after { right:-12px; background:radial-gradient(circle at 100% 0, transparent 11px, var(--line) 11px, var(--line) 12px, white 12px); }
+.settings-tab + .settings-tab { margin-left:2px; }

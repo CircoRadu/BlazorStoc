@@ -45,13 +45,18 @@ else if (vehicle is not null)
             <div class="table-scroll"><table><thead><tr><th>INFORMAȚIE</th><th>VALOARE</th><th>STARE</th></tr></thead><tbody>
                 <tr><td>Număr de înmatriculare</td><td><span class="role-badge limited">@vehicle.PlateNumber</span></td><td></td></tr>
                 <tr><td>Descriere</td><td><strong>@vehicle.Description</strong></td><td></td></tr>
-                @foreach (var (label, date) in Expiries(vehicle))
+                @foreach (var (field, date) in Expiries(vehicle))
                 {
-                    <tr><td>@label</td><td><strong>@VehicleRules.DisplayExpiry(date)</strong></td><td>@ExpiryBadge(date)</td></tr>
+                    <tr><td>@field.Label</td><td><strong>@VehicleRules.DisplayExpiry(date)</strong> <button class="row-action edit" aria-label="Modifică @field.Label.ToLowerInvariant()" disabled="@(editing || editingExpiry is not null)" @onclick="() => editingExpiry = field">✎</button></td><td>@ExpiryBadge(date)</td></tr>
                 }
             </tbody></table></div>
         </div>
     </section>
+}
+
+@if (editingExpiry is not null && vehicle is not null)
+{
+    <VehicleExpiryDialog @key="editingExpiry.Kind" Vehicle="vehicle" Field="editingExpiry" Saved="ExpirySavedAsync" Cancelled="CloseExpiryDialog" />
 }
 
 @if (deleting && vehicle is not null)
@@ -72,10 +77,17 @@ else if (vehicle is not null)
     private LiveRefresh? live;
     private readonly CancellationTokenSource lifetime = new();
 
-    private static IEnumerable<(string Label, DateOnly? Date)> Expiries(Vehicle value) =>
+    private VehicleExpiryField? editingExpiry;
+
+    private static IEnumerable<(VehicleExpiryField Field, DateOnly? Date)> Expiries(Vehicle value) =>
     [
-        ("Data expirare ITP", value.ItpExpiry), ("Data expirare asigurare", value.InsuranceExpiry), ("Data expirare rovinietă", value.RovinietaExpiry)
+        (new(VehicleExpiryKind.Itp, "Data expirare ITP"), value.ItpExpiry),
+        (new(VehicleExpiryKind.Insurance, "Data expirare asigurare"), value.InsuranceExpiry),
+        (new(VehicleExpiryKind.Rovinieta, "Data expirare rovinietă"), value.RovinietaExpiry)
     ];
+
+    private Task CloseExpiryDialog() { editingExpiry = null; return Task.CompletedTask; }
+    private Task ExpirySavedAsync(Vehicle updated) { vehicle = updated; editingExpiry = null; notice = "Data de expirare a fost actualizată."; return Task.CompletedTask; }
 
     // Expired dates and dates within a month are flagged; the check uses the server's local day.
     private static RenderFragment ExpiryBadge(DateOnly? date) => builder =>
@@ -92,7 +104,7 @@ else if (vehicle is not null)
         // An open form or dialog is never replaced.
         live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Vehicle,
             () => InvokeAsync(async () => { if (!loading) { await RefreshAsync(); StateHasChanged(); } }),
-            () => editing || deleting, () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(15));
+            () => editing || deleting || editingExpiry is not null, () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(15));
         await LoadAsync();
     }
 

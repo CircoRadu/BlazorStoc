@@ -60,7 +60,7 @@ public sealed class SqliteVehicleRepository(SqliteLocalStore store, IAccessContr
         }
     }
 
-    public async Task<Vehicle> UpdateAsync(Vehicle original, VehicleInput input, CancellationToken cancellationToken = default)
+    public async Task<Vehicle> UpdateAsync(Vehicle original, VehicleInput input, CancellationToken cancellationToken = default, string? auditAction = null)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         var value = input.Validated(true);
@@ -84,7 +84,7 @@ public sealed class SqliteVehicleRepository(SqliteLocalStore store, IAccessContr
                 throw new VehicleOperationException(VehicleRules.ConcurrentMessage);
             var vehicle = new Vehicle(original.Id, value.PlateNumber, value.Description, version, value.ItpExpiry, value.InsuranceExpiry, value.RovinietaExpiry);
             await SqliteLocalStore.InsertAuditAsync(connection, transaction, new(actor.Username, actor.Role,
-                AuditEntities.Vehicle, AuditActions.Edit, Target(vehicle),
+                AuditEntities.Vehicle, auditAction ?? AuditActions.Edit, Target(vehicle),
                 AuditDetails.Changes(VehicleRules.Changes(original, vehicle)), value.Reason, vehicle.Id.ToString()),
                 cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
