@@ -396,3 +396,59 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 - Neverificat vizual: aspectul pe ecran ingust (telefon) al tabelului si al popup-ului, si comportamentul pentru un utilizator cu rol limitat (preluarea si amanarea sunt permise oricarui utilizator autentificat, sabloanele doar administratorului; testat automat, nu in browser).
 - Neverificat: reavertizarea reala la sfarsitul unei amanari (testata automat cu ceas simulat, nu asteptand zilele), si actualizarea triunghiului dintr-o a doua fereastra dupa preluarea din prima (interogare la 60 s, neasteptata in browser).
 - Verificare manuala recomandata pe baza reala: creeaza un sablon pentru un eveniment cu expirare apropiata (Setari -> Notificari), deschide `/notificari`, preia si amana o notificare, apoi verifica intrarile din Jurnal activitate.
+
+## Notificari depasite, rezolvate si ordonate (30.09.2026)
+
+### N1. Aspectul paginii `/notificari` pe ecran ingust
+- **Motiv**: M3 (redimensionarea la dispozitive reale nu este acoperita de panoul Browser). **Pasi**: deschide `/notificari` pe un telefon sau in emulare 375 px cu cel putin o notificare depasita si una nerezolvata; verifica cele doua tabele (derulare orizontala), filele "Active"/"Rezolvate", dialogul si campul de amanare.
+- **Asteptat**: tabelele se deruleaza orizontal, fondul rosu ramane lizibil, butoanele dialogului nu se suprapun.
+
+### N2. Utilizator cu rol limitat
+- **Motiv**: M2 (o singura sesiune autentificata in panoul Browser). **Pasi**: autentifica-te cu un cont cu rolul Utilizator, deschide `/notificari`, preia, amana si marcheaza ca rezolvata o notificare; incearca Setari -> Notificari.
+- **Asteptat**: cele trei operatii merg pentru orice utilizator autentificat, iar sabloanele raman rezervate administratorului (acoperit automat, neconfirmat in browser).
+
+### N3. Rezolvarea automata pe date reale
+- **Pasi**: pe baza reala, dupa ce ai reinnoit un ITP (modifici data pe pagina vehiculului), deschide `/notificari` -> "Rezolvate" si citeste motivul; sterge un vehicul cu notificare activa si verifica motivul "Vehiculul a fost sters.".
+- **Asteptat**: motivul numeste data veche si cea noua; notificarea nu dispare. (Automat: acoperit cu sursa de test si cu ITP-ul unui vehicul, nu cu stergerea unui vehicul real.)
+
+## Setari notificari: curatarea rezolvatelor (30.09.2026)
+
+### N4. Aspectul subtabului "Setari notificari" pe ecran ingust
+- **Motiv**: M3 (redimensionarea la dispozitive reale nu este acoperita de panoul Browser). **Pasi**: deschide Setari -> Notificari -> "Setari notificari" pe un telefon sau in emulare 375 px; bifeaza comutatorul, schimba perioada si apasa "Salveaza setarile" cu cel putin o notificare rezolvata veche.
+- **Asteptat**: comutatorul si campul de luni se aseaza pe verticala, iar popup-ul de confirmare se vede complet, cu butoanele nesuprapuse.
+
+### N5. Rularea zilnica pe ceas real
+- **Motiv**: M6 (curatarea zilnica ruleaza la prima evaluare din ziua noua; testata cu ceas simulat, nu asteptand miezul noptii). **Pasi**: cu comutatorul activ pe baza reala si o notificare rezolvata veche (rezolvata manual pentru un obiect a carui data s-a schimbat), asteapta prima evaluare a zilei urmatoare (deschide orice pagina dupa miezul noptii) si verifica in Jurnal intrarea "Curatare notificari rezolvate" cu actorul "sistem".
+- **Asteptat**: o singura intrare pe zi, doar cand s-a sters ceva; notificarile nerezolvate si cele rezolvate manual pentru evenimente curente raman neatinse.
+
+### N6. Restaurarea dintr-un backup facut inainte de migrarea 6
+- **Motiv**: M5 (restaurarea inlocuieste baza; necesita si contul `blazorstoc_restore`, neconfigurat pe aceasta masina). **Pasi**: fa un backup nou (contine `notification_settings`), apoi restaureaza-l; incearca si cu un backup mai vechi.
+- **Asteptat**: un backup nou se restaureaza; unul mai vechi este refuzat cu mesajul de structura diferita (manifestul nu contine tabelul nou). Backupurile existente din 29.09.2026 erau oricum anterioare tabelelor notificarilor.
+
+## Puncte de lucru extinse (30.09.2026)
+
+### N7. Aspectul editorului si al galeriei de poze pe ecran ingust
+- **Motiv**: M3 (redimensionarea la dispozitive reale nu este acoperita de panoul Browser). **Pasi**: deschide un beneficiar pe telefon sau in emulare 375 px, editeaza un punct de lucru cu 3-4 poze si o descriere lunga.
+- **Asteptat**: campurile se aseaza pe verticala, galeria are 2 coloane, butoanele "Sterge" nu se suprapun, tabelul punctelor se deruleaza orizontal.
+
+### N8. Incarcarea de fotografii reale si utilizator cu rol limitat
+- **Motiv**: M2 (o singura sesiune autentificata; nu se folosesc fisiere reale mari din panou). **Pasi**: cu un cont cu rol Utilizator, incarca de pe telefon 3-4 fotografii de camera (2-8 MB fiecare) intr-un punct de lucru; incearca si o imagine de peste 10 MB; sterge una.
+- **Asteptat**: fotografiile mari se incarca si se vad; cea de peste 10 MB este refuzata cu mesaj, celelalte raman; un cont fara dreptul de operator de beneficiari nu vede butoanele de modificare (acoperit automat, neconfirmat in browser).
+
+### N9. Beneficiari fara adresa si restaurarea dintr-un backup anterior
+- **Pasi (a)**: pe baza reala, 2 beneficiari nu au adresa (punctul lor principal are adresa goala); completeaza-o din "Editeaza" beneficiar si verifica ca punctul principal o preia. **Pasi (b)**: fa un backup nou (contine tabelele `service_photos`, `archive_work_points`, `archive_service_photos`), apoi restaureaza-l pe o copie; un backup mai vechi trebuie refuzat cu mesajul de structura diferita.
+- **Motiv**: (b) M5 (restaurarea inlocuieste baza; cere si contul `blazorstoc_restore`, neconfigurat pe aceasta masina). **Nota**: pozele de pe disc nu sunt in backup (risc acceptat, `docs/PROPUNERE_CONTRACTE_MENTENANTA.md`, sectiunea 12).
+
+## Contracte de mentenanta si acoperire (30.09.2026)
+
+### N10. Aspectul sectiunii de contracte si al formularului pe ecran ingust
+- **Motiv**: M3 (redimensionarea la dispozitive reale nu este acoperita de panoul Browser). **Pasi**: deschide un beneficiar cu 3-4 puncte de lucru pe telefon sau in emulare 375 px; adauga un contract cu toate punctele, editeaza-l, expandeaza lista de puncte, deschide panoul de activare.
+- **Asteptat**: tabelul contractelor si cel al punctelor se deruleaza orizontal, calendarele se deschid, butoanele nu se suprapun, textul "Muta aici" si mesajele de stare raman lizibile.
+
+### N11. Mutarea unui punct intre contracte active si stergerea unui contract din interfata
+- **Motiv**: M4 (fluxul e acoperit de teste de integrare, dar nu a fost parcurs in browser). **Pasi**: creeaza doua contracte pe acelasi beneficiar; in al doilea bifeaza "Muta aici" pentru un punct al primului; sterge apoi un contract din dialogul "Stergi contractul?" (motiv implicit sau propriu, cuvantul de confirmare).
+- **Asteptat**: punctul apare in al doilea contract cu scadenta pastrata, primul contract il pierde; stergerea arhiveaza contractul (Jurnal: "Stergere", tipul "Contracte mentenanta (stergeri)"), iar mutarea apare ca "Mutare punct de lucru in alt contract".
+
+### N12. Rol limitat si restaurare dintr-un backup anterior migrarii 8
+- **Motiv**: M2 / M5 (o singura sesiune autentificata; restaurarea cere contul `blazorstoc_restore`, neconfigurat pe aceasta masina). **Pasi**: cu un cont fara dreptul de operator de beneficiari, deschide un beneficiar cu contracte; fa un backup nou (contine `service_contracts`, `service_contract_points`, `archive_service_contracts`) si restaureaza-l pe o copie; un backup mai vechi trebuie refuzat.
+- **Asteptat**: fara drept, butoanele de modificare lipsesc (acoperit automat, neconfirmat in browser); backup-ul vechi este refuzat cu mesajul de structura diferita.

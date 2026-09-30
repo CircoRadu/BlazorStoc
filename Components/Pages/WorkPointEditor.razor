@@ -1,11 +1,12 @@
 @using BlazorStoc.Services
 @inject IWorkPointRepository Repository
+@inject IServicePhotoStore PhotoStore
 @inject ILogger<WorkPointEditor> Logger
 @implements IDisposable
 
 <UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="work-point-editor-title">
-    <div class="catalog-heading"><h2 id="work-point-editor-title">@(Original is null ? "Adaugă punct de lucru" : $"Editează punctul de lucru «{Original.Name}»")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    <div class="catalog-heading"><h2 id="work-point-editor-title">@(Original is null ? "Adaugă punct de lucru" : IsPrimary ? "Editează punctul de lucru principal" : $"Editează punctul de lucru «{Original!.Name}»")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="work-point-editor">
         <DataAnnotationsValidator />
@@ -13,13 +14,64 @@
         <fieldset disabled="@saving">
             <div class="editor-grid">
                 <label for="work-point-name">Nume *<InputTextLive id="work-point-name" @bind-Value="input.Name" maxlength="200" autocomplete="off" /><ValidationMessage For="() => input.Name" /></label>
-                <label for="work-point-address">Adresă *<InputTextLive id="work-point-address" @bind-Value="input.Address" maxlength="300" autocomplete="off" /><small>Două puncte de lucru ale aceluiași beneficiar nu pot avea aceeași adresă, chiar dacă numele diferă.</small><ValidationMessage For="() => input.Address" /></label>
-                <label for="work-point-phone">Număr de telefon<InputTextLive id="work-point-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="off" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
+                @if (IsPrimary)
+                {
+                    <label for="work-point-address">Adresă<input id="work-point-address" value="@input.Address" readonly /><small>Adresa și telefonul punctului principal se modifică din editarea beneficiarului.</small></label>
+                    <label for="work-point-phone">Număr de telefon<input id="work-point-phone" value="@input.Phone" readonly /></label>
+                }
+                else
+                {
+                    <label for="work-point-address">Adresă *<InputTextLive id="work-point-address" @bind-Value="input.Address" maxlength="300" autocomplete="off" /><small>Două puncte de lucru ale aceluiași beneficiar nu pot avea aceeași adresă, chiar dacă numele diferă.</small><ValidationMessage For="() => input.Address" /></label>
+                    <label for="work-point-phone">Număr de telefon<InputTextLive id="work-point-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="off" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
+                }
                 <label for="work-point-contact">Persoană de contact<InputTextLive id="work-point-contact" @bind-Value="input.ContactPerson" maxlength="200" autocomplete="off" /><ValidationMessage For="() => input.ContactPerson" /></label>
+                <label for="work-point-description" class="full-width">Descriere<textarea id="work-point-description" rows="4" maxlength="@WorkPointInput.DescriptionMaximumLength" @bind="input.Description" @bind:event="oninput"></textarea><small>Text liber despre punctul de lucru (acces, echipamente, particularități). Cel mult @WorkPointInput.DescriptionMaximumLength de caractere.</small><ValidationMessage For="() => input.Description" /></label>
+                <label class="check-label full-width" for="work-point-use-coordinates"><input id="work-point-use-coordinates" type="checkbox" role="switch" @bind="input.UseCoordinates" /> Coordonate (opțional)</label>
+                @if (input.UseCoordinates)
+                {
+                    <label for="work-point-coordinates" class="full-width">Latitudine, longitudine<InputTextLive id="work-point-coordinates" @bind-Value="input.CoordinatesText" maxlength="60" autocomplete="off" placeholder="45.7489, 21.2087" /><small>Poți lipi coordonatele copiate dintr-o hartă (de exemplu 45.7489, 21.2087). Latitudinea este între -90 și 90, longitudinea între -180 și 180. Cu comutatorul oprit, punctul rămâne fără coordonate.</small><ValidationMessage For="() => input.CoordinatesText" /></label>
+                }
             </div>
             <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează punctul de lucru")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
         </fieldset>
     </EditForm>
+
+    <div class="work-point-photos">
+        <div class="catalog-heading"><h3>Fotografii <span>@photos.Count</span></h3></div>
+        @if (Original is null || Original.Id == 0)
+        {
+            <p class="form-note">Fotografiile se adaugă după salvarea punctului de lucru; fișa rămâne deschisă după salvare, ca să le poți adăuga imediat.</p>
+        }
+        else
+        {
+            @if (photoError is not null) { <div class="error-banner" role="alert">@photoError</div> }
+            <div class="image-inputs">
+                <label class="photo-caption" for="work-point-photo-caption">Legendă pentru fotografiile alese (opțional)<input id="work-point-photo-caption" @bind="caption" @bind:event="oninput" maxlength="@ServicePhotoRules.CaptionMaximumLength" autocomplete="off" /></label>
+                <InputFile OnChange="PhotosSelectedAsync" multiple accept="image/jpeg,image/png,image/webp,image/gif" disabled="@(uploading || photoBusy || saving)" />
+                <small>JPG, PNG, WebP sau GIF, cel mult 10 MB fiecare, cel mult @ServicePhotoRules.MaximumPerOwner de fotografii per punct. Se salvează imediat, fără să apeși „Salvează punctul de lucru”.</small>
+                @if (uploading) { <span role="status">Se încarcă…</span> }
+            </div>
+            @if (photos.Count == 0)
+            {
+                <p class="muted">Nu există fotografii pentru acest punct de lucru.</p>
+            }
+            else
+            {
+                <ul class="photo-grid">
+                    @foreach (var photo in photos)
+                    {
+                        <li @key="photo.Id">
+                            <a href="@($"/media/service-photos/{photo.Id}")" target="_blank" rel="noopener"><img src="@($"/media/service-photos/{photo.Id}")" alt="@(photo.Caption.Length > 0 ? photo.Caption : photo.OriginalName)" loading="lazy" /></a>
+                            <span class="photo-name" title="@photo.OriginalName">@photo.OriginalName</span>
+                            @if (photo.Caption.Length > 0) { <span class="photo-caption-text">@photo.Caption</span> }
+                            <span class="muted">@photo.UploadedBy · @StockMovementRules.DisplayDate(DateOnly.FromDateTime(photo.UploadedUtc.ToLocalTime()))</span>
+                            <button type="button" class="danger" disabled="@(uploading || photoBusy || saving)" @onclick="() => DeletePhotoAsync(photo)">Șterge</button>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    </div>
 </section>
 
 @code {
@@ -27,18 +79,34 @@
     [Parameter] public WorkPoint? Original { get; set; }
     [Parameter] public EventCallback<WorkPoint> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
+    // Raised after a photo was added or deleted (the list of work points shows the number of photos).
+    [Parameter] public EventCallback PhotosChanged { get; set; }
     private UnsavedChangesTracker? tracker;
     private string CurrentSnapshot() => FormSnapshot.Of(input);
     private Task DiscardAsync() => Closed.InvokeAsync();
     private WorkPointInput input = new();
-    private bool saving;
-    private string? error;
+    private IReadOnlyList<ServicePhoto> photos = Array.Empty<ServicePhoto>();
+    private bool saving, uploading, photoBusy;
+    private string? error, photoError;
+    private string caption = "";
     private readonly CancellationTokenSource lifetime = new();
+    private bool IsPrimary => Original?.IsPrimary == true;
 
-    protected override Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
         input = Original is null ? new() : WorkPointInput.From(Original);
-        return Task.CompletedTask;
+        if (Original is { Id: > 0 }) await LoadPhotosAsync();
+    }
+
+    private async Task LoadPhotosAsync()
+    {
+        try { photos = await PhotoStore.GetForWorkPointAsync(Original!.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Work point photos loading failed ({ErrorType}).", exception.GetType().Name);
+            photoError = "Fotografiile nu au putut fi încărcate.";
+        }
     }
 
     private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
@@ -65,6 +133,61 @@
         }
         finally { saving = false; }
         if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    // Each chosen file is stored at once (and journaled); a refused file is reported and the others are still stored.
+    private async Task PhotosSelectedAsync(InputFileChangeEventArgs eventArgs)
+    {
+        if (Original is not { Id: > 0 } point || uploading) return;
+        uploading = true;
+        photoError = null;
+        var problems = new List<string>();
+        try
+        {
+            foreach (var file in eventArgs.GetMultipleFiles(ServicePhotoRules.MaximumPerOwner))
+            {
+                try
+                {
+                    await using var stream = file.OpenReadStream(ServicePhotoRules.MaximumBytes, lifetime.Token);
+                    using var buffer = new MemoryStream();
+                    await stream.CopyToAsync(buffer, lifetime.Token);
+                    await PhotoStore.AddToWorkPointAsync(point.Id, file.Name, buffer.ToArray(), caption, lifetime.Token);
+                }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+                catch (WorkPointOperationException exception) { problems.Add($"{file.Name}: {exception.Message}"); }
+                catch (AccessDeniedException exception) { problems.Add($"{file.Name}: {exception.Message}"); }
+                catch (IOException) { problems.Add($"{file.Name}: fotografia depășește 10 MB sau nu a putut fi citită."); }
+                catch (Exception exception)
+                {
+                    Logger.LogError("Work point photo upload failed ({ErrorType}).", exception.GetType().Name);
+                    problems.Add($"{file.Name}: fotografia nu a putut fi încărcată.");
+                }
+            }
+        }
+        finally { uploading = false; }
+        if (problems.Count > 0) photoError = string.Join(" ", problems);
+        await LoadPhotosAsync();
+        await PhotosChanged.InvokeAsync();
+    }
+
+    // One step, like deleting a work point: the journal receives the fixed reason WorkPointRules.PhotoDeleteReason.
+    private async Task DeletePhotoAsync(ServicePhoto photo)
+    {
+        if (photoBusy) return;
+        photoBusy = true;
+        photoError = null;
+        try { await PhotoStore.DeleteAsync(photo.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { photoError = exception.Message; }
+        catch (AccessDeniedException exception) { photoError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Work point photo deletion failed ({ErrorType}).", exception.GetType().Name);
+            photoError = "Fotografia nu a putut fi ștearsă.";
+        }
+        finally { photoBusy = false; }
+        await LoadPhotosAsync();
+        await PhotosChanged.InvokeAsync();
     }
 
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }

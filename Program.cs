@@ -138,6 +138,8 @@ builder.Services.AddScoped<IProductRepository>(services => new MariaProductRepos
 builder.Services.AddScoped<IStockMovementRepository>(services => new MariaStockMovementRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddScoped<IWorkPointRepository>(services => new MariaWorkPointRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
+builder.Services.AddScoped<IServicePhotoStore>(services => new MariaServicePhotoStore(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
+builder.Services.AddScoped<IServiceContractRepository>(services => new MariaServiceContractRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
 builder.Services.AddScoped<IBeneficiaryRepository>(services => new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IExpiryNotificationRepository>(services => new MariaExpiryNotificationRepository(services.GetRequiredService<IConfiguration>()));
@@ -267,6 +269,11 @@ app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileS
         ? Results.NotFound()
         : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
 }).RequireAuthorization();
+app.MapGet("/media/service-photos/{photoId:int}", async (int photoId, IServicePhotoStore photos, CancellationToken token) =>
+{
+    var photo = await photos.GetContentAsync(photoId, token);
+    return photo is null ? Results.NotFound() : Results.File(photo.Content, photo.ContentType, photo.OriginalName, enableRangeProcessing: true);
+}).RequireAuthorization();
 app.MapHub<ChangesHub>(ChangesHub.Path);
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
@@ -282,6 +289,13 @@ var migrateOnly = args.Contains("--migrate-schema");
             app.Logger.LogError("MariaDB schema is behind the application: missing {Columns}. {Hint}", string.Join(", ", report.MissingColumns),
                 report.MigratorConfigured ? "The migration ran but the columns are still missing." : "Configure Database:MigratorUser/MigratorPassword (migration-account.private.json) and restart, or run --migrate-schema.");
         else app.Logger.LogInformation("MariaDB schema is current ({Applied} migration(s) applied now).", report.Applied.Count);
+        if (report.MissingColumns.Count == 0)
+        {
+            // The main work point of the beneficiaries that existed before migration 7 (idempotent: creates only what is missing).
+            var backfill = await WorkPointBackfill.EnsurePrimariesAsync(app.Configuration);
+            if (backfill.Created + backfill.Promoted > 0 || backfill.EmptyAddress > 0)
+                app.Logger.LogInformation("Main work points: {Created} created, {Promoted} promoted from an additional point, {Empty} beneficiary(ies) without an address.", backfill.Created, backfill.Promoted, backfill.EmptyAddress);
+        }
         if (migrateOnly) return report.MissingColumns.Count == 0 ? 0 : 1;
     }
     catch (Exception exception) when (!migrateOnly)

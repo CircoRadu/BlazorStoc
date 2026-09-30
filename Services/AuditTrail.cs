@@ -19,6 +19,14 @@ public static class AuditEntities
     public const string DatabaseBackup = "CopieSiguranta";
     public const string NotificationTemplate = "SablonNotificare";
     public const string Notification = "Notificare";
+    public const string NotificationSettings = "SetariNotificari";
+    // Only the deletions of a work point and of a photo are recorded under these types (they are archived); creations and
+    // edits are recorded under the beneficiary the work point belongs to.
+    public const string WorkPoint = "PunctLucru";
+    public const string ServicePhoto = "FotografiePunctLucru";
+    // Only the deletion of a maintenance contract is recorded under this type (it is archived); the other operations on contracts
+    // are recorded under the beneficiary the contract belongs to.
+    public const string ServiceContract = "ContractMentenanta";
 }
 
 public static class AuditActions
@@ -45,11 +53,42 @@ public static class AuditActions
     public const string NotificationCreated = "Notificare creată";
     public const string AcknowledgeNotification = "Preluare notificare";
     public const string SnoozeNotification = "Amânare notificare";
+    // A user marks a notification resolved; the system closes one whose cause is gone (date changed, object removed) and
+    // reopens an automatically closed one whose date came back.
+    public const string ResolveNotification = "Rezolvare notificare";
+    public const string AutoResolveNotification = "Rezolvare automată notificare";
+    public const string ReopenNotification = "Redeschidere automată notificare";
+    // The clean-up of old resolved notifications: the change of its setting (switch or period) and each run that removed rows
+    // (by the administrator when the setting is switched on or the period shortened, by the system on the daily run).
+    public const string EditNotificationSettings = "Modificare setări curățare notificări";
+    public const string PurgeResolvedNotifications = "Curățare notificări rezolvate";
+    // Work points: each kind of change is named exactly (an edit that touches only the description or only the coordinates has
+    // its own name; a mixed edit is "Modificare punct de lucru"). Deleting a photo or a work point is the archived "Ștergere".
+    public const string CreateWorkPoint = "Adăugare punct de lucru";
+    public const string EditWorkPoint = "Modificare punct de lucru";
+    public const string EditWorkPointDescription = "Modificare descriere punct de lucru";
+    public const string EditWorkPointCoordinates = "Modificare coordonate punct de lucru";
+    public const string AddWorkPointPhoto = "Adăugare fotografie punct de lucru";
+    // Maintenance contracts and their coverage: each kind of change is named exactly. Deleting a contract is the archived "Ștergere".
+    public const string CreateServiceContract = "Adăugare contract mentenanță";
+    public const string EditServiceContract = "Modificare contract mentenanță";
+    public const string EditServiceContractExpiry = "Modificare expirare contract mentenanță";
+    public const string ActivateServiceContract = "Activare contract mentenanță";
+    public const string DeactivateServiceContract = "Dezactivare contract mentenanță";
+    public const string AddContractPoint = "Adăugare punct în contract";
+    public const string RemoveContractPoint = "Scoatere punct din contract";
+    public const string EditMaintenanceCycle = "Modificare ciclicitate mentenanță";
+    public const string RescheduleMaintenance = "Reprogramare intervenție mentenanță";
+    public const string MoveContractPoint = "Mutare punct de lucru în alt contract";
 
     // Events whose object still has a live page (a plain edit or one of the specific edit operations).
     public static bool IsCreateOrEdit(string? action) =>
         action is Create or Edit or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
-            or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification;
+            or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification
+            or ResolveNotification or AutoResolveNotification or ReopenNotification or EditNotificationSettings
+            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto
+            or CreateServiceContract or EditServiceContract or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
+            or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -103,7 +142,8 @@ public static class AuditNavigation
         [AuditEntities.Vehicle] = VehicleNavigation.PageUrl,
         // Templates live in Settings, notifications on their own page (neither has a page per object).
         [AuditEntities.NotificationTemplate] = _ => "/setari",
-        [AuditEntities.Notification] = _ => "/notificari"
+        [AuditEntities.Notification] = _ => "/notificari",
+        [AuditEntities.NotificationSettings] = _ => "/setari"
     };
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)

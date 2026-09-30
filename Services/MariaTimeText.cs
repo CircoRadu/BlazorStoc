@@ -59,6 +59,9 @@ internal static class MariaAssetPaths
     public static string ProjectFiles(IConfiguration configuration) => Path.GetFullPath(
         configuration["Database:MariaProjectFilesPath"] ?? Path.Combine(AssetsRoot(configuration), "project-files"));
 
+    public static string ServicePhotos(IConfiguration configuration) => Path.GetFullPath(
+        configuration["Database:MariaServicePhotosPath"] ?? Path.Combine(AssetsRoot(configuration), "service-photos"));
+
     // Shared by every MariaDB-mode store that archives a file (product images, project files): one directory,
     // never one per store, so ArchiveFileSafety's cleanup-marker retry logic always looks in the same place.
     public static string ArchiveFiles(IConfiguration configuration) => Path.GetFullPath(

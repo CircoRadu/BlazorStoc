@@ -424,3 +424,31 @@ Verificat la 25 septembrie 2026.
 - `tests/BlazorStoc.Checks`: 570 PASS (394 fara baza + integrare MariaDB), 5 rulari consecutive fara esec; sectiunea "Expiry notifications" acopera sabloane, motor, preluare concurenta, amanare si jurnal.
 - Browser (baza de test, port 5088): sablon creat din exemplul implicit, notificare cu triunghi rosu in meniu, popup, limita amanarii, amanare de 3 zile, jurnal cu operatiile "Adaugare sablon notificare" si "Amanare notificare".
 - Preview pe baza reala: `http://127.0.0.1:5087/` (migrarea 4 aplicata la pornire).
+
+## Notificari depasite, rezolvate si ordonate (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 601 PASS (570 inainte), 3 rulari consecutive fara esec, cu integrare MariaDB pe `blazorstoc_test` (`RUN_MARIA_INTEGRATION_CHECKS=1`); sectiunea "Expiry notifications" a fost rescrisa pentru regulile noi (un singur sablon activ, notificare pastrata dupa scadenta, rezolvare manuala si automata, redeschidere, dezactivare fara ascundere, jurnal).
+- Migrarea 5 aplicata pe baza reala `BlazorStoc` (la pornirea preview-ului 5087) si pe `blazorstoc_test`; schema verificata cu `SHOW CREATE TABLE` (cheia unica pe eveniment, coloana generata pentru sablonul activ).
+- Browser (baza de test, port 5088): al doilea sablon activ refuzat, doua tabele cu depasita prima pe fond rosu deschis, dialog cu linia de depasire, amanare precompletata cu 7, "Marcheaza ca rezolvata" si fila "Rezolvate", rezolvare automata cu motivul datelor vechi si noi. Pagina de pe baza reala (5087) se incarca cu noua schema.
+- Neverificat vizual: ecran ingust (telefon) si rol limitat; vezi `docs/TESTE_RAMASE.md` (N1, N2).
+
+## Setari notificari: curatarea rezolvatelor (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 636 PASS (601 inainte), 3 rulari consecutive fara esec, cu integrare MariaDB pe `blazorstoc_test` (`RUN_MARIA_INTEGRATION_CHECKS=1`); sectiunea noua "Notification settings: clean-up of old resolved notifications" acopera valorile implicite, accesul doar pentru administrator, validarea perioadei, ce se sterge si ce se pastreaza, activarea cu stergere imediata, scurtarea perioadei, oprirea, rularea zilnica o data pe zi (ceas simulat) si jurnalul.
+- Migrarea 6 aplicata pe baza reala `BlazorStoc` (la pornirea preview-ului 5087) si pe `blazorstoc_test` (`--migrate-schema`).
+- Browser (baza de test, port 5088): subtabul "Setari notificari", popup cu "3 notificari rezolvate mai vechi de 30.09.2025", Anuleaza (nimic nu se schimba), Confirma si sterge (mesaj, stare "activa ... ultima curatare"), scurtare 12 -> 1 luna cu popup pentru inca o notificare, oprire fara popup, intrarile din Jurnal. Pagina de pe baza reala (5087) se incarca cu setarile implicite; nicio setare nu a fost modificata pe baza reala.
+- Neverificat: ecran ingust, rulare zilnica pe ceas real, restaurare dintr-un backup anterior migrarii; vezi `docs/TESTE_RAMASE.md` (N4-N6).
+
+## Puncte de lucru extinse (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 680 PASS (647 inainte), 3 rulari consecutive fara esec, cu integrare MariaDB pe `blazorstoc_test` (`RUN_MARIA_INTEGRATION_CHECKS=1`); sectiunea "Work points" a fost rescrisa (punct principal real si unic, urmarea beneficiarului, descriere, coordonate, jurnal, poze, stergeri arhivate, backfill).
+- Migrarea 7 aplicata pe baza reala `BlazorStoc` (la pornirea preview-ului 5087; backfill: 7 randuri principale create, 2 beneficiari fara adresa) si pe `blazorstoc_test` (`--migrate-schema`).
+- Browser (baza de test, port 5088): tabelul cu coloanele noi, punct nou cu coordonate lipite, incarcare de poze (un `.txt` refuzat), stergere de poza, editarea punctului principal, stergerea punctului cu poza lui (arhivat), intrarile din Jurnal. Nu s-a modificat nimic manual pe baza reala in afara migrarii si a backfill-ului de la pornire.
+- Neverificat: ecran ingust, rol limitat, fisiere reale de 10 MB, restaurare dintr-un backup anterior migrarii; vezi `docs/TESTE_RAMASE.md` (N7-N9).
+
+## Contracte de mentenanta si acoperire (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 743 PASS (680 inainte), 3 rulari consecutive fara esec, cu integrare MariaDB pe `blazorstoc_test` (`RUN_MARIA_INTEGRATION_CHECKS=1`); sectiune noua "Maintenance contracts" (acoperire, un contract activ per punct, On/Off, mutari, doua sesiuni simultane, arhivare) si verificari pure pentru numarul/data contractului, validare, stari de scadenta, actiuni de jurnal, arhivare si migrarea 8.
+- Migrarea 8 aplicata pe baza reala `BlazorStoc` (la pornirea preview-ului 5087) si pe `blazorstoc_test` (`--migrate-schema`). Nimic nu a fost creat manual pe baza reala.
+- Browser (baza de test, port 5088, beneficiarul 241): contract nou cu doua puncte, expandare, Dezactiveaza / "Arata si contractele Off", Activeaza cu panoul de reprogramare, coloana "Mentenanta" din tabelul punctelor, refuzul stergerii unui punct acoperit.
+- Neverificat: ecran ingust, rol limitat, mutare si stergere de contract din interfata (acoperite in teste), restaurare dintr-un backup anterior migrarii 8; vezi `docs/TESTE_RAMASE.md` (N10-N12).

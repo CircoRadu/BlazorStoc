@@ -14,7 +14,23 @@ Din 28.09.2026, taskurile finalizate nu mai stau in acest fisier: ele se muta in
 
 # Taskuri active
 
-Nu exista taskuri active. Ultimele taskuri (eliminarea SQLite, refacerea testelor pe MariaDB, notificarile de expirare) sunt finalizate si arhivate in `IMPLEMENTED.md` (30.09.2026). Verificarile ramase sunt in `docs/TESTE_RAMASE.md`.
+Planul de mai jos vine din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` (deciziile confirmate de utilizator la 30.09.2026) si din evaluarea de la sfarsitul `docs/PROPUNERE_HARTA_MENTENANTA.md`. Detaliile fiecarui task (schema, reguli, jurnal, teste) sunt in documentul de propunere; aici sunt numai subtaskurile de urmarit. Verificarile ramase din taskurile anterioare sunt in `docs/TESTE_RAMASE.md`.
+
+## Task 1. Registru de interventii (propunere, sectiunile 3.4, 4)
+
+Interventii de mentenanta si la cerere, cele trei variante de scadenta, poze, pagina `/mentenanta`.
+
+De legat de contracte (deja implementate): la `service_contract_points.next_due` se scrie scadenta aleasa la inregistrare (contractul si punctul se blocheaza cu `FOR UPDATE` sub blocarea beneficiarului, ca in `MariaServiceContractRepository`); stergerea unui contract sau scoaterea unui punct din contract cu interventii se refuza cu mesaj clar (azi cheile straine ale interventiilor nu exista, deci verificarea se adauga odata cu ele); pagina `/mentenanta` primeste tabul "Scadente" cu comutatorul "Arata si contractele Off" (gri, fara stare de scadenta).
+
+## Task 2. Surse de notificare pentru mentenanta (propunere, sectiunile 6.2, 6.3)
+
+`mentenanta.scadenta` si `contract.expirare`, cu marcajele `<beneficiar>`, `<numar contract>`, `<data expirare>` etc.
+
+Pragul vizual al starii "In curand" (azi `ServiceDueRules.DefaultThresholdDays` = 30 in `Services/ServiceContracts.cs`) trece la pragul sablonului activ al sursei `mentenanta.scadenta`.
+
+## Task 3. Harta de mentenanta (optional, `docs/PROPUNERE_HARTA_MENTENANTA.md`)
+
+Depinde de contracte (implementate) si de Task 1 (registru); coordonatele si pozele punctelor de lucru exista deja.
 
 ## Observații pentru etapa de implementare
 

@@ -1,0 +1,84 @@
+@using BlazorStoc.Services
+
+@* Off -> On: a contract reopened after months would raise "overdue" for all its points at once, so the due dates are reviewed here first.
+   The points now covered by another active contract stop the activation unless they are taken out of this contract. *@
+<section class="product-editor" aria-labelledby="contract-activation-title">
+    <div class="catalog-heading"><h2 id="contract-activation-title">Activare contract @Plan.Details.Contract.Label</h2><button type="button" class="danger" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Închide</button></div>
+    @if (Error is not null) { <div class="error-banner" role="alert">@Error</div> }
+    @if (Plan.Details.Contract.ValidUntil is { } validUntil && validUntil < Today)
+    {
+        <div class="error-banner" role="status">Contractul a expirat la @StockMovementRules.DisplayDate(validUntil). Poți să-l activezi oricum, dar prelungește data de expirare din «Editează».</div>
+    }
+    <p class="form-note">Cât timp a fost oprit, scadențele nu s-au mutat. Alege pentru fiecare punct data următoarei intervenții (scadențele din trecut ar apărea imediat ca depășite) sau păstreaz-o pe cea existentă.</p>
+    @if (Plan.Conflicts.Count > 0)
+    {
+        <div class="error-banner" role="alert">
+            <p><strong>Unele puncte sunt acum în alt contract activ:</strong></p>
+            <ul>@foreach (var conflict in Plan.Conflicts) { <li>«@conflict.WorkPointName» este în contractul activ <strong>@conflict.ContractLabel</strong></li> }</ul>
+            <label class="check-label"><input type="checkbox" @bind="removeConflicting" disabled="@Busy" /> Scoate aceste puncte din contractul reactivat</label>
+        </div>
+    }
+    @if (Plan.Details.Points.Count == 0)
+    {
+        <p class="muted">Contractul nu acoperă niciun punct de lucru.</p>
+    }
+    else
+    {
+        <div class="contract-global-date">
+            <label for="activation-global-due">Reprogramează toate punctele la<PickOnlyDate Id="activation-global-due" @bind-Value="globalDue" Disabled="Busy" /></label>
+            <button type="button" class="refresh" disabled="@(globalDue is null || Busy)" @onclick="ApplyGlobalDue">Aplică tuturor</button>
+        </div>
+        <div class="table-scroll"><table><thead><tr><th>PUNCT DE LUCRU</th><th>SCADENȚA CURENTĂ</th><th>NOUA SCADENȚĂ</th></tr></thead><tbody>
+        @foreach (var point in Plan.Details.Points)
+        {
+            var conflicting = IsConflicting(point);
+            <tr @key="point.Point.Id" class="@(conflicting ? "contract-row-off" : null)">
+                <td><strong>@point.WorkPointName</strong><br /><small class="muted">@point.WorkPointAddress</small></td>
+                <td>@StockMovementRules.DisplayDate(point.Point.NextDue)@if (point.Point.NextDue < Today) { <text> <span class="due-chip due-overdue">din trecut</span></text> }</td>
+                <td>
+                    @if (conflicting) { <small class="muted">Se scoate din contract</small> }
+                    else { <PickOnlyDate Id="@($"activation-due-{point.Point.Id}")" @bind-Value="dues[point.Point.WorkPointId]" Disabled="Busy" /> }
+                </td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+    <div class="editor-actions">
+        <button type="button" class="primary" disabled="@(Busy || (Plan.Conflicts.Count > 0 && !removeConflicting))" @onclick="ConfirmAsync">@(Busy ? "Se activează…" : "Activează contractul")</button>
+        <button type="button" class="danger" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ServiceContractActivationPlan Plan { get; set; } = null!;
+    [Parameter] public DateOnly Today { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter, EditorRequired] public EventCallback<ServiceContractActivationChoice> Confirmed { get; set; }
+    [Parameter, EditorRequired] public EventCallback Cancelled { get; set; }
+
+    private readonly Dictionary<int, DateOnly?> dues = [];
+    private DateOnly? globalDue;
+    private bool removeConflicting;
+
+    protected override void OnInitialized()
+    {
+        foreach (var point in Plan.Details.Points) dues[point.Point.WorkPointId] = point.Point.NextDue;
+    }
+
+    private bool IsConflicting(ServiceContractPointView point) => removeConflicting && Plan.Conflicts.Any(conflict => conflict.WorkPointId == point.Point.WorkPointId);
+
+    private void ApplyGlobalDue()
+    {
+        if (globalDue is not { } date) return;
+        foreach (var point in Plan.Details.Points.Where(item => !IsConflicting(item))) dues[point.Point.WorkPointId] = date;
+    }
+
+    private Task ConfirmAsync()
+    {
+        var reschedules = Plan.Details.Points
+            .Where(point => !IsConflicting(point) && dues.TryGetValue(point.Point.WorkPointId, out var due) && due is not null)
+            .Select(point => new ServiceContractReschedule(point.Point.WorkPointId, dues[point.Point.WorkPointId]!.Value)).ToList();
+        return Confirmed.InvokeAsync(new ServiceContractActivationChoice(reschedules, removeConflicting));
+    }
+}

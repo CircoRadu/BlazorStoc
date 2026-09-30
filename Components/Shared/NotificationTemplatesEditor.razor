@@ -4,7 +4,7 @@
 @implements IDisposable
 
 <h2>Șabloane notificări</h2>
-<p class="muted">Definește pentru ce expirări se creează notificări, cu câte zile înainte și cu ce text. În subiect și în text poți folosi marcaje de forma <code>&lt;numar autovehicul&gt;</code>, înlocuite automat cu valorile obiectului. Categoriile și evenimentele disponibile vin din registrul de expirări al aplicației; un eveniment nou (de exemplu analiza de risc a unui obiectiv) apare aici de îndată ce este înregistrat.</p>
+<p class="muted">Definește pentru ce expirări se creează notificări, cu câte zile înainte și cu ce text. În subiect și în text poți folosi marcaje de forma <code>&lt;numar autovehicul&gt;</code>, înlocuite automat cu valorile obiectului. Categoriile și evenimentele disponibile vin din registrul de expirări al aplicației; un eveniment nou (de exemplu analiza de risc a unui obiectiv) apare aici de îndată ce este înregistrat. Pentru fiecare eveniment poate fi activ un singur șablon; notificarea creată rămâne în listă până este rezolvată, chiar și după data expirării.</p>
 
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -27,13 +27,13 @@
                     </select></label>
                 <label for="template-days">Cu câte zile înainte de expirare *<input id="template-days" type="number" min="1" max="@ExpiryTemplateRules.MaxThreshold" step="1" @bind="input.ThresholdDays" /></label>
                 <label class="anaf-check"><input type="checkbox" @bind="input.Active" /> Șablon activ</label>
-                <label for="template-subject" class="anaf-wide">Subiect *<input id="template-subject" @bind="input.Subject" @bind:event="oninput" maxlength="@ExpiryTemplateRules.MaxSubject" autocomplete="off" /></label>
-                <label for="template-body" class="anaf-wide">Text *<textarea id="template-body" rows="6" maxlength="@ExpiryTemplateRules.MaxBody" @bind="input.Body" @bind:event="oninput"></textarea></label>
+                <label for="template-subject" class="anaf-wide">Subiect *<input id="template-subject" @bind="input.Subject" @bind:event="oninput" @onfocus="() => subjectActive = true" maxlength="@ExpiryTemplateRules.MaxSubject" autocomplete="off" /></label>
+                <label for="template-body" class="anaf-wide">Text *<textarea id="template-body" rows="6" maxlength="@ExpiryTemplateRules.MaxBody" @bind="input.Body" @bind:event="oninput" @onfocus="() => subjectActive = false"></textarea></label>
             </div>
             @if (SelectedSource is { } selectedSource)
             {
                 <div class="placeholder-list" aria-label="Marcaje disponibile">
-                    <span class="muted small">Marcaje disponibile (clic pentru a le adăuga la sfârșitul textului):</span>
+                    <span class="muted small">Marcaje disponibile (clic pentru a le adăuga la sfârșitul câmpului activ, Subiect sau Text):</span>
                     @foreach (var placeholder in ExpiryTemplateRules.AllPlaceholders(selectedSource))
                     {
                         <button type="button" class="placeholder-chip" title="@placeholder.Description" @onclick="() => Append(placeholder.Name)">&lt;@placeholder.Name&gt;</button>
@@ -74,7 +74,7 @@ else
                 <td class="number">@template.ThresholdDays</td>
                 <td><span class="notification-state @(template.Active ? "done" : "")">@(template.Active ? "Activ" : "Inactiv")</span></td>
                 <td class="row-actions"><button type="button" class="refresh" disabled="@(editing || saving)" @onclick="() => OpenEditor(template)">Editează</button>
-                    <button type="button" class="danger" disabled="@(editing || saving)" @onclick="() => deleting = template">Șterge</button></td>
+                    <button type="button" class="danger" disabled="@(editing || saving)" @onclick="() => BeginDeleteAsync(template)">Șterge</button></td>
             </tr>
         }
         </tbody></table></div>
@@ -84,7 +84,7 @@ else
 @if (deleting is not null)
 {
     <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi șablonul?" Subject="Șablonul" ObjectLabel="@deleting.Subject"
-                              Description="Notificările create din acest șablon sunt șterse odată cu el."
+                              Description="@DeleteDescription"
                               ConfirmationNote="Operația șterge șablonul și notificările lui și va fi înregistrată în jurnal."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDelete" />
 }
@@ -95,7 +95,8 @@ else
     private NotificationTemplate? original, deleting;
     private NotificationTemplateInput input = new();
     private string category = "";
-    private bool loading, editing, saving, deleteBusy;
+    private bool loading, editing, saving, deleteBusy, subjectActive;
+    private int openCount;
     private string? error, notice, deleteError;
 
     private IEnumerable<string> Categories => Service.Sources.Select(source => source.Category).Distinct().Order(StringComparer.CurrentCultureIgnoreCase);
@@ -123,6 +124,7 @@ else
         original = template; notice = null; error = null;
         input = template is null ? new NotificationTemplateInput() : NotificationTemplateInput.From(template);
         category = Service.Sources.FirstOrDefault(source => source.Key == input.SourceKey)?.Category ?? "";
+        subjectActive = false;
         editing = true;
     }
 
@@ -137,7 +139,11 @@ else
 
     private void EventChanged(ChangeEventArgs args) => input.SourceKey = args.Value?.ToString() ?? "";
 
-    private void Append(string name) => input.Body += $"<{name}>";
+    private void Append(string name)
+    {
+        if (subjectActive) input.Subject += $"<{name}>";
+        else input.Body += $"<{name}>";
+    }
 
     private void FillExample()
     {
@@ -189,6 +195,27 @@ else
         }
         finally { deleteBusy = false; }
     }
+
+    // The notifications of a template are deleted with it: the dialog says how many of them are still unresolved.
+    private async Task BeginDeleteAsync(NotificationTemplate template)
+    {
+        error = null; notice = null; deleteError = null;
+        try
+        {
+            openCount = await Service.CountOpenNotificationsAsync(template, lifetime.Token);
+            deleting = template;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Counting the open notifications failed ({ErrorType}).", exception.GetType().Name);
+            error = "Numărul notificărilor nerezolvate nu a putut fi aflat. Reîncearcă.";
+        }
+    }
+
+    private string DeleteDescription => openCount > 0
+        ? $"Atenție: șablonul are {openCount} {(openCount == 1 ? "notificare nerezolvată" : "notificări nerezolvate")}, care vor fi șterse odată cu el, împreună cu cele rezolvate."
+        : "Notificările create din acest șablon (inclusiv cele rezolvate) sunt șterse odată cu el.";
 
     private void CancelDelete() { deleting = null; deleteError = null; }
 

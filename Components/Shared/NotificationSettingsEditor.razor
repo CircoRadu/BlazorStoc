@@ -1,0 +1,164 @@
+@using BlazorStoc.Services
+@inject IExpiryNotificationService Service
+@inject ILogger<NotificationSettingsEditor> Logger
+@implements IDisposable
+
+<h2>Setări notificări</h2>
+<p class="muted">O notificare rezolvată rămâne în lista „Rezolvate” a paginii Notificări. Cu ștergerea activată, notificările rezolvate de mai mult de perioada aleasă sunt eliminate din baza de date, o dată pe zi. Notificările nerezolvate nu se șterg niciodată, iar o notificare rezolvată manual pentru o expirare încă valabilă se păstrează, pentru ca sistemul să nu o creeze din nou.</p>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă setările</h3></div>
+}
+else if (settings is not null)
+{
+    <section class="product-editor" aria-labelledby="purge-settings-title">
+        <div class="catalog-heading"><h3 id="purge-settings-title">Ștergerea notificărilor rezolvate</h3></div>
+        <fieldset disabled="@(saving || confirming is not null)">
+            <div class="editor-grid">
+                <label class="anaf-check anaf-wide"><input id="purge-enabled" type="checkbox" role="switch" checked="@enabled" @onchange="args => enabled = args.Value is true" />
+                    Șterge notificările rezolvate mai vechi de:</label>
+                <label for="purge-months">Perioada, în luni (@NotificationPurgeRules.MinMonths–@NotificationPurgeRules.MaxMonths)
+                    <input id="purge-months" type="number" min="@NotificationPurgeRules.MinMonths" max="@NotificationPurgeRules.MaxMonths" step="1" @bind="months" /></label>
+            </div>
+            <p class="form-note">Stare actuală: @CurrentState</p>
+            <div class="editor-actions">
+                <button class="primary" type="button" disabled="@(!Changed)" @onclick="BeginSaveAsync">@(saving ? "Se salvează…" : "Salvează setările")</button>
+                <button class="refresh" type="button" disabled="@(!Changed)" @onclick="Reset">Renunță la modificări</button>
+            </div>
+        </fieldset>
+    </section>
+}
+
+@if (confirming is not null)
+{
+    <SaveConfirmationDialog Title="Ștergi notificările rezolvate vechi?" Changes="@confirming.Changes" Message="@confirming.Message"
+                            ConfirmLabel="Confirmă și șterge" Note="Ștergerea nu poate fi anulată și va fi înregistrată în jurnal."
+                            Confirmed="ConfirmAsync" Cancelled="CancelConfirmation" />
+}
+
+@code {
+    private sealed record Confirmation(string Message, IReadOnlyList<AuditChange> Changes);
+
+    private readonly CancellationTokenSource lifetime = new();
+    private NotificationSettings? settings;
+    private Confirmation? confirming;
+    private bool loading, saving, enabled;
+    private int months = NotificationPurgeRules.DefaultMonths;
+    private string? error, notice;
+
+    private bool Changed => settings is not null && (enabled != settings.PurgeEnabled || months != settings.PurgeMonths);
+
+    private string CurrentState => settings is null ? "" : settings.PurgeEnabled
+        ? $"activă, pentru notificările rezolvate de mai mult de {NotificationPurgeRules.Months(settings.PurgeMonths)}"
+          + (settings.LastPurgeUtc is { } last ? $"; ultima curățare: {StockMovementRules.DisplayDate(DateOnly.FromDateTime(last.ToLocalTime()))}" : "; încă nu a rulat")
+        : "oprită (notificările rezolvate se păstrează)";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            settings = await Service.GetSettingsAsync(lifetime.Token);
+            Reset();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Notification settings loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Setările nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private void Reset()
+    {
+        enabled = settings?.PurgeEnabled ?? false;
+        months = settings?.PurgeMonths ?? NotificationPurgeRules.DefaultMonths;
+    }
+
+    // Switching the clean-up on, or shortening the period while it is on, deletes rows at once: the administrator is told how
+    // many, and the date limit, before anything is applied. When there is nothing to remove the change is applied directly.
+    private async Task BeginSaveAsync()
+    {
+        if (settings is null || saving || !Changed) return;
+        saving = true; error = null; notice = null;
+        try
+        {
+            if (!NotificationPurgeRules.IsValidMonths(months))
+            {
+                error = $"Perioada trebuie să fie între {NotificationPurgeRules.MinMonths} și {NotificationPurgeRules.MaxMonths} de luni.";
+                return;
+            }
+            var deletes = enabled && (!settings.PurgeEnabled || months < settings.PurgeMonths);
+            if (deletes)
+            {
+                var plan = await Service.PreviewPurgeAsync(months, lifetime.Token);
+                if (plan.Count > 0)
+                {
+                    confirming = new Confirmation($"Cu această setare {NotificationPurgeRules.WillRemoveText(plan.Count, plan.Cutoff)}. Continui?",
+                        [.. NotificationPurgeRules.Changes(settings, enabled, months)]);
+                    return;
+                }
+            }
+            await SaveAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (NotificationOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Notification settings check failed ({ErrorType}).", exception.GetType().Name);
+            error = "Setările nu au putut fi verificate. Reîncearcă.";
+        }
+        finally { saving = false; }
+    }
+
+    private async Task ConfirmAsync()
+    {
+        confirming = null;
+        if (saving) return;
+        saving = true;
+        try { await SaveAsync(); }
+        finally { saving = false; }
+    }
+
+    private void CancelConfirmation() => confirming = null;
+
+    private async Task SaveAsync()
+    {
+        if (settings is null) return;
+        try
+        {
+            var saved = await Service.SaveSettingsAsync(settings, enabled, months, lifetime.Token);
+            settings = saved.Settings;
+            Reset();
+            notice = saved.Cutoff is { } cutoff && saved.Removed > 0
+                ? $"Setările au fost salvate: {NotificationPurgeRules.RemovedText(saved.Removed, cutoff)}."
+                : "Setările au fost salvate.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (NotificationOperationException exception) { error = exception.Message; await ReloadAfterConflictAsync(); }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Notification settings saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Setările nu au putut fi salvate. Reîncearcă.";
+        }
+    }
+
+    private async Task ReloadAfterConflictAsync()
+    {
+        var message = error;
+        await LoadAsync();
+        error = message;
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

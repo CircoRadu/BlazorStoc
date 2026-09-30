@@ -174,6 +174,39 @@ internal static class MariaArchivePersistence
                     """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", vehicle.Id),
                     ("@plate", vehicle.PlateNumber), ("@description", vehicle.Description), ("@version", vehicle.Version)).ConfigureAwait(false);
                 break;
+            case AuditEntities.WorkPoint:
+                var workPoint = ArchiveJson.Entity<WorkPoint>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_work_points
+                        (archive_id,original_id,beneficiary_id,name,address,phone,contact_person,description,latitude,longitude,is_primary,version)
+                    VALUES(@archiveId,@id,@beneficiary,@name,@address,@phone,@contact,@description,@latitude,@longitude,@primary,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", workPoint.Id), ("@beneficiary", workPoint.BeneficiaryId),
+                    ("@name", workPoint.Name), ("@address", workPoint.Address), ("@phone", workPoint.Phone),
+                    ("@contact", workPoint.ContactPerson), ("@description", workPoint.Description), ("@latitude", workPoint.Latitude),
+                    ("@longitude", workPoint.Longitude), ("@primary", workPoint.IsPrimary ? 1 : 0), ("@version", workPoint.Version)).ConfigureAwait(false);
+                break;
+            case AuditEntities.ServicePhoto:
+                var servicePhoto = ArchiveJson.Entity<ServicePhoto>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_service_photos
+                        (archive_id,original_id,work_point_id,intervention_id,original_name,content_type,byte_length,sha256,caption,uploaded_by,uploaded_utc)
+                    VALUES(@archiveId,@id,@workPoint,@intervention,@name,@contentType,@length,@hash,@caption,@author,@uploaded)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", servicePhoto.Id), ("@workPoint", servicePhoto.WorkPointId),
+                    ("@intervention", servicePhoto.InterventionId), ("@name", servicePhoto.OriginalName), ("@contentType", servicePhoto.ContentType),
+                    ("@length", servicePhoto.SizeBytes), ("@hash", servicePhoto.Sha256), ("@caption", servicePhoto.Caption),
+                    ("@author", servicePhoto.UploadedBy), ("@uploaded", MariaTimeText.Format(servicePhoto.UploadedUtc))).ConfigureAwait(false);
+                break;
+            case AuditEntities.ServiceContract:
+                var serviceContract = ArchiveJson.Entity<ServiceContract>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_service_contracts
+                        (archive_id,original_id,beneficiary_id,contract_number,contract_date,cycle_months,valid_until,is_active,notes,version)
+                    VALUES(@archiveId,@id,@beneficiary,@number,@date,@cycle,@validUntil,@active,@notes,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", serviceContract.Id), ("@beneficiary", serviceContract.BeneficiaryId),
+                    ("@number", serviceContract.Number), ("@date", serviceContract.Date.ToDateTime(TimeOnly.MinValue)), ("@cycle", serviceContract.CycleMonths),
+                    ("@validUntil", serviceContract.ValidUntil?.ToDateTime(TimeOnly.MinValue)), ("@active", serviceContract.IsActive ? 1 : 0),
+                    ("@notes", serviceContract.Notes), ("@version", serviceContract.Version)).ConfigureAwait(false);
+                break;
             default:
                 throw new ArchiveContractException(
                     $"Tipul «{snapshot.EntityType}» este înregistrat, dar nu are mapare MariaDB pentru tabela sa archive_*.");

@@ -16,7 +16,10 @@ public static class ArchiveSchemaRegistry
             new ArchiveEntitySchema(AuditEntities.ProjectObservation, "archive_project_observations", true, true),
             new ArchiveEntitySchema(AuditEntities.ProjectObservationFile, "archive_project_observation_files", false, true),
             new ArchiveEntitySchema(AuditEntities.StockMovement, "archive_stock_movements", true, false),
-            new ArchiveEntitySchema(AuditEntities.Vehicle, "archive_vehicles", true, false)
+            new ArchiveEntitySchema(AuditEntities.Vehicle, "archive_vehicles", true, false),
+            new ArchiveEntitySchema(AuditEntities.WorkPoint, "archive_work_points", true, true),
+            new ArchiveEntitySchema(AuditEntities.ServicePhoto, "archive_service_photos", false, true),
+            new ArchiveEntitySchema(AuditEntities.ServiceContract, "archive_service_contracts", true, false)
         }.ToDictionary(schema => schema.EntityType, StringComparer.Ordinal);
 
     public static IReadOnlyCollection<ArchiveEntitySchema> All { get; } = Schemas.Values.ToArray();
@@ -151,11 +154,43 @@ public static class ArchiveRequests
             ProductCode.AuditTarget(value), ProductCode.AuditIdentification(value), motif);
     }
 
-    public static ArchiveRequest Beneficiary(Beneficiary value, string motif)
+    // The work points of the beneficiary and their photos travel with it as relations (their files as archived files).
+    public static ArchiveRequest Beneficiary(Beneficiary value, string motif,
+        IEnumerable<WorkPoint>? workPoints = null, IEnumerable<ServicePhoto>? photos = null)
     {
         var details = AuditDetails.Identification(("Denumire", value.Name), ("CUI", value.Cui));
-        return new(ArchiveSnapshot.Create(AuditEntities.Beneficiary, value.Id.ToString(), value.Version, value),
+        var relations = (workPoints ?? []).Select(point => ArchiveRelationSnapshot.Create(AuditEntities.WorkPoint, point.Id.ToString(), point))
+            .Concat((photos ?? []).Select(photo => ArchiveRelationSnapshot.Create(AuditEntities.ServicePhoto, photo.Id.ToString(), photo)));
+        return new(ArchiveSnapshot.Create(AuditEntities.Beneficiary, value.Id.ToString(), value.Version, value, relations),
             $"#{value.Id} · {value.Name}", details, motif);
+    }
+
+    public static ArchiveRequest WorkPoint(WorkPoint value, string beneficiaryName, IEnumerable<ServicePhoto> photos, string motif)
+    {
+        var details = AuditDetails.Identification(("Nume", value.Name), ("Adresă", value.Address), ("Beneficiar", beneficiaryName));
+        var relations = photos.Select(photo => ArchiveRelationSnapshot.Create(AuditEntities.ServicePhoto, photo.Id.ToString(), photo));
+        return new(ArchiveSnapshot.Create(AuditEntities.WorkPoint, value.Id.ToString(), value.Version, value, relations),
+            WorkPointRules.Target(value.BeneficiaryId, beneficiaryName, value.Name), details, motif);
+    }
+
+    public static ArchiveRequest ServicePhoto(ServicePhoto value, string workPointName, string motif)
+    {
+        var details = AuditDetails.Identification(("Nume fișier", value.OriginalName), ("Punct de lucru", workPointName), ("Autor", value.UploadedBy));
+        return new(ArchiveSnapshot.Create(AuditEntities.ServicePhoto, value.Id.ToString(), 0, value),
+            value.OriginalName, details, motif);
+    }
+
+    public const string ServiceContractPointRelation = "PunctContractMentenanta";
+
+    // The coverage (the work points of the contract with their due dates) travels with the contract as relations.
+    public static ArchiveRequest ServiceContract(ServiceContractDetails value, string beneficiaryName, string motif)
+    {
+        var contract = value.Contract;
+        var details = AuditDetails.Identification(("Contract", contract.Label), ("Beneficiar", beneficiaryName),
+            ("Stare", contract.IsActive ? "activ (On)" : "inactiv (Off)"), ("Puncte de lucru", value.Points.Count.ToString()));
+        var relations = value.Points.Select(point => ArchiveRelationSnapshot.Create(ServiceContractPointRelation, point.Point.Id.ToString(), point));
+        return new(ArchiveSnapshot.Create(AuditEntities.ServiceContract, contract.Id.ToString(), contract.Version, contract, relations),
+            ServiceContractRules.Target(contract.BeneficiaryId, beneficiaryName, contract.Label), details, motif);
     }
 
     public static ArchiveRequest Vehicle(Vehicle value, string motif)

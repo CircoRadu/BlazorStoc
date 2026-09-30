@@ -1,0 +1,229 @@
+@using BlazorStoc.Services
+@inject IServiceContractRepository Repository
+@inject TimeProvider Clock
+@inject ILogger<ServiceContractsSection> Logger
+@implements IDisposable
+
+@if (adding || editing is not null)
+{
+    <ServiceContractEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Original="editing"
+                           Saved="SavedAsync" Closed="CloseEditorAsync" />
+}
+
+@if (activation is not null)
+{
+    <ServiceContractActivationPanel @key="activationKey" Plan="activation" Today="Today" Busy="busy" Error="@activationError"
+                                    Confirmed="ActivateAsync" Cancelled="CancelActivationAsync" />
+}
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Contracte de mentenanță <span>@Visible.Count</span></h2>
+        <div class="heading-actions">
+            @if (OffCount > 0) { <label class="check-label"><input type="checkbox" @bind="showOff" /> Arată și contractele Off (@OffCount)</label> }
+            @if (CanManage) { <button class="refresh" disabled="@Locked" @onclick="OpenAdd">+ Adaugă contract</button> }
+        </div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (Visible.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>@(Contracts.Count == 0 ? "Nu există contracte de mentenanță" : "Toate contractele sunt oprite (Off)")</h3>
+            <p>@(Contracts.Count == 0 ? "Adaugă un contract ca să urmărești scadențele de mentenanță ale punctelor de lucru." : "Bifează „Arată și contractele Off” ca să le vezi.")</p></div>
+    }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>CONTRACT</th><th>EXPIRĂ</th><th>STARE</th><th>CICLICITATE</th><th class="number">PUNCTE</th><th>URMĂTOAREA SCADENȚĂ</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+        @foreach (var details in Visible)
+        {
+            var contract = details.Contract;
+            var expired = ServiceDueRules.IsExpired(contract, Today);
+            <tr @key="contract.Id" class="@(contract.IsActive ? null : "contract-row-off")">
+                <td><strong>@contract.Label</strong>@if (contract.Notes.Length > 0) { <br /><small class="muted" title="@contract.Notes">@Shorten(contract.Notes)</small> }</td>
+                <td>@ServiceContractRules.ValidUntilText(contract.ValidUntil)@if (expired) { <text> <span class="contract-state expired">Expirat</span></text> }</td>
+                <td><span class="contract-state @(contract.IsActive ? "on" : "off")">@(contract.IsActive ? "On" : "Off")</span></td>
+                <td>@ServiceContractRules.CycleText(contract.CycleMonths)</td>
+                <td class="number"><button type="button" class="link-button" aria-expanded="@expanded.Contains(contract.Id)" @onclick="() => Toggle(contract.Id)">@details.Points.Count @(expanded.Contains(contract.Id) ? "▴" : "▾")</button></td>
+                <td>
+                    @if (!contract.IsActive) { <span class="muted">—</span> }
+                    else if (details.NextDue is { } due) { <span>@StockMovementRules.DisplayDate(due) <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(due, Today))">@ServiceDueRules.Label(ServiceDueRules.State(due, Today))</span></span> }
+                    else { <span class="muted">fără puncte</span> }
+                </td>
+                @if (CanManage)
+                {
+                    <td>
+                        <button class="refresh" disabled="@Locked" @onclick="() => OpenEdit(details)">Editează</button>
+                        @if (contract.IsActive) { <button class="refresh" disabled="@Locked" @onclick="() => DeactivateAsync(contract)">Dezactivează</button> }
+                        else { <button class="refresh" disabled="@Locked" @onclick="() => OpenActivationAsync(contract)">Activează</button> }
+                        <button class="danger" disabled="@Locked" @onclick="() => OpenDelete(contract)">Șterge</button>
+                    </td>
+                }
+            </tr>
+            @if (expanded.Contains(contract.Id))
+            {
+                <tr class="contract-points-row" @key="@($"points-{contract.Id}")"><td colspan="@(CanManage ? 7 : 6)">
+                    @if (details.Points.Count == 0) { <span class="muted">Contractul nu acoperă niciun punct de lucru.</span> }
+                    else
+                    {
+                        <table class="contract-points-table"><thead><tr><th>PUNCT DE LUCRU</th><th>CICLICITATE</th><th>SCADENȚĂ</th><th>STARE</th></tr></thead><tbody>
+                        @foreach (var point in details.Points)
+                        {
+                            <tr @key="point.Point.Id"><td><strong>@point.WorkPointName</strong>@if (point.WorkPointIsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }<br /><small class="muted">@point.WorkPointAddress</small></td>
+                                <td>@ServiceContractRules.PointCycleText(point.Point.CycleMonths, contract.CycleMonths)</td>
+                                <td>@StockMovementRules.DisplayDate(point.Point.NextDue)</td>
+                                <td>@if (contract.IsActive) { <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(point.Point.NextDue, Today))">@ServiceDueRules.Label(ServiceDueRules.State(point.Point.NextDue, Today))</span> } else { <span class="contract-state off">Contract Off</span> }</td></tr>
+                        }
+                        </tbody></table>
+                    }
+                </td></tr>
+            }
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi contractul?" Subject="Contractul" ObjectLabel="@($"{deleting.Label} · {BeneficiaryName}")"
+                              Description="Contractul se arhivează împreună cu punctele de lucru acoperite. Dacă vrei doar să-l oprești, folosește «Dezactivează»."
+                              Busy="@busy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDeleteAsync" />
+}
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter, EditorRequired] public string BeneficiaryName { get; set; } = "";
+    [Parameter, EditorRequired] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
+    [Parameter, EditorRequired] public IReadOnlyList<ServiceContractDetails> Contracts { get; set; } = Array.Empty<ServiceContractDetails>();
+    [Parameter] public bool CanManage { get; set; }
+    // The parent reloads the contracts (and the work point list, which shows the contract of each point) after a change.
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private bool adding, busy, showOff;
+    private ServiceContractDetails? editing;
+    private ServiceContractActivationPlan? activation;
+    private ServiceContract? deleting;
+    private Guid editorKey, activationKey;
+    private string? notice, error, activationError, deleteError;
+    private readonly HashSet<int> expanded = [];
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    private int OffCount => Contracts.Count(item => !item.Contract.IsActive);
+    private IReadOnlyList<ServiceContractDetails> Visible => Contracts.Where(item => item.Contract.IsActive || showOff).ToList();
+    private bool Locked => busy || adding || editing is not null || activation is not null;
+
+    private static string Shorten(string text) => text.Length <= 60 ? text : text[..60] + "…";
+
+    private void Toggle(int contractId) { if (!expanded.Remove(contractId)) expanded.Add(contractId); }
+
+    private void OpenAdd() { adding = true; editing = null; editorKey = Guid.NewGuid(); notice = error = null; }
+    private void OpenEdit(ServiceContractDetails details) { adding = false; editing = details; editorKey = Guid.NewGuid(); notice = error = null; }
+    private Task CloseEditorAsync() { adding = false; editing = null; return Task.CompletedTask; }
+
+    private async Task SavedAsync(ServiceContractDetails saved)
+    {
+        notice = adding ? $"Contractul {saved.Contract.Label} a fost adăugat." : $"Contractul {saved.Contract.Label} a fost actualizat.";
+        adding = false;
+        editing = null;
+        await Changed.InvokeAsync();
+    }
+
+    private async Task DeactivateAsync(ServiceContract contract)
+    {
+        if (busy) return;
+        busy = true;
+        notice = error = null;
+        try
+        {
+            await Repository.DeactivateAsync(contract, lifetime.Token);
+            notice = $"Contractul {contract.Label} a fost oprit (Off). Punctele lui nu mai produc scadențe.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceContractOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service contract deactivation failed ({ErrorType}).", exception.GetType().Name);
+            error = "Contractul nu a putut fi oprit.";
+        }
+        finally { busy = false; }
+        await Changed.InvokeAsync();
+    }
+
+    private async Task OpenActivationAsync(ServiceContract contract)
+    {
+        if (busy) return;
+        busy = true;
+        notice = error = activationError = null;
+        try
+        {
+            activation = await Repository.PrepareActivationAsync(contract.Id, lifetime.Token);
+            activationKey = Guid.NewGuid();
+            if (activation.Details.Contract != contract) { activation = null; error = ServiceContractRules.Changed().Message; await Changed.InvokeAsync(); }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceContractOperationException exception) { error = exception.Message; await Changed.InvokeAsync(); }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service contract activation preparation failed ({ErrorType}).", exception.GetType().Name);
+            error = "Contractul nu a putut fi pregătit pentru activare.";
+        }
+        finally { busy = false; }
+    }
+
+    private Task CancelActivationAsync() { activation = null; activationError = null; return Task.CompletedTask; }
+
+    private async Task ActivateAsync(ServiceContractActivationChoice choice)
+    {
+        if (busy || activation is null) return;
+        busy = true;
+        activationError = null;
+        var contract = activation.Details.Contract;
+        var done = false;
+        try
+        {
+            await Repository.ActivateAsync(contract, choice.Reschedules, choice.RemoveConflicting, lifetime.Token);
+            notice = $"Contractul {contract.Label} este activ (On); scadențele au fost actualizate.";
+            done = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceContractOperationException exception) { activationError = exception.Message; }
+        catch (AccessDeniedException exception) { activationError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service contract activation failed ({ErrorType}).", exception.GetType().Name);
+            activationError = "Contractul nu a putut fi activat.";
+        }
+        finally { busy = false; }
+        if (done) { activation = null; await Changed.InvokeAsync(); }
+    }
+
+    private void OpenDelete(ServiceContract contract) { deleting = contract; deleteError = null; notice = error = null; }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (busy || deleting is not { } contract) return;
+        busy = true;
+        deleteError = null;
+        var done = false;
+        try
+        {
+            await Repository.DeleteAsync(contract, reason, lifetime.Token);
+            notice = $"Contractul {contract.Label} a fost șters (arhivat).";
+            done = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceContractOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service contract deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Contractul nu a putut fi șters.";
+        }
+        finally { busy = false; }
+        if (done) { deleting = null; expanded.Remove(contract.Id); await Changed.InvokeAsync(); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

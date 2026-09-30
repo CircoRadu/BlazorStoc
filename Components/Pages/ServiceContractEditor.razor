@@ -1,0 +1,185 @@
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using BlazorStoc.Services
+@inject IServiceContractRepository Repository
+@inject ILogger<ServiceContractEditor> Logger
+@implements IDisposable
+
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="contract-editor-title">
+    <div class="catalog-heading"><h2 id="contract-editor-title">@(Original is null ? "Adaugă contract de mentenanță" : $"Editează contractul {Original.Contract.Label}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (errors.Count > 0)
+    {
+        <div class="error-banner" role="alert"><ul class="validation-errors">@foreach (var message in errors) { <li>@message</li> }</ul></div>
+    }
+    <EditForm Model="input" OnSubmit="SubmitAsync" FormName="service-contract-editor">
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="contract-number">Număr / dată contract *<InputTextLive id="contract-number" @bind-Value="input.NumberText" maxlength="60" autocomplete="off" placeholder="26/23.09.2025" /><small>Se acceptă 26/23.09.2025, 26 / 23.09.2025 sau 26 din 23.09.2025; se afișează ca număr/dată.</small></label>
+                <label for="contract-cycle">Ciclicitate (luni) *<select id="contract-cycle" @bind="input.CycleMonths">@for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months">@ServiceContractRules.CycleText(months)</option> }</select><small>Ciclicitatea globală a contractului; fiecare punct o poate înlocui cu una proprie.</small></label>
+                <label for="contract-valid-until">Valabil până la (opțional)<span class="valid-until-field"><PickOnlyDate Id="contract-valid-until" @bind-Value="input.ValidUntil" Min="@ValidUntilMin" Disabled="saving" /><button type="button" class="refresh" disabled="@(input.ValidUntil is null)" @onclick="ClearValidUntil">Fără termen</button></span><small>Data de expirare a contractului; fără ea contractul nu are termen. Nu oprește singură mentenanța.</small></label>
+                <label for="contract-notes" class="full-width">Observații<textarea id="contract-notes" rows="3" maxlength="@ServiceContractInput.NotesMaximumLength" @bind="input.Notes" @bind:event="oninput"></textarea></label>
+            </div>
+
+            <div class="catalog-heading contract-points-heading"><h3>Puncte de lucru din contract <span>@rows.Count(row => row.Included)</span></h3></div>
+            @if (rows.Count == 0)
+            {
+                <p class="muted">Beneficiarul nu are încă puncte de lucru salvate. Adaugă mai întâi un punct de lucru.</p>
+            }
+            else
+            {
+                <div class="contract-global-date">
+                    <label for="contract-global-due">Data primei intervenții (pentru mai multe puncte deodată)<PickOnlyDate Id="contract-global-due" @bind-Value="globalDue" Disabled="saving" /></label>
+                    <button type="button" class="refresh" disabled="@(globalDue is null)" @onclick="ApplyGlobalDue">Aplică tuturor punctelor bifate</button>
+                </div>
+                <p class="form-note">Data primei intervenții este scadența inițială (prima vizită planificată), nu data de la care se numără ciclul. Ciclicitatea individuală, dacă o alegi, înlocuiește ciclicitatea contractului pentru punctul respectiv.</p>
+                <div class="table-scroll"><table class="contract-points-table"><thead><tr><th></th><th>PUNCT DE LUCRU</th><th>STARE</th><th>PRIMA INTERVENȚIE / SCADENȚA CURENTĂ</th><th>CICLICITATE INDIVIDUALĂ</th></tr></thead><tbody>
+                @foreach (var row in rows)
+                {
+                    <tr @key="row.Point.Id">
+                        <td>
+                            @if (row.Conflict is not null)
+                            {
+                                <label class="check-label"><input type="checkbox" checked="@row.Move" @onchange="e => SetMove(row, (bool)(e.Value ?? false))" aria-label="@($"Mută aici punctul {row.Point.Name}")" /> Mută aici</label>
+                            }
+                            else
+                            {
+                                <input type="checkbox" checked="@row.Included" @onchange="e => SetIncluded(row, (bool)(e.Value ?? false))" aria-label="@($"Include punctul {row.Point.Name}")" />
+                            }
+                        </td>
+                        <td><strong>@row.Point.Name</strong>@if (row.Point.IsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }<br /><small class="muted">@row.Point.Address</small></td>
+                        <td>
+                            @if (row.Existing) { <span>În acest contract</span> }
+                            else if (row.Conflict is not null) { <small>În contractul activ <strong>@row.Conflict.ContractLabel</strong>@if (row.ConflictDue is { } due) { <text>, scadență @StockMovementRules.DisplayDate(due)</text> }. Scadența și ciclicitatea lui se păstrează la mutare.</small> }
+                        </td>
+                        <td>
+                            @if (row.Included && !row.Move) { <PickOnlyDate Id="@($"contract-due-{row.Point.Id}")" @bind-Value="row.NextDue" Disabled="saving" /> }
+                            else if (row.Move && row.ConflictDue is { } kept) { <span>@StockMovementRules.DisplayDate(kept) <small class="muted">(păstrată)</small></span> }
+                        </td>
+                        <td>
+                            @if (row.Included && !row.Move)
+                            {
+                                <select aria-label="@($"Ciclicitate individuală pentru {row.Point.Name}")" @onchange="e => row.Cycle = ParseCycle(e.Value)">
+                                    <option value="" selected="@(row.Cycle is null)">Din contract (@ServiceContractRules.CycleText(input.CycleMonths))</option>
+                                    @for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months" selected="@(row.Cycle == months)">@ServiceContractRules.CycleText(months)</option> }
+                                </select>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody></table></div>
+            }
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : Original is null ? "Adaugă contractul" : "Salvează contractul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
+    // Every contract of the beneficiary: the ones that already cover a point decide which points must be moved instead of added.
+    [Parameter, EditorRequired] public IReadOnlyList<ServiceContractDetails> Contracts { get; set; } = Array.Empty<ServiceContractDetails>();
+    [Parameter] public ServiceContractDetails? Original { get; set; }
+    [Parameter] public EventCallback<ServiceContractDetails> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private sealed class Row
+    {
+        public required WorkPoint Point { get; init; }
+        public bool Included { get; set; }
+        public bool Move { get; set; }
+        public DateOnly? NextDue { get; set; }
+        public int? Cycle { get; set; }
+        public bool Existing { get; init; }
+        public ServiceContractConflict? Conflict { get; init; }
+        public DateOnly? ConflictDue { get; init; }
+    }
+
+    private UnsavedChangesTracker? tracker;
+    private ServiceContractInput input = new();
+    private List<Row> rows = [];
+    private DateOnly? globalDue;
+    private bool saving;
+    private string? error;
+    private List<string> errors = [];
+    private readonly CancellationTokenSource lifetime = new();
+
+    private string ValidUntilMin => ServiceContractNumber.TryParse(input.NumberText, out _, out var date, out _)
+        ? date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "2000-01-01";
+
+    private string CurrentSnapshot() => FormSnapshot.Of(input,
+        string.Join('|', rows.Where(row => row.Included).Select(row => $"{row.Point.Id}:{row.Move}:{row.NextDue:yyyy-MM-dd}:{row.Cycle}")));
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    protected override void OnInitialized()
+    {
+        input = Original is null ? new() : ServiceContractInput.From(Original);
+        var contractActive = Original?.Contract.IsActive ?? true;
+        var currentId = Original?.Contract.Id ?? 0;
+        var coverage = Contracts.Where(item => item.Contract.IsActive && item.Contract.Id != currentId)
+            .SelectMany(item => item.Points.Select(point => (item.Contract, point.Point))).ToList();
+        rows = WorkPoints.Where(point => point.Id > 0).Select(point =>
+        {
+            var own = Original?.Points.FirstOrDefault(item => item.Point.WorkPointId == point.Id)?.Point;
+            var other = contractActive ? coverage.FirstOrDefault(item => item.Point.WorkPointId == point.Id) : default;
+            return new Row
+            {
+                Point = point, Included = own is not null, Existing = own is not null, NextDue = own?.NextDue, Cycle = own?.CycleMonths,
+                Conflict = own is null && other.Contract is not null ? new(point.Id, point.Name, other.Contract.Id, other.Contract.Label) : null,
+                ConflictDue = own is null && other.Contract is not null ? other.Point.NextDue : null
+            };
+        }).ToList();
+    }
+
+    private void ClearValidUntil() => input.ValidUntil = null;
+
+    private static void SetIncluded(Row row, bool included) => row.Included = included;
+    private static void SetMove(Row row, bool move) { row.Move = move; row.Included = move; }
+
+    private static int? ParseCycle(object? value) => int.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var months) ? months : null;
+
+    private void ApplyGlobalDue()
+    {
+        if (globalDue is not { } date) return;
+        foreach (var row in rows.Where(row => row.Included && !row.Move)) row.NextDue = date;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (saving) return;
+        error = null;
+        errors = [];
+        input.Points = rows.Where(row => row.Included).Select(row => new ServiceContractPointInput
+        {
+            WorkPointId = row.Point.Id, NextDue = row.Move ? null : row.NextDue, CycleMonths = row.Move ? null : row.Cycle, MoveFromOtherContract = row.Move
+        }).ToList();
+        var results = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
+        {
+            errors = results.Select(result => result.ErrorMessage ?? string.Empty).Where(message => message.Length > 0).Distinct().ToList();
+            return;
+        }
+        saving = true;
+        ServiceContractDetails? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(BeneficiaryId, input, lifetime.Token)
+                : await Repository.UpdateAsync(Original.Contract, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceContractOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service contract saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Contractul nu a putut fi salvat. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

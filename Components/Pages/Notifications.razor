@@ -9,33 +9,64 @@
 
 <PageTitle>Notificări · BlazorStoc</PageTitle>
 <div class="page-heading">
-    <div><p class="eyebrow">AVERTIZĂRI</p><h1>Notificări</h1><p class="muted">Expirări apropiate, după șabloanele definite de administrator. O notificare preluată nu mai avertizează; dacă o amâni, avertizează din nou la sfârșitul perioadei.</p></div>
+    <div><p class="eyebrow">AVERTIZĂRI</p><h1>Notificări</h1><p class="muted">Expirări apropiate sau depășite, după șabloanele definite de administrator. O notificare rămâne în listă până este rezolvată. O notificare preluată nu mai avertizează; dacă o amâni, avertizează din nou la sfârșitul perioadei.</p></div>
     <div class="heading-actions"><button class="refresh" type="button" disabled="@loading" @onclick="() => LoadAsync(true)">↻ Actualizează</button></div>
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 
-<section class="catalog">
-    <div class="catalog-heading"><h2>Lista notificărilor <span>@views.Count</span></h2><small>@AlertCount necesită atenție</small></div>
-    @if (loading && !loaded) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă notificările</h3></div> }
-    else if (loaded && views.Count == 0) { <div class="empty-state"><span class="empty-icon">✉</span><h3>Nu există notificări</h3><p>Notificările apar când o expirare intră în perioada stabilită într-un șablon (Setări → Notificări → Șabloane notificări).</p></div> }
-    else if (loaded)
+<div class="settings-tabs" role="tablist" aria-label="Liste de notificări">
+    <button type="button" role="tab" id="tab-active" class="settings-tab @(showResolved ? "" : "active")" aria-selected="@(showResolved ? "false" : "true")" aria-controls="panel-notifications" @onclick="() => showResolved = false">Active (@views.Count)</button>
+    <button type="button" role="tab" id="tab-resolved" class="settings-tab @(showResolved ? "active" : "")" aria-selected="@(showResolved ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => showResolved = true">Rezolvate (@resolved.Count)</button>
+</div>
+
+<div id="panel-notifications" role="tabpanel" aria-labelledby="@(showResolved ? "tab-resolved" : "tab-active")">
+@if (loading && !loaded) { <section class="catalog"><div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă notificările</h3></div></section> }
+else if (loaded && !showResolved)
+{
+    @if (views.Count == 0)
     {
-        <div class="table-scroll"><table class="notification-table"><thead><tr><th>STARE</th><th>TITLU</th><th>OBIECT</th><th>EXPIRĂ LA</th><th class="number">ZILE RĂMASE</th></tr></thead><tbody>
-        @foreach (var view in views)
-        {
-            <tr @key="view.Notification.Id" class="notification-row @(view.IsAlert ? "notification-unread" : "")" tabindex="0" role="button"
-                aria-label="Deschide notificarea @view.Subject" @onclick="() => Open(view)" @onkeydown="args => KeyDown(args, view)">
-                <td><span class="notification-state @(view.IsAlert ? "alert" : "done")">@StateText(view)</span></td>
-                <td>@view.Subject</td>
-                <td>@view.ObjectLabel</td>
-                <td>@StockMovementRules.DisplayDate(view.Notification.ExpiryDate)</td>
-                <td class="number">@view.DaysLeft</td>
-            </tr>
-        }
-        </tbody></table></div>
+        <section class="catalog"><div class="empty-state"><span class="empty-icon">✉</span><h3>Nu există notificări</h3><p>Notificările apar când o expirare intră în perioada stabilită într-un șablon (Setări → Notificări → Șabloane notificări) și rămân aici până sunt rezolvate.</p></div></section>
     }
-</section>
+    else
+    {
+        <section class="catalog notification-section">
+            <div class="catalog-heading"><h2>Scadență depășită <span>@Overdue.Count</span></h2><small>@AlertCount necesită atenție</small></div>
+            @if (Overdue.Count == 0) { <p class="muted notification-none">Nicio notificare cu scadența depășită.</p> }
+            else { @NotificationTable(Overdue, true) }
+        </section>
+        <section class="catalog notification-section">
+            <div class="catalog-heading"><h2>Următoarele scadențe <span>@Upcoming.Count</span></h2></div>
+            @if (Upcoming.Count == 0) { <p class="muted notification-none">Nicio altă notificare activă.</p> }
+            else { @NotificationTable(Upcoming, false) }
+        </section>
+    }
+}
+else if (loaded)
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Notificări rezolvate <span>@resolved.Count</span></h2><small>cele mai recente @ExpiryNotificationService.MaxResolvedListed</small></div>
+        @if (resolved.Count == 0) { <div class="empty-state"><span class="empty-icon">✓</span><h3>Nu există notificări rezolvate</h3><p>O notificare devine rezolvată când o marchezi tu sau când data obiectului se schimbă ori obiectul dispare.</p></div> }
+        else
+        {
+            <div class="table-scroll"><table class="notification-table"><thead><tr><th>TITLU</th><th>OBIECT</th><th>SCADENȚĂ</th><th>REZOLVATĂ LA</th><th>REZOLVATĂ DE</th><th>MOTIV</th></tr></thead><tbody>
+            @foreach (var item in resolved)
+            {
+                <tr @key="item.Notification.Id" class="notification-row" tabindex="0" role="button" aria-label="Deschide notificarea rezolvată @item.Subject"
+                    @onclick="() => OpenResolved(item)" @onkeydown="args => ResolvedKeyDown(args, item)">
+                    <td>@item.Subject</td>
+                    <td>@item.ObjectLabel</td>
+                    <td>@StockMovementRules.DisplayDate(item.Notification.ExpiryDate)</td>
+                    <td>@ResolvedAt(item.Notification)</td>
+                    <td>@(item.Notification.ResolvedAutomatically ? "sistem (automat)" : item.Notification.ResolvedBy)</td>
+                    <td class="notification-reason">@item.Notification.ResolvedReason</td>
+                </tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+}
+</div>
 
 @if (selected is not null)
 {
@@ -44,7 +75,8 @@
             <h2 id="notification-title">@selected.Subject</h2>
             <p class="delete-object"><strong>@selected.Category · @selected.EventName · @selected.ObjectLabel</strong></p>
             <p class="notification-body">@selected.Body</p>
-            <p class="muted small">Expiră la @StockMovementRules.DisplayDate(selected.Notification.ExpiryDate) · @selected.DaysLeft zile rămase · @StateDetail(selected)</p>
+            @if (selected.IsOverdue) { <p class="notification-overdue-note">Termenul a fost depășit cu @(-selected.DaysLeft) @(-selected.DaysLeft == 1 ? "zi" : "zile").</p> }
+            <p class="muted small">@(selected.IsOverdue ? "Scadență" : "Expiră la") @StockMovementRules.DisplayDate(selected.Notification.ExpiryDate)@(selected.IsOverdue ? "" : $" · {selected.DaysLeft} zile rămase") · @StateDetail(selected)</p>
             @if (dialogError is not null) { <div class="error-banner" role="alert">@dialogError</div> }
             @if (selected.IsAlert)
             {
@@ -57,28 +89,75 @@
                     else { <small class="muted">Amânarea nu mai este posibilă: expirarea este prea aproape (limita este numărul de zile rămase minus 2).</small> }
                 </div>
             }
-            <div class="editor-actions">
-                @if (selected.IsAlert) { <button type="button" class="primary" disabled="@busy" @onclick="AcknowledgeAsync">@(busy ? "Se salvează…" : "Preiau notificarea")</button> }
-                <button type="button" class="danger" disabled="@busy" @onclick="Close">Închide</button>
-            </div>
+            @if (confirmingResolve)
+            {
+                <div class="notification-resolve-confirm" role="alert">
+                    <p>Marchezi notificarea ca rezolvată? Trece în lista „Rezolvate” și nu mai avertizează.</p>
+                    <div class="editor-actions">
+                        <button type="button" class="primary" disabled="@busy" @onclick="ResolveAsync">@(busy ? "Se salvează…" : "Da, rezolvată")</button>
+                        <button type="button" class="refresh" disabled="@busy" @onclick="() => confirmingResolve = false">Renunț</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="editor-actions">
+                    @if (selected.IsAlert) { <button type="button" class="primary" disabled="@busy" @onclick="AcknowledgeAsync">@(busy ? "Se salvează…" : "Preiau notificarea")</button> }
+                    <button type="button" class="refresh" disabled="@busy" @onclick="() => confirmingResolve = true">Marchează ca rezolvată</button>
+                    @if (selected.Url is { Length: > 0 } url) { <a class="refresh" href="@url">Deschide obiectul</a> }
+                    <button type="button" class="danger" disabled="@busy" @onclick="Close">Închide</button>
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@if (selectedResolved is not null)
+{
+    <div class="delete-overlay" @onkeydown="DialogKeyDown">
+        <section class="delete-dialog notification-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="resolved-title">
+            <h2 id="resolved-title">@selectedResolved.Subject</h2>
+            <p class="delete-object"><strong>@selectedResolved.SourceText · @selectedResolved.ObjectLabel</strong></p>
+            <p class="notification-body">@selectedResolved.Body</p>
+            <p class="muted small">Scadență @StockMovementRules.DisplayDate(selectedResolved.Notification.ExpiryDate) · rezolvată la @ResolvedAt(selectedResolved.Notification) de @(selectedResolved.Notification.ResolvedAutomatically ? "sistem (automat)" : selectedResolved.Notification.ResolvedBy)</p>
+            <p class="notification-reason-box"><strong>Motiv:</strong> @selectedResolved.Notification.ResolvedReason</p>
+            <div class="editor-actions"><button type="button" class="danger" @onclick="Close">Închide</button></div>
         </section>
     </div>
 }
 
 @code {
     private IReadOnlyList<NotificationView> views = Array.Empty<NotificationView>();
+    private IReadOnlyList<ResolvedNotificationView> resolved = Array.Empty<ResolvedNotificationView>();
     private NotificationView? selected;
-    private bool loading, loaded, busy;
+    private ResolvedNotificationView? selectedResolved;
+    private bool loading, loaded, busy, showResolved, confirmingResolve;
     private string? error, notice, dialogError;
     private int snoozeDays = 1;
     private readonly CancellationTokenSource lifetime = new();
     private int AlertCount => views.Count(view => view.IsAlert);
+    private List<NotificationView> Overdue => views.Where(view => view.IsOverdue).ToList();
+    private List<NotificationView> Upcoming => views.Where(view => !view.IsOverdue).ToList();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync(true);
         _ = RefreshPeriodicallyAsync();
     }
+
+    private RenderFragment NotificationTable(IReadOnlyList<NotificationView> items, bool overdue) => @<div class="table-scroll"><table class="notification-table"><thead><tr><th>STARE</th><th>TITLU</th><th>OBIECT</th><th>@(overdue ? "SCADENȚĂ" : "EXPIRĂ LA")</th><th class="number">@(overdue ? "DEPĂȘIT CU (ZILE)" : "ZILE RĂMASE")</th></tr></thead><tbody>
+        @foreach (var view in items)
+        {
+            <tr @key="view.Notification.Id" class="notification-row @(view.IsAlert ? "notification-unread" : "") @(overdue ? "notification-overdue" : "")" tabindex="0" role="button"
+                aria-label="Deschide notificarea @view.Subject" @onclick="() => Open(view)" @onkeydown="args => KeyDown(args, view)">
+                <td><span class="notification-state @(view.IsAlert ? "alert" : "done")">@StateText(view)</span></td>
+                <td>@view.Subject</td>
+                <td>@view.ObjectLabel</td>
+                <td>@StockMovementRules.DisplayDate(view.Notification.ExpiryDate)</td>
+                <td class="number">@(overdue ? -view.DaysLeft : view.DaysLeft)</td>
+            </tr>
+        }
+        </tbody></table></div>;
 
     private async Task LoadAsync(bool evaluate)
     {
@@ -87,8 +166,10 @@
         {
             if (evaluate) await Service.EvaluateAsync(null, lifetime.Token);
             views = await Service.GetViewsAsync(lifetime.Token);
+            resolved = await Service.GetResolvedViewsAsync(lifetime.Token);
             loaded = true;
             if (selected is not null) selected = views.FirstOrDefault(view => view.Notification.Id == selected.Notification.Id);
+            if (selected is null) confirmingResolve = false;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception)
@@ -106,20 +187,28 @@
         try
         {
             while (await timer.WaitForNextTickAsync(lifetime.Token))
-                await InvokeAsync(async () => { if (selected is null && !busy) { await LoadAsync(false); StateHasChanged(); } });
+                await InvokeAsync(async () => { if (selected is null && selectedResolved is null && !busy) { await LoadAsync(false); StateHasChanged(); } });
         }
         catch (OperationCanceledException) { }
     }
 
     private void Open(NotificationView view)
     {
-        selected = view; dialogError = null; notice = null;
-        snoozeDays = Math.Clamp(snoozeDays, 1, Math.Max(1, view.MaxSnoozeDays));
+        selected = view; dialogError = null; notice = null; confirmingResolve = false;
+        var max = Math.Max(1, view.MaxSnoozeDays);
+        snoozeDays = view.IsOverdue ? Math.Min(ExpiryTemplateRules.SuggestedOverdueSnoozeDays, max) : Math.Clamp(snoozeDays, 1, max);
     }
+
+    private void OpenResolved(ResolvedNotificationView view) { selectedResolved = view; notice = null; }
 
     private void KeyDown(KeyboardEventArgs args, NotificationView view)
     {
         if (args.Key is "Enter" or " ") Open(view);
+    }
+
+    private void ResolvedKeyDown(KeyboardEventArgs args, ResolvedNotificationView view)
+    {
+        if (args.Key is "Enter" or " ") OpenResolved(view);
     }
 
     private void DialogKeyDown(KeyboardEventArgs args)
@@ -127,7 +216,7 @@
         if (args.Key == "Escape" && !busy) Close();
     }
 
-    private void Close() { selected = null; dialogError = null; }
+    private void Close() { selected = null; selectedResolved = null; dialogError = null; confirmingResolve = false; }
 
     private async Task AcknowledgeAsync()
     {
@@ -146,6 +235,12 @@
         });
     }
 
+    private async Task ResolveAsync()
+    {
+        if (selected is null || busy) return;
+        await RunAsync(async view => { await Service.ResolveAsync(view, lifetime.Token); return "Notificarea a fost marcată ca rezolvată și a trecut în lista „Rezolvate”."; });
+    }
+
     private async Task RunAsync(Func<NotificationView, Task<string>> operation)
     {
         var view = selected!;
@@ -153,13 +248,13 @@
         try
         {
             notice = await operation(view);
-            selected = null;
+            selected = null; confirmingResolve = false;
             await LoadAsync(false);
             // The menu warning follows immediately (the layout itself is not re-rendered by this page).
             try { await JS.InvokeVoidAsync("refreshNotificationAlerts"); } catch (Exception) { }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (NotificationOperationException exception) { dialogError = exception.Message; await LoadAsync(false); }
+        catch (NotificationOperationException exception) { dialogError = exception.Message; confirmingResolve = false; await LoadAsync(false); }
         catch (Exception exception)
         {
             Logger.LogError("Notification operation failed ({ErrorType}).", exception.GetType().Name);
@@ -167,6 +262,9 @@
         }
         finally { busy = false; }
     }
+
+    private static string ResolvedAt(ExpiryNotification notification) =>
+        notification.ResolvedUtc is { } at ? at.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : string.Empty;
 
     private static string StateText(NotificationView view) =>
         view.IsAlert ? (view.Notification.AcknowledgedBy is null ? "Nouă" : "Amânare încheiată") : view.Notification.SnoozeUntil is not null ? "Amânată" : "Preluată";

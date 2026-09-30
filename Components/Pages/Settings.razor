@@ -22,10 +22,21 @@
     else if (activeTab == NotificationsTab)
     {
         <div role="tabpanel" id="panel-@NotificationsTab" aria-labelledby="tab-@NotificationsTab" class="settings-body">
-            <div class="settings-subtabs" role="tablist" aria-label="Secțiuni notificări">
-                <button type="button" role="tab" id="subtab-templates" class="settings-subtab active" aria-selected="true" aria-controls="subpanel-templates">Șabloane notificări</button>
+            <div class="settings-subtabs" role="tablist" aria-label="Secțiuni notificări" @onkeydown="OnSubtabKeyDown">
+                @foreach (var subtab in Subtabs)
+                {
+                    var selected = subtab.Id == activeSubtab;
+                    <button type="button" role="tab" id="subtab-@subtab.Id" class="settings-subtab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" aria-controls="subpanel-@subtab.Id" tabindex="@(selected ? 0 : -1)" @onclick="() => activeSubtab = subtab.Id">@subtab.Title</button>
+                }
             </div>
-            <div role="tabpanel" id="subpanel-templates" aria-labelledby="subtab-templates"><NotificationTemplatesEditor /></div>
+            @if (activeSubtab == TemplatesSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@TemplatesSubtab" aria-labelledby="subtab-@TemplatesSubtab"><NotificationTemplatesEditor /></div>
+            }
+            else
+            {
+                <div role="tabpanel" id="subpanel-@SettingsSubtab" aria-labelledby="subtab-@SettingsSubtab"><NotificationSettingsEditor /></div>
+            }
         </div>
     }
 </section>
@@ -35,6 +46,23 @@
     private const string NotificationsTab = "notificari";
     private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări")];
     private string activeTab = AnafTab;
+
+    private const string TemplatesSubtab = "templates";
+    private const string SettingsSubtab = "settings";
+    private static readonly (string Id, string Title)[] Subtabs = [(TemplatesSubtab, "Șabloane notificări"), (SettingsSubtab, "Setări notificări")];
+    private string activeSubtab = TemplatesSubtab;
+
+    private void OnSubtabKeyDown(KeyboardEventArgs args)
+    {
+        var index = Array.FindIndex(Subtabs, tab => tab.Id == activeSubtab);
+        index = args.Key switch
+        {
+            "ArrowRight" => (index + 1) % Subtabs.Length,
+            "ArrowLeft" => (index - 1 + Subtabs.Length) % Subtabs.Length,
+            _ => index
+        };
+        activeSubtab = Subtabs[index].Id;
+    }
 
     private void OnTabKeyDown(KeyboardEventArgs args)
     {

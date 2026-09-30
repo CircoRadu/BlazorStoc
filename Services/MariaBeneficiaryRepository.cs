@@ -42,7 +42,9 @@ public sealed class MariaBeneficiaryRepository(
                     @postalCode, @caenCode, @anafVerified, 0)
                 """, Fields(value));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            return Build(checked((int)command.LastInsertedId), value, 0);
+            var createdId = checked((int)command.LastInsertedId);
+            await InsertPrimaryWorkPointAsync(connection, transaction, createdId, value, cancellationToken).ConfigureAwait(false);
+            return Build(createdId, value, 0);
         }, cancellationToken, value).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
             $"#{beneficiary.Id} · {beneficiary.Name}", BeneficiaryRules.Identification(beneficiary), cancellationToken).ConfigureAwait(false);
@@ -58,7 +60,7 @@ public sealed class MariaBeneficiaryRepository(
             BeneficiaryRules.CheckCurrent(await GetLockedAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false), original);
             await EnsureUniqueAsync(connection, transaction, value, original.Id, cancellationToken).ConfigureAwait(false);
             await using (var clash = Command(connection, transaction, """
-                SELECT name FROM beneficiary_work_points WHERE beneficiary_id=@id AND normalized_address=@key LIMIT 1
+                SELECT name FROM beneficiary_work_points WHERE beneficiary_id=@id AND is_primary=0 AND normalized_address=@key LIMIT 1
                 """, ("@id", original.Id), ("@key", AddressNormalization.Key(value.Address))))
                 if (await clash.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string workPointName)
                     throw WorkPointRules.BeneficiaryAddressTaken(workPointName);
@@ -71,6 +73,7 @@ public sealed class MariaBeneficiaryRepository(
                 """, [.. Fields(value), ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version)]);
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                 throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
+            await SyncPrimaryWorkPointAsync(connection, transaction, original.Id, value, cancellationToken).ConfigureAwait(false);
             return Build(original.Id, value, version);
         }, cancellationToken, value, original.Id).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Beneficiary, beneficiary.Id.ToString(),
@@ -84,29 +87,90 @@ public sealed class MariaBeneficiaryRepository(
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new BeneficiaryOperationException(reasonError);
-        await archiver.ExecuteAsync(ArchiveRequests.Beneficiary(original, motif), async (operation, token) =>
+        // The work points of the beneficiary and their photos are archived with it (rows as relations, photo files moved to the
+        // archive directory); read before the archive operation starts and re-checked inside the transaction.
+        var workPoints = new List<WorkPoint>();
+        IReadOnlyList<ServicePhoto> photos;
+        await using (var readConnection = CreateConnection())
         {
-            await WriteAsync(async (connection, transaction) =>
+            await readConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using (var command = Command(readConnection, null,
+                $"SELECT {MariaWorkPointRepository.Columns} FROM beneficiary_work_points WHERE beneficiary_id=@id ORDER BY id", ("@id", original.Id)))
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) workPoints.Add(MariaWorkPointRepository.Read(reader));
+            photos = await ServicePhotoArchive.ReadAsync(readConnection, null,
+                "work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", cancellationToken, ("@id", original.Id)).ConfigureAwait(false);
+            if (await MariaServiceContractRepository.CountForBeneficiaryAsync(readConnection, null, original.Id, cancellationToken).ConfigureAwait(false) is var contracts and > 0)
+                throw ServiceContractRules.BeneficiaryHasContracts(contracts);
+        }
+        var liveRoot = MariaAssetPaths.ServicePhotos(configuration);
+        var archiveRoot = MariaAssetPaths.ArchiveFiles(configuration);
+        await archiver.ExecuteAsync(ArchiveRequests.Beneficiary(original, motif, workPoints, photos), async (operation, token) =>
+        {
+            var prepared = await ServicePhotoArchive.PrepareAsync(liveRoot, archiveRoot, photos, operation, token).ConfigureAwait(false);
+            try
             {
-                BeneficiaryRules.CheckCurrent(await GetLockedAsync(connection, transaction, original.Id, token).ConfigureAwait(false), original);
-                await using (var relations = Command(connection, transaction,
-                    "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE beneficiary_id=@id)", ("@id", original.Id)))
-                    BeneficiaryRules.CheckDelete(Convert.ToBoolean(await relations.ExecuteScalarAsync(token).ConfigureAwait(false)));
-                await using (var projects = Command(connection, transaction,
-                    "SELECT COUNT(*) FROM projects WHERE beneficiary_id=@id", ("@id", original.Id)))
-                    BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
-                await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token).ConfigureAwait(false);
-                await using (var workPoints = Command(connection, transaction,
-                    "DELETE FROM beneficiary_work_points WHERE beneficiary_id=@id", ("@id", original.Id)))
-                    await workPoints.ExecuteNonQueryAsync(token).ConfigureAwait(false);
-                await using var command = Command(connection, transaction,
-                    "DELETE FROM beneficiaries WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
-                if (await command.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)
-                    throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
-                await MariaArchivePersistence.InsertAuditAsync(connection, transaction, operation, token).ConfigureAwait(false);
-                return true;
-            }, token).ConfigureAwait(false);
+                await WriteAsync(async (connection, transaction) =>
+                {
+                    BeneficiaryRules.CheckCurrent(await GetLockedAsync(connection, transaction, original.Id, token).ConfigureAwait(false), original);
+                    await using (var relations = Command(connection, transaction,
+                        "SELECT EXISTS(SELECT 1 FROM stock_movements WHERE beneficiary_id=@id)", ("@id", original.Id)))
+                        BeneficiaryRules.CheckDelete(Convert.ToBoolean(await relations.ExecuteScalarAsync(token).ConfigureAwait(false)));
+                    await using (var projects = Command(connection, transaction,
+                        "SELECT COUNT(*) FROM projects WHERE beneficiary_id=@id", ("@id", original.Id)))
+                        BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
+                    if (await MariaServiceContractRepository.CountForBeneficiaryAsync(connection, transaction, original.Id, token).ConfigureAwait(false) is var contractCount and > 0)
+                        throw ServiceContractRules.BeneficiaryHasContracts(contractCount);
+                    var currentPhotos = await ServicePhotoArchive.ReadAsync(connection, transaction,
+                        "work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", token, ("@id", original.Id)).ConfigureAwait(false);
+                    if (!currentPhotos.Select(photo => photo.Id).Order().SequenceEqual(photos.Select(photo => photo.Id).Order()))
+                        throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
+                    await MariaArchivePersistence.InsertAsync(connection, transaction, operation, prepared, token).ConfigureAwait(false);
+                    await using (var deletePhotos = Command(connection, transaction,
+                        "DELETE FROM service_photos WHERE work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", ("@id", original.Id)))
+                        await deletePhotos.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                    await using (var deletePoints = Command(connection, transaction,
+                        "DELETE FROM beneficiary_work_points WHERE beneficiary_id=@id", ("@id", original.Id)))
+                        await deletePoints.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+                    await using var command = Command(connection, transaction,
+                        "DELETE FROM beneficiaries WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
+                    if (await command.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)
+                        throw new BeneficiaryOperationException("Beneficiarul s-a schimbat între timp. Actualizează lista.");
+                    await MariaArchivePersistence.InsertAuditAsync(connection, transaction, operation, token).ConfigureAwait(false);
+                    return true;
+                }, token).ConfigureAwait(false);
+            }
+            catch
+            {
+                ServicePhotoArchive.Rollback(archiveRoot, prepared);
+                throw;
+            }
+            await ServicePhotoArchive.CompleteAsync(liveRoot, archiveRoot, prepared, token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
+    }
+
+    // The main work point is a real row, created with the beneficiary and kept in step with its address and phone.
+    private static async Task InsertPrimaryWorkPointAsync(MySqlConnection connection, MySqlTransaction transaction, int beneficiaryId,
+        BeneficiaryInput value, CancellationToken token)
+    {
+        await using var insert = Command(connection, transaction, """
+            INSERT INTO beneficiary_work_points (beneficiary_id, name, address, normalized_address, phone, is_primary, version)
+            VALUES (@id, @name, @address, @key, @phone, 1, 0)
+            """, ("@id", beneficiaryId), ("@name", WorkPointRules.PrimaryName), ("@address", value.Address),
+            ("@key", AddressNormalization.Key(value.Address)), ("@phone", value.Phone));
+        await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+    }
+
+    private static async Task SyncPrimaryWorkPointAsync(MySqlConnection connection, MySqlTransaction transaction, int beneficiaryId,
+        BeneficiaryInput value, CancellationToken token)
+    {
+        await using var update = Command(connection, transaction, """
+            UPDATE beneficiary_work_points SET version=IF(address<>@address OR phone<>@phone, version+1, version),
+                address=@address, normalized_address=@key, phone=@phone
+            WHERE beneficiary_id=@id AND is_primary=1
+            """, ("@id", beneficiaryId), ("@address", value.Address), ("@key", AddressNormalization.Key(value.Address)), ("@phone", value.Phone));
+        if (await update.ExecuteNonQueryAsync(token).ConfigureAwait(false) == 0)
+            await InsertPrimaryWorkPointAsync(connection, transaction, beneficiaryId, value, token).ConfigureAwait(false);
     }
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
