@@ -47,7 +47,7 @@
             @if (photoError is not null) { <div class="error-banner" role="alert">@photoError</div> }
             <div class="image-inputs">
                 <label class="photo-caption" for="work-point-photo-caption">Legendă pentru fotografiile alese (opțional)<input id="work-point-photo-caption" @bind="caption" @bind:event="oninput" maxlength="@ServicePhotoRules.CaptionMaximumLength" autocomplete="off" /></label>
-                <InputFile OnChange="PhotosSelectedAsync" multiple accept="image/jpeg,image/png,image/webp,image/gif" disabled="@(uploading || photoBusy || saving)" />
+                <FileDropZone OnChange="PhotosSelectedAsync" Multiple="true" Accept="image/jpeg,image/png,image/webp,image/gif" Text="Alege fotografii" Disabled="@(uploading || photoBusy || saving)" />
                 <small>JPG, PNG, WebP sau GIF, cel mult 10 MB fiecare, cel mult @ServicePhotoRules.MaximumPerOwner de fotografii per punct. Se salvează imediat, fără să apeși „Salvează punctul de lucru”.</small>
                 @if (uploading) { <span role="status">Se încarcă…</span> }
             </div>

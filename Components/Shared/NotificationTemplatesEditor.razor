@@ -147,8 +147,8 @@ else
 
     private void FillExample()
     {
-        input.Subject = ExpiryTemplateRules.DefaultSubject;
-        input.Body = ExpiryTemplateRules.DefaultBody;
+        input.Subject = SelectedSource?.DefaultSubject ?? ExpiryTemplateRules.DefaultSubject;
+        input.Body = SelectedSource?.DefaultBody ?? ExpiryTemplateRules.DefaultBody;
     }
 
     private async Task SaveAsync()

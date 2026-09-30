@@ -45,7 +45,7 @@
                 <td class="number"><button type="button" class="link-button" aria-expanded="@expanded.Contains(contract.Id)" @onclick="() => Toggle(contract.Id)">@details.Points.Count @(expanded.Contains(contract.Id) ? "▴" : "▾")</button></td>
                 <td>
                     @if (!contract.IsActive) { <span class="muted">—</span> }
-                    else if (details.NextDue is { } due) { <span>@StockMovementRules.DisplayDate(due) <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(due, Today))">@ServiceDueRules.Label(ServiceDueRules.State(due, Today))</span></span> }
+                    else if (details.NextDue is { } due) { <span>@StockMovementRules.DisplayDate(due) <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(due, Today, ThresholdDays))">@ServiceDueRules.Label(ServiceDueRules.State(due, Today, ThresholdDays))</span></span> }
                     else { <span class="muted">fără puncte</span> }
                 </td>
                 @if (CanManage)
@@ -70,7 +70,7 @@
                             <tr @key="point.Point.Id"><td><strong>@point.WorkPointName</strong>@if (point.WorkPointIsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }<br /><small class="muted">@point.WorkPointAddress</small></td>
                                 <td>@ServiceContractRules.PointCycleText(point.Point.CycleMonths, contract.CycleMonths)</td>
                                 <td>@StockMovementRules.DisplayDate(point.Point.NextDue)</td>
-                                <td>@if (contract.IsActive) { <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(point.Point.NextDue, Today))">@ServiceDueRules.Label(ServiceDueRules.State(point.Point.NextDue, Today))</span> } else { <span class="contract-state off">Contract Off</span> }</td></tr>
+                                <td>@if (contract.IsActive) { <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(point.Point.NextDue, Today, ThresholdDays))">@ServiceDueRules.Label(ServiceDueRules.State(point.Point.NextDue, Today, ThresholdDays))</span> } else { <span class="contract-state off">Contract Off</span> }</td></tr>
                         }
                         </tbody></table>
                     }
@@ -94,6 +94,8 @@
     [Parameter, EditorRequired] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
     [Parameter, EditorRequired] public IReadOnlyList<ServiceContractDetails> Contracts { get; set; } = Array.Empty<ServiceContractDetails>();
     [Parameter] public bool CanManage { get; set; }
+    // The days before a due date within which the state is "In curand" (from the active notification template).
+    [Parameter] public int ThresholdDays { get; set; } = ServiceDueRules.DefaultThresholdDays;
     // The parent reloads the contracts (and the work point list, which shows the contract of each point) after a change.
     [Parameter] public EventCallback Changed { get; set; }
 

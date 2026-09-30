@@ -19,6 +19,9 @@ public sealed record ServiceContractPoint(int Id, int ContractId, int WorkPointI
 
 public sealed record ServiceContractPointView(ServiceContractPoint Point, string WorkPointName, string WorkPointAddress, bool WorkPointIsPrimary);
 
+// One covered work point on the "Scadente" list of /mentenanta, with its beneficiary and contract.
+public sealed record ServiceDueRow(int BeneficiaryId, string BeneficiaryName, ServiceContract Contract, ServiceContractPointView Point);
+
 public sealed record ServiceContractDetails(ServiceContract Contract, IReadOnlyList<ServiceContractPointView> Points)
 {
     /// <summary>The earliest due date among the covered points (null when the contract covers no point).</summary>
@@ -171,7 +174,7 @@ public static class ServiceContractNumber
 public enum ServiceDueState { OnTime, DueSoon, Overdue }
 
 // The displayed state of a due date (derived, never stored): Depasita when the date is before today, In curand within the threshold.
-// The threshold will follow the active notification template of the maintenance source; until that source exists it is the default.
+// The threshold is the one of the active notification template of the maintenance source (mentenanta.scadenta); this is the default used when it has none.
 public static class ServiceDueRules
 {
     public const int DefaultThresholdDays = 30;
@@ -204,6 +207,8 @@ public interface IServiceContractRepository
 {
     /// <summary>Every contract of the beneficiary (On and Off) with its covered work points, newest contract date first.</summary>
     Task<IReadOnlyList<ServiceContractDetails>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default);
+    /// <summary>Every covered work point of every beneficiary, earliest due date first; contracts that are Off only with includeOff.</summary>
+    Task<IReadOnlyList<ServiceDueRow>> GetDueListAsync(bool includeOff, CancellationToken cancellationToken = default);
     /// <summary>A new contract is On. A point already covered by another active contract is taken only with MoveFromOtherContract.</summary>
     Task<ServiceContractDetails> CreateAsync(int beneficiaryId, ServiceContractInput input, CancellationToken cancellationToken = default);
     /// <summary>Changes the fields of the contract and its coverage (points added, removed, moved in, cycle or due date changed).</summary>

@@ -1,0 +1,168 @@
+@using BlazorStoc.Services
+@inject IServiceInterventionRepository Repository
+@inject IServicePhotoStore PhotoStore
+@inject ILogger<ServiceInterventionsSection> Logger
+@implements IDisposable
+
+@if (adding || editing is not null)
+{
+    <ServiceInterventionEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Interventions="interventions" Original="editing"
+                               Saved="SavedAsync" Closed="CloseEditorAsync" PhotosChanged="ReloadCountsAsync" />
+}
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Intervenții <span>@Visible.Count</span></h2>
+        <div class="heading-actions">
+            <label class="kind-filter">Fel <select aria-label="Filtrează după felul intervenției" @bind="kindFilter">
+                <option value="">Toate</option>
+                <option value="M">Mentenanță</option>
+                <option value="C">La cerere</option>
+            </select></label>
+            @if (CanManage) { <button class="refresh" disabled="@Locked" @onclick="OpenAdd">+ Înregistrează intervenție</button> }
+        </div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (loading)
+    {
+        <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă intervențiile</h3></div>
+    }
+    else if (Visible.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">⚒</span><h3>@(interventions.Count == 0 ? "Nu există intervenții înregistrate" : "Nicio intervenție de acest fel")</h3>
+            <p>@(interventions.Count == 0 ? "Înregistrează o intervenție de mentenanță sau la cerere ca să ții evidența lucrărilor la punctele de lucru." : "Schimbă filtrul „Fel” ca să vezi celelalte intervenții.")</p></div>
+    }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>EFECTUATĂ LA</th><th>FEL</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>SCADENȚĂ</th><th>OBSERVAȚII</th><th class="number">FOTO</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+        @foreach (var item in Visible)
+        {
+            <tr @key="item.Id">
+                <td>@StockMovementRules.DisplayDate(item.PerformedOn)</td>
+                <td><span class="contract-state @(item.IsMaintenance ? "on" : "off")">@ServiceInterventionRules.KindLabel(item.Kind)</span></td>
+                <td><strong>@item.WorkPointName</strong><br /><small class="muted">@item.WorkPointAddress</small></td>
+                <td>@(item.ContractLabel ?? "—")</td>
+                <td>
+                    @if (!item.IsMaintenance) { <span class="muted">—</span> }
+                    else if (item.MovesDue) { <span>@StockMovementRules.DisplayDate(item.PlannedDue!.Value) → <strong>@StockMovementRules.DisplayDate(item.NextDueSet!.Value)</strong><br /><small class="muted">@ServiceInterventionRules.BasisLabel(item.Basis!.Value)</small></span> }
+                    else { <small class="muted">Nu a modificat scadența</small> }
+                </td>
+                <td class="work-point-description" title="@item.Notes">@item.Notes</td>
+                <td class="number">@(photoCounts.TryGetValue(item.Id, out var count) ? count.ToString() : "")</td>
+                @if (CanManage)
+                {
+                    <td>
+                        <button class="refresh" disabled="@Locked" @onclick="() => OpenEdit(item)">Editează</button>
+                        <button class="danger" disabled="@Locked" @onclick="() => OpenDelete(item)">Șterge</button>
+                    </td>
+                }
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi intervenția?" Subject="Intervenția" ObjectLabel="@($"{ServiceInterventionRules.KindLabel(deleting.Kind)} · {deleting.WorkPointName} · {StockMovementRules.DisplayDate(deleting.PerformedOn)}")"
+                              Description="@DeleteDescription" Busy="@busy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDeleteAsync" />
+}
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter, EditorRequired] public string BeneficiaryName { get; set; } = "";
+    [Parameter, EditorRequired] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
+    [Parameter, EditorRequired] public IReadOnlyList<ServiceContractDetails> Contracts { get; set; } = Array.Empty<ServiceContractDetails>();
+    [Parameter] public bool CanManage { get; set; }
+    // The parent reloads the contracts (and the work point list) after a change: a maintenance intervention moves due dates.
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private IReadOnlyList<ServiceIntervention> interventions = Array.Empty<ServiceIntervention>();
+    private IReadOnlyDictionary<int, int> photoCounts = new Dictionary<int, int>();
+    private bool adding, busy, loading = true;
+    private ServiceIntervention? editing, deleting;
+    private Guid editorKey;
+    private string kindFilter = "";
+    private string? notice, error, deleteError;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private bool Locked => busy || adding || editing is not null;
+    private IReadOnlyList<ServiceIntervention> Visible => kindFilter.Length == 0 ? interventions : interventions.Where(item => ServiceInterventionRules.KindCode(item.Kind).ToString() == kindFilter).ToList();
+
+    private string DeleteDescription => deleting is { MovesDue: true }
+        ? "Intervenția se arhivează împreună cu fotografiile ei. Dacă este ultima intervenție de mentenanță a punctului, scadența punctului revine la cea pe care a închis-o."
+        : "Intervenția se arhivează împreună cu fotografiile ei; nu modifică scadențele punctului.";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            interventions = await Repository.GetForBeneficiaryAsync(BeneficiaryId, lifetime.Token);
+            photoCounts = await PhotoStore.CountsForInterventionsAsync(BeneficiaryId, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service interventions loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Intervențiile nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task ReloadCountsAsync()
+    {
+        try { photoCounts = await PhotoStore.CountsForInterventionsAsync(BeneficiaryId, lifetime.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Logger.LogWarning("Intervention photo counts refresh failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private void OpenAdd() { adding = true; editing = null; editorKey = Guid.NewGuid(); notice = error = null; }
+    private void OpenEdit(ServiceIntervention item) { adding = false; editing = item; editorKey = Guid.NewGuid(); notice = error = null; }
+    private Task CloseEditorAsync() { adding = false; editing = null; return Task.CompletedTask; }
+
+    private async Task SavedAsync(ServiceInterventionSaved saved)
+    {
+        var wasNew = adding;
+        var kind = ServiceInterventionRules.KindText(saved.Intervention.Kind);
+        notice = wasNew
+            ? $"Intervenția {kind} din {StockMovementRules.DisplayDate(saved.Intervention.PerformedOn)} a fost înregistrată" + (saved.NewDue is { } due ? $"; următoarea scadență a punctului: {StockMovementRules.DisplayDate(due)}." : ".") + " Poți adăuga acum fotografii sau închide fișa."
+            : $"Intervenția {kind} din {StockMovementRules.DisplayDate(saved.Intervention.PerformedOn)} a fost actualizată.";
+        await LoadAsync();
+        // A new intervention stays open for editing, so its photos can be added right away.
+        adding = false;
+        editing = wasNew ? interventions.FirstOrDefault(item => item.Id == saved.Intervention.Id) ?? saved.Intervention : null;
+        if (wasNew) editorKey = Guid.NewGuid();
+        await Changed.InvokeAsync();
+    }
+
+    private void OpenDelete(ServiceIntervention item) { deleting = item; deleteError = null; notice = error = null; }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (busy || deleting is not { } item) return;
+        busy = true;
+        deleteError = null;
+        var done = false;
+        try
+        {
+            await Repository.DeleteAsync(item, reason, lifetime.Token);
+            notice = $"Intervenția {ServiceInterventionRules.KindText(item.Kind)} din {StockMovementRules.DisplayDate(item.PerformedOn)} a fost ștearsă (arhivată).";
+            done = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceInterventionOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service intervention deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Intervenția nu a putut fi ștearsă.";
+        }
+        finally { busy = false; }
+        if (done) { deleting = null; await LoadAsync(); await Changed.InvokeAsync(); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

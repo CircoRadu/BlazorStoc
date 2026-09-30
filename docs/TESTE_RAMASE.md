@@ -452,3 +452,31 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 ### N12. Rol limitat si restaurare dintr-un backup anterior migrarii 8
 - **Motiv**: M2 / M5 (o singura sesiune autentificata; restaurarea cere contul `blazorstoc_restore`, neconfigurat pe aceasta masina). **Pasi**: cu un cont fara dreptul de operator de beneficiari, deschide un beneficiar cu contracte; fa un backup nou (contine `service_contracts`, `service_contract_points`, `archive_service_contracts`) si restaureaza-l pe o copie; un backup mai vechi trebuie refuzat.
 - **Asteptat**: fara drept, butoanele de modificare lipsesc (acoperit automat, neconfirmat in browser); backup-ul vechi este refuzat cu mesajul de structura diferita.
+
+## Registru de interventii si campuri de fisiere (30.09.2026)
+
+### N13. Aspectul sectiunii de interventii, al formularului si al paginii /mentenanta pe ecran ingust
+- **Motiv**: M3 (redimensionarea la dispozitive reale nu este acoperita de panoul Browser). **Pasi**: pe telefon sau in emulare 375 px deschide un beneficiar cu interventii; inregistreaza una de mentenanta cu varianta "Stabilita de mine", deschide `/mentenanta` (ambele taburi, filtrele de perioada).
+- **Asteptat**: tabelele se deruleaza orizontal, cele trei variante de scadenta si calendarul raman lizibile, filtrele nu se suprapun, zona de fisiere ocupa latimea disponibila.
+
+### N14. Fotografii reale la interventii si tragerea cu mouse-ul
+- **Motiv**: M4 (testat cu imagini generate si cu evenimente de drag and drop simulate). **Pasi**: pe o interventie deschisa la editare trage cu mouse-ul 2-3 fotografii reale de telefon (cateva MB) direct din Explorer pe zona "Alege fotografii sau trage fisierele aici"; repeta pe editorul de produs (imagine), pe observatia de proiect si pe punctul de lucru.
+- **Asteptat**: zona se coloreaza la survol, fisierele se incarca, un fisier de alt tip este ignorat, un fisier lasat langa zona nu se deschide in browser.
+
+### N15. Rol limitat si stergerea unui punct cu interventii din interfata
+- **Motiv**: M2 (o singura sesiune autentificata) si M4. **Pasi**: cu un cont fara dreptul de operator de beneficiari deschide un beneficiar cu interventii; apoi, cu administrator, incearca stergerea unui punct de lucru care are interventii si a unui contract cu interventii.
+- **Asteptat**: fara drept, butoanele de inregistrare/editare/stergere lipsesc (acoperit automat, neconfirmat in browser); stergerea punctului si a contractului este refuzata cu mesajul despre interventii.
+
+### N16. Restaurare dintr-un backup anterior migrarii 9
+- **Motiv**: M5 (restaurarea cere contul `blazorstoc_restore`, neconfigurat pe aceasta masina). **Pasi**: cu un backup facut inainte de migrarea 9 incearca restaurarea; apoi fa un backup nou (contine `service_interventions` si `archive_service_interventions`) si restaureaza-l.
+- **Asteptat**: backup-ul vechi este refuzat cu mesajul de structura diferita; cel nou se restaureaza cu interventiile si pozele lor.
+
+## Surse de notificare pentru mentenanta (30.09.2026)
+
+### N17. Formularul de sabloane si lista de notificari pe ecran ingust
+- **Motiv**: M3 (redimensionarea la dispozitive reale nu este acoperita de panoul Browser). **Pasi**: pe telefon sau in emulare 375 px deschide Setari -> Notificari -> Sabloane, alege categoria "Mentenanta", completeaza text-exemplu si salveaza; deschide `/notificari` cu mai multe notificari de mentenanta.
+- **Asteptat**: lista de marcaje se rupe pe randuri fara sa iasa din ecran, textul de previzualizare ramane lizibil, tabelele de notificari se deruleaza orizontal.
+
+### N18. Evaluarea la interval real cu doua sesiuni
+- **Motiv**: M2 (o singura sesiune autentificata; evaluarea ruleaza la 5 minute). **Pasi**: cu un sablon `mentenanta.scadenta` activ, inregistreaza o interventie de mentenanta dintr-o sesiune, apoi asteapta cel mult 5 minute cu `/notificari` deschis in alta sesiune (un utilizator fara drept de operator de beneficiari) si reincarca.
+- **Asteptat**: notificarea veche a punctului apare la "Rezolvate" cu motivul "Scadenta interventiei de mentenanta s-a modificat de la ... la ... (ultima interventie de mentenanta: ...)" (jurnal "Rezolvare automata notificare", actor `sistem`); una noua apare doar cand noua scadenta intra in prag.

@@ -19,7 +19,8 @@ public static class ArchiveSchemaRegistry
             new ArchiveEntitySchema(AuditEntities.Vehicle, "archive_vehicles", true, false),
             new ArchiveEntitySchema(AuditEntities.WorkPoint, "archive_work_points", true, true),
             new ArchiveEntitySchema(AuditEntities.ServicePhoto, "archive_service_photos", false, true),
-            new ArchiveEntitySchema(AuditEntities.ServiceContract, "archive_service_contracts", true, false)
+            new ArchiveEntitySchema(AuditEntities.ServiceContract, "archive_service_contracts", true, false),
+            new ArchiveEntitySchema(AuditEntities.ServiceIntervention, "archive_service_interventions", true, true)
         }.ToDictionary(schema => schema.EntityType, StringComparer.Ordinal);
 
     public static IReadOnlyCollection<ArchiveEntitySchema> All { get; } = Schemas.Values.ToArray();
@@ -191,6 +192,16 @@ public static class ArchiveRequests
         var relations = value.Points.Select(point => ArchiveRelationSnapshot.Create(ServiceContractPointRelation, point.Point.Id.ToString(), point));
         return new(ArchiveSnapshot.Create(AuditEntities.ServiceContract, contract.Id.ToString(), contract.Version, contract, relations),
             ServiceContractRules.Target(contract.BeneficiaryId, beneficiaryName, contract.Label), details, motif);
+    }
+
+    // The photos of the intervention travel with it as relations (their files as archived files).
+    public static ArchiveRequest ServiceIntervention(ServiceIntervention value, string beneficiaryName, IEnumerable<ServicePhoto> photos, string motif)
+    {
+        var details = AuditDetails.Identification(("Fel", ServiceInterventionRules.KindLabel(value.Kind)), ("Beneficiar", beneficiaryName),
+            ("Punct de lucru", value.WorkPointName), ("Efectuată la", StockMovementRules.DisplayDate(value.PerformedOn)));
+        var relations = photos.Select(photo => ArchiveRelationSnapshot.Create(AuditEntities.ServicePhoto, photo.Id.ToString(), photo));
+        return new(ArchiveSnapshot.Create(AuditEntities.ServiceIntervention, value.Id.ToString(), value.Version, value, relations),
+            ServiceInterventionRules.Target(value, beneficiaryName), details, motif);
     }
 
     public static ArchiveRequest Vehicle(Vehicle value, string motif)

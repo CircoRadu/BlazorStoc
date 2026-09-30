@@ -47,7 +47,7 @@ else if (observation is not null && project is not null)
     <section class="catalog">
         <div class="catalog-heading"><h2>Fișiere <span>@files.Count</span></h2></div>
         <div class="image-inputs section-actions">
-            <InputFile OnChange="FilesSelectedAsync" multiple />
+            <FileDropZone OnChange="FilesSelectedAsync" Multiple="true" Disabled="@uploading" />
             <small>Dimensiune maximă per fișier: 20 MB. Cel mult @ProjectFileRules.MaximumFilesPerObservation fișiere per observație.</small>
             @if (uploadError is not null) { <span class="validation-message">@uploadError</span> }
             @if (uploading) { <span>Se încarcă…</span> }

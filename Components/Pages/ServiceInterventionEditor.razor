@@ -1,0 +1,341 @@
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using BlazorStoc.Services
+@inject IServiceInterventionRepository Repository
+@inject IServicePhotoStore PhotoStore
+@inject TimeProvider Clock
+@inject ILogger<ServiceInterventionEditor> Logger
+@implements IDisposable
+
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="intervention-editor-title">
+    <div class="catalog-heading"><h2 id="intervention-editor-title">@(Original is null ? "Înregistrează o intervenție" : $"Editează intervenția {ServiceInterventionRules.KindText(Original.Kind)} din {StockMovementRules.DisplayDate(Original.PerformedOn)}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (errors.Count > 0)
+    {
+        <div class="error-banner" role="alert"><ul class="validation-errors">@foreach (var message in errors) { <li>@message</li> }</ul></div>
+    }
+    <EditForm Model="input" OnSubmit="SubmitAsync" FormName="service-intervention-editor">
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <div class="full-width intervention-kind" role="radiogroup" aria-label="Felul intervenției">
+                    <span class="field-caption">Felul intervenției *</span>
+                    @if (Original is null)
+                    {
+                        <label class="check-label"><input type="radio" name="intervention-kind" checked="@(input.Kind == ServiceInterventionKind.Maintenance)" disabled="@(CoveredPoints.Count == 0)" @onchange="() => SetKind(ServiceInterventionKind.Maintenance)" /> Mentenanță (din contract) <small class="muted">mută scadența punctului</small></label>
+                        <label class="check-label"><input type="radio" name="intervention-kind" checked="@(input.Kind == ServiceInterventionKind.OnDemand)" @onchange="() => SetKind(ServiceInterventionKind.OnDemand)" /> La cerere <small class="muted">în afara ciclului; nu modifică scadențele</small></label>
+                        @if (CoveredPoints.Count == 0) { <small class="muted">Nu există puncte de lucru sub un contract activ (On), deci se poate înregistra doar o intervenție la cerere.</small> }
+                    }
+                    else
+                    {
+                        <strong>@ServiceInterventionRules.KindLabel(Original.Kind)</strong>
+                    }
+                </div>
+                @if (Original is null)
+                {
+                    <label for="intervention-point">Punct de lucru *<select id="intervention-point" value="@input.WorkPointId" @onchange="e => SetPoint(e.Value)">
+                        <option value="0">— alege punctul —</option>
+                        @foreach (var point in Choices)
+                        {
+                            <option value="@point.Id" selected="@(point.Id == input.WorkPointId)">@PointLabel(point)</option>
+                        }
+                    </select></label>
+                }
+                else
+                {
+                    <div class="field-static"><span class="field-caption">Punct de lucru</span><strong>@Original.WorkPointName</strong><small class="muted">@Original.WorkPointAddress@(Original.ContractLabel is { } label ? $" · contract {label}" : "")</small></div>
+                }
+                <label for="intervention-date">Data efectuării *<PickOnlyDate Id="intervention-date" @bind-Value="input.PerformedOn" @bind-Value:after="DateChanged" Min="2000-01-01" Max="@TodayIso" Disabled="@(saving || !DateEditable)" />
+                    @if (Original is not null && !DateEditable) { <small>Data se poate corecta numai la ultima intervenție de mentenanță a punctului; pentru aceasta se pot schimba doar observațiile.</small> }</label>
+                <label for="intervention-notes" class="full-width">Observații<textarea id="intervention-notes" rows="3" maxlength="@ServiceInterventionInput.NotesMaximumLength" @bind="input.Notes" @bind:event="oninput"></textarea></label>
+            </div>
+
+            @if (ShowsDueChoice)
+            {
+                <div class="due-choice" role="radiogroup" aria-label="Scadența următoare">
+                    <h3>Scadența următoare</h3>
+                    <p class="form-note">Punctul are scadența curentă <strong>@StockMovementRules.DisplayDate(PlannedDue!.Value)</strong>, ciclicitate @ServiceContractRules.CycleText(Cycle). Alege de unde se numără următoarea scadență.</p>
+                    @foreach (var option in Options)
+                    {
+                        <label class="check-label due-option @(option.Enabled ? null : "disabled")">
+                            <input type="radio" name="intervention-due-basis" checked="@(input.Basis == option.Basis)" disabled="@(!option.Enabled)" @onchange="() => SetBasis(option.Basis)" />
+                            <span><strong>@option.Label</strong>@if (option.Date is { } date) { <text>: @StockMovementRules.DisplayDate(date)</text> }
+                                @if (option.Reason is not null) { <br /><small class="muted">@option.Reason</small> }</span>
+                        </label>
+                        @if (option.Basis == ServiceNextDueBasis.Chosen && input.Basis == ServiceNextDueBasis.Chosen)
+                        {
+                            <div class="due-choice-date"><PickOnlyDate Id="intervention-chosen-due" @bind-Value="input.ChosenDue" Min="@ChosenMin" Disabled="saving" /><small class="muted">Trebuie să fie după data efectuării.</small></div>
+                        }
+                    }
+                </div>
+            }
+            else if (Original is null && input.Kind == ServiceInterventionKind.Maintenance && input.WorkPointId > 0 && input.PerformedOn is not null && !MovesDue)
+            {
+                <p class="form-note">Există o intervenție de mentenanță mai recentă pentru acest punct. Cea nouă se înregistrează în istoric, dar <strong>nu modifică scadența</strong>.</p>
+            }
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : Original is null ? "Înregistrează intervenția" : "Salvează modificările")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+
+    <div class="work-point-photos">
+        <div class="catalog-heading"><h3>Fotografii <span>@photos.Count</span></h3></div>
+        @if (Original is null)
+        {
+            <p class="form-note">Fotografiile se adaugă după înregistrarea intervenției; fișa rămâne deschisă după salvare, ca să le poți adăuga imediat.</p>
+        }
+        else
+        {
+            @if (photoError is not null) { <div class="error-banner" role="alert">@photoError</div> }
+            <div class="image-inputs">
+                <label class="photo-caption" for="intervention-photo-caption">Legendă pentru fotografiile alese (opțional)<input id="intervention-photo-caption" @bind="caption" @bind:event="oninput" maxlength="@ServicePhotoRules.CaptionMaximumLength" autocomplete="off" /></label>
+                <FileDropZone OnChange="PhotosSelectedAsync" Multiple="true" Accept="image/jpeg,image/png,image/webp,image/gif" Text="Alege fotografii" Disabled="@(uploading || photoBusy || saving)" />
+                <small>JPG, PNG, WebP sau GIF, cel mult 10 MB fiecare, cel mult @ServicePhotoRules.MaximumPerOwner de fotografii per intervenție. Se salvează imediat.</small>
+                @if (uploading) { <span role="status">Se încarcă…</span> }
+            </div>
+            @if (photos.Count == 0)
+            {
+                <p class="muted">Nu există fotografii pentru această intervenție.</p>
+            }
+            else
+            {
+                <ul class="photo-grid">
+                    @foreach (var photo in photos)
+                    {
+                        <li @key="photo.Id">
+                            <a href="@($"/media/service-photos/{photo.Id}")" target="_blank" rel="noopener"><img src="@($"/media/service-photos/{photo.Id}")" alt="@(photo.Caption.Length > 0 ? photo.Caption : photo.OriginalName)" loading="lazy" /></a>
+                            <span class="photo-name" title="@photo.OriginalName">@photo.OriginalName</span>
+                            @if (photo.Caption.Length > 0) { <span class="photo-caption-text">@photo.Caption</span> }
+                            <span class="muted">@photo.UploadedBy · @StockMovementRules.DisplayDate(DateOnly.FromDateTime(photo.UploadedUtc.ToLocalTime()))</span>
+                            <button type="button" class="danger" disabled="@(uploading || photoBusy || saving)" @onclick="() => DeletePhotoAsync(photo)">Șterge</button>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
+    // Every contract of the beneficiary: the active ones decide which points accept a maintenance intervention and their due dates.
+    [Parameter, EditorRequired] public IReadOnlyList<ServiceContractDetails> Contracts { get; set; } = Array.Empty<ServiceContractDetails>();
+    // Every intervention of the beneficiary: the latest due-moving one of a point decides whether a new or corrected one moves the due date.
+    [Parameter, EditorRequired] public IReadOnlyList<ServiceIntervention> Interventions { get; set; } = Array.Empty<ServiceIntervention>();
+    [Parameter] public ServiceIntervention? Original { get; set; }
+    [Parameter] public EventCallback<ServiceInterventionSaved> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    // Raised after a photo was added or deleted (the list shows the number of photos).
+    [Parameter] public EventCallback PhotosChanged { get; set; }
+
+    private UnsavedChangesTracker? tracker;
+    private ServiceInterventionInput input = new();
+    private IReadOnlyList<ServicePhoto> photos = Array.Empty<ServicePhoto>();
+    private bool saving, uploading, photoBusy;
+    private string? error, photoError;
+    private List<string> errors = [];
+    private string caption = "";
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    private string TodayIso => Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private string CurrentSnapshot() => FormSnapshot.Of(input);
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    // The work points under an active contract (with the contract and the coverage), the ones that accept a maintenance intervention.
+    private List<(WorkPoint Point, ServiceContractDetails Details, ServiceContractPoint Coverage)> CoveredPoints
+    {
+        get
+        {
+            var result = new List<(WorkPoint, ServiceContractDetails, ServiceContractPoint)>();
+            foreach (var point in WorkPoints.Where(point => point.Id > 0))
+                foreach (var details in Contracts.Where(item => item.Contract.IsActive))
+                    if (details.Points.FirstOrDefault(item => item.Point.WorkPointId == point.Id) is { } covered) { result.Add((point, details, covered.Point)); break; }
+            return result;
+        }
+    }
+
+    private IEnumerable<WorkPoint> Choices => input.Kind == ServiceInterventionKind.Maintenance
+        ? CoveredPoints.Select(item => item.Point) : WorkPoints.Where(point => point.Id > 0);
+
+    private string PointLabel(WorkPoint point)
+    {
+        if (input.Kind != ServiceInterventionKind.Maintenance) return $"{point.Name} — {point.Address}";
+        var covered = CoveredPoints.First(item => item.Point.Id == point.Id);
+        return $"{point.Name} — contract {covered.Details.Contract.Label}, scadență {StockMovementRules.DisplayDate(covered.Coverage.NextDue)}";
+    }
+
+    // The coverage the due choice is computed from: the current one of the chosen point for a new intervention, the one of the contract
+    // it was recorded under when it is corrected.
+    private (ServiceContractDetails Details, ServiceContractPoint Coverage)? CurrentCoverage()
+    {
+        if (Original is null)
+            return CoveredPoints.Where(item => item.Point.Id == input.WorkPointId).Select(item => ((ServiceContractDetails, ServiceContractPoint)?)(item.Details, item.Coverage)).FirstOrDefault();
+        if (Original.ContractId is not { } contractId) return null;
+        var details = Contracts.FirstOrDefault(item => item.Contract.Id == contractId && item.Contract.IsActive);
+        var coverage = details?.Points.FirstOrDefault(item => item.Point.WorkPointId == Original.WorkPointId);
+        return details is null || coverage is null ? null : (details, coverage.Point);
+    }
+
+    private bool IsLatestMoving => Original is { MovesDue: true, IsMaintenance: true } original && ServiceInterventionRules.LatestMoving(Interventions, original.WorkPointId)?.Id == original.Id;
+    private bool DateEditable => Original is null || !Original.IsMaintenance || IsLatestMoving;
+
+    private DateOnly? PlannedDue => Original is null ? CurrentCoverage()?.Coverage.NextDue : Original.PlannedDue;
+    private int Cycle => CurrentCoverage() is { } current ? current.Details.EffectiveCycle(current.Coverage) : ServiceContractRules.MinimumCycle;
+
+    private bool MovesDue
+    {
+        get
+        {
+            if (Original is not null) return IsLatestMoving;
+            if (input.PerformedOn is not { } performed) return true;
+            return ServiceInterventionRules.Moves(performed, ServiceInterventionRules.LatestMoving(Interventions, input.WorkPointId)?.PerformedOn);
+        }
+    }
+
+    private bool ShowsDueChoice => input.Kind == ServiceInterventionKind.Maintenance && input.WorkPointId > 0 && input.PerformedOn is not null &&
+                                   PlannedDue is not null && CurrentCoverage() is not null && MovesDue;
+
+    private IReadOnlyList<ServiceDueOption> Options => ServiceInterventionRules.Options(input.PerformedOn!.Value, PlannedDue!.Value, Cycle);
+
+    private string ChosenMin => input.PerformedOn is { } performed ? performed.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "2000-01-01";
+
+    protected override async Task OnInitializedAsync()
+    {
+        input = Original is null ? new() { Kind = CoveredPoints.Count > 0 ? ServiceInterventionKind.Maintenance : ServiceInterventionKind.OnDemand } : ServiceInterventionInput.From(Original);
+        if (Original is null) input.PerformedOn = Today;
+        if (Original is { Id: > 0 }) await LoadPhotosAsync();
+    }
+
+    private void SetKind(ServiceInterventionKind kind)
+    {
+        input.Kind = kind;
+        if (!Choices.Any(point => point.Id == input.WorkPointId)) input.WorkPointId = 0;
+        EnsureBasis();
+    }
+
+    private void SetPoint(object? value)
+    {
+        input.WorkPointId = int.TryParse(value?.ToString(), CultureInfo.InvariantCulture, out var id) ? id : 0;
+        EnsureBasis();
+    }
+
+    private void DateChanged() => EnsureBasis();
+
+    private void SetBasis(ServiceNextDueBasis basis)
+    {
+        input.Basis = basis;
+        if (basis != ServiceNextDueBasis.Chosen) input.ChosenDue = null;
+    }
+
+    // The planned-date variant may become unusable after a change of the date; the default is the one counted from the date performed.
+    private void EnsureBasis()
+    {
+        if (!ShowsDueChoice) return;
+        var option = Options.FirstOrDefault(item => item.Basis == input.Basis);
+        if (option is null || !option.Enabled) SetBasis(ServiceNextDueBasis.FromPerformed);
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (saving) return;
+        error = null;
+        errors = [];
+        if (input.Kind == ServiceInterventionKind.OnDemand || !ShowsDueChoice) { input.Basis = Original?.Basis ?? ServiceNextDueBasis.FromPerformed; if (Original is null) input.ChosenDue = null; }
+        var results = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
+        {
+            errors = results.Select(result => result.ErrorMessage ?? string.Empty).Where(message => message.Length > 0).Distinct().ToList();
+            return;
+        }
+        if (input.PerformedOn is { } performed && ServiceInterventionRules.PerformedOnError(performed, Today) is { } dateError) { errors = [dateError]; return; }
+        if (ShowsDueChoice && ServiceInterventionRules.ResolveDue(input.Basis, input.PerformedOn!.Value, PlannedDue!.Value, Cycle, input.ChosenDue, out var dueError) is null) { errors = [dueError!]; return; }
+        saving = true;
+        ServiceInterventionSaved? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.RecordAsync(BeneficiaryId, input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ServiceInterventionOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Service intervention saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Intervenția nu a putut fi salvată. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    private async Task LoadPhotosAsync()
+    {
+        try { photos = await PhotoStore.GetForInterventionAsync(Original!.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Intervention photos loading failed ({ErrorType}).", exception.GetType().Name);
+            photoError = "Fotografiile nu au putut fi încărcate.";
+        }
+    }
+
+    // Each chosen file is stored at once (and journaled); a refused file is reported and the others are still stored.
+    private async Task PhotosSelectedAsync(InputFileChangeEventArgs eventArgs)
+    {
+        if (Original is not { Id: > 0 } intervention || uploading) return;
+        uploading = true;
+        photoError = null;
+        var problems = new List<string>();
+        try
+        {
+            foreach (var file in eventArgs.GetMultipleFiles(ServicePhotoRules.MaximumPerOwner))
+            {
+                try
+                {
+                    await using var stream = file.OpenReadStream(ServicePhotoRules.MaximumBytes, lifetime.Token);
+                    using var buffer = new MemoryStream();
+                    await stream.CopyToAsync(buffer, lifetime.Token);
+                    await PhotoStore.AddToInterventionAsync(intervention.Id, file.Name, buffer.ToArray(), caption, lifetime.Token);
+                }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+                catch (WorkPointOperationException exception) { problems.Add($"{file.Name}: {exception.Message}"); }
+                catch (AccessDeniedException exception) { problems.Add($"{file.Name}: {exception.Message}"); }
+                catch (IOException) { problems.Add($"{file.Name}: fotografia depășește 10 MB sau nu a putut fi citită."); }
+                catch (Exception exception)
+                {
+                    Logger.LogError("Intervention photo upload failed ({ErrorType}).", exception.GetType().Name);
+                    problems.Add($"{file.Name}: fotografia nu a putut fi încărcată.");
+                }
+            }
+        }
+        finally { uploading = false; }
+        if (problems.Count > 0) photoError = string.Join(" ", problems);
+        await LoadPhotosAsync();
+        await PhotosChanged.InvokeAsync();
+    }
+
+    private async Task DeletePhotoAsync(ServicePhoto photo)
+    {
+        if (photoBusy) return;
+        photoBusy = true;
+        photoError = null;
+        try { await PhotoStore.DeleteAsync(photo.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { photoError = exception.Message; }
+        catch (AccessDeniedException exception) { photoError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Intervention photo deletion failed ({ErrorType}).", exception.GetType().Name);
+            photoError = "Fotografia nu a putut fi ștearsă.";
+        }
+        finally { photoBusy = false; }
+        await LoadPhotosAsync();
+        await PhotosChanged.InvokeAsync();
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

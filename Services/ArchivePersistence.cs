@@ -207,6 +207,23 @@ internal static class MariaArchivePersistence
                     ("@validUntil", serviceContract.ValidUntil?.ToDateTime(TimeOnly.MinValue)), ("@active", serviceContract.IsActive ? 1 : 0),
                     ("@notes", serviceContract.Notes), ("@version", serviceContract.Version)).ConfigureAwait(false);
                 break;
+            case AuditEntities.ServiceIntervention:
+                var intervention = ArchiveJson.Entity<ServiceIntervention>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_service_interventions
+                        (archive_id,original_id,kind,beneficiary_id,work_point_id,contract_id,work_point_name,work_point_address,contract_label,
+                         performed_on,planned_due,next_due_basis,next_due_set,notes,recorded_by,recorded_utc,version)
+                    VALUES(@archiveId,@id,@kind,@beneficiary,@workPoint,@contract,@pointName,@pointAddress,@contractLabel,
+                           @performed,@planned,@basis,@dueSet,@notes,@recordedBy,@recorded,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", intervention.Id),
+                    ("@kind", ServiceInterventionRules.KindCode(intervention.Kind).ToString()), ("@beneficiary", intervention.BeneficiaryId),
+                    ("@workPoint", intervention.WorkPointId), ("@contract", intervention.ContractId), ("@pointName", intervention.WorkPointName),
+                    ("@pointAddress", intervention.WorkPointAddress), ("@contractLabel", intervention.ContractLabel),
+                    ("@performed", intervention.PerformedOn.ToDateTime(TimeOnly.MinValue)), ("@planned", intervention.PlannedDue?.ToDateTime(TimeOnly.MinValue)),
+                    ("@basis", intervention.Basis is { } basis ? ServiceInterventionRules.BasisCode(basis).ToString() : null),
+                    ("@dueSet", intervention.NextDueSet?.ToDateTime(TimeOnly.MinValue)), ("@notes", intervention.Notes), ("@recordedBy", intervention.RecordedBy),
+                    ("@recorded", MariaTimeText.Format(intervention.RecordedUtc)), ("@version", intervention.Version)).ConfigureAwait(false);
+                break;
             default:
                 throw new ArchiveContractException(
                     $"Tipul «{snapshot.EntityType}» este înregistrat, dar nu are mapare MariaDB pentru tabela sa archive_*.");

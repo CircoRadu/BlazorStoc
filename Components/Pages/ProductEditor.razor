@@ -27,7 +27,7 @@
                     </div>
                     <div class="image-inputs">
                         <strong>Imagine produs (opțional)</strong>
-                        <InputFile id="product-image-input" OnChange="ImageSelectedAsync" accept="image/jpeg,image/png,image/webp,image/gif" />
+                        <FileDropZone Id="product-image-input" OnChange="ImageSelectedAsync" Accept="image/jpeg,image/png,image/webp,image/gif" Text="Alege imaginea" />
                         <div class="clipboard-zone" @ref="pasteArea" tabindex="0">
                             <span>Lipește aici imaginea cu <kbd>Ctrl</kbd> + <kbd>V</kbd></span>
                             <button type="button" class="refresh" @onclick="ReadClipboardAsync">Preia imaginea din clipboard</button>

@@ -32,7 +32,7 @@ public static class MariaArchiveSchema
     // was missing from the list used by backup/restore, so backups exported it in dump.sql but left it out of the
     // manifest and of the canonical row hash. Add every future migration-created table here.
     private static readonly string[] MigratedTables = ["beneficiary_work_points", "notification_templates", "expiry_notifications", "notification_settings",
-        "service_photos", "archive_work_points", "archive_service_photos", "service_contracts", "service_contract_points", "archive_service_contracts"];
+        "service_photos", "archive_work_points", "archive_service_photos", "service_contracts", "service_contract_points", "archive_service_contracts", "service_interventions", "archive_service_interventions"];
 
     internal static readonly string[] RequiredTables = [.. BaselineTables, .. MigratedTables];
 

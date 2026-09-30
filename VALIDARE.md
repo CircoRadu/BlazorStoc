@@ -452,3 +452,17 @@ Verificat la 25 septembrie 2026.
 - Migrarea 8 aplicata pe baza reala `BlazorStoc` (la pornirea preview-ului 5087) si pe `blazorstoc_test` (`--migrate-schema`). Nimic nu a fost creat manual pe baza reala.
 - Browser (baza de test, port 5088, beneficiarul 241): contract nou cu doua puncte, expandare, Dezactiveaza / "Arata si contractele Off", Activeaza cu panoul de reprogramare, coloana "Mentenanta" din tabelul punctelor, refuzul stergerii unui punct acoperit.
 - Neverificat: ecran ingust, rol limitat, mutare si stergere de contract din interfata (acoperite in teste), restaurare dintr-un backup anterior migrarii 8; vezi `docs/TESTE_RAMASE.md` (N10-N12).
+
+## Registru de interventii si campuri de fisiere cu drag and drop (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 815 PASS (743 inainte), 3 rulari consecutive fara esec, cu integrare MariaDB pe `blazorstoc_test`; sectiune noua "Maintenance interventions" (variantele E/P/O, interventie mai veche, corectari, poze, registru, doua sesiuni simultane, arhivare, ocrotirile contract/punct/beneficiar) si verificari pure pentru variantele de scadenta, regula ultimei interventii, validare, actiuni de jurnal, arhivare si migrarea 9.
+- Migrarea 9 aplicata pe baza reala `BlazorStoc` (la pornirea preview-ului 5087) si pe `blazorstoc_test` (`--migrate-schema`). Nimic nu a fost creat manual pe baza reala.
+- Browser (baza de test, port 5088, beneficiarul 241): inregistrare cu alegerea scadentei, poza, interventie veche, interventie la cerere, stergere cu revenirea scadentei, pagina `/mentenanta`, lasare de fisier pe zona de drag and drop.
+- Neverificat: ecran ingust, fotografii reale, rol limitat, stergere de punct cu interventii din interfata, restaurare dintr-un backup anterior migrarii 9, tragere reala cu mouse-ul; vezi `docs/TESTE_RAMASE.md` (N13-N16).
+
+## Surse de notificare pentru mentenanta (30.09.2026)
+
+- `tests/BlazorStoc.Checks`: 835 PASS (815 inainte), 3 rulari consecutive fara esec, cu integrare MariaDB pe `blazorstoc_test`; sectiune noua "Maintenance notifications" (notificare pe punct si pe contract, inchidere automata la interventie / prelungire / contract Off, redeschidere cand data revine, prag din sablon) si verificari pure pentru surse, marcaje, texte si motive.
+- Nu s-a modificat schema. Pe baza reala nu s-a creat niciun sablon.
+- Browser (baza de test, port 5088): sablon nou pe categoria "Mentenanta" (text-exemplu, marcaje), notificarile aparute pe `/notificari`, starea "In curand" din `/mentenanta` dupa pragul sablonului.
+- Neverificat: ecran ingust, rularea la interval real cu mai multe sesiuni; vezi `docs/TESTE_RAMASE.md` (N17-N18).

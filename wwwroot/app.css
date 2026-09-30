@@ -438,3 +438,31 @@ tr.contract-points-row td { background: #f6faf8; padding-left: 40px; }
 .link-button { background: none; border: 0; color: var(--green); font-weight: 650; padding: 4px 6px; border-radius: 5px; }
 .link-button:hover { background: #edf5f0; }
 @media (max-width: 720px) { tr.contract-points-row td { padding-left: 18px; } }
+
+/* Register of interventions: the kind selector and the next-due choice of the editor, the filters of /mentenanta */
+.intervention-kind { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; }
+.field-caption { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; width: 100%; }
+.field-static { display: flex; flex-direction: column; gap: 3px; }
+.due-choice { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: #f8fbf9; }
+.due-choice h3 { margin: 0 0 4px; font-size: 15px; }
+.due-option { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; }
+.due-option.disabled { opacity: .65; }
+.due-choice-date { margin: 0 0 6px 26px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.kind-filter { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.register-filters { flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.period-field { display: inline-flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 600; }
+.register-filters .search-box { flex: 1 1 280px; }
+.register-filters select { width: auto; min-width: 190px; }
+
+/* Styled file fields (FileDropZone): click to choose or drag files onto the area; the native input is visually hidden */
+.file-drop { position: relative; width: 100%; max-width: 560px; border: 2px dashed #b9cfc7; border-radius: 10px; background: #f8fbf9; transition: border-color .15s ease, background-color .15s ease; }
+.file-drop-label { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; margin: 0; }
+.file-drop-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; flex: none; border-radius: 8px; background: var(--green); color: white; font-size: 20px; }
+.file-drop-text strong { color: var(--green); }
+.file-drop:hover, .file-drop:focus-within { border-color: var(--green); background: #f0f8f4; }
+.file-drop:focus-within { outline: 2px solid #9fd0c3; outline-offset: 2px; }
+.file-drop.file-drop-active { border-color: #4ea187; background: #e6f3ed; }
+.file-drop.disabled { opacity: .55; pointer-events: none; }
+/* The remaining native file inputs (the fallback of any field not yet on FileDropZone) get a styled button too */
+input[type=file]::file-selector-button { margin-right: 12px; padding: 8px 14px; border: 0; border-radius: 7px; background: var(--green); color: white; font: inherit; font-weight: 650; cursor: pointer; }
+input[type=file]::file-selector-button:hover { background: #0f6659; }

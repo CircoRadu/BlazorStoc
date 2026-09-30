@@ -1947,6 +1947,144 @@ async Task RunMaintenanceGateChecksAsync()
         "MariaDB migration 8 adds the contracts, their coverage with the one-active-contract key and the archive table");
 }
 
+// Register of interventions (pure rules): the three ways to choose the next due date, the rule of the latest intervention, the input
+// validation, the exact journal operations, the registry entry and migration 9.
+{
+    static bool Throws<T>(Action action) where T : Exception { try { action(); return false; } catch (T) { return true; } }
+    var performed = new DateOnly(2026, 1, 18);
+    var planned = new DateOnly(2026, 1, 15);
+    var options = ServiceInterventionRules.Options(performed, planned, 3);
+    Check(options.Count == 3 && options[0].Basis == ServiceNextDueBasis.FromPerformed && options[0].Date == new DateOnly(2026, 4, 18) && options[0].Enabled &&
+          options[1].Basis == ServiceNextDueBasis.FromPlanned && options[1].Date == new DateOnly(2026, 4, 15) && options[1].Enabled &&
+          options[2].Basis == ServiceNextDueBasis.Chosen && options[2].Date is null && options[2].Enabled,
+        "The three variants: from the date performed, from the planned date, chosen by the operator");
+    var late = ServiceInterventionRules.Options(new DateOnly(2026, 6, 1), new DateOnly(2026, 1, 15), 3);
+    Check(late[0].Enabled && !late[1].Enabled && late[1].Reason is not null && late[2].Enabled &&
+          !ServiceInterventionRules.Options(new DateOnly(2026, 4, 15), planned, 3)[1].Enabled,
+        "The planned-date variant is disabled (with its reason) when planned date plus cycle is not after the date performed");
+    Check(ServiceInterventionRules.Options(new DateOnly(2026, 11, 30), planned, 3)[0].Date == new DateOnly(2027, 2, 28) &&
+          ServiceInterventionRules.Options(new DateOnly(2026, 8, 31), planned, 6)[0].Date == new DateOnly(2027, 2, 28),
+        "A month-end date moves to the last day of a shorter month");
+    Check(ServiceInterventionRules.ResolveDue(ServiceNextDueBasis.FromPerformed, performed, planned, 3, null, out var error) == new DateOnly(2026, 4, 18) && error is null &&
+          ServiceInterventionRules.ResolveDue(ServiceNextDueBasis.FromPlanned, performed, planned, 3, null, out error) == new DateOnly(2026, 4, 15) &&
+          ServiceInterventionRules.ResolveDue(ServiceNextDueBasis.Chosen, performed, planned, 3, new DateOnly(2026, 6, 2), out error) == new DateOnly(2026, 6, 2) &&
+          ServiceInterventionRules.ResolveDue(ServiceNextDueBasis.Chosen, performed, planned, 3, null, out error) is null && error is not null &&
+          ServiceInterventionRules.ResolveDue(ServiceNextDueBasis.Chosen, performed, planned, 3, performed, out error) is null && error is not null &&
+          ServiceInterventionRules.ResolveDue(ServiceNextDueBasis.FromPlanned, new DateOnly(2026, 6, 1), planned, 3, null, out error) is null && error is not null,
+        "The chosen date must exist and be after the date performed; a planned-date result not after it is refused");
+    Check(ServiceInterventionRules.PerformedOnError(new DateOnly(2026, 9, 30), new DateOnly(2026, 9, 30)) is null &&
+          ServiceInterventionRules.PerformedOnError(new DateOnly(2026, 10, 1), new DateOnly(2026, 9, 30)) is not null,
+        "The date performed cannot be in the future");
+
+    ServiceIntervention Row(int id, ServiceInterventionKind kind, int point, DateOnly on, ServiceNextDueBasis? basis) => new(id, kind, 1, point, kind == ServiceInterventionKind.Maintenance ? 7 : null,
+        "Sediu", "Str. A 1", kind == ServiceInterventionKind.Maintenance ? "26/23.09.2025" : null, on, basis is null ? null : new DateOnly(2025, 12, 1), basis, basis is null ? null : on.AddMonths(3), "", "ana", DateTime.UtcNow, 0);
+    var register = new[]
+    {
+        Row(1, ServiceInterventionKind.Maintenance, 5, new DateOnly(2026, 1, 10), ServiceNextDueBasis.FromPerformed),
+        Row(2, ServiceInterventionKind.Maintenance, 5, new DateOnly(2026, 4, 12), ServiceNextDueBasis.FromPlanned),
+        Row(3, ServiceInterventionKind.Maintenance, 5, new DateOnly(2026, 2, 1), null),
+        Row(4, ServiceInterventionKind.OnDemand, 5, new DateOnly(2026, 8, 1), null),
+        Row(5, ServiceInterventionKind.Maintenance, 6, new DateOnly(2026, 3, 1), ServiceNextDueBasis.Chosen)
+    };
+    Check(ServiceInterventionRules.LatestMoving(register, 5)?.Id == 2 && ServiceInterventionRules.LatestMoving(register, 6)?.Id == 5 && ServiceInterventionRules.LatestMoving(register, 9) is null &&
+          !register[2].MovesDue && !register[3].MovesDue && register[1].MovesDue,
+        "The latest due-moving maintenance intervention of a point is the one with the latest date performed (on-demand and non-moving ones do not count)");
+    Check(ServiceInterventionRules.Moves(new DateOnly(2026, 4, 12), new DateOnly(2026, 4, 12)) && ServiceInterventionRules.Moves(new DateOnly(2026, 5, 1), new DateOnly(2026, 4, 12)) &&
+          !ServiceInterventionRules.Moves(new DateOnly(2026, 4, 11), new DateOnly(2026, 4, 12)) && ServiceInterventionRules.Moves(new DateOnly(2020, 1, 1), null),
+        "A new maintenance intervention moves the due date unless a later one already exists");
+
+    Check(ServiceInterventionRules.KindCode(ServiceInterventionKind.Maintenance) == 'M' && ServiceInterventionRules.KindCode(ServiceInterventionKind.OnDemand) == 'C' &&
+          ServiceInterventionRules.ParseKind("M") == ServiceInterventionKind.Maintenance && ServiceInterventionRules.ParseKind("C") == ServiceInterventionKind.OnDemand &&
+          ServiceInterventionRules.ParseBasis("E") == ServiceNextDueBasis.FromPerformed && ServiceInterventionRules.ParseBasis("P") == ServiceNextDueBasis.FromPlanned &&
+          ServiceInterventionRules.ParseBasis("O") == ServiceNextDueBasis.Chosen && ServiceInterventionRules.ParseBasis(null) is null &&
+          new[] { ServiceNextDueBasis.FromPerformed, ServiceNextDueBasis.FromPlanned, ServiceNextDueBasis.Chosen }.Select(ServiceInterventionRules.BasisCode).Distinct().Count() == 3,
+        "The kind and the choice are stored as one-letter codes and read back");
+
+    static ServiceInterventionInput Input(Action<ServiceInterventionInput>? change = null)
+    {
+        var value = new ServiceInterventionInput { WorkPointId = 5, PerformedOn = new DateOnly(2026, 1, 18), Notes = "  Filtre schimbate  " };
+        change?.Invoke(value);
+        return value;
+    }
+    Check(Input().Validated().Notes == "Filtre schimbate" && Input().Validated().Kind == ServiceInterventionKind.Maintenance &&
+          Throws<ServiceInterventionOperationException>(() => Input(value => value.WorkPointId = 0).Validated()) &&
+          Throws<ServiceInterventionOperationException>(() => Input(value => value.PerformedOn = null).Validated()) &&
+          Throws<ServiceInterventionOperationException>(() => Input(value => value.PerformedOn = new DateOnly(1999, 1, 1)).Validated()) &&
+          Throws<ServiceInterventionOperationException>(() => Input(value => value.Notes = new string('x', 2001)).Validated()) &&
+          Input(value => value.Notes = new string('x', 2000)).Validated().Notes.Length == 2000,
+        "A valid intervention input is normalized; the point and the date are required and the notes are limited to 2000 characters");
+    var fromRow = ServiceInterventionInput.From(register[4]);
+    Check(fromRow.Basis == ServiceNextDueBasis.Chosen && fromRow.ChosenDue == register[4].NextDueSet && ServiceInterventionInput.From(register[3]).Basis == ServiceNextDueBasis.FromPerformed &&
+          ServiceInterventionInput.From(register[3]).ChosenDue is null,
+        "The correction form starts from the recorded choice");
+
+    var interventionActions = new[] { AuditActions.RecordMaintenance, AuditActions.EditMaintenanceIntervention, AuditActions.RecordOnDemand, AuditActions.EditOnDemandIntervention, AuditActions.AddInterventionPhoto };
+    Check(interventionActions.Distinct().Count() == 5 && interventionActions.All(AuditActions.IsCreateOrEdit) && interventionActions.All(action => action != AuditActions.Create && action != AuditActions.Edit),
+        "Each intervention operation has its own journal action, linked to the beneficiary page");
+    Check(ServiceInterventionRules.Changes(register[0], register[0] with { PerformedOn = new DateOnly(2026, 1, 12) }).Any(change => change.Field == "Efectuată la" && change.Before == "10.01.2026" && change.After == "12.01.2026") &&
+          ServiceInterventionRules.Target(register[3], "Beneficiar SRL").Contains("la cerere") && ServiceInterventionRules.Target(register[0], "Beneficiar SRL").Contains("de mentenanță") &&
+          ServiceInterventionRules.Identification(register[0]).Contains("10.01.2026"),
+        "The journal details hold the old and the new value in dd.MM.yyyy and the kind of the intervention");
+
+    Check(ArchiveSchemaRegistry.All.Any(schema => schema.EntityType == AuditEntities.ServiceIntervention && schema.TableName == "archive_service_interventions" && schema.SupportsRelations && schema.SupportsFiles),
+        "The interventions are registered for archiving (with their photos and files)");
+    var archivedIntervention = ArchiveRequests.ServiceIntervention(register[0], "Beneficiar SRL",
+        [new ServicePhoto(9, null, 1, "a.png", "x.png", "image/png", 10, new string('a', 64), "", "ana", DateTime.UtcNow)], "Motiv");
+    Check(archivedIntervention.Snapshot.EntityType == AuditEntities.ServiceIntervention && archivedIntervention.Snapshot.Relations.Count == 1 &&
+          archivedIntervention.Snapshot.Relations[0].RelationType == AuditEntities.ServicePhoto && archivedIntervention.Target.Contains("de mentenanță"),
+        "The archive request of an intervention carries its photos as relations");
+
+    var migration9 = MariaSchemaMigrations.All.Single(m => m.Version == 9);
+    Check(new[] { "kind", "beneficiary_id", "work_point_id", "contract_id", "work_point_name", "contract_label", "performed_on", "planned_due", "next_due_basis", "next_due_set", "notes", "version" }
+              .All(column => migration9.ExpectedColumns.Contains(("service_interventions", column))) &&
+          migration9.ExpectedColumns.Contains(("archive_service_interventions", "next_due_set")) &&
+          migration9.Statements.Any(sql => sql.Contains("ck_service_interventions_kind") && sql.Contains("ck_service_interventions_due") && sql.Contains("ck_service_interventions_next_due") && sql.Contains("ON DELETE RESTRICT")) &&
+          migration9.Statements.Any(sql => sql.Contains("fk_service_photos_intervention")) &&
+          migration9.Statements.Any(sql => sql.Contains("CREATE TABLE IF NOT EXISTS `archive_service_interventions`")),
+        "MariaDB migration 9 adds the register with its constraints, the photo link and the archive table");
+}
+
+// Maintenance notification sources (pure): keys, category and event, placeholders, the texts rendered for an instance, the reasons
+// written when a date changes, and the proposed default texts.
+{
+    var reader = new FakeMaintenanceReader(
+        [new MaintenanceDueItem(7, 3, "Demo Puncte SRL", "Sediu central", "Strada Demo 10, Timișoara", "26/23.09.2025", new DateOnly(2026, 11, 5), new DateOnly(2026, 8, 1)),
+         new MaintenanceDueItem(8, 3, "Demo Puncte SRL", "Depozit", "Str. Depozitului 5", "26/23.09.2025", new DateOnly(2026, 10, 20), null)],
+        [new ContractExpiryItem(11, 3, "Demo Puncte SRL", "26/23.09.2025", new DateOnly(2025, 9, 23), new DateOnly(2027, 9, 22))]);
+    var dueSource = new MaintenanceDueSource(reader);
+    var expirySource = new ContractExpirySource(reader);
+    Check(dueSource.Key == "mentenanta.scadenta" && expirySource.Key == "contract.expirare" && ExpirySourceKeys.MaintenanceDue == dueSource.Key && ExpirySourceKeys.ContractExpiry == expirySource.Key &&
+          dueSource.Category == "Mentenanță" && expirySource.Category == "Mentenanță" && dueSource.EventName != expirySource.EventName,
+        "The two maintenance sources have their stable keys and share the category \"Mentenanță\"");
+    var dueInstances = await dueSource.GetInstancesAsync();
+    Check(dueInstances.Count == 2 && dueInstances[0].ObjectId == 7 && dueInstances[0].Expiry == new DateOnly(2026, 11, 5) && dueInstances[0].Label == "Demo Puncte SRL · Sediu central" &&
+          dueInstances[0].Url == "/beneficiari/3" && dueInstances[0].Values["data ultima interventie"] == "01.08.2026" && dueInstances[1].Values["data ultima interventie"] == MaintenanceDueSource.NoIntervention,
+        "A due instance is the covered point, dated at its next due date, with the link of the beneficiary and the last maintenance intervention (or none)");
+    var today = new DateOnly(2026, 10, 30);
+    var subject = ExpiryTemplateRules.Render(dueSource.DefaultSubject, dueSource.EventName, dueInstances[0], today);
+    var body = ExpiryTemplateRules.Render(dueSource.DefaultBody, dueSource.EventName, dueInstances[0], today);
+    Check(subject == "Scadență mentenanță – Demo Puncte SRL, Sediu central" && body.Contains("Sediu central (Strada Demo 10, Timișoara)") && body.Contains("contract 26/23.09.2025") && body.Contains("05.11.2026") &&
+          body.Contains("zile rămase: 6") && body.Contains("Ultima intervenție de mentenanță: 01.08.2026") && !body.Contains('<'),
+        "The proposed text of the due source renders every placeholder");
+    var expiryInstances = await expirySource.GetInstancesAsync();
+    Check(expiryInstances.Count == 1 && expiryInstances[0].ObjectId == 11 && expiryInstances[0].Expiry == new DateOnly(2027, 9, 22) && expiryInstances[0].Label == "Demo Puncte SRL · Contract 26/23.09.2025" &&
+          ExpiryTemplateRules.Render(expirySource.DefaultBody, expirySource.EventName, expiryInstances[0], new DateOnly(2027, 9, 12)) ==
+              "Contractul de mentenanță 26/23.09.2025 al beneficiarului Demo Puncte SRL expiră la data de 22.09.2027 (zile rămase: 10; zile de depășire: 0).",
+        "An expiry instance is the contract dated at its expiry date; the proposed text names the contract, the beneficiary and the date");
+    Check(ExpiryTemplateRules.UnknownPlaceholders("<beneficiar> <punct de lucru> <adresa punct de lucru> <numar contract> <data ultima interventie> <data expirare> <zile ramase> <zile depasire>", dueSource).Count == 0 &&
+          ExpiryTemplateRules.UnknownPlaceholders("<beneficiar> <numar contract> <data contract> <data expirare>", expirySource).Count == 0 &&
+          ExpiryTemplateRules.UnknownPlaceholders("<punct de lucru>", expirySource).Count == 1 && ExpiryTemplateRules.UnknownPlaceholders("<numar autovehicul>", dueSource).Count == 1,
+        "Each source accepts its own placeholders and refuses the ones of other sources");
+    Check(dueSource.DateChangedReason(new DateOnly(2026, 1, 18), new DateOnly(2026, 5, 5), dueInstances[0]) == "Scadența intervenției de mentenanță s-a modificat de la 18.01.2026 la 05.05.2026 (ultima intervenție de mentenanță: 01.08.2026)." &&
+          dueSource.DateChangedReason(new DateOnly(2026, 1, 18), new DateOnly(2026, 5, 5), dueInstances[1]) == "Scadența intervenției de mentenanță s-a modificat de la 18.01.2026 la 05.05.2026." &&
+          expirySource.DateChangedReason(new DateOnly(2027, 9, 22), new DateOnly(2028, 9, 22), expiryInstances[0]) == "Data expirării contractului s-a modificat de la 22.09.2027 la 22.09.2028." &&
+          ((IExpirySource)new TestExpirySource("t", [])).DateChangedReason(new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), dueInstances[0]) == "Data expirării Eveniment test s-a modificat de la 01.01.2026 la 01.02.2026." &&
+          dueSource.RemovedReason.Contains("contractul a fost dezactivat") && expirySource.RemovedReason.Contains("dezactivat"),
+        "The reasons written when a date changes or the object leaves are specific to each source (the other sources keep the generic text)");
+    Check(((IExpirySource)new TestExpirySource("t", [])).DefaultSubject == ExpiryTemplateRules.DefaultSubject && dueSource.DefaultSubject != ExpiryTemplateRules.DefaultSubject,
+        "A source without its own proposed text keeps the vehicle one");
+}
+
 // Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped
 // entirely (no-op, prints nothing extra) unless RUN_MARIA_INTEGRATION_CHECKS=1, so the default dotnet run/CI
 // experience (the checks above, no network, no MariaDB needed) is unchanged.
@@ -2107,4 +2245,10 @@ sealed class TestExpirySource(string key, List<ExpiryInstance> instances) : IExp
     public IReadOnlyList<ExpiryPlaceholder> Placeholders { get; } = [new("obiect", "Denumirea obiectului", "Obiect test")];
     public Task<IReadOnlyList<ExpiryInstance>> GetInstancesAsync(CancellationToken cancellationToken = default) =>
         Fail ? Task.FromException<IReadOnlyList<ExpiryInstance>>(new InvalidOperationException("source unavailable")) : Task.FromResult<IReadOnlyList<ExpiryInstance>>(Instances.ToArray());
+}
+
+sealed class FakeMaintenanceReader(IReadOnlyList<MaintenanceDueItem> due, IReadOnlyList<ContractExpiryItem> expiries) : IMaintenanceNotificationReader
+{
+    public Task<IReadOnlyList<MaintenanceDueItem>> GetDueAsync(CancellationToken cancellationToken = default) => Task.FromResult(due);
+    public Task<IReadOnlyList<ContractExpiryItem>> GetContractExpiriesAsync(CancellationToken cancellationToken = default) => Task.FromResult(expiries);
 }

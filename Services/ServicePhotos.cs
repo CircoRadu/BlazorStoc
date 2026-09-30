@@ -17,6 +17,10 @@ public interface IServicePhotoStore
     Task<IReadOnlyDictionary<int, int>> CountsForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default);
     Task<ServicePhotoContent?> GetContentAsync(int photoId, CancellationToken cancellationToken = default);
     Task<ServicePhoto> AddToWorkPointAsync(int workPointId, string originalName, byte[] content, string caption, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ServicePhoto>> GetForInterventionAsync(int interventionId, CancellationToken cancellationToken = default);
+    /// <summary>Number of photos per intervention (id) of a beneficiary; interventions without photos are absent.</summary>
+    Task<IReadOnlyDictionary<int, int>> CountsForInterventionsAsync(int beneficiaryId, CancellationToken cancellationToken = default);
+    Task<ServicePhoto> AddToInterventionAsync(int interventionId, string originalName, byte[] content, string caption, CancellationToken cancellationToken = default);
     /// <summary>Archived deletion: the file moves to the archive directory together with the archived row.</summary>
     Task DeleteAsync(int photoId, CancellationToken cancellationToken = default);
 }
@@ -64,7 +68,7 @@ public static class ServicePhotoRules
     public static string Hash(byte[] content) => Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
 
     public static WorkPointOperationException LimitReached() =>
-        new($"Un punct de lucru poate avea cel mult {MaximumPerOwner} de fotografii.");
+        new($"Un punct de lucru sau o intervenție poate avea cel mult {MaximumPerOwner} de fotografii.");
 
-    public static WorkPointOperationException Duplicate() => new("Această fotografie a fost deja încărcată pentru punctul de lucru.");
+    public static WorkPointOperationException Duplicate() => new("Această fotografie a fost deja încărcată aici.");
 }

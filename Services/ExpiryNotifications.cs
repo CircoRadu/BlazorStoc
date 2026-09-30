@@ -29,6 +29,12 @@ public interface IExpirySource
     string DateLabel => "expirării";
     // The reason written when the object is no longer among the instances (deleted or taken out of the records).
     string RemovedReason => "Obiectul nu mai este urmărit (a fost șters sau scos din evidență).";
+    // The reason written when the date of an object changed (current is the object with its new date).
+    string DateChangedReason(DateOnly from, DateOnly to, ExpiryInstance current) =>
+        $"Data {DateLabel} {EventName} s-a modificat de la {StockMovementRules.DisplayDate(from)} la {StockMovementRules.DisplayDate(to)}.";
+    // The subject and text the template form proposes for this source.
+    string DefaultSubject => ExpiryTemplateRules.DefaultSubject;
+    string DefaultBody => ExpiryTemplateRules.DefaultBody;
     // Placeholders specific to this source; the common ones are added by ExpiryTemplateRules.
     IReadOnlyList<ExpiryPlaceholder> Placeholders { get; }
     Task<IReadOnlyList<ExpiryInstance>> GetInstancesAsync(CancellationToken cancellationToken = default);
@@ -65,6 +71,8 @@ public static class ExpirySourceKeys
     public const string VehicleItp = "vehicul.itp";
     public const string VehicleInsurance = "vehicul.asigurare";
     public const string VehicleRovinieta = "vehicul.rovinieta";
+    public const string MaintenanceDue = "mentenanta.scadenta";
+    public const string ContractExpiry = "contract.expirare";
 }
 
 public sealed record NotificationTemplate(int Id, string SourceKey, string Subject, string Body, int ThresholdDays, bool Active, long Version);
@@ -249,6 +257,9 @@ public interface IExpiryNotificationService
     Task<NotificationTemplate> CreateTemplateAsync(NotificationTemplateInput input, CancellationToken cancellationToken = default);
     Task<NotificationTemplate> UpdateTemplateAsync(NotificationTemplate original, NotificationTemplateInput input, CancellationToken cancellationToken = default);
     Task DeleteTemplateAsync(NotificationTemplate original, string reason, CancellationToken cancellationToken = default);
+    // The number of days before the date within which the active template of the source raises its notification (the default when the source
+    // has none). Any signed-in user may read it: the pages colour the "soon" state of the due dates with it.
+    Task<int> GetThresholdDaysAsync(string sourceKey, int defaultDays, CancellationToken cancellationToken = default);
     // How many unresolved notifications a template's deletion would take away with it.
     Task<int> CountOpenNotificationsAsync(NotificationTemplate template, CancellationToken cancellationToken = default);
     // Evaluates every source now (at most once per interval when a minimum age is given).
@@ -340,6 +351,10 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
         ExpireEvaluation();
     }
 
+    public async Task<int> GetThresholdDaysAsync(string sourceKey, int defaultDays, CancellationToken cancellationToken = default) =>
+        (await repository.GetTemplatesAsync(cancellationToken).ConfigureAwait(false)).Where(template => template.Active && template.SourceKey == sourceKey)
+            .Select(template => (int?)template.ThresholdDays).FirstOrDefault() ?? defaultDays;
+
     public async Task<int> CountOpenNotificationsAsync(NotificationTemplate template, CancellationToken cancellationToken = default)
     {
         await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
@@ -376,8 +391,7 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
                 var source = Find(notification.SourceKey)!;
                 byId.TryGetValue(notification.ObjectId, out var current);
                 if (current is not null && current.Expiry == notification.ExpiryDate) continue;
-                var reason = current is null ? source.RemovedReason
-                    : $"Data {source.DateLabel} {source.EventName} s-a modificat de la {StockMovementRules.DisplayDate(notification.ExpiryDate)} la {StockMovementRules.DisplayDate(current.Expiry)}.";
+                var reason = current is null ? source.RemovedReason : source.DateChangedReason(notification.ExpiryDate, current.Expiry, current);
                 var resolution = BuildResolution(SystemUser, reason, true, notification, templateById.GetValueOrDefault(notification.TemplateId), source, current, today);
                 if (await repository.ResolveAsync(notification, resolution, cancellationToken).ConfigureAwait(false) is not null)
                     journal.Add((AuditActions.AutoResolveNotification, notification, resolution.ObjectLabel, reason));

@@ -102,6 +102,8 @@ public sealed class MariaBeneficiaryRepository(
                 "work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", cancellationToken, ("@id", original.Id)).ConfigureAwait(false);
             if (await MariaServiceContractRepository.CountForBeneficiaryAsync(readConnection, null, original.Id, cancellationToken).ConfigureAwait(false) is var contracts and > 0)
                 throw ServiceContractRules.BeneficiaryHasContracts(contracts);
+            if (await MariaServiceInterventionRepository.CountAsync(readConnection, null, "beneficiary_id", original.Id, cancellationToken).ConfigureAwait(false) is var interventions and > 0)
+                throw ServiceInterventionRules.BeneficiaryHasInterventions(interventions);
         }
         var liveRoot = MariaAssetPaths.ServicePhotos(configuration);
         var archiveRoot = MariaAssetPaths.ArchiveFiles(configuration);
@@ -121,6 +123,8 @@ public sealed class MariaBeneficiaryRepository(
                         BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
                     if (await MariaServiceContractRepository.CountForBeneficiaryAsync(connection, transaction, original.Id, token).ConfigureAwait(false) is var contractCount and > 0)
                         throw ServiceContractRules.BeneficiaryHasContracts(contractCount);
+                    if (await MariaServiceInterventionRepository.CountAsync(connection, transaction, "beneficiary_id", original.Id, token).ConfigureAwait(false) is var interventionCount and > 0)
+                        throw ServiceInterventionRules.BeneficiaryHasInterventions(interventionCount);
                     var currentPhotos = await ServicePhotoArchive.ReadAsync(connection, transaction,
                         "work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", token, ("@id", original.Id)).ConfigureAwait(false);
                     if (!currentPhotos.Select(photo => photo.Id).Order().SequenceEqual(photos.Select(photo => photo.Id).Order()))

@@ -277,8 +277,8 @@ Observatie: operatiile existente pe puncte de lucru se jurnalizeaza azi cu `Reco
 2. **(IMPLEMENTAT 30.09.2026) Setari notificari: curatarea rezolvatelor** (sectiunea 6.4): subtab, comutator, popup, curatare periodica, jurnal. Depinde de 1.
 3. **(IMPLEMENTAT 30.09.2026) Puncte de lucru extinse**: punct principal real (+ backfill), descriere, **coordonate optionale cu comutator**, poze (`service_photos` si magazinul de fisiere, refolosite la interventii).
 4. **(IMPLEMENTAT 30.09.2026) Contracte si acoperire**: schema (inclusiv `valid_until` si `active_work_point_id`), serviciu, formular, On/Off cu reprogramare si verificarea conflictelor, ciclicitate globala/individuala, "Arata si contractele Off".
-5. **Registru de interventii**: ambele feluri (mentenanta si la cerere), inregistrare cu cele trei variante de scadenta, poze la interventii, pagina `/mentenanta`.
-6. **Surse de notificare pentru mentenanta**: `mentenanta.scadenta` si `contract.expirare`, cu marcajele din 6.2 si 6.3.
+5. **(IMPLEMENTAT 30.09.2026) Registru de interventii**: ambele feluri (mentenanta si la cerere), inregistrare cu cele trei variante de scadenta, poze la interventii, pagina `/mentenanta`.
+6. **(IMPLEMENTAT 30.09.2026) Surse de notificare pentru mentenanta**: `mentenanta.scadenta` si `contract.expirare`, cu marcajele din 6.2 si 6.3.
 7. **Harta de mentenanta** (optional, ulterior): vezi `PROPUNERE_HARTA_MENTENANTA.md`, cu evaluarea de la sfarsitul lui; depinde de 3, 4 si 5 (coordonatele sunt introduse deja la 3).
 
 Dependente: 2 depinde de 1; 4 de 3 (id stabil pentru punctul principal); 5 de 4; 6 de 1 si de 5 (sursa de expirare contract ar putea fi livrata chiar dupa 4); 7 de 3, 4 si 5. Taskul 1 nu depinde de nimic.

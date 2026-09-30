@@ -50,7 +50,38 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
         return File.Exists(path) ? new(await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false), photo.ContentType, photo.OriginalName) : null;
     }
 
-    public async Task<ServicePhoto> AddToWorkPointAsync(int workPointId, string originalName, byte[] content, string caption, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ServicePhoto>> GetForInterventionAsync(int interventionId, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        return await ServicePhotoArchive.ReadAsync(connection, null, "intervention_id=@id", cancellationToken, ("@id", interventionId)).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyDictionary<int, int>> CountsForInterventionsAsync(int beneficiaryId, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("""
+            SELECT p.intervention_id, COUNT(*) FROM service_photos p JOIN service_interventions i ON i.id=p.intervention_id
+            WHERE i.beneficiary_id=@id GROUP BY p.intervention_id
+            """, connection);
+        command.Parameters.AddWithValue("@id", beneficiaryId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var result = new Dictionary<int, int>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result[checked((int)reader.GetInt64(0))] = checked((int)reader.GetInt64(1));
+        return result;
+    }
+
+    public Task<ServicePhoto> AddToWorkPointAsync(int workPointId, string originalName, byte[] content, string caption, CancellationToken cancellationToken = default) =>
+        AddAsync(false, workPointId, originalName, content, caption, cancellationToken);
+
+    public Task<ServicePhoto> AddToInterventionAsync(int interventionId, string originalName, byte[] content, string caption, CancellationToken cancellationToken = default) =>
+        AddAsync(true, interventionId, originalName, content, caption, cancellationToken);
+
+    // A photo belongs to exactly one work point or one intervention (the table has a CHECK); the rest of the handling is the same.
+    private async Task<ServicePhoto> AddAsync(bool onIntervention, int ownerId, string originalName, byte[] content, string caption, CancellationToken cancellationToken)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
@@ -76,31 +107,36 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
                 try
                 {
                     // The work point row is locked, so two uploads of the same point are counted one after the other.
-                    await using (var lookup = new MySqlCommand("SELECT name, beneficiary_id FROM beneficiary_work_points WHERE id=@id FOR UPDATE", connection, transaction))
+                    var ownerColumn = onIntervention ? "intervention_id" : "work_point_id";
+                    await using (var lookup = new MySqlCommand(onIntervention
+                        ? "SELECT work_point_name, beneficiary_id FROM service_interventions WHERE id=@id FOR UPDATE"
+                        : "SELECT name, beneficiary_id FROM beneficiary_work_points WHERE id=@id FOR UPDATE", connection, transaction))
                     {
-                        lookup.Parameters.AddWithValue("@id", workPointId);
+                        lookup.Parameters.AddWithValue("@id", ownerId);
                         await using var reader = await lookup.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                            throw new WorkPointOperationException("Punctul de lucru nu mai există. Actualizează pagina înainte să reîncerci încărcarea.");
+                            throw new WorkPointOperationException(onIntervention
+                                ? "Intervenția nu mai există. Actualizează pagina înainte să reîncerci încărcarea."
+                                : "Punctul de lucru nu mai există. Actualizează pagina înainte să reîncerci încărcarea.");
                         (pointName, beneficiaryId) = (reader.GetString(0), checked((int)reader.GetInt64(1)));
                     }
-                    await using (var count = new MySqlCommand("SELECT COUNT(*) FROM service_photos WHERE work_point_id=@id", connection, transaction))
+                    await using (var count = new MySqlCommand($"SELECT COUNT(*) FROM service_photos WHERE {ownerColumn}=@id", connection, transaction))
                     {
-                        count.Parameters.AddWithValue("@id", workPointId);
+                        count.Parameters.AddWithValue("@id", ownerId);
                         if (Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) >= ServicePhotoRules.MaximumPerOwner)
                             throw ServicePhotoRules.LimitReached();
                     }
                     var uploaded = MariaTimeText.Now();
-                    await using var insert = new MySqlCommand("""
-                        INSERT INTO service_photos (work_point_id, relative_path, original_name, content_type, byte_length, sha256, caption, uploaded_by, uploaded_utc)
+                    await using var insert = new MySqlCommand($"""
+                        INSERT INTO service_photos ({ownerColumn}, relative_path, original_name, content_type, byte_length, sha256, caption, uploaded_by, uploaded_utc)
                         VALUES (@point, @path, @name, @type, @length, @hash, @caption, @author, @uploaded)
                         """, connection, transaction);
-                    foreach (var (name, value) in new (string, object)[] { ("@point", workPointId), ("@path", storedName), ("@name", displayName), ("@type", contentType),
+                    foreach (var (name, value) in new (string, object)[] { ("@point", ownerId), ("@path", storedName), ("@name", displayName), ("@type", contentType),
                                  ("@length", content.LongLength), ("@hash", hash), ("@caption", normalizedCaption), ("@author", author), ("@uploaded", MariaTimeText.Format(uploaded)) })
                         insert.Parameters.AddWithValue(name, value);
                     try { await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false); }
                     catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.DuplicateKeyEntry) { throw ServicePhotoRules.Duplicate(); }
-                    saved = new(checked((int)insert.LastInsertedId), workPointId, null, displayName, storedName, contentType, content.LongLength, hash, normalizedCaption, author, uploaded);
+                    saved = new(checked((int)insert.LastInsertedId), onIntervention ? null : ownerId, onIntervention ? ownerId : null, displayName, storedName, contentType, content.LongLength, hash, normalizedCaption, author, uploaded);
                     await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
                 }
                 catch
@@ -108,8 +144,9 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
                     await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
                     throw;
                 }
-                await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Beneficiary, AuditActions.AddWorkPointPhoto, beneficiaryId.ToString(),
-                    $"#{beneficiaryId} · punct de lucru «{pointName}»",
+                await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Beneficiary,
+                    onIntervention ? AuditActions.AddInterventionPhoto : AuditActions.AddWorkPointPhoto, beneficiaryId.ToString(),
+                    onIntervention ? $"#{beneficiaryId} · intervenție la punctul de lucru «{pointName}»" : $"#{beneficiaryId} · punct de lucru «{pointName}»",
                     AuditDetails.Identification(("Nume fișier", saved.OriginalName), ("Punct de lucru", pointName), ("Legendă", saved.Caption),
                         ("Dimensiune (octeți)", saved.SizeBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)), ("Autor", saved.UploadedBy)),
                     string.Empty, cancellationToken).ConfigureAwait(false);
@@ -133,8 +170,9 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
             await lookupConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
             photo = (await ServicePhotoArchive.ReadAsync(lookupConnection, null, "id=@id", cancellationToken, ("@id", photoId)).ConfigureAwait(false)).FirstOrDefault();
             if (photo is null) throw new WorkPointOperationException("Fotografia a fost eliminată deja. Actualizează pagina.");
-            await using var name = new MySqlCommand("SELECT name FROM beneficiary_work_points WHERE id=@id", lookupConnection);
-            name.Parameters.AddWithValue("@id", photo.WorkPointId ?? 0);
+            await using var name = new MySqlCommand(photo.InterventionId is null
+                ? "SELECT name FROM beneficiary_work_points WHERE id=@id" : "SELECT work_point_name FROM service_interventions WHERE id=@id", lookupConnection);
+            name.Parameters.AddWithValue("@id", photo.WorkPointId ?? photo.InterventionId ?? 0);
             pointName = await name.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string ?? string.Empty;
         }
         await archiver.ExecuteAsync(ArchiveRequests.ServicePhoto(photo, pointName, WorkPointRules.PhotoDeleteReason), async (operation, token) =>

@@ -1,0 +1,238 @@
+@page "/mentenanta"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IServiceContractRepository Contracts
+@inject IServiceInterventionRepository Interventions
+@inject IExpiryNotificationService NotificationService
+@inject TimeProvider Clock
+@inject ILogger<ServiceMaintenance> Logger
+@implements IDisposable
+
+<PageTitle>Mentenanță · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">SERVICE</p><h1>Mentenanță</h1><p class="muted">Scadențele punctelor de lucru acoperite de contracte active și registrul intervențiilor. Intervențiile se înregistrează din fișa beneficiarului.</p></div>
+    <div class="heading-actions"><button class="refresh" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button></div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+
+<div class="settings-tabs" role="tablist" aria-label="Mentenanță">
+    <button type="button" role="tab" id="tab-due" class="settings-tab @(showRegister ? "" : "active")" aria-selected="@(showRegister ? "false" : "true")" aria-controls="panel-maintenance" @onclick="ShowDue">Scadente (@dueRows.Count)</button>
+    <button type="button" role="tab" id="tab-register" class="settings-tab @(showRegister ? "active" : "")" aria-selected="@(showRegister ? "true" : "false")" aria-controls="panel-maintenance" @onclick="ShowRegisterAsync">Registru intervenții@(registerLoaded ? $" ({register.TotalCount})" : "")</button>
+</div>
+
+<div id="panel-maintenance" role="tabpanel" aria-labelledby="@(showRegister ? "tab-register" : "tab-due")">
+@if (!showRegister)
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Scadențe pe puncte de lucru <span>@VisibleDue.Count</span></h2>
+            <div class="heading-actions">
+                @if (offCount > 0) { <label class="check-label"><input type="checkbox" checked="@showOff" @onchange="ToggleOffAsync" /> Arată și contractele Off (@offCount)</label> }
+            </div>
+        </div>
+        <div class="filters">
+            <label class="search-box"><span>⌕</span><input aria-label="Caută în scadențe" placeholder="Beneficiar, punct de lucru sau contract…" @bind="dueText" @bind:event="oninput" /></label>
+            <select aria-label="Filtrează după stare" @bind="dueState">
+                <option value="">Toate stările</option>
+                <option value="Overdue">Depășite</option>
+                <option value="DueSoon">În curând</option>
+                <option value="OnTime">La zi</option>
+            </select>
+        </div>
+        @if (loading && !dueLoaded)
+        {
+            <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă scadențele</h3></div>
+        }
+        else if (VisibleDue.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">⚒</span><h3>@(dueRows.Count == 0 ? "Nu există scadențe de mentenanță" : "Nicio scadență pentru filtrele alese")</h3>
+                <p>@(dueRows.Count == 0 ? "Scadențele apar când un contract de mentenanță activ (On) acoperă puncte de lucru." : "Schimbă filtrele sau textul căutat.")</p></div>
+        }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>SCADENȚĂ</th><th>STARE</th><th>BENEFICIAR</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>CICLICITATE</th></tr></thead><tbody>
+            @foreach (var row in VisibleDue)
+            {
+                var active = row.Contract.IsActive;
+                var state = ServiceDueRules.State(row.Point.Point.NextDue, Today, thresholdDays);
+                <tr @key="row.Point.Point.Id" class="@(active ? null : "contract-row-off")">
+                    <td>@StockMovementRules.DisplayDate(row.Point.Point.NextDue)</td>
+                    <td>@if (active) { <span class="due-chip @ServiceDueRules.CssClass(state)">@ServiceDueRules.Label(state)</span> } else { <span class="contract-state off">Contract Off</span> }</td>
+                    <td><a class="category-table-link" href="@($"/beneficiari/{row.BeneficiaryId}")"><strong>@row.BeneficiaryName</strong></a></td>
+                    <td><strong>@row.Point.WorkPointName</strong><br /><small class="muted">@row.Point.WorkPointAddress</small></td>
+                    <td>@row.Contract.Label@if (ServiceDueRules.IsExpired(row.Contract, Today)) { <text> <span class="contract-state expired">Expirat</span></text> }</td>
+                    <td>@ServiceContractRules.CycleText(ServiceDueRules.EffectiveCycle(row.Point.Point.CycleMonths, row.Contract.CycleMonths))</td>
+                </tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+}
+else
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Registru intervenții <span>@register.TotalCount</span></h2></div>
+        <div class="filters register-filters">
+            <label class="search-box"><span>⌕</span><input aria-label="Caută în registru" placeholder="Beneficiar, punct de lucru sau contract…" @bind="registerText" @bind:event="onchange" @bind:after="ApplyFiltersAsync" /></label>
+            <select aria-label="Filtrează după felul intervenției" @bind="kindFilter" @bind:after="ApplyFiltersAsync">
+                <option value="">Toate felurile</option>
+                <option value="M">Mentenanță</option>
+                <option value="C">La cerere</option>
+            </select>
+            <label class="period-field">De la <PickOnlyDate Id="register-from" @bind-Value="from" @bind-Value:after="ApplyFiltersAsync" /></label>
+            <label class="period-field">Până la <PickOnlyDate Id="register-to" @bind-Value="to" @bind-Value:after="ApplyFiltersAsync" /></label>
+            <button type="button" class="refresh" disabled="@(from is null && to is null)" @onclick="ClearPeriodAsync">Fără perioadă</button>
+        </div>
+        @if (loading && !registerLoaded)
+        {
+            <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă registrul</h3></div>
+        }
+        else if (register.Items.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">⚒</span><h3>Nu există intervenții pentru filtrele alese</h3><p>Intervențiile se înregistrează din fișa beneficiarului, secțiunea „Intervenții”.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>EFECTUATĂ LA</th><th>FEL</th><th>BENEFICIAR</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>SCADENȚĂ</th><th>OBSERVAȚII</th><th class="number">FOTO</th></tr></thead><tbody>
+            @foreach (var row in register.Items)
+            {
+                var item = row.Intervention;
+                <tr @key="item.Id">
+                    <td>@StockMovementRules.DisplayDate(item.PerformedOn)</td>
+                    <td><span class="contract-state @(item.IsMaintenance ? "on" : "off")">@ServiceInterventionRules.KindLabel(item.Kind)</span></td>
+                    <td><a class="category-table-link" href="@($"/beneficiari/{item.BeneficiaryId}")"><strong>@row.BeneficiaryName</strong></a></td>
+                    <td><strong>@item.WorkPointName</strong><br /><small class="muted">@item.WorkPointAddress</small></td>
+                    <td>@(item.ContractLabel ?? "—")</td>
+                    <td>
+                        @if (!item.IsMaintenance) { <span class="muted">—</span> }
+                        else if (item.MovesDue) { <span>@StockMovementRules.DisplayDate(item.PlannedDue!.Value) → <strong>@StockMovementRules.DisplayDate(item.NextDueSet!.Value)</strong><br /><small class="muted">@ServiceInterventionRules.BasisLabel(item.Basis!.Value)</small></span> }
+                        else { <small class="muted">Nu a modificat scadența</small> }
+                    </td>
+                    <td class="work-point-description" title="@item.Notes">@item.Notes</td>
+                    <td class="number">@(row.PhotoCount > 0 ? row.PhotoCount.ToString() : "")</td>
+                </tr>
+            }
+            </tbody></table></div>
+            <div class="table-footer">
+                <span>@register.TotalCount intervenții</span>
+                @if (TotalPages > 1)
+                {
+                    <nav class="pagination" aria-label="Paginare registru">
+                        <button type="button" aria-label="Pagina anterioară" disabled="@(pageNumber <= 1 || loading)" @onclick="() => GoToPageAsync(pageNumber - 1)">‹</button>
+                        <span>Pagina <strong>@pageNumber</strong> din <strong>@TotalPages</strong></span>
+                        <button type="button" aria-label="Pagina următoare" disabled="@(pageNumber >= TotalPages || loading)" @onclick="() => GoToPageAsync(pageNumber + 1)">›</button>
+                    </nav>
+                }
+            </div>
+        }
+    </section>
+}
+</div>
+
+@code {
+    private const int PageSize = 25;
+    // The days before a due date within which the state is "In curand": the threshold of the active template of the maintenance source.
+    private int thresholdDays = ServiceDueRules.DefaultThresholdDays;
+
+    private IReadOnlyList<ServiceDueRow> dueRows = Array.Empty<ServiceDueRow>();
+    private ServiceInterventionPage register = new(Array.Empty<ServiceInterventionRow>(), 0);
+    private bool showRegister, showOff, loading, dueLoaded, registerLoaded;
+    private int offCount, pageNumber = 1;
+    private string dueText = "", dueState = "", registerText = "", kindFilter = "";
+    private DateOnly? from, to;
+    private string? error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(register.TotalCount / (double)PageSize));
+
+    private IReadOnlyList<ServiceDueRow> VisibleDue
+    {
+        get
+        {
+            var text = dueText.Trim();
+            var today = Today;
+            return dueRows.Where(row => (text.Length == 0 || Matches(row, text)) &&
+                (dueState.Length == 0 || (row.Contract.IsActive && ServiceDueRules.State(row.Point.Point.NextDue, today, thresholdDays).ToString() == dueState))).ToList();
+        }
+    }
+
+    private static bool Matches(ServiceDueRow row, string text) =>
+        Contains(row.BeneficiaryName, text) || Contains(row.Point.WorkPointName, text) || Contains(row.Point.WorkPointAddress, text) || Contains(row.Contract.Label, text);
+
+    private static bool Contains(string value, string text) => System.Globalization.CultureInfo.InvariantCulture.CompareInfo
+        .IndexOf(value, text, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace) >= 0;
+
+    protected override async Task OnInitializedAsync() => await LoadDueAsync();
+
+    private async Task LoadDueAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            thresholdDays = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.MaintenanceDue, ServiceDueRules.DefaultThresholdDays, lifetime.Token);
+            var all = await Contracts.GetDueListAsync(true, lifetime.Token);
+            offCount = all.Count(row => !row.Contract.IsActive);
+            dueRows = showOff ? all : all.Where(row => row.Contract.IsActive).ToList();
+            dueLoaded = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Maintenance due list loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Scadențele nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task LoadRegisterAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            var kind = kindFilter.Length == 0 ? (ServiceInterventionKind?)null : ServiceInterventionRules.ParseKind(kindFilter);
+            var text = registerText.Trim();
+            register = await Interventions.GetPageAsync(new(Text: text.Length == 0 ? null : text, From: from, To: to, Kind: kind, Page: pageNumber, PageSize: PageSize), lifetime.Token);
+            if (pageNumber > TotalPages) { pageNumber = TotalPages; register = await Interventions.GetPageAsync(new(Text: text.Length == 0 ? null : text, From: from, To: to, Kind: kind, Page: pageNumber, PageSize: PageSize), lifetime.Token); }
+            registerLoaded = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Intervention register loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Registrul nu a putut fi încărcat.";
+        }
+        finally { loading = false; }
+    }
+
+    private void ShowDue() => showRegister = false;
+
+    private async Task ShowRegisterAsync()
+    {
+        showRegister = true;
+        if (!registerLoaded) await LoadRegisterAsync();
+    }
+
+    // The "Off" contracts are loaded once with the list and only shown or hidden by the switch.
+    private async Task ToggleOffAsync(ChangeEventArgs args)
+    {
+        showOff = args.Value is true;
+        await LoadDueAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        await LoadDueAsync();
+        if (registerLoaded) await LoadRegisterAsync();
+    }
+
+    private async Task ApplyFiltersAsync() { pageNumber = 1; await LoadRegisterAsync(); }
+    private async Task ClearPeriodAsync() { from = to = null; await ApplyFiltersAsync(); }
+    private async Task GoToPageAsync(int target) { pageNumber = Math.Clamp(target, 1, TotalPages); await LoadRegisterAsync(); }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

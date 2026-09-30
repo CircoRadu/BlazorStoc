@@ -140,12 +140,16 @@ builder.Services.AddScoped<IStockMovementRepository>(services => new MariaStockM
 builder.Services.AddScoped<IWorkPointRepository>(services => new MariaWorkPointRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
 builder.Services.AddScoped<IServicePhotoStore>(services => new MariaServicePhotoStore(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
 builder.Services.AddScoped<IServiceContractRepository>(services => new MariaServiceContractRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
+builder.Services.AddScoped<IServiceInterventionRepository>(services => new MariaServiceInterventionRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), timeProvider: services.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped<IBeneficiaryRepository>(services => new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IExpiryNotificationRepository>(services => new MariaExpiryNotificationRepository(services.GetRequiredService<IConfiguration>()));
 builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Itp, ExpirySourceKeys.VehicleItp, "ITP"));
 builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Insurance, ExpirySourceKeys.VehicleInsurance, "Asigurare"));
 builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Rovinieta, ExpirySourceKeys.VehicleRovinieta, "Rovinietă"));
+builder.Services.AddScoped<IMaintenanceNotificationReader, MariaMaintenanceNotificationReader>();
+builder.Services.AddScoped<IExpirySource>(services => new MaintenanceDueSource(services.GetRequiredService<IMaintenanceNotificationReader>()));
+builder.Services.AddScoped<IExpirySource>(services => new ContractExpirySource(services.GetRequiredService<IMaintenanceNotificationReader>()));
 builder.Services.AddScoped<IExpiryNotificationService, ExpiryNotificationService>();
 builder.Services.AddScoped<IInventoryReportBuilder, InventoryReportBuilder>();
 builder.Services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();

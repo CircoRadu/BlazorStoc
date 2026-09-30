@@ -7,6 +7,7 @@
 @inject IWorkPointRepository WorkPointStore
 @inject IServicePhotoStore PhotoStore
 @inject IServiceContractRepository ContractStore
+@inject IExpiryNotificationService NotificationService
 @inject TimeProvider Clock
 @inject ExitFormDraft ExitDraft
 @inject UnsavedChanges Guard
@@ -79,7 +80,7 @@ else if (beneficiary is not null)
                     <td class="work-point-description" title="@workPoint.Description">@workPoint.Description</td>
                     <td>@(workPoint.HasCoordinates ? WorkPointCoordinates.Format(workPoint.Latitude, workPoint.Longitude) : "")</td>
                     <td class="number">@(photoCounts.TryGetValue(workPoint.Id, out var photoCount) ? photoCount.ToString() : "")</td>
-                    <td>@{ var coverage = ActiveCoverage(workPoint.Id); }@if (coverage is { } covered) { <span>@covered.Contract.Label</span><text> </text><span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(covered.Point.NextDue, Today))">@StockMovementRules.DisplayDate(covered.Point.NextDue)</span> } else if (InOffContract(workPoint.Id)) { <span class="contract-state off">Contract Off</span> }</td>
+                    <td>@{ var coverage = ActiveCoverage(workPoint.Id); }@if (coverage is { } covered) { <span>@covered.Contract.Label</span><text> </text><span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(covered.Point.NextDue, Today, thresholdDays))">@StockMovementRules.DisplayDate(covered.Point.NextDue)</span> } else if (InOffContract(workPoint.Id)) { <span class="contract-state off">Contract Off</span> }</td>
                     @if (canManage)
                     {
                         <td>
@@ -106,7 +107,9 @@ else if (beneficiary is not null)
         </tbody></table></div>
     </section>
 
-    <ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" Changed="ReloadContractsAsync" />
+    <ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
+
+    <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" Changed="ReloadContractsAsync" />
 
     <section class="catalog">
         <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
@@ -160,6 +163,8 @@ else if (beneficiary is not null)
     private IReadOnlyDictionary<int, int> photoCounts = new Dictionary<int, int>();
     // Every maintenance contract of the beneficiary (On and Off) with its covered points.
     private IReadOnlyList<ServiceContractDetails> contracts = Array.Empty<ServiceContractDetails>();
+    // The days before a due date within which the maintenance state shows "In curand" (the threshold of the active template of the source).
+    private int thresholdDays = ServiceDueRules.DefaultThresholdDays;
     private bool addingWorkPoint, workPointBusy;
     private WorkPoint? editingWorkPoint;
     private Guid workPointEditorKey;
@@ -274,6 +279,7 @@ else if (beneficiary is not null)
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
             contracts = await ContractStore.GetForBeneficiaryAsync(Id, lifetime.Token);
+            await LoadThresholdAsync();
             addingWorkPoint = false;
             editingWorkPoint = null;
             await LoadProjectsAsync();
@@ -369,6 +375,13 @@ else if (beneficiary is not null)
 
     private bool InOffContract(int workPointId) =>
         contracts.Any(item => !item.Contract.IsActive && item.Points.Any(point => point.Point.WorkPointId == workPointId));
+
+    private async Task LoadThresholdAsync()
+    {
+        try { thresholdDays = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.MaintenanceDue, ServiceDueRules.DefaultThresholdDays, lifetime.Token); }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Logger.LogWarning("Maintenance threshold loading failed ({ErrorType}).", exception.GetType().Name); }
+    }
 
     private async Task ReloadContractsAsync()
     {

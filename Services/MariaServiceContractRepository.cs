@@ -41,6 +41,31 @@ public sealed class MariaServiceContractRepository(
         return contracts.Select(contract => new ServiceContractDetails(contract, points.Where(point => point.Point.ContractId == contract.Id).ToArray())).ToArray();
     }
 
+    public async Task<IReadOnlyList<ServiceDueRow>> GetDueListAsync(bool includeOff, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, null, """
+            SELECT c.id, c.beneficiary_id, c.contract_number, c.contract_date, c.cycle_months, c.valid_until, c.is_active, c.notes, c.version,
+                   p.id, p.contract_id, p.work_point_id, p.cycle_months, p.next_due, p.version, w.name, w.address, w.is_primary, b.name
+            FROM service_contract_points p
+            JOIN service_contracts c ON c.id = p.contract_id
+            JOIN beneficiary_work_points w ON w.id = p.work_point_id
+            JOIN beneficiaries b ON b.id = c.beneficiary_id
+            WHERE c.is_active = 1 OR @includeOff = 1
+            ORDER BY p.next_due, b.name, w.name, p.id
+            """, ("@includeOff", includeOff ? 1 : 0));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var rows = new List<ServiceDueRow>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            rows.Add(new(checked((int)reader.GetInt64(1)), reader.GetString(18), ReadContract(reader),
+                new(new(checked((int)reader.GetInt64(9)), checked((int)reader.GetInt64(10)), checked((int)reader.GetInt64(11)),
+                        reader.IsDBNull(12) ? null : reader.GetInt32(12), ReadDate(reader, 13), reader.GetInt64(14)),
+                    reader.GetString(15), reader.GetString(16), reader.GetInt32(17) != 0)));
+        return rows;
+    }
+
     public async Task<ServiceContractDetails> CreateAsync(int beneficiaryId, ServiceContractInput input, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
@@ -208,6 +233,8 @@ public sealed class MariaServiceContractRepository(
         {
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             details = await LoadDetailsAsync(connection, null, original.Id, cancellationToken).ConfigureAwait(false);
+            if (await MariaServiceInterventionRepository.CountAsync(connection, null, "contract_id", original.Id, cancellationToken).ConfigureAwait(false) is var interventions and > 0)
+                throw ServiceInterventionRules.ContractHasInterventions(interventions);
             await using var owner = Command(connection, null, "SELECT name FROM beneficiaries WHERE id=@id", ("@id", original.BeneficiaryId));
             ownerName = await owner.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string ?? throw ServiceContractRules.BeneficiaryMissing();
         }
@@ -218,6 +245,8 @@ public sealed class MariaServiceContractRepository(
             {
                 await LockBeneficiaryAsync(connection, transaction, original.BeneficiaryId, token).ConfigureAwait(false);
                 ServiceContractRules.CheckCurrent(await GetLockedAsync(connection, transaction, original.Id, token).ConfigureAwait(false), original);
+                if (await MariaServiceInterventionRepository.CountAsync(connection, transaction, "contract_id", original.Id, token).ConfigureAwait(false) is var interventionsNow and > 0)
+                    throw ServiceInterventionRules.ContractHasInterventions(interventionsNow);
                 var current = await LockPointsAsync(connection, transaction, original.Id, token).ConfigureAwait(false);
                 if (!current.Select(row => row.Point.Id).Order().SequenceEqual(details.Points.Select(row => row.Point.Id).Order())) throw ServiceContractRules.Changed();
                 await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token).ConfigureAwait(false);
