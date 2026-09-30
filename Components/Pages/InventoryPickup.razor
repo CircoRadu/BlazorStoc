@@ -78,7 +78,7 @@ else if (review is not null)
                                 <table>
                                     <thead><tr>
                                         <th><span class="sr-only">Selectează</span></th>
-                                        <th>COD PRODUS</th><th>STOC CURENT</th><th>VALOARE REALĂ</th><th>DIFERENȚĂ</th>
+                                        <th>NR. CRT.</th><th>COD PRODUS</th><th>STOC CURENT</th><th>VALOARE REALĂ</th><th>DIFERENȚĂ</th>
                                     </tr></thead>
                                     <tbody>
                                         @foreach (var line in group.Lines)
@@ -86,6 +86,7 @@ else if (review is not null)
                                             <tr @key="line.ProductId">
                                                 <td><input type="checkbox" aria-label="@($"Selectează {line.ProductName}")"
                                                            checked="@IsSelected(line)" @onchange="e => ToggleLine(line, (bool)(e.Value ?? false))" /></td>
+                                                <td class="pickup-number">@(line.Number?.ToString(CultureInfo.InvariantCulture) ?? "—")</td>
                                                 <td>
                                                     @line.ProductName
                                                     @if (line.Uncertain) { <span class="uncertain-badge" title="Citire OCR nesigura - verifica valoarea">⚠ de verificat</span> }
@@ -115,11 +116,11 @@ else if (review is not null)
                     <p class="muted">Codul citit din formular nu corespunde niciunui produs curent din catalog (produs șters sau redenumit între generarea situației și preluare). Nu se trimite nicio modificare pentru acestea.</p>
                     <div class="table-scroll">
                         <table>
-                            <thead><tr><th>COD CITIT</th><th>VALOARE REALĂ CITITĂ</th></tr></thead>
+                            <thead><tr><th>NR. CRT.</th><th>COD CITIT</th><th>VALOARE REALĂ CITITĂ</th></tr></thead>
                             <tbody>
                                 @foreach (var line in review.NotFound)
                                 {
-                                    <tr><td>@line.RawCode</td><td>@(line.RecognizedValue?.ToString() ?? "—")</td></tr>
+                                    <tr><td class="pickup-number">@(line.Number?.ToString(CultureInfo.InvariantCulture) ?? "—")</td><td>@line.RawCode</td><td>@(line.RecognizedValue?.ToString() ?? "—")</td></tr>
                                 }
                             </tbody>
                         </table>
@@ -140,7 +141,7 @@ else if (review is not null)
             <div class="table-scroll">
                 <table class="save-summary">
                     <caption class="sr-only">Modificări de stoc</caption>
-                    <thead><tr><th>Categorie / subcategorie</th><th>Cod produs</th><th>Modificare stoc</th></tr></thead>
+                    <thead><tr><th>Categorie / subcategorie</th><th>Nr. crt.</th><th>Cod produs</th><th>Modificare stoc</th></tr></thead>
                     <tbody>
                         @foreach (var group in SelectedGroupedForPopup)
                         {
@@ -148,6 +149,7 @@ else if (review is not null)
                             {
                                 <tr>
                                     <td>@group.Category / @group.Subcategory</td>
+                                    <td>@(line.Number?.ToString(CultureInfo.InvariantCulture) ?? "—")</td>
                                     <td>@line.ProductName</td>
                                     <td class="@(DifferenceClass(line))">@DifferenceLabel(line)</td>
                                 </tr>

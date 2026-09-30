@@ -11,7 +11,9 @@ namespace BlazorStoc.Services;
 // One row read from the scanned form: the printed "Cod produs" text and, if the handwritten "Valoare reala" cell
 // was filled in, the recognized number. Uncertain rows are still returned (never silently dropped) so the review
 // page can show them for the user to inspect and correct (TODO.md Task 1, decizia privind selectia implicita).
-public sealed record InventoryPickupScanRow(int Page, string RawCode, int? RecognizedValue, bool Uncertain);
+// Number is the row's printed "Nr. crt." (its running number inside the subcategory table), null on forms without that
+// column or when it could not be settled; it is display-only and is never stored.
+public sealed record InventoryPickupScanRow(int Page, string RawCode, int? RecognizedValue, bool Uncertain, int? Number = null);
 public sealed record InventoryPickupScanResult(int PageCount, IReadOnlyList<InventoryPickupScanRow> Rows, IReadOnlyList<int> UnreadablePages);
 
 public sealed class InventoryPickupOcrException(string message) : Exception(message);
@@ -35,11 +37,12 @@ public interface IInventoryPickupOcrService
 }
 
 // Reads a scanned copy of the situatia de inventar PDF (Components/Pages/Inventory.razor + InventoryPdfWriter):
-// rasterizes each page, finds the printed table grid by its known column geometry (InventoryPdfLayout) and by
-// scanning the image for the horizontal/vertical rule lines InventoryPdfWriter draws around every cell, reads the
-// printed "Cod produs" cell with classic OCR (Tesseract) and the handwritten "Valoare reala" cell by segmenting
-// its ink into individual digit blobs and classifying each with a small ONNX handwritten-digit model. No general
-// document-layout detection is used (see TODO.md's "Decizie tehnica pentru recunoasterea scrisului de mana").
+// rasterizes each page, deskews it, and finds the table grid in the scan itself: the long horizontal rule lines
+// InventoryPdfWriter draws give the rows, and the vertical rules that run through a whole table (anchored at its
+// "Cod produs" header row) give its columns - no fixed position or cell size is assumed (InventoryPdfLayout is only a
+// fallback for broken rules). A faint scan or pencil is contrast-stretched. It then reads the printed "Nr. crt." and
+// "Cod produs" cells with classic OCR (Tesseract) and the handwritten "Valoare reala" cell by segmenting its ink into
+// individual digit blobs and classifying each with a small ONNX handwritten-digit model.
 public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDisposable
 {
     // 300 DPI keeps a full A4 page under 2500x3500px (fast for OpenCV) while giving Tesseract and the digit
@@ -47,6 +50,20 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     private const int RenderDpi = 300;
     private const double LineFillRatio = 0.65;
     private const double DividerFillRatio = 0.55;
+    // Grid detection (FindGridLines / FindDividers), all relative to the page or to the row - never absolute positions:
+    // a horizontal rule must span at least this share of the page width; the opening kernel used to isolate rules is
+    // the page width divided by GridLineOpeningDivisor; a vertical rule must cover this share of its row band's height
+    // (after widening it by DividerDetectionDilationWidth pixels to absorb residual skew).
+    private const double MinGridLineWidthRatio = 0.30;
+    private const int GridLineOpeningDivisor = 25;
+    private const double DetectedDividerFillRatio = 0.75;
+    private const int DividerDetectionDilationWidth = 5;
+    // Contrast handling for faint scans and pencil: ink contrast = paper level minus the darkest 1% of pixels. Below
+    // MinUsableContrast there is no ink at all (paper noise); below FaintInkContrast (graphite pencil, a washed-out
+    // scan, a nearly dry pen) the image is stretched before thresholding.
+    private const double ContrastInkPercentile = 0.01;
+    private const int MinUsableContrast = 25;
+    private const int FaintInkContrast = 140;
     private const double CellPaddingPoints = 4;
     private const double DigitConfidenceThreshold = 0.80;
 
@@ -114,6 +131,10 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         }
     }
 
+    // One data row read from the page before its "Nr. crt." is settled (see ScanPageAsync): Block numbers the tables of
+    // the page (a table starts at its "Cod produs" header row) and Index is the row's position inside its table.
+    private sealed record PendingRow(int Block, int Index, string Code, int? Value, bool Uncertain, int? PrintedNumber);
+
     private async Task<List<InventoryPickupScanRow>> ScanPageAsync(SKBitmap page, int pageNumber, CancellationToken cancellationToken)
     {
         var scale = RenderDpi / 72.0;
@@ -123,64 +144,160 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
 
         using var grayRaw = ToGrayMat(page);
         // A real scan is never perfectly straight (paper feed skew), and confirmed real user scans went from a
-        // fraction of a degree up to a couple of degrees. Beyond a fraction of a degree, the small dilation in
-        // FindHorizontalLines below is no longer enough - the whole page is deskewed here first, before any other
-        // geometry is computed, so every downstream step (line detection, column calibration, cell cropping)
-        // works against an upright page exactly like the one FindSkewDegrees was tuned against.
+        // fraction of a degree up to a couple of degrees. The whole page is deskewed first, before any other
+        // geometry is computed, so every downstream step (grid detection, cell cropping) works against an upright
+        // page.
         var skewDegrees = FindSkewDegrees(grayRaw);
         if (debug) Console.WriteLine($"[debug] estimated skew = {skewDegrees:F2} degrees");
-        using var gray = Math.Abs(skewDegrees) >= MinCorrectedSkewDegrees ? Rotate(grayRaw, skewDegrees, Scalar.White) : grayRaw.Clone();
+        using var deskewed = Math.Abs(skewDegrees) >= MinCorrectedSkewDegrees ? Rotate(grayRaw, skewDegrees, Scalar.White) : grayRaw.Clone();
+        // A washed-out scan (faint print, pencil) is stretched to the full gray range first, so the rule lines and text
+        // survive the thresholding below; a page with normal contrast, or none at all, is left untouched.
+        var pageContrast = InkContrast(deskewed);
+        using var stretchedPage = pageContrast < FaintInkContrast ? StretchContrast(deskewed) : null;
+        var gray = stretchedPage ?? deskewed;
+        if (debug) Console.WriteLine($"[debug] page ink contrast = {pageContrast}{(stretchedPage is not null ? " (faint: stretched)" : "")}");
         using var binary = new Mat();
         Cv2.Threshold(gray, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
 
-        // Expected column x-positions, assuming the scan reproduces the generated PDF at exactly the requested
-        // DPI. A real scan of a printed page rarely does (printer "fit to printable area" scaling, minor
-        // registration drift), so these are only a starting point for CalibrateColumns below, not used directly.
-        var approxLeft = ToPixel(columns.CodeX, scale, gray.Cols);
-        var approxRight = ToPixel(columns.RightEdge, scale, gray.Cols);
-        var lines = FindHorizontalLines(binary, approxLeft, approxRight);
-        if (debug) Console.WriteLine($"[debug] gray {gray.Rows}x{gray.Cols}, approxLeft={approxLeft} approxRight={approxRight}, lines ({lines.Count}): {string.Join(",", lines)}");
-        if (lines.Count < 2) return [];
-
-        var (xLeft, xStock, xReal, xRight) = CalibrateColumns(binary, columns, scale, lines[0], lines[1]);
-        if (debug) Console.WriteLine($"[debug] xLeft={xLeft} xStock={xStock} xReal={xReal} xRight={xRight}");
-        var rows = new List<InventoryPickupScanRow>();
-        for (var i = 0; i + 1 < lines.Count; i++)
+        // The table grid is found in the deskewed page itself: long horizontal rule lines give the row edges (and how
+        // far the table extends), and the vertical rule lines inside each row band give that row's column edges. No
+        // position or cell size is assumed. The geometry computed from the generated PDF (InventoryPdfLayout) is only
+        // a fallback for a row whose vertical rules cannot be told apart (faint or broken lines), see below.
+        var gridLines = FindGridLines(binary);
+        var legacyLeft = ToPixel(columns.NumberX, scale, gray.Cols);
+        var legacyRight = ToPixel(columns.RightEdge, scale, gray.Cols);
+        if (gridLines.Count < 2)
         {
-            var top = lines[i];
-            var bottom = lines[i + 1];
-            var height = bottom - top;
-            if (height < gray.Rows * 0.008) continue; // touching duplicate line, not a real row
-            if (!HasVerticalDivider(binary, xStock, top, bottom) || !HasVerticalDivider(binary, xReal, top, bottom))
+            // No long rule lines at all: fall back to searching only where the generated layout puts the table.
+            gridLines = FindHorizontalLines(binary, legacyLeft, legacyRight)
+                .Select(y => new GridLine(y, legacyLeft, legacyRight)).ToList();
+            if (debug) Console.WriteLine($"[debug] no grid lines detected, legacy lines: {gridLines.Count}");
+        }
+        if (debug) Console.WriteLine($"[debug] gray {gray.Rows}x{gray.Cols}, grid lines ({gridLines.Count}): {string.Join(", ", gridLines.Select(line => $"y={line.Y} x={line.Left}-{line.Right}"))}");
+        if (gridLines.Count < 2) return [];
+
+        using var verticalSource = new Mat();
+        Cv2.Dilate(binary, verticalSource, Cv2.GetStructuringElement(MorphShapes.Rect, new Size(DividerDetectionDilationWidth, 1)));
+
+        // Table blocks: consecutive row bands that carry the table's own left and right borders. A band between two
+        // tables (a subcategory heading's text) has no borders, so it ends a block. The column structure is then read
+        // ONCE per block, from the vertical rules that run through the whole block starting at its header row: text
+        // strokes inside a short row can look like a rule, but only a real rule stays continuous down the table.
+        var blocks = new List<List<TableBand>>();
+        List<TableBand>? currentBlock = null;
+        for (var i = 0; i + 1 < gridLines.Count; i++)
+        {
+            var top = gridLines[i].Y;
+            var bottom = gridLines[i + 1].Y;
+            var rowLeft = Math.Max(gridLines[i].Left, gridLines[i + 1].Left);
+            var rowRight = Math.Min(gridLines[i].Right, gridLines[i + 1].Right);
+            var isRow = bottom - top >= gray.Rows * 0.008 && rowRight - rowLeft >= gray.Cols * MinGridLineWidthRatio &&
+                        HasBorders(verticalSource, top, bottom, rowLeft, rowRight);
+            if (!isRow)
             {
-                if (debug) Console.WriteLine($"[debug] {top}-{bottom}: no divider");
+                if (debug && bottom - top >= gray.Rows * 0.008) Console.WriteLine($"[debug] {top}-{bottom}: between tables (no borders)");
+                currentBlock = null;
                 continue;
             }
-
-            // The vertical inset only needs to clear the rule lines' own stroke width (a handful of pixels
-            // regardless of DPI): rows can be as short as one text line, so scaling this from PDF points the way
-            // the horizontal inset does would eat a large share of a short row's actual content.
-            var horizontalPad = (int)Math.Round(CellPaddingPoints * scale);
-            var verticalPad = Math.Min(6, height / 6);
-            var codeCell = SafeCrop(gray, xLeft + horizontalPad, top + verticalPad, xStock - xLeft - 2 * horizontalPad, height - 2 * verticalPad);
-            var realCell = SafeCrop(gray, xReal + horizontalPad, top + verticalPad, xRight - xReal - 2 * horizontalPad, height - 2 * verticalPad);
-            if (codeCell is null || realCell is null) { codeCell?.Dispose(); realCell?.Dispose(); continue; }
-
-            string code;
-            try { code = await ReadCodeAsync(codeCell, cancellationToken).ConfigureAwait(false); }
-            finally { codeCell.Dispose(); }
-            if (debug) Console.WriteLine($"[debug] {top}-{bottom}: code='{code}'");
-
-            if (TextNormalization.SameUniqueValue(code, InventoryPickupOcrRules.HeaderCode)) { realCell.Dispose(); continue; }
-            if (code.Length == 0) { realCell.Dispose(); continue; }
-
-            var (hasInk, value, uncertain) = ReadHandwrittenNumber(realCell);
-            if (debug) Console.WriteLine($"[debug] {top}-{bottom}: hasInk={hasInk} value={value} uncertain={uncertain}");
-            realCell.Dispose();
-            if (!hasInk) continue; // empty cell: "neinventariat", no row at all (subtask 1.2)
-            rows.Add(new InventoryPickupScanRow(pageNumber, code, value, uncertain));
+            if (currentBlock is null) { currentBlock = []; blocks.Add(currentBlock); }
+            currentBlock.Add(new TableBand(top, bottom, rowLeft, rowRight));
         }
-        return rows;
+
+        var codeFraction = (columns.CodeX - columns.PageMargin) / columns.ContentWidth;
+        var stockFraction = (columns.StockX - columns.PageMargin) / columns.ContentWidth;
+        var realFraction = (columns.RealX - columns.PageMargin) / columns.ContentWidth;
+        var horizontalPad = (int)Math.Round(CellPaddingPoints * scale);
+        var pending = new List<PendingRow>();
+        var hasNumberColumn = false;
+        for (var blockNumber = 1; blockNumber <= blocks.Count; blockNumber++)
+        {
+            var bands = blocks[blockNumber - 1];
+            var blockLeft = bands.Min(band => band.Left);
+            var blockRight = bands.Max(band => band.Right);
+            // Vertical rules along the whole block. Five = Nr. crt. | Cod produs | Valoare stoc | Valoare reala; four = the
+            // same table without the leading "Nr. crt." column (forms printed before that column existed).
+            var dividers = FindDividers(verticalSource, bands[0].Top, bands[^1].Bottom, blockLeft, blockRight);
+            int xLeft, xCode, xStock, xReal, xRight;
+            bool blockHasNumber;
+            var fallbackColumns = false;
+            if (dividers.Count == 5)
+            {
+                (xLeft, xCode, xStock, xReal, xRight) = (dividers[0], dividers[1], dividers[2], dividers[3], dividers[4]);
+                blockHasNumber = true;
+            }
+            else if (dividers.Count == 4)
+            {
+                (xLeft, xStock, xReal, xRight) = (dividers[0], dividers[1], dividers[2], dividers[3]);
+                xCode = xLeft;
+                blockHasNumber = false;
+            }
+            else
+            {
+                // Not a complete set of rules (faint or broken ones): use the block's horizontal extent and the same
+                // column FRACTIONS the generated PDF used (invariant to print/scan scale).
+                xLeft = blockLeft;
+                xRight = blockRight;
+                xCode = xLeft + (int)Math.Round(codeFraction * (xRight - xLeft));
+                xStock = xLeft + (int)Math.Round(stockFraction * (xRight - xLeft));
+                xReal = xLeft + (int)Math.Round(realFraction * (xRight - xLeft));
+                blockHasNumber = true;
+                fallbackColumns = true;
+            }
+            if (debug) Console.WriteLine($"[debug] table {blockNumber}: rows {bands[0].Top}-{bands[^1].Bottom}, {dividers.Count} rules ({string.Join(",", dividers)}) -> xLeft={xLeft} xCode={xCode} xStock={xStock} xReal={xReal} xRight={xRight} numberColumn={blockHasNumber}{(fallbackColumns ? " (fallback fractions)" : "")}");
+
+            var indexInBlock = 0;
+            foreach (var band in bands)
+            {
+                var top = band.Top;
+                var bottom = band.Bottom;
+                var height = bottom - top;
+                // The vertical inset only needs to clear the rule lines' own stroke width (a handful of pixels
+                // regardless of DPI): rows can be as short as one text line, so scaling this from PDF points the way
+                // the horizontal inset does would eat a large share of a short row's actual content.
+                var verticalPad = Math.Min(6, height / 6);
+                var codeCell = SafeCrop(gray, xCode + horizontalPad, top + verticalPad, xStock - xCode - 2 * horizontalPad, height - 2 * verticalPad);
+                var realCell = SafeCrop(gray, xReal + horizontalPad, top + verticalPad, xRight - xReal - 2 * horizontalPad, height - 2 * verticalPad);
+                if (codeCell is null || realCell is null) { codeCell?.Dispose(); realCell?.Dispose(); continue; }
+
+                string code;
+                try { code = await ReadCodeAsync(codeCell, cancellationToken).ConfigureAwait(false); }
+                finally { codeCell.Dispose(); }
+                if (debug) Console.WriteLine($"[debug] {top}-{bottom}: code='{code}'");
+
+                // The header row ("Cod produs") is not data; the rows after it are numbered from 1 within this table.
+                if (TextNormalization.SameUniqueValue(code, InventoryPickupOcrRules.HeaderCode)) { realCell.Dispose(); indexInBlock = 0; continue; }
+                indexInBlock++;
+                if (code.Length == 0) { realCell.Dispose(); continue; }
+
+                var (hasInk, value, uncertain) = ReadHandwrittenWithContrast(realCell, debug);
+                if (debug) Console.WriteLine($"[debug] {top}-{bottom}: hasInk={hasInk} value={value} uncertain={uncertain}");
+                realCell.Dispose();
+                if (!hasInk) continue; // empty cell: "neinventariat", no row at all (subtask 1.2)
+
+                int? printedNumber = null;
+                if (blockHasNumber)
+                {
+                    hasNumberColumn = true;
+                    using var numberCell = SafeCrop(gray, xLeft + horizontalPad, top + verticalPad, xCode - xLeft - 2 * horizontalPad, height - 2 * verticalPad);
+                    if (numberCell is not null) printedNumber = await ReadPrintedNumberAsync(numberCell, cancellationToken).ConfigureAwait(false);
+                    if (debug) Console.WriteLine($"[debug] {top}-{bottom}: printed number={printedNumber?.ToString() ?? "?"} (index {indexInBlock} in table {blockNumber})");
+                }
+                pending.Add(new PendingRow(blockNumber, indexInBlock, code, value, uncertain, printedNumber));
+            }
+        }
+
+        // "Nr. crt." is settled per table from the sequence: the numbers run 1, 2, 3... down a table (continuing on the
+        // next page when a subcategory does not fit), so each read number implies the table's starting offset
+        // (number - position). The offset most reads agree on wins, which corrects an isolated misread digit and fills
+        // in a row whose number could not be read at all. A table where nothing was read keeps no number.
+        var offsets = pending.Where(row => row.PrintedNumber is not null)
+            .GroupBy(row => row.Block)
+            .ToDictionary(group => group.Key, group => group
+                .GroupBy(row => row.PrintedNumber!.Value - row.Index)
+                .OrderByDescending(offsetGroup => offsetGroup.Count()).ThenBy(offsetGroup => offsetGroup.Key)
+                .First().Key);
+        return pending.Select(row => new InventoryPickupScanRow(pageNumber, row.Code, row.Value, row.Uncertain,
+            hasNumberColumn && offsets.TryGetValue(row.Block, out var offset) && row.Index + offset > 0 ? row.Index + offset : null)).ToList();
     }
 
     private static Mat ToGrayMat(SKBitmap bitmap)
@@ -248,43 +365,108 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
 
     private static int ToPixel(double points, double scale, int max) => Math.Clamp((int)Math.Round(points * scale), 0, max - 1);
 
-    // A printed-then-scanned page rarely lands pixel-exact on the geometry computed from the PDF's own point
-    // coordinates (printers commonly scale content a percent or two to fit their printable area). Rather than
-    // trusting the computed positions outright, this finds the table's actual left/right border near where they
-    // are expected and re-derives the internal dividers from the same column FRACTIONS InventoryPdfWriter used -
-    // those fractions are invariant to a uniform print/scan scale, so this still never redetects the layout from
-    // scratch (TODO.md's "fara detectie de layout"), it only recalibrates the one page-wide scale factor.
-    private static (int Left, int Stock, int Real, int Right) CalibrateColumns(Mat binary, InventoryTableColumns points, double scale, int sampleTop, int sampleBottom)
-    {
-        var approxLeft = ToPixel(points.CodeX, scale, binary.Cols);
-        var approxRight = ToPixel(points.RightEdge, scale, binary.Cols);
-        var searchRadius = Math.Max(20, (int)(binary.Cols * 0.03));
-        var left = FindSolidVerticalNear(binary, approxLeft, searchRadius, sampleTop, sampleBottom) ?? approxLeft;
-        var right = FindSolidVerticalNear(binary, approxRight, searchRadius, sampleTop, sampleBottom) ?? approxRight;
-        var stockFraction = (points.StockX - points.PageMargin) / points.ContentWidth;
-        var realFraction = (points.RealX - points.PageMargin) / points.ContentWidth;
-        var stock = left + (int)Math.Round(stockFraction * (right - left));
-        var real = left + (int)Math.Round(realFraction * (right - left));
-        return (left, stock, real, right);
-    }
+    // A grid rule line found in the page: its row (y) and horizontal extent.
+    private sealed record GridLine(int Y, int Left, int Right);
 
-    private static int? FindSolidVerticalNear(Mat binary, int approxX, int radius, int top, int bottom)
+    // The table grid is read from the scan itself, not from the generated PDF's geometry, because a printed-then-
+    // scanned page rarely lands on those coordinates (printer scaling, feed offset - a real Konica Minolta scan of
+    // 30.09.2026 had the table's left border ~88 px, 7 mm, from where the PDF puts it). Long horizontal rules are
+    // isolated with a morphological opening whose kernel is a fraction of the PAGE width (text strokes are far shorter
+    // and disappear), merged into lines by row, and each keeps the extent of its longest unbroken stretch.
+    private static List<GridLine> FindGridLines(Mat binary)
     {
-        var height = bottom - top;
-        if (height <= 0) return null;
-        var threshold = height * 0.9;
-        var best = -1;
-        var bestCount = -1.0;
-        var lastColumn = binary.Cols - 1;
-        for (var x = Math.Max(0, approxX - radius); x <= Math.Min(lastColumn, approxX + radius); x++)
+        var minLength = (int)(binary.Cols * MinGridLineWidthRatio);
+        using var dilated = new Mat();
+        Cv2.Dilate(binary, dilated, Cv2.GetStructuringElement(MorphShapes.Rect, new Size(1, LineDetectionDilationHeight)));
+        using var opened = new Mat();
+        Cv2.MorphologyEx(dilated, opened, MorphTypes.Open, Cv2.GetStructuringElement(MorphShapes.Rect, new Size(Math.Max(15, binary.Cols / GridLineOpeningDivisor), 1)));
+
+        var candidates = new List<int>();
+        int openedRows = opened.Rows, openedCols = opened.Cols;
+        for (var y = 0; y < openedRows; y++)
         {
-            using var column = binary.SubMat(top, bottom, x, x + 1);
-            var count = Cv2.CountNonZero(column);
-            if (count >= threshold && count > bestCount) { bestCount = count; best = x; }
+            using var row = opened.SubMat(y, y + 1, 0, openedCols);
+            if (Cv2.CountNonZero(row) >= minLength) candidates.Add(y);
         }
-        return best < 0 ? null : best;
+
+        var lines = new List<GridLine>();
+        void Flush(int runStart, int runEnd)
+        {
+            using var band = opened.SubMat(runStart, runEnd + 1, 0, opened.Cols);
+            using var presence = new Mat();
+            Cv2.Reduce(band, presence, ReduceDimension.Row, ReduceTypes.Max, -1);
+            presence.GetArray(out byte[] columns);
+            var (start, end) = LongestSegment(columns, 12);
+            if (end - start + 1 >= minLength) lines.Add(new GridLine((runStart + runEnd) / 2, start, end));
+        }
+        var runStart = -1;
+        var previous = -10;
+        foreach (var y in candidates)
+        {
+            if (y > previous + 1)
+            {
+                if (runStart >= 0) Flush(runStart, previous);
+                runStart = y;
+            }
+            previous = y;
+        }
+        if (runStart >= 0) Flush(runStart, previous);
+        return lines;
     }
 
+    // Longest stretch of non-zero entries, bridging gaps of up to maxGap zeros (a scanned rule has small breaks).
+    private static (int Start, int End) LongestSegment(byte[] present, int maxGap)
+    {
+        var bestStart = 0;
+        var bestEnd = -1;
+        var start = -1;
+        var last = -1;
+        for (var i = 0; i < present.Length; i++)
+        {
+            if (present[i] == 0) continue;
+            if (start < 0 || i - last > maxGap)
+            {
+                if (start >= 0 && last - start > bestEnd - bestStart) { bestStart = start; bestEnd = last; }
+                start = i;
+            }
+            last = i;
+        }
+        if (start >= 0 && last - start > bestEnd - bestStart) { bestStart = start; bestEnd = last; }
+        return (bestStart, bestEnd);
+    }
+
+    // The x positions of the vertical rules inside one row band: columns whose ink covers most of the band's height
+    // (text strokes cover at most about half of it), neighbouring columns merged into one rule at their midpoint.
+    // The band's own top/bottom rules are excluded by a small inset, and only the row's horizontal extent is searched.
+    private static List<int> FindDividers(Mat verticalSource, int top, int bottom, int left, int right)
+    {
+        var inset = Math.Min(8, (bottom - top) / 6);
+        var bandTop = top + inset;
+        var bandBottom = bottom - inset;
+        var dividers = new List<int>();
+        if (bandBottom <= bandTop) return dividers;
+        var from = Math.Max(0, left - 8);
+        var to = Math.Min(verticalSource.Cols, right + 9);
+        using var band = verticalSource.SubMat(bandTop, bandBottom, from, to);
+        using var counts = new Mat();
+        Cv2.Reduce(band, counts, ReduceDimension.Row, ReduceTypes.Sum, MatType.CV_32S);
+        counts.GetArray(out int[] sums);
+        var threshold = 255.0 * (bandBottom - bandTop) * DetectedDividerFillRatio;
+        var runStart = -1;
+        var previous = -10;
+        for (var x = 0; x < sums.Length; x++)
+        {
+            if (sums[x] < threshold) continue;
+            if (x > previous + 2)
+            {
+                if (runStart >= 0) dividers.Add(from + (runStart + previous) / 2);
+                runStart = x;
+            }
+            previous = x;
+        }
+        if (runStart >= 0) dividers.Add(from + (runStart + previous) / 2);
+        return dividers;
+    }
     // A rule line perfectly horizontal in the printed page lands on a single image row after scanning only if the
     // paper fed in dead straight. Even a fraction of a degree of skew (unavoidable on a real scanner/photocopier,
     // confirmed against a real user scan where well under half a degree was enough) spreads that same line's ink
@@ -354,6 +536,88 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         return width <= 0 || height <= 0 ? null : new Mat(source, new CvRect(x, y, width, height)).Clone();
     }
 
+    // A row of a table: the y of its top/bottom rule lines and the horizontal extent they share.
+    private sealed record TableBand(int Top, int Bottom, int Left, int Right);
+
+    // A row band belongs to a table when both of the table's outer borders run through it (the row rectangle is drawn
+    // with all four sides). Independent of any expected position: the borders are looked for where the band's own
+    // horizontal rules end.
+    private static bool HasBorders(Mat verticalSource, int top, int bottom, int left, int right) =>
+        CoversBand(verticalSource, left, top, bottom) && CoversBand(verticalSource, right, top, bottom);
+
+    private static bool CoversBand(Mat verticalSource, int x, int top, int bottom)
+    {
+        var inset = Math.Min(8, (bottom - top) / 6);
+        var bandTop = top + inset;
+        var bandBottom = bottom - inset;
+        if (bandBottom <= bandTop) return false;
+        var from = Math.Max(0, x - 6);
+        var to = Math.Min(verticalSource.Cols, x + 7);
+        if (to <= from) return false;
+        using var band = verticalSource.SubMat(bandTop, bandBottom, from, to);
+        using var counts = new Mat();
+        Cv2.Reduce(band, counts, ReduceDimension.Row, ReduceTypes.Sum, MatType.CV_32S);
+        counts.GetArray(out int[] sums);
+        var threshold = 255.0 * (bandBottom - bandTop) * DetectedDividerFillRatio;
+        return sums.Any(sum => sum >= threshold);
+    }
+
+    // Gray level below which the given share of the cell's/page's pixels lie (0 = darkest).
+    private static int GrayPercentile(Mat gray, double fraction)
+    {
+        using var histogram = new Mat();
+        Cv2.CalcHist([gray], [0], null, histogram, 1, [256], [new Rangef(0, 256)]);
+        histogram.GetArray(out float[] bins);
+        var target = fraction * gray.Rows * gray.Cols;
+        float accumulated = 0;
+        for (var level = 0; level < bins.Length; level++)
+        {
+            accumulated += bins[level];
+            if (accumulated >= target) return level;
+        }
+        return 255;
+    }
+
+    // Ink contrast of an image: the paper level (median) minus the level of its darkest ink (1st percentile).
+    private static int InkContrast(Mat gray) => GrayPercentile(gray, 0.5) - GrayPercentile(gray, ContrastInkPercentile);
+
+    // Stretches the ink..paper range to the full 0..255 range so faint pen strokes / a washed-out scan become clearly
+    // dark before thresholding. Returns null when the image has no usable contrast at all (a blank cell: stretching
+    // would only turn paper noise into "ink").
+    private static Mat? StretchContrast(Mat gray)
+    {
+        var ink = GrayPercentile(gray, ContrastInkPercentile);
+        var paper = GrayPercentile(gray, 0.5);
+        if (paper - ink < MinUsableContrast) return null;
+        var stretched = new Mat();
+        gray.ConvertTo(stretched, MatType.CV_8UC1, 255.0 / (paper - ink), -ink * 255.0 / (paper - ink));
+        return stretched;
+    }
+
+    // Reads a handwritten cell; when the read is unsure (or a faint pen left nothing readable) it is retried once on a
+    // contrast-stretched copy of the cell, and the retry is kept when it is at least as good (a confident reading
+    // beats an uncertain one). A very faint cell is stretched up front. A cell with no contrast at all stays empty.
+    private (bool HasInk, int? Value, bool Uncertain) ReadHandwrittenWithContrast(Mat cell, bool debug)
+    {
+        var first = ReadHandwrittenNumber(cell);
+        var contrast = InkContrast(cell);
+        if (contrast < MinUsableContrast) return first;
+        var faint = contrast < FaintInkContrast;
+        if (!faint && first.HasInk && !first.Uncertain) return first;
+        using var stretched = StretchContrast(cell);
+        if (stretched is null) return first;
+        var second = ReadHandwrittenNumber(stretched, thickenStrokes: true);
+        if (debug) Console.WriteLine($"[debug]   contrast {contrast}: first=({first.HasInk},{first.Value},{first.Uncertain}) stretched=({second.HasInk},{second.Value},{second.Uncertain})");
+        if (!first.HasInk) return second;                     // the faint pen was not seen at all
+        if (!second.HasInk) return first;
+        // More digits found after stretching means strokes the plain read lost (a thin pencil "1" simply vanishes and
+        // the rest reads as a sure, wrong number), so that read wins even if the plain one looked confident.
+        static int DigitCount(int? value) => value is int number ? number.ToString(System.Globalization.CultureInfo.InvariantCulture).Length : 0;
+        if (DigitCount(second.Value) > DigitCount(first.Value)) return second;
+        if (first.Uncertain && !second.Uncertain) return second;
+        return first;
+    }
+
     private async Task<string> ReadCodeAsync(Mat cell, CancellationToken cancellationToken)
     {
         using var codeMat = new Mat();
@@ -371,23 +635,46 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         finally { tesseractGate.Release(); }
     }
 
+    // Reads the printed "Nr. crt." digits of one cell with Tesseract restricted to digits; null when nothing usable.
+    private async Task<int?> ReadPrintedNumberAsync(Mat cell, CancellationToken cancellationToken)
+    {
+        using var numberMat = new Mat();
+        Cv2.Threshold(cell, numberMat, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
+        Cv2.CopyMakeBorder(numberMat, numberMat, 8, 8, 8, 8, BorderTypes.Constant, Scalar.White);
+        var bytes = numberMat.ImEncode(".png");
+        await tesseractGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            using var engine = new TesseractEngine(tessdataPath, "eng", EngineMode.LstmOnly);
+            engine.SetVariable("tessedit_char_whitelist", "0123456789");
+            using var pix = Pix.LoadFromMemory(bytes);
+            using var page = engine.Process(pix, PageSegMode.SingleLine);
+            var digits = new string(page.GetText().Where(char.IsAsciiDigit).ToArray());
+            return digits.Length is > 0 and <= 4 && int.TryParse(digits, out var number) ? number : null;
+        }
+        finally { tesseractGate.Release(); }
+    }
     // Segments the cell's ink into per-digit blobs and classifies each with the embedded MNIST model.
     // HasInk distinguishes a genuinely empty cell (no row at all - subtask 1.2's "neinventariat") from one that
     // has handwriting but could not be read with confidence (still returned as an uncertain row - subtask 1.2/1.3
     // - never silently dropped just because segmentation or classification struggled).
-    private (bool HasInk, int? Value, bool Uncertain) ReadHandwrittenNumber(Mat cell)
+    private (bool HasInk, int? Value, bool Uncertain) ReadHandwrittenNumber(Mat cell, bool thickenStrokes = false)
     {
         using var binary = new Mat();
         Cv2.Threshold(cell, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
         var cellArea = cell.Rows * cell.Cols;
         if (Cv2.CountNonZero(binary) < cellArea * 0.001) return (false, null, false); // no ink at all: not counted yet
         Cv2.MorphologyEx(binary, binary, MorphTypes.Close, Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3)));
+        // Pencil and dry-pen strokes are thin and break into fragments: thickening joins them into one stroke per digit.
+        if (thickenStrokes) Cv2.Dilate(binary, binary, Cv2.GetStructuringElement(MorphShapes.Ellipse, new Size(3, 3)));
 
         using var labels = new Mat();
         using var stats = new Mat();
         using var centroids = new Mat();
         Cv2.ConnectedComponentsWithStats(binary, labels, stats, centroids);
-        var minArea = cellArea * 0.008;
+        // A pencil or dry-pen "1" is a thin stroke: on the faint path (thickened strokes) the area floor is lower, and
+        // the height filter below (a digit is at least 30% of the cell tall) still rejects specks.
+        var minArea = cellArea * (thickenStrokes ? 0.002 : 0.008);
         var blobs = new List<(CvRect Box, double CentroidX)>();
         var statsRows = stats.Rows;
         for (var label = 1; label < statsRows; label++) // label 0 is the background

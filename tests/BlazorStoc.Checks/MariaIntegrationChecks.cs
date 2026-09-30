@@ -28,6 +28,7 @@ namespace BlazorStoc.Checks;
 // is exercised in full against the real database.
 public static class MariaIntegrationChecks
 {
+    private static readonly DateOnly? TestExpiry = new DateOnly(2027, 3, 15);
     private const string WriteGuardMarker = "numai în baza BlazorStoc";
 
     public static async Task RunAsync(IConfiguration configuration)
@@ -240,14 +241,14 @@ public static class MariaIntegrationChecks
         var repository = new MariaVehicleRepository(configuration, admin, audit);
         try
         {
-            var vehicle = await repository.CreateAsync(new VehicleInput { PlateNumber = "TS-99-ZZZ", Description = "Vehicul verificare integrare" })
+            var vehicle = await repository.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "TS-99-ZZZ", Description = "Vehicul verificare integrare" })
                 .ConfigureAwait(false);
             try
             {
                 check(vehicle.Id > 0 && vehicle.PlateNumber == "TS-99-ZZZ", "A new vehicle is created with a valid plate number");
                 try
                 {
-                    await repository.CreateAsync(new VehicleInput { PlateNumber = "ts99zzz", Description = "Duplicat" }).ConfigureAwait(false);
+                    await repository.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "ts99zzz", Description = "Duplicat" }).ConfigureAwait(false);
                     throw new Exception("A duplicate plate number was accepted");
                 }
                 catch (VehicleOperationException) { Console.WriteLine("PASS: A duplicate vehicle plate number is rejected"); }
@@ -288,7 +289,7 @@ public static class MariaIntegrationChecks
                 Name = "Integrare Test Produs Miscari", Category = category, Subcategory = subcategory,
                 Description = "Produs pentru verificarea miscarilor de stoc, Subtask 2.11"
             }).ConfigureAwait(false);
-            vehicle = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "TS-99-MIS", Description = "Vehicul verificare miscari" })
+            vehicle = await vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "TS-99-MIS", Description = "Vehicul verificare miscari" })
                 .ConfigureAwait(false);
 
             var entry = await movements.CreateAsync(product.Id, new StockMovementInput

@@ -107,6 +107,9 @@ CREATE TABLE `vehicles` (
   `normalized_plate` VARCHAR(191) NOT NULL,
   `description` LONGTEXT NOT NULL,
   `version` BIGINT NOT NULL DEFAULT 0,
+  `itp_expiry` DATE NOT NULL DEFAULT '2027-03-15',
+  `insurance_expiry` DATE NOT NULL DEFAULT '2027-06-30',
+  `rovinieta_expiry` DATE NOT NULL DEFAULT '2027-09-30',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_vehicles_0` (`normalized_plate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin;

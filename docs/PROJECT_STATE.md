@@ -4,6 +4,18 @@ Actualizat de: **Claude**
 Data: **29 septembrie 2026 (Task 3, subtaskurile 3.3 si 3.4 - declansarea si pasii de restaurare a bazei de date)**
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
 
+## Verificare MariaDB reala si OCR reproiectat - 30.09.2026
+
+- Backup (A18) si restaurare (A20) verificate pe instanta reala `C:\Dev\BlazorStoc-MariaDB` (port 3307), inclusiv doua refuzuri (hash alterat, structura); `beneficiary_work_points` adaugata in `MariaArchiveSchema.RequiredTables` (lista pentru backup/restaurare, separata de tabelele de baza verificate la pornire). Detalii in `docs/TESTE_RAMASE.md`. Pornire preview MariaDB: `Database__PrivateConfigPath` catre `local-secrets\application-connection.private.json`, `Database__MariaDumpExecutablePath`/`Database__MariaClientExecutablePath` catre `C:\Dev\...\bin`, `App__DemoMode=false`, port 5083.
+- PDF-ul de inventar are prima coloana "Nr. crt." (numar curent in subcategorie, de la 1, reluat la fiecare subcategorie, continuat peste pagini; nu se stocheaza). Pagina de preluare il arata inaintea codului (tabel principal, "negasite", popup), citit din scan.
+- OCR-ul de preluare: tabelul si coloanele se gasesc in scan (linii orizontale lungi = randuri, linii verticale pe tot blocul de tabel = coloane, ancorate la antetul "Cod produs"), fara pozitii sau dimensiuni fixe; layout-ul din PDF ramane doar rezerva. Scanurile vechi (3 coloane) se citesc in continuare. Contrast: pagina slaba se intinde inainte de binarizare; celula scrisa de mana (inclusiv creion) se reciteste pe o copie cu contrast intins si tuse ingrosate cand citirea e nesigura sau cand gaseste mai multe cifre. Numarul curent se stabileste pe tabel prin vot pe secventa (corecteaza cifre gresit citite).
+- Suita: 708 PASS (formulare sintetice cu stilou negru, creion si scan sters, plus scanul real decalat din 30.09.2026).
+- Verificat de utilizator in browser (30.09.2026): un formular nou tiparit, completat de mana si scanat se preia corect (fixture `inventar-proba-nr-crt.pdf`, 710 PASS); fereastra cu PDF-ul generat (Imprima, Salveaza, Inchide; fisierul nu ramane pe server) functioneaza. Ramas neverificat: alt scaner/rezolutii, formular multipagina cu subcategorie continuata, creion foarte deschis.
+
+## Taburi vehicul si date de expirare - 29.09.2026
+
+Pagina vehiculului are taburile Informatii autovehicul (numar, descriere, date expirare ITP/asigurare/rovinieta, obligatorii, fara restrictie de data viitoare) si Echipamente aflate in masina. Vehiculele existente au date implicite din 2027 (valoarea implicita a coloanelor SQLite si migrarea MariaDB 3). Detalii in IMPLEMENTED.md; neverificat in browser si pe MariaDB reala (vezi docs/TESTE_RAMASE.md). Preview: http://127.0.0.1:5085/.
+
 ## Backup real MariaDB: verificat partial - 29.09.2026
 
 - Backupul real (`MariaDatabaseBackupService`) rulat contra instantei `C:\Dev\BlazorStoc-MariaDB` (port 3307). Corectat: `ssl-mode` in fisierul de credentiale al `mariadb-dump`/`mariadb` (optiune necunoscuta) inlocuit cu `ssl=1` (`MariaClientSsl`), si la restaurare.

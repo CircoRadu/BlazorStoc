@@ -1,0 +1,15 @@
+@using BlazorStoc.Services
+
+@* Tab strip of the vehicle page: each tab is its own address, so both stay linkable and the back button works. *@
+<div class="settings-tabs vehicle-tabs" role="tablist" aria-label="Secțiuni vehicul">
+    <a role="tab" id="vehicle-tab-info" class="settings-tab @(Active == InfoTab ? "active" : "")" aria-selected="@(Active == InfoTab ? "true" : "false")" href="@VehicleNavigation.PageUrl(VehicleId)">Informații autovehicul</a>
+    <a role="tab" id="vehicle-tab-equipment" class="settings-tab @(Active == EquipmentTab ? "active" : "")" aria-selected="@(Active == EquipmentTab ? "true" : "false")" href="@VehicleNavigation.EquipmentUrl(VehicleId)">Echipamente aflate în mașină</a>
+</div>
+
+@code {
+    public const string InfoTab = "info";
+    public const string EquipmentTab = "equipment";
+
+    [Parameter, EditorRequired] public int VehicleId { get; set; }
+    [Parameter, EditorRequired] public string Active { get; set; } = InfoTab;
+}

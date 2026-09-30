@@ -3,7 +3,6 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IVehicleRepository Repository
-@inject IStockMovementRepository Movements
 @inject NavigationManager Navigation
 @inject IChangeFeed ChangeFeed
 @inject ChangeOrigin Origin
@@ -40,14 +39,18 @@ else if (vehicle is not null)
         <VehicleEditor @key="editorKey" Original="vehicle" Saved="VehicleSavedAsync" Closed="CloseEditor" />
     }
 
-    <section class="catalog">
-        <div class="catalog-heading"><h2>Conținutul vehiculului</h2></div>
-        <div class="table-scroll"><table><thead><tr><th>ELEMENT</th><th>DETALII</th></tr></thead><tbody>
-            <tr>
-                <td><a class="category-table-link" href="@VehicleNavigation.EquipmentUrl(Id)"><strong>Materiale și echipamente</strong></a></td>
-                <td class="muted">Materiale și echipamente aflate în această mașină@(EquipmentSummary is { } summary ? " · " + summary : "")</td>
-            </tr>
-        </tbody></table></div>
+    <section class="catalog settings-panel">
+        <VehicleTabs VehicleId="Id" Active="@VehicleTabs.InfoTab" />
+        <div role="tabpanel" aria-labelledby="vehicle-tab-info" class="vehicle-info">
+            <div class="table-scroll"><table><thead><tr><th>INFORMAȚIE</th><th>VALOARE</th><th>STARE</th></tr></thead><tbody>
+                <tr><td>Număr de înmatriculare</td><td><span class="role-badge limited">@vehicle.PlateNumber</span></td><td></td></tr>
+                <tr><td>Descriere</td><td><strong>@vehicle.Description</strong></td><td></td></tr>
+                @foreach (var (label, date) in Expiries(vehicle))
+                {
+                    <tr><td>@label</td><td><strong>@VehicleRules.DisplayExpiry(date)</strong></td><td>@ExpiryBadge(date)</td></tr>
+                }
+            </tbody></table></div>
+        </div>
     </section>
 }
 
@@ -63,21 +66,31 @@ else if (vehicle is not null)
 @code {
     [Parameter] public int Id { get; set; }
     private Vehicle? vehicle;
-    private IReadOnlyList<VehicleEquipment> equipment = Array.Empty<VehicleEquipment>();
     private bool loading = true, editing, deleting, deleteBusy;
     private string? error, notice, deleteError;
     private Guid editorKey;
     private LiveRefresh? live;
     private readonly CancellationTokenSource lifetime = new();
 
-    private string? EquipmentSummary => equipment.Count == 0 ? null
-        : $"{equipment.Count} {(equipment.Count == 1 ? "reper" : "repere")}, {equipment.Sum(item => item.Quantity)} buc.";
+    private static IEnumerable<(string Label, DateOnly? Date)> Expiries(Vehicle value) =>
+    [
+        ("Data expirare ITP", value.ItpExpiry), ("Data expirare asigurare", value.InsuranceExpiry), ("Data expirare rovinietă", value.RovinietaExpiry)
+    ];
+
+    // Expired dates and dates within a month are flagged; the check uses the server's local day.
+    private static RenderFragment ExpiryBadge(DateOnly? date) => builder =>
+    {
+        if (date is not { } value) return;
+        var days = value.DayNumber - DateOnly.FromDateTime(DateTime.Now).DayNumber;
+        var (css, text) = days < 0 ? ("negative", "Expirat") : days <= 30 ? ("zero", days == 0 ? "Expiră astăzi" : $"Expiră în {days} zile") : ("positive", "Valabil");
+        builder.OpenElement(0, "span"); builder.AddAttribute(1, "class", "stock-badge " + css); builder.AddContent(2, text); builder.CloseElement();
+    };
 
     protected override async Task OnInitializedAsync()
     {
-        // Vehicle changes have no change events; the periodic fallback keeps the page current, and stock movements
-        // of other sessions refresh the equipment summary. An open form or dialog is never replaced.
-        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Product,
+        // Vehicle changes have no change events; the periodic fallback keeps the page current.
+        // An open form or dialog is never replaced.
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Vehicle,
             () => InvokeAsync(async () => { if (!loading) { await RefreshAsync(); StateHasChanged(); } }),
             () => editing || deleting, () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(15));
         await LoadAsync();
@@ -96,8 +109,7 @@ else if (vehicle is not null)
         try
         {
             vehicle = await Repository.GetAsync(Id, lifetime.Token);
-            if (vehicle is null) { error = "Vehiculul solicitat nu mai există."; equipment = Array.Empty<VehicleEquipment>(); return; }
-            equipment = await Movements.GetVehicleEquipmentAsync(Id, lifetime.Token);
+            if (vehicle is null) { error = "Vehiculul solicitat nu mai există."; return; }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException exception) { error = exception.Message; }
@@ -113,7 +125,6 @@ else if (vehicle is not null)
             var current = await Repository.GetAsync(Id, lifetime.Token);
             if (current is null) { vehicle = null; error = "Vehiculul solicitat nu mai există."; return; }
             vehicle = current;
-            equipment = await Movements.GetVehicleEquipmentAsync(Id, lifetime.Token);
         }
         catch (OperationCanceledException) { }
         catch (Exception exception) { Logger.LogWarning("Vehicle refresh failed ({ErrorType}).", exception.GetType().Name); }

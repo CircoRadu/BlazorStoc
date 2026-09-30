@@ -3,7 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace BlazorStoc.Services;
 
-public sealed record Vehicle(int Id, string PlateNumber, string Description, long Version = 0);
+// The three expiry dates are required by the editor; they are nullable here only so that a vehicle can be built without them.
+public sealed record Vehicle(int Id, string PlateNumber, string Description, long Version = 0,
+    DateOnly? ItpExpiry = null, DateOnly? InsuranceExpiry = null, DateOnly? RovinietaExpiry = null);
 
 // Registration number in the form "AA-OOO-AAA": one or two letters (county; "B" for Bucharest), two or three digits,
 // three letters (for example HD-01-FDG, HD-233-VDG, B-123-ABC). The stored form is upper case with hyphens.
@@ -45,6 +47,15 @@ public sealed class VehicleInput
     [StringLength(DescriptionMaximumLength, ErrorMessage = "Descrierea poate avea cel mult 100 de caractere.")]
     public string Description { get; set; } = "";
 
+    [Required(ErrorMessage = "Alege data de expirare a ITP.")]
+    public DateOnly? ItpExpiry { get; set; }
+
+    [Required(ErrorMessage = "Alege data de expirare a asigurării.")]
+    public DateOnly? InsuranceExpiry { get; set; }
+
+    [Required(ErrorMessage = "Alege data de expirare a rovinietei.")]
+    public DateOnly? RovinietaExpiry { get; set; }
+
     [StringLength(ChangeReasonRules.MaximumLength, ErrorMessage = ChangeReasonRules.TooLongMessage)]
     public string Reason { get; set; } = "";
 
@@ -55,17 +66,27 @@ public sealed class VehicleInput
         {
             PlateNumber = plate,
             Description = TextNormalization.ForObjectNameOrCode(Description),
+            ItpExpiry = ItpExpiry,
+            InsuranceExpiry = InsuranceExpiry,
+            RovinietaExpiry = RovinietaExpiry,
             Reason = ChangeReasonRules.Normalize(Reason)
         };
         var results = new List<ValidationResult>();
         if (!Validator.TryValidateObject(normalized, new ValidationContext(normalized), results, true))
             throw new VehicleOperationException(string.Join(" ", results.Select(result => result.ErrorMessage)));
+        foreach (var (date, label) in new[] { (ItpExpiry, "ITP"), (InsuranceExpiry, "asigurării"), (RovinietaExpiry, "rovinietei") })
+            if (date is { } value && (value < StockMovementRules.EarliestDate || value > VehicleRules.LatestExpiry))
+                throw new VehicleOperationException($"Data de expirare a {label} nu este validă.");
         if (requiresReason && ChangeReasonRules.ValidationError(normalized.Reason) is { } reasonError)
             throw new VehicleOperationException(reasonError);
         return normalized;
     }
 
-    public static VehicleInput From(Vehicle vehicle) => new() { PlateNumber = vehicle.PlateNumber, Description = vehicle.Description };
+    public static VehicleInput From(Vehicle vehicle) => new()
+    {
+        PlateNumber = vehicle.PlateNumber, Description = vehicle.Description,
+        ItpExpiry = vehicle.ItpExpiry, InsuranceExpiry = vehicle.InsuranceExpiry, RovinietaExpiry = vehicle.RovinietaExpiry
+    };
 }
 
 public sealed class VehicleOperationException(string message) : Exception(message);
@@ -109,6 +130,31 @@ public static class VehicleRules
 {
     public const string ChangedMessage = "Vehiculul a fost modificat sau șters între timp. Actualizează lista și reia operația.";
     public const string ConcurrentMessage = "Vehiculul s-a schimbat între timp. Actualizează lista.";
+
+    // Existing vehicles received these dates (next year) when the columns were added; the same values are the column defaults.
+    public static readonly DateOnly DefaultItpExpiry = new(2027, 3, 15);
+    public static readonly DateOnly DefaultInsuranceExpiry = new(2027, 6, 30);
+    public static readonly DateOnly DefaultRovinietaExpiry = new(2027, 9, 30);
+    // Expiry dates may lie in the future; only an absurd year is rejected.
+    public static readonly DateOnly LatestExpiry = new(2100, 12, 31);
+
+    public static string DisplayExpiry(DateOnly? date) => date is { } value ? StockMovementRules.DisplayDate(value) : "—";
+    public static string StorageExpiry(DateOnly? date) => date is { } value ? StockMovementRules.StorageDate(value) : string.Empty;
+    public static DateOnly? ParseStoredExpiry(string? text) =>
+        DateOnly.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date) ? date : null;
+
+    public static string AuditIdentification(Vehicle vehicle) => AuditDetails.Identification(
+        ("Număr de înmatriculare", vehicle.PlateNumber), ("Descriere", vehicle.Description),
+        ("Expirare ITP", DisplayExpiry(vehicle.ItpExpiry)), ("Expirare asigurare", DisplayExpiry(vehicle.InsuranceExpiry)),
+        ("Expirare rovinietă", DisplayExpiry(vehicle.RovinietaExpiry)));
+
+    public static AuditChange[] Changes(Vehicle before, Vehicle after) =>
+    [
+        new("Număr de înmatriculare", before.PlateNumber, after.PlateNumber), new("Descriere", before.Description, after.Description),
+        new("Expirare ITP", DisplayExpiry(before.ItpExpiry), DisplayExpiry(after.ItpExpiry)),
+        new("Expirare asigurare", DisplayExpiry(before.InsuranceExpiry), DisplayExpiry(after.InsuranceExpiry)),
+        new("Expirare rovinietă", DisplayExpiry(before.RovinietaExpiry), DisplayExpiry(after.RovinietaExpiry))
+    ];
 
     public static void CheckCurrent(Vehicle? current, Vehicle original)
     {

@@ -1211,3 +1211,36 @@ Formularul de iesire din pagina de miscari a produsului (`ExitDestinationPicker.
 - **Fisiere:** `Services/InventoryPdfWriter.cs`, `tests/BlazorStoc.Checks/Program.cs`.
 - **Verificari:** o verificare noua (fiecare pagina are cel mult 21 de randuri, niciun rand pierdut intre pagini, 300 de randuri in total); suita completa: 690 PASS, inclusiv cele existente pentru PDF (semnatura, texte, diacritice, culoarea rosie, antet repetat, subsol) si pentru OCR. Un PDF de proba generat cu noul layout a fost deschis in panoul de previzualizare.
 - **Neverificat:** cat de bine citeste OCR-ul un formular tiparit cu noua inaltime si completat real de mana (fixture-urile de test sunt scanari mai vechi, cu inaltimea veche); un ciclu complet generare - tiparire - completare - scanare - preluare ramane de incercat de utilizator.
+
+
+## Finalizat la 29.09.2026 16:00 — Taburi in pagina autovehiculului si date de expirare ITP / asigurare / rovinieta
+
+**Data si ora implementarii:** 29.09.2026 16:00 (ora locala).
+
+- **Ce s-a schimbat:** pagina vehiculului are doua taburi (`Components/Shared/VehicleTabs.razor`, fiecare tab cu adresa lui: `/vehicule/{id}` si `/vehicule/{id}/echipamente`). Tabul 1 "Informatii autovehicul" arata numarul, descrierea si cele trei date de expirare (dd.mm.yyyy) cu o eticheta de stare (Expirat / Expira in N zile pentru cel mult 30 de zile / Valabil). Tabul 2 "Echipamente aflate in masina" contine pagina existenta de materiale si echipamente, neschimbata ca functionalitate.
+- **Date de expirare:** noi campuri `ItpExpiry`, `InsuranceExpiry`, `RovinietaExpiry` (`Vehicle`, `VehicleInput`), obligatorii la crearea si editarea vehiculului, alese doar din calendar cu `PickOnlyDate` ca in miscari, dar fara limita superioara (date viitoare permise; limita inferioara 01.01.1990, superioara 31.12.2100 doar pentru date absurde). Jurnalul si dialogul de confirmare a editarii afiseaza modificarile lor.
+- **Vehicule existente:** primesc date din anul urmator prin valoarea implicita a coloanelor: ITP 15.03.2027, asigurare 30.06.2027, rovinieta 30.09.2027.
+- **Schema:** SQLite - coloane `itp_expiry`, `insurance_expiry`, `rovinieta_expiry` (TEXT `yyyy-MM-dd`, NOT NULL DEFAULT) adaugate la initializare; MariaDB - migrarea 3 in `Services/MariaSchemaMigrations.cs` (coloane `DATE NOT NULL DEFAULT`, `ADD COLUMN IF NOT EXISTS`) si `database/mariadb/schema-mariadb.sql`.
+- **Fisiere principale:** `Services/Vehicles.cs`, `Services/SqliteVehicleRepository.cs`, `Services/MariaVehicleRepository.cs`, `Services/SqliteLocalStore.cs`, `Services/MariaSchemaMigrations.cs`, `Components/Pages/VehiclePage.razor`, `VehicleEquipmentPage.razor`, `VehicleEditor.razor`, `wwwroot/app.css`.
+- **Verificari:** verificari noi (datele se salveaza, lipsa fiecareia este respinsa, modificarea unei date se jurnalizeaza ca dd.mm.yyyy); suita de verificari: 623 PASS pana la o verificare care cauta folderul proiectului relativ la directorul de iesire (cade doar pentru ca testele au rulat dintr-un director de build alternativ, deoarece bin/ era blocat de previzualizarile pornite); verificarile de vehicule, inclusiv arhivarea, trec.
+- **Neverificat:** aspectul in browser (autentificarea este facuta de utilizator), migrarea 3 pe instanta MariaDB reala (rulare cu `--migrate-schema` sau la pornirea in mod MariaDB), restul suitei dupa verificarea cu folderul proiectului. Arhiva vehiculelor sterse nu are coloane pentru date (ele raman doar in instantaneul JSON al arhivei).
+
+## Finalizat la 30.09.2026 09:30 - Numar curent in PDF-ul de inventar si OCR de preluare cu tabel detectat din scan
+
+**Data si ora implementarii:** 30.09.2026 09:30 (ora locala).
+
+- **PDF:** prima coloana "Nr. crt." (InventoryPdfLayout, InventoryPdfWriter): numarul curent al produsului in subcategorie, de la 1, reluat la fiecare subcategorie si continuat peste pagini. Numai tiparit, nu devine camp in baza de date.
+- **Pagina de preluare:** coloana "NR. CRT." inaintea codului in tabelul principal, in lista "Produse negasite" si in popup-ul de confirmare (InventoryPickup.razor); valoarea vine din scan (InventoryPickupScanRow.Number, InventoryPickupLine.Number), "—" cand lipseste.
+- **OCR (Services/InventoryPickupOcr.cs):** deskew ca inainte; apoi tabelul se gaseste in scan, fara pozitii fixe: liniile orizontale lungi (deschidere morfologica cu nucleu relativ la latimea paginii) dau randurile, blocurile de randuri care au ambele borduri formeaza un tabel, iar coloanele se citesc o singura data pe bloc din liniile verticale continue pe tot tabelul (5 = cu "Nr. crt.", 4 = formular vechi). Fractiile din InventoryPdfLayout raman doar rezerva pentru reguli rupte. Numarul curent se citeste cu Tesseract (doar cifre) si se stabileste pe tabel prin vot pe secventa. Contrast: pagina slaba se intinde inainte de binarizare, celula scrisa de mana (creion inclus) se reciteste cu contrast intins si tuse ingrosate cand citirea e nesigura sau gaseste mai multe cifre. Corectat si scanul real decalat din 30.09.2026 (raza de calibrare fixa, inlocuita de detectia din scan).
+- **Fisiere:** Services/InventoryPdfLayout.cs, InventoryPdfWriter.cs, InventoryPickupOcr.cs, InventoryPickup.cs, Components/Pages/InventoryPickup.razor, 	ests/BlazorStoc.Checks (+ Fixtures/inventar-proba-decalata.pdf).
+- **Verificari:** suita 708 PASS: cele 6 scanuri reale vechi (3 coloane) neschimbate, scanul real decalat, formulare sintetice noi cu "Nr. crt." pentru stilou negru, creion si scan sters (5 randuri, numere 1,2,3,1,2, valori 10-14).
+- **Neverificat:** un formular nou tiparit, completat de mana (creion real) si scanat; testele folosesc cifre desenate. Formularele generate inainte de schimbare se citesc in continuare (fara numar curent).
+
+## Finalizat la 30.09.2026 10:15 - Fereastra cu situatia de inventar generata (imprimare si salvare)
+
+**Data si ora implementarii:** 30.09.2026 10:15 (ora locala).
+
+- **Ce s-a schimbat:** la "Genereaza situatia de inventar" nu se mai descarca direct fisierul; se deschide un dialog in pagina (Components/Pages/Inventory.razor, wwwroot/inventory-pdf-preview.js) cu PDF-ul intr-un cadru si butoanele Imprima, Salveaza si Inchide (Escape inchide). Dialog in pagina, nu window.open, ca sa nu fie blocat de browser dupa un apel asincron.
+- **Nimic nu ramane pe server:** PDF-ul se genereaza in memorie, se trimite o singura data browserului (showPdf) si copia de pe server se anuleaza imediat; Salveaza si Imprima lucreaza pe copia din browser, care se elibereaza (URL revocat, cadru golit) la inchiderea ferestrei si la parasirea paginii. Fisierul nu se scrie pe disc. Jurnalul de audit al generarii ramane neschimbat.
+- **Eliminat:** wwwroot/inventory-download.js si DownloadAsync (descarcarea prin server), nefolosite.
+- **Neverificat:** comportamentul in browser (autentificare facuta de utilizator): afisarea PDF-ului in cadru, Imprima (tiparirea dintr-un cadru difera intre browsere; exista rezerva intr-un tab nou), Salveaza si eliberarea la inchidere.

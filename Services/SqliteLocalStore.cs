@@ -47,6 +47,16 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
                      })
                 await EnsureColumnAsync(connection, "beneficiaries", column,
                     $"ALTER TABLE beneficiaries ADD COLUMN {column} {definition}", cancellationToken).ConfigureAwait(false);
+            // Vehicle expiry dates (ITP, insurance, road tax): existing vehicles receive dates in the next year
+            // through the column defaults.
+            foreach (var (column, definition) in new[]
+                     {
+                         ("itp_expiry", $"TEXT NOT NULL DEFAULT '{VehicleRules.StorageExpiry(VehicleRules.DefaultItpExpiry)}'"),
+                         ("insurance_expiry", $"TEXT NOT NULL DEFAULT '{VehicleRules.StorageExpiry(VehicleRules.DefaultInsuranceExpiry)}'"),
+                         ("rovinieta_expiry", $"TEXT NOT NULL DEFAULT '{VehicleRules.StorageExpiry(VehicleRules.DefaultRovinietaExpiry)}'")
+                     })
+                await EnsureColumnAsync(connection, "vehicles", column,
+                    $"ALTER TABLE vehicles ADD COLUMN {column} {definition}", cancellationToken).ConfigureAwait(false);
             await EnsureColumnAsync(connection, "stock_movements", "project_id",
                 "ALTER TABLE stock_movements ADD COLUMN project_id INTEGER NULL REFERENCES projects(id) ON DELETE RESTRICT",
                 cancellationToken).ConfigureAwait(false);
@@ -591,7 +601,10 @@ public sealed class SqliteLocalStore(IWebHostEnvironment environment, IConfigura
             plate_number TEXT NOT NULL,
             normalized_plate TEXT NOT NULL UNIQUE,
             description TEXT NOT NULL,
-            version INTEGER NOT NULL DEFAULT 0
+            version INTEGER NOT NULL DEFAULT 0,
+            itp_expiry TEXT NOT NULL DEFAULT '2027-03-15',
+            insurance_expiry TEXT NOT NULL DEFAULT '2027-06-30',
+            rovinieta_expiry TEXT NOT NULL DEFAULT '2027-09-30'
         );
         CREATE TABLE IF NOT EXISTS web_users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -14,6 +14,9 @@
             <div class="editor-grid">
                 <label for="vehicle-plate">Număr de înmatriculare *<InputText id="vehicle-plate" @bind-Value="input.PlateNumber" @bind-Value:after="NormalizePlate" maxlength="12" autocomplete="off" placeholder="HD-01-FDG" /><small>Forma AA-OOO-AAA: 1–2 litere, 2–3 cifre, 3 litere (HD-01-FDG, HD-233-VDG, B-123-ABC).</small><ValidationMessage For="() => input.PlateNumber" /></label>
                 <label for="vehicle-description">Descriere *<InputText id="vehicle-description" @bind-Value="input.Description" maxlength="100" autocomplete="off" placeholder="Dacia Dokker albă" /><small>Text scurt, de exemplu marca, modelul și culoarea.</small><ValidationMessage For="() => input.Description" /></label>
+                <label for="vehicle-itp">Data expirare ITP *<PickOnlyDate Id="vehicle-itp" @bind-Value="input.ItpExpiry" Min="@MinDate" /><ValidationMessage For="() => input.ItpExpiry" /></label>
+                <label for="vehicle-insurance">Data expirare asigurare *<PickOnlyDate Id="vehicle-insurance" @bind-Value="input.InsuranceExpiry" Min="@MinDate" /><ValidationMessage For="() => input.InsuranceExpiry" /></label>
+                <label for="vehicle-rovinieta">Data expirare rovinietă *<PickOnlyDate Id="vehicle-rovinieta" @bind-Value="input.RovinietaExpiry" Min="@MinDate" /><ValidationMessage For="() => input.RovinietaExpiry" /></label>
                 @if (Original is not null)
                 {
                     <ChangeReasonField Id="vehicle-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
@@ -33,6 +36,8 @@
     [Parameter] public Vehicle? Original { get; set; }
     [Parameter] public EventCallback<Vehicle> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
+    // Expiry dates have no upper limit (they lie in the future); only the calendar's lower bound is set.
+    private static readonly string MinDate = StockMovementRules.StorageDate(StockMovementRules.EarliestDate);
     private UnsavedChangesTracker? tracker;
     private string CurrentSnapshot() => FormSnapshot.Of(input);
     // "Părăsește editarea": the leave warning closes the form without saving.
@@ -69,7 +74,9 @@
             try
             {
                 var value = input.Validated(true);
-                pendingChanges = SaveSummary.Changed(new("Număr de înmatriculare", Original.PlateNumber, value.PlateNumber), new("Descriere", Original.Description, value.Description));
+                pendingChanges = SaveSummary.Changed(VehicleRules.Changes(Original,
+                    Original with { PlateNumber = value.PlateNumber, Description = value.Description, ItpExpiry = value.ItpExpiry,
+                                    InsuranceExpiry = value.InsuranceExpiry, RovinietaExpiry = value.RovinietaExpiry }));
             }
             catch (VehicleOperationException exception) { error = exception.Message; }
             return;

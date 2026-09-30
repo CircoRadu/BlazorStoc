@@ -84,18 +84,21 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
         // Column geometry is shared with the OCR pickup pipeline (InventoryPdfLayout), which re-crops a scanned
         // copy of this exact PDF at the same positions; keep both in sync instead of duplicating the formula.
         var columns = InventoryPdfLayout.ComputeColumns(page.Width.Point);
+        var numberColumnWidth = columns.NumberColumnWidth;
         var codeColumnWidth = columns.CodeColumnWidth;
         var stockColumnWidth = columns.StockColumnWidth;
         var realColumnWidth = columns.RealColumnWidth;
+        var numberX = columns.NumberX;
         var codeX = columns.CodeX;
         var stockX = columns.StockX;
         var realX = columns.RealX;
 
         // Every cell has all four sides drawn (not just a header rule), so the printed sheet is easy to follow while
-        // counting by hand: vertical dividers between the three columns, plus the row's top and bottom edges.
+        // counting by hand: vertical dividers between the four columns, plus the row's top and bottom edges.
         void DrawRowGrid(double top, double height)
         {
             gfx.DrawRectangle(RulePen, PageMargin, top, contentWidth, height);
+            gfx.DrawLine(RulePen, codeX, top, codeX, top + height);
             gfx.DrawLine(RulePen, stockX, top, stockX, top + height);
             gfx.DrawLine(RulePen, realX, top, realX, top + height);
         }
@@ -104,6 +107,7 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
         {
             EnsureSpace(LineHeight);
             var top = y;
+            gfx.DrawString(InventoryPdfLayout.NumberHeader, NormalFont, BlackBrush, new XRect(numberX + CellPadding, top, numberColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
             gfx.DrawString("Cod produs", NormalFont, BlackBrush, new XRect(codeX + CellPadding, top, codeColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
             gfx.DrawString("Valoare stoc", NormalFont, BlackBrush, new XRect(stockX + CellPadding, top, stockColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
             gfx.DrawString("Valoare reală", NormalFont, BlackBrush, new XRect(realX + CellPadding, top, realColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
@@ -125,14 +129,20 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
                 DrawLine(subcategory.Subcategory, HeadingFont, BlackBrush, HeadingLineHeight);
                 DrawTableHeader();
 
+                // "Nr. crt.": running number of the product inside its subcategory, from 1, restarting for every
+                // subcategory and continuing across a page break. Printed only, never stored (the pickup page shows it
+                // back next to the code, read from the scan, to ease matching the paper against the screen).
+                var rowNumber = 0;
                 foreach (var line in subcategory.Lines)
                 {
+                    rowNumber++;
                     var codeLines = WrapText(gfx, line.Code, NormalFont, codeColumnWidth - 2 * CellPadding);
                     var textHeight = codeLines.Count * LineHeight;
                     var rowHeight = Math.Max(RowHeight, textHeight + 2 * CellPadding);
                     if (EnsureSpace(rowHeight)) DrawTableHeader();
                     var brush = line.IsNegative ? RedBrush : BlackBrush;
                     var top = y;
+                    gfx.DrawString(rowNumber.ToString(CultureInfo.InvariantCulture), NormalFont, brush, new XRect(numberX + CellPadding, top + (rowHeight - LineHeight) / 2, numberColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
                     for (var i = 0; i < codeLines.Count; i++)
                         gfx.DrawString(codeLines[i], NormalFont, brush, new XRect(codeX + CellPadding, top + (rowHeight - textHeight) / 2 + i * LineHeight, codeColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);
                     gfx.DrawString(line.Quantity.ToString(CultureInfo.InvariantCulture), NormalFont, brush, new XRect(stockX + CellPadding, top + (rowHeight - LineHeight) / 2, stockColumnWidth - CellPadding, LineHeight), XStringFormats.TopLeft);

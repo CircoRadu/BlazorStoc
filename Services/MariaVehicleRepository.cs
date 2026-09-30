@@ -22,12 +22,12 @@ public sealed class MariaVehicleRepository(
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
-            SELECT id, plate_number, description, version FROM vehicles ORDER BY plate_number, id
+            SELECT id, plate_number, description, version, itp_expiry, insurance_expiry, rovinieta_expiry FROM vehicles ORDER BY plate_number, id
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<Vehicle>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-            result.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3)));
+            result.Add(ReadVehicle(reader));
         return result;
     }
 
@@ -37,11 +37,11 @@ public sealed class MariaVehicleRepository(
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
-            SELECT id, plate_number, description, version FROM vehicles WHERE id=@id
+            SELECT id, plate_number, description, version, itp_expiry, insurance_expiry, rovinieta_expiry FROM vehicles WHERE id=@id
             """, ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
-            ? new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3)) : null;
+            ? ReadVehicle(reader) : null;
     }
 
     public async Task<Vehicle> CreateAsync(VehicleInput input, CancellationToken cancellationToken = default)
@@ -52,15 +52,17 @@ public sealed class MariaVehicleRepository(
         {
             await EnsureUniqueAsync(connection, transaction, value.PlateNumber, null, cancellationToken).ConfigureAwait(false);
             await using var command = Command(connection, transaction, """
-                INSERT INTO vehicles (plate_number, normalized_plate, description, version) VALUES (@plate, @normalizedPlate, @description, 0)
+                INSERT INTO vehicles (plate_number, normalized_plate, description, version, itp_expiry, insurance_expiry, rovinieta_expiry)
+                VALUES (@plate, @normalizedPlate, @description, 0, @itp, @insurance, @rovinieta)
                 """, ("@plate", value.PlateNumber), ("@normalizedPlate", TextNormalization.UniquenessKey(value.PlateNumber)),
-                ("@description", value.Description));
+                ("@description", value.Description), ("@itp", SqlDate(value.ItpExpiry)), ("@insurance", SqlDate(value.InsuranceExpiry)),
+                ("@rovinieta", SqlDate(value.RovinietaExpiry)));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            return new Vehicle(checked((int)command.LastInsertedId), value.PlateNumber, value.Description);
+            return new Vehicle(checked((int)command.LastInsertedId), value.PlateNumber, value.Description, 0,
+                value.ItpExpiry, value.InsuranceExpiry, value.RovinietaExpiry);
         }, cancellationToken, value.PlateNumber).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Vehicle, vehicle.Id.ToString(),
-            SqliteVehicleRepository.Target(vehicle), AuditDetails.Identification(
-                ("Număr de înmatriculare", vehicle.PlateNumber), ("Descriere", vehicle.Description)), cancellationToken).ConfigureAwait(false);
+            SqliteVehicleRepository.Target(vehicle), VehicleRules.AuditIdentification(vehicle), cancellationToken).ConfigureAwait(false);
         return vehicle;
     }
 
@@ -74,17 +76,20 @@ public sealed class MariaVehicleRepository(
             await EnsureUniqueAsync(connection, transaction, value.PlateNumber, original.Id, cancellationToken).ConfigureAwait(false);
             var version = checked(original.Version + 1);
             await using var command = Command(connection, transaction, """
-                UPDATE vehicles SET plate_number=@plate, normalized_plate=@normalizedPlate, description=@description, version=@version
+                UPDATE vehicles SET plate_number=@plate, normalized_plate=@normalizedPlate, description=@description, version=@version,
+                    itp_expiry=@itp, insurance_expiry=@insurance, rovinieta_expiry=@rovinieta
                 WHERE id=@id AND version=@oldVersion
                 """, ("@plate", value.PlateNumber), ("@normalizedPlate", TextNormalization.UniquenessKey(value.PlateNumber)),
-                ("@description", value.Description), ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version));
+                ("@description", value.Description), ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version),
+                ("@itp", SqlDate(value.ItpExpiry)), ("@insurance", SqlDate(value.InsuranceExpiry)), ("@rovinieta", SqlDate(value.RovinietaExpiry)));
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                 throw new VehicleOperationException(VehicleRules.ConcurrentMessage);
-            return new Vehicle(original.Id, value.PlateNumber, value.Description, version);
+            return new Vehicle(original.Id, value.PlateNumber, value.Description, version,
+                value.ItpExpiry, value.InsuranceExpiry, value.RovinietaExpiry);
         }, cancellationToken, value.PlateNumber, original.Id).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Vehicle, vehicle.Id.ToString(),
             SqliteVehicleRepository.Target(vehicle),
-            [new("Număr de înmatriculare", original.PlateNumber, vehicle.PlateNumber), new("Descriere", original.Description, vehicle.Description)],
+            VehicleRules.Changes(original, vehicle),
             value.Reason, cancellationToken).ConfigureAwait(false);
         return vehicle;
     }
@@ -114,6 +119,12 @@ public sealed class MariaVehicleRepository(
         }, cancellationToken).ConfigureAwait(false);
     }
 
+    private static Vehicle ReadVehicle(MySqlDataReader reader) =>
+        new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3),
+            DateOnly.FromDateTime(reader.GetDateTime(4)), DateOnly.FromDateTime(reader.GetDateTime(5)), DateOnly.FromDateTime(reader.GetDateTime(6)));
+
+    private static object SqlDate(DateOnly? date) => date is { } value ? value.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+
     private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
         string? savedPlate = null, int? savedId = null)
     {
@@ -140,11 +151,11 @@ public sealed class MariaVehicleRepository(
     private static async Task<Vehicle?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT id, plate_number, description, version FROM vehicles WHERE id=@id FOR UPDATE
+            SELECT id, plate_number, description, version, itp_expiry, insurance_expiry, rovinieta_expiry FROM vehicles WHERE id=@id FOR UPDATE
             """, ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         return await reader.ReadAsync(token).ConfigureAwait(false)
-            ? new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetInt64(3)) : null;
+            ? ReadVehicle(reader) : null;
     }
 
     private static async Task EnsureUniqueAsync(MySqlConnection connection, MySqlTransaction transaction, string plate, int? excludedId, CancellationToken token)

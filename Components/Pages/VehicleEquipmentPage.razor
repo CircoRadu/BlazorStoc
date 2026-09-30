@@ -37,7 +37,9 @@ else if (vehicle is not null)
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
 
-    <section class="catalog">
+    <section class="catalog settings-panel">
+        <VehicleTabs VehicleId="Id" Active="@VehicleTabs.EquipmentTab" />
+        <div role="tabpanel" aria-labelledby="vehicle-tab-equipment">
         @if (items.Count == 0)
         {
             <div class="empty-state">
@@ -65,6 +67,7 @@ else if (vehicle is not null)
             </tbody></table></div>
             <div class="table-footer"><span>@(items.Count == 1 ? "1 reper" : $"{items.Count} repere") · @items.Sum(item => item.Quantity) buc.</span></div>
         }
+        </div>
     </section>
 }
 

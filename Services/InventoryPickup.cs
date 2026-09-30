@@ -7,8 +7,10 @@ namespace BlazorStoc.Services;
 // the UI before sending, which is why it travels as plain data here rather than being folded into a computed
 // Difference up front - the page recomputes Difference after every correction (subtask 1.3).
 public sealed record InventoryPickupLine(int? ProductId, string RawCode, string? ProductName, string? Category,
-    string? Subcategory, int? CurrentStock, int? RecognizedValue, bool Uncertain)
+    string? Subcategory, int? CurrentStock, int? RecognizedValue, bool Uncertain, int? Number = null)
 {
+    // Number: the row's printed "Nr. crt." read from the scan - shown before the code to ease matching paper against
+    // screen, never stored.
     public int? Difference => CurrentStock is not null && RecognizedValue is not null ? RecognizedValue - CurrentStock : null;
     public bool FoundInCatalog => ProductId is not null;
 }
@@ -98,12 +100,12 @@ public sealed class InventoryPickupBuilder(IProductRepository products, IStockMo
             var product = InventoryPickupRules.MatchProduct(row.RawCode, allProducts);
             if (product is null)
             {
-                notFound.Add(new InventoryPickupLine(null, row.RawCode, null, null, null, null, row.RecognizedValue, row.Uncertain));
+                notFound.Add(new InventoryPickupLine(null, row.RawCode, null, null, null, null, row.RecognizedValue, row.Uncertain, row.Number));
                 continue;
             }
             var warehouseStock = StockMovementRules.WarehouseStock(product.Quantity, inVehicles.GetValueOrDefault(product.Id));
             var line = new InventoryPickupLine(product.Id, row.RawCode, product.Name, product.Category, product.Subcategory,
-                warehouseStock, row.RecognizedValue, row.Uncertain);
+                warehouseStock, row.RecognizedValue, row.Uncertain, row.Number);
             // Only rows with an actual difference need a decision from the user; an exact, confident match to the
             // current stock has nothing to correct (subtask 1.3). An uncertain read always needs a look, even if
             // the (possibly wrong) recognized value happens to equal the current stock.

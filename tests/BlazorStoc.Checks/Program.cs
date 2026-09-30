@@ -10,6 +10,8 @@ using System.IO.Compression;
 using System.Text.Json;
 
 var data = await new DemoProductRepository().GetProductsAsync();
+DateOnly? TestExpiry = new DateOnly(2027, 3, 15);
+
 void Check(bool condition, string message)
 {
     if (!condition) throw new Exception(message);
@@ -98,6 +100,18 @@ Check(MariaSchemaMigrations.All.Single(m => m.Version == 2).ExpectedColumns.Sele
         new[] { "id", "beneficiary_id", "name", "address", "normalized_address", "phone", "contact_person", "version" }.Order()) &&
       MariaSchemaMigrations.All.Single(m => m.Version == 2).Statements.All(sql => sql.Contains("CREATE TABLE IF NOT EXISTS `beneficiary_work_points`")),
     "MariaDB migration 2 creates the work points table used by MariaWorkPointRepository");
+// Backup/restore scope: every table a schema migration creates must be in MariaArchiveSchema.RequiredTables, otherwise
+// mariadb-dump exports it but the manifest and the canonical row hash silently leave it out (found 30.09.2026 on the
+// real instance: dump had 28 tables, manifest 27, because beneficiary_work_points was missing).
+{
+    var requiredTables = ((string[])typeof(MariaArchiveSchema).GetField("RequiredTables",
+        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!.GetValue(null)!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var migrationTables = MariaSchemaMigrations.All.SelectMany(m => m.Statements)
+        .SelectMany(sql => System.Text.RegularExpressions.Regex.Matches(sql, @"CREATE TABLE IF NOT EXISTS `(\w+)`").Select(match => match.Groups[1].Value))
+        .Distinct().ToList();
+    Check(migrationTables.Count > 0 && migrationTables.All(requiredTables.Contains),
+        $"Every table created by a MariaDB migration is part of the backup/restore table list ({string.Join(", ", migrationTables.Where(t => !requiredTables.Contains(t)))} missing)");
+}
 
 var dumpApp = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Database:User"] = "app", ["Database:Password"] = "p1" }).Build();
 var dumpBackup = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Database:User"] = "app", ["Database:Password"] = "p1", ["Database:BackupUser"] = "bk", ["Database:BackupPassword"] = "p2" }).Build();
@@ -1936,8 +1950,8 @@ finally
         var vsAudit = new SqliteAuditTrail(vsStore);
         var vsProduct = await CreateProductAsync(vsProducts, new ProductInput { Name = "Produs in masini", Category = "Masini", Subcategory = "Test" });
         var otherProduct = await CreateProductAsync(vsProducts, new ProductInput { Name = "Alt produs in masini", Category = "Masini", Subcategory = "Test" });
-        var van = await vsVehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-01-FDG", Description = "Dacia Dokker" });
-        var truck = await vsVehicles.CreateAsync(new VehicleInput { PlateNumber = "B-123-ABC", Description = "Autoutilitara" });
+        var van = await vsVehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "HD-01-FDG", Description = "Dacia Dokker" });
+        var truck = await vsVehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "B-123-ABC", Description = "Autoutilitara" });
         var xBeneficiary = await vsBeneficiaries.CreateAsync(LegalInput("Beneficiar masini", "RO17777771"));
         var allMovements = new StockMovementQuery(null, false, 1, 0);
         StockMovementInput InputOf(StockMovementKind kind, int quantity, ExitDestination? destination = null, int? vehicleId = null, int? sourceId = null,
@@ -2049,7 +2063,7 @@ finally
         }
 
         // Two sessions cannot use the same pieces of a vehicle twice.
-        var concurrentVehicle = await vsVehicles.CreateAsync(new VehicleInput { PlateNumber = "CJ-77-XYZ", Description = "Masina concurenta" });
+        var concurrentVehicle = await vsVehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "CJ-77-XYZ", Description = "Masina concurenta" });
         await vsMovements.CreateAsync(otherProduct.Id, InputOf(StockMovementKind.Entry, 10));
         await vsMovements.CreateAsync(otherProduct.Id, InputOf(StockMovementKind.Exit, 4, ExitDestination.Vehicle, vehicleId: concurrentVehicle.Id));
         var raced = await Task.WhenAll(Enumerable.Range(0, 4).Select(async index =>
@@ -2120,8 +2134,8 @@ finally
         var pgAll = new StockMovementQuery(null, false, 1, 0);
         var productB = await CreateProductAsync(pgProducts, new ProductInput { Name = "B produs vehicul", Category = "Pagina", Subcategory = "Test" });
         var productA = await CreateProductAsync(pgProducts, new ProductInput { Name = "a produs vehicul", Category = "Pagina", Subcategory = "Test" });
-        var carOne = await pgVehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-01-FDG", Description = "Prima masina" });
-        var carTwo = await pgVehicles.CreateAsync(new VehicleInput { PlateNumber = "B-123-ABC", Description = "A doua masina" });
+        var carOne = await pgVehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "HD-01-FDG", Description = "Prima masina" });
+        var carTwo = await pgVehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "B-123-ABC", Description = "A doua masina" });
         StockMovementInput Entry(int quantity) => new() { Kind = StockMovementKind.Entry, Quantity = quantity, Description = "Test", Date = new DateOnly(2026, 9, 24) };
         StockMovementInput ToVehicle(int quantity, int vehicleId) => new()
             { Kind = StockMovementKind.Exit, Quantity = quantity, Description = "Completare", Date = new DateOnly(2026, 9, 24), Destination = ExitDestination.Vehicle, VehicleId = vehicleId };
@@ -2879,18 +2893,18 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
         }
         Check((await vehicles.GetVehiclesAsync()).Count == 0, "A new database has no vehicles");
 
-        var dokker = await vehicles.CreateAsync(new VehicleInput { PlateNumber = " hd 01 fdg ", Description = "  Dacia   Dokker albă " });
+        var dokker = await vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = " hd 01 fdg ", Description = "  Dacia   Dokker albă " });
         Check(dokker.PlateNumber == "HD-01-FDG" && dokker.Description == "Dacia Dokker alba" && dokker.Version == 0 && dokker.Id > 0,
             "A vehicle is saved with the canonical number, a trimmed description without diacritics and version 0");
-        var bucharest = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "B-123-ABC", Description = "Autoutilitara Bucuresti" });
+        var bucharest = await vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "B-123-ABC", Description = "Autoutilitara Bucuresti" });
         Check((await vehicles.GetVehiclesAsync()).Select(vehicle => vehicle.PlateNumber).SequenceEqual(["B-123-ABC", "HD-01-FDG"]),
             "Vehicles are listed alphabetically by registration number");
 
-        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "", Description = "Fara numar" }), "A missing registration number is rejected");
-        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-1-FDG", Description = "Numar gresit" }), "An invalid registration number is rejected");
-        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-02-FDG", Description = "   " }), "A missing description is rejected");
-        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-02-FDG", Description = new string('a', 101) }), "An oversize description is rejected");
-        try { await vehicles.CreateAsync(new VehicleInput { PlateNumber = "hd01fdg", Description = "Duplicat" }); throw new Exception("Duplicate number accepted"); }
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "", Description = "Fara numar" }), "A missing registration number is rejected");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "HD-1-FDG", Description = "Numar gresit" }), "An invalid registration number is rejected");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "HD-02-FDG", Description = "   " }), "A missing description is rejected");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "HD-02-FDG", Description = new string('a', 101) }), "An oversize description is rejected");
+        try { await vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "hd01fdg", Description = "Duplicat" }); throw new Exception("Duplicate number accepted"); }
         catch (VehicleOperationException exception)
         {
             Check(exception.Message == VehicleRules.DuplicatePlateMessage("HD-01-FDG", "Dacia Dokker alba"),
@@ -2922,10 +2936,25 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
             "A vehicle edit journals the changed fields (before → after), the reason and the vehicle as target");
         Check(AuditNavigation.TargetUrl(editEvent) == $"/vehicule/{dokker.Id}", "The journal links a vehicle event to its page");
 
+        // Expiry dates (ITP, insurance, road tax): required, stored as given (future dates allowed), journaled, editable.
+        Check(dokker.ItpExpiry == TestExpiry && dokker.InsuranceExpiry == TestExpiry && dokker.RovinietaExpiry == TestExpiry &&
+              (await vehicles.GetAsync(dokker.Id))! is { } storedDokker && storedDokker.ItpExpiry == TestExpiry && storedDokker.RovinietaExpiry == TestExpiry,
+            "A new vehicle stores the three expiry dates");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-02-FDG", Description = "Fara ITP", InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry }), "A vehicle without the ITP date is rejected");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-02-FDG", Description = "Fara asigurare", ItpExpiry = TestExpiry, RovinietaExpiry = TestExpiry }), "A vehicle without the insurance date is rejected");
+        await VehicleRejected(() => vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-02-FDG", Description = "Fara rovinieta", ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry }), "A vehicle without the road tax date is rejected");
+        var expiryEdit = VehicleInput.From(keptNumber); expiryEdit.ItpExpiry = new DateOnly(2028, 5, 1); expiryEdit.Reason = "Test automat";
+        var expiryEdited = await vehicles.UpdateAsync(keptNumber, expiryEdit);
+        Check(expiryEdited.ItpExpiry == new DateOnly(2028, 5, 1) && expiryEdited.InsuranceExpiry == TestExpiry, "An expiry date can be changed without touching the others");
+        var expiryEvent = (await vehicleAudit.GetEventsAsync()).Where(entry => entry.EntityType == AuditEntities.Vehicle && entry.Action == AuditActions.Edit)
+            .OrderByDescending(entry => entry.TimestampUtc).First();
+        Check(expiryEvent.Details == "Expirare ITP: 15.03.2027 → 01.05.2028", "The journal shows an expiry date change as dd.mm.yyyy");
+        keptNumber = expiryEdited;
+
         // Concurrent creations of the same number: exactly one succeeds.
         var racing = await Task.WhenAll(Enumerable.Range(0, 4).Select(async index =>
         {
-            try { await new SqliteVehicleRepository(vehicleStore, vehicleAccess).CreateAsync(new VehicleInput { PlateNumber = "CJ-77-XYZ", Description = "Sesiune " + index }); return true; }
+            try { await new SqliteVehicleRepository(vehicleStore, vehicleAccess).CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "CJ-77-XYZ", Description = "Sesiune " + index }); return true; }
             catch (Exception exception) when (exception is VehicleOperationException or Microsoft.Data.Sqlite.SqliteException) { return false; }
         }));
         Check(racing.Count(created => created) == 1 && (await vehicles.GetVehiclesAsync()).Count(vehicle => vehicle.PlateNumber == "CJ-77-XYZ") == 1,
@@ -2946,13 +2975,13 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
                 """, ("@id", keptNumber.Id), ("@delete", AuditActions.Delete));
             await using var reader = await archived.ExecuteReaderAsync();
             Check(await reader.ReadAsync() && reader.GetString(0) == "HD-01-FDG" && reader.GetString(1) == "Dacia Dokker gri inchis" &&
-                  reader.GetInt64(2) == 2 && reader.GetString(3) == "Vehiculul nu va mai fi folosit" && reader.GetString(4) == "operator.vehicule" &&
+                  reader.GetInt64(2) == 3 && reader.GetString(3) == "Vehiculul nu va mai fi folosit" && reader.GetString(4) == "operator.vehicule" &&
                   reader.GetInt32(5) == 1,
                 "Deleting a vehicle archives its data with the reason and the operator and writes the journal event in the same operation");
         }
         Check((await vehicleAudit.GetEventsAsync()).Count == eventsBeforeDelete + 1, "A deletion writes exactly one journal event");
         await VehicleRejected(() => vehicles.DeleteAsync(keptNumber, "Motiv"), "A repeated deletion is rejected");
-        var reused = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "HD-01-FDG", Description = "Alt vehicul" });
+        var reused = await vehicles.CreateAsync(new VehicleInput { ItpExpiry = TestExpiry, InsuranceExpiry = TestExpiry, RovinietaExpiry = TestExpiry, PlateNumber = "HD-01-FDG", Description = "Alt vehicul" });
         Check(reused.Id != keptNumber.Id, "The number of an archived vehicle can be registered again");
         VehicleRules.CheckDelete(false);
         try { VehicleRules.CheckDelete(true); throw new Exception("Deleting a vehicle with movements accepted"); }
@@ -3088,8 +3117,8 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
             "The first page has the title and the local generation moment in the dd.MM.yyyy HH:mm form");
         Check(pageText.Contains("Scule electrice") && pageText.Contains("Găurire") && pageText.Contains("Consumabile") && pageText.Contains("Fixare"),
             "The selected category and subcategory names appear on the page");
-        Check(pageText.Contains("Cod produs") && pageText.Contains("Valoare stoc") && pageText.Contains("Valoare reală"),
-            "The table header has the three required columns");
+        Check(pageText.Contains("Nr. crt.") && pageText.Contains("Cod produs") && pageText.Contains("Valoare stoc") && pageText.Contains("Valoare reală"),
+            "The table header has the four required columns (Nr. crt., Cod produs, Valoare stoc, Valoare reală)");
         Check(pageText.Contains("Șurub"), "A product code with Romanian diacritics is extracted correctly from the embedded font");
         var fontNames = PdfTextExtractor.FontBaseNames(pdfDocument.Pages[0]);
         var fontUsage = PdfTextExtractor.FontUsage(pdfDocument.Pages[0]);
@@ -3247,6 +3276,102 @@ InventoryPickupScanResult pickupScan;
     Check(rotatedScan.Rows.Count == 10, $"A visibly rotated real scan is still read as a table after deskewing (10 rows expected, got {rotatedScan.Rows.Count})");
     Check(rotatedScan.Rows.Any(row => TextNormalization.SameUniqueValue(row.RawCode, "Masina de gaurit cu acumulator") && row.RecognizedValue == 11),
         "A row from the rotated scan still reads its handwritten value correctly after deskewing");
+
+    // A real Konica Minolta scan (30.09.2026): the table's left border sat ~88 px right of the computed position,
+    // outside the former 3% calibration radius, so the dividers were derived from the wrong edge and the single
+    // row was rejected ("Nu a fost gasit niciun tabel"). CalibrateColumns now searches 8% of the page width.
+    await using var shiftedFixtureStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "inventar-proba-decalata.pdf"));
+    var shiftedScan = await ocrService.ScanAsync(shiftedFixtureStream);
+    Check(shiftedScan.Rows.Count == 1 && shiftedScan.Rows[0].RecognizedValue == 50 && !shiftedScan.Rows[0].Uncertain,
+        $"A scan whose table is shifted several millimetres from the computed position is still read (1 row = 50 expected, got {shiftedScan.Rows.Count})");
+    Check(shiftedScan.Rows[0].Number is null, "A form printed before the \"Nr. crt.\" column existed is still read, without a running number");
+
+    // The first real scan of the form WITH the "Nr. crt." column (30.09.2026, Konica Minolta, pencil-like faint ink,
+    // about -1.5 degrees of skew): two tables, running numbers 1,2 then 1 again, and a handwritten "10" whose thin "1"
+    // the plain read loses (it reads 1) - only the contrast-stretched re-read recovers it.
+    await using var numberedFixtureStream = File.OpenRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "inventar-proba-nr-crt.pdf"));
+    var numberedScan = await ocrService.ScanAsync(numberedFixtureStream);
+    Check(numberedScan.Rows.Select(row => row.Number).SequenceEqual(new int?[] { 1, 2, 1 }),
+        $"A real scan of the numbered form restarts the running number for the second subcategory (got {string.Join(",", numberedScan.Rows.Select(row => row.Number?.ToString() ?? "?"))})");
+    Check(numberedScan.Rows.Select(row => row.RecognizedValue).SequenceEqual(new int?[] { 2, 10, 7 }) && numberedScan.Rows.All(row => !row.Uncertain),
+        $"A real faint, slightly rotated scan is read correctly, including a thin handwritten \"10\" (got {string.Join(",", numberedScan.Rows.Select(row => row.RecognizedValue?.ToString() ?? "?"))})");
+
+    // Forms with the "Nr. crt." column, end to end: the writer's PDF is rasterised, "handwriting" is painted into every
+    // row's "Valoare reala" cell (black pen, graphite pencil, and a washed-out scan), put back into a PDF and read by
+    // the OCR. The running number restarts at 1 for every subcategory and is only display data (never stored).
+    {
+        var numberedReport = new InventoryReport(DateTime.UtcNow,
+            [new InventoryCategorySection("Categorie test", [
+                new InventorySubcategorySection("Prima subcategorie", [new("Produs alfa", 3), new("Produs beta", 4), new("Produs gama", 5)]),
+                new InventorySubcategorySection("A doua subcategorie", [new("Produs delta", 6), new("Produs epsilon", 7)])])],
+            1, 2, 5, 0);
+        var formPdf = new InventoryPdfWriter().Write(numberedReport, new DateTime(2026, 9, 30, 9, 0, 0));
+
+        byte[] HandwriteAndRescan(byte[] pdf, int inkGray, int thickness, double washOut)
+        {
+            using var source = new MemoryStream(pdf);
+            var bitmaps = PDFtoImage.Conversion.ToImages(source, options: new PDFtoImage.RenderOptions(Dpi: 300, Grayscale: true)).ToList();
+            using var bitmap = bitmaps[0];
+            using var gray8 = bitmap.ColorType == SkiaSharp.SKColorType.Gray8 ? null : bitmap.Copy(SkiaSharp.SKColorType.Gray8);
+            var pixels = gray8 ?? bitmap;
+            using var raw = OpenCvSharp.Mat.FromPixelData(pixels.Height, pixels.Width, OpenCvSharp.MatType.CV_8UC1, pixels.GetPixels(), (long)pixels.RowBytes);
+            using var image = raw.Clone();
+            var scale = 300 / 72.0;
+            var columns = InventoryPdfLayout.ComputeColumns(image.Cols / scale);
+            int left = (int)(columns.NumberX * scale), right = (int)(columns.RightEdge * scale);
+
+            // Horizontal rules of the rendered form (dark rows across the table width), then the data rows between them.
+            var lineRows = new List<int>();
+            for (var y = 0; y < image.Rows; y++)
+            {
+                using var strip = image.SubMat(y, y + 1, left, right);
+                using var dark = strip.LessThan(128).ToMat();
+                if (OpenCvSharp.Cv2.CountNonZero(dark) > (right - left) * 0.6) lineRows.Add(y);
+            }
+            var lines = new List<int>();
+            foreach (var y in lineRows) if (lines.Count == 0 || y - lines[^1] > 3) lines.Add(y);
+            var dataRows = 0;
+            for (var i = 0; i + 1 < lines.Count; i++)
+            {
+                var top = lines[i];
+                var height = lines[i + 1] - top;
+                if (height < 120 || height > 170) continue; // data rows are 34 pt (about 142 px); header rows and gaps are not
+                var text = (10 + dataRows).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var size = OpenCvSharp.Cv2.GetTextSize(text, OpenCvSharp.HersheyFonts.HersheySimplex, 2.6, thickness, out var baseline);
+                var cellLeft = (int)(columns.RealX * scale);
+                var origin = new OpenCvSharp.Point(cellLeft + ((right - cellLeft) - size.Width) / 2, top + (height + size.Height) / 2);
+                OpenCvSharp.Cv2.PutText(image, text, origin, OpenCvSharp.HersheyFonts.HersheySimplex, 2.6, new OpenCvSharp.Scalar(inkGray), thickness, OpenCvSharp.LineTypes.AntiAlias);
+                dataRows++;
+            }
+            // Washed-out scan: every ink level pulled towards white (out = 255 - (255 - in) * washOut).
+            if (washOut < 1.0) image.ConvertTo(image, OpenCvSharp.MatType.CV_8UC1, washOut, 255 * (1 - washOut));
+
+            using var document = new PdfSharp.Pdf.PdfDocument();
+            var page = document.AddPage();
+            page.Size = PdfSharp.PageSize.A4;
+            using (var graphics = PdfSharp.Drawing.XGraphics.FromPdfPage(page))
+            using (var png = new MemoryStream(image.ImEncode(".png")))
+            using (var xImage = PdfSharp.Drawing.XImage.FromStream(png))
+                graphics.DrawImage(xImage, 0, 0, page.Width.Point, page.Height.Point);
+            using var output = new MemoryStream();
+            document.Save(output, false);
+            return output.ToArray();
+        }
+
+        foreach (var (label, inkGray, thickness, washOut) in new[] { ("black pen", 0, 6, 1.0), ("graphite pencil", 150, 2, 1.0), ("washed-out scan", 0, 6, 0.4) })
+        {
+            using var formStream = new MemoryStream(HandwriteAndRescan(formPdf, inkGray, thickness, washOut));
+            InventoryPickupScanResult scanned;
+            try { scanned = await ocrService.ScanAsync(formStream); }
+            catch (InventoryPickupOcrException exception) { Check(false, $"A form with the \"Nr. crt.\" column ({label}) is read ({exception.Message})"); continue; }
+            Check(scanned.Rows.Count == 5 && TextNormalization.SameUniqueValue(scanned.Rows[0].RawCode, "Produs alfa"),
+                $"A form with the \"Nr. crt.\" column ({label}) is read: 5 rows expected, got {scanned.Rows.Count}");
+            Check(scanned.Rows.Select(row => row.Number).SequenceEqual(new int?[] { 1, 2, 3, 1, 2 }),
+                $"The running number restarts at 1 for each subcategory ({label}): got {string.Join(",", scanned.Rows.Select(row => row.Number?.ToString() ?? "?"))}");
+            Check(scanned.Rows.Select(row => row.RecognizedValue).SequenceEqual(new int?[] { 10, 11, 12, 13, 14 }),
+                $"The handwritten values are read ({label}): got {string.Join(",", scanned.Rows.Select(row => row.RecognizedValue?.ToString() ?? "?"))}");
+        }
+    }
 
     // A single PDF can have a different skew on every page (each page was fed through the scanner separately, or
     // a multi-page situatia de inventar was assembled from several individual scans). FindSkewDegrees/Rotate must

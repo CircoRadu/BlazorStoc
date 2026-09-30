@@ -97,6 +97,23 @@ else if (loadError is null)
     </div>
 }
 
+@if (showPreview)
+{
+    <div class="delete-overlay" @onkeydown="PreviewKeyDownAsync">
+        <section class="delete-dialog pdf-preview-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="pdf-preview-title">
+            <h2 id="pdf-preview-title">Situația de inventar</h2>
+            <p class="muted">@previewFileName</p>
+            <iframe class="pdf-preview-frame" @ref="previewFrame" title="Previzualizare situație de inventar"></iframe>
+            @if (previewError is not null) { <div class="validation-message" role="alert">@previewError</div> }
+            <div class="editor-actions">
+                <button type="button" class="primary" @onclick="PrintPreviewAsync">Imprimă</button>
+                <button type="button" class="refresh" @onclick="SavePreviewAsync">Salvează</button>
+                <button type="button" class="danger" @onclick="ClosePreviewAsync">Închide</button>
+            </div>
+        </section>
+    </div>
+}
+
 @code {
     private IReadOnlyList<ProductGroup> groups = Array.Empty<ProductGroup>();
     private IReadOnlyList<Product> products = Array.Empty<Product>();
@@ -106,7 +123,14 @@ else if (loadError is null)
     private ElementReference selectAllCheckboxRef;
     private bool loading, generating, indeterminateDirty;
     private string? loadError, error, notice;
-    private IJSObjectReference? indeterminateModule, downloadModule;
+    private IJSObjectReference? indeterminateModule, previewModule;
+    // The generated file is shown in a dialog with print / save. It is never stored on the server: the bytes are held
+    // here only until they have been handed to the browser (OnAfterRenderAsync), then dropped; saving and printing work
+    // on the browser's copy, which is released when the dialog closes.
+    private bool showPreview, previewLoadPending;
+    private byte[]? previewBytes;
+    private string? previewFileName, previewError;
+    private ElementReference previewFrame;
     private readonly CancellationTokenSource lifetime = new();
 
     private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
@@ -209,7 +233,11 @@ else if (loadError is null)
             var fileName = InventoryRules.FileName(generatedLocal);
             try { await LogGenerationAsync(request, report, fileName); }
             catch (Exception exception) { Logger.LogError("Inventory audit logging failed ({ErrorType}).", exception.GetType().Name); }
-            await DownloadAsync(fileName, bytes);
+            previewBytes = bytes;
+            previewFileName = fileName;
+            previewError = null;
+            previewLoadPending = true;
+            showPreview = true;
             notice = "Situația de inventar a fost generată.";
         }
         catch (InventoryOperationException exception) { error = exception.Message; }
@@ -230,16 +258,77 @@ else if (loadError is null)
         return AuditRecorder.RecordGenerateAsync(AuditTrail, Access, AuditEntities.Inventory, "Situație de inventar", details, lifetime.Token);
     }
 
-    private async Task DownloadAsync(string fileName, byte[] bytes)
+    private async Task SavePreviewAsync()
     {
-        using var stream = new MemoryStream(bytes);
-        using var streamRef = new DotNetStreamReference(stream, leaveOpen: true);
-        downloadModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./inventory-download.js");
-        await downloadModule.InvokeVoidAsync("downloadFileFromStream", lifetime.Token, fileName, streamRef);
+        if (previewFileName is null || previewModule is null) return;
+        previewError = null;
+        try
+        {
+            if (!await previewModule.InvokeAsync<bool>("savePdf", lifetime.Token, previewFileName))
+                previewError = "Fișierul nu a putut fi salvat.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (JSDisconnectedException) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Inventory PDF save failed ({ErrorType}).", exception.GetType().Name);
+            previewError = "Fișierul nu a putut fi salvat.";
+        }
     }
+
+    private async Task PrintPreviewAsync()
+    {
+        previewError = null;
+        try
+        {
+            previewModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./inventory-pdf-preview.js");
+            if (!await previewModule.InvokeAsync<bool>("printPdf", lifetime.Token, previewFrame))
+                previewError = "Imprimarea nu a putut fi pornită. Salvează fișierul și tipărește-l din vizualizatorul PDF.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (JSDisconnectedException) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Inventory PDF print failed ({ErrorType}).", exception.GetType().Name);
+            previewError = "Imprimarea nu a putut fi pornită.";
+        }
+    }
+
+    private async Task ClosePreviewAsync()
+    {
+        showPreview = false;
+        previewLoadPending = false;
+        previewBytes = null;
+        previewError = null;
+        try { if (previewModule is not null) await previewModule.InvokeVoidAsync("release", lifetime.Token, previewFrame); }
+        catch (Exception exception) when (exception is OperationCanceledException or JSDisconnectedException or InvalidOperationException) { }
+    }
+
+    private Task PreviewKeyDownAsync(KeyboardEventArgs e) => e.Key == "Escape" ? ClosePreviewAsync() : Task.CompletedTask;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (previewLoadPending && showPreview && previewBytes is not null)
+        {
+            previewLoadPending = false;
+            try
+            {
+                previewModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./inventory-pdf-preview.js");
+                using var stream = new MemoryStream(previewBytes, writable: false);
+                using var streamRef = new DotNetStreamReference(stream, leaveOpen: true);
+                await previewModule.InvokeVoidAsync("showPdf", lifetime.Token, previewFrame, streamRef);
+                previewBytes = null; // delivered to the browser: no copy of the generated file stays on the server
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+            catch (JSDisconnectedException) { }
+            catch (Exception exception)
+            {
+                Logger.LogError("Inventory PDF preview failed ({ErrorType}).", exception.GetType().Name);
+                previewBytes = null;
+                previewError = "Previzualizarea nu a putut fi afișată. Închide fereastra și generează din nou situația.";
+                StateHasChanged();
+            }
+        }
         if (!indeterminateDirty && !firstRender) return;
         if (Categories.Count == 0) return;
         try
@@ -262,7 +351,12 @@ else if (loadError is null)
     {
         lifetime.Cancel();
         if (indeterminateModule is not null) try { await indeterminateModule.DisposeAsync(); } catch (JSDisconnectedException) { }
-        if (downloadModule is not null) try { await downloadModule.DisposeAsync(); } catch (JSDisconnectedException) { }
+        previewBytes = null;
+        if (previewModule is not null)
+        {
+            try { await previewModule.InvokeVoidAsync("release", null); } catch (Exception exception) when (exception is JSDisconnectedException or InvalidOperationException) { }
+            try { await previewModule.DisposeAsync(); } catch (JSDisconnectedException) { }
+        }
         lifetime.Dispose();
     }
 }

@@ -353,3 +353,6 @@
 .searchable-select-list li.searchable-select-empty { color:var(--muted); cursor:default; }
 .searchable-select-list li.searchable-select-empty:hover { background:none; }
 .relation-row .add-related { white-space:nowrap; }
+
+.vehicle-tabs a.settings-tab { display:inline-block; text-decoration:none; }
+.pdf-preview-dialog{width:min(960px,96vw);max-width:none;height:min(92vh,1000px);display:flex;flex-direction:column;gap:6px;box-sizing:border-box;padding:22px 26px}.pdf-preview-dialog h2,.pdf-preview-dialog p{margin:0}.pdf-preview-frame{flex:1;min-height:0;width:100%;border:1px solid var(--line);border-radius:6px;background:#fff}

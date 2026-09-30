@@ -53,7 +53,17 @@ public static class MariaSchemaMigrations
             ("beneficiary_work_points", "id"), ("beneficiary_work_points", "beneficiary_id"), ("beneficiary_work_points", "name"),
             ("beneficiary_work_points", "address"), ("beneficiary_work_points", "normalized_address"),
             ("beneficiary_work_points", "phone"), ("beneficiary_work_points", "contact_person"), ("beneficiary_work_points", "version")
-        ])
+        ]),
+        new(3, "Vehicule: date de expirare ITP, asigurare si rovinieta (vehiculele existente primesc date din anul urmator)",
+        [
+            """
+            ALTER TABLE `vehicles`
+                ADD COLUMN IF NOT EXISTS `itp_expiry` DATE NOT NULL DEFAULT '2027-03-15' AFTER `version`,
+                ADD COLUMN IF NOT EXISTS `insurance_expiry` DATE NOT NULL DEFAULT '2027-06-30' AFTER `itp_expiry`,
+                ADD COLUMN IF NOT EXISTS `rovinieta_expiry` DATE NOT NULL DEFAULT '2027-09-30' AFTER `insurance_expiry`
+            """
+        ],
+        [("vehicles", "itp_expiry"), ("vehicles", "insurance_expiry"), ("vehicles", "rovinieta_expiry")])
     ];
 }
 

@@ -16,7 +16,9 @@ public static class MariaArchiveSchema
     // Internal, not private: Subtask 2.2 (Task 2) reuses this exact table list as the scope of the canonical
     // row-hash comparison run around the mariadb-dump export (CanonicalRowHasher), so both checks always agree on
     // what "the whole live database" means.
-    internal static readonly string[] RequiredTables =
+    // The tables of the migrated base database. Only these are checked at startup: that check runs BEFORE the schema
+    // migrations, so a table a migration creates must not be required there.
+    private static readonly string[] BaselineTables =
     [
         "app_metadata", "audit_events", "archive_operations", "archive_beneficiaries", "archive_files",
         "archive_products", "archive_project_observation_files", "archive_project_observations", "archive_projects",
@@ -25,6 +27,13 @@ public static class MariaArchiveSchema
         "project_observation_files", "product_images", "product_locks", "stock_movements", "stock_movement_history",
         "vehicles", "web_users", "change_events"
     ];
+
+    // Tables created by schema migrations (MariaSchemaMigrations). Until 30.09.2026 "beneficiary_work_points" (migration 2)
+    // was missing from the list used by backup/restore, so backups exported it in dump.sql but left it out of the
+    // manifest and of the canonical row hash. Add every future migration-created table here.
+    private static readonly string[] MigratedTables = ["beneficiary_work_points"];
+
+    internal static readonly string[] RequiredTables = [.. BaselineTables, .. MigratedTables];
 
     public static async Task InitializeAsync(IConfiguration configuration, CancellationToken cancellationToken = default)
     {
@@ -35,7 +44,7 @@ public static class MariaArchiveSchema
         var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) present.Add(reader.GetString(0));
-        var missing = RequiredTables.Where(table => !present.Contains(table)).ToArray();
+        var missing = BaselineTables.Where(table => !present.Contains(table)).ToArray();
         if (missing.Length > 0)
             throw new InvalidOperationException(
                 $"Baza MariaDB configurata nu are tabelele asteptate ({string.Join(", ", missing)}). " +
