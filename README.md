@@ -1,5 +1,7 @@
 # BlazorStoc 0.3
 
+**Calculator nou?** Instalarea si configurarea mediului de dezvoltare (.NET 9, MariaDB local, conturi, schema, preview) este descrisa in [`docs/SETUP_DEZVOLTARE.md`](docs/SETUP_DEZVOLTARE.md): `git clone`, apoi `.\tools\setup-dev-environment.ps1` si `.\tools\start-preview.ps1`.
+
 ## Colaborare Codex–Claude
 
 Dezvoltarea folosește cicluri strict secvențiale Codex–Claude: agentul activ modifică proiectul, verifică, documentează, face commit și se oprește înainte ca celălalt agent să preia lucrul. Protocolul complet este în [`docs/SEQUENTIAL_COLLABORATION.md`](docs/SEQUENTIAL_COLLABORATION.md), iar starea curentă este în [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md).

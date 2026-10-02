@@ -6,6 +6,8 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
 >
 > **Actualizare 29 septembrie 2026 (prevaleaza asupra sectiunii "Inainte de predare" de mai jos):** Claude nu mai face commit automat la finalul fiecarui task/ciclu. Dupa implementare, verificari si actualizarea documentatiei (`docs/PROJECT_STATE.md`, `TODO.md`/`IMPLEMENTED.md`, `docs/TESTE_RAMASE.md`, `VALIDARE.md`), Claude se opreste cu modificarile necomise si asteapta o cerere explicita a utilizatorului inainte de a rula `agent-cycle.ps1 finish` sau orice alt `git commit`. Lucrul continua normal intre task-uri fara commit intre ele (working tree-ul poate ramane cu modificari necomise de la un task la altul); verificarea "working tree curat" de la pasul 3 din "Inainte de orice modificare" se relaxeaza in mod corespunzator (modificari proprii, necomise, ale sesiunii curente/anterioare de Claude nu blocheaza inceperea unui task nou, insa nu se sterg si nu se suprascriu fara sa fie intelese intai). Commitul, cand e cerut, poate acoperi mai multe task-uri deodata.
 
+> **Calculator nou sau mediu lipsa (02 octombrie 2026):** daca .NET 9, MariaDB-ul local sau fisierele `local-secrets/*.private.json` lipsesc, nu improviza: urmeaza `docs/SETUP_DEZVOLTARE.md` (scripturile `tools/setup-dev-environment.ps1`, `tools/dev-mariadb.ps1`, `tools/start-preview.ps1`). Parolele generate raman in `local-secrets/` si nu se afiseaza, nu se comit si nu se trimit in chat.
+
 ## Înainte de orice modificare
 
 1. Citește `docs/SEQUENTIAL_COLLABORATION.md`, `docs/PROJECT_STATE.md`, `TODO.md` și ultimele intrări din `docs/AGENT_CHANGELOG.md`.
