@@ -225,6 +225,74 @@ public static class InvoiceChecks
             "Invoice vocabulary: the lines that end a table (totals, payment instructions) are told from product names that start alike");
         var (words, meaning) = InvoiceVocabulary.MatchFieldLabelPrefix(InvoiceVocabulary.Tokens("Data scadenta 2026-11-21"));
         check(words == 2 && meaning == InvoiceFieldMeanings.DueDate, "Invoice vocabulary: the longest label wins (Data scadenta is the due date, not the date)");
+        // The header fields are grouped by party: the same label means the supplier's or the buyer's attribute by the heading it stands under.
+        check(InvoiceVocabulary.ResolveFieldMeaning("@address", InvoiceVocabulary.BuyerSection) == "buyer.address" &&
+              InvoiceVocabulary.ResolveFieldMeaning("@phone", InvoiceVocabulary.SupplierSection) == "supplier.phone" &&
+              InvoiceVocabulary.ResolveFieldMeaning("@address", null) == "" && InvoiceVocabulary.ResolveFieldMeaning(InvoiceFieldMeanings.Total, "supplier") == InvoiceFieldMeanings.Total &&
+              InvoiceVocabulary.FieldMeanings.Any(item => item.Key == "buyer.registry") && InvoiceVocabulary.FieldMeanings.Any(item => item.Key == "supplier.iban"),
+            "Invoice vocabulary: a party attribute (address, phone, bank...) belongs to the supplier or to the buyer by its heading; invoice-level labels do not");
+        check(InvoiceVocabulary.MatchSectionLead("Furnizor: SC TELESYSTEM SRL") == InvoiceVocabulary.SupplierSection &&
+              InvoiceVocabulary.MatchSectionLead("Cumparator: ELECTRIC STANDARD PREST SRL") == InvoiceVocabulary.BuyerSection && InvoiceVocabulary.MatchSectionLead("Furnizor:") is null &&
+              InvoiceVocabulary.MatchSectionLead("Total: 10") is null,
+            "Invoice vocabulary: a heading followed by the party's name on the same line (Furnizor: SC ... SRL) opens its section");
+        // A table drawn with ruled lines: its columns are the boxes between the vertical rules and its rows the boxes between the horizontal
+        // ones, so a scan that misreads the running numbers ("]" for 1) and splits a heading ("N r.") still reads right.
+        InvoiceWord Word(string text, double x, double y, int order) => new(1, text, x, y, Math.Max(4, text.Length * 4.0), 8, order);
+        var ruledWords = new List<InvoiceWord>
+        {
+            Word("N r.", 45, 100, 0), Word("Denumire produs", 100, 100, 1), Word("U.M.", 305, 100, 2), Word("Cant.", 350, 100, 3), Word("Pret unitar", 410, 100, 4), Word("Valoare", 480, 100, 5),
+            Word("]", 50, 122, 6), Word("Switch", 100, 122, 7), Word("Buc", 305, 122, 8), Word("2", 355, 122, 9), Word("10.00", 420, 122, 10), Word("20.00", 490, 122, 11),
+            Word("2", 50, 142, 12), Word("Cablu", 100, 142, 13), Word("Buc", 305, 142, 14), Word("3", 355, 142, 15), Word("5.00", 425, 142, 16), Word("15.00", 490, 142, 17),
+            Word("3", 50, 162, 18), Word("Router", 100, 162, 19), Word("Buc", 305, 162, 20), Word("1", 355, 162, 21), Word("30.00", 420, 162, 22), Word("30.00", 490, 162, 23),
+            Word("TOTAL", 100, 182, 24), Word("65.00", 490, 182, 25)
+        };
+        var ruledRules = new List<InvoiceRule>();
+        foreach (var y in new[] { 95.0, 115, 135, 155, 175, 195 }) ruledRules.Add(new InvoiceRule(false, y, 40, 540));
+        foreach (var x in new[] { 40.0, 70, 300, 340, 400, 470, 540 }) ruledRules.Add(new InvoiceRule(true, x, 95, 195));
+        var ruledDocument = new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Ocr, ruledWords, ruledRules)]);
+        var (ruledTable, _) = InvoiceTableReader.Detect(ruledDocument, '.');
+        var ruledName = ruledTable?.Columns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Name);
+        var ruledValue = ruledTable?.Columns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Value);
+        check(ruledTable is not null && ruledName is not null && ruledValue is not null && ruledTable.Rows.Count == 3 &&
+              ruledTable.Rows.Select(row => row.Cells[ruledName.Id]).SequenceEqual(["Switch", "Cablu", "Router"]) &&
+              ruledTable.Rows.Select(row => row.Cells[ruledValue.Id]).SequenceEqual(["20.00", "15.00", "30.00"]) &&
+              ruledTable.Columns.Any(column => column.Meaning == InvoiceColumnMeanings.Index && Math.Abs(column.Left - 40) < 1 && Math.Abs(column.Right - 70) < 1),
+            "Invoice tables: with ruled lines the columns are the boxes between the vertical rules and the rows those between the horizontal ones (garbled running numbers, split headings and the totals box do not matter)");
+        check(InvoiceTableReader.Detect(new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Ocr, ruledWords)]), '.').Table is not null,
+            "Invoice tables: the same page without rules is still read from the spacing of its words (the rules are a hint, never required)");
+        check(!InvoiceVocabulary.IsExtraPartyAttribute("supplier.name") && !InvoiceVocabulary.IsExtraPartyAttribute("buyer.cui") && InvoiceVocabulary.IsExtraPartyAttribute("buyer.address") &&
+              !InvoiceVocabulary.IsExtraPartyAttribute(InvoiceFieldMeanings.Total),
+            "Invoice vocabulary: name, tax code and registry number are imported by default, the other party attributes only when ticked");
+        var descriptionDraft = new InvoiceTemplateDraft
+        {
+            Fields = [new DraftField { Id = "f1", Meaning = InvoiceFieldMeanings.InvoiceNumber, Name = "Număr factură", Use = true, Page = 1, Width = 10, Height = 5 },
+                      new DraftField { Id = "f2", Name = "Observație", Use = false, Page = 1, Width = 10, Height = 5 }],
+            Columns = [new DraftColumn { Id = "c1", Label = "Denumire", Meaning = InvoiceColumnMeanings.Name, Use = true }, new DraftColumn { Id = "c2", Label = "Cod", Meaning = InvoiceColumnMeanings.Code, Use = true }],
+            HasTable = true, ProductDescription = "<Cod produs> - <denumire> (factura <numar factura>)"
+        };
+        var descriptionLabels = InvoiceProductDescription.Labels(descriptionDraft).Select(item => item.Label).ToList();
+        check(descriptionLabels[0] == InvoiceProductDescription.ProductCodeLabel && descriptionLabels.Contains("Număr factură") && !descriptionLabels.Contains("Observație") && descriptionLabels.Count(label => label == InvoiceProductDescription.ProductCodeLabel) == 1,
+            "Product description: the labels offered are the product code (always, once) and the labels used in the template");
+        check(InvoiceProductDescription.Render(descriptionDraft.ProductDescription, label => InvoiceValues.Normalize(label) switch { "cod produs" => "GS-1", "denumire" => "Router", "numar factura" => "640", _ => null }) == "GS-1 - Router (factura 640)" &&
+              InvoiceProductDescription.Render("<nimic> ok", _ => null) == "<nimic> ok" && InvoiceProductDescription.UnknownMarks("<Cod produs> <Observație> <x>", descriptionLabels).SequenceEqual(["Observație", "x"]),
+            "Product description: marks are replaced by their values (case and diacritics ignored), unknown marks are left and reported");
+        check(descriptionDraft.Problems().Any(problem => problem.Contains("<denumire>", StringComparison.Ordinal)) == false && new InvoiceTemplateDraft { Fields = descriptionDraft.Fields, ProductDescription = "<Observație>" }.Problems().Any(problem => problem.Contains("<Observație>", StringComparison.Ordinal)),
+            "Product description: a mark that is not an active label of the template is a problem that blocks saving");
+    }
+
+    // How concentrated the ink of a picture is in rows when it is turned by the given angle (highest when the text lines are horizontal).
+    private static double InkRowVariance(OpenCvSharp.Mat gray, double degrees)
+    {
+        using var binary = new OpenCvSharp.Mat();
+        OpenCvSharp.Cv2.Threshold(gray, binary, 0, 255, OpenCvSharp.ThresholdTypes.BinaryInv | OpenCvSharp.ThresholdTypes.Otsu);
+        using var matrix = OpenCvSharp.Cv2.GetRotationMatrix2D(new OpenCvSharp.Point2f(binary.Cols / 2f, binary.Rows / 2f), degrees, 1.0);
+        using var rotated = new OpenCvSharp.Mat();
+        OpenCvSharp.Cv2.WarpAffine(binary, rotated, matrix, binary.Size());
+        using var rows = new OpenCvSharp.Mat();
+        OpenCvSharp.Cv2.Reduce(rotated, rows, OpenCvSharp.ReduceDimension.Column, OpenCvSharp.ReduceTypes.Sum, OpenCvSharp.MatType.CV_32S);
+        rows.GetArray(out int[] sums);
+        var mean = sums.Average();
+        return sums.Average(value => (value - mean) * (double)(value - mean));
     }
 
     // ---- scans: the same invoice as a picture, read with OCR ----
@@ -237,8 +305,12 @@ public static class InvoiceChecks
         {
             ("straight scan", InvoiceFixtures.Scan(source.Pdf)),
             ("tilted scan (1.4 degrees)", InvoiceFixtures.Scan(source.Pdf, skewDegrees: 1.4)),
+            ("tilted scan (3.5 degrees)", InvoiceFixtures.Scan(source.Pdf, skewDegrees: 3.5)),
             ("scan turned 90 degrees", InvoiceFixtures.Scan(source.Pdf, rotation: 90)),
-            ("scan upside down", InvoiceFixtures.Scan(source.Pdf, rotation: 180))
+            ("scan upside down", InvoiceFixtures.Scan(source.Pdf, rotation: 180)),
+            ("pale scan (ink at 22%)", InvoiceFixtures.Scan(source.Pdf, inkStrength: 0.22)),
+            ("blurry scan (out of focus)", InvoiceFixtures.Scan(source.Pdf, blurSigma: 1.8)),
+            ("scan at 600 dpi", InvoiceFixtures.Scan(source.Pdf, dpi: 600))
         };
         foreach (var (name, pdf) in variants)
         {
@@ -256,6 +328,14 @@ public static class InvoiceChecks
                 $"Invoice scan ({name}): the table is found and the rows are read ({valueOk} of {english.Count} values exact, {rows.Count} rows)");
             check(field(analysis, InvoiceFieldMeanings.InvoiceNumber).Contains("4471", StringComparison.Ordinal) && field(analysis, InvoiceFieldMeanings.Currency).Contains("EUR", StringComparison.Ordinal),
                 $"Invoice scan ({name}): the invoice number and currency are read from the picture");
+            // The picture shown under the elements is the straightened scan: its text lines are the most concentrated at 0 degrees.
+            if (name.StartsWith("tilted", StringComparison.Ordinal))
+            {
+                using var picture = OpenCvSharp.Cv2.ImDecode(read.PagePreviews[0], OpenCvSharp.ImreadModes.Grayscale);
+                var straight = InkRowVariance(picture, 0);
+                check(!picture.Empty() && straight >= InkRowVariance(picture, -1.0) && straight >= InkRowVariance(picture, 1.0) && straight >= InkRowVariance(picture, 0.5) * 0.98 && straight >= InkRowVariance(picture, -0.5) * 0.98,
+                    $"Invoice scan ({name}): the picture shown to the user is rotated so that its lines are horizontal and vertical");
+            }
         }
 
         // Romanian text with diacritics is read with the Romanian data (ron + eng together).
@@ -286,10 +366,11 @@ public static class InvoiceChecks
             var read = await reader.ReadAsync(stream);
             loaded.Add((Path.GetFileName(file), read.Document, InvoiceAnalyzer.Analyze(read.Document)));
         }
-        foreach (var (name, _, analysis) in loaded)
+        foreach (var (name, document, analysis) in loaded)
         {
             var table = analysis.Table;
-            var hint = '.';
+            // The decimal separator is the one the invoice itself uses ("3.149,16" is Romanian style, "2,328.64" English style).
+            var hint = InvoiceValues.DecimalStyle(document.AllWords.Select(word => word.Text));
             var value = table?.Columns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Value);
             var sum = table is null || value is null ? 0 : table.Rows.Sum(row => InvoiceValues.ParseNumber(row.Cells[value.Id], hint) ?? 0);
             var totalNet = InvoiceValues.ParseNumber(analysis.Fields.FirstOrDefault(field => field.Meaning == InvoiceFieldMeanings.TotalNet)?.Value, hint);
@@ -299,7 +380,9 @@ public static class InvoiceChecks
         }
         var failures = new List<string>();
         foreach (var source in loaded)
-            foreach (var destination in loaded.Where(item => item.Name != source.Name))
+            // A template belongs to a kind of file (the text of a PDF, or the recognised words of a scan): a supplier has one template for
+            // each, so a template is tried on files of its own kind.
+            foreach (var destination in loaded.Where(item => item.Name != source.Name && item.Analysis.Source == source.Analysis.Source))
             {
                 var definition = InvoiceTemplateJson.Deserialize(InvoiceTemplateJson.Serialize(InvoiceTemplateDraft.FromAnalysis(source.Analysis).ToDefinition(source.Document)));
                 var extraction = InvoiceTemplateEngine.Apply(definition, destination.Document);
@@ -347,7 +430,13 @@ public static class InvoiceChecks
     {
         private readonly List<InvoiceTemplateRecord> records = [];
         private readonly Dictionary<int, List<InvoiceTemplateVersionInfo>> versions = [];
+        private readonly Dictionary<int, InvoiceTemplateModel> models = [];
         private int nextId = 1;
+        public Task<InvoiceTemplateModel?> GetModelAsync(int id, CancellationToken cancellationToken = default) => Task.FromResult(models.GetValueOrDefault(id));
+        private void KeepModel(int id, int version, InvoiceTemplateInput clean, string actor)
+        {
+            if (clean.ModelContent is { Length: > 0 } content) models[id] = new InvoiceTemplateModel(clean.ModelFileName, content, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(content)).ToLowerInvariant(), version, actor, DateTime.UtcNow);
+        }
         public Task<IReadOnlyList<InvoiceTemplateInfo>> ListAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<InvoiceTemplateInfo>>(records.Select(item => item.Info).ToList());
         public Task<InvoiceTemplateRecord?> GetAsync(int id, CancellationToken cancellationToken = default) => Task.FromResult(records.FirstOrDefault(item => item.Info.Id == id));
         public Task<IReadOnlyList<InvoiceTemplateRecord>> GetAllAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<InvoiceTemplateRecord>>(records.ToList());
@@ -359,6 +448,7 @@ public static class InvoiceChecks
             var record = new InvoiceTemplateRecord(new InvoiceTemplateInfo(nextId++, clean.Name, clean.SupplierName, clean.SupplierCui, clean.Definition!.SourceKind, 1, 0, actor, DateTime.UtcNow, actor, DateTime.UtcNow), clean.Definition);
             records.Add(record);
             versions[record.Info.Id] = [new InvoiceTemplateVersionInfo(1, clean.Note, actor, DateTime.UtcNow)];
+            KeepModel(record.Info.Id, 1, clean, actor);
             return Task.FromResult(record);
         }
         public Task<InvoiceTemplateRecord> SaveNewVersionAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, string actor, CancellationToken cancellationToken = default)
@@ -369,6 +459,7 @@ public static class InvoiceChecks
             var info = original with { Name = clean.Name, SupplierName = clean.SupplierName, SupplierCui = clean.SupplierCui, VersionNumber = original.VersionNumber + 1, Version = original.Version + 1, UpdatedBy = actor };
             records[index] = new InvoiceTemplateRecord(info, clean.Definition!);
             versions[original.Id].Add(new InvoiceTemplateVersionInfo(info.VersionNumber, clean.Note, actor, DateTime.UtcNow));
+            KeepModel(original.Id, info.VersionNumber, clean, actor);
             return Task.FromResult(records[index]);
         }
         public Task<InvoiceTemplateInfo> UpdateDetailsAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, string actor, CancellationToken cancellationToken = default)
@@ -419,6 +510,26 @@ public static class InvoiceChecks
             "Invoice template service: an empty name, a name over 120 characters and an empty definition are refused");
         check(await Throws<AccessDeniedException>(() => limited.CreateAsync(new InvoiceTemplateInput { Name = "X", Definition = SampleDefinition() })) &&
               await Throws<AccessDeniedException>(() => limited.DeleteAsync(created.Info, "motiv")), "Invoice template service: only an administrator changes templates");
+
+        // The template is tied to the supplier (name and tax id) and keeps the invoice it was made from.
+        check(await Throws<InvoiceTemplateOperationException>(() => admin.CreateAsync(new InvoiceTemplateInput { Name = "Fără furnizor", SupplierCui = "12345678", Definition = SampleDefinition() })) &&
+              await Throws<InvoiceTemplateOperationException>(() => admin.CreateAsync(new InvoiceTemplateInput { Name = "Fără CUI", SupplierName = "Delta SRL", Definition = SampleDefinition() })) &&
+              await Throws<InvoiceTemplateOperationException>(() => admin.CreateAsync(new InvoiceTemplateInput { Name = "CUI greșit", SupplierName = "Delta SRL", SupplierCui = "J40/1/2020", Definition = SampleDefinition() })),
+            "Invoice template service: a template without the supplier's name or a valid tax id is refused (it is tied to the supplier)");
+        var firstPdf = new byte[] { 0x25, 0x50, 0x44, 0x46, 1, 2, 3 };
+        var withModel = await admin.CreateAsync(new InvoiceTemplateInput { Name = "Model", SupplierName = "Model SRL", SupplierCui = "RO 777001", ModelFileName = "factura-1.pdf", ModelContent = firstPdf, Definition = SampleDefinition() });
+        var storedModel = await admin.GetModelAsync(withModel.Info.Id);
+        check(storedModel is not null && storedModel.FileName == "factura-1.pdf" && storedModel.Content.SequenceEqual(firstPdf) && storedModel.VersionNumber == 1 && trail.Entries.Last().Details.Contains("factura-1.pdf", StringComparison.Ordinal),
+            "Invoice template service: the invoice used as model is saved with the template and named in the journal");
+        var secondPdf = new byte[] { 0x25, 0x50, 0x44, 0x46, 9, 9 };
+        var newModel = await admin.SaveNewVersionAsync(withModel.Info, new InvoiceTemplateInput { Name = "Model", SupplierName = "Model SRL", SupplierCui = "777001", ModelFileName = "factura-noua.pdf", ModelContent = secondPdf, Definition = SampleDefinition() });
+        var replaced = await admin.GetModelAsync(withModel.Info.Id);
+        check(replaced is not null && replaced.FileName == "factura-noua.pdf" && replaced.VersionNumber == 2 && trail.Entries.Last().Details.Contains("Factură model: factura-1.pdf → factura-noua.pdf", StringComparison.Ordinal),
+            "Invoice template service: a new PDF uploaded while editing replaces the model, and the journal shows the change");
+        await admin.SaveNewVersionAsync(newModel.Info, new InvoiceTemplateInput { Name = "Model", SupplierName = "Model SRL", SupplierCui = "777001", Definition = SampleDefinition() });
+        check((await admin.GetModelAsync(withModel.Info.Id))?.FileName == "factura-noua.pdf", "Invoice template service: a version saved without a new file keeps the model");
+        check(await Throws<InvoiceTemplateOperationException>(() => admin.CreateAsync(new InvoiceTemplateInput { Name = "Mare", SupplierName = "Mare SRL", SupplierCui = "888001", ModelContent = new byte[InvoiceTemplateRules.MaxModelBytes + 1], Definition = SampleDefinition() })),
+            "Invoice template service: a model over 15 MB is refused");
 
         var saved = await admin.SaveNewVersionAsync(created.Info, new InvoiceTemplateInput { Name = "Delta PDF v2", SupplierName = "Delta SRL", SupplierCui = "12345678", Note = "a doua", Definition = SampleDefinition() });
         check(saved.Info.VersionNumber == 2 && (await admin.GetVersionsAsync(created.Info.Id)).Select(item => item.VersionNumber).SequenceEqual([2, 1]) && trail.Entries.Last() is { Action: var versionAction, Details: var versionDetails } &&

@@ -143,8 +143,21 @@ public static partial class InvoiceValues
     public static string NormalizeCui(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
+        text = text.Trim().TrimEnd(',', ';', '.', ' ');
         var match = CuiShape().Match(text);
+        if (!match.Success) match = CuiShape().Match(RepairOcrDigits(text));
         return match.Success ? match.Groups[1].Value.TrimStart('0') is { Length: >= 2 } digits ? digits : "" : "";
+    }
+
+    // A tax code read by OCR may carry a letter where a digit is ("RO2Z2460883"): in a code that is otherwise digits, the look-alike letters
+    // are read as the digits they resemble. Text that is not mostly digits is left alone.
+    private static string RepairOcrDigits(string text)
+    {
+        var prefix = text.StartsWith("RO", StringComparison.OrdinalIgnoreCase) ? 2 : 0;
+        var body = text[prefix..].Trim();
+        if (body.Length is < 6 or > 12 || body.Count(char.IsAsciiDigit) * 10 < body.Length * 7) return text;
+        var repaired = body.Select(letter => letter switch { 'Z' or 'z' => '2', 'O' or 'o' => '0', 'I' or 'l' or '|' => '1', 'S' => '5', 'B' => '8', _ => letter });
+        return text[..prefix] + new string(repaired.ToArray());
     }
 
     // The kind of value a text is, to pick how it is shown and validated.

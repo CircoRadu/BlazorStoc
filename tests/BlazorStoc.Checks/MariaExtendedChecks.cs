@@ -68,9 +68,11 @@ public static class MariaExtendedChecks
         var started = DateTime.UtcNow.AddSeconds(-1);
         try
         {
-            var first = await service.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon {suffix}", SupplierName = $"Furnizor {suffix}", SupplierCui = "RO" + cui, Note = "prima", Definition = InvoiceDefinition() });
+            var first = await service.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon {suffix}", SupplierName = $"Furnizor {suffix}", SupplierCui = "RO" + cui, ModelFileName = "model.pdf", ModelContent = [1, 2, 3, 4, 250], Note = "prima", Definition = InvoiceDefinition() });
             Check(first.Info.Id > 0 && first.Info.SupplierCui == cui && first.Info.VersionNumber == 1 && first.Info.CreatedBy == "integration.tester", "A template is saved with its supplier's tax id reduced to digits and the actor");
             var loaded = await store.GetAsync(first.Info.Id);
+            var model = await store.GetModelAsync(first.Info.Id);
+            Check(model is not null && model.FileName == "model.pdf" && model.Content.SequenceEqual(new byte[] { 1, 2, 3, 4, 250 }) && model.Sha256.Length == 64, "The invoice used as model is stored with the template (binary content unchanged)");
             Check(loaded is not null && loaded.Definition.Fields[0].LabelText == "Nr. factura" && loaded.Definition.Fields[0].Mode == InvoiceFieldModes.Right && loaded.Definition.Table!.NameCodeSeparator == ";" &&
                   loaded.Definition.Anchors.Count == 1 && loaded.Info.UpdatedUtc.Kind == DateTimeKind.Utc, "The definition (with diacritics, label anchors, table) is stored and read back unchanged");
             await Rejects<InvoiceTemplateOperationException>(() => service.CreateAsync(new InvoiceTemplateInput { Name = $"SABLON {suffix}", SupplierName = "x", SupplierCui = cui, Definition = InvoiceDefinition() }), "The same name for the same supplier is refused (also in another letter case)");
@@ -93,7 +95,7 @@ public static class MariaExtendedChecks
             Check(events.Contains(AuditActions.CreateInvoiceTemplate) && events.Contains(AuditActions.EditInvoiceTemplate) && events.Contains(AuditActions.EditInvoiceTemplateDetails), "Each operation is in the journal under its own exact action");
 
             await service.DeleteAsync(renamed, "Motiv de test");
-            Check(await store.GetAsync(first.Info.Id) is null && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM invoice_template_versions WHERE template_id=@id", ("@id", first.Info.Id)) == 0, "Deleting a template removes its versions with it");
+            Check(await store.GetAsync(first.Info.Id) is null && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM invoice_template_versions WHERE template_id=@id", ("@id", first.Info.Id)) == 0 && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM invoice_template_models WHERE template_id=@id", ("@id", first.Info.Id)) == 0, "Deleting a template removes its versions with it");
             var deleted = (await audit.GetEventsAsync()).FirstOrDefault(item => item.TimestampUtc >= started && item.Action == AuditActions.DeleteInvoiceTemplate && item.EntityId == first.Info.Id.ToString());
             Check(deleted is not null && deleted.Motif == "Motiv de test" && deleted.Details.Contains("Versiuni salvate: 2", StringComparison.Ordinal), "The deletion is journaled with its reason");
             var createdEvent = (await audit.GetEventsAsync()).First(item => item.TimestampUtc >= started && item.Action == AuditActions.CreateInvoiceTemplate && item.EntityId == first.Info.Id.ToString());

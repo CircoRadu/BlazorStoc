@@ -8,13 +8,38 @@ public sealed record InvoiceMeaningInfo(string Key, string Title);
 // letters or more) when the label word starts with it ("pretul" ~ "pret", "cantitatea" ~ "cantitate").
 public static class InvoiceVocabulary
 {
+    // What an invoice says about each of its two parties. The same attributes exist for the supplier ("supplier.<key>") and the buyer
+    // ("buyer.<key>"); the label dictionary gives the attribute ("@<key>"), the heading the label stands under gives the party.
+    private static readonly (string Key, string Title, string[] Phrases)[] PartyAttributes =
+    [
+        ("name", "denumire", ["nume", "denumire", "denumirea", "firma", "societate", "company name", "name"]),
+        ("cui", "CUI / cod TVA", ["cui", "cif", "cod fiscal", "cod de identificare fiscala", "identificatorul tva", "identificator tva", "identificator", "identificat", "nr tva",
+            "cod tva", "vat id", "vat no", "vat number", "tax id", "c i f", "c u i", "nr identificare fiscala"]),
+        ("registry", "nr. înregistrare", ["nr inregistrare", "nr reg com", "nr registrul comertului", "reg com", "reg comertului", "registrul comertului", "registration no", "company no", "j"]),
+        ("address", "adresa", ["strada", "adresa", "adresa sediu", "adresa sediu social", "sediu social", "sediul", "sediu", "address", "street", "anschrift"]),
+        ("city", "localitatea", ["oras", "localitate", "city", "stadt"]),
+        ("region", "județul / regiunea", ["judet", "regiune", "regiun", "county", "state", "region"]),
+        ("country", "țara", ["tara", "country", "land"]),
+        ("postalCode", "cod poștal", ["cod postal", "cod", "postal code", "zip", "zip code", "plz"]),
+        ("contact", "persoana de contact", ["persoana de contact", "contact", "contact person", "ansprechpartner"]),
+        ("phone", "telefon", ["telefon", "tel", "phone", "telephone", "telefonnummer"]),
+        ("email", "e-mail", ["email", "e mail", "adresa electronica", "mail"]),
+        ("bank", "banca", ["banca", "bank"]),
+        ("iban", "cont IBAN", ["iban", "cont", "cont iban", "cont bancar", "nr cont de plata", "bank account"])
+    ];
+
+    // Name, tax code and registry number identify a party and are imported by default; the rest of what is said about a party (address,
+    // phone, bank...) is recognised and grouped, but only imported when the user ticks it (it varies too much from one invoice to the next).
+    public static bool IsExtraPartyAttribute(string meaning)
+    {
+        var dot = meaning.IndexOf('.');
+        return dot > 0 && meaning[..dot] is SupplierSection or BuyerSection && meaning[(dot + 1)..] is not ("name" or "cui" or "registry");
+    }
+
     public static readonly IReadOnlyList<InvoiceMeaningInfo> FieldMeanings =
     [
-        new(InvoiceFieldMeanings.SupplierName, "Furnizor — denumire"),
-        new(InvoiceFieldMeanings.SupplierCui, "Furnizor — CUI / cod TVA"),
-        new(InvoiceFieldMeanings.SupplierRegistry, "Furnizor — nr. înregistrare"),
-        new(InvoiceFieldMeanings.BuyerName, "Client — denumire"),
-        new(InvoiceFieldMeanings.BuyerCui, "Client — CUI / cod TVA"),
+        .. PartyAttributes.Select(attribute => new InvoiceMeaningInfo(SupplierSection + "." + attribute.Key, "Furnizor — " + attribute.Title)),
+        .. PartyAttributes.Select(attribute => new InvoiceMeaningInfo(BuyerSection + "." + attribute.Key, "Beneficiar — " + attribute.Title)),
         new(InvoiceFieldMeanings.InvoiceNumber, "Număr factură"),
         new(InvoiceFieldMeanings.InvoiceDate, "Data emiterii"),
         new(InvoiceFieldMeanings.DueDate, "Data scadenței"),
@@ -133,35 +158,27 @@ public static class InvoiceVocabulary
         return true;
     }
 
-    public const string NameLabel = "@name";
-    public const string CuiLabel = "@cui";
-    public const string RegistryLabel = "@registry";
-
-    // Labels of the fields outside the table. A Meaning starting with "@" depends on the section (supplier / buyer).
+    // Labels of the fields outside the table. A Meaning starting with "@" is a party attribute: it depends on the section (supplier / buyer).
     private static readonly (string Meaning, string[] Phrases)[] FieldPhrases =
     [
-        (NameLabel, ["nume", "denumire", "denumirea", "firma", "societate", "company name", "name"]),
-        (CuiLabel, ["cui", "cif", "cod fiscal", "cod de identificare fiscala", "identificatorul tva", "identificator tva", "identificator", "identificat", "nr tva",
-            "cod tva", "vat id", "vat no", "vat number", "tax id", "c i f", "c u i", "nr identificare fiscala"]),
-        (RegistryLabel, ["nr inregistrare", "nr reg com", "nr registrul comertului", "reg com", "registrul comertului", "registration no", "company no", "j"]),
-        (InvoiceFieldMeanings.InvoiceNumber, ["nr factura", "numar factura", "factura nr", "factura numar", "factura seria si numarul", "seria si numarul", "nr document",
+        .. PartyAttributes.Select(attribute => ("@" + attribute.Key, attribute.Phrases)),
+        (InvoiceFieldMeanings.InvoiceNumber, ["nr factura", "numar factura", "factura nr", "factura numar", "factura seria si numarul", "seria si numarul", "seria", "nr document",
             "numar document", "invoice no", "invoice number", "invoice nr", "rechnungsnummer", "factura", "invoice", "nr factura fiscala"]),
         (InvoiceFieldMeanings.InvoiceDate, ["data emitere", "data emiterii", "data factura", "data facturii", "data emiterii facturii", "invoice date", "issue date",
             "rechnungsdatum", "data", "date"]),
         (InvoiceFieldMeanings.DueDate, ["data scadenta", "data scadentei", "scadenta", "scadent la", "due date", "payment due", "faelligkeit", "termen de plata data"]),
         (InvoiceFieldMeanings.Currency, ["moneda facturii", "moneda", "valuta", "currency", "wahrung"]),
         (InvoiceFieldMeanings.TotalNet, ["total fara tva", "valoare totala fara tva", "total net", "baza de calcul", "subtotal", "total valoare fara tva", "sub total",
-            "net total", "total excl vat", "valoare fara tva", "total baza"]),
+            "net total", "total excl vat", "valoare fara tva", "total baza", "total ron", "total lei"]),
         (InvoiceFieldMeanings.TotalVat, ["total tva", "valoare tva", "tva total", "total taxe", "vat total", "total vat"]),
         (InvoiceFieldMeanings.Total, ["total plata", "total de plata", "total general", "valoare totala cu tva", "total cu tva", "de plata", "total factura", "grand total",
             "amount due", "total amount", "suma de plata", "total de achitat", "valoare totala", "total incl vat", "gesamtbetrag"]),
         (InvoiceFieldMeanings.OrderNumber, ["nr comanda", "numar comanda", "comanda", "order no", "order number", "purchase order", "bestellnummer"]),
         // Recognised labels without a meaning of their own: they keep the values next to them from being taken for labels.
-        ("", ["strada", "oras", "localitate", "judet", "regiune", "regiun", "tara", "cod postal", "cod", "adresa", "adresa electronica", "telefon", "tel", "fax", "email",
-            "e mail", "banca", "iban", "cont", "nr cont de plata", "capital social", "persoana de contact", "informatii juridice", "data de exigibilitate",
-            "moneda contabilizare", "codul tipului", "termeni de plata", "termen de plata", "reprezentant", "delegat", "sediul", "sediu", "adresa livrare",
+        ("", ["fax", "capital social", "informatii juridice", "data de exigibilitate",
+            "moneda contabilizare", "codul tipului", "termeni de plata", "termen de plata", "reprezentant", "delegat", "adresa livrare",
             "referinta avizului de expeditie", "numele contului de plata", "nota", "observatii", "cota tva", "total deduceri", "total taxe suplimentare",
-            "suma platita", "valoare de rotunjire", "total plata", "nume", "pagina"])
+            "suma platita", "valoare de rotunjire", "total plata", "pagina"])
     ];
 
     // Headings of the two sides of an invoice; the labels under them belong to the supplier or to the buyer.
@@ -187,6 +204,17 @@ public static class InvoiceVocabulary
         return null;
     }
 
+    // A run that opens with a party word and a colon and goes on with the party's name ("Furnizor: SC TELESYSTEM SRL"): the heading and
+    // the name are on the same line. The section it opens, or null.
+    public static string? MatchSectionLead(string? text)
+    {
+        var trimmed = (text ?? "").TrimStart();
+        var colon = trimmed.IndexOf(':');
+        if (colon <= 0 || colon == trimmed.Length - 1) return null;
+        var lead = MatchSection(trimmed[..colon]);
+        return lead is not null && Tokens(trimmed[..colon]).Length == 1 ? lead : null;
+    }
+
     // Longest label phrase at the start of the tokens: (number of words it covers, meaning) - or (0, null) when the text does not
     // start with a known label. Longer phrases win, so "data scadenta" is not read as the label "data".
     public static (int Words, string? Meaning) MatchFieldLabelPrefix(string[] tokens)
@@ -205,14 +233,10 @@ public static class InvoiceVocabulary
     }
 
     // The meaning a label has in a section ("@name" in the supplier section is the supplier's name).
-    public static string ResolveFieldMeaning(string? labelMeaning, string? section) => labelMeaning switch
-    {
-        null or "" => "",
-        NameLabel => section == SupplierSection ? InvoiceFieldMeanings.SupplierName : section == BuyerSection ? InvoiceFieldMeanings.BuyerName : "",
-        CuiLabel => section == SupplierSection ? InvoiceFieldMeanings.SupplierCui : section == BuyerSection ? InvoiceFieldMeanings.BuyerCui : "",
-        RegistryLabel => section == SupplierSection ? InvoiceFieldMeanings.SupplierRegistry : "",
-        _ => labelMeaning
-    };
+    public static string ResolveFieldMeaning(string? labelMeaning, string? section) =>
+        string.IsNullOrEmpty(labelMeaning) ? ""
+        : labelMeaning[0] == '@' ? (section is SupplierSection or BuyerSection ? section + "." + labelMeaning[1..] : "")
+        : labelMeaning;
 
     // Words that begin the lines under the table (totals, payment instructions, notes): the table ends before them.
     private static readonly string[] FooterPhrases =

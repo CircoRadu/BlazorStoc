@@ -46,7 +46,7 @@ public static class InvoiceTableReader
             // Longer bands win a tie: the second line of a header ("articolului", "facturata") must not be left to the body.
             for (var length = 1; length <= band.Count; length++)
             {
-                var candidate = Evaluate(page.Number, band.Take(length).ToList());
+                var candidate = Evaluate(page.Number, band.Take(length).ToList(), page.Rules);
                 if (candidate is null || candidate.Score < minScore) continue;
                 if (best is null || candidate.Score >= best.Score) best = candidate;
             }
@@ -62,9 +62,9 @@ public static class InvoiceTableReader
         return numeric * 10 >= segments.Count * 3;
     }
 
-    internal static HeaderBand? Evaluate(int page, IReadOnlyList<TextLine> lines)
+    internal static HeaderBand? Evaluate(int page, IReadOnlyList<TextLine> lines, IReadOnlyList<InvoiceRule>? rules = null)
     {
-        var cells = BuildCells(lines);
+        var cells = (rules is { Count: > 0 } ? BuildRuledCells(lines, rules) : null) ?? BuildCells(lines);
         if (cells.Count < 3) return null;
         var meanings = cells.Where(cell => cell.Meaning.Length > 0 && cell.Meaning != InvoiceColumnMeanings.Ignore).Select(cell => cell.Meaning).Distinct().ToList();
         var hasIdentity = meanings.Contains(InvoiceColumnMeanings.Name) || meanings.Contains(InvoiceColumnMeanings.Code);
@@ -73,6 +73,41 @@ public static class InvoiceTableReader
         var score = meanings.Sum(InvoiceVocabulary.ColumnWeight) + 0.05 * cells.Count;
         var words = lines.SelectMany(line => line.Words).ToList();
         return new HeaderBand(page, cells, words.Min(word => word.Y), words.Max(word => word.Bottom), score);
+    }
+
+    // The header cells when the table is drawn with ruled lines: the vertical rules that cross the header are the borders of its cells, so a
+    // cell is every word between two of them, on however many lines ("NR." + "CRT.", "CANTI-" + "TATEA."). Null when the rules do not
+    // frame at least three cells with words (the header is then built from the spacing of the words).
+    internal static List<HeaderCell>? BuildRuledCells(IReadOnlyList<TextLine> lines, IReadOnlyList<InvoiceRule> rules)
+    {
+        var words = lines.SelectMany(line => line.Words).ToList();
+        if (words.Count == 0) return null;
+        var top = words.Min(word => word.Y);
+        var bottom = words.Max(word => word.Bottom);
+        var borders = new List<double>();
+        foreach (var rule in rules.Where(rule => rule.Vertical && rule.From <= top + 4 && rule.To >= bottom - 4).OrderBy(rule => rule.Position))
+            if (borders.Count == 0 || rule.Position - borders[^1] > 3) borders.Add(rule.Position);
+        // The rules must frame the whole header: a few borders found among the faint ones of a worn scan say nothing about its other columns.
+        if (borders.Count < 4 || borders[0] > words.Min(word => word.X) + 6 || borders[^1] < words.Max(word => word.Right) - 6) return null;
+        var cells = new List<HeaderCell>();
+        for (var index = 0; index + 1 < borders.Count; index++)
+        {
+            var inside = words.Where(word => word.CenterX >= borders[index] && word.CenterX < borders[index + 1]).ToList();
+            if (inside.Count == 0) continue;
+            var label = "";
+            foreach (var line in inside.GroupBy(word => lines.ToList().FindIndex(item => item.Words.Contains(word))).OrderBy(group => group.Key))
+            {
+                var text = string.Join(' ', line.OrderBy(word => word.X).Select(word => word.Text));
+                // A word broken at the end of a line ("CANTI-" / "TATEA.") is one word.
+                label = label.EndsWith('-') ? label[..^1] + text : label.Length == 0 ? text : label + " " + text;
+            }
+            var (meaning, score) = InvoiceVocabulary.MatchColumn(label);
+            // OCR sometimes splits a bold heading into letters ("N r."): the cell also reads with its spaces closed up.
+            var (closedMeaning, closedScore) = InvoiceVocabulary.MatchColumn(label.Replace(" ", ""));
+            if (closedScore > score) { meaning = closedMeaning; score = closedScore; }
+            cells.Add(new HeaderCell(label, borders[index], borders[index + 1], inside.Min(word => word.Y), inside.Max(word => word.Bottom), meaning, score));
+        }
+        return cells.Count >= 3 ? cells : null;
     }
 
     internal static List<HeaderCell> BuildCells(IReadOnlyList<TextLine> lines)
@@ -282,6 +317,16 @@ public static class InvoiceTableReader
                 read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, split, useIndex: false);
             if (best is null || read.Score > best.Score + 0.001) best = read;
         }
+        // A table drawn with horizontal rules: each box between two rules is a row, whatever the running numbers say (a scan reads a "1" as
+        // "]"). Kept only when its rows pass the arithmetic checks better than the strategies above.
+        if (forcedSplit is null && RuledBands(document, columns, headerPage, headerBottom) is { Count: >= 2 } ruled)
+        {
+            var read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, InvoiceRowSplit.Top, useIndex: false, ruled);
+            // The rules are the table's own drawing of its rows: they win unless they give more rows with problems than the other reading
+            // (the score cannot decide: it counts rows, and a reading that mistakes the row of column numbers for goods has one more).
+            var flagged = (InvoiceTableRead item) => item.Rows.Count(row => row.Flags.Count > 0);
+            if (read.Rows.Count >= 2 && read.Rows.Count <= best!.Rows.Count + 1 && flagged(read) <= flagged(best)) best = read;
+        }
         // Rows that still fail the arithmetic may have a column that sits at another height than its row: read it by order instead.
         if (best!.Rows.Any(row => row.Flags.Contains(ArithmeticFlag)))
             foreach (var meaning in new[] { InvoiceColumnMeanings.Quantity, InvoiceColumnMeanings.UnitPrice, InvoiceColumnMeanings.Value })
@@ -296,15 +341,39 @@ public static class InvoiceTableReader
         return best;
     }
 
+    // The boxes between the horizontal rules of the table under the header (page points, top to bottom), or null when the page has none:
+    // only rules that run along most of the table count, rules closer than 3 points are one (a double or thick line).
+    internal static List<(double Top, double Bottom)>? RuledBands(InvoiceDocument document, IReadOnlyList<InvoiceColumn> columns, int headerPage, double headerBottom)
+    {
+        var page = document.Pages.FirstOrDefault(item => item.Number == headerPage);
+        if (page?.Rules is not { Count: > 0 } rules || columns.Count == 0) return null;
+        var left = columns.Min(column => column.Left);
+        var right = columns.Max(column => column.Right);
+        var width = right - left;
+        var positions = new List<double>();
+        foreach (var rule in rules.Where(rule => !rule.Vertical && rule.Position > headerBottom - 2 && InvoiceLayout.Overlap(left, right, rule.From, rule.To) >= 0.6 * width).OrderBy(rule => rule.Position))
+            if (positions.Count == 0 || rule.Position - positions[^1] > 3) positions.Add(rule.Position);
+        if (positions.Count < 3) return null;
+        return positions.Zip(positions.Skip(1), (top, bottom) => (top, bottom)).Where(band => band.bottom - band.top >= 4).ToList();
+    }
+
+    // The row of column numbers some invoices print under the header ("0 1 2 3 4 5 6 (4+5)*3 7") is not a row of goods.
+    private static bool IsColumnNumberRow(IEnumerable<string> texts)
+    {
+        var cells = texts.Where(text => text.Length > 0).ToList();
+        return cells.Count >= 3 && cells.Count(text => text.Split(' ')[0].Trim('(', ')', '.').Length == 1 && char.IsAsciiDigit(text.Trim('(')[0])) >= cells.Count * 0.8 &&
+               !cells.Any(text => System.Text.RegularExpressions.Regex.IsMatch(text, @"\d[.,]\d"));
+    }
+
     private static InvoiceTableRead ReadRows(InvoiceDocument document, IReadOnlyList<InvoiceColumn> columns, int headerPage, double headerBottom,
-        char? hint, string split, bool useIndex)
+        char? hint, string split, bool useIndex, List<(double Top, double Bottom)>? ruledBands = null)
     {
         var refined = columns.ToList();
         var rows = new List<InvoiceTableRow>();
         var indexColumn = useIndex ? refined.FindIndex(column => column.Meaning == InvoiceColumnMeanings.Index) : -1;
         var expected = 1;
-        var usedIndex = indexColumn >= 0;
-        var table = new List<(int Page, List<BodyCell> Cells, List<(int Number, double Y, double Height, BodyCell Anchor)> Anchors)>();
+        var usedIndex = indexColumn >= 0 && ruledBands is null;
+        var table = new List<(int Page, List<BodyCell> Cells, List<(int Number, double Y, double Height, BodyCell Anchor)> Anchors, List<(double Top, double Bottom)>? Bands)>();
         var rowCells = new List<BodyCell>();
         var consumed = new HashSet<InvoiceWord>();
 
@@ -315,6 +384,24 @@ public static class InvoiceTableReader
             var cells = AssignCells(page, refined, startY);
             if (cells.Count == 0) continue;
             var anchors = new List<(int Number, double Y, double Height, BodyCell Anchor)>();
+            if (ruledBands is not null)
+            {
+                // Rows are the boxes between the table's horizontal rules (header page only): a box with no text is not a row, nor is the
+                // row of column numbers.
+                if (page.Number != headerPage) continue;
+                var ruledRows = new List<(double Top, double Bottom)>();
+                foreach (var (top, bottom) in ruledBands)
+                {
+                    var inBox = cells.Where(cell => cell.Segment.CenterY >= top && cell.Segment.CenterY < bottom).ToList();
+                    if (inBox.Count == 0 || IsColumnNumberRow(inBox.Select(cell => cell.Segment.Text))) continue;
+                    // The totals box ends the table.
+                    if (inBox.Any(cell => InvoiceVocabulary.IsFooterStart(cell.Segment.Text))) break;
+                    ruledRows.Add((top, bottom));
+                    anchors.Add((ruledRows.Count, (top + bottom) / 2, Math.Max(1, inBox.Average(cell => cell.Segment.Height)), inBox[0]));
+                }
+                if (anchors.Count > 0) table.Add((page.Number, cells, anchors, ruledRows));
+                continue;
+            }
             if (indexColumn >= 0)
             {
                 foreach (var cell in cells.Where(cell => cell.Column == indexColumn).OrderBy(cell => cell.Segment.CenterY))
@@ -332,12 +419,12 @@ public static class InvoiceTableReader
                 anchors = ReferenceAnchors(cells, refined, hint);
             }
             if (anchors.Count == 0) { if (page.Number == headerPage && indexColumn >= 0) { usedIndex = false; } continue; }
-            table.Add((page.Number, cells, anchors));
+            table.Add((page.Number, cells, anchors, null));
         }
 
-        foreach (var (pageNumber, cells, anchors) in table)
+        foreach (var (pageNumber, cells, anchors, ruledRowBands) in table)
         {
-            var bands = RowBands(cells, anchors, split, firstRowOpen: pageNumber == headerPage);
+            var bands = ruledRowBands ?? RowBands(cells, anchors, split, firstRowOpen: pageNumber == headerPage);
             // A column whose text is vertically offset from its row is read by order: its k-th value belongs to the k-th row.
             var sequences = new Dictionary<int, List<string>>();
             for (var column = 0; column < refined.Count; column++)

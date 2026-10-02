@@ -28,13 +28,13 @@ public static class InvoiceFieldModes
 public sealed record InvoiceTemplateField(string Id, string Meaning, string Name, bool Use, int Page, double X, double Y, double Width, double Height,
     string LabelText, string Kind, bool Manual, string Mode = InvoiceFieldModes.Region, double LabelX = 0, double LabelY = 0);
 
-public sealed record InvoiceTemplateColumn(string Id, string Label, string Meaning, bool Use, double Left, double Right, string RowMapping, bool Manual);
+public sealed record InvoiceTemplateColumn(string Id, string Label, string Meaning, bool Use, double Left, double Right, string RowMapping, bool Manual, string HeaderText = "");
 
 public sealed record InvoiceTemplateTable(int HeaderPage, double HeaderTop, double HeaderBottom, string RowSplit, bool HasIndexColumn,
     string NameCodeSeparator, IReadOnlyList<InvoiceTemplateColumn> Columns);
 
 public sealed record InvoiceTemplateDefinition(int Schema, string SourceKind, double PageWidth, double PageHeight,
-    IReadOnlyList<InvoiceTemplateAnchor> Anchors, IReadOnlyList<InvoiceTemplateField> Fields, InvoiceTemplateTable? Table)
+    IReadOnlyList<InvoiceTemplateAnchor> Anchors, IReadOnlyList<InvoiceTemplateField> Fields, InvoiceTemplateTable? Table, string ProductDescription = "")
 {
     public const int CurrentSchema = 1;
     public int UsedFieldCount => Fields.Count(field => field.Use);
@@ -85,6 +85,8 @@ public sealed class DraftColumn
 {
     public string Id { get; set; } = "";
     public string Label { get; set; } = "";
+    // The text of the table header this column was made from: what ties it to the header of a file (Label is only the name shown).
+    public string HeaderText { get; set; } = "";
     public string Meaning { get; set; } = InvoiceColumnMeanings.Ignore;
     public bool Use { get; set; }
     public double Left { get; set; }
@@ -109,6 +111,8 @@ public sealed class InvoiceTemplateDraft
     public List<InvoiceTemplateAnchor> Anchors { get; set; } = [];
     public string SupplierName { get; set; } = "";
     public string SupplierCui { get; set; } = "";
+    // How a product taken from an invoice is described: text with <label> marks (see InvoiceProductDescription).
+    public string ProductDescription { get; set; } = "";
 
     // Initial draft = what the analysis proposes: recognised fields and columns are used, the rest is offered but unused.
     public static InvoiceTemplateDraft FromAnalysis(InvoiceAnalysis analysis)
@@ -118,7 +122,7 @@ public sealed class InvoiceTemplateDraft
             draft.Fields.Add(new DraftField
             {
                 Id = field.Id, Meaning = field.Meaning, Name = field.Meaning.Length > 0 ? InvoiceVocabulary.FieldTitle(field.Meaning) : field.Label,
-                Use = field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom,
+                Use = field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom && !InvoiceVocabulary.IsExtraPartyAttribute(field.Meaning),
                 Page = field.ValueBox.Page, X = field.ValueBox.X, Y = field.ValueBox.Y, Width = field.ValueBox.Width, Height = field.ValueBox.Height,
                 LabelText = field.Label, Value = field.Value, Kind = KindName(field.ValueKind), Confidence = field.Confidence, Section = field.Section,
                 LabelX = field.LabelBox.X, LabelY = field.LabelBox.Y,
@@ -134,7 +138,7 @@ public sealed class InvoiceTemplateDraft
             draft.HasIndexColumn = table.HasIndexColumn;
             draft.Columns = table.Columns.Select(column => new DraftColumn
             {
-                Id = column.Id, Label = column.Label, Meaning = column.Meaning, Use = column.Meaning != InvoiceColumnMeanings.Ignore,
+                Id = column.Id, Label = column.Label, HeaderText = column.Label, Meaning = column.Meaning, Use = column.Meaning != InvoiceColumnMeanings.Ignore,
                 Left = column.Left, Right = column.Right, RowMapping = column.RowMapping
             }).ToList();
         }
@@ -145,6 +149,31 @@ public sealed class InvoiceTemplateDraft
     public static string KindName(InvoiceValueKind kind) => kind switch { InvoiceValueKind.Number => "number", InvoiceValueKind.Date => "date", _ => "text" };
 
     // Problems that stop the draft from being saved as a template (empty = acceptable).
+    // The label a field is known by: its own name, else the title of its meaning.
+    public static string EffectiveLabel(DraftField field) =>
+        field.Name.Trim().Length > 0 ? field.Name.Trim() : field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom ? InvoiceVocabulary.FieldTitle(field.Meaning) : "";
+
+    // The other fields that already carry the same label or the same meaning as this one (what the user is warned about).
+    public IEnumerable<DraftField> SameLabelAs(DraftField field)
+    {
+        var key = InvoiceValues.Normalize(EffectiveLabel(field));
+        var meaning = field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom ? field.Meaning : "";
+        return Fields.Where(other => other != field && ((meaning.Length > 0 && other.Meaning == meaning) || (key.Length > 0 && InvoiceValues.Normalize(EffectiveLabel(other)) == key)));
+    }
+
+    // A free label built from this one ("Număr factură (2)").
+    public string FreeLabelFor(DraftField field)
+    {
+        var baseLabel = EffectiveLabel(field);
+        if (baseLabel.Length == 0) baseLabel = "Câmp";
+        for (var number = 2; ; number++)
+        {
+            var candidate = $"{baseLabel} ({number})";
+            var key = InvoiceValues.Normalize(candidate);
+            if (!Fields.Any(other => other != field && InvoiceValues.Normalize(EffectiveLabel(other)) == key)) return candidate;
+        }
+    }
+
     public IReadOnlyList<string> Problems()
     {
         var problems = new List<string>();
@@ -154,11 +183,17 @@ public sealed class InvoiceTemplateDraft
         foreach (var group in usedFields.Where(field => field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom).GroupBy(field => field.Meaning).Where(group => group.Count() > 1))
             problems.Add($"Sensul „{InvoiceVocabulary.FieldTitle(group.Key)}” este dat la mai multe câmpuri.");
         foreach (var field in usedFields.Where(field => field.Meaning.Length == 0 || field.Meaning == InvoiceFieldMeanings.Custom))
-            if (field.Name.Trim().Length == 0) problems.Add("Un câmp fără sens propriu are nevoie de o denumire.");
+            if (field.Name.Trim().Length == 0) problems.Add("Un câmp fără sens propriu are nevoie de o etichetă.");
+        foreach (var group in usedFields.Where(field => EffectiveLabel(field).Length > 0).GroupBy(field => InvoiceValues.Normalize(EffectiveLabel(field)))
+                     .Where(group => group.Count() > 1 && group.Any(field => field.Meaning.Length == 0 || field.Meaning == InvoiceFieldMeanings.Custom)))
+            problems.Add($"Eticheta „{EffectiveLabel(group.First())}” este folosită la mai multe câmpuri; dă-le etichete diferite.");
         foreach (var group in usedColumns.GroupBy(column => column.Meaning).Where(group => group.Count() > 1))
             problems.Add($"Sensul „{InvoiceVocabulary.ColumnTitle(group.Key)}” este dat la mai multe coloane.");
         if (usedColumns.Count > 0 && !usedColumns.Any(column => column.Meaning is InvoiceColumnMeanings.Name or InvoiceColumnMeanings.Code))
             problems.Add("Tabelul are nevoie de o coloană cu denumirea sau cu codul produsului.");
+        if (ProductDescription.Length > InvoiceProductDescription.MaxLength) problems.Add($"Descrierea produsului poate avea cel mult {InvoiceProductDescription.MaxLength} de caractere.");
+        foreach (var mark in InvoiceProductDescription.UnknownMarks(ProductDescription, InvoiceProductDescription.Labels(this).Select(item => item.Label)))
+            problems.Add($"Descrierea produsului conține marcajul <{mark}>, care nu este o etichetă activă în șablon.");
         return problems;
     }
 
@@ -179,16 +214,16 @@ public sealed class InvoiceTemplateDraft
             var page = PageOf(HeaderPage);
             table = new InvoiceTemplateTable(HeaderPage, HeaderTop / page.Height, HeaderBottom / page.Height, RowSplit, HasIndexColumn, NameCodeSeparator.Trim(),
                 Columns.OrderBy(column => column.Left).Select(column => new InvoiceTemplateColumn(column.Id, column.Label, column.Meaning, column.Use,
-                    column.Left / page.Width, column.Right / page.Width, column.RowMapping, column.Manual)).ToList());
+                    column.Left / page.Width, column.Right / page.Width, column.RowMapping, column.Manual, column.HeaderText)).ToList());
         }
-        return new InvoiceTemplateDefinition(InvoiceTemplateDefinition.CurrentSchema, SourceKind, first.Width, first.Height, Anchors, fields, table);
+        return new InvoiceTemplateDefinition(InvoiceTemplateDefinition.CurrentSchema, SourceKind, first.Width, first.Height, Anchors, fields, table, ProductDescription.Trim());
     }
 
     // The draft of a saved template, positioned on a file: the saved positions are moved by the offset that aligns the template's
     // anchors with the words of this file, so the regions land where this file has the same labels.
     public static InvoiceTemplateDraft FromDefinition(InvoiceTemplateDefinition definition, InvoiceDocument document, string supplierName, string supplierCui)
     {
-        var draft = new InvoiceTemplateDraft { SourceKind = definition.SourceKind, Anchors = [.. definition.Anchors], SupplierName = supplierName, SupplierCui = supplierCui };
+        var draft = new InvoiceTemplateDraft { SourceKind = definition.SourceKind, Anchors = [.. definition.Anchors], SupplierName = supplierName, SupplierCui = supplierCui, ProductDescription = definition.ProductDescription ?? "" };
         var alignment = InvoiceTemplateEngine.Align(definition, document);
         InvoicePageData PageOf(int number) => document.Pages.FirstOrDefault(page => page.Number == number) ?? document.Pages[0];
         foreach (var field in definition.Fields)
@@ -222,7 +257,7 @@ public sealed class InvoiceTemplateDraft
                 var own = table.Columns.FirstOrDefault(item => item.Id == column.Id);
                 return new DraftColumn
                 {
-                    Id = column.Id, Label = own?.Label ?? column.Label, Meaning = own?.Meaning ?? InvoiceColumnMeanings.Ignore, Use = own?.Use ?? false,
+                    Id = column.Id, Label = own?.Label ?? column.Label, HeaderText = own is null ? column.Label : own.HeaderText.Length > 0 ? own.HeaderText : own.Label, Meaning = own?.Meaning ?? InvoiceColumnMeanings.Ignore, Use = own?.Use ?? false,
                     Left = column.Left, Right = column.Right, RowMapping = column.RowMapping, Manual = own?.Manual ?? false
                 };
             }).ToList();
@@ -491,7 +526,7 @@ public static class InvoiceTemplateEngine
         var matches = new Dictionary<string, HeaderCell>();
         foreach (var column in table.Columns)
         {
-            var key = InvoiceValues.Normalize(column.Label);
+            var key = InvoiceValues.Normalize(column.HeaderText.Length > 0 ? column.HeaderText : column.Label);
             var index = key.Length == 0 ? -1 : cells.FindIndex(cell => !used.Contains(cells.IndexOf(cell)) && InvoiceValues.Normalize(cell.Label) == key);
             if (index < 0) continue;
             used.Add(index);

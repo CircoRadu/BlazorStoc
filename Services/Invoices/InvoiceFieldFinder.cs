@@ -19,7 +19,7 @@ internal static class InvoiceFieldFinder
             var segmentsByLine = lines.Select((line, index) => MergeLabelSegments(InvoiceLayout.Segments(line, index))).ToList();
             var headings = new List<Heading>();
             foreach (var segment in segmentsByLine.SelectMany(segments => segments))
-                if (InvoiceVocabulary.MatchSection(segment.Text) is { } section)
+                if ((InvoiceVocabulary.MatchSection(segment.Text) ?? InvoiceVocabulary.MatchSectionLead(segment.Text)) is { } section)
                     headings.Add(new Heading(page.Number, section, segment.X, segment.Y));
 
             var used = new HashSet<Segment>();
@@ -37,12 +37,42 @@ internal static class InvoiceFieldFinder
                     if (consumedNext && next is not null) used.Add(next);
                     used.Add(segment);
                     var section = SectionOf(headings, label.Box);
+                    // "Furnizor: SC TELESYSTEM SRL": the party word is the label and the rest the party's name.
+                    if (meaningKey is null && InvoiceVocabulary.MatchSection(label.Text) is { } leadSection) { section = leadSection; meaningKey = "@name"; confidence = 0.9; }
                     fields.Add(new InvoiceHeaderField($"f{page.Number}_{fields.Count + 1}", label.Text, value.Text, label.Box, value.Box,
                         InvoiceVocabulary.ResolveFieldMeaning(meaningKey, section), section ?? "", confidence, InvoiceValues.KindOf(value.Text, hint)));
                 }
             }
         }
-        return KeepBestPerMeaning(fields);
+        return LimitSectionsToPartyBlocks(KeepBestPerMeaning(fields));
+    }
+
+    // A section is the block of lines under a VANZATOR/CUMPARATOR heading, not everything below it: invoice-level fields (number, dates,
+    // totals) and any field under the last party line (totals, payment notes) do not belong to a party, even when they sit in its column.
+    private static List<InvoiceHeaderField> LimitSectionsToPartyBlocks(List<InvoiceHeaderField> fields)
+    {
+        static bool IsParty(string meaning) => meaning.StartsWith(InvoiceVocabulary.SupplierSection + ".", StringComparison.Ordinal) ||
+                                               meaning.StartsWith(InvoiceVocabulary.BuyerSection + ".", StringComparison.Ordinal);
+        // The block runs from the heading down through party lines that follow each other (gap up to 30 points); a party line far below
+        // (the bank account in the payment notes) keeps its party but does not stretch the block over the totals in between.
+        var bottoms = fields.Where(field => IsParty(field.Meaning))
+            .GroupBy(field => (field.LabelBox.Page, field.Section))
+            .ToDictionary(group => group.Key, group =>
+            {
+                var bottom = double.MinValue;
+                foreach (var field in group.OrderBy(field => field.LabelBox.Y))
+                {
+                    if (bottom != double.MinValue && field.LabelBox.Y - bottom > 30) break;
+                    bottom = Math.Max(bottom, field.LabelBox.Y + field.LabelBox.Height);
+                }
+                return bottom;
+            });
+        return fields.Select(field =>
+        {
+            if (field.Section.Length == 0 || IsParty(field.Meaning)) return field;
+            var partyLine = field.Meaning.Length == 0 && bottoms.TryGetValue((field.LabelBox.Page, field.Section), out var bottom) && field.LabelBox.Y <= bottom + 4;
+            return partyLine ? field : field with { Section = "" };
+        }).ToList();
     }
 
     private sealed record Part(string Text, InvoiceBox Box);
@@ -98,6 +128,19 @@ internal static class InvoiceFieldFinder
             var before = colonText[..colonText.IndexOf(':')];
             var after = colonText[(colonText.IndexOf(':') + 1)..];
             var valueWords = segment.Words.Skip(colonIndex + 1).ToList();
+            // "Hunedoara, Cod fiscal: 9178894": a label that does not match as a whole but ends with one that does ("Cod fiscal") - the
+            // words before it belong to the previous value on the line.
+            var allLabelWords = labelWords.Select(word => word.Text).Append(before).Where(text => text.Length > 0).ToList();
+            for (var skip = 0; skip < allLabelWords.Count - 1; skip++)
+            {
+                var whole = InvoiceVocabulary.Tokens(string.Join(' ', allLabelWords.Skip(skip)));
+                if (whole.Length > 0 && InvoiceVocabulary.MatchFieldLabelPrefix(whole).Words == whole.Length)
+                {
+                    if (skip > 0) labelWords = labelWords.Skip(skip).ToList();
+                    break;
+                }
+                if (skip == 0 && InvoiceVocabulary.MatchFieldLabelPrefix(InvoiceVocabulary.Tokens(string.Join(' ', allLabelWords))).Words > 0) break;
+            }
             var labelText = string.Join(' ', labelWords.Select(word => word.Text).Append(before).Where(text => text.Length > 0));
             if (labelText.Length > 0 && labelText.Split(' ').Length <= 6)
             {
@@ -134,7 +177,8 @@ internal static class InvoiceFieldFinder
                         new Part(string.Join(' ', valueWords.Select(word => word.Text)), InvoiceLayout.Union(valueWords)), labelMeaning, confidence, false);
                 if (valueWords.Count == 0)
                 {
-                    if (next is not null && !used.Contains(next) && !LooksLikeLabel(InvoiceVocabulary.Tokens(next.Text)) && IsPlausibleValue(next.Text))
+                    if (next is not null && !used.Contains(next) && !LooksLikeLabel(InvoiceVocabulary.Tokens(next.Text)) && IsPlausibleValue(next.Text) &&
+                        InvoiceVocabulary.MatchFieldLabelPrefix(InvoiceVocabulary.Tokens(next.Text)).Words == 0)
                         return (new Part(segment.Text, segment.Box), new Part(next.Text, next.Box), labelMeaning, confidence, true);
                     var below = ValueBelow(segment, lineIndex, segmentsByLine, lines, used, hint);
                     if (below is not null) return (new Part(segment.Text, segment.Box), new Part(below.Text, below.Box), labelMeaning, confidence * 0.9, false);
@@ -200,7 +244,10 @@ internal static class InvoiceFieldFinder
             // The heading spans from its own x to the next heading on the same row (or the page's right edge).
             var right = headings.Where(item => item.Page == heading.Page && item.X > heading.X + 5 && Math.Abs(item.Y - heading.Y) < 12)
                 .Select(item => item.X).DefaultIfEmpty(double.MaxValue).Min();
-            if (label.X < heading.X - 8 || label.X >= right) continue;
+            // With another party's heading on the same row, the party's own column is the left part of that span: what starts in its
+            // right part (the invoice number/date block that many invoices put between the two parties) belongs to neither.
+            var limit = right == double.MaxValue ? right : heading.X + 0.6 * (right - heading.X);
+            if (label.X < heading.X - 8 || label.X >= limit) continue;
             if (best is null || heading.Y > best.Y) best = heading;
         }
         return best?.Section;

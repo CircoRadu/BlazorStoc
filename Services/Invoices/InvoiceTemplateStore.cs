@@ -12,6 +12,9 @@ public sealed record InvoiceTemplateInfo(int Id, string Name, string SupplierNam
 
 public sealed record InvoiceTemplateRecord(InvoiceTemplateInfo Info, InvoiceTemplateDefinition Definition);
 
+// The invoice a template was made from, kept with it: shown again when the template is edited. Content is the PDF itself.
+public sealed record InvoiceTemplateModel(string FileName, byte[] Content, string Sha256, int VersionNumber, string CreatedBy, DateTime CreatedUtc);
+
 public sealed record InvoiceTemplateVersionInfo(int VersionNumber, string Note, string CreatedBy, DateTime CreatedUtc);
 
 public sealed class InvoiceTemplateInput
@@ -21,6 +24,9 @@ public sealed class InvoiceTemplateInput
     public string SupplierCui { get; set; } = "";
     public string Note { get; set; } = "";
     public InvoiceTemplateDefinition? Definition { get; set; }
+    // The invoice the template was made from (PDF), saved with the template; null keeps the model already saved.
+    public string ModelFileName { get; set; } = "";
+    public byte[]? ModelContent { get; set; }
 }
 
 public static class InvoiceTemplateRules
@@ -34,6 +40,10 @@ public static class InvoiceTemplateRules
     public const string DuplicateMessage = "Există deja un șablon cu această denumire pentru același furnizor.";
     public const string ConcurrentMessage = "Șablonul a fost modificat sau șters între timp. Actualizează lista și reîncearcă.";
     public const string DefinitionRequiredMessage = "Șablonul nu are conținut de salvat.";
+    public const int MaxModelBytes = 15 * 1024 * 1024;
+    public const string SupplierRequiredMessage = "Denumirea furnizorului (vânzătorului) este obligatorie: șablonul se leagă de furnizor.";
+    public const string CuiRequiredMessage = "CUI/CIF-ul furnizorului este obligatoriu și trebuie să fie valid: șablonul se leagă de furnizor.";
+    public const string ModelTooLargeMessage = "Factura model depășește 15 MB și nu poate fi salvată cu șablonul.";
 
     // Normalises and checks the text fields of an input: trimmed name and supplier, the supplier's tax id reduced to its digits.
     public static InvoiceTemplateInput Clean(InvoiceTemplateInput input)
@@ -42,12 +52,17 @@ public static class InvoiceTemplateRules
         if (name.Length == 0) throw new InvoiceTemplateOperationException(NameRequiredMessage);
         if (name.Length > MaxNameLength) throw new InvoiceTemplateOperationException(NameTooLongMessage);
         var supplier = (input.SupplierName ?? "").Trim();
+        if (supplier.Length == 0) throw new InvoiceTemplateOperationException(SupplierRequiredMessage);
         if (supplier.Length > MaxSupplierNameLength) throw new InvoiceTemplateOperationException(SupplierTooLongMessage);
+        var cui = InvoiceValues.NormalizeCui(input.SupplierCui);
+        if (cui.Length == 0) throw new InvoiceTemplateOperationException(CuiRequiredMessage);
+        if (input.ModelContent is { Length: > MaxModelBytes }) throw new InvoiceTemplateOperationException(ModelTooLargeMessage);
         var note = (input.Note ?? "").Trim();
         if (note.Length > MaxNoteLength) note = note[..MaxNoteLength];
         return new InvoiceTemplateInput
         {
-            Name = name, SupplierName = supplier, SupplierCui = InvoiceValues.NormalizeCui(input.SupplierCui), Note = note, Definition = input.Definition
+            Name = name, SupplierName = supplier, SupplierCui = cui, Note = note, Definition = input.Definition,
+            ModelFileName = (input.ModelFileName ?? "").Trim() is { Length: > 0 } modelName ? (modelName.Length > 255 ? modelName[..255] : modelName) : "model.pdf", ModelContent = input.ModelContent
         };
     }
 
@@ -55,7 +70,7 @@ public static class InvoiceTemplateRules
     public static bool SameName(string left, string right) => InvoiceValues.Normalize(left) == InvoiceValues.Normalize(right);
 
     public static string Describe(InvoiceTemplateDefinition definition) =>
-        $"sursă: {(definition.SourceKind == InvoiceSources.Ocr ? "OCR" : "text")}; câmpuri folosite: {definition.UsedFieldCount}; coloane folosite: {definition.UsedColumnCount}";
+        $"sursă: {(definition.SourceKind == InvoiceSources.Ocr ? "OCR" : "text")}; câmpuri folosite: {definition.UsedFieldCount}; coloane folosite: {definition.UsedColumnCount}" + ((definition.ProductDescription ?? "").Length > 0 ? $"; descriere produs: {definition.ProductDescription}" : "");
 }
 
 public interface IInvoiceTemplateStore
@@ -64,6 +79,7 @@ public interface IInvoiceTemplateStore
     Task<InvoiceTemplateRecord?> GetAsync(int id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<InvoiceTemplateRecord>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<InvoiceTemplateVersionInfo>> GetVersionsAsync(int id, CancellationToken cancellationToken = default);
+    Task<InvoiceTemplateModel?> GetModelAsync(int id, CancellationToken cancellationToken = default);
     Task<InvoiceTemplateRecord> CreateAsync(InvoiceTemplateInput input, string actor, CancellationToken cancellationToken = default);
     Task<InvoiceTemplateRecord> SaveNewVersionAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, string actor, CancellationToken cancellationToken = default);
     Task<InvoiceTemplateInfo> UpdateDetailsAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, string actor, CancellationToken cancellationToken = default);
@@ -123,6 +139,17 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         return result;
     }
 
+    public async Task<InvoiceTemplateModel?> GetModelAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("SELECT file_name, content, sha256, version_number, created_by, created_utc FROM invoice_template_models WHERE template_id=@id ORDER BY id DESC LIMIT 1", connection);
+        command.Parameters.AddWithValue("@id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return null;
+        return new InvoiceTemplateModel(reader.GetString(0), (byte[])reader["content"], reader.GetString(2), reader.GetInt32(3), reader.GetString(4), MariaTimeText.Parse(reader.GetString(5)));
+    }
+
     public async Task<InvoiceTemplateRecord> CreateAsync(InvoiceTemplateInput input, string actor, CancellationToken cancellationToken = default)
     {
         EnsureWritable();
@@ -149,6 +176,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
                 id = insert.LastInsertedId;
             }
             await InsertVersionAsync(connection, transaction, id, 1, json, clean.Note, actor, now, cancellationToken).ConfigureAwait(false);
+            await InsertModelAsync(connection, transaction, id, 1, clean, actor, now, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return new InvoiceTemplateRecord(new InvoiceTemplateInfo(checked((int)id), clean.Name, clean.SupplierName, clean.SupplierCui, definition.SourceKind, 1, 0,
                 actor, MariaTimeText.Parse(now), actor, MariaTimeText.Parse(now)), definition);
@@ -191,6 +219,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
                 if (changed != 1) throw new InvoiceTemplateOperationException(InvoiceTemplateRules.ConcurrentMessage);
             }
             await InsertVersionAsync(connection, transaction, original.Id, versionNumber, json, clean.Note, actor, now, cancellationToken).ConfigureAwait(false);
+            await InsertModelAsync(connection, transaction, original.Id, versionNumber, clean, actor, now, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return new InvoiceTemplateRecord(original with
             {
@@ -270,6 +299,32 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // The model is kept when it is a different file from the last saved one (the same file saved again adds nothing).
+    private static async Task InsertModelAsync(MySqlConnection connection, MySqlTransaction transaction, long templateId, int versionNumber, InvoiceTemplateInput clean, string actor,
+        string now, CancellationToken cancellationToken)
+    {
+        if (clean.ModelContent is not { Length: > 0 } content) return;
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(content)).ToLowerInvariant();
+        await using (var latest = new MySqlCommand("SELECT sha256 FROM invoice_template_models WHERE template_id=@id ORDER BY id DESC LIMIT 1", connection, transaction))
+        {
+            latest.Parameters.AddWithValue("@id", templateId);
+            if (await latest.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string last && last == hash) return;
+        }
+        await using var command = new MySqlCommand("""
+            INSERT INTO invoice_template_models (template_id, version_number, file_name, byte_length, sha256, content, created_by, created_utc)
+            VALUES (@id, @number, @file, @length, @hash, @content, @actor, @now)
+            """, connection, transaction);
+        command.Parameters.AddWithValue("@id", templateId);
+        command.Parameters.AddWithValue("@number", versionNumber);
+        command.Parameters.AddWithValue("@file", clean.ModelFileName);
+        command.Parameters.AddWithValue("@length", content.LongLength);
+        command.Parameters.AddWithValue("@hash", hash);
+        command.Parameters.AddWithValue("@content", content);
+        command.Parameters.AddWithValue("@actor", actor);
+        command.Parameters.AddWithValue("@now", now);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private void EnsureWritable()
     {
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
@@ -292,6 +347,7 @@ public interface IInvoiceTemplateService
     Task<InvoiceTemplateRecord?> GetAsync(int id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<InvoiceTemplateRecord>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<InvoiceTemplateVersionInfo>> GetVersionsAsync(int id, CancellationToken cancellationToken = default);
+    Task<InvoiceTemplateModel?> GetModelAsync(int id, CancellationToken cancellationToken = default);
     Task<InvoiceTemplateRecord> CreateAsync(InvoiceTemplateInput input, CancellationToken cancellationToken = default);
     Task<InvoiceTemplateRecord> SaveNewVersionAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default);
     Task<InvoiceTemplateInfo> UpdateDetailsAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default);
@@ -304,6 +360,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
     public Task<InvoiceTemplateRecord?> GetAsync(int id, CancellationToken cancellationToken = default) => store.GetAsync(id, cancellationToken);
     public Task<IReadOnlyList<InvoiceTemplateRecord>> GetAllAsync(CancellationToken cancellationToken = default) => store.GetAllAsync(cancellationToken);
     public Task<IReadOnlyList<InvoiceTemplateVersionInfo>> GetVersionsAsync(int id, CancellationToken cancellationToken = default) => store.GetVersionsAsync(id, cancellationToken);
+    public Task<InvoiceTemplateModel?> GetModelAsync(int id, CancellationToken cancellationToken = default) => store.GetModelAsync(id, cancellationToken);
 
     public async Task<InvoiceTemplateRecord> CreateAsync(InvoiceTemplateInput input, CancellationToken cancellationToken = default)
     {
@@ -312,7 +369,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
         await CheckUniqueNameAsync(input, null, cancellationToken).ConfigureAwait(false);
         var created = await store.CreateAsync(input, actor, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.InvoiceTemplate, AuditActions.CreateInvoiceTemplate, Id(created.Info), created.Info.Name,
-            AuditDetails.Identification(("Furnizor", Supplier(created.Info)), ("Versiune", "1"), ("Conținut", InvoiceTemplateRules.Describe(created.Definition))),
+            AuditDetails.Identification(("Furnizor", Supplier(created.Info)), ("Versiune", "1"), ("Conținut", InvoiceTemplateRules.Describe(created.Definition)), ("Factură model", input.ModelContent is null ? "—" : InvoiceTemplateRules.Clean(input).ModelFileName)),
             string.Empty, cancellationToken).ConfigureAwait(false);
         return created;
     }
@@ -323,13 +380,15 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await CheckUniqueNameAsync(input, original.Id, cancellationToken).ConfigureAwait(false);
         var before = await store.GetAsync(original.Id, cancellationToken).ConfigureAwait(false);
+        var modelBefore = await store.GetModelAsync(original.Id, cancellationToken).ConfigureAwait(false);
         var saved = await store.SaveNewVersionAsync(original, input, actor, cancellationToken).ConfigureAwait(false);
         var changes = new List<AuditChange>
         {
             new("Versiune", original.VersionNumber.ToString(CultureInfo.InvariantCulture), saved.Info.VersionNumber.ToString(CultureInfo.InvariantCulture)),
             new("Denumire", original.Name, saved.Info.Name),
             new("Furnizor", Supplier(original), Supplier(saved.Info)),
-            new("Conținut", before is null ? "" : InvoiceTemplateRules.Describe(before.Definition), InvoiceTemplateRules.Describe(saved.Definition))
+            new("Conținut", before is null ? "" : InvoiceTemplateRules.Describe(before.Definition), InvoiceTemplateRules.Describe(saved.Definition)),
+            new("Factură model", modelBefore?.FileName ?? "—", (await store.GetModelAsync(original.Id, cancellationToken).ConfigureAwait(false))?.FileName ?? "—")
         };
         await AuditRecorder.RecordEditAsync(audit, access, AuditEntities.InvoiceTemplate, Id(saved.Info), saved.Info.Name, changes, string.Empty, cancellationToken,
             AuditActions.EditInvoiceTemplate).ConfigureAwait(false);

@@ -62,8 +62,8 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     // MinUsableContrast there is no ink at all (paper noise); below FaintInkContrast (graphite pencil, a washed-out
     // scan, a nearly dry pen) the image is stretched before thresholding.
     private const double ContrastInkPercentile = 0.01;
-    private const int MinUsableContrast = 25;
-    private const int FaintInkContrast = 140;
+    internal const int MinUsableContrast = 25;
+    internal const int FaintInkContrast = 140;
     private const double CellPaddingPoints = 4;
     private const double DigitConfidenceThreshold = 0.80;
 
@@ -315,7 +315,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     // on the table geometry at all, unlike the line/column detection below - it works the same whether the page
     // has one table or eight scattered across it. Runs on a small downscaled copy purely for speed; the angle
     // found is then applied to the full-resolution page once by the caller.
-    internal static double FindSkewDegrees(Mat grayFullRes)
+    internal static double FindSkewDegrees(Mat grayFullRes, double maxSearchedDegrees = MaxSearchedSkewDegrees)
     {
         using var binary = new Mat();
         Cv2.Threshold(grayFullRes, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
@@ -324,7 +324,7 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
 
         var bestAngle = 0.0;
         var bestScore = -1.0;
-        foreach (var angle in SearchAngles(-MaxSearchedSkewDegrees, MaxSearchedSkewDegrees, 1.0))
+        foreach (var angle in SearchAngles(-maxSearchedDegrees, maxSearchedDegrees, 1.0))
         {
             var score = ProjectionProfileVariance(small, angle);
             if (score > bestScore) { bestScore = score; bestAngle = angle; }
@@ -579,12 +579,12 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
     }
 
     // Ink contrast of an image: the paper level (median) minus the level of its darkest ink (1st percentile).
-    private static int InkContrast(Mat gray) => GrayPercentile(gray, 0.5) - GrayPercentile(gray, ContrastInkPercentile);
+    internal static int InkContrast(Mat gray) => GrayPercentile(gray, 0.5) - GrayPercentile(gray, ContrastInkPercentile);
 
     // Stretches the ink..paper range to the full 0..255 range so faint pen strokes / a washed-out scan become clearly
     // dark before thresholding. Returns null when the image has no usable contrast at all (a blank cell: stretching
     // would only turn paper noise into "ink").
-    private static Mat? StretchContrast(Mat gray)
+    internal static Mat? StretchContrast(Mat gray)
     {
         var ink = GrayPercentile(gray, ContrastInkPercentile);
         var paper = GrayPercentile(gray, 0.5);

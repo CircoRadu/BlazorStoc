@@ -17,7 +17,11 @@ public sealed record InvoiceWord(int Page, string Text, double X, double Y, doub
     public double CenterY => Y + Height / 2;
 }
 
-public sealed record InvoicePageData(int Number, double Width, double Height, string Source, IReadOnlyList<InvoiceWord> Words);
+// A ruled line drawn on the page (a table border), in page points: a vertical rule is at x = Position and spans y From..To, a horizontal
+// one is at y = Position and spans x From..To. Found in scans (OpenCV); a hint for the table's columns, never required.
+public sealed record InvoiceRule(bool Vertical, double Position, double From, double To);
+
+public sealed record InvoicePageData(int Number, double Width, double Height, string Source, IReadOnlyList<InvoiceWord> Words, IReadOnlyList<InvoiceRule>? Rules = null);
 
 public sealed record InvoiceDocument(IReadOnlyList<InvoicePageData> Pages)
 {

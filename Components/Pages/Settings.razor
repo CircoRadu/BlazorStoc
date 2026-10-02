@@ -39,7 +39,7 @@
             @SubtabBar(InvoiceSubtabs, "Secțiuni facturi")
             @* The analysis stays mounted (hidden) when the saved templates are shown, so switching sub-tabs does not lose the file being worked on. *@
             <div role="tabpanel" id="subpanel-@InvoiceAnalysisSubtab" aria-labelledby="subtab-@InvoiceAnalysisSubtab" hidden="@(invoiceSubtab != InvoiceAnalysisSubtab)">
-                <InvoiceTemplateWorkbench EditTemplateId="editTemplate?.Info.Id" EditTemplateName="@(editTemplate?.Info.Name)" Saved="OnTemplateSaved" />
+                <InvoiceTemplateWorkbench EditTemplateId="editTemplate?.Info.Id" EditTemplateName="@(editTemplate?.Info.Name)" EditRequest="editRequest" Saved="OnTemplateSaved" />
             </div>
             @if (invoiceSubtab == InvoiceTemplatesSubtab)
             {
@@ -89,10 +89,12 @@
     private string invoiceSubtab = InvoiceAnalysisSubtab;
     private InvoiceTemplateRecord? editTemplate;
     private int templatesVersion;
+    private int editRequest;
 
     private void EditWithFile(InvoiceTemplateRecord template)
     {
         editTemplate = template;
+        editRequest++;
         invoiceSubtab = InvoiceAnalysisSubtab;
     }
 

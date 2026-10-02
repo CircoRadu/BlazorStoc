@@ -432,6 +432,32 @@ public static class MariaSchemaMigrations
             ("invoice_templates", "created_utc"), ("invoice_templates", "updated_by"), ("invoice_templates", "updated_utc"), ("invoice_templates", "version"),
             ("invoice_template_versions", "id"), ("invoice_template_versions", "template_id"), ("invoice_template_versions", "version_number"),
             ("invoice_template_versions", "definition"), ("invoice_template_versions", "note"), ("invoice_template_versions", "created_by"), ("invoice_template_versions", "created_utc")
+        ]),
+        // The invoice (PDF) a template was made from, kept with the template so that editing it shows the same invoice again. A row is added
+        // when a different file is saved with a new version; the latest row is the model in use.
+        new(11, "Sabloane de facturi: factura PDF folosita ca model",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `invoice_template_models` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `template_id` BIGINT NOT NULL,
+              `version_number` INT NOT NULL,
+              `file_name` VARCHAR(255) NOT NULL,
+              `byte_length` BIGINT NOT NULL,
+              `sha256` CHAR(64) NOT NULL,
+              `content` LONGBLOB NOT NULL,
+              `created_by` VARCHAR(100) NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              KEY `ix_invoice_template_models_template` (`template_id`, `id`),
+              CONSTRAINT `fk_invoice_template_models_template` FOREIGN KEY (`template_id`) REFERENCES `invoice_templates` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("invoice_template_models", "id"), ("invoice_template_models", "template_id"), ("invoice_template_models", "version_number"), ("invoice_template_models", "file_name"),
+            ("invoice_template_models", "byte_length"), ("invoice_template_models", "sha256"), ("invoice_template_models", "content"), ("invoice_template_models", "created_by"),
+            ("invoice_template_models", "created_utc")
         ])
     ];
 }

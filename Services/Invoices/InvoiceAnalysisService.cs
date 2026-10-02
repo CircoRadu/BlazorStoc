@@ -1,7 +1,8 @@
 namespace BlazorStoc.Services;
 
-// One uploaded file under analysis. The file itself is never written to disk: the words and the page pictures stay in memory for the time
-// the template is being made, and go away when the template is saved or abandoned, or when the session expires.
+// One uploaded file under analysis. The file is not written to disk by the analysis: the words and the page pictures stay in memory for the time
+// the template is being made, and go away when the template is saved or abandoned, or when the session expires; saving the template
+// keeps the PDF with it (invoice_template_models), as the model shown again when the template is edited.
 public sealed class InvoiceAnalysisSession
 {
     public required Guid Id { get; init; }
@@ -10,6 +11,8 @@ public sealed class InvoiceAnalysisSession
     public required InvoiceDocument Document { get; init; }
     public required IReadOnlyList<byte[]> Previews { get; init; }
     public required InvoiceAnalysis Analysis { get; init; }
+    // The uploaded PDF itself, kept in memory so that it can be saved with the template as its model.
+    public byte[]? SourcePdf { get; init; }
     public DateTime LastUsedUtc { get; set; } = DateTime.UtcNow;
 }
 
@@ -34,7 +37,7 @@ public sealed class InvoiceAnalysisStore(TimeProvider clock) : IInvoiceAnalysisS
     {
         var session = new InvoiceAnalysisSession
         {
-            Id = Guid.NewGuid(), Owner = owner, FileName = fileName, Document = read.Document, Previews = read.PagePreviews, Analysis = analysis,
+            Id = Guid.NewGuid(), Owner = owner, FileName = fileName, Document = read.Document, Previews = read.PagePreviews, Analysis = analysis, SourcePdf = read.SourcePdf,
             LastUsedUtc = clock.GetUtcNow().UtcDateTime
         };
         lock (gate)

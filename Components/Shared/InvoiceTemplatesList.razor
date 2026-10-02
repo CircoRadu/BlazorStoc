@@ -52,7 +52,7 @@
                 <td><small>@Stamp(info.UpdatedUtc)<br />@info.UpdatedBy</small></td>
                 <td class="row-actions">
                     <button type="button" class="refresh" @onclick="() => ToggleDetailsAsync(info.Id)">@(open ? "Ascunde" : "Detalii")</button>
-                    <button type="button" class="refresh" disabled="@saving" @onclick="() => OnEditWithFile.InvokeAsync(template)">Editează cu un fișier</button>
+                    <button type="button" class="refresh" disabled="@saving" @onclick="() => OnEditWithFile.InvokeAsync(template)">Editează șablonul</button>
                     <button type="button" class="refresh" disabled="@saving" @onclick="() => OpenDetails(info)">Redenumește</button>
                     <button type="button" class="danger" disabled="@saving" @onclick="() => deleting = info">Șterge</button>
                 </td>

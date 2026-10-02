@@ -216,8 +216,8 @@ internal static class InvoiceFixtures
     }
 
     // The page rendered to a picture and saved as a PDF that has only that picture: what a scanner produces. rotation: 0/90/180/270 turns
-    // the sheet, skewDegrees tilts it, noise adds paper grain.
-    public static byte[] Scan(byte[] textPdf, double skewDegrees = 0, int rotation = 0, int dpi = 200)
+    // the sheet, skewDegrees tilts it, inkStrength below 1 makes the ink pale (a washed-out scan, pencil), blurSigma (pixels) softens it (out of focus).
+    public static byte[] Scan(byte[] textPdf, double skewDegrees = 0, int rotation = 0, int dpi = 200, double inkStrength = 1.0, double blurSigma = 0)
     {
         using var input = new MemoryStream(textPdf);
 #pragma warning disable CA1416
@@ -226,7 +226,7 @@ internal static class InvoiceFixtures
         using var gray = new Mat(bitmap.Height, bitmap.Width, MatType.CV_8UC1);
         for (var y = 0; y < bitmap.Height; y++)
             for (var x = 0; x < bitmap.Width; x++)
-                gray.Set(y, x, bitmap.GetPixel(x, y).Red);
+                gray.Set(y, x, (byte)Math.Round(255 - (255 - bitmap.GetPixel(x, y).Red) * inkStrength));
         var current = gray.Clone();
         if (Math.Abs(skewDegrees) > 0.01)
         {
@@ -243,6 +243,7 @@ internal static class InvoiceFixtures
             current.Dispose();
             current = turned;
         }
+        if (blurSigma > 0) Cv2.GaussianBlur(current, current, new Size(0, 0), blurSigma);
         var png = current.ImEncode(".png");
         var pixelWidth = current.Cols;
         var pixelHeight = current.Rows;
@@ -257,7 +258,7 @@ internal static class InvoiceFixtures
             g.DrawImage(image, 0, 0, page.Width.Point, page.Height.Point);
         using var output = new MemoryStream();
         document.Save(output);
-        Dump(output.ToArray(), $"scan-skew{skewDegrees}-rot{rotation}");
+        Dump(output.ToArray(), $"scan-skew{skewDegrees}-rot{rotation}-ink{inkStrength}-blur{blurSigma}-dpi{dpi}");
         return output.ToArray();
     }
 
