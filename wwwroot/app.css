@@ -632,3 +632,54 @@ input[type=file]::file-selector-button:hover { background: #0f6659; }
 .invoice-replace { display: grid; gap: 6px; margin: 8px 0; padding: 10px 12px; border: 1px solid #c9d6d2; border-radius: 8px; background: #f4faf8; }
 .invoice-section > summary:focus, .invoice-section > summary:focus-visible { outline: none; }
 .invoice-description-field { display:block; font-size:13px; font-weight:600; } .invoice-description-field textarea { display:block; width:100%; margin-top:8px; font:inherit; border:1px solid #e0e7e3; border-radius:6px; padding:10px; resize:vertical; }
+
+/* Produse -> Preluare factura: demarcation lines of the line table over the page picture (invoice-separators.js) */
+.sep-overlay { touch-action: none; }
+.sep-overlay line, .sep-overlay rect { vector-effect: non-scaling-stroke; }
+.sep-column { fill: #13796a10; stroke: #13796a40; stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+.sep-line { cursor: ns-resize; }
+.sep-visible { stroke: #d2342a; stroke-width: 1.5; pointer-events: none; }
+.sep-hit { stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: ns-resize; }
+.sep-line.selected .sep-visible { stroke: #a31d14; stroke-width: 2.5; }
+.sep-line.adjusting .sep-visible { stroke-dasharray: 5 3; }
+.sep-end { fill: white; stroke: #a31d14; stroke-width: 1.5; cursor: ew-resize; }
+
+/* MarkedTextField: <label> marks in a colour of their own inside the text of a field (a coloured backdrop under a transparent-text input) */
+.mark-field { position: relative; display: block; width: 100%; margin-top: 8px; background: white; border-radius: 6px; font-weight: 400; }
+.mark-field .mark-backdrop, .mark-field input, .mark-field textarea { box-sizing: border-box; margin: 0; padding: 10px 12px; border: 1px solid #e0e7e3; border-radius: 6px; font: inherit; font-size: 13px; line-height: 1.5; letter-spacing: normal; text-align: left; }
+.mark-field .mark-backdrop { position: absolute; inset: 0; color: var(--ink); border-color: transparent; pointer-events: none; overflow: hidden; scrollbar-gutter: stable; white-space: pre-wrap; overflow-wrap: break-word; }
+.mark-field.single .mark-backdrop { white-space: pre; overflow-wrap: normal; }
+.mark-field input, .mark-field textarea { position: relative; display: block; width: 100%; background: transparent; color: transparent; caret-color: var(--ink); }
+.mark-field textarea { resize: vertical; overflow-y: auto; scrollbar-gutter: stable; overflow-wrap: break-word; }
+.mark-field input::selection, .mark-field textarea::selection { background: #b9ddd2; color: transparent; }
+.mark-field:focus-within { outline: 2px solid #9fd0c3; outline-offset: 1px; }
+.mark-field input:focus, .mark-field textarea:focus { outline: none; }
+.mark-label { color: #1d4ed8; font-weight: inherit; }
+.mark-label.unknown { color: #c81e1e; }
+.mark-space { position: relative; }
+.mark-space::after { content: ""; position: absolute; left: 0.03em; right: 0.03em; bottom: 0.02em; height: 0.5em; border: 2px solid #d6249f; border-top: 0; border-radius: 0 0 2px 2px; pointer-events: none; }
+
+/* A compact on/off switch inside a table row (invoice templates: used or not): small track, the state written beside it in the colour of the state */
+.row-toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; margin: 0; }
+.row-toggle input[type=checkbox] { position: absolute; opacity: 0; width: 1px !important; height: 1px !important; min-width: 0; margin: 0; padding: 0 !important; border: 0 !important; }
+.row-toggle .toggle-track { width: 34px; height: 18px; border-radius: 9px; background: #aebbb7; border: 1px solid #8fa09b; box-sizing: border-box; }
+.row-toggle .toggle-track::after { top: 1px; left: 1px; width: 14px; height: 14px; }
+.row-toggle input:checked + .toggle-track { background: var(--green); border-color: #0d5d51; }
+.row-toggle input:checked + .toggle-track::after { transform: translateX(16px); }
+.row-toggle input:disabled + .toggle-track { opacity: .5; }
+.row-toggle-text { font-size: 12px; font-weight: 650; min-width: 52px; }
+.row-toggle.on .row-toggle-text { color: #0d6b5c; }
+.row-toggle.off .row-toggle-text { color: #7a8784; }
+.mark-op { color: #7e22ce; font-weight: inherit; }
+.placeholder-chip.operation-chip, .placeholder-chip.column-chip { background: #fff; font-weight: 600; }
+
+/* The data zone of a table column in the column dialog. */
+.zone-note { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+
+/* The table header is selectable and its cells are the columns of the table (their width is the width of the column). */
+.invoice-header-band { pointer-events: all; cursor: pointer; }
+.invoice-header-band.selected { fill: #13796a33; stroke: #13796a; stroke-width: 1.6; }
+.invoice-hcell { --col: #2f6fd5; fill: color-mix(in srgb, var(--col) 18%, transparent); stroke: var(--col); stroke-width: 1.2; cursor: pointer; }
+.invoice-hcell.selected { fill: color-mix(in srgb, var(--col) 34%, transparent); stroke-width: 2.4; }
+.invoice-hcell.no-zone { stroke: #d9381e; stroke-dasharray: 4 3; }
+.problem-text { color: #c81e1e; font-size: .8rem; font-weight: 600; }

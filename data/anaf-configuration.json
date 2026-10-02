@@ -1,0 +1,494 @@
+{
+  "Draft": {
+    "Name": "ANAF – Date contribuabil",
+    "Enabled": true,
+    "Url": "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva",
+    "Method": "POST",
+    "Timeout": 30,
+    "Interval": 1000,
+    "MaxBatch": 100,
+    "StripRO": true,
+    "Trim": true,
+    "DateFormat": "yyyy-MM-dd",
+    "Found": "$.found",
+    "NotFound": "$.notFound",
+    "Identity": "$.date_generale.cui",
+    "Headers": [
+      {
+        "Name": "Content-Type",
+        "Value": "application/json",
+        "Enabled": true
+      },
+      {
+        "Name": "Accept",
+        "Value": "application/json",
+        "Enabled": true
+      }
+    ],
+    "Template": "[\n  {\n    \"cui\": {{cui}},\n    \"data\": \"{{data_interogare}}\"\n  }\n]",
+    "Mappings": [
+      {
+        "Label": "CUI",
+        "Path": "$.date_generale.cui",
+        "Type": "text",
+        "Required": true,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "Denumire",
+        "Path": "$.date_generale.denumire",
+        "Type": "text",
+        "Required": true,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "Adresă fiscală",
+        "Path": "$.date_generale.adresa",
+        "Type": "text",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "Nr. Registrul Comerțului",
+        "Path": "$.date_generale.nrRegCom",
+        "Type": "text",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "Telefon",
+        "Path": "$.date_generale.telefon",
+        "Type": "text",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "Cod poștal",
+        "Path": "$.date_generale.codPostal",
+        "Type": "text",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "Cod CAEN",
+        "Path": "$.date_generale.cod_CAEN",
+        "Type": "text",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "Plătitor TVA",
+        "Path": "$.inregistrare_scop_Tva.scpTVA",
+        "Type": "boolean",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "TVA la încasare",
+        "Path": "$.inregistrare_RTVAI.statusTvaIncasare",
+        "Type": "boolean",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "Inactiv fiscal",
+        "Path": "$.stare_inactiv.statusInactivi",
+        "Type": "boolean",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      },
+      {
+        "Label": "RO e-Factura",
+        "Path": "$.date_generale.statusRO_e_Factura",
+        "Type": "boolean",
+        "Required": false,
+        "Missing": "keep",
+        "Update": "confirm"
+      }
+    ]
+  },
+  "Active": {
+    "Id": 2,
+    "At": "2026-09-29T13:26:11.2886455+03:00",
+    "Admin": "administrator.demo",
+    "Config": {
+      "Name": "ANAF – Date contribuabil",
+      "Enabled": true,
+      "Url": "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva",
+      "Method": "POST",
+      "Timeout": 30,
+      "Interval": 1000,
+      "MaxBatch": 100,
+      "StripRO": true,
+      "Trim": true,
+      "DateFormat": "yyyy-MM-dd",
+      "Found": "$.found",
+      "NotFound": "$.notFound",
+      "Identity": "$.date_generale.cui",
+      "Headers": [
+        {
+          "Name": "Content-Type",
+          "Value": "application/json",
+          "Enabled": true
+        },
+        {
+          "Name": "Accept",
+          "Value": "application/json",
+          "Enabled": true
+        }
+      ],
+      "Template": "[\n  {\n    \"cui\": {{cui}},\n    \"data\": \"{{data_interogare}}\"\n  }\n]",
+      "Mappings": [
+        {
+          "Label": "CUI",
+          "Path": "$.date_generale.cui",
+          "Type": "text",
+          "Required": true,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "Denumire",
+          "Path": "$.date_generale.denumire",
+          "Type": "text",
+          "Required": true,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "Adresă fiscală",
+          "Path": "$.date_generale.adresa",
+          "Type": "text",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "Nr. Registrul Comerțului",
+          "Path": "$.date_generale.nrRegCom",
+          "Type": "text",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "Telefon",
+          "Path": "$.date_generale.telefon",
+          "Type": "text",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "Cod poștal",
+          "Path": "$.date_generale.codPostal",
+          "Type": "text",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "Cod CAEN",
+          "Path": "$.date_generale.cod_CAEN",
+          "Type": "text",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "Plătitor TVA",
+          "Path": "$.inregistrare_scop_Tva.scpTVA",
+          "Type": "boolean",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "TVA la încasare",
+          "Path": "$.inregistrare_RTVAI.statusTvaIncasare",
+          "Type": "boolean",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "Inactiv fiscal",
+          "Path": "$.stare_inactiv.statusInactivi",
+          "Type": "boolean",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        },
+        {
+          "Label": "RO e-Factura",
+          "Path": "$.date_generale.statusRO_e_Factura",
+          "Type": "boolean",
+          "Required": false,
+          "Missing": "keep",
+          "Update": "confirm"
+        }
+      ]
+    },
+    "RestoredFrom": null
+  },
+  "History": [
+    {
+      "Id": 1,
+      "At": "2026-09-29T13:26:03.564429+03:00",
+      "Admin": "administrator.demo",
+      "Config": {
+        "Name": "ANAF – Date contribuabil",
+        "Enabled": true,
+        "Url": "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva",
+        "Method": "POST",
+        "Timeout": 30,
+        "Interval": 1000,
+        "MaxBatch": 100,
+        "StripRO": true,
+        "Trim": true,
+        "DateFormat": "yyyy-MM-dd",
+        "Found": "$.found",
+        "NotFound": "$.notFound",
+        "Identity": "$.date_generale.cui",
+        "Headers": [
+          {
+            "Name": "Content-Type",
+            "Value": "application/json",
+            "Enabled": true
+          },
+          {
+            "Name": "Accept",
+            "Value": "application/json",
+            "Enabled": true
+          }
+        ],
+        "Template": "[\n  {\n    \"cui\": {{cui}},\n    \"data\": \"{{data_interogare}}\"\n  }\n]",
+        "Mappings": [
+          {
+            "Label": "CUI",
+            "Path": "$.date_generale.cui",
+            "Type": "text",
+            "Required": true,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Denumire",
+            "Path": "$.date_generale.denumire",
+            "Type": "text",
+            "Required": true,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Adresă fiscală",
+            "Path": "$.date_generale.adresa",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Nr. Registrul Comerțului",
+            "Path": "$.date_generale.nrRegCom",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Telefon",
+            "Path": "$.date_generale.telefon",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Cod poștal",
+            "Path": "$.date_generale.codPostal",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Cod CAEN",
+            "Path": "$.date_generale.cod_CAEN",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Plătitor TVA",
+            "Path": "$.inregistrare_scop_Tva.scpTVA",
+            "Type": "boolean",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "TVA la încasare",
+            "Path": "$.inregistrare_RTVAI.statusTvaIncasare",
+            "Type": "boolean",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Inactiv fiscal",
+            "Path": "$.stare_inactiv.statusInactivi",
+            "Type": "boolean",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "RO e-Factura",
+            "Path": "$.date_generale.statusRO_e_Factura",
+            "Type": "boolean",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          }
+        ]
+      },
+      "RestoredFrom": null
+    },
+    {
+      "Id": 2,
+      "At": "2026-09-29T13:26:11.2886455+03:00",
+      "Admin": "administrator.demo",
+      "Config": {
+        "Name": "ANAF – Date contribuabil",
+        "Enabled": true,
+        "Url": "https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva",
+        "Method": "POST",
+        "Timeout": 30,
+        "Interval": 1000,
+        "MaxBatch": 100,
+        "StripRO": true,
+        "Trim": true,
+        "DateFormat": "yyyy-MM-dd",
+        "Found": "$.found",
+        "NotFound": "$.notFound",
+        "Identity": "$.date_generale.cui",
+        "Headers": [
+          {
+            "Name": "Content-Type",
+            "Value": "application/json",
+            "Enabled": true
+          },
+          {
+            "Name": "Accept",
+            "Value": "application/json",
+            "Enabled": true
+          }
+        ],
+        "Template": "[\n  {\n    \"cui\": {{cui}},\n    \"data\": \"{{data_interogare}}\"\n  }\n]",
+        "Mappings": [
+          {
+            "Label": "CUI",
+            "Path": "$.date_generale.cui",
+            "Type": "text",
+            "Required": true,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Denumire",
+            "Path": "$.date_generale.denumire",
+            "Type": "text",
+            "Required": true,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Adresă fiscală",
+            "Path": "$.date_generale.adresa",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Nr. Registrul Comerțului",
+            "Path": "$.date_generale.nrRegCom",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Telefon",
+            "Path": "$.date_generale.telefon",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Cod poștal",
+            "Path": "$.date_generale.codPostal",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Cod CAEN",
+            "Path": "$.date_generale.cod_CAEN",
+            "Type": "text",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Plătitor TVA",
+            "Path": "$.inregistrare_scop_Tva.scpTVA",
+            "Type": "boolean",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "TVA la încasare",
+            "Path": "$.inregistrare_RTVAI.statusTvaIncasare",
+            "Type": "boolean",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "Inactiv fiscal",
+            "Path": "$.stare_inactiv.statusInactivi",
+            "Type": "boolean",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          },
+          {
+            "Label": "RO e-Factura",
+            "Path": "$.date_generale.statusRO_e_Factura",
+            "Type": "boolean",
+            "Required": false,
+            "Missing": "keep",
+            "Update": "confirm"
+          }
+        ]
+      },
+      "RestoredFrom": null
+    }
+  ]
+}

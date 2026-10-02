@@ -29,13 +29,13 @@
                     </select></label>
                 <label for="template-days">Cu câte zile înainte de expirare *<input id="template-days" type="number" min="1" max="@ExpiryTemplateRules.MaxThreshold" step="1" @bind="input.ThresholdDays" /></label>
                 <label class="anaf-check"><input type="checkbox" @bind="input.Active" /> Șablon activ</label>
-                <label for="template-subject" class="anaf-wide">Subiect *<input id="template-subject" @bind="input.Subject" @bind:event="oninput" @onfocus="() => subjectActive = true" maxlength="@ExpiryTemplateRules.MaxSubject" autocomplete="off" /></label>
-                <label for="template-body" class="anaf-wide">Text *<textarea id="template-body" rows="6" maxlength="@ExpiryTemplateRules.MaxBody" @bind="input.Body" @bind:event="oninput" @onfocus="() => subjectActive = false"></textarea></label>
+                <label for="template-subject" class="anaf-wide">Subiect *<MarkedTextField @ref="subjectField" Id="template-subject" Value="@input.Subject" ValueChanged="value => input.Subject = value" OnFocus="() => subjectActive = true" MaxLength="@ExpiryTemplateRules.MaxSubject" Known="IsKnownMark" /></label>
+                <label for="template-body" class="anaf-wide">Text *<MarkedTextField @ref="bodyField" Id="template-body" Multiline="true" Rows="6" Value="@input.Body" ValueChanged="value => input.Body = value" OnFocus="() => subjectActive = false" MaxLength="@ExpiryTemplateRules.MaxBody" Known="IsKnownMark" /></label>
             </div>
             @if (SelectedSource is { } selectedSource)
             {
                 <div class="placeholder-list" aria-label="Marcaje disponibile">
-                    <span class="muted small">Marcaje disponibile (clic pentru a le adăuga la sfârșitul câmpului activ, Subiect sau Text):</span>
+                    <span class="muted small">Marcaje disponibile (clic pentru a le adăuga la poziția cursorului din câmpul activ, Subiect sau Text):</span>
                     @foreach (var placeholder in ExpiryTemplateRules.AllPlaceholders(selectedSource))
                     {
                         <button type="button" class="placeholder-chip" title="@placeholder.Description" @onclick="() => Append(placeholder.Name)">&lt;@placeholder.Name&gt;</button>
@@ -156,10 +156,18 @@ else
 
     private void EventChanged(ChangeEventArgs args) => input.SourceKey = args.Value?.ToString() ?? "";
 
-    private void Append(string name)
+    private MarkedTextField? subjectField, bodyField;
+
+    private bool IsKnownMark(string name) => name == ExpiryTemplateRules.EventName || SelectedSource is null || ExpiryTemplateRules.AllPlaceholders(SelectedSource).Any(item => item.Name == name);
+
+    // The mark goes where the cursor is in the field that was used last (Subject or Text); at its end when that is not possible.
+    private async Task Append(string name)
     {
-        if (subjectActive) input.Subject += $"<{name}>";
-        else input.Body += $"<{name}>";
+        var mark = $"<{name}>";
+        var field = subjectActive ? subjectField : bodyField;
+        if (field is not null && await field.InsertAsync(mark)) return;
+        if (subjectActive) input.Subject += mark;
+        else input.Body += mark;
     }
 
     private void FillExample()

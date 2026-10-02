@@ -1,2 +1,8 @@
 Assets/Fonts/*.ttf binary
 Assets/Fonts/OFL.txt -whitespace
+
+# Datele de dezvoltare se pastreaza byte cu byte (fara conversia sfarsiturilor de linie)
+database/dev-data/** -text
+keys/** -text
+local-secrets/** -text
+data/** -text

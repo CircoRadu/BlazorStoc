@@ -1,0 +1,12 @@
+﻿{
+    "Database":  {
+                     "Host":  "127.0.0.1",
+                     "Port":  3307,
+                     "Name":  "blazorstoc_test",
+                     "ExpectedName":  "blazorstoc_test",
+                     "User":  "blazorstoc_test_app",
+                     "Password":  "jdtnZ35Tby0WqxbD2nwDen9EItMdpI",
+                     "SslMode":  "Required"
+                 },
+    "Purpose":  "Baza MariaDB izolata pentru verificari de integrare (Subtask 2.11) - schema identica cu BlazorStoc, separata de cele 229 de randuri reale ale bazei de livrare. Se poate recrea oricand cu CreateTestDb.cs."
+}

@@ -28,10 +28,17 @@ public static class InvoiceFieldModes
 public sealed record InvoiceTemplateField(string Id, string Meaning, string Name, bool Use, int Page, double X, double Y, double Width, double Height,
     string LabelText, string Kind, bool Manual, string Mode = InvoiceFieldModes.Region, double LabelX = 0, double LabelY = 0);
 
-public sealed record InvoiceTemplateColumn(string Id, string Label, string Meaning, bool Use, double Left, double Right, string RowMapping, bool Manual, string HeaderText = "");
+// Top/Bottom: the data zone of the column (fractions of the page height, 0 = automatic: from the header to the end of the rows), with the text of
+// the element right above (TopAnchor) and right below (BottomAnchor) the zone: in another file the zone is found from those elements, never from
+// fixed coordinates. BottomPage: the page of the bottom anchor (0 = the header page).
+public sealed record InvoiceTemplateColumn(string Id, string Label, string Meaning, bool Use, double Left, double Right, string RowMapping, bool Manual, string HeaderText = "",
+    double Top = 0, double Bottom = 0, string TopAnchor = "", string BottomAnchor = "", int BottomPage = 0,
+    double CellTop = 0, double CellBottom = 0, bool ZoneDrawn = true);
 
+// BodyBottom: where the rows of the table ended on the header page in the file the template was made from (fraction of the page; 0 = not known,
+// templates saved before it existed): the columns are drawn down to it when the template is shown without having been read.
 public sealed record InvoiceTemplateTable(int HeaderPage, double HeaderTop, double HeaderBottom, string RowSplit, bool HasIndexColumn,
-    string NameCodeSeparator, IReadOnlyList<InvoiceTemplateColumn> Columns);
+    string NameCodeSeparator, IReadOnlyList<InvoiceTemplateColumn> Columns, double BodyBottom = 0);
 
 public sealed record InvoiceTemplateDefinition(int Schema, string SourceKind, double PageWidth, double PageHeight,
     IReadOnlyList<InvoiceTemplateAnchor> Anchors, IReadOnlyList<InvoiceTemplateField> Fields, InvoiceTemplateTable? Table, string ProductDescription = "")
@@ -93,6 +100,17 @@ public sealed class DraftColumn
     public double Right { get; set; }
     public string RowMapping { get; set; } = InvoiceRowMapping.Band;
     public bool Manual { get; set; }
+    // The data zone of the column (points on the header page; 0 = automatic) and the text of the element right above / below it (what it is anchored to).
+    public double Top { get; set; }
+    public double Bottom { get; set; }
+    public string TopAnchor { get; set; } = "";
+    public string BottomAnchor { get; set; } = "";
+    public int BottomPage { get; set; }
+    // The cell of the table header the column is made from: its width is the width of the column (CellTop/CellBottom = its extent, 0 = the header band of
+    // the table). The zone of the column (Top/Bottom) must be drawn too: a column whose zone was not drawn is a problem that stops the save.
+    public double CellTop { get; set; }
+    public double CellBottom { get; set; }
+    public bool ZoneDrawn { get; set; } = true;
 }
 
 public sealed class InvoiceTemplateDraft
@@ -106,6 +124,8 @@ public sealed class InvoiceTemplateDraft
     public string RowSplit { get; set; } = InvoiceRowSplit.Top;
     public bool HasIndexColumn { get; set; }
     public string NameCodeSeparator { get; set; } = "";
+    // The foot of the table body on the header page, in points (0 = not known): kept with the template, set when it is saved.
+    public double BodyBottom { get; set; }
     public List<DraftColumn> Columns { get; set; } = [];
     // The words that identify the layout (kept from the analysed file; they are what a later invoice is matched with).
     public List<InvoiceTemplateAnchor> Anchors { get; set; } = [];
@@ -114,6 +134,18 @@ public sealed class InvoiceTemplateDraft
     // How a product taken from an invoice is described: text with <label> marks (see InvoiceProductDescription).
     public string ProductDescription { get; set; } = "";
 
+    // With ruled lines a header cell is the rectangle the rules frame: the header spans the inside of that rectangle (between the rule right above
+    // and the rule right below its words, kept RuleInset away from them), never the lines themselves. Without such rules the extent of its words.
+    public static (double Top, double Bottom) HeaderInterior(InvoicePageData? page, double top, double bottom, double left, double right)
+    {
+        if (page?.Rules is not { Count: > 0 } rules) return (top, bottom);
+        var horizontals = rules.Where(rule => !rule.Vertical && InvoiceLayout.Overlap(left, right, rule.From, rule.To) >= 0.6 * (right - left)).Select(rule => rule.Position).OrderBy(position => position).ToList();
+        var above = horizontals.Where(position => position <= top + 1 && top - position <= 14).DefaultIfEmpty(double.NaN).Max();
+        var below = horizontals.Where(position => position >= bottom - 1 && position - bottom <= 14).DefaultIfEmpty(double.NaN).Min();
+        if (double.IsNaN(above) || double.IsNaN(below)) return (top, bottom);
+        return (above + InvoiceTableReader.RuleInset, below - InvoiceTableReader.RuleInset);
+    }
+
     // Initial draft = what the analysis proposes: recognised fields and columns are used, the rest is offered but unused.
     public static InvoiceTemplateDraft FromAnalysis(InvoiceAnalysis analysis)
     {
@@ -121,7 +153,7 @@ public sealed class InvoiceTemplateDraft
         foreach (var field in analysis.Fields)
             draft.Fields.Add(new DraftField
             {
-                Id = field.Id, Meaning = field.Meaning, Name = field.Meaning.Length > 0 ? InvoiceVocabulary.FieldTitle(field.Meaning) : field.Label,
+                Id = field.Id, Meaning = field.Meaning, Name = OwnName(field),
                 Use = field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom && !InvoiceVocabulary.IsExtraPartyAttribute(field.Meaning),
                 Page = field.ValueBox.Page, X = field.ValueBox.X, Y = field.ValueBox.Y, Width = field.ValueBox.Width, Height = field.ValueBox.Height,
                 LabelText = field.Label, Value = field.Value, Kind = KindName(field.ValueKind), Confidence = field.Confidence, Section = field.Section,
@@ -133,17 +165,29 @@ public sealed class InvoiceTemplateDraft
         {
             draft.HasTable = true;
             draft.HeaderPage = table.HeaderPage;
-            draft.HeaderTop = table.HeaderTop;
-            draft.HeaderBottom = table.HeaderBottom;
+            (draft.HeaderTop, draft.HeaderBottom) = HeaderInterior(analysis.Pages.FirstOrDefault(item => item.Number == table.HeaderPage), table.HeaderTop, table.HeaderBottom, table.Columns.Min(column => column.Left), table.Columns.Max(column => column.Right));
+            draft.RowSplit = table.RowSplit;
             draft.HasIndexColumn = table.HasIndexColumn;
             draft.Columns = table.Columns.Select(column => new DraftColumn
             {
-                Id = column.Id, Label = column.Label, HeaderText = column.Label, Meaning = column.Meaning, Use = column.Meaning != InvoiceColumnMeanings.Ignore,
+                Id = column.Id, Label = column.Label, HeaderText = column.Label, Meaning = column.Meaning == InvoiceColumnMeanings.Ignore ? InvoiceColumnMeanings.Other : column.Meaning, Use = column.Meaning != InvoiceColumnMeanings.Ignore,
                 Left = column.Left, Right = column.Right, RowMapping = column.RowMapping
             }).ToList();
         }
+        // Two used fields with the same label in the file ("Data" twice) get different labels.
+        foreach (var field in draft.Fields.Where(item => item.Use))
+            if (draft.Fields.TakeWhile(item => item != field).Any(other => other.Use && InvoiceValues.Normalize(EffectiveLabel(other)) == InvoiceValues.Normalize(EffectiveLabel(field)))) field.Name = draft.FreeLabelFor(field);
         draft.Anchors = InvoiceTemplateAnchors.From(analysis);
+        draft.ProductDescription = InvoiceProductDescription.Default(draft);
         return draft;
+    }
+
+    // The label of a field found by the analysis: the text the file itself has beside it (what the template is made of), and only when the file has
+    // none (a supplier or a customer found by its place on the page) the title of its meaning.
+    private static string OwnName(InvoiceHeaderField field)
+    {
+        var own = field.Label.Trim().TrimEnd(':', ' ');
+        return own.Length > 0 ? own : field.Meaning.Length > 0 ? InvoiceVocabulary.FieldTitle(field.Meaning) : "";
     }
 
     public static string KindName(InvoiceValueKind kind) => kind switch { InvoiceValueKind.Number => "number", InvoiceValueKind.Date => "date", _ => "text" };
@@ -181,19 +225,22 @@ public sealed class InvoiceTemplateDraft
         var usedColumns = Columns.Where(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore).ToList();
         if (usedFields.Count == 0 && usedColumns.Count == 0) problems.Add("Marchează cel puțin un câmp sau o coloană folosită la import.");
         foreach (var group in usedFields.Where(field => field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom).GroupBy(field => field.Meaning).Where(group => group.Count() > 1))
-            problems.Add($"Sensul „{InvoiceVocabulary.FieldTitle(group.Key)}” este dat la mai multe câmpuri.");
+            problems.Add("Câmpurile " + string.Join(", ", group.Select(field => "„" + EffectiveLabel(field) + "”")) + " sunt citite cu același rol; folosește numai unul dintre ele.");
         foreach (var field in usedFields.Where(field => field.Meaning.Length == 0 || field.Meaning == InvoiceFieldMeanings.Custom))
             if (field.Name.Trim().Length == 0) problems.Add("Un câmp fără sens propriu are nevoie de o etichetă.");
         foreach (var group in usedFields.Where(field => EffectiveLabel(field).Length > 0).GroupBy(field => InvoiceValues.Normalize(EffectiveLabel(field)))
                      .Where(group => group.Count() > 1 && group.Any(field => field.Meaning.Length == 0 || field.Meaning == InvoiceFieldMeanings.Custom)))
             problems.Add($"Eticheta „{EffectiveLabel(group.First())}” este folosită la mai multe câmpuri; dă-le etichete diferite.");
-        foreach (var group in usedColumns.GroupBy(column => column.Meaning).Where(group => group.Count() > 1))
-            problems.Add($"Sensul „{InvoiceVocabulary.ColumnTitle(group.Key)}” este dat la mai multe coloane.");
+        foreach (var group in usedColumns.Where(column => column.Meaning != InvoiceColumnMeanings.Other).GroupBy(column => column.Meaning).Where(group => group.Count() > 1))
+            problems.Add("Coloanele " + string.Join(", ", group.Select(column => "„" + column.Label + "”")) + " sunt citite cu același rol; folosește numai una dintre ele.");
         if (usedColumns.Count > 0 && !usedColumns.Any(column => column.Meaning is InvoiceColumnMeanings.Name or InvoiceColumnMeanings.Code))
             problems.Add("Tabelul are nevoie de o coloană cu denumirea sau cu codul produsului.");
-        if (ProductDescription.Length > InvoiceProductDescription.MaxLength) problems.Add($"Descrierea produsului poate avea cel mult {InvoiceProductDescription.MaxLength} de caractere.");
+        foreach (var column in Columns.Where(column => !column.ZoneDrawn))
+            problems.Add($"Celula de antet „{(column.Label.Length > 0 ? column.Label : "fără denumire")}” nu are zona coloanei desenată pe pagină (desenează zona sub celulă sau șterge celula).");
+        problems.AddRange(InvoiceProductDescription.OperationProblems(ProductDescription));
+        if (ProductDescription.Length > InvoiceProductDescription.MaxLength) problems.Add($"Descrierea intrării în stoc a produsului poate avea cel mult {InvoiceProductDescription.MaxLength} de caractere.");
         foreach (var mark in InvoiceProductDescription.UnknownMarks(ProductDescription, InvoiceProductDescription.Labels(this).Select(item => item.Label)))
-            problems.Add($"Descrierea produsului conține marcajul <{mark}>, care nu este o etichetă activă în șablon.");
+            problems.Add($"Descrierea intrării în stoc conține marcajul <{mark}>, care nu este o etichetă activă în șablon.");
         return problems;
     }
 
@@ -214,9 +261,54 @@ public sealed class InvoiceTemplateDraft
             var page = PageOf(HeaderPage);
             table = new InvoiceTemplateTable(HeaderPage, HeaderTop / page.Height, HeaderBottom / page.Height, RowSplit, HasIndexColumn, NameCodeSeparator.Trim(),
                 Columns.OrderBy(column => column.Left).Select(column => new InvoiceTemplateColumn(column.Id, column.Label, column.Meaning, column.Use,
-                    column.Left / page.Width, column.Right / page.Width, column.RowMapping, column.Manual, column.HeaderText)).ToList());
+                    column.Left / page.Width, column.Right / page.Width, column.RowMapping, column.Manual, column.HeaderText,
+                    column.Top / page.Height, column.Bottom > 0 ? column.Bottom / PageOf(column.BottomPage > 0 ? column.BottomPage : HeaderPage).Height : 0, column.TopAnchor, column.BottomAnchor, column.BottomPage,
+                    column.CellTop / page.Height, column.CellBottom / page.Height, column.ZoneDrawn)).ToList(), BodyBottom / page.Height);
         }
         return new InvoiceTemplateDefinition(InvoiceTemplateDefinition.CurrentSchema, SourceKind, first.Width, first.Height, Anchors, fields, table, ProductDescription.Trim());
+    }
+
+    // The draft of a saved template exactly as it was saved, shown on a file: every position is the saved fraction of the page (no alignment
+    // with the file's words, no search of the table header in it), so that editing a template changes only the elements of the template and
+    // never runs the template through the analysis of the file. Aligning it with the file is the user's choice (FromDefinition, "Analizează fișierul").
+    public static InvoiceTemplateDraft FromSaved(InvoiceTemplateDefinition definition, InvoiceDocument document, string supplierName, string supplierCui)
+    {
+        var draft = new InvoiceTemplateDraft { SourceKind = definition.SourceKind, Anchors = [.. definition.Anchors], SupplierName = supplierName, SupplierCui = supplierCui, ProductDescription = definition.ProductDescription ?? "" };
+        var none = new InvoiceAlignment(0, 0, 0, 0, 0, 0);
+        InvoicePageData PageOf(int number) => document.Pages.FirstOrDefault(page => page.Number == number) ?? document.Pages[0];
+        foreach (var field in definition.Fields)
+        {
+            var page = PageOf(field.Page);
+            draft.Fields.Add(new DraftField
+            {
+                Id = field.Id, Meaning = field.Meaning, Name = field.Name, Use = field.Use, Page = page.Number,
+                X = field.X * page.Width, Y = field.Y * page.Height, Width = field.Width * page.Width, Height = field.Height * page.Height,
+                LabelText = field.LabelText, Kind = field.Kind, Manual = field.Manual, Value = InvoiceTemplateEngine.ReadField(field, document, none).Value, Mode = field.Mode,
+                LabelX = field.LabelX * page.Width, LabelY = field.LabelY * page.Height
+            });
+        }
+        if (definition.Table is { } table)
+        {
+            var page = PageOf(table.HeaderPage);
+            draft.HasTable = true;
+            draft.HeaderPage = page.Number;
+            draft.HeaderTop = table.HeaderTop * page.Height;
+            draft.HeaderBottom = table.HeaderBottom * page.Height;
+            draft.RowSplit = table.RowSplit;
+            draft.HasIndexColumn = table.HasIndexColumn;
+            draft.NameCodeSeparator = table.NameCodeSeparator;
+            draft.BodyBottom = table.BodyBottom * page.Height;
+            draft.Columns = table.Columns.Select(column => new DraftColumn
+            {
+                Id = column.Id, Label = column.Label, HeaderText = column.HeaderText.Length > 0 ? column.HeaderText : column.Label, Meaning = column.Meaning, Use = column.Use,
+                Left = column.Left * page.Width, Right = column.Right * page.Width, RowMapping = column.RowMapping, Manual = column.Manual,
+                Top = column.Top * page.Height, Bottom = column.Bottom > 0 ? column.Bottom * PageOf(column.BottomPage > 0 ? column.BottomPage : table.HeaderPage).Height : 0,
+                TopAnchor = column.TopAnchor, BottomAnchor = column.BottomAnchor, BottomPage = column.BottomPage,
+                CellTop = column.CellTop * page.Height, CellBottom = column.CellBottom * page.Height, ZoneDrawn = column.ZoneDrawn
+            }).ToList();
+        }
+        draft.ProductDescription = InvoiceProductDescription.Upgrade(draft.ProductDescription, draft);
+        return draft;
     }
 
     // The draft of a saved template, positioned on a file: the saved positions are moved by the offset that aligns the template's
@@ -244,7 +336,7 @@ public sealed class InvoiceTemplateDraft
             var page = PageOf(table.HeaderPage);
             // The columns are placed as the engine places them when it reads this file (the header found in the file when its labels are the
             // template's), each keeping the meaning and the "used" choice of the template.
-            var (geometry, headerBottom) = InvoiceTemplateEngine.TableGeometry(table, page, alignment);
+            var (geometry, headerBottom) = InvoiceTemplateEngine.TableGeometry(table, page, alignment, document);
             draft.HasTable = true;
             draft.HeaderPage = page.Number;
             draft.HeaderBottom = headerBottom;
@@ -252,16 +344,23 @@ public sealed class InvoiceTemplateDraft
             draft.RowSplit = table.RowSplit;
             draft.HasIndexColumn = table.HasIndexColumn;
             draft.NameCodeSeparator = table.NameCodeSeparator;
+            draft.BodyBottom = table.BodyBottom > 0 ? table.BodyBottom * page.Height + (headerBottom - table.HeaderBottom * page.Height) : 0;
             draft.Columns = geometry.Select(column =>
             {
                 var own = table.Columns.FirstOrDefault(item => item.Id == column.Id);
                 return new DraftColumn
                 {
-                    Id = column.Id, Label = own?.Label ?? column.Label, HeaderText = own is null ? column.Label : own.HeaderText.Length > 0 ? own.HeaderText : own.Label, Meaning = own?.Meaning ?? InvoiceColumnMeanings.Ignore, Use = own?.Use ?? false,
-                    Left = column.Left, Right = column.Right, RowMapping = column.RowMapping, Manual = own?.Manual ?? false
+                    Id = column.Id, Label = own?.Label ?? column.Label, HeaderText = own is null ? column.Label : own.HeaderText.Length > 0 ? own.HeaderText : own.Label, Meaning = own?.Meaning ?? InvoiceColumnMeanings.Other, Use = own?.Use ?? false,
+                    Left = column.Left, Right = column.Right, RowMapping = column.RowMapping, Manual = own?.Manual ?? false,
+                    Top = column.ZoneTop > 0 ? column.ZoneTop : own is { Top: > 0 } ? own.Top * page.Height + alignment.TableDy : 0,
+                    Bottom = column.ZoneBottom > 0 ? column.ZoneBottom : own is { Bottom: > 0 } ? own.Bottom * PageOf(own.BottomPage > 0 ? own.BottomPage : table.HeaderPage).Height + alignment.TableDy : 0,
+                    TopAnchor = own?.TopAnchor ?? "", BottomAnchor = own?.BottomAnchor ?? "", BottomPage = own?.BottomPage ?? 0,
+                    CellTop = own is { CellTop: > 0 } ? own.CellTop * page.Height + (headerBottom - table.HeaderBottom * page.Height) : 0,
+                    CellBottom = own is { CellBottom: > 0 } ? own.CellBottom * page.Height + (headerBottom - table.HeaderBottom * page.Height) : 0, ZoneDrawn = own?.ZoneDrawn ?? true
                 };
             }).ToList();
         }
+        draft.ProductDescription = InvoiceProductDescription.Upgrade(draft.ProductDescription, draft);
         return draft;
     }
 }
@@ -498,7 +597,7 @@ public static class InvoiceTemplateEngine
         if (definition.Table is { } table)
         {
             var page = PageOf(table.HeaderPage);
-            var (tableColumns, headerBottom) = TableGeometry(table, page, alignment);
+            var (tableColumns, headerBottom) = TableGeometry(table, page, alignment, document);
             var read = InvoiceTableReader.ReadRows(document, tableColumns, page.Number, headerBottom, hint, table.RowSplit);
             // The columns keep the positions of the template; only the rows come from this file.
             columns = tableColumns;
@@ -513,7 +612,73 @@ public static class InvoiceTemplateEngine
     // geometry from the file itself when its header is recognised and its labels are the template's: a supplier's invoices differ in
     // how wide the columns are and how far down the table starts, so a header found in the file places the columns better than the
     // positions of the file the template was made from. Columns that are not found keep the template's positions moved by the alignment.
-    internal static (List<InvoiceColumn> Columns, double HeaderBottom) TableGeometry(InvoiceTemplateTable table, InvoicePageData page, InvoiceAlignment alignment)
+    // ---- the data zone of a column: anchored to the elements above and below it, not to coordinates ----
+
+    // The text runs of a page that belong to a column, top to bottom. The runs are those of the whole lines (so they are the same whatever the
+    // width given to the column); strict = the centre of the run is inside the column (where an anchor is chosen), else it is enough that the run
+    // overlaps the column (where an anchor is looked for: the header of another file may give the column another width).
+    internal static List<Segment> ColumnSegments(InvoicePageData page, double left, double right, bool strict = false) =>
+        InvoiceLayout.BuildLines(page.Words).SelectMany((line, index) => InvoiceLayout.Segments(line, index))
+            .Where(segment => strict ? (segment.X + segment.Right) / 2 >= left - 3 && (segment.X + segment.Right) / 2 <= right + 3 : InvoiceLayout.Overlap(segment.X, segment.Right, left, right) > 0)
+            .OrderBy(segment => segment.CenterY).ToList();
+
+    // The text of the element right above a horizontal line of the column (empty when there is none), and the one right below it.
+    public static string AnchorAbove(InvoicePageData page, double left, double right, double y) =>
+        ColumnSegments(page, left, right, strict: true).Where(segment => segment.Box.Y + segment.Box.Height <= y + 2).OrderByDescending(segment => segment.Box.Y + segment.Box.Height).FirstOrDefault()?.Text ?? "";
+
+    public static string AnchorBelow(InvoicePageData page, double left, double right, double y) =>
+        ColumnSegments(page, left, right, strict: true).Where(segment => segment.Box.Y >= y - 2).OrderBy(segment => segment.Box.Y).FirstOrDefault()?.Text ?? "";
+
+    // Where the data of a column starts and ends in this file, found from the text of the element above (the zone starts under it) and
+    // below (the zone ends over it); 0 = not anchored, or the element is not in this file (the zone is then automatic, never a fixed position).
+    internal static (double Top, double Bottom, int BottomPage) ResolveZone(InvoiceTemplateColumn column, InvoiceDocument document, int headerPage, double left, double right,
+        double expectedTop, double expectedBottom)
+    {
+        double top = 0, bottom = 0;
+        var bottomPage = 0;
+        if (column.TopAnchor.Length > 0 && document.Pages.FirstOrDefault(page => page.Number == headerPage) is { } first)
+        {
+            var key = InvoiceValues.Normalize(column.TopAnchor);
+            var found = ColumnSegments(first, left, right).Where(segment => InvoiceValues.Normalize(segment.Text) == key)
+                .OrderBy(segment => Math.Abs(segment.Box.Y + segment.Box.Height - expectedTop)).FirstOrDefault();
+            if (found is not null) top = found.Box.Y + found.Box.Height;
+        }
+        if (column.BottomAnchor.Length > 0)
+        {
+            var key = InvoiceValues.Normalize(column.BottomAnchor);
+            var preferred = column.BottomPage > 0 ? column.BottomPage : headerPage;
+            foreach (var page in document.Pages.Where(page => page.Number >= headerPage).OrderBy(page => page.Number == preferred ? 0 : 1).ThenBy(page => page.Number))
+            {
+                var found = ColumnSegments(page, left, right).Where(segment => InvoiceValues.Normalize(segment.Text) == key)
+                    .OrderBy(segment => Math.Abs(segment.Box.Y - expectedBottom)).FirstOrDefault();
+                if (found is null) continue;
+                bottom = found.Box.Y;
+                bottomPage = page.Number == headerPage ? 0 : page.Number;
+                break;
+            }
+        }
+        return (top, bottom, bottomPage);
+    }
+
+    // The columns with the data zone of each one found in this file.
+    private static List<InvoiceColumn> WithZones(List<InvoiceColumn> columns, InvoiceTemplateTable table, InvoicePageData page, InvoiceDocument? document, InvoiceAlignment alignment)
+    {
+        if (document is null || !table.Columns.Any(column => column.TopAnchor.Length > 0 || column.BottomAnchor.Length > 0)) return columns;
+        return columns.Select(column =>
+        {
+            if (table.Columns.FirstOrDefault(item => item.Id == column.Id) is not { } own || (own.TopAnchor.Length == 0 && own.BottomAnchor.Length == 0)) return column;
+            var (top, bottom, bottomPage) = ResolveZone(own, document, page.Number, column.Left, column.Right, own.Top * page.Height + alignment.TableDy, own.Bottom * page.Height + alignment.TableDy);
+            return column with { ZoneTop = top, ZoneBottom = bottom, ZoneBottomPage = bottomPage };
+        }).ToList();
+    }
+
+    internal static (List<InvoiceColumn> Columns, double HeaderBottom) TableGeometry(InvoiceTemplateTable table, InvoicePageData page, InvoiceAlignment alignment, InvoiceDocument? document = null)
+    {
+        var (columns, headerBottom) = TableGeometryCore(table, page, alignment);
+        return (WithZones(columns, table, page, document, alignment), headerBottom);
+    }
+
+    internal static (List<InvoiceColumn> Columns, double HeaderBottom) TableGeometryCore(InvoiceTemplateTable table, InvoicePageData page, InvoiceAlignment alignment)
     {
         var fallback = table.Columns.Select(column => new InvoiceColumn(column.Id, column.Label, column.Use ? column.Meaning : InvoiceColumnMeanings.Ignore,
             column.Left * page.Width + alignment.TableDx, column.Right * page.Width + alignment.TableDx, column.RowMapping)).ToList();

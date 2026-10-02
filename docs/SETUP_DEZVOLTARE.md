@@ -50,12 +50,12 @@ Parametri: `-MariaRoot` (implicit `C:\Dev\BlazorStoc-MariaDB`), `-Port` (implici
 | `blazorstoc_restore` | ALL pe `BlazorStoc_bak` si `BlazorStoc_old`; SELECT, ALTER, DROP, CREATE, INSERT, TRIGGER pe `BlazorStoc` | restaurarea bazei din aplicatie |
 | `blazorstoc_test_app` | SELECT, INSERT, UPDATE, DELETE pe `blazorstoc_test` | verificarile de integrare |
 
-6. Scrie fisierele private (nu intra in Git: `local-secrets/` si `*.private.*` sunt in `.gitignore`):
+6. Fisierele private (**se comit** in repository-ul privat: parolele sunt doar de dezvoltare si astfel pe calculatorul nou nu se introduc parole; daca lipsesc, se genereaza):
    - `application-connection.private.json`: conexiunea aplicatiei, utilizatorul `admin` si parola lui, caile catre `mariadb.exe`/`mariadb-dump.exe` (`Database:MariaClientExecutablePath`, `Database:MariaDumpExecutablePath`), radacina fisierelor (`Database:MariaAssetsRoot`, `App:DataProtectionPath`);
    - `migration-account.private.json`, `backup-account.private.json`, `restore-account.private.json`, `test-database.private.json`.
 7. Incarca schema de baza (`database\mariadb\schema-mariadb.sql`, 28 de tabele) si triggerele (`triggers-mariadb.sql`), apoi ruleaza `dotnet run ... --migrate-schema`, care aplica migrarile 1-10 din `Services/MariaSchemaMigrations.cs`. Rezultatul corect: **41 de tabele si 18 triggere** in `BlazorStoc` si in `blazorstoc_test` (aceleasi cifre ca pe calculatorul de dezvoltare initial).
 
-Scriptul nu suprascrie fisiere private existente si nu afiseaza parole. Daca exista doar o parte din fisierele private, se opreste cu un mesaj; pentru a reface totul de la zero, sterge directorul `-MariaRoot` si fisierele `*.private.json` generate, apoi ruleaza-l din nou. O nepotrivire intre calea implicita din cod (`%LOCALAPPDATA%\BlazorStoc-MariaDB`) si calea aleasa la instalare este acoperita de cheile din `application-connection.private.json`.
+Daca fisierele private exista deja (vin din repository), scriptul creeaza conturile MariaDB cu parolele din ele (nu genereaza altele), apoi incarca datele din `databasedev-data` (vezi mai jos). Scriptul nu suprascrie fisiere private existente si nu afiseaza parole. Daca exista doar o parte din fisierele private, se opreste cu un mesaj; pentru a reface totul de la zero, sterge directorul `-MariaRoot` si fisierele `*.private.json` generate, apoi ruleaza-l din nou. O nepotrivire intre calea implicita din cod (`%LOCALAPPDATA%\BlazorStoc-MariaDB`) si calea aleasa la instalare este acoperita de cheile din `application-connection.private.json`.
 
 ## 4. Lucrul de zi cu zi
 
@@ -81,10 +81,10 @@ Pentru a controla baza direct, foloseste clientul cu fisierul root (parola nu ap
 
 | Element | Unde era pe calculatorul initial | Observatii |
 |---|---|---|
-| Datele bazei | MariaDB `C:\Dev\BlazorStoc-MariaDB\data` | Baza noua porneste goala (doar schema). Pentru datele reale vezi sectiunea 6 |
-| Parolele conturilor | `local-secrets\*.private.json`, `C:\Dev\BlazorStoc-MariaDB\admin.private.cnf` | Pe calculatorul nou se genereaza altele; nu le copia in Git sau in chat |
+| Datele bazei | MariaDB `C:DevBlazorStoc-MariaDBdata` | Se comit ca dump in `databasedev-dataBlazorStoc_data.sql` (fara `audit_events` si `change_events`, jurnalul nu are interes) si se incarca de `setup-dev-environment.ps1` daca `BlazorStoc` e goala; se reimprospateaza cu `toolsexport-dev-data.ps1` inainte de fiecare push |
+| Parolele conturilor | `local-secrets*.private.json`, `C:DevBlazorStoc-MariaDBdmin.private.cnf` | `local-secrets` se comite (repository privat); `admin.private.cnf` (root-ul instantei) se genereaza pe fiecare calculator si nu se comite |
 | Fisierele de pe disc | `%LOCALAPPDATA%\BlazorStoc-MariaDB\assets` (imagini produse, atasamente, fisiere arhivate, fotografii, chei Data Protection) | **Nu sunt incluse in backupul bazei** (risc acceptat in documentele de propunere). Se copiaza manual, impreuna cu `data\` din proiect, daca vrei aceleasi fisiere |
-| Configuratii locale | `data\anaf-configuration.json`, `data\map-configuration.json`, `data\audit-events.jsonl` | Ignorate de Git; aplicatia le recreeaza cu valori implicite |
+| Configuratii locale | `datanaf-configuration.json`, `datamap-configuration.json`, `datarchive`, `dataproduct-images`, `dataproject-files` | Se comit; nu se comit baza SQLite veche, `dataudit-events.jsonl*` si copiile de siguranta |
 | Cheile Data Protection | `Database:MariaAssetsRoot\data-protection-keys` | Fara ele, sesiunile existente si datele protejate nu se pot citi; pe un calculator nou nu conteaza (utilizatorii se autentifica din nou) |
 | Memoria agentului Claude | `C:\Users\<utilizator>\.claude\projects\...\memory` | Este per calculator si per cale de proiect; regulile permanente sunt in `CLAUDE.md`, `AGENTS.md` si `TODO.md` |
 
@@ -127,7 +127,7 @@ Verificat, pe o instanta de proba (alt port, alt director, secrete separate, ste
 ## 9. Reguli de lucru (rezumat din `CLAUDE.md`)
 
 - Citeste `CLAUDE.md`, `TODO.md`, `docs/PROJECT_STATE.md` inainte de orice modificare. Claude este agentul unic (`mode: claude_only`).
-- Commit si push **numai la cererea explicita a utilizatorului**; nu commita secrete (`local-secrets/`, `*.private.*`, `keys/`, `data/` sunt ignorate).
+- Commit si push **numai la cererea explicita a utilizatorului**. Repository-ul este privat si parolele sunt doar de dezvoltare, deci `local-secrets/`, `keys/` si `data/` (cu exceptiile din `.gitignore`) se comit; inainte de fiecare push se ruleaza `toolsexport-dev-data.ps1` (dump fara jurnalul de evenimente + fisierele din `%LOCALAPPDATA%BlazorStoc-MariaDBssets`).
 - Fisierele `.md` se scriu fara diacritice; textele din aplicatie sunt in romana, cu diacritice, date in forma `dd.mm.yyyy`.
 - Operatiile noi care modifica date se jurnalizeaza cu actiuni exacte (`AuditActions`, filtrul Audit, test).
 - Taskurile finalizate se muta din `TODO.md` la sfarsitul `IMPLEMENTED.md`; verificarile nefacute se trec in `docs/TESTE_RAMASE.md`.

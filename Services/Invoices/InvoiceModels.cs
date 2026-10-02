@@ -46,7 +46,10 @@ public sealed record InvoiceHeaderField(string Id, string Label, string Value, I
 // One column of the line table. Left/Right are the column edges in points (the same on every page of the table). Meaning is a key
 // of InvoiceVocabulary.ColumnMeanings. RowMapping: "band" = a value belongs to the row whose band it is in; "sequence" = the k-th
 // value of the column belongs to the k-th row (for columns whose text is vertically offset from its row).
-public sealed record InvoiceColumn(string Id, string Label, string Meaning, double Left, double Right, string RowMapping = InvoiceRowMapping.Band);
+// ZoneTop / ZoneBottom (points, 0 = none): where the data of the column starts and ends, found in the file from the elements the template
+// anchors them to (the text above and below the zone); ZoneBottomPage is the page the bottom anchor was found on (0 = the header page).
+public sealed record InvoiceColumn(string Id, string Label, string Meaning, double Left, double Right, string RowMapping = InvoiceRowMapping.Band,
+    double ZoneTop = 0, double ZoneBottom = 0, int ZoneBottomPage = 0);
 
 public static class InvoiceRowMapping
 {
@@ -62,7 +65,7 @@ public sealed record InvoiceTableRow(int Page, int? Number, IReadOnlyDictionary<
 // ByStructure: the header was not recognised by its labels (the table was found from its running numbers), so the meanings of the
 // columns are guesses or unknown and the user is asked to check them.
 public sealed record InvoiceTable(int HeaderPage, double HeaderTop, double HeaderBottom, IReadOnlyList<InvoiceColumn> Columns,
-    IReadOnlyList<InvoiceTableRow> Rows, bool HasIndexColumn, double Confidence, bool ByStructure = false);
+    IReadOnlyList<InvoiceTableRow> Rows, bool HasIndexColumn, double Confidence, bool ByStructure = false, string RowSplit = InvoiceRowSplit.Top);
 
 public sealed record InvoiceAnalysis(IReadOnlyList<InvoicePageData> Pages, IReadOnlyList<InvoiceHeaderField> Fields, InvoiceTable? Table,
     IReadOnlyList<string> Warnings)
@@ -104,5 +107,7 @@ public static class InvoiceColumnMeanings
     public const string ValueWithVat = "valueWithVat";
     public const string Discount = "discount";
     public const string Currency = "currency";
+    // A column with a name of its own that no other meaning describes ("Taxa verde"): used, it is offered as a label under that name.
+    public const string Other = "other";
     public const string Ignore = "ignore";
 }

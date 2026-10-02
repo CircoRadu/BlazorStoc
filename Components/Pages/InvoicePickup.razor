@@ -1,0 +1,343 @@
+@page "/produse/preluare-factura"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Globalization
+@using BlazorStoc.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject IAccessControl Access
+@inject IInvoiceAnalysisService Analysis
+@inject IInvoiceTemplateService Templates
+@inject IJSRuntime JS
+@inject ILogger<InvoicePickup> Logger
+@implements IAsyncDisposable
+
+<PageTitle>Preluare factură · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">PRODUSE</p><h1>Preluare factură</h1>
+        <p class="muted">Încarcă factura PDF a furnizorului: se citește după șablonul detectat, iar liniile de demarcare dintre rânduri pot fi corectate.</p></div>
+</div>
+
+<FileDropZone Id="invoice-pickup-file" Accept=".pdf,application/pdf" Text="Alege factura PDF" OnChange="FileSelectedAsync" Disabled="@(loading || loadError is not null || busy)" />
+
+@if (loadError is not null) { <div class="error-banner" role="alert">@loadError</div> }
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se verifică drepturile de acces</h3></div>
+}
+else if (busy)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se citește factura…</h3><p>O pagină scanată poate dura câteva secunde.</p></div>
+}
+else if (loadError is null && session is null)
+{
+    <div class="empty-state"><h3>Nicio factură încărcată</h3><p>Alege fișierul PDF al facturii sau trage-l în câmpul de mai sus.</p></div>
+}
+else if (session is not null)
+{
+    var pageData = CurrentPageData;
+    <section class="invoice-head" aria-label="Fișierul citit">
+        <div><strong>@session.FileName</strong> <span class="muted">· @session.Document.Pages.Count @(session.Document.Pages.Count == 1 ? "pagină" : "pagini")</span></div>
+        <button type="button" class="danger" @onclick="DiscardAsync">Renunță și elimină fișierul</button>
+    </section>
+
+    @if (templateInfo is not null)
+    {
+        <div class="invoice-suggestions" role="status">
+            <strong>@templateInfo</strong>
+            @if (suggestions.Count > 1)
+            {
+                <label class="muted">Alt șablon:
+                    <select @onchange="ChooseTemplate" aria-label="Alege șablonul de citire">
+                        @foreach (var suggestion in suggestions)
+                        {
+                            <option value="@suggestion.Template.Info.Id" selected="@(chosen?.Info.Id == suggestion.Template.Info.Id)">@suggestion.Template.Info.Name · @SupplierLabel(suggestion.Template.Info)</option>
+                        }
+                    </select>
+                </label>
+            }
+        </div>
+    }
+    @foreach (var warning in session.Analysis.Warnings) { <div class="invoice-warning" role="status">⚠ @warning</div> }
+
+    @if (reading is null)
+    {
+        <div class="empty-state"><h3>Tabelul cu liniile facturii nu a fost găsit</h3><p>Nu există un șablon salvat potrivit, iar citirea automată nu a găsit tabelul. Creează șablonul în Setări → Facturi.</p></div>
+    }
+    else
+    {
+        <div class="invoice-layout">
+            <div class="invoice-pages">
+                @if (session.Document.Pages.Count > 1)
+                {
+                    <div class="invoice-page-tabs" role="tablist" aria-label="Paginile facturii">
+                        @foreach (var page in session.Document.Pages)
+                        {
+                            var number = page.Number;
+                            <button type="button" role="tab" class="invoice-page-tab @(number == currentPage ? "active" : "")" aria-selected="@(number == currentPage ? "true" : "false")" @onclick="() => currentPage = number">Pagina @number</button>
+                        }
+                    </div>
+                }
+                <div class="invoice-draw-tools">
+                    <button type="button" class="refresh @(addMode ? "active" : "")" aria-pressed="@(addMode ? "true" : "false")" @onclick="() => addMode = !addMode">─ Adaugă linie de demarcare</button>
+                    <button type="button" class="danger" disabled="@(selectedId.Length == 0)" @onclick="DeleteSelected">Șterge linia selectată</button>
+                    <button type="button" class="refresh" @onclick="ResetSeparators">Liniile propuse automat</button>
+                    <span class="muted">@(addMode ? "Apasă pe pagină, la înălțimea la care vrei linia." : "Trage o linie în sus sau în jos; trage capetele ei ca să o scurtezi sau să o lungești. Ce este sub ultima linie nu se citește.")</span>
+                </div>
+                <div class="invoice-page-wrap" style="aspect-ratio: @F(pageData.Width) / @F(pageData.Height)">
+                    <img src="@ImageUrl(pageData.Number)" alt="Pagina @pageData.Number a facturii" draggable="false" />
+                    <svg class="invoice-overlay sep-overlay @(addMode ? "drawing" : "")" viewBox="0 0 @F(pageData.Width) @F(pageData.Height)" preserveAspectRatio="none"
+                         data-sep-svg data-sep-add="@(addMode ? "true" : "false")" data-sep-page="@pageData.Number" role="group" aria-label="Liniile de demarcare ale tabelului pe pagina @pageData.Number">
+                        @foreach (var column in reading.Extraction.Columns.Where(column => column.Meaning != InvoiceColumnMeanings.Ignore))
+                        {
+                            <rect class="sep-column" x="@F(column.Left)" y="0" width="@F(Math.Max(1, column.Right - column.Left))" height="@F(pageData.Height)"><title>@(column.Label.Length > 0 ? column.Label : InvoiceVocabulary.ColumnTitle(column.Meaning))</title></rect>
+                        }
+                        @{ var size = pageData.Width / 110; }
+                        @foreach (var separator in separators.Where(item => item.Page == pageData.Number))
+                        {
+                            var id = separator.Id;
+                            var selected = id == selectedId;
+                            <g class="sep-line @(selected ? "selected" : "")" data-sep-id="@id" data-sep-y="@F(separator.Y)" data-sep-left="@F(separator.Left)" data-sep-right="@F(separator.Right)"
+                               @onclick="() => Select(id)" @onclick:stopPropagation="true">
+                                <line class="sep-visible" x1="@F(separator.Left)" x2="@F(separator.Right)" y1="@F(separator.Y)" y2="@F(separator.Y)" />
+                                <line class="sep-hit" data-sep-handle="move" x1="@F(separator.Left)" x2="@F(separator.Right)" y1="@F(separator.Y)" y2="@F(separator.Y)"><title>Trage pentru a muta linia</title></line>
+                                @if (selected)
+                                {
+                                    <rect class="sep-end" data-sep-handle="left" x="@F(separator.Left - size / 2)" y="@F(separator.Y - size / 2)" width="@F(size)" height="@F(size)"><title>Trage pentru a schimba începutul liniei</title></rect>
+                                    <rect class="sep-end" data-sep-handle="right" x="@F(separator.Right - size / 2)" y="@F(separator.Y - size / 2)" width="@F(size)" height="@F(size)"><title>Trage pentru a schimba sfârșitul liniei</title></rect>
+                                    <g class="invoice-delete" role="button" tabindex="0" aria-label="Șterge linia de demarcare" @onclick="DeleteSelected" @onclick:stopPropagation="true">
+                                        <title>Șterge linia</title>
+                                        <circle cx="@F(Math.Min(pageData.Width - size * 1.2, separator.Right + size * 1.8))" cy="@F(separator.Y)" r="@F(size * 1.1)" />
+                                        <text x="@F(Math.Min(pageData.Width - size * 1.2, separator.Right + size * 1.8))" y="@F(separator.Y + size * 0.55)" font-size="@F(size * 1.6)" text-anchor="middle">×</text>
+                                    </g>
+                                }
+                            </g>
+                        }
+                    </svg>
+                </div>
+            </div>
+
+            <section class="catalog" aria-label="Rândurile citite">
+                <div class="catalog-heading"><span class="category-title">Rânduri citite din factură (@rows.Count)</span></div>
+                @if (rows.Count == 0)
+                {
+                    <div class="empty-state"><h3>Niciun rând între liniile de demarcare</h3><p>Pune cel puțin două linii de demarcare, deasupra și sub rândurile tabelului.</p></div>
+                }
+                else
+                {
+                    <div class="table-scroll">
+                        <table>
+                            <thead><tr><th>#</th>@foreach (var column in ShownColumns) { <th>@column.Title</th> }<th>Pagina</th></tr></thead>
+                            <tbody>
+                                @for (var index = 0; index < rows.Count; index++)
+                                {
+                                    var row = rows[index];
+                                    <tr>
+                                        <td>@(index + 1)</td>
+                                        @foreach (var column in ShownColumns) { <td>@row.Cells.GetValueOrDefault(column.Id, "")</td> }
+                                        <td>@row.Page @foreach (var flag in row.Flags) { <span class="uncertain-badge" title="@flag">⚠ @flag</span> }</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        </div>
+    }
+}
+
+@code {
+    private sealed record ShownColumn(string Id, string Title);
+
+    private bool loading = true, busy, addMode;
+    private string? loadError, error, notice, templateInfo;
+    private string selectedId = "";
+    private int currentPage = 1, separatorCounter;
+    private InvoiceAnalysisSession? session;
+    private InvoiceTemplateRecord? chosen;
+    private IReadOnlyList<InvoiceTemplateSuggestion> suggestions = [];
+    private InvoicePickupReading? reading;
+    private List<InvoiceSeparator> separators = [];
+    private IReadOnlyList<InvoiceTableRow> rows = [];
+    private DotNetObjectReference<InvoicePickup>? reference;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private InvoicePageData CurrentPageData => session!.Document.Pages.FirstOrDefault(page => page.Number == currentPage) ?? session.Document.Pages[0];
+    private string ImageUrl(int page) => $"/media/invoice-analysis/{session!.Id}/{page}";
+    private static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    private static string SupplierLabel(InvoiceTemplateInfo info) => info.SupplierName.Length > 0 ? info.SupplierName : info.SupplierCui.Length > 0 ? "CUI " + info.SupplierCui : "furnizor nespecificat";
+
+    // The columns the template reads with a meaning, plus the product code when it was split off the name.
+    private IEnumerable<ShownColumn> ShownColumns
+    {
+        get
+        {
+            var columns = reading!.Extraction.Columns.Where(column => column.Meaning != InvoiceColumnMeanings.Ignore).ToList();
+            foreach (var column in columns) yield return new ShownColumn(column.Id, column.Label.Length > 0 ? column.Label : InvoiceVocabulary.ColumnTitle(column.Meaning));
+            if (columns.All(column => column.Id != "code") && rows.Any(row => row.Cells.ContainsKey("code"))) yield return new ShownColumn("code", InvoiceVocabulary.ColumnTitle(InvoiceColumnMeanings.Code));
+        }
+    }
+
+    protected override void OnInitialized() => reference = DotNetObjectReference.Create(this);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Access.CanManageProductsAsync(lifetime.Token)) loadError = "Nu ai dreptul să preiei facturi.";
+        loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await JS.InvokeVoidAsync("blazorStocInvoiceSeparators.register", reference); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
+    }
+
+    private async Task FileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        if (busy) return;
+        error = notice = null;
+        var file = e.File;
+        if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && !string.Equals(file.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase)) { error = InvoiceAnalysisRules.NotAPdfMessage; return; }
+        if (file.Size > InvoiceAnalysisRules.MaxFileSizeBytes) { error = InvoiceAnalysisRules.TooLargeMessage; return; }
+
+        busy = true;
+        StateHasChanged();
+        try
+        {
+            DiscardSession();
+            await using var stream = file.OpenReadStream(InvoiceAnalysisRules.MaxFileSizeBytes, lifetime.Token);
+            session = await Analysis.AnalyzeAsync(stream, file.Name, lifetime.Token);
+            suggestions = InvoiceTemplateSuggestions.Rank(await Templates.GetAllAsync(lifetime.Token), session.Document);
+            currentPage = session.Document.Pages[0].Number;
+            chosen = suggestions.FirstOrDefault()?.Template;
+            LoadReading();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (InvoiceAnalysisException exception) { error = exception.Message; ClearReading(); }
+        catch (AccessDeniedException exception) { error = exception.Message; ClearReading(); }
+        catch (Exception exception)
+        {
+            Logger.LogError("Invoice pickup analysis failed ({ErrorType}).", exception.GetType().Name);
+            error = "Fișierul nu a putut fi citit. Încearcă din nou sau alt fișier.";
+            ClearReading();
+        }
+        finally { busy = false; }
+    }
+
+    private void ChooseTemplate(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var id)) return;
+        chosen = suggestions.FirstOrDefault(item => item.Template.Info.Id == id)?.Template ?? chosen;
+        LoadReading();
+    }
+
+    // Reads the file with the detected template (the best saved one for the file); without one, with what the automatic analysis proposes.
+    private void LoadReading()
+    {
+        InvoiceTemplateDefinition? definition = null;
+        if (chosen is not null)
+        {
+            definition = chosen.Definition;
+            var match = suggestions.First(item => item.Template.Info.Id == chosen.Info.Id).Match;
+            templateInfo = $"Șablon detectat: {chosen.Info.Name} · {SupplierLabel(chosen.Info)} · potrivire {(int)Math.Round(match.Score * 100)}%";
+        }
+        else if (session!.Analysis.Table is not null)
+        {
+            definition = InvoiceTemplateDraft.FromAnalysis(session.Analysis).ToDefinition(session.Document);
+            templateInfo = "Niciun șablon salvat nu se potrivește cu factura: s-a folosit citirea automată. Verifică rândurile și coloanele.";
+        }
+        else templateInfo = null;
+
+        reading = definition is null ? null : InvoicePickupReader.Read(definition, session!.Document);
+        if (reading is not null && reading.Extraction.Columns.Count == 0) reading = null;
+        ResetSeparators();
+    }
+
+    private void ResetSeparators()
+    {
+        separators = reading is null ? [] : [.. reading.Separators];
+        separatorCounter = separators.Count;
+        selectedId = "";
+        addMode = false;
+        RereadRows();
+    }
+
+    private void RereadRows() => rows = reading is null ? [] : InvoicePickupReader.Reread(reading, session!.Document, separators);
+
+    private void ClearReading() { session = null; reading = null; separators = []; rows = []; templateInfo = null; suggestions = []; chosen = null; selectedId = ""; }
+
+    private void Select(string id) => selectedId = selectedId == id ? "" : id;
+
+    private void DeleteSelected()
+    {
+        if (selectedId.Length == 0) return;
+        separators.RemoveAll(item => item.Id == selectedId);
+        selectedId = "";
+        RereadRows();
+    }
+
+    // Called by invoice-separators.js when a line was dragged (move, shorten, lengthen): the rows are read again between the new lines.
+    [JSInvokable]
+    public Task OnSeparatorChanged(string id, double y, double left, double right)
+    {
+        var index = separators.FindIndex(item => item.Id == id);
+        if (index < 0) return Task.CompletedTask;
+        var page = CurrentPageData;
+        left = Math.Clamp(left, 0, page.Width);
+        right = Math.Clamp(right, left + 1, page.Width);
+        separators[index] = separators[index] with { Y = Math.Clamp(y, 0, page.Height), Left = left, Right = right };
+        selectedId = id;
+        RereadRows();
+        return InvokeAsync(StateHasChanged);
+    }
+
+    // Called by invoice-separators.js when the page was pressed in "add line" mode.
+    [JSInvokable]
+    public Task OnSeparatorAdded(int pageNumber, double y)
+    {
+        if (reading is null) return Task.CompletedTask;
+        var page = session!.Document.Pages.FirstOrDefault(item => item.Number == pageNumber) ?? CurrentPageData;
+        var columns = reading.Extraction.Columns;
+        separatorCounter++;
+        var separator = new InvoiceSeparator("s" + separatorCounter.ToString(CultureInfo.InvariantCulture), page.Number, Math.Clamp(y, 0, page.Height), columns.Min(column => column.Left), columns.Max(column => column.Right));
+        separators.Add(separator);
+        selectedId = separator.Id;
+        addMode = false;
+        RereadRows();
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task OnSeparatorDeleteKey()
+    {
+        DeleteSelected();
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void DiscardSession()
+    {
+        if (session is not null) Analysis.Discard(session.Id);
+    }
+
+    private Task DiscardAsync()
+    {
+        DiscardSession();
+        ClearReading();
+        notice = "Fișierul a fost eliminat din memorie.";
+        return Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        DiscardSession();
+        try { await JS.InvokeVoidAsync("blazorStocInvoiceSeparators.unregister"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
+        reference?.Dispose();
+        lifetime.Dispose();
+    }
+}

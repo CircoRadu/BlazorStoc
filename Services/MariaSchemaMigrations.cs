@@ -459,6 +459,16 @@ public static class MariaSchemaMigrations
             ("invoice_template_models", "byte_length"), ("invoice_template_models", "sha256"), ("invoice_template_models", "content"), ("invoice_template_models", "created_by"),
             ("invoice_template_models", "created_utc")
         ])
+        ,
+        // Versioning of invoice templates was given up (nothing keeps the earlier versions): a template is replaced when saved. A supplier can
+        // have several templates and chooses which ones are used when invoices are read: `active` (every existing template stays in use).
+        new(12, "Sabloane de facturi: coloana active (sablon folosit la citirea facturilor)",
+        [
+            "ALTER TABLE `invoice_templates` ADD COLUMN IF NOT EXISTS `active` TINYINT(1) NOT NULL DEFAULT 1"
+        ],
+        [
+            ("invoice_templates", "active")
+        ])
     ];
 }
 

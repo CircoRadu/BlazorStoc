@@ -65,6 +65,7 @@ public static class InvoiceVocabulary
         new(InvoiceColumnMeanings.ValueWithVat, "Valoare cu TVA"),
         new(InvoiceColumnMeanings.Discount, "Discount"),
         new(InvoiceColumnMeanings.Currency, "Moneda"),
+        new(InvoiceColumnMeanings.Other, "Altă coloană (cu denumirea ei)"),
         new(InvoiceColumnMeanings.Ignore, "Nefolosit")
     ];
 
@@ -84,7 +85,7 @@ public static class InvoiceVocabulary
         (InvoiceColumnMeanings.Quantity, ["cantitate", "cant", "qty", "quantity", "cantitate facturata", "buc", "bucati", "menge"]),
         (InvoiceColumnMeanings.UnitPrice, ["pret", "pret unitar", "pretul net", "pret net", "pret fara tva", "pret unitar fara tva", "unit price", "price", "pret unit",
             "pret buc", "valoare unitara", "einzelpreis", "preis"]),
-        (InvoiceColumnMeanings.VatRate, ["cota tva", "tva", "vat", "vat rate", "cota", "tva %", "mwst", "taxa"]),
+        (InvoiceColumnMeanings.VatRate, ["cota tva", "tva", "vat", "vat rate", "cota", "tva %", "mwst", "taxa tva"]),
         (InvoiceColumnMeanings.VatAmount, ["valoare tva", "suma tva", "vat amount", "tva valoare", "tva lei", "tva ron"]),
         (InvoiceColumnMeanings.Value, ["valoare", "valoare neta", "valoare fara tva", "valoare linie", "total", "total linie", "suma", "amount", "line total",
             "net amount", "val", "valoare lei", "valoare ron", "gesamtpreis", "betrag", "total fara tva", "valoare totala"]),

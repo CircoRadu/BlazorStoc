@@ -6,55 +6,36 @@
 @implements IDisposable
 
 <h2>Șabloane de facturi salvate</h2>
-<p class="muted">Fiecare furnizor poate avea mai multe șabloane (de exemplu pentru un PDF din program și pentru unul scanat). La analiza unei facturi, aplicația propune șabloanele care se potrivesc, după CUI-ul furnizorului și după aspectul facturii. Un șablon se modifică din pagina „Analiza unui fișier”, cu o factură încărcată; fiecare salvare creează o versiune nouă.</p>
+<p class="muted">Fiecare furnizor poate avea mai multe șabloane (de exemplu pentru un PDF din program și pentru unul scanat). La analiza unei facturi, aplicația propune șabloanele care se potrivesc, după CUI-ul furnizorului și după aspectul facturii. Un șablon se editează cu iconița ✎ (elementele lui, denumirea și furnizorul); fiecare salvare înlocuiește șablonul.</p>
 
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 @if (FocusTemplateId is { } wanted && !loading && templates.All(item => item.Info.Id != wanted)) { <div class="error-banner" role="status">Șablonul #@wanted nu mai există (a fost șters).</div> }
 
-@if (editing is not null)
-{
-    <section class="product-editor" aria-labelledby="invoice-details-title">
-        <div class="catalog-heading"><h3 id="invoice-details-title">Modifică datele șablonului „@editing.Name”</h3></div>
-        <fieldset disabled="@saving">
-            <div class="editor-grid">
-                <label for="invoice-edit-name">Denumire *<input id="invoice-edit-name" @bind="editName" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxNameLength" autocomplete="off" /></label>
-                <label for="invoice-edit-supplier">Furnizor<input id="invoice-edit-supplier" @bind="editSupplier" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxSupplierNameLength" autocomplete="off" /></label>
-                <label for="invoice-edit-cui">CUI furnizor<input id="invoice-edit-cui" @bind="editCui" @bind:event="oninput" maxlength="20" autocomplete="off" /></label>
-            </div>
-            <div class="editor-actions">
-                <button class="primary" type="button" @onclick="SaveDetailsAsync">@(saving ? "Se salvează…" : "Salvează")</button>
-                <button class="danger" type="button" @onclick="() => editing = null">Anulează</button>
-            </div>
-        </fieldset>
-    </section>
-}
-
 <section class="catalog">
     <div class="catalog-heading"><h3>Șabloane <span>@templates.Count</span></h3><button type="button" class="refresh" disabled="@loading" @onclick="LoadAsync">Actualizează</button></div>
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă șabloanele</h3></div> }
-    else if (templates.Count == 0) { <div class="empty-state"><div class="empty-icon" aria-hidden="true">▤</div><h3>Nu există șabloane salvate</h3><p>Încarcă o factură în pagina „Analiza unui fișier” și salvează șablonul creat.</p></div> }
+    else if (templates.Count == 0) { <div class="empty-state"><div class="empty-icon" aria-hidden="true">▤</div><h3>Nu există șabloane salvate</h3><p>Încarcă o factură în pagina „Generare șablon factură” și salvează șablonul creat.</p></div> }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>ȘABLON</th><th>FURNIZOR</th><th>CUI</th><th>SURSĂ</th><th class="number">VERSIUNE</th><th>CONȚINUT</th><th>ACTUALIZAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th>ACTIV</th><th>ȘABLON</th><th>FURNIZOR</th><th>CUI</th><th>SURSĂ</th><th>CONȚINUT</th><th>ACTUALIZAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var template in templates)
         {
             var info = template.Info;
             var focused = info.Id == FocusTemplateId;
             var open = expanded == info.Id;
             <tr @key="info.Id" id="invoice-template-@info.Id" class="@(focused ? "row-focus" : null)">
+                <td><label class="row-toggle @(info.Active ? "on" : "off")" title="@(info.Active ? "Șablonul este folosit la citirea facturilor. Apasă ca să nu mai fie folosit." : "Șablonul nu este folosit la citirea facturilor. Apasă ca să fie folosit.")"><input type="checkbox" role="switch" checked="@info.Active" disabled="@saving" aria-label="@($"Șablon activ: {info.Name}")" @onchange="args => SetActiveAsync(info, args.Value is true)" /><span class="toggle-track" aria-hidden="true"></span><span class="row-toggle-text">@(info.Active ? "Activ" : "Inactiv")</span></label></td>
                 <td><strong>@info.Name</strong></td>
                 <td>@(info.SupplierName.Length > 0 ? info.SupplierName : "—")</td>
                 <td>@(info.SupplierCui.Length > 0 ? info.SupplierCui : "—")</td>
                 <td>@(info.SourceKind == InvoiceSources.Ocr ? "Scanat (OCR)" : "PDF cu text")</td>
-                <td class="number">@info.VersionNumber</td>
                 <td><small>@template.Definition.UsedFieldCount câmpuri · @template.Definition.UsedColumnCount coloane</small></td>
                 <td><small>@Stamp(info.UpdatedUtc)<br />@info.UpdatedBy</small></td>
                 <td class="row-actions">
-                    <button type="button" class="refresh" @onclick="() => ToggleDetailsAsync(info.Id)">@(open ? "Ascunde" : "Detalii")</button>
-                    <button type="button" class="refresh" disabled="@saving" @onclick="() => OnEditWithFile.InvokeAsync(template)">Editează șablonul</button>
-                    <button type="button" class="refresh" disabled="@saving" @onclick="() => OpenDetails(info)">Redenumește</button>
-                    <button type="button" class="danger" disabled="@saving" @onclick="() => deleting = info">Șterge</button>
+                    <button type="button" class="invoice-icon-btn" title="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-label="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleDetails(info.Id)">👁</button>
+                    <button type="button" class="invoice-icon-btn" disabled="@saving" title="Editează șablonul (elementele, denumirea și furnizorul)" aria-label="Editează șablonul" @onclick="() => OnEditWithFile.InvokeAsync(template)">✎</button>
+                    <button type="button" class="invoice-icon-btn danger" disabled="@saving" title="Șterge șablonul" aria-label="Șterge șablonul" @onclick="() => deleting = info">🗑</button>
                 </td>
             </tr>
             @if (open)
@@ -62,16 +43,13 @@
                 <tr class="invoice-details-row"><td colspan="8">
                     <div class="invoice-details">
                         <div><strong>Câmpuri folosite</strong>
-                            <ul>@foreach (var field in template.Definition.Fields.Where(field => field.Use)) { <li>@(field.Name.Length > 0 ? field.Name : InvoiceVocabulary.FieldTitle(field.Meaning))@if (field.Name != InvoiceVocabulary.FieldTitle(field.Meaning)) { <span class="muted"> · @InvoiceVocabulary.FieldTitle(field.Meaning)</span> }</li> }
+                            <ul>@foreach (var field in template.Definition.Fields.Where(field => field.Use)) { <li>@(field.Name.Length > 0 ? field.Name : "(fără denumire)")</li> }
                                 @if (template.Definition.UsedFieldCount == 0) { <li class="muted">niciunul</li> }</ul></div>
                         <div><strong>Coloanele tabelului</strong>
                             <ul>@foreach (var column in template.Definition.Table?.Columns.Where(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore) ?? [])
-                                { <li>@(column.Label.Length > 0 ? column.Label : "(fără denumire)") <span class="muted">· @InvoiceVocabulary.ColumnTitle(column.Meaning)</span></li> }
+                                { <li>@(column.Label.Length > 0 ? column.Label : "(fără denumire)")</li> }
                                 @if (template.Definition.UsedColumnCount == 0) { <li class="muted">niciuna</li> }</ul>
                             @if (template.Definition.Table?.NameCodeSeparator is { Length: > 0 } separator) { <small class="muted">Codul produsului se ia din denumire, înaintea separatorului „@separator”.</small> }</div>
-                        <div><strong>Versiuni salvate</strong>
-                            @if (versions is null) { <p class="muted">Se încarcă…</p> }
-                            else { <ul>@foreach (var version in versions) { <li>v@(version.VersionNumber) · @Stamp(version.CreatedUtc) · @version.CreatedBy @if (version.Note.Length > 0) { <span class="muted">· @version.Note</span> }</li> }</ul> }</div>
                     </div>
                 </td></tr>
             }
@@ -94,9 +72,7 @@
 
     private readonly CancellationTokenSource lifetime = new();
     private IReadOnlyList<InvoiceTemplateRecord> templates = [];
-    private IReadOnlyList<InvoiceTemplateVersionInfo>? versions;
-    private InvoiceTemplateInfo? editing, deleting;
-    private string editName = "", editSupplier = "", editCui = "";
+    private InvoiceTemplateInfo? deleting;
     private string? error, notice, deleteError;
     private int? expanded, scrolledTo;
     private bool loading, saving, deleteBusy;
@@ -126,45 +102,28 @@
         finally { loading = false; }
     }
 
-    private async Task ToggleDetailsAsync(int id)
-    {
-        if (expanded == id) { expanded = null; return; }
-        expanded = id; versions = null;
-        try { versions = await Service.GetVersionsAsync(id, lifetime.Token); }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (Exception exception)
-        {
-            Logger.LogError("Invoice template versions loading failed ({ErrorType}).", exception.GetType().Name);
-            versions = [];
-        }
-    }
+    private void ToggleDetails(int id) => expanded = expanded == id ? null : id;
 
-    private void OpenDetails(InvoiceTemplateInfo info)
+    // Chooses whether the template is used when invoices are read (a supplier can have several templates).
+    private async Task SetActiveAsync(InvoiceTemplateInfo info, bool active)
     {
-        notice = null; error = null;
-        editing = info; editName = info.Name; editSupplier = info.SupplierName; editCui = info.SupplierCui;
-    }
-
-    private async Task SaveDetailsAsync()
-    {
-        if (saving || editing is null) return;
-        saving = true; error = null;
+        if (saving) return;
+        saving = true; error = null; notice = null;
         try
         {
-            await Service.UpdateDetailsAsync(editing, new InvoiceTemplateInput { Name = editName, SupplierName = editSupplier, SupplierCui = editCui }, lifetime.Token);
-            editing = null;
-            notice = "Datele șablonului au fost modificate.";
-            await LoadAsync();
+            await Service.SetActiveAsync(info, active, lifetime.Token);
+            notice = active ? $"Șablonul „{info.Name}” este folosit din nou la citirea facturilor." : $"Șablonul „{info.Name}” nu mai este folosit la citirea facturilor.";
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (InvoiceTemplateOperationException exception) { error = exception.Message; }
         catch (AccessDeniedException exception) { error = exception.Message; }
         catch (Exception exception)
         {
-            Logger.LogError("Invoice template details saving failed ({ErrorType}).", exception.GetType().Name);
-            error = "Datele șablonului nu au putut fi salvate. Reîncearcă.";
+            Logger.LogError("Invoice template activation failed ({ErrorType}).", exception.GetType().Name);
+            error = "Starea șablonului nu a putut fi schimbată. Reîncearcă.";
         }
         finally { saving = false; }
+        await LoadAsync();
     }
 
     private async Task DeleteAsync(string reason)

@@ -1,0 +1,14 @@
+﻿{
+    "Database":  {
+                     "Host":  "127.0.0.1",
+                     "Port":  3307,
+                     "Name":  "BlazorStoc",
+                     "User":  "blazorstoc_dev",
+                     "Password":  "6cnDPy65bbYHJ58sknOJH0qad6RiwP",
+                     "SslMode":  "Required"
+                 },
+    "Authentication":  {
+                           "Username":  "admin",
+                           "Password":  "4DD1D83ED2E5AA7A14C42C2163CE5D929958330F014094D3"
+                       }
+}

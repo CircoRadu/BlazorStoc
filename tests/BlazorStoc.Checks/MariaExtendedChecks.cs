@@ -68,8 +68,8 @@ public static class MariaExtendedChecks
         var started = DateTime.UtcNow.AddSeconds(-1);
         try
         {
-            var first = await service.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon {suffix}", SupplierName = $"Furnizor {suffix}", SupplierCui = "RO" + cui, ModelFileName = "model.pdf", ModelContent = [1, 2, 3, 4, 250], Note = "prima", Definition = InvoiceDefinition() });
-            Check(first.Info.Id > 0 && first.Info.SupplierCui == cui && first.Info.VersionNumber == 1 && first.Info.CreatedBy == "integration.tester", "A template is saved with its supplier's tax id reduced to digits and the actor");
+            var first = await service.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon {suffix}", SupplierName = $"Furnizor {suffix}", SupplierCui = "RO" + cui, ModelFileName = "model.pdf", ModelContent = [1, 2, 3, 4, 250], Definition = InvoiceDefinition() });
+            Check(first.Info.Id > 0 && first.Info.SupplierCui == cui && first.Info.Active && first.Info.CreatedBy == "integration.tester", "A template is saved with its supplier's tax id reduced to digits and the actor");
             var loaded = await store.GetAsync(first.Info.Id);
             var model = await store.GetModelAsync(first.Info.Id);
             Check(model is not null && model.FileName == "model.pdf" && model.Content.SequenceEqual(new byte[] { 1, 2, 3, 4, 250 }) && model.Sha256.Length == 64, "The invoice used as model is stored with the template (binary content unchanged)");
@@ -81,18 +81,19 @@ public static class MariaExtendedChecks
             var scanned = await service.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon scanat {suffix}", SupplierName = $"Furnizor {suffix}", SupplierCui = cui, Definition = InvoiceDefinition(InvoiceSources.Ocr) });
             Check(scanned.Info.SourceKind == InvoiceSources.Ocr && (await store.ListAsync()).Count(item => item.SupplierCui == cui) == 2, "A supplier has several templates");
 
-            var second = await service.SaveNewVersionAsync(first.Info, new InvoiceTemplateInput { Name = first.Info.Name, SupplierName = first.Info.SupplierName, SupplierCui = cui, Note = "a doua", Definition = InvoiceDefinition() with { PageWidth = 600 } });
-            var versions = await store.GetVersionsAsync(first.Info.Id);
-            Check(second.Info.VersionNumber == 2 && second.Info.Version == first.Info.Version + 1 && versions.Select(item => item.VersionNumber).SequenceEqual([2, 1]) && versions[1].Note == "prima" && (await store.GetAsync(first.Info.Id))!.Definition.PageWidth == 600,
-                "A new version becomes the current definition and keeps the earlier one with its note");
-            await Rejects<InvoiceTemplateOperationException>(() => service.SaveNewVersionAsync(first.Info, new InvoiceTemplateInput { Name = first.Info.Name, SupplierCui = cui, Definition = InvoiceDefinition() }), "Saving over a template changed in the meantime (stale version) is refused");
-            Check((await store.GetVersionsAsync(first.Info.Id)).Count == 2, "A refused save leaves no version behind");
+            var second = await service.SaveAsync(first.Info, new InvoiceTemplateInput { Name = first.Info.Name, SupplierName = first.Info.SupplierName, SupplierCui = cui, Definition = InvoiceDefinition() with { PageWidth = 600 } });
+            Check(second.Info.Version == first.Info.Version + 1 && (await store.GetAsync(first.Info.Id))!.Definition.PageWidth == 600, "Saving replaces the template's definition (no earlier version is kept)");
+            await Rejects<InvoiceTemplateOperationException>(() => service.SaveAsync(first.Info, new InvoiceTemplateInput { Name = first.Info.Name, SupplierCui = cui, Definition = InvoiceDefinition() }), "Saving over a template changed in the meantime (stale version) is refused");
             var renamed = await service.UpdateDetailsAsync(second.Info, new InvoiceTemplateInput { Name = $"Redenumit {suffix}", SupplierName = $"Furnizor nou {suffix}", SupplierCui = cui });
-            Check(renamed.Name == $"Redenumit {suffix}" && renamed.VersionNumber == 2 && renamed.Version == second.Info.Version + 1 && (await store.GetVersionsAsync(first.Info.Id)).Count == 2, "Renaming changes the details without creating a version");
+            Check(renamed.Name == $"Redenumit {suffix}" && renamed.Version == second.Info.Version + 1, "Renaming changes the details");
+            var switchedOff = await service.SetActiveAsync(renamed, false);
+            Check(!switchedOff.Active && !(await store.GetAsync(first.Info.Id))!.Info.Active && switchedOff.Version == renamed.Version + 1, "A template can be switched off (not used when invoices are read) and the choice is stored");
+            renamed = await service.SetActiveAsync(switchedOff, true);
+            Check(renamed.Active && (await store.GetAsync(first.Info.Id))!.Info.Active, "A template can be switched on again");
             await Rejects<InvoiceTemplateOperationException>(() => service.UpdateDetailsAsync(renamed, new InvoiceTemplateInput { Name = scanned.Info.Name, SupplierName = "x", SupplierCui = cui }), "Renaming to another template's name of the same supplier is refused");
 
             var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.InvoiceTemplate && item.EntityId == first.Info.Id.ToString()).Select(item => item.Action).ToList();
-            Check(events.Contains(AuditActions.CreateInvoiceTemplate) && events.Contains(AuditActions.EditInvoiceTemplate) && events.Contains(AuditActions.EditInvoiceTemplateDetails), "Each operation is in the journal under its own exact action");
+            Check(events.Contains(AuditActions.CreateInvoiceTemplate) && events.Contains(AuditActions.EditInvoiceTemplate) && events.Contains(AuditActions.EditInvoiceTemplateDetails) && events.Contains(AuditActions.ActivateInvoiceTemplate) && events.Contains(AuditActions.DeactivateInvoiceTemplate), "Each operation is in the journal under its own exact action");
 
             await service.DeleteAsync(renamed, "Motiv de test");
             Check(await store.GetAsync(first.Info.Id) is null && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM invoice_template_versions WHERE template_id=@id", ("@id", first.Info.Id)) == 0 && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM invoice_template_models WHERE template_id=@id", ("@id", first.Info.Id)) == 0, "Deleting a template removes its versions with it");

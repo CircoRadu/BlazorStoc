@@ -19,6 +19,8 @@ internal sealed record InvoiceSpec(
     bool Rotated = false,                // landscape content on a portrait page turned with /Rotate 90, as the ANAF e-Factura PDFs are
     int WrapNamesAt = 0,                 // names longer than this many characters are written on two lines (0 = never)
     bool RepeatHeader = false,           // the table header is written again at the top of the next page
+    bool ColumnNumbers = false,          // a row of column numbers (0 1 2 3 ...) under the header, as many Romanian invoices print
+    bool CenterRows = false,             // the cells of a row are vertically centred on its lines (the number sits in the middle of a wrapped name)
     string SupplierName = "Delta Instalatii SRL",
     string SupplierCui = "RO12345678",
     string Number = "DIS 1042",
@@ -165,6 +167,17 @@ internal static class InvoiceFixtures
         }
         Header(y);
         y += headerHeight;
+        if (spec.ColumnNumbers)
+        {
+            var number = 0;
+            foreach (var (kind, _) in columns)
+            {
+                if (kind is "index" or "name" or "unit") Text(number.ToString(CultureInfo.InvariantCulture), leftEdges[kind] + 4, y + 2);
+                else RightText(number.ToString(CultureInfo.InvariantCulture), rightEdgeOf[kind], y + 2);
+                number++;
+            }
+            y += 14;
+        }
         var onPage = 0;
         for (var i = 0; i < rows.Count; i++)
         {
@@ -178,16 +191,17 @@ internal static class InvoiceFixtures
             }
             var parts = Wrap(row.Name, spec.WrapNamesAt);
             var thisHeight = rowHeight + (parts.Count - 1) * 11;
+            var middle = spec.CenterRows ? (parts.Count - 1) * 11 / 2.0 : 0;
             if (lines) g.DrawRectangle(pen, left, y, right - left, thisHeight);
             foreach (var (kind, _) in columns)
                 switch (kind)
                 {
-                    case "index": Text((i + 1).ToString(CultureInfo.InvariantCulture), leftEdges[kind] + 4, y + 3); break;
+                    case "index": Text((i + 1).ToString(CultureInfo.InvariantCulture), leftEdges[kind] + 4, y + 3 + middle); break;
                     case "name": for (var part = 0; part < parts.Count; part++) Text(parts[part], leftEdges[kind] + 3, y + 3 + part * 11); break;
-                    case "unit": Text(row.Unit, leftEdges[kind] + 3, y + 3); break;
-                    case "qty": RightText(row.Quantity.ToString("0", CultureInfo.InvariantCulture), rightEdgeOf[kind], y + 3); break;
-                    case "price": RightText(Money(row.Price, ro), rightEdgeOf[kind], y + 3); break;
-                    case "value": RightText(Money(row.Value, ro), rightEdgeOf[kind], y + 3); break;
+                    case "unit": Text(row.Unit, leftEdges[kind] + 3, y + 3 + middle); break;
+                    case "qty": RightText(row.Quantity.ToString("0", CultureInfo.InvariantCulture), rightEdgeOf[kind], y + 3 + middle); break;
+                    case "price": RightText(Money(row.Price, ro), rightEdgeOf[kind], y + 3 + middle); break;
+                    case "value": RightText(Money(row.Value, ro), rightEdgeOf[kind], y + 3 + middle); break;
                 }
             if (lines) foreach (var (kind, _) in columns.Skip(1)) g.DrawLine(pen, leftEdges[kind], y, leftEdges[kind], y + thisHeight);
             y += thisHeight;

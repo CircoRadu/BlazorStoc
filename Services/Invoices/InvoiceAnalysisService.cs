@@ -10,7 +10,9 @@ public sealed class InvoiceAnalysisSession
     public required string FileName { get; init; }
     public required InvoiceDocument Document { get; init; }
     public required IReadOnlyList<byte[]> Previews { get; init; }
-    public required InvoiceAnalysis Analysis { get; init; }
+    // Empty (no fields, no table) until the user asks for the analysis of the file (IInvoiceAnalysisService.Analyze): editing a saved template
+    // opens its model without analysing it.
+    public required InvoiceAnalysis Analysis { get; set; }
     // The uploaded PDF itself, kept in memory so that it can be saved with the template as its model.
     public byte[]? SourcePdf { get; init; }
     public DateTime LastUsedUtc { get; set; } = DateTime.UtcNow;
@@ -77,6 +79,11 @@ public sealed class InvoiceAnalysisStore(TimeProvider clock) : IInvoiceAnalysisS
 public interface IInvoiceAnalysisService
 {
     Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default);
+    // Reads the file (words, page pictures) WITHOUT analysing it: nothing is proposed, the session's analysis is empty. Used to edit a saved
+    // template on its model; the analysis is run only when the user asks for it (Analyze).
+    Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default);
+    // Runs the analysis of an opened file (on the user's request).
+    InvoiceAnalysisSession Analyze(Guid id);
     InvoiceAnalysisSession? Get(Guid id);
     void Discard(Guid id);
 }
@@ -88,11 +95,27 @@ public sealed class InvoiceAnalysisService(IInvoicePdfReader reader, IInvoiceAna
 
     public async Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        // Settings -> Facturi (administrator) and Produse -> Preluare factura (any product operator) read files; saving templates stays administrator-only.
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var read = await reader.ReadAsync(pdf, cancellationToken).ConfigureAwait(false);
         var analysis = InvoiceAnalyzer.Analyze(read.Document);
         return store.Add(owner, fileName, read, analysis);
+    }
+
+    public async Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
+        var read = await reader.ReadAsync(pdf, cancellationToken).ConfigureAwait(false);
+        return store.Add(owner, fileName, read, new InvoiceAnalysis(read.Document.Pages, [], null, []));
+    }
+
+    public InvoiceAnalysisSession Analyze(Guid id)
+    {
+        var session = Get(id) ?? throw new InvoiceAnalysisException("Sesiunea de analiză a expirat: încarcă din nou fișierul.");
+        session.Analysis = InvoiceAnalyzer.Analyze(session.Document);
+        return session;
     }
 
     public InvoiceAnalysisSession? Get(Guid id) => owner is null ? null : store.Get(id, owner);
@@ -112,7 +135,7 @@ public static class InvoiceTemplateSuggestions
     public const double MinLayoutScore = 0.5;
 
     public static IReadOnlyList<InvoiceTemplateSuggestion> Rank(IEnumerable<InvoiceTemplateRecord> templates, InvoiceDocument document) =>
-        templates.Select(template => new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, document)))
+        templates.Where(template => template.Info.Active).Select(template => new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, document)))
             .Where(item => item.Match.SupplierMatch || item.Match.Score >= MinLayoutScore)
             .OrderByDescending(item => item.Match.SupplierMatch).ThenByDescending(item => item.Match.Score).ThenBy(item => item.Template.Info.Name).ToList();
 }

@@ -40,7 +40,18 @@
         {
             <p class="nav-label">SPAȚIU DE LUCRU</p>
             <NavLink class="nav-item" href="/" Match="NavLinkMatch.All"><span>⌂</span> Pagina principală <span class="nav-arrow">→</span></NavLink>
-            <NavLink class="nav-item" href="/produse" Match="NavLinkMatch.Prefix"><span>▦</span> Produse și stocuri <span class="nav-arrow">→</span></NavLink>
+            <CollapsibleSection Id="products-menu"
+                                RootClass="administration-menu"
+                                HeaderRowClass="collapsible-header"
+                                ToggleClass="@($"nav-item administration-parent {(productsMenuSection ? "active" : "")}")"
+                                ContentClass="administration-submenu"
+                                Expanded="@productsExpanded">
+                <Header><span>▦</span> Produse</Header>
+                <ChildContent>
+                    <a class="@(productsMenuSection && !onInvoicePickupPage ? "active" : "")" href="/produse">Stoc</a>
+                    <NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink>
+                </ChildContent>
+            </CollapsibleSection>
             <CollapsibleSection Id="inventory-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
@@ -100,7 +111,7 @@
 @code {
     private IReadOnlyList<BlazorStoc.Services.ProductGroup> groups = Array.Empty<BlazorStoc.Services.ProductGroup>();
     private List<string> categories = [];
-    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, onRestorePage, onWaitingPage;
+    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, productsMenuSection, productsExpanded, onInvoicePickupPage, onRestorePage, onWaitingPage;
     private string selectedCategory = "", selectedSubcategory = "";
     private OperationLockInfo? activeOperation;
     private int alertCount;
@@ -167,6 +178,9 @@
             uri.AbsolutePath.StartsWith("/vehicule", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase);
         if (administrationSection) administrationExpanded = true;
+        productsMenuSection = uri.AbsolutePath.StartsWith("/produse", StringComparison.OrdinalIgnoreCase);
+        if (productsMenuSection) productsExpanded = true;
+        onInvoicePickupPage = uri.AbsolutePath.StartsWith("/produse/preluare-factura", StringComparison.OrdinalIgnoreCase);
         inventorySection = uri.AbsolutePath.StartsWith("/inventar", StringComparison.OrdinalIgnoreCase);
         if (inventorySection) inventoryExpanded = true;
         onRestorePage = uri.AbsolutePath.StartsWith("/inventar/restaurare", StringComparison.OrdinalIgnoreCase);

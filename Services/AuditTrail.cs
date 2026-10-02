@@ -110,6 +110,8 @@ public static class AuditActions
     public const string EditInvoiceTemplate = "Modificare șablon factură";
     public const string EditInvoiceTemplateDetails = "Modificare date șablon factură";
     public const string DeleteInvoiceTemplate = "Ștergere șablon factură";
+    public const string ActivateInvoiceTemplate = "Activare șablon factură";
+    public const string DeactivateInvoiceTemplate = "Dezactivare șablon factură";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
@@ -124,7 +126,7 @@ public static class AuditActions
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
-            or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails;
+            or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -251,8 +253,10 @@ public static class SettingsNavigation
 
     public const string InvoicesTab = "facturi";
     public const string InvoiceAnalysisSubtab = "analiza";
+    public const string InvoiceEditSubtab = "editare";
     public const string InvoiceTemplatesSubtab = "sabloane";
     public const string InvoiceTemplateParameter = "sablonfactura";
+    public const string InvoiceEditParameter = "editeaza";
 
     public static string InvoiceTemplateUrl(int templateId) =>
         $"/setari?{TabParameter}={InvoicesTab}&{SubtabParameter}={InvoiceTemplatesSubtab}&{InvoiceTemplateParameter}={templateId}";

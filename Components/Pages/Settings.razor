@@ -2,17 +2,42 @@
 @attribute [Authorize(Roles = AccessRoles.Administrator)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
+@inject UnsavedChanges Guard
+@inject IInvoiceTemplateService InvoiceTemplates
 
 <PageTitle>Setări · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
 <div class="page-heading"><div><p class="eyebrow">ADMINISTRARE</p><h1>Setări</h1><p class="muted">Configurări și operații rezervate administratorului.</p></div></div>
 <section class="catalog settings-panel">
     <div class="settings-tabs" role="tablist" aria-label="Secțiuni setări" @onkeydown="OnTabKeyDown">
         @foreach (var tab in Tabs)
         {
             var selected = tab.Id == activeTab;
-            <button type="button" role="tab" id="tab-@tab.Id" class="settings-tab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" aria-controls="panel-@tab.Id" tabindex="@(selected ? 0 : -1)" @onclick="() => activeTab = tab.Id">@tab.Title</button>
+            <button type="button" role="tab" id="tab-@tab.Id" class="settings-tab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" aria-controls="panel-@tab.Id" tabindex="@(selected ? 0 : -1)" @onclick="() => SelectTab(tab.Id)">@tab.Title</button>
         }
     </div>
+    @* The invoices panel stays mounted (hidden) when another tab is shown, so a template being edited keeps its changes. *@
+        <div role="tabpanel" id="panel-@InvoicesTab" aria-labelledby="tab-@InvoicesTab" class="settings-body" hidden="@(activeTab != InvoicesTab)">
+            @SubtabBar(InvoiceSubtabs, "Secțiuni facturi")
+            @* The analysis stays mounted (hidden) when the saved templates are shown, so switching sub-tabs does not lose the file being worked on. *@
+            <div role="tabpanel" id="subpanel-@InvoiceAnalysisSubtab" aria-labelledby="subtab-@InvoiceAnalysisSubtab" hidden="@(invoiceSubtab != InvoiceAnalysisSubtab)">
+                <InvoiceTemplateWorkbench Saved="OnTemplateCreated" />
+            </div>
+            @* Editing a saved template has a sub-tab of its own, present only while the editing is active; leaving it (for another sub-tab, tab or
+               page) closes the editing, after a warning when there are unsaved changes. *@
+            @if (editTemplate is not null)
+            {
+                <div role="tabpanel" id="subpanel-@InvoiceEditSubtab" aria-labelledby="subtab-@InvoiceEditSubtab" hidden="@(invoiceSubtab != InvoiceEditSubtab)">
+                    <InvoiceTemplateWorkbench @key="editRequest" EditTemplateId="editTemplate.Info.Id" EditTemplateName="@editTemplate.Info.Name" EditRequest="editRequest" Saved="OnTemplateEdited" Closed="CloseEditing" />
+                </div>
+            }
+            @if (invoiceSubtab == InvoiceTemplatesSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@InvoiceTemplatesSubtab" aria-labelledby="subtab-@InvoiceTemplatesSubtab">
+                    <InvoiceTemplatesList @key="templatesVersion" FocusTemplateId="InvoiceTemplateParameter" OnEditWithFile="EditWithFile" />
+                </div>
+            }
+        </div>
     @if (activeTab == AnafTab)
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
@@ -30,22 +55,6 @@
             else
             {
                 <div role="tabpanel" id="subpanel-@SettingsSubtab" aria-labelledby="subtab-@SettingsSubtab"><NotificationSettingsEditor /></div>
-            }
-        </div>
-    }
-    else if (activeTab == InvoicesTab)
-    {
-        <div role="tabpanel" id="panel-@InvoicesTab" aria-labelledby="tab-@InvoicesTab" class="settings-body">
-            @SubtabBar(InvoiceSubtabs, "Secțiuni facturi")
-            @* The analysis stays mounted (hidden) when the saved templates are shown, so switching sub-tabs does not lose the file being worked on. *@
-            <div role="tabpanel" id="subpanel-@InvoiceAnalysisSubtab" aria-labelledby="subtab-@InvoiceAnalysisSubtab" hidden="@(invoiceSubtab != InvoiceAnalysisSubtab)">
-                <InvoiceTemplateWorkbench EditTemplateId="editTemplate?.Info.Id" EditTemplateName="@(editTemplate?.Info.Name)" EditRequest="editRequest" Saved="OnTemplateSaved" />
-            </div>
-            @if (invoiceSubtab == InvoiceTemplatesSubtab)
-            {
-                <div role="tabpanel" id="subpanel-@InvoiceTemplatesSubtab" aria-labelledby="subtab-@InvoiceTemplatesSubtab">
-                    <InvoiceTemplatesList @key="templatesVersion" FocusTemplateId="InvoiceTemplateParameter" OnEditWithFile="EditWithFile" />
-                </div>
             }
         </div>
     }
@@ -85,23 +94,48 @@
 
     private const string InvoiceAnalysisSubtab = SettingsNavigation.InvoiceAnalysisSubtab;
     private const string InvoiceTemplatesSubtab = SettingsNavigation.InvoiceTemplatesSubtab;
-    private static readonly (string Id, string Title)[] InvoiceSubtabs = [(InvoiceAnalysisSubtab, "Analiza unui fișier"), (InvoiceTemplatesSubtab, "Șabloane salvate")];
+    private const string InvoiceEditSubtab = SettingsNavigation.InvoiceEditSubtab;
+    private static readonly (string Id, string Title)[] InvoiceSubtabsBase = [(InvoiceAnalysisSubtab, "Generare șablon factură"), (InvoiceTemplatesSubtab, "Șabloane salvate")];
+    private static readonly (string Id, string Title)[] InvoiceSubtabsEditing = [.. InvoiceSubtabsBase, (InvoiceEditSubtab, "Editare șablon")];
+    // The "Editare șablon" sub-tab exists only while a template is being edited.
+    private (string Id, string Title)[] InvoiceSubtabs => editTemplate is null ? InvoiceSubtabsBase : InvoiceSubtabsEditing;
     private string invoiceSubtab = InvoiceAnalysisSubtab;
     private InvoiceTemplateRecord? editTemplate;
     private int templatesVersion;
     private int editRequest;
 
+    // The edit sub-tab opens for the chosen template. When another template is being edited with unsaved changes, the user is asked first.
     private void EditWithFile(InvoiceTemplateRecord template)
+    {
+        if (editTemplate is not null && Guard.HasUnsavedChanges)
+        {
+            Guard.Request(() => { OpenEditing(template); return InvokeAsync(StateHasChanged); });
+            return;
+        }
+        OpenEditing(template);
+    }
+
+    private void OpenEditing(InvoiceTemplateRecord template)
     {
         editTemplate = template;
         editRequest++;
-        invoiceSubtab = InvoiceAnalysisSubtab;
+        invoiceSubtab = InvoiceEditSubtab;
     }
 
-    private void OnTemplateSaved()
+    // A template made in "Generare șablon factură" was saved: the list of saved templates is reloaded.
+    private void OnTemplateCreated() => templatesVersion++;
+
+    // The edited template was saved: the edit sub-tab closes and the saved templates are shown.
+    private void OnTemplateEdited()
+    {
+        CloseEditing();
+        templatesVersion++;
+    }
+
+    private void CloseEditing()
     {
         editTemplate = null;
-        templatesVersion++;
+        invoiceSubtab = InvoiceTemplatesSubtab;
     }
 
     private string CurrentSubtab((string Id, string Title)[] subtabs) =>
@@ -115,15 +149,25 @@
     [SupplyParameterFromQuery(Name = SettingsNavigation.InvoiceTemplateParameter)] public int? InvoiceTemplateParameter { get; set; }
     private string? appliedLink;
 
-    protected override void OnParametersSet()
+    // A link with the id of a template opens its editing (the "Editare șablon" sub-tab) at once.
+    [SupplyParameterFromQuery(Name = SettingsNavigation.InvoiceEditParameter)] public int? InvoiceEditParameter { get; set; }
+
+    protected override async Task OnParametersSetAsync()
     {
-        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}";
+        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}";
         if (link == appliedLink) return;
         appliedLink = link;
         if (Tabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
         if (InvoiceSubtabs.Any(tab => tab.Id == SubtabQuery)) invoiceSubtab = SubtabQuery!;
+        if (InvoiceEditParameter is { } editId && editTemplate?.Info.Id != editId)
+        {
+            InvoiceTemplateRecord? record = null;
+            try { record = await InvoiceTemplates.GetAsync(editId); }
+            catch (Exception) { }
+            if (record is not null) { activeTab = InvoicesTab; OpenEditing(record); }
+        }
     }
 
     private RenderFragment SubtabBar((string Id, string Title)[] subtabs, string label) => builder =>
@@ -154,10 +198,35 @@
         builder.CloseElement();
     };
 
+    // Leaving the "Editare șablon" sub-tab (for another sub-tab, another tab or another page) closes the editing; with unsaved changes the user is
+    // asked first (the same question as for every editor), and the change happens only after he chose to leave.
+    private void SelectTab(string id)
+    {
+        if (id != InvoicesTab && activeTab == InvoicesTab && editTemplate is not null) AfterEditingClosed(() => activeTab = id);
+        else activeTab = id;
+    }
+
+    private void AfterEditingClosed(Action change)
+    {
+        if (editTemplate is null) { change(); return; }
+        if (Guard.HasUnsavedChanges)
+        {
+            Guard.Request(() =>
+            {
+                CloseEditing();
+                change();
+                return InvokeAsync(StateHasChanged);
+            });
+            return;
+        }
+        CloseEditing();
+        change();
+    }
+
     private void SelectSubtab((string Id, string Title)[] subtabs, string id)
     {
         if (subtabs == MapSubtabs) mapSubtab = id;
-        else if (subtabs == InvoiceSubtabs) invoiceSubtab = id;
+        else if (subtabs == InvoiceSubtabs) { if (id != InvoiceEditSubtab && editTemplate is not null) AfterEditingClosed(() => invoiceSubtab = id); else invoiceSubtab = id; }
         else notificationSubtab = id;
     }
 
@@ -185,6 +254,6 @@
             "End" => Tabs.Length - 1,
             _ => index
         };
-        activeTab = Tabs[index].Id;
+        SelectTab(Tabs[index].Id);
     }
 }

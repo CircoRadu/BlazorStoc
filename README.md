@@ -70,6 +70,12 @@ Meniul Inventar are, numai pentru administrator, optiunea "Restaurează stoc" (`
 
 Generarea foloseste PDFsharp 6.2.1 (licenta MIT; versiunea curenta nu include inca MigraDoc pentru API-ul cross-platform, asa ca raportul este desenat direct cu `XGraphics`) si fontul PT Sans (SIL Open Font License, `Assets/Fonts`), care contine diacriticele romanesti si este inclus in aplicatie, fara dependenta de fonturile instalate pe server.
 
+## Produse: Stoc si Preluare factura
+
+Meniul **Produse** are doua intrari: **Stoc** (pagina cu categoriile si stocul produselor) si **Preluare factura** (`/produse/preluare-factura`). Pe pagina de preluare se incarca (sau se trage) un PDF de factura; el se citeste dupa sablonul de factura detectat (numai sabloanele active; fara sablon potrivit se foloseste citirea automata, cu avertisment), iar peste imaginea paginii apar liniile de demarcare dintre randurile tabelului. Liniile lipsa din factura se genereaza, se pot muta, redimensiona, sterge si adauga, iar randurile se citesc din nou la fiecare modificare; ce este sub ultima linie nu se citeste. Pagina nu importa inca nimic in stoc.
+
+Sabloanele de factura se fac si se editeaza in **Setari → Facturi**: „Generare sablon factura" (analiza unui fisier), „Sabloane salvate" (comutator Activ/Inactiv, detalii, editare, stergere) si „Editare sablon" (sub-tab prezent numai cat editarea e activa; sablonul se afiseaza exact ca salvat peste factura model, iar analiza fisierului porneste doar din butonul „Analizeaza fisierul"). Sabloanele nu au versiuni: „Salveaza" inlocuieste sablonul, iar „Salveaza ca sablon nou" cere o denumire diferita. Descrierea intrarii in stoc a produsului foloseste etichete (`<Pret unitar>`, `<Numar factura>`...) care se insereaza la cursor si apar colorate in text; etichetele din randul „Coloane folosite din tabel” (titlul coloanei, de exemplu `<Pret unitar>`) sunt valorile coloanelor tabelului (fara etichete obligatorii), iar ADUNARE{} aduna valorile etichetelor dintre acolade.
+
 ## Administrarea utilizatorilor
 Administratorul configurat prin `Authentication__Username` și `Authentication__Password` rămâne contul de inițializare. După autentificare, pagina **Utilizatori** permite:
 

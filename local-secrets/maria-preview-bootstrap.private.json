@@ -1,0 +1,5 @@
+﻿{
+    "AuthenticationPassword":  "jLMYpwiMq16x9GARgHnQ",
+    "Note":  "Parola bootstrap generata pentru preview-ul MariaDB (port 5085); folosita numai in variabila de mediu Authentication__Password la pornirea acelui preview, niciodata scrisa in appsettings.json sau Git.",
+    "AuthenticationUsername":  "admin"
+}

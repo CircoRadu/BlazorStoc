@@ -4,15 +4,21 @@ obj/
 .env
 .env.*
 !.env.example
-keys/
 keys-test/
-local-secrets/
 artifacts/
-data/
 *.user
 *.log
 
-# Credentiale MariaDB (nu se comit)
-*.private.*
-
 bin_verify*/
+
+# Mediu de dezvoltare: repository-ul este PRIVAT si parolele sunt folosite numai in dezvoltare, deci
+# local-secrets/ (*.private.*), keys/ (chei Data Protection) si data/ (fisiere folosite de aplicatie:
+# configurari, arhiva, imagini, pdf-uri) se comit, ca pe celalalt calculator sa nu se introduca parole noi.
+# Nu se comit: baza SQLite veche, jurnalul de evenimente (nu are interes), copiile de siguranta locale.
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/audit-events.jsonl*
+data/manual-backups/
+data/database-backups/
+local-secrets/tmp-setup.sql

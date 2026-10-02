@@ -1,0 +1,114 @@
+@using System.Text.RegularExpressions
+@inject IJSRuntime JS
+@* A text field whose <label> marks are shown in a colour of their own (a known mark in the accent colour, an unknown one in red), and where a
+   label is inserted at the cursor (InsertAsync), not at the end. The coloured text is a backdrop under a transparent-text input/textarea
+   (mark-field.js keeps their scrolling together and remembers the cursor while the focus is on a label button). Every field of the
+   application that takes marks (notification templates, the stock-entry description of an invoice template) uses this component. *@
+<div class="mark-field @(Multiline ? "multi" : "single")" data-mark-field data-mark-ops="@(Operations ? "true" : null)">
+    <div class="mark-backdrop" aria-hidden="true">@foreach (var part in Parts) { if (part.Kind == PartKind.Mark) { <span class="mark-label @(IsKnown(part.Text) ? "" : "unknown")" style="@MarkStyle(part.Text)">@part.Raw</span> } else if (part.Kind == PartKind.Operation) { <span class="mark-op" style="@(OperationColor is null ? null : "color:" + OperationColor)">@part.Raw</span> } else { @Spaced(part.Raw) } }@("​")</div>
+    @if (Multiline)
+    {
+        <textarea id="@Id" rows="@Rows" maxlength="@MaxLength" value="@Value" @oninput="OnInputAsync" @onfocus="OnFocus" aria-label="@AriaLabel" spellcheck="false"></textarea>
+    }
+    else
+    {
+        <input id="@Id" type="text" maxlength="@MaxLength" value="@Value" @oninput="OnInputAsync" @onfocus="OnFocus" aria-label="@AriaLabel" autocomplete="off" spellcheck="false" />
+    }
+</div>
+
+@code {
+    private enum PartKind { Text, Mark, Operation }
+    private sealed record Part(string Raw, string Text, PartKind Kind);
+
+    // A mark, or the opening "ADUNARE{" / a closing "}" of an arithmetic operation.
+    private static readonly Regex Token = new("<([^<>\\r\\n]{1,80})>|(?:ADUNARE|SCADERE|INMULTIRE|IMPARTIRE)\\{|\\}", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Multiline { get; set; }
+    [Parameter] public int Rows { get; set; } = 3;
+    [Parameter] public int MaxLength { get; set; } = 400;
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public EventCallback OnFocus { get; set; }
+    // Says whether a mark names something that exists; an unknown mark is drawn in red. Without it every mark counts as known.
+    [Parameter] public Func<string, bool>? Known { get; set; }
+    // The field takes arithmetic operations (ADUNARE{<label> <label>}): their words and braces are drawn in a colour of their own.
+    [Parameter] public bool Operations { get; set; }
+    // The colour of the value a mark stands for (for example the colour of a table column), when it has one of its own; null = the usual colour.
+    [Parameter] public Func<string, string?>? ColorOf { get; set; }
+    // The colour of the arithmetic operations (null = the usual one).
+    [Parameter] public string? OperationColor { get; set; }
+
+    private string? MarkStyle(string name) => IsKnown(name) && ColorOf?.Invoke(name) is { } color ? "color:" + color : null;
+
+    private bool IsKnown(string name) => Known is null || Known(name);
+
+    // Every space is drawn with a faint dot over it (the space itself stays, so the text keeps exactly the width of the text typed in the field):
+    // it shows whether there is a space, for instance between two labels.
+    private static RenderFragment Spaced(string text) => builder =>
+    {
+        var start = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] != ' ') continue;
+            if (index > start) builder.AddContent(0, text[start..index]);
+            builder.OpenElement(1, "span");
+            builder.AddAttribute(2, "class", "mark-space");
+            builder.AddContent(3, " ");
+            builder.CloseElement();
+            start = index + 1;
+        }
+        if (start < text.Length) builder.AddContent(4, text[start..]);
+    };
+
+    private IEnumerable<Part> Parts
+    {
+        get
+        {
+            var text = Value ?? "";
+            var position = 0;
+            var open = 0;
+            foreach (Match match in Token.Matches(text))
+            {
+                var isOperation = match.Value.EndsWith('{') ? Operations : match.Value == "}" && open > 0;
+                if (match.Value.StartsWith('<') is false && !isOperation) continue;
+                if (match.Index > position) foreach (var part in TextParts(text[position..match.Index], open > 0)) yield return part;
+                if (match.Value.StartsWith('<')) yield return new Part(match.Value, match.Groups[1].Value.Trim(), PartKind.Mark);
+                else
+                {
+                    open += match.Value == "}" ? -1 : 1;
+                    yield return new Part(match.Value, "", PartKind.Operation);
+                }
+                position = match.Index + match.Length;
+            }
+            if (position < text.Length) foreach (var part in TextParts(text[position..], open > 0)) yield return part;
+        }
+    }
+
+    // The text between marks; inside an arithmetic operation its symbols (+ - * / and their other forms) are drawn like the operation itself.
+    private static IEnumerable<Part> TextParts(string raw, bool insideOperation)
+    {
+        if (!insideOperation) { yield return new Part(raw, "", PartKind.Text); yield break; }
+        var start = 0;
+        for (var index = 0; index < raw.Length; index++)
+        {
+            if ("+-−–*×/÷".IndexOf(raw[index]) < 0) continue;
+            if (index > start) yield return new Part(raw[start..index], "", PartKind.Text);
+            yield return new Part(raw[index].ToString(), "", PartKind.Operation);
+            start = index + 1;
+        }
+        if (start < raw.Length) yield return new Part(raw[start..], "", PartKind.Text);
+    }
+
+    private Task OnInputAsync(ChangeEventArgs args) => ValueChanged.InvokeAsync(args.Value?.ToString() ?? "");
+
+    // Puts the text at the cursor of the field (replacing what is selected); false when the browser could not do it (the text did not fit
+    // the maximum length, or the field is gone), so that the caller can add it at the end.
+    // caretBack: how many characters before the end of the inserted text the cursor is left (1 puts it inside "ADUNARE{}").
+    public async Task<bool> InsertAsync(string text, int caretBack = 0, bool join = false)
+    {
+        try { return await JS.InvokeAsync<bool>("blazorStocMarkField.insert", Id, text, caretBack, join); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { return false; }
+    }
+}

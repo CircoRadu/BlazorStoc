@@ -54,7 +54,8 @@ public static class AuditFilterOptions
         (AuditActions.RecordOnDemand, AuditActions.RecordOnDemand), (AuditActions.EditOnDemandIntervention, AuditActions.EditOnDemandIntervention),
         (AuditActions.AddInterventionPhoto, AuditActions.AddInterventionPhoto),
         (AuditActions.CreateInvoiceTemplate, AuditActions.CreateInvoiceTemplate), (AuditActions.EditInvoiceTemplate, AuditActions.EditInvoiceTemplate),
-        (AuditActions.EditInvoiceTemplateDetails, AuditActions.EditInvoiceTemplateDetails), (AuditActions.DeleteInvoiceTemplate, AuditActions.DeleteInvoiceTemplate)
+        (AuditActions.EditInvoiceTemplateDetails, AuditActions.EditInvoiceTemplateDetails), (AuditActions.DeleteInvoiceTemplate, AuditActions.DeleteInvoiceTemplate),
+        (AuditActions.ActivateInvoiceTemplate, AuditActions.ActivateInvoiceTemplate), (AuditActions.DeactivateInvoiceTemplate, AuditActions.DeactivateInvoiceTemplate)
     ];
 }
 

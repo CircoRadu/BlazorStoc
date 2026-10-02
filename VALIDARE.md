@@ -4,6 +4,15 @@
 
 > Verificările care nu au putut fi efectuate sunt urmărite, cu pașii și motivul, în `docs/TESTE_RAMASE.md`.
 
+## Preluare factura, sabloane de factura si campuri cu etichete - 2 octombrie 2026
+
+1. Autentifica-te, deschide **Produse → Preluare factura**: incarca (sau trage) un PDF de factura; se citeste dupa sablonul detectat, iar peste pagina apar liniile de demarcare. Trage o linie in sus/jos, trage capetele ei, sterge-o (buton, × sau Delete), adauga una cu „Adauga linie de demarcare": randurile din tabel se citesc din nou la fiecare modificare, iar ce este sub ultima linie nu apare.
+2. **Setari → Facturi → Sabloane salvate**: coloana ACTIV are comutator cu textul „Activ"/„Inactiv"; un sablon inactiv nu mai este propus la incarcarea unei facturi. Iconitele 👁 (detalii), ✎ (editeaza) si 🗑 (sterge) au tooltip in romana; nu exista „Redenumeste" si nu exista versiuni.
+3. Apasa ✎: apare sub-tab-ul **Editare sablon**, cu sablonul exact ca salvat peste factura model; ce citeste sablonul apare dupa „Analizeaza fisierul". Modifica ceva si schimba tab-ul sau pagina: apare „editare neterminata"; tasta Delete sterge elementul activ.
+4. „Salveaza" inlocuieste sablonul; „Salveaza ca sablon nou" cere o denumire diferita.
+5. In descrierea intrarii in stoc, eticheta mov ADUNARE{} se insereaza la cursor si etichetele adaugate dupa ea intra intre acolade (la citire se aduna valorile lor); etichetele din randul „Coloane folosite din tabel” (valorile coloanelor, de exemplu `<Pret unitar>`) au culoarea coloanei de pe pagina. In descrierea intrarii in stoc a produsului (si la Notificari → Sabloane, Subiect/Text) etichetele se insereaza la cursor, apar colorate, iar spatiile dintre ele au simbolul magenta.
+6. Verificari automate: `dotnet run --project tests/BlazorStoc.Checks` (cu `INVOICE_CORPUS_DIR` catre un director inexistent daca nu vrei facturile reale; vezi `docs/TESTE_RAMASE.md`, N38).
+
 ## Drag and drop pentru incarcarea fisierului la preluarea inventarului - 29 septembrie 2026
 
 - Zona de continut din `/inventar/preluare` (starea fara fisier incarcat, starea de scanare si tabelul de revizuire) accepta acum si tragerea unui fisier PDF direct din sistemul de operare, nu doar apasarea butonului "Preia inventar". Implementat prin `wwwroot/inventory-pickup-dropzone.js` (script delegat pe `document`, ca `collapsible.js`): la `drop`, fisierul este atribuit direct campului `<InputFile>` ascuns existent si se declanseaza evenimentul `change`, astfel incat fluxul C# existent (`ProcessFileAsync`) ruleaza neschimbat - nicio cale noua de incarcare de mentinut in paralel.

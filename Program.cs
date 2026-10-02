@@ -284,7 +284,7 @@ app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileS
 // A page picture of the invoice under analysis (Settings -> Facturi): kept in memory, served only to the administrator who uploaded the file.
 app.MapGet("/media/invoice-analysis/{id:guid}/{page:int}", (Guid id, int page, HttpContext context, IInvoiceAnalysisStore store) =>
 {
-    if (!context.User.IsInRole(AccessRoles.Administrator)) return Results.Forbid();
+    if (!context.User.IsInRole(AccessRoles.Administrator) && !context.User.IsInRole(AccessRoles.LimitedUser)) return Results.Forbid();
     var session = store.Get(id, context.User.Identity?.Name ?? "necunoscut");
     if (session is null || page < 1 || page > session.Previews.Count) return Results.NotFound();
     context.Response.Headers.CacheControl = "no-store";

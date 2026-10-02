@@ -2,12 +2,18 @@
     // Settings -> Facturi: drawing a rectangle on the page picture of the invoice under analysis (InvoiceTemplateWorkbench). The
     // overlay <svg data-invoice-draw="field|column"> shares the page point coordinates (its viewBox), so a drag is converted to
     // points of the page and handed to the component. Delegated on document (nothing to initialise when the component re-renders).
-    let dotnet = null;
+    // Several instances of the workbench can be on the page at once (generation, and the template being edited): each registers under its own id
+    // and its overlay <svg> carries it (data-invoice-owner), so an event is handed to the instance that owns the overlay it happened on.
+    const owners = new Map();
     let drag = null;
     window.blazorStocInvoiceTemplate = {
-        register(reference) { dotnet = reference; },
-        unregister() { dotnet = null; }
+        register(reference, id) { owners.set(id, reference); },
+        unregister(id) { owners.delete(id); }
     };
+    function dotnetOf(svg) { return svg ? owners.get(svg.getAttribute("data-invoice-owner") || "") ?? null : null; }
+    // The overlay the user is looking at (the one of the visible instance); the keys act on it.
+    function activeSvg() { return [...document.querySelectorAll("svg[data-invoice-draw]")].find(item => item.getBoundingClientRect().width > 0) ?? null; }
+
 
     function point(svg, event) {
         const matrix = svg.getScreenCTM();
@@ -49,6 +55,7 @@
         drag = null;
         rectangle.setAttribute("visibility", "hidden");
         try { svg.releasePointerCapture(event.pointerId); } catch (error) { /* already released */ }
+        const dotnet = dotnetOf(svg);
         if (cancelled || !dotnet) return;
         const end = point(svg, event);
         const x = Math.min(start.x, end.x), y = Math.min(start.y, end.y);
@@ -71,14 +78,15 @@
         const dx = now.x - state.start.x, dy = now.y - state.start.y;
         let { x, y, w, h } = state.box;
         const name = state.handle;
-        if (name === "move") { x += dx; y += state.kind === "c" ? 0 : dy; }
+        // The zone of a column and the table header keep their width (it belongs to the header cells): they only move and resize vertically.
+        const fixedWidth = state.kind === "c" || state.kind === "H";
+        if (name === "move") { if (!fixedWidth) x += dx; y += dy; }
         else {
             if (name.includes("e")) w = Math.max(MINIMUM, w + dx);
             if (name.includes("w")) { const right = x + w; x = Math.min(x + dx, right - MINIMUM); w = right - x; }
-            if (state.kind !== "c") {
-                if (name.includes("s")) h = Math.max(MINIMUM, h + dy);
-                if (name.includes("n")) { const bottom = y + h; y = Math.min(y + dy, bottom - MINIMUM); h = bottom - y; }
-            }
+            // A column is resized at the top and at the bottom too: its data zone starts and ends where the user puts the edges.
+            if (name.includes("s")) h = Math.max(MINIMUM, h + dy);
+            if (name.includes("n")) { const bottom = y + h; y = Math.min(y + dy, bottom - MINIMUM); h = bottom - y; }
         }
         return { x, y, w, h };
     }
@@ -117,9 +125,10 @@
         adjust = null;
         state.group.classList.remove("adjusting");
         try { state.svg.releasePointerCapture(event.pointerId); } catch (error) { /* already released */ }
+        const dotnet = dotnetOf(state.svg);
         if (cancelled || !state.moved || !dotnet) return;
         const { x, y, w, h } = state.result;
-        dotnet.invokeMethodAsync("OnRegionAdjusted", state.kind, state.id, x, y, w, h).catch(() => { /* the component is gone */ });
+        dotnet.invokeMethodAsync("OnRegionAdjusted", state.kind, state.id, x, y, w, h, state.page).catch(() => { /* the component is gone */ });
     }
 
     document.addEventListener("pointerup", event => finishAdjust(event, false));
@@ -136,7 +145,7 @@
         if (event.target.closest("[data-invoice-handle], .invoice-delete, .invoice-badge")) return;
         const rectangle = svg.querySelector("#invoice-draw-rect");
         if (!rectangle) return;
-        marquee = { svg, rectangle, start: point(svg, event), active: false, onElement: !!event.target.closest(".invoice-field, .invoice-column, .invoice-edit") };
+        marquee = { svg, rectangle, start: point(svg, event), active: false, onElement: !!event.target.closest(".invoice-field, .invoice-column, .invoice-edit, .invoice-hcell, .invoice-header-band") };
     });
 
     document.addEventListener("pointermove", event => {
@@ -155,10 +164,11 @@
         if (!marquee) return;
         const { svg, rectangle, start, active, onElement } = marquee;
         marquee = null;
-        if (!active) { if (!cancelled && !onElement && dotnet) dotnet.invokeMethodAsync("OnBackgroundClicked").catch(() => { /* the component is gone */ }); return; }
+        if (!active) { const owner = dotnetOf(svg); if (!cancelled && !onElement && owner) owner.invokeMethodAsync("OnBackgroundClicked").catch(() => { /* the component is gone */ }); return; }
         rectangle.setAttribute("visibility", "hidden");
         rectangle.classList.remove("marquee");
         try { svg.releasePointerCapture(event.pointerId); } catch (error) { /* already released */ }
+        const dotnet = dotnetOf(svg);
         if (cancelled || !dotnet) return;
         const end = point(svg, event);
         const page = parseInt(svg.getAttribute("data-invoice-page") || "1", 10);
@@ -170,6 +180,7 @@
 
     // Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo and redo the last template action, unless a text field has the focus.
     document.addEventListener("keydown", event => {
+        const dotnet = dotnetOf(activeSvg());
         if (!dotnet || !(event.ctrlKey || event.metaKey) || event.altKey) return;
         const key = event.key.toLowerCase();
         if (key !== "z" && key !== "y") return;
@@ -193,6 +204,15 @@
             const pad = font * 0.35;
             const width = (box.width + 2 * pad).toFixed(2);
             if (rect.getAttribute("width") !== width) rect.setAttribute("width", width);
+            // The cross that removes the element stands right after the label, whatever its real width.
+            const cross = badge.parentElement?.querySelector(".invoice-delete");
+            const circle = cross?.querySelector("circle"), mark = cross?.querySelector("text");
+            if (circle && mark) {
+                const r = parseFloat(circle.getAttribute("r")) || 0;
+                const page = badge.closest("svg")?.viewBox?.baseVal?.width ?? Infinity;
+                const cx = Math.min(page - r - 1, parseFloat(rect.getAttribute("x")) + parseFloat(width) + r * 1.6).toFixed(2);
+                if (circle.getAttribute("cx") !== cx) { circle.setAttribute("cx", cx); mark.setAttribute("x", cx); }
+            }
         });
     }
     let fitQueued = false;
@@ -204,6 +224,7 @@
 
     // The Delete key removes the selected element (or the selected group of elements) unless a text field has the focus.
     document.addEventListener("keydown", event => {
+        const dotnet = dotnetOf(activeSvg());
         if (!dotnet || event.key !== "Delete" || event.ctrlKey || event.altKey || event.metaKey) return;
         const target = event.target instanceof Element ? event.target : null;
         if (target && target.closest("input, textarea, select, [contenteditable]")) return;

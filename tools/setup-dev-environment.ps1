@@ -3,7 +3,8 @@
   Sets up a BlazorStoc development machine: local MariaDB 11.4 instance, database accounts, schema, private config files.
 .DESCRIPTION
   Idempotent in the sense that finished steps are skipped (distribution present, data directory initialised, secrets
-  written). It never overwrites existing secret files and never prints passwords. To start over, delete the MariaDB root
+  written). It never overwrites existing secret files and never prints passwords. When the private files are already there
+  (they are kept in the private repository), the database accounts are created with the passwords they hold. To start over, delete the MariaDB root
   directory and the generated *.private.json files first. See docs/SETUP_DEZVOLTARE.md.
 .PARAMETER MariaRoot
   Where the MariaDB distribution, data directory, my.ini and admin.private.cnf live (outside the repository).
@@ -21,7 +22,8 @@ param(
     [int]$Port = 3307,
     [string]$SecretsDir,
     [string]$MariaBinDir,
-    [switch]$SkipTestDatabase
+    [switch]$SkipTestDatabase,
+    [switch]$SkipData
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -131,30 +133,46 @@ $existing = $names.Values | Where-Object { Test-Path (Join-Path $SecretsDir $_) 
 if ($existing.Count -gt 0 -and $existing.Count -lt $names.Count - $(if ($SkipTestDatabase) { 1 } else { 0 })) {
     throw "Some private files already exist in $SecretsDir ($($existing -join ', ')) but not all. Remove them (and the MariaDB root) to start over, or complete them by hand."
 }
-if ($existing.Count -eq 0) {
+$generate = $existing.Count -eq 0
+if ($generate) {
     $pw = @{ app = New-Secret; migrator = New-Secret; backup = New-Secret; restore = New-Secret; test = New-Secret; admin = New-Secret }
-    $sql = @"
+}
+else {
+    # The private files travel with the (private) repository: the accounts are created with the passwords they already hold.
+    function Read-Password([string]$File) { (Get-Content (Join-Path $SecretsDir $File) -Raw -Encoding UTF8 | ConvertFrom-Json).Database.Password }
+    $pw = @{ app = Read-Password $names.app; migrator = Read-Password $names.migrator; backup = Read-Password $names.backup; restore = Read-Password $names.restore; test = $null }
+    if (Test-Path (Join-Path $SecretsDir $names.test)) { $pw.test = Read-Password $names.test }
+    Write-Host 'Private files already exist: the database accounts are created with the passwords they hold (no new passwords).'
+}
+$sql = @"
 CREATE DATABASE IF NOT EXISTS ``BlazorStoc`` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin;
 CREATE USER IF NOT EXISTS 'blazorstoc_dev'@'127.0.0.1' IDENTIFIED BY '$($pw.app)' REQUIRE SSL;
+ALTER USER 'blazorstoc_dev'@'127.0.0.1' IDENTIFIED BY '$($pw.app)';
 GRANT SELECT, INSERT, UPDATE, DELETE ON ``BlazorStoc``.* TO 'blazorstoc_dev'@'127.0.0.1';
 CREATE USER IF NOT EXISTS 'blazorstoc_migrator'@'127.0.0.1' IDENTIFIED BY '$($pw.migrator)' REQUIRE SSL;
+ALTER USER 'blazorstoc_migrator'@'127.0.0.1' IDENTIFIED BY '$($pw.migrator)';
 GRANT CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE VIEW, TRIGGER ON ``BlazorStoc``.* TO 'blazorstoc_migrator'@'127.0.0.1';
 CREATE USER IF NOT EXISTS 'blazorstoc_backup'@'127.0.0.1' IDENTIFIED BY '$($pw.backup)' REQUIRE SSL;
+ALTER USER 'blazorstoc_backup'@'127.0.0.1' IDENTIFIED BY '$($pw.backup)';
 GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES ON ``BlazorStoc``.* TO 'blazorstoc_backup'@'127.0.0.1';
 CREATE USER IF NOT EXISTS 'blazorstoc_restore'@'127.0.0.1' IDENTIFIED BY '$($pw.restore)' REQUIRE SSL;
+ALTER USER 'blazorstoc_restore'@'127.0.0.1' IDENTIFIED BY '$($pw.restore)';
 GRANT ALL PRIVILEGES ON ``BlazorStoc\_bak``.* TO 'blazorstoc_restore'@'127.0.0.1';
 GRANT ALL PRIVILEGES ON ``BlazorStoc\_old``.* TO 'blazorstoc_restore'@'127.0.0.1';
 GRANT SELECT, ALTER, DROP, CREATE, INSERT, TRIGGER ON ``BlazorStoc``.* TO 'blazorstoc_restore'@'127.0.0.1';
 "@
-    if (-not $SkipTestDatabase) {
-        $sql += @"
+if (-not $SkipTestDatabase -and $pw.test) {
+    $sql += @"
 CREATE DATABASE IF NOT EXISTS ``blazorstoc_test`` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin;
 CREATE USER IF NOT EXISTS 'blazorstoc_test_app'@'127.0.0.1' IDENTIFIED BY '$($pw.test)' REQUIRE SSL;
+ALTER USER 'blazorstoc_test_app'@'127.0.0.1' IDENTIFIED BY '$($pw.test)';
 GRANT SELECT, INSERT, UPDATE, DELETE ON ``blazorstoc_test``.* TO 'blazorstoc_test_app'@'127.0.0.1';
 GRANT CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE VIEW, TRIGGER ON ``blazorstoc\_test``.* TO 'blazorstoc_migrator'@'127.0.0.1';
 "@
-    }
-    Invoke-SqlText ($sql + "FLUSH PRIVILEGES;`n")
+}
+Invoke-SqlText ($sql + "FLUSH PRIVILEGES;`n")
+
+if ($generate) {
 
     $assets = Join-Path $MariaRoot 'assets'
     Write-Json (Join-Path $SecretsDir $names.app) ([ordered]@{
@@ -176,7 +194,7 @@ GRANT CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE VIEW, TRIGGER ON ``blazorst
     }
     Write-Host "Private files written to $SecretsDir (passwords are inside them; they are not printed)."
 }
-else { Write-Host 'Private files already exist; accounts left untouched.' }
+else { Write-Host 'Private files kept as they are.' }
 
 # --- 5. Schema: base DDL + triggers, then the application's own migrations --------------------------------------------
 function Install-Schema([string]$Database, [string]$ConfigPath) {
@@ -200,6 +218,37 @@ Install-Schema 'BlazorStoc' (Join-Path $SecretsDir $names.app)
 if (-not $SkipTestDatabase) {
     Write-Step 'Schema blazorstoc_test'
     Install-Schema 'blazorstoc_test' (Join-Path $SecretsDir $names.test)
+}
+
+
+# --- 6. Data of the development database (the dump in the repository, without the audit journal) -------------------------
+$dumpFile = Join-Path $repo 'database\dev-data\BlazorStoc_data.sql'
+if (-not $SkipData -and (Test-Path $dumpFile)) {
+    $rows = & $client "--defaults-extra-file=$adminCnf" -N -e "SELECT COUNT(*) FROM BlazorStoc.products"
+    if ([int]$rows -eq 0) {
+        Write-Step 'Data BlazorStoc (from database\dev-data)'
+        & $client "--defaults-extra-file=$adminCnf" --default-character-set=utf8mb4 --batch --init-command="SET FOREIGN_KEY_CHECKS=0, UNIQUE_CHECKS=0" "--database=BlazorStoc" "--execute=source $($dumpFile.Replace('\', '/'))"
+        if ($LASTEXITCODE -ne 0) { throw 'Loading the development data failed.' }
+        & $client "--defaults-extra-file=$adminCnf" --batch "--database=BlazorStoc" -e 'DELETE FROM change_events'   # the triggers wrote one event per loaded row
+    }
+    else { Write-Host 'BlazorStoc already holds data; the development dump was not loaded (use -SkipData to hide this message).' }
+}
+# The files the data refers to (archive files, photos, Data Protection keys) go where the application looks for them: Database:MariaAssetsRoot
+# of the application config, or %LOCALAPPDATA%\BlazorStoc-MariaDB\assets; files that already exist are never overwritten.
+$assetsSource = Join-Path $repo 'database\dev-data\assets'
+if (-not $SkipData -and (Test-Path $assetsSource)) {
+    $appConfig = Join-Path $SecretsDir $names.app
+    $assetsRoot = $null
+    if (Test-Path $appConfig) { $assetsRoot = (Get-Content $appConfig -Raw -Encoding UTF8 | ConvertFrom-Json).Database.MariaAssetsRoot }
+    if (-not $assetsRoot) { $assetsRoot = Join-Path $env:LOCALAPPDATA 'BlazorStoc-MariaDB\assets' }
+    Write-Step "Files of the development data -> $assetsRoot"
+    foreach ($file in Get-ChildItem $assetsSource -Recurse -File) {
+        $target = Join-Path $assetsRoot $file.FullName.Substring($assetsSource.Length).TrimStart('\')
+        if (-not (Test-Path -LiteralPath $target)) {
+            New-Item -ItemType Directory -Force (Split-Path $target -Parent) | Out-Null
+            Copy-Item -LiteralPath $file.FullName -Destination $target
+        }
+    }
 }
 
 Write-Step 'Done'

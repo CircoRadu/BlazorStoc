@@ -1,0 +1,11 @@
+﻿{
+    "Database":  {
+                     "Host":  "127.0.0.1",
+                     "Port":  3307,
+                     "Name":  "BlazorStoc",
+                     "User":  "blazorstoc_migrator",
+                     "Password":  "kG4KWR74dKJ5FWDdvXXXwuJYFqME7c",
+                     "SslMode":  "Required"
+                 },
+    "Purpose":  "Cont operational dedicat migrarilor de schema (Subtask 2.9): CREATE/ALTER/INDEX/DROP/REFERENCES/CREATE VIEW/TRIGGER numai pe baza BlazorStoc, fara SELECT/INSERT/UPDATE/DELETE si fara drepturi globale. Contul aplicatiei (blazorstoc_dev) ramane fara DDL."
+}

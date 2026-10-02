@@ -544,3 +544,37 @@ Tot codul MariaDB a fost rescris in acest ciclu pentru schema reala (vezi TODO.m
 ### N33. Restaurare dintr-un backup anterior migrarii 10 si ciocniri intre administratori
 - **Motiv**: M2 (un singur administrator; restaurarea pe baza reala nu se ruleaza in verificari). **Pasi**: restaureaza un backup facut inainte de migrarea 10 si reporneste aplicatia (tabelele de sabloane se recreeaza prin migrare); in doua ferestre editeaza acelasi sablon si salveaza pe rand ca versiune noua.
 - **Asteptat**: dupa restaurare Setari → Facturi functioneaza (lista poate fi goala); a doua salvare primeste „Sablonul a fost modificat sau sters intre timp".
+
+## Preluare factura si editare de sabloane (02.10.2026)
+
+### N34. Liniile de demarcare din Preluare factura, trase cu mouse-ul
+- **Motiv**: M1 (tragerea reala cu mouse-ul nu se ruleaza in verificari automate; logica de citire intre linii este testata). **Pasi**: Produse → Preluare factura, incarca o factura (cu linii trase, una fara linii, una scanata); trage o linie in sus/jos, trage capetele ei, sterge-o (buton, × si Delete), adauga una cu „Adauga linie de demarcare" si clic pe pagina; schimba pagina la o factura pe mai multe pagini.
+- **Asteptat**: liniile urmeaza mouse-ul, randurile din tabel se citesc din nou dupa fiecare modificare, ce este sub ultima linie nu apare, o singura linie nu da niciun rand; pe o scanare liniile cad pe pagina indreptata.
+
+### N35. Campul cu etichete colorate (cursor, culori, simbol pentru spatiu)
+- **Motiv**: M1 (aspectul si pozitia cursorului depind de browser si de rezolutie; verificat doar la compilare). **Pasi**: in Setari → Facturi → descrierea intrarii in stoc a produsului si la Notificari → Sabloane (Subiect si Text): apasa etichete, scrie intre ele, selecteaza text; incearca pe un ecran 4K si in Brave, Chrome, Edge.
+- **Asteptat**: eticheta se insereaza la cursor si cursorul ramane dupa ea, etichetele sunt albastre (cele necunoscute rosii), fiecare spatiu din afara etichetelor are simbolul magenta vizibil, iar textul colorat si cel tastat se suprapun exact (fara deplasare, si cu text lung si defilare).
+
+### N36. Sub-tab-ul „Editare sablon" si avertizarea la parasire
+- **Motiv**: M1 (fluxul cu mai multe tab-uri si dialogul de avertizare nu au fost rulate in browser). **Pasi**: ✎ pe un sablon; modifica un element; apasa pe alt sub-tab, pe alt tab din Setari, pe o intrare din meniu, pe Inapoi, pe ✎ al altui sablon, pe „Inchide editarea"; repeta fara modificari; salveaza cu „Salveaza" si cu „Salveaza ca sablon nou" (cu aceeasi denumire, apoi cu alta).
+- **Asteptat**: tasta Delete sterge elementul activ al sablonului (si Ctrl+Z anuleaza) chiar si cand panourile Generare si Editare sunt amandoua pe pagina; cu modificari apare „editare neterminata" si, la „Parasesc", sub-tab-ul dispare; fara modificari iesirea e imediata; sub-tab-ul apare numai cat editarea e activa; „Salveaza ca sablon nou" refuza aceeasi denumire; la deschidere sablonul apare exact ca salvat peste PDF-ul model, fara citire pana la „Analizeaza fisierul".
+
+### N37. Comutatorul Activ/Inactiv din lista de sabloane
+- **Motiv**: M1 (aspectul in tabel si propunerea sabloanelor depind de browser si de date reale). **Pasi**: Setari → Facturi → Sabloane salvate: comuta un sablon, reincarca pagina, incarca o factura a aceluiasi furnizor in Generare sablon si in Preluare factura; verifica jurnalul.
+- **Asteptat**: bara mica aliniata cu textul „Activ" (verde) / „Inactiv" (gri); un sablon inactiv nu este propus; jurnalul are „Activare/Dezactivare sablon factura".
+
+### N38. Migrarea 12, restaurare si factura reala Emproium
+- **Motiv**: M2/M3 (nu s-a rulat pe o baza cu sabloane existente, iar verificarea cu facturile reale esueaza la una din ele). **Pasi**: aplica migrarea 12 pe o baza cu sabloane salvate si restaureaza un backup anterior; ruleaza `tests/BlazorStoc.Checks` cu `INVOICE_CORPUS_DIR=D:\_BlazTest\Facturi furnizori` si analizeaza `Emproium 09.11.2026 - 640.pdf` cu `tests/BlazorStoc.InvoiceCorpus`.
+- **Asteptat**: toate sabloanele existente raman active; pentru factura Emproium (scanata, cu „Discount +tva" si „TIMBRU VERDE") suma randurilor se potriveste cu totalul fara TVA sau esecul se transforma intr-un test cu o fixtura generata si se corecteaza motorul.
+
+## N39 - Etichete din denumirile proprii ale sablonului (02.10.2026)
+
+De verificat in browser (dupa Ctrl+F5): (1) coloana „Taxa verde" cu sensul Cota TVA apare in „Coloane folosite din tabel" ca `<Taxa verde>`; (2) la analiza unui PDF, etichetele campurilor din antet sunt textele din factura; (3) stergerea unei coloane/unui camp de pe overlay scoate butonul etichetei si marcajele ei din descriere; (4) un sablon salvat inainte se deschide cu descrierea adusa la denumirile coloanelor.
+
+## N40 - Operatii aritmetice noi si redenumirea etichetelor (02.10.2026)
+
+De verificat in browser: (1) butoanele SCADERE{}, INMULTIRE{}, IMPARTIRE{} se insereaza la cursor cu cursorul intre acolade, iar etichetele apasate dupa prima primesc automat simbolul (+ - * /) intre ele; (2) simbolurile apar in culoarea operatiei; (3) IMPARTIRE{} cu 3 etichete blocheaza salvarea; (4) schimbarea „Denumirii din antet" a unei coloane (sau „Etichetei" unui camp) redenumeste marcajul in descriere.
+
+## N41 - Cap de tabel cu celule, zone de coloana ancorate (02.10.2026)
+
+De verificat in browser pe `905550.pdf` (Generare sablon) si pe un sablon salvat: (1) capul de tabel se selecteaza si se redimensioneaza sus/jos, celulele lui au 8 manere si latimea lor devine latimea coloanei; (2) zona unei coloane are doar manere sus/jos, iar dupa tragere dialogul coloanei arata elementele de deasupra/dedesubt de care e legata; (3) „Adauga celula de antet" fara „Deseneaza zona" blocheaza salvarea cu mesajul din Probleme; (4) stergerea celulei sau a zonei sterge coloana; (5) pe o factura cu rand de numere („0 1 2 ...") randul 0 nu apare ca produs si coloanele incep sub el; (6) factura de mai multe pagini cu antet repetat: zona se opreste la elementul de jos.
