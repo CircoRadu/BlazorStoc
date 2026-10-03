@@ -148,7 +148,8 @@ REPLACE INTO `categories` (`id`, `name`, `normalized_name`) VALUES (1,'Scule ele
 (2,'Echipamente de protectie personala','ECHIPAMENTE DE PROTECTIE PERSONALA'),
 (3,'Consumabile generice','CONSUMABILE GENERICE'),
 (4,'Masurare','MASURARE'),
-(5,'Scule de mana','SCULE DE MANA');
+(5,'Scule de mana','SCULE DE MANA'),
+(6,'TVCI','TVCI');
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -210,7 +211,9 @@ REPLACE INTO `products` (`id`, `category_id`, `subcategory_id`, `name`, `normali
 (8,3,2,'Disc diamantat 230 mm','DISC DIAMANTAT 230 MM','Pentru beton si zidarie',-2,0),
 (9,4,8,'Nivela cu bula 60 cm','NIVELA CU BULA 60 CM','Corp aluminiu · trei fiole',5,0),
 (10,1,1,'Ciocan rotopercutor SDS Plus','CIOCAN ROTOPERCUTOR SDS PLUS','Putere 800 W · energie de impact 2,7 J',2,0),
-(12,5,6,'Diblu nylon 8 × 40 test 22','DIBLU NYLON 8 × 40 TEST 22','Pentru fixari in zidarie si polistiren si BCA',148,8);
+(12,5,6,'Diblu nylon 8 × 40 test 22','DIBLU NYLON 8 × 40 TEST 22','Pentru fixari in zidarie si polistiren si BCA',148,8),
+(13,6,9,'EBD3612','EBD3612','Sursa de alimentare 12V, 3A - MW Power',0,0),
+(14,6,9,'HDMI-3','HDMI-3','Cablu HDMI 3 metri',0,0);
 /*!40000 ALTER TABLE `products` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -303,7 +306,8 @@ REPLACE INTO `subcategories` (`id`, `category_id`, `name`, `normalized_name`) VA
 (5,4,'Distante','DISTANTE'),
 (6,5,'Strangere','STRANGERE'),
 (7,2,'Protectie maini','PROTECTIE MAINI'),
-(8,4,'Nivelare','NIVELARE');
+(8,4,'Nivelare','NIVELARE'),
+(9,6,'Generice','GENERICE');
 /*!40000 ALTER TABLE `subcategories` ENABLE KEYS */;
 UNLOCK TABLES;
 
