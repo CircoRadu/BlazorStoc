@@ -341,13 +341,21 @@ public static partial class InvoiceTableReader
         // A table drawn with horizontal rules: each box between two successive rules is a row (the rows have no fixed height; also when a template
         // reads the file), whatever the running numbers say (a scan reads a "1" as
         // "]"). Kept only when its rows pass the arithmetic checks better than the strategies above.
-        if (RuledBands(document, columns, headerPage, headerBottom) is { Count: >= 2 } ruled)
+        if (RuledBands(document, columns, headerPage, headerBottom) is { Count: >= 2 })
         {
-            var read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, InvoiceRowSplit.Top, useIndex: false, ruled);
+            var read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, InvoiceRowSplit.Top, useIndex: false, ruled: true);
             // The rules are the table's own drawing of its rows: they win unless they give more rows with problems than the other reading
             // (the score cannot decide: it counts rows, and a reading that mistakes the row of column numbers for goods has one more).
+            // They also win when the other reading has more problems than they do: rows glued together or cut in two by a strategy that
+            // ignores the rules fail the arithmetic, and the rules then give more rows than it, not fewer.
+            // A row of a column that holds one amount per row with several amounts in it is two or more rows glued together (checked by the
+            // arithmetic only when the template reads the columns the check needs).
             var flagged = (InvoiceTableRead item) => item.Rows.Count(row => row.Flags.Count > 0);
-            if (read.Rows.Count >= 2 && read.Rows.Count <= best!.Rows.Count + 1 && flagged(read) <= flagged(best)) best = read;
+            var glued = (InvoiceTableRead item) => item.Rows.Count(row => item.Columns.Any(column =>
+                column.Meaning is InvoiceColumnMeanings.Quantity or InvoiceColumnMeanings.UnitPrice &&
+                row.Cells.GetValueOrDefault(column.Id, "").Split(' ', StringSplitOptions.RemoveEmptyEntries).Count(token => token.Any(char.IsAsciiDigit)) >= 2));
+            if (read.Rows.Count >= 2 && flagged(read) <= flagged(best!) &&
+                (read.Rows.Count <= best!.Rows.Count + 1 || flagged(read) < flagged(best) || glued(read) < glued(best))) best = read;
         }
         // Rows that still fail the arithmetic may have a column that sits at another height than its row: read it by order instead.
         if (best!.Rows.Any(row => row.Flags.Contains(ArithmeticFlag)))
@@ -368,7 +376,13 @@ public static partial class InvoiceTableReader
     internal static List<(double Top, double Bottom)>? RuledBands(InvoiceDocument document, IReadOnlyList<InvoiceColumn> columns, int headerPage, double headerBottom)
     {
         var page = document.Pages.FirstOrDefault(item => item.Number == headerPage);
-        if (page?.Rules is not { Count: > 0 } rules || columns.Count == 0) return null;
+        return page is null ? null : RuledBands(page, columns, headerBottom);
+    }
+
+    // The same for any page of the table (a following page starts under its repeated header, or at the top).
+    internal static List<(double Top, double Bottom)>? RuledBands(InvoicePageData page, IReadOnlyList<InvoiceColumn> columns, double headerBottom)
+    {
+        if (page.Rules is not { Count: > 0 } rules || columns.Count == 0) return null;
         var left = columns.Min(column => column.Left);
         var right = columns.Max(column => column.Right);
         var width = right - left;
@@ -427,8 +441,9 @@ public static partial class InvoiceTableReader
     }
 
     private static InvoiceTableRead ReadRows(InvoiceDocument document, IReadOnlyList<InvoiceColumn> columns, int headerPage, double headerBottom,
-        char? hint, string split, bool useIndex, List<(double Top, double Bottom)>? ruledBands = null)
+        char? hint, string split, bool useIndex, bool ruled = false)
     {
+        var ruledBands = ruled ? new List<(double Top, double Bottom)>() : null;
         var refined = columns.ToList();
         var rows = new List<InvoiceTableRow>();
         var indexColumn = useIndex ? refined.FindIndex(column => column.Meaning == InvoiceColumnMeanings.Index) : -1;
@@ -445,8 +460,16 @@ public static partial class InvoiceTableReader
         foreach (var page in document.Pages.Where(page => page.Number >= headerPage).OrderBy(page => page.Number))
         {
             // On a following page the table starts under its repeated header, when there is one.
-            var startY = page.Number == headerPage ? headerBottom : FindHeader(page, 3)?.Bottom ?? 0;
-            var cells = AssignCells(page, refined, startY);
+            var startY = headerBottom;
+            var pageColumns = (IReadOnlyList<InvoiceColumn>)refined;
+            if (page.Number != headerPage)
+            {
+                // The repeated header also tells where the columns are on this page (a scan of another page may be shifted or scaled).
+                var repeated = FindHeader(page, 3);
+                startY = repeated?.Bottom ?? 0;
+                if (repeated is not null) pageColumns = ColumnsOnPage(refined, repeated);
+            }
+            var cells = AssignCells(page, pageColumns, startY);
             cells = InsideZones(cells, refined, page.Number, headerPage);
             var floor = 0.0;
             if (ruledBands is null) cells = WithoutColumnNumberRow(cells, out floor);
@@ -455,16 +478,17 @@ public static partial class InvoiceTableReader
             var anchors = new List<(int Number, double Y, double Height, BodyCell Anchor)>();
             if (ruledBands is not null)
             {
-                // Rows are the boxes between the table's horizontal rules (header page only): a box with no text is not a row, nor is the
-                // row of column numbers.
-                if (page.Number != headerPage) continue;
+                // Rows are the boxes between the table's horizontal rules, on every page of the table (a following page has its own rules,
+                // under its repeated header): a box with no text is not a row, nor is the row of column numbers.
+                var pageBands = RuledBands(page, pageColumns, startY);
+                if (pageBands is not { Count: >= 1 }) continue;
                 var ruledRows = new List<(double Top, double Bottom)>();
-                foreach (var (top, bottom) in ruledBands)
+                foreach (var (top, bottom) in pageBands)
                 {
                     var inBox = cells.Where(cell => cell.Segment.CenterY >= top && cell.Segment.CenterY < bottom).ToList();
                     if (inBox.Count == 0 || IsColumnNumberRow(inBox.Select(cell => cell.Segment.Text))) continue;
                     // The totals box ends the table.
-                    if (inBox.Any(cell => InvoiceVocabulary.IsFooterStart(cell.Segment.Text))) break;
+                    if (inBox.Any(cell => InvoiceVocabulary.IsFooterStart(cell.Segment.Text))) break;   // the totals box ends the table on this page; a following page may continue it
                     ruledRows.Add((top, bottom));
                     anchors.Add((ruledRows.Count, (top + bottom) / 2, Math.Max(1, inBox.Average(cell => cell.Segment.Height)), inBox[0]));
                 }
@@ -516,7 +540,7 @@ public static partial class InvoiceTableReader
                     if (ys.Count > 0) misalignment += Math.Abs(anchors[index].Y - (split == InvoiceRowSplit.Mid ? (ys.Min() + ys.Max()) / 2 : ys.Min())) / Math.Max(1, anchors[index].Height);
                 }
                 foreach (var cell in inRow) consumed.UnionWith(cell.Segment.Words);
-                rowCells.AddRange(inRow);
+                if (pageNumber == headerPage) rowCells.AddRange(inRow);   // only the first page widens the columns of the template
                 var values = new Dictionary<string, string>();
                 for (var column = 0; column < refined.Count; column++)
                 {
@@ -639,6 +663,49 @@ public static partial class InvoiceTableReader
                 }
             }
         return result;
+    }
+
+    // The columns of the table where this page draws them, found from its repeated header: a column goes to the header cell of the same
+    // meaning (else the same label), keeping its own width scaled as the header is scaled between the two pages; columns without a header
+    // cell here are placed by the shift and scale of the matched ones. The result has the same columns in the same order. Without at least
+    // two matched columns the columns stay where they are.
+    internal static IReadOnlyList<InvoiceColumn> ColumnsOnPage(IReadOnlyList<InvoiceColumn> columns, HeaderBand header)
+    {
+        var used = new HashSet<HeaderCell>();
+        var matches = new (double Centre, bool Found)[columns.Count];
+        for (var index = 0; index < columns.Count; index++)
+        {
+            var column = columns[index];
+            var cell = header.Cells.FirstOrDefault(item => !used.Contains(item) && column.Meaning.Length > 0 && column.Meaning != InvoiceColumnMeanings.Ignore && column.Meaning != InvoiceColumnMeanings.Other && item.Meaning == column.Meaning)
+                       ?? header.Cells.FirstOrDefault(item => !used.Contains(item) && InvoiceValues.Normalize(item.Label).Length > 0 && InvoiceValues.Normalize(item.Label) == InvoiceValues.Normalize(column.Label));
+            if (cell is null) continue;
+            used.Add(cell);
+            matches[index] = ((cell.Left + cell.Right) / 2, true);
+        }
+        var matched = Enumerable.Range(0, columns.Count).Where(index => matches[index].Found).ToList();
+        if (matched.Count < 2) return columns;
+        var first = matched[0];
+        var last = matched[^1];
+        var oldSpan = (columns[last].Left + columns[last].Right) / 2 - (columns[first].Left + columns[first].Right) / 2;
+        var scale = oldSpan > 1 ? (matches[last].Centre - matches[first].Centre) / oldSpan : 1;
+        if (scale < 0.5 || scale > 2) return columns;
+        var shifted = new List<InvoiceColumn>();
+        for (var index = 0; index < columns.Count; index++)
+        {
+            var oldCentre = (columns[index].Left + columns[index].Right) / 2;
+            var centre = matches[index].Found ? matches[index].Centre : matches[first].Centre + (oldCentre - (columns[first].Left + columns[first].Right) / 2) * scale;
+            var half = (columns[index].Right - columns[index].Left) * scale / 2;
+            shifted.Add(columns[index] with { Left = centre - half, Right = centre + half });
+        }
+        // Neighbours meet halfway where their widths overlap or leave a gap.
+        for (var index = 0; index + 1 < shifted.Count; index++)
+        {
+            if (shifted[index + 1].Left <= shifted[index].Left) continue;
+            var border = (shifted[index].Right + shifted[index + 1].Left) / 2;
+            shifted[index] = shifted[index] with { Right = Math.Max(border, shifted[index].Left + 1) };
+            shifted[index + 1] = shifted[index + 1] with { Left = Math.Min(border, shifted[index + 1].Right - 1) };
+        }
+        return shifted;
     }
 
     private static int NearestColumn(IReadOnlyList<InvoiceColumn> columns, double x, double right)

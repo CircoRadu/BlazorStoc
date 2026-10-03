@@ -17,6 +17,7 @@ public static class InvoiceChecks
     {
         Console.WriteLine("=== Invoice templates ===");
         Values(check);
+        SeparatorsOnRules(check);
         Vocabulary(check);
         var reader = new InvoicePdfReader(new TestTessdata());
 
@@ -360,6 +361,23 @@ public static class InvoiceChecks
             $"Invoice separators: moving the first line under the first row leaves it out of the reading ({label})");
         check(InvoicePickupReader.Reread(reading, document, [lines[0]]).Count == 0, $"Invoice separators: a single line makes no row ({label})");
     }
+    // A scanned ruled table: its rows are read from the text, but the demarcation lines go on the table's own rules (above the first row, between
+    // rows, under the last), not on the text of the rows; without rules they go midway between two rows.
+    private static void SeparatorsOnRules(Action<bool, string> check)
+    {
+        var columns = new List<InvoiceColumn> { new("a", "Denumire", InvoiceColumnMeanings.Name, 90, 280), new("b", "Valoare", InvoiceColumnMeanings.Value, 280, 430) };
+        InvoiceTableRow Row(double top, double bottom) => new(1, null, new Dictionary<string, string>(), [], top, bottom);
+        // Rows' text extents (two-line, one-line, two-line rows) inside boxes ruled at 283 / 303.7 / 324.5 / 345.2 / 366.
+        var rows = new[] { Row(287, 299), Row(308, 318), Row(328, 341), Row(349, 362) };
+        InvoiceRule[] rules = [new(false, 283, 67, 528), new(false, 303.7, 67, 528), new(false, 324.5, 67, 528), new(false, 345.2, 67, 528), new(false, 366, 67, 528), new(false, 240, 400, 410), new(true, 89, 240, 400)];
+        var page = new InvoicePageData(1, 595, 842, InvoiceSources.Ocr, [], rules);
+        var ruled = InvoiceTableReader.SeparatorsFromRows(rows, columns, [page]).Select(item => item.Y).ToList();
+        check(ruled.SequenceEqual([283, 303.7, 324.5, 345.2, 366]), "Invoice separators: the lines of a scanned ruled table sit on its rules, not on the text of the rows");
+        var plain = InvoiceTableReader.SeparatorsFromRows(rows, columns, [page with { Rules = null }]).Select(item => item.Y).ToList();
+        check(plain.Count == 5 && plain[1] == 303.5 && plain[2] == 323 && plain[3] == 345 && plain[0] == 287 && plain[4] == 362,
+            "Invoice separators: without rules the line between two rows is drawn midway between them");
+    }
+
     private static void Values(Action<bool, string> check)
     {
         check(InvoiceValues.ParseNumber("1.234,56") == 1234.56m && InvoiceValues.ParseNumber("1,234.56") == 1234.56m && InvoiceValues.ParseNumber("1 234,56") == 1234.56m &&

@@ -6,9 +6,11 @@ using BlazorStoc.Services;
 // header fields. --words also lists every word with its position. --transfer makes a template from each file (the analysis as proposed)
 // and applies it to every other file, comparing what it reads with what the analysis of that file proposes - the test of a template on
 // an invoice of another supplier with the same layout.
-var target = args.FirstOrDefault(argument => !argument.StartsWith("--")) ?? ".";
+var target = args.FirstOrDefault(argument => !argument.StartsWith("--")) ?? ".";   // the file or directory comes first; the value after --template is read separately
 var showWords = args.Contains("--words");
 var transfer = args.Contains("--transfer");
+var templateIndex = Array.IndexOf(args, "--template");
+var templateFile = templateIndex >= 0 && templateIndex + 1 < args.Length ? args[templateIndex + 1] : null;
 var files = Directory.Exists(target) ? Directory.GetFiles(target, "*.pdf", SearchOption.AllDirectories).OrderBy(file => file).ToArray() : [target];
 var reader = new InvoicePdfReader(new CorpusTessdata());
 var loaded = new List<(string Name, InvoiceDocument Document, InvoiceAnalysis Analysis)>();
@@ -31,6 +33,21 @@ foreach (var file in files)
                     Console.WriteLine($"    y={word.Y,6:F1} x={word.X,6:F1} w={word.Width,5:F1} h={word.Height,4:F1} o={word.Order,4} {word.Text}");
         }
         if (transfer) continue;
+        if (templateFile is not null)
+        {
+            // The saved template (its JSON, e.g. the definition column of invoice_templates) applied as the pickup does: fields, rows, demarcation lines.
+            var definition = InvoiceTemplateJson.Deserialize(File.ReadAllText(templateFile));
+            var match = InvoiceTemplateEngine.Match(definition, analysis.SupplierCui, read.Document);
+            Console.WriteLine($"  TEMPLATE MATCH layout {match.Score:P0}, supplier match {match.SupplierMatch}, file supplier CUI '{analysis.SupplierCui}'");
+            var reading = InvoicePickupReader.Read(definition, read.Document);
+            foreach (var field in reading.Extraction.Fields) Console.WriteLine($"  TEMPLATE FIELD {field.Meaning,-18} {field.Name} = {field.Value}");
+            foreach (var column in reading.Extraction.Columns) Console.WriteLine($"  TEMPLATE COLUMN {column.Id} x={column.Left,6:F1}-{column.Right,6:F1} [{column.Meaning}] {column.Label}");
+            foreach (var row in reading.Extraction.Rows)
+                Console.WriteLine($"  TEMPLATE ROW p{row.Page} y={row.Top:F1}-{row.Bottom:F1}: " + string.Join(" | ", reading.Extraction.Columns.Select(column => row.Cells[column.Id])));
+            foreach (var line in reading.Separators) Console.WriteLine($"  TEMPLATE LINE p{line.Page} y={line.Y:F1} x={line.Left:F0}-{line.Right:F0}");
+            foreach (var warning in reading.Extraction.Warnings) Console.WriteLine("  TEMPLATE WARN " + warning);
+            continue;
+        }
         if (analysis.Table is { } table)
         {
             Console.WriteLine($"  TABLE page {table.HeaderPage}, header y={table.HeaderTop:F1}-{table.HeaderBottom:F1}, index={table.HasIndexColumn}, confidence={table.Confidence}");

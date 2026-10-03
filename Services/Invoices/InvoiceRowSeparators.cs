@@ -14,26 +14,54 @@ public static partial class InvoiceTableReader
 {
     private const double MinSeparatorBand = 1;
 
+    // How far (points) above the first row / below the last row of a page a rule still counts as the border of the table.
+    private const double EdgeRuleReach = 25;
+
     // The demarcation lines the rows were read between: the top of the first row of each page and the bottom of every row. Where the table is
-    // ruled these are its rules; where the rows are told apart only by the space between them, the lines are drawn in that space.
-    public static List<InvoiceSeparator> SeparatorsFromRows(IReadOnlyList<InvoiceTableRow> rows, IReadOnlyList<InvoiceColumn> columns)
+    // ruled these are its rules (a row's text extent is not the row: a ruled row is the box between two rules, whatever the text inside);
+    // where the rows are told apart only by the space between them, the lines are drawn in that space, midway between two rows.
+    public static List<InvoiceSeparator> SeparatorsFromRows(IReadOnlyList<InvoiceTableRow> rows, IReadOnlyList<InvoiceColumn> columns, IReadOnlyList<InvoicePageData>? pages = null)
     {
         var separators = new List<InvoiceSeparator>();
         if (rows.Count == 0 || columns.Count == 0) return separators;
-        var left = columns.Min(column => column.Left);
-        var right = columns.Max(column => column.Right);
         var counter = 0;
+        var firstPage = rows.Min(row => row.Page);
         foreach (var page in rows.GroupBy(row => row.Page).OrderBy(group => group.Key))
         {
+            // The columns as this page draws them (a following page may be shifted or scaled against the first one).
+            var pageData = pages?.FirstOrDefault(item => item.Number == page.Key);
+            var pageColumns = page.Key != firstPage && pageData is not null && FindHeader(pageData, 3) is { } repeated ? ColumnsOnPage(columns, repeated) : columns;
+            var left = pageColumns.Min(column => column.Left);
+            var right = pageColumns.Max(column => column.Right);
+            var width = right - left;
+            var rules = (pageData?.Rules ?? [])
+                .Where(rule => !rule.Vertical && InvoiceLayout.Overlap(left, right, rule.From, rule.To) >= 0.6 * width).Select(rule => rule.Position).OrderBy(y => y).ToList();
+            var ordered = page.Where(row => row.Bottom > row.Top).OrderBy(row => row.Top).ToList();
             var last = double.NegativeInfinity;
-            foreach (var row in page.OrderBy(row => row.Top))
+            for (var index = 0; index < ordered.Count; index++)
             {
-                if (row.Bottom <= row.Top) continue;
-                if (row.Top - last > MinSeparatorBand) Add(page.Key, row.Top);
-                if (row.Bottom - last > MinSeparatorBand) Add(page.Key, row.Bottom);
+                var row = ordered[index];
+                if (index == 0)
+                {
+                    var above = rules.Where(y => y <= row.Top + 2 && y >= row.Top - EdgeRuleReach).DefaultIfEmpty(double.NaN).Max();
+                    Add(page.Key, double.IsNaN(above) ? row.Top : above);
+                }
+                if (index + 1 < ordered.Count)
+                {
+                    var next = ordered[index + 1];
+                    var middle = (row.Bottom + next.Top) / 2;
+                    var between = rules.Where(y => y >= Math.Min(row.Bottom, next.Top) - 2 && y <= Math.Max(row.Bottom, next.Top) + 2).OrderBy(y => Math.Abs(y - middle)).Select(y => (double?)y).FirstOrDefault();
+                    Add(page.Key, between ?? middle);
+                }
+                else
+                {
+                    var below = rules.Where(y => y >= row.Bottom - 2 && y <= row.Bottom + EdgeRuleReach).DefaultIfEmpty(double.NaN).Min();
+                    Add(page.Key, double.IsNaN(below) ? row.Bottom : below);
+                }
             }
             void Add(int number, double y)
             {
+                if (y - last <= MinSeparatorBand) return;
                 counter++;
                 separators.Add(new InvoiceSeparator("s" + counter.ToString(CultureInfo.InvariantCulture), number, y, left, right));
                 last = y;
@@ -48,11 +76,15 @@ public static partial class InvoiceTableReader
     {
         var rows = new List<InvoiceTableRow>();
         if (columns.Count == 0) return rows;
+        var allColumns = columns;
         var indexColumn = columns.ToList().FindIndex(column => column.Meaning == InvoiceColumnMeanings.Index);
+        var firstPage = separators.Count == 0 ? 0 : separators.Min(separator => separator.Page);
         foreach (var page in document.Pages.OrderBy(page => page.Number))
         {
             var lines = separators.Where(separator => separator.Page == page.Number).Select(separator => separator.Y).OrderBy(y => y).ToList();
             if (lines.Count < 2) continue;
+            // On a following page the columns are where its repeated header puts them (the template's are those of the first page).
+            columns = page.Number != firstPage && FindHeader(page, 3) is { } repeated ? ColumnsOnPage(allColumns, repeated) : allColumns;
             var cells = AssignCells(page, columns, lines[0]).Where(cell => cell.Segment.CenterY < lines[^1]).ToList();
             var bands = lines.Zip(lines.Skip(1), (top, bottom) => (Top: top, Bottom: bottom)).Where(band => band.Bottom - band.Top >= MinSeparatorBand).ToList();
             var filled = bands.Select(band => cells.Where(cell => cell.Segment.CenterY >= band.Top && cell.Segment.CenterY < band.Bottom).ToList())
@@ -90,7 +122,7 @@ public static class InvoicePickupReader
     public static InvoicePickupReading Read(InvoiceTemplateDefinition definition, InvoiceDocument document)
     {
         var extraction = InvoiceTemplateEngine.Apply(definition, document);
-        var separators = InvoiceTableReader.SeparatorsFromRows(extraction.Rows, extraction.Columns);
+        var separators = InvoiceTableReader.SeparatorsFromRows(extraction.Rows, extraction.Columns, document.Pages);
         return new InvoicePickupReading(extraction, separators, definition.Table?.NameCodeSeparator ?? "");
     }
 
