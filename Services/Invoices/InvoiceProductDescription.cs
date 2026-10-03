@@ -198,6 +198,25 @@ public static partial class InvoiceProductDescription
         return Mark().Matches(template ?? "").Select(match => match.Groups[1].Value.Trim()).Where(mark => !known.Contains(InvoiceValues.Normalize(mark))).Distinct().ToList();
     }
 
+    // The description of the stock entry of one row of an invoice, as the template says: header fields from what the template read in the file,
+    // the values of the columns from the cells of the row (as edited), the product code from the code cell or the start of the name. A label the
+    // row has no value for is left as written.
+    public static string RenderRow(InvoiceTemplateDraft draft, IReadOnlyList<InvoiceExtractedField> fields, IReadOnlyDictionary<string, string> cells, char? decimalHint)
+    {
+        var columns = ColumnLabels(draft);
+        string? Lookup(string label)
+        {
+            var key = InvoiceValues.Normalize(label);
+            if (fields.FirstOrDefault(field => field.Found && InvoiceValues.Normalize(field.Name) == key) is { } found)
+                return InvoiceTemplateEngine.Display(found.Value, found.Kind, decimalHint);
+            if (columns.FirstOrDefault(item => InvoiceValues.Normalize(item.Label) == key) is not { Label: not null } column) return null;
+            if (column.Column is null)   // the product code taken from the name
+                return cells.TryGetValue("code", out var code) && code.Length > 0 ? code : null;
+            return cells.TryGetValue(column.Column.Id, out var cell) && cell.Length > 0 ? cell : null;
+        }
+        return Render(draft.ProductDescription, Lookup);
+    }
+
     // A readable sample for the preview: field values from what the template reads, the first table row for the values of the columns (a
     // note in ‹ › when the template has not been read yet, or the table has no such column or no row).
     public static string RenderSample(InvoiceTemplateDraft draft, InvoiceExtraction? preview)

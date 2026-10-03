@@ -18,6 +18,7 @@ public static class InvoiceChecks
         Console.WriteLine("=== Invoice templates ===");
         Values(check);
         SeparatorsOnRules(check);
+        ProductMatching(check);
         Vocabulary(check);
         var reader = new InvoicePdfReader(new TestTessdata());
 
@@ -281,6 +282,12 @@ public static class InvoiceChecks
         check(Extracted(InvoiceFieldMeanings.InvoiceNumber) == "SE 77" && Extracted(InvoiceFieldMeanings.InvoiceDate) == "01.12.2026" && Extracted(InvoiceFieldMeanings.SupplierName) == "Sigma Electro SRL" &&
               InvoiceValues.NormalizeCui(Extracted(InvoiceFieldMeanings.SupplierCui)) == "99887766" && InvoiceValues.ParseNumber(Extracted(InvoiceFieldMeanings.Total), ',') == other.Total,
             "Invoice template: applied to an invoice of another supplier with longer values and a table three lines lower, the fields are read from the labels' new places");
+        // The description of a stock entry is the template's text with the invoice's fields and the row's cells put in (step 3 of the invoice pickup).
+        var descriptionDraft = InvoiceTemplateDraft.FromDefinition(definition, otherDocument, "", "");
+        var firstRow = extraction.Rows[0];
+        var renderedDescription = InvoiceProductDescription.RenderRow(descriptionDraft, extraction.Fields, new Dictionary<string, string>(firstRow.Cells) { ["code"] = otherRows[0].Name }, ',');
+        check(renderedDescription.Length > 0 && !renderedDescription.Contains('<') && renderedDescription.Contains("SE 77", StringComparison.Ordinal) && renderedDescription.Contains("Sigma Electro SRL", StringComparison.Ordinal),
+            "Invoice pickup: the description of an entry is generated from the template (invoice number and supplier from the fields, the row's values from its cells)");
         var extractedTable = new InvoiceTable(1, 0, 0, extraction.Columns, extraction.Rows, true, 1);
         check(extraction.Rows.Count == 9 && extraction.Rows.Select((row, index) =>
                   Cell(extractedTable, row, InvoiceColumnMeanings.Name) == otherRows[index].Name && InvoiceValues.ParseNumber(Cell(extractedTable, row, InvoiceColumnMeanings.Value), ',') == otherRows[index].Value).All(ok => ok),
@@ -382,6 +389,26 @@ public static class InvoiceChecks
         var plain = InvoiceTableReader.SeparatorsFromRows(rows, columns, [page with { Rules = null }]).Select(item => item.Y).ToList();
         check(plain.Count == 5 && plain[1] == 303.5 && plain[2] == 323 && plain[3] == 345 && plain[0] == 287 && plain[4] == 362,
             "Invoice separators: without rules the line between two rows is drawn midway between them");
+    }
+
+    // Invoice pickup, step 2: the product of a row is the one with the same code (whatever the spacing, case or dashes); without it the closest
+    // products are offered, best first, at most five.
+    private static void ProductMatching(Action<bool, string> check)
+    {
+        var catalog = new List<Product>
+        {
+            new(1, "C", "S", "DS-UPS1000", "Sursa neintreruptibila UPS 1000VA", 3), new(2, "C", "S", "DS-UPS1500", "Sursa neintreruptibila UPS 1500VA", 0),
+            new(3, "C", "S", "DS-7616NXI-K1", "NVR 4K 16 porturi", 1), new(4, "C", "S", "TND-O1-5G", "Access Point Bridge", 2), new(5, "C", "S", "RACK-6U", "Rack perete 6U", 0),
+        };
+        check(InvoiceProductMatcher.CodeOf(null, "DS-UPS1000 - Sursa neintreruptibila - UPS") == "DS-UPS1000" && InvoiceProductMatcher.CodeOf("X1", "alt nume") == "X1" && InvoiceProductMatcher.CodeOf("", "ABC 12 foo") == "ABC",
+            "Invoice product matching: the code of a row is its code cell, else the start of its name");
+        var exact = InvoiceProductMatcher.Match("ds ups-1000", "DS UPS 1000 - Sursa", catalog);
+        check(exact.Exact?.Id == 1 && exact.Alternatives.All(candidate => candidate.Product.Id != 1), "Invoice product matching: an exact code is found whatever the spacing, case or dashes, and is not offered as an alternative");
+        var close = InvoiceProductMatcher.Match("DS-UPS1200", "Sursa neintreruptibila", catalog);
+        check(close.Exact is null && close.Alternatives.Count >= 2 && close.Alternatives[0].Product.Id is 1 or 2 && close.Alternatives.Count <= InvoiceProductMatcher.MaxAlternatives &&
+              close.Alternatives.Zip(close.Alternatives.Skip(1)).All(pair => pair.First.Score >= pair.Second.Score), "Invoice product matching: without an exact code the closest products are offered, best first");
+        check(InvoiceProductMatcher.Match("ZZZ-9", "Ceva fara legatura cu catalogul", catalog).Alternatives.Count == 0 && InvoiceProductMatcher.Match("", "", catalog).Exact is null,
+            "Invoice product matching: nothing is offered when nothing is close");
     }
 
     private static void Values(Action<bool, string> check)

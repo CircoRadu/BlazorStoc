@@ -8,7 +8,7 @@
 
 <UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="editor-title">
-    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? "Adaugă produs" : $"Editează produsul {Original.Name}")</h2><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></div>
+    <div class="catalog-heading"><h2 id="editor-title">@(Original is null ? (Staging ? "Pregătește produs nou" : "Adaugă produs") : $"Editează produsul {Original.Name}")</h2><button type="button" class="danger" disabled="@saving" @onclick="Close">Închide</button></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="product-editor">
         <DataAnnotationsValidator />
@@ -18,7 +18,7 @@
                 <label class="full-width" for="product-code">@ProductCode.Label *<InputText id="product-code" @bind-Value="input.Name" maxlength="100" autocomplete="off" aria-describedby="product-code-note" /><small id="product-code-note" class="form-note">Introdu codul stabilit de producător. Codul trebuie să fie unic în catalog.</small><ValidationMessage For="() => input.Name" /></label>
                 <label for="product-category">Categorie *<InputSelect id="product-category" @bind-Value="input.Category" @bind-Value:after="CategoryChangedAsync">@foreach (var category in Categories) { <option value="@category">@category</option> }</InputSelect><ValidationMessage For="() => input.Category" /></label>
                 <label for="product-subcategory">Subcategorie *<InputSelect id="product-subcategory" @bind-Value="input.Subcategory">@foreach (var subcategory in Subcategories) { <option value="@subcategory">@subcategory</option> }</InputSelect><ValidationMessage For="() => input.Subcategory" /></label>
-                <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>.</p>
+                <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>@if (Original is null) { <text> sau <button type="button" class="refresh" @onclick="OpenCategories">Adaugă categorie / subcategorie</button> (se deschide într-o fereastră separată)</text> }.</p>
                 @if (!HasSelectableGroup) { <p class="validation-message full-width" role="alert">Nu există nicio combinație categorie–subcategorie disponibilă. Creează mai întâi o subcategorie în pagina dedicată.</p> }
                 <label class="full-width" for="product-description">Descriere<InputTextArea id="product-description" @bind-Value="input.Description" maxlength="1000" rows="3" /><ValidationMessage For="() => input.Description" /></label>
                 <div class="product-image-editor full-width">
@@ -39,7 +39,8 @@
                     </div>
                 </div>
                 <div class="form-note full-width" id="product-stock">
-                    @if (Original is null) { <span>Produsul nou este creat cu stoc 0. Stocul se modifică numai prin intrări și ieșiri.</span> }
+                    @if (Original is null && Staging) { <span>Produsul nu se salvează acum: se pregătește aici și se adaugă în catalog la finalizarea preluării (pasul 3), împreună cu intrarea în stoc.</span> }
+                    else if (Original is null) { <span>Produsul nou este creat cu stoc 0. Stocul se modifică numai prin intrări și ieșiri.</span> }
                     else { <span>Stoc curent: <strong>@Original.Quantity buc.</strong>@if (inVehicles > 0) { <text> (@(Original.Quantity - inVehicles) în depozit, @inVehicles în vehicule)</text> } Stocul nu se editează aici; se modifică numai prin intrări și ieșiri.</span> }
                 </div>
                 @if (Original is not null)
@@ -47,10 +48,19 @@
                     <ChangeReasonField Id="product-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
                 }
             </div>
-            <div class="editor-actions"><button class="primary" type="submit" disabled="@(!HasSelectableGroup)">@(saving ? "Se salvează…" : "Salvează produsul")</button><button class="danger" type="button" @onclick="Close">Anulează</button></div>
+            <div class="editor-actions"><button class="primary" type="submit" disabled="@(!HasSelectableGroup)">@(saving ? "Se salvează…" : Staging ? "Pregătește produsul" : "Salvează produsul")</button><button class="danger" type="button" @onclick="Close">Anulează</button></div>
         </fieldset>
     </EditForm>
 </section>
+@if (categoriesOpen)
+{
+    <div class="invoice-modal-backdrop front">
+        <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Categorii și subcategorii">
+            <div class="catalog-heading"><h3>Categorii și subcategorii</h3><button type="button" class="primary" @onclick="CloseCategoriesAsync">Gata, înapoi la produs</button></div>
+            <iframe class="categories-frame" src="/categorii/fereastra" title="Categorii și subcategorii"></iframe>
+        </div>
+    </div>
+}
 @if (pendingChanges is not null && Original is not null)
 {
     <SaveConfirmationDialog Title="Salvezi modificările produsului?" ObjectLabel="@Original.Name" Changes="pendingChanges"
@@ -61,6 +71,9 @@
     [Parameter] public Product? Original { get; set; }
     [Parameter] public string InitialCategory { get; set; } = "";
     [Parameter] public string InitialSubcategory { get; set; } = "";
+    // A new product can start with a code and a description (the invoice pickup offers the product of an invoice row).
+    [Parameter] public string InitialName { get; set; } = "";
+    [Parameter] public string InitialDescription { get; set; } = "";
     [Parameter] public IReadOnlyList<ProductGroup> Groups { get; set; } = Array.Empty<ProductGroup>();
     [Parameter] public EventCallback<Product> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
@@ -77,10 +90,34 @@
     private IJSObjectReference? imageModule;
     private readonly CancellationTokenSource lifetime = new();
     private string ImagePreviewUrl => imagePreviewUrl ?? (Original is null ? ProductImageRules.PlaceholderUrl : $"/media/products/{Original.Id}?v={Original.Version}");
-    private IReadOnlyList<string> Categories => Groups.Select(group => group.Category)
+    // Invoice pickup: the product is only prepared (checked and handed back), nothing is written to the catalog; the pickup saves it at the end.
+    [Parameter] public bool Staging { get; set; }
+    [Parameter] public EventCallback<StagedProduct> Staged { get; set; }
+    [Parameter] public ProductImageData? InitialImage { get; set; }
+
+    // The categories as they are now: the list given by the page, read again after the categories were edited in the popup.
+    private IReadOnlyList<ProductGroup>? refreshedGroups;
+    private bool categoriesOpen;
+    private IReadOnlyList<ProductGroup> CurrentGroups => refreshedGroups ?? Groups;
+
+    private void OpenCategories() => categoriesOpen = true;
+
+    private async Task CloseCategoriesAsync()
+    {
+        categoriesOpen = false;
+        try
+        {
+            refreshedGroups = await Repository.GetGroupsAsync(lifetime.Token);
+            NormalizeGroupSelection();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Category list reloading failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private IReadOnlyList<string> Categories => CurrentGroups.Select(group => group.Category)
         .Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.OrdinalIgnoreCase)
         .Order(StringComparer.CurrentCultureIgnoreCase).ToArray();
-    private IReadOnlyList<string> Subcategories => Groups
+    private IReadOnlyList<string> Subcategories => CurrentGroups
         .Where(group => string.Equals(group.Category, input.Category, StringComparison.OrdinalIgnoreCase))
         .Select(group => group.Subcategory).Where(value => !string.IsNullOrWhiteSpace(value))
         .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToArray();
@@ -100,8 +137,14 @@
     protected override void OnInitialized()
     {
         input = Original is null
-            ? new ProductInput { Category = InitialCategory, Subcategory = InitialSubcategory }
+            ? new ProductInput { Category = InitialCategory, Subcategory = InitialSubcategory, Name = InitialName, Description = InitialDescription }
             : ProductInput.From(Original);
+        if (Original is null && InitialImage is not null)
+        {
+            selectedImage = InitialImage;
+            imageFileName = InitialImage.FileName;
+            imagePreviewUrl = $"data:{InitialImage.ContentType};base64,{Convert.ToBase64String(InitialImage.Content)}";
+        }
         NormalizeGroupSelection();
     }
 
@@ -154,7 +197,24 @@
             catch (ProductOperationException exception) { error = exception.Message; }
             return;
         }
+        if (Staging) { await StageAsync(); return; }
         await PersistAsync();
+    }
+
+    // Invoice pickup: the product is checked like a new one (fields, code not used in the catalog) and handed back, not saved.
+    private async Task StageAsync()
+    {
+        error = null;
+        try
+        {
+            var value = input.Validated();
+            var existing = (await Repository.GetProductsAsync(lifetime.Token)).FirstOrDefault(product => TextNormalization.SameUniqueValue(product.Name, value.Name));
+            if (existing is not null) throw new ProductOperationException(ProductCode.DuplicateMessage(existing.Name, existing.Category, existing.Subcategory));
+            tracker?.Rebase();
+            await Staged.InvokeAsync(new StagedProduct(value, selectedImage));
+        }
+        catch (ProductOperationException exception) { error = exception.Message; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
     }
 
     private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
