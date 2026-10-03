@@ -314,6 +314,12 @@ public static class InvoiceChecks
         twice.Fields.First(field => field.Meaning == InvoiceFieldMeanings.InvoiceDate).Meaning = InvoiceFieldMeanings.InvoiceNumber;
         twice.Fields.First(field => field.Meaning == InvoiceFieldMeanings.InvoiceNumber && field.Id != twice.Fields.First(f => f.Meaning == InvoiceFieldMeanings.InvoiceNumber).Id).Use = true;
         check(twice.Problems().Any(problem => problem.Contains("sunt citite cu același rol", StringComparison.Ordinal)), "Invoice template: one meaning on two used fields is refused");
+        var sameLabel = InvoiceTemplateDraft.FromAnalysis(roAnalysis);
+        var labelled = sameLabel.Fields.Where(field => field.Use).Take(2).ToList();
+        foreach (var field in labelled) { field.Meaning = InvoiceFieldMeanings.Custom; field.Name = "Aceeași etichetă"; }
+        check(labelled.Count == 2 && sameLabel.Problems().Any(problem => problem.Contains("mai multe câmpuri", StringComparison.Ordinal)), "Invoice template: two used fields with the same label are refused");
+        labelled[1].Name = "Altă etichetă";
+        check(!sameLabel.Problems().Any(problem => problem.Contains("mai multe câmpuri", StringComparison.Ordinal)), "Invoice template: different labels are accepted again");
 
         // code taken from the name
         var codeDefinition = definition with { Table = definition.Table! with { NameCodeSeparator = " " } };

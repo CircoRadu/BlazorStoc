@@ -228,9 +228,12 @@ public sealed class InvoiceTemplateDraft
             problems.Add("Câmpurile " + string.Join(", ", group.Select(field => "„" + EffectiveLabel(field) + "”")) + " sunt citite cu același rol; folosește numai unul dintre ele.");
         foreach (var field in usedFields.Where(field => field.Meaning.Length == 0 || field.Meaning == InvoiceFieldMeanings.Custom))
             if (field.Name.Trim().Length == 0) problems.Add("Un câmp fără sens propriu are nevoie de o etichetă.");
+        // Two used fields never share a label, whatever their roles: the labels are what the description of the stock entry and the page refer to.
         foreach (var group in usedFields.Where(field => EffectiveLabel(field).Length > 0).GroupBy(field => InvoiceValues.Normalize(EffectiveLabel(field)))
-                     .Where(group => group.Count() > 1 && group.Any(field => field.Meaning.Length == 0 || field.Meaning == InvoiceFieldMeanings.Custom)))
+                     .Where(group => group.Count() > 1 && !group.All(field => field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom && field.Meaning == group.First().Meaning)))   // one role twice is reported above
             problems.Add($"Eticheta „{EffectiveLabel(group.First())}” este folosită la mai multe câmpuri; dă-le etichete diferite.");
+        foreach (var group in usedColumns.Where(column => column.Label.Trim().Length > 0).GroupBy(column => InvoiceValues.Normalize(column.Label)).Where(group => group.Count() > 1))
+            problems.Add($"Eticheta „{group.First().Label.Trim()}” este folosită la mai multe coloane; dă-le etichete diferite.");
         foreach (var group in usedColumns.Where(column => column.Meaning != InvoiceColumnMeanings.Other).GroupBy(column => column.Meaning).Where(group => group.Count() > 1))
             problems.Add("Coloanele " + string.Join(", ", group.Select(column => "„" + column.Label + "”")) + " sunt citite cu același rol; folosește numai una dintre ele.");
         if (usedColumns.Count > 0 && !usedColumns.Any(column => column.Meaning is InvoiceColumnMeanings.Name or InvoiceColumnMeanings.Code))

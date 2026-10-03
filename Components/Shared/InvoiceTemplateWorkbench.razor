@@ -354,7 +354,7 @@ else
     {
         <div class="invoice-modal-backdrop" @onclick="TryClosePopup">
             <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare câmp" @onclick:stopPropagation="true">
-                <h4>Editare câmp @(pf.LabelText.Length > 0 ? "· etichetă: " + pf.LabelText : "")</h4>
+                <h4>Editare câmp @(InvoiceTemplateDraft.EffectiveLabel(pf) is { Length: > 0 } effectiveLabel ? "· etichetă: " + effectiveLabel : "")</h4>
                 <div class="editor-grid">
                     <label>Etichetă *<input value="@pf.Name" @onchange="args => RenameField(pf, args.Value?.ToString() ?? string.Empty)" maxlength="120" autocomplete="off" /></label>
                     @if (InvoiceTemplateDraft.EffectiveLabel(pf).Length == 0)
@@ -387,7 +387,7 @@ else
                 </div>
                 <div class="invoice-modal-actions">
                     <button type="button" class="danger" @onclick="() => RemoveField(pf)">@(pf.Manual ? "Șterge câmpul desenat" : "Șterge câmpul (nu este necesar)")</button>
-                    <button type="button" class="primary" disabled="@(InvoiceTemplateDraft.EffectiveLabel(pf).Length == 0)" @onclick="ClosePopup">Gata</button>
+                    <button type="button" class="primary" disabled="@(InvoiceTemplateDraft.EffectiveLabel(pf).Length == 0 || LabelTaken(pf))" @onclick="ClosePopup">Gata</button>
                 </div>
             </div>
         </div>
@@ -911,9 +911,13 @@ else
         Refresh();
     }
 
+    // A used field whose label another used field already has cannot be left: the labels are what the description and the page refer to.
+    private bool LabelTaken(DraftField field) => field.Use && draft!.SameLabelAs(field).Any(item => item.Use &&
+        InvoiceValues.Normalize(InvoiceTemplateDraft.EffectiveLabel(item)) == InvoiceValues.Normalize(InvoiceTemplateDraft.EffectiveLabel(field)));
+
     private void TryClosePopup()
     {
-        if (PopupField() is { } field && InvoiceTemplateDraft.EffectiveLabel(field).Length == 0) return;
+        if (PopupField() is { } field && (InvoiceTemplateDraft.EffectiveLabel(field).Length == 0 || LabelTaken(field))) return;
         popupOpen = false;
     }
 
@@ -1115,7 +1119,8 @@ else
         {
             var field = draft.Fields.FirstOrDefault(item => item.Id == selectedId);
             if (field is null || field.Page != page) return null;
-            var label = field.LabelText.Length > 0 ? "Etichetă: " + field.LabelText : field.Manual ? "Câmp desenat de tine (fără etichetă)" : "Fără etichetă (valoare găsită direct)";
+            var name = InvoiceTemplateDraft.EffectiveLabel(field);
+            var label = name.Length > 0 ? "Etichetă: " + name : field.Manual ? "Câmp desenat de tine (fără etichetă)" : "Fără etichetă (valoare găsită direct)";
             return new EditBox('f', field.Id, field.X, field.Y, field.Width, field.Height, label);
         }
         if (selectedKind == 'H' && draft.HasTable && draft.HeaderPage == page)
