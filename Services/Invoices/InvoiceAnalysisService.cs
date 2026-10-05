@@ -100,7 +100,7 @@ public sealed class InvoiceAnalysisService(IInvoicePdfReader reader, IInvoiceAna
         owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var read = await reader.ReadAsync(pdf, cancellationToken).ConfigureAwait(false);
         // The numbers of the table that the OCR did not read as numbers are read again, cell by cell, once the table is known.
-        if (reader is IInvoiceNumberRereader rereader) read = await rereader.RereadNumbersAsync(read, null, cancellationToken).ConfigureAwait(false);
+        if (reader is IInvoiceNumberRereader rereader) read = await rereader.RereadNumbersAsync(read, cancellationToken).ConfigureAwait(false);
         var analysis = InvoiceAnalyzer.Analyze(read.Document);
         return store.Add(owner, fileName, read, analysis);
     }

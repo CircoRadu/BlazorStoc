@@ -84,22 +84,15 @@ else if (session is not null)
     {
         <section class="lab-panel" aria-label="Laborator OCR">
             <div class="lab-head"><strong>Laborator OCR</strong>
-                <span class="muted">motorul citirii de mai jos:</span>
-                @foreach (var engine in InvoiceEngines.All)
-                {
-                    var id = engine.Id;
-                    <label class="reason-option"><input type="radio" name="lab-engine" checked="@(labEngineId == id)" @onchange="() => SetLabEngine(id)" /> <span>@engine.Id · @engine.Name</span></label>
-                }
                 <button type="button" class="refresh" disabled="@(reading is null)" @onclick="SaveReference">Salvează ca referință</button>
             </div>
             @if (labNotice is not null) { <p class="muted" role="status">@labNotice</p> }
             <table class="lab-table">
-                <thead><tr><th>Motor</th><th>Tabel</th><th>Rânduri găsite / așteptate</th><th>Linii P / R</th><th>Coloane P / R</th><th>Scor</th><th>Rânduri cu probleme în valori</th></tr></thead>
+                <thead><tr><th>Tabel</th><th>Rânduri găsite / așteptate</th><th>Linii P / R</th><th>Coloane P / R</th><th>Scor</th><th>Rânduri cu probleme în valori</th></tr></thead>
                 <tbody>
-                    @foreach (var result in labResults)
+                    @if (labResult is { } result)
                     {
-                        <tr class="@(result.Engine.Id == labEngineId ? "lab-current" : "")">
-                            <td>@result.Engine.Id</td>
+                        <tr class="lab-current">
                             <td>@(result.Table is null ? "nu" : "da")</td>
                             @if (result.Match is { } match)
                             {
@@ -118,7 +111,7 @@ else if (session is not null)
                     }
                 </tbody>
             </table>
-            <small class="muted">@(labReference is null ? "Corectează liniile și coloanele pe pagină, apoi „Salvează ca referință”: motoarele se măsoară după geometrie, nu după valorile citite." : "Referința fișierului este încărcată; „Salvează ca referință” o înlocuiește cu ce vezi pe pagină.")@(Lab.ReferencesDirectory is null ? " Folderul pentru referințe nu este configurat." : "")</small>
+            <small class="muted">@(labReference is null ? "Corectează liniile și coloanele pe pagină, apoi „Salvează ca referință”: citirea se măsoară după geometrie, nu după valorile citite." : "Referința fișierului este încărcată; „Salvează ca referință” o înlocuiește cu ce vezi pe pagină.")@(Lab.ReferencesDirectory is null ? " Folderul pentru referințe nu este configurat." : "")</small>
         </section>
     }
 
@@ -722,7 +715,7 @@ else
             session = await Analysis.AnalyzeAsync(stream, file.Name, lifetime.Token);
             suggestions = InvoiceTemplateSuggestions.Rank(await Templates.GetAllAsync(lifetime.Token), session.Document);
             currentPage = session.Document.Pages[0].Number;
-            chosen = Lab.Enabled ? null : suggestions.FirstOrDefault()?.Template;   // the laboratory starts from the automatic reading, where the engines differ
+            chosen = Lab.Enabled ? null : suggestions.FirstOrDefault()?.Template;   // the laboratory starts from the automatic reading, the one that is measured against the reference
             LoadReading();
             RefreshLab();
         }
@@ -755,48 +748,35 @@ else
             var match = suggestions.First(item => item.Template.Info.Id == chosen.Info.Id).Match;
             templateInfo = $"Șablon detectat: {chosen.Info.Name} · {SupplierLabel(chosen.Info)} · potrivire {(int)Math.Round(match.Score * 100)}%";
         }
-        else if (EngineAnalysis.Table is not null)
+        else if (session!.Analysis.Table is not null)
         {
-            definition = InvoiceTemplateDraft.FromAnalysis(EngineAnalysis).ToDefinition(session!.Document);
-            templateInfo = Lab.Enabled ? $"Laborator OCR: citirea automată cu motorul {LabEngine!.Id} ({LabEngine.Name})."
+            definition = InvoiceTemplateDraft.FromAnalysis(session!.Analysis).ToDefinition(session!.Document);
+            templateInfo = Lab.Enabled ? "Laborator OCR: citirea automată a fișierului."
                 : "Niciun șablon salvat nu se potrivește cu factura: s-a folosit citirea automată. Verifică rândurile și coloanele.";
         }
         else templateInfo = null;
 
-        reading = definition is null ? null : InvoicePickupReader.Read(definition, session!.Document, LabEngine);
+        reading = definition is null ? null : InvoicePickupReader.Read(definition, session!.Document);
         if (reading is not null && reading.Extraction.Columns.Count == 0) reading = null;
         // The template's own overlay (fields with their read values, header, columns) placed on this file the way the engine reads it.
         overlay = reading is null || definition is null ? null
             : chosen is not null ? InvoiceTemplateDraft.FromDefinition(definition, session!.Document, chosen.Info.SupplierName, chosen.Info.SupplierCui)
-            : InvoiceTemplateDraft.FromAnalysis(EngineAnalysis);
+            : InvoiceTemplateDraft.FromAnalysis(session!.Analysis);
         excluded.Clear();
         ResetSeparators();
     }
 
-    // ---- OCR laboratory (Invoices:Lab = true): the engine of the reading, the engines against the reference of the file, the reference saved from the page ----
+    // ---- OCR laboratory (Invoices:Lab = true): the reading against the reference of the file, the reference saved from the page ----
 
-    private string labEngineId = InvoiceEngines.A.Id;
-    private IReadOnlyList<InvoiceLabResult> labResults = [];
+    private InvoiceLabResult? labResult;
     private InvoiceReference? labReference;
     private string? labNotice;
-    private InvoiceEngineOptions? LabEngine => Lab.Enabled ? InvoiceEngines.Find(labEngineId) : null;
-    // What the automatic proposal is: the analysis of the file with the engine chosen in the laboratory (the application's own otherwise).
-    private InvoiceAnalysis EngineAnalysis => LabEngine is null ? session!.Analysis : InvoiceAnalyzer.Analyze(session!.Document, LabEngine);
-
     private void RefreshLab()
     {
-        if (!Lab.Enabled || session is null) { labResults = []; labReference = null; return; }
+        if (!Lab.Enabled || session is null) { labResult = null; labReference = null; return; }
         try { labReference = InvoiceLab.LoadReference(Lab.ReferencesDirectory, session.FileName); }
         catch (Exception exception) when (exception is InvalidOperationException or System.Text.Json.JsonException or IOException) { labReference = null; labNotice = "Fișierul de referință nu poate fi citit: " + exception.Message; }
-        labResults = InvoiceLab.Evaluate(session.Document, labReference);
-    }
-
-    private void SetLabEngine(string id)
-    {
-        if (InvoiceEngines.Find(id) is null || id == labEngineId) return;
-        labEngineId = id;
-        labNotice = null;
-        LoadReading();   // the table is read again with the engine (the demarcation lines are the engine's again)
+        labResult = InvoiceLab.Evaluate(session.Document, labReference);
     }
 
     private void SaveReference()

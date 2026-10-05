@@ -2,6 +2,8 @@
 
 Actualizat de: **Claude**
 Data: **05 octombrie 2026 (motor geometric pentru tabelul facturii, laborator OCR, recitirea numerelor; preluare factura: corectii si facilitati, motiv automat la editari, tabel Secpral/Emproium)**
+
+Actualizare 05.10.2026 (main): un singur motor de recunoastere a tabelului facturii, cel geometric (fostul B); motorul A, optiunile de motor si scorul pe valori au fost eliminate; sabloanele existente au fost sterse din baza de dezvoltare (de refacut cu motorul nou). Vezi IMPLEMENTED.md.
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
 
 ## Motor geometric pentru tabelul facturii, laborator OCR, recitirea numerelor - 05.10.2026

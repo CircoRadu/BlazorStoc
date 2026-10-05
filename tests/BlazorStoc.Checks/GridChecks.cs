@@ -158,7 +158,7 @@ public static class GridChecks
             var document = new InvoiceDocument([
                 new InvoicePageData(1, 595, 842, InvoiceSources.Text, Page(1, 0, true, 247, first)),
                 new InvoicePageData(2, 595, 842, InvoiceSources.Text, Page(2, shift, false, 60, second))]);
-            var table = InvoiceTableReader.Detect(document, '.', InvoiceEngines.B).Table;
+            var table = InvoiceTableReader.Detect(document, '.').Table;
             var rows = table?.Rows ?? [];
             string Cell(int row, string meaning) => table is null || row >= rows.Count ? "" : (table.Columns.FirstOrDefault(column => column.Meaning == meaning) is { } found ? rows[row].Cells.GetValueOrDefault(found.Id, "") : "");
             check(table is not null && rows.Count == 4 && rows.Select(row => row.Number).SequenceEqual([1, 2, 3, 4]) && rows.All(row => row.Cells.Values.All(text => !text.Contains("5(3x4)", StringComparison.Ordinal))),
@@ -186,9 +186,9 @@ public static class GridChecks
         {
             var rules = withRule ? new List<InvoiceRule> { new(false, 262, 55, 540) } : [];
             var document = new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, words, rules)]);
-            var analysis = InvoiceAnalyzer.Analyze(document, InvoiceEngines.A);
+            var analysis = InvoiceAnalyzer.Analyze(document);
             var definition = InvoiceTemplateDraft.FromAnalysis(analysis).ToDefinition(document);
-            var reading = InvoicePickupReader.Read(definition, document, InvoiceEngines.A);
+            var reading = InvoicePickupReader.Read(definition, document);
             var reread = InvoicePickupReader.Reread(reading, document, reading.Separators);
             check(reread.Count == 2 && reread.All(row => row.Cells.Values.All(text => !text.Contains("5(3x4)", StringComparison.Ordinal))) && reading.Separators.Count >= 2 && reading.Separators.Min(separator => separator.Y) >= 277,
                 $"Pickup reading ({(withRule ? "a line between the header and the row of numbers" : "no drawn lines")}): the row of column numbers is not part of the first row ({reread.Count} rows, first line at {(reading.Separators.Count == 0 ? double.NaN : reading.Separators.Min(separator => separator.Y)):F1})");
@@ -214,8 +214,8 @@ public static class GridChecks
         for (var row = 0; row < rows.Length; row++)
             for (var column = 0; column < 7; column++) words.Add(Word(rows[row][column], xs[column] + (column >= 3 ? 6 : 0), 275 + row * 16, column >= 3 ? 4.5 * rows[row][column].Length : 0));
         var document = new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, words)]);
-        var analysis = InvoiceAnalyzer.Analyze(document, InvoiceEngines.B);
-        var reading = InvoicePickupReader.Read(InvoiceTemplateDraft.FromAnalysis(analysis).ToDefinition(document), document, InvoiceEngines.B);
+        var analysis = InvoiceAnalyzer.Analyze(document);
+        var reading = InvoicePickupReader.Read(InvoiceTemplateDraft.FromAnalysis(analysis).ToDefinition(document), document);
         var name = analysis.Table?.Columns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Name);
         var shown = reading.Extraction.Columns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Name);
         check(name is not null && shown is not null && name.Right - name.Left > 150 && Math.Abs(shown.Left - name.Left) <= 3 && Math.Abs(shown.Right - name.Right) <= 3 &&
@@ -244,7 +244,7 @@ public static class GridChecks
         List<InvoiceRule> rules = [];
         foreach (var y in new[] { 300.0, 320, 340, 360, 380, 400, 420, 640 }) rules.Add(new InvoiceRule(false, y, 20, 520));
         foreach (var x in borders) rules.Add(new InvoiceRule(true, x, 300, 640));
-        var table = InvoiceTableReader.Detect(new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Ocr, words, rules)]), '.', InvoiceEngines.B).Table;
+        var table = InvoiceTableReader.Detect(new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Ocr, words, rules)]), '.').Table;
         check(table is not null && table.Rows.Count == 3, $"Table grid: three rows in a ruled table with a description box, a repeated header and a note under the last row ({table?.Rows.Count ?? 0} rows)");
         check(table is not null && table.Rows.Count == 3 && table.Rows[1].Cells.Values.Any(text => text.Contains("Detalii", StringComparison.Ordinal) && text.Contains("Switch", StringComparison.Ordinal)),
             "Table grid: a box with only a description at its top is part of the row above it");
@@ -269,7 +269,7 @@ public static class GridChecks
             words.AddRange([Word(1, rows[row][0], 40, y), Word(1, rows[row][1], 255, y, 10), Word(1, rows[row][2], 330, y, 22), Word(1, rows[row][3], 405, y, 28), Word(1, (double.Parse(rows[row][3].Replace(',', '.'), System.Globalization.CultureInfo.InvariantCulture) * 1.21).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture), 470, y, 30)]);
         }
         var unlabelled = new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, words)]);
-        var found = InvoiceTableReader.Detect(unlabelled, '.', InvoiceEngines.B).Table;
+        var found = InvoiceTableReader.Detect(unlabelled, '.').Table;
         check(found is not null && found.Columns.Count >= 5 && found.Rows.Count == 4 && found.Rows[0].Cells.Values.Any(text => text.Contains("Cablu")) && found.Rows[3].Cells.Values.Any(text => text.Contains("izolatoare")),
             "Geometric engine: a table whose labels no dictionary knows is found from its rows of figures and the header over them");
 
@@ -277,7 +277,7 @@ public static class GridChecks
         List<InvoiceWord> withProse = [.. words];
         for (var line = 0; line < 5; line++) withProse.Add(Word(1, "Conditii generale de livrare si plata valabile pentru toate comenzile onorate de furnizor in baza contractului", 40, 120 + line * 10, 450));
         var proseDocument = new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, withProse)]);
-        var withText = InvoiceTableReader.Detect(proseDocument, '.', InvoiceEngines.B).Table;
+        var withText = InvoiceTableReader.Detect(proseDocument, '.').Table;
         check(withText is not null && withText.HeaderTop >= 196 && withText.Columns.All(column => !column.Label.Contains("Conditii")) && withText.Rows.Count == 4, "Geometric engine: the paragraph above the header is not part of it");
 
         // A row of column numbers and the name of the first row above its figures (the rows are drawn with the figures lower): the name belongs to the row, not to the header.
@@ -285,7 +285,7 @@ public static class GridChecks
             Word(1, "1", 40, 214, 4), Word(1, "2", 255, 214, 4), Word(1, "3", 335, 214, 4), Word(1, "4=2x3", 410, 214, 25), Word(1, "5", 480, 214, 4),
             Word(1, "IMPRIMANTA LASER MONOCROM", 40, 228), Word(1, "2", 258, 232, 5), Word(1, "504,12", 330, 232, 30), Word(1, "1.008,24", 405, 232, 35), Word(1, "211,73", 475, 232, 30),
             Word(1, "SCANNER PLAN A4", 40, 250), Word(1, "1", 258, 254, 5), Word(1, "199,00", 330, 254, 30), Word(1, "199,00", 410, 254, 30), Word(1, "41,79", 475, 254, 30)];
-        var numberedTable = InvoiceTableReader.Detect(new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, numbered)]), '.', InvoiceEngines.B).Table;
+        var numberedTable = InvoiceTableReader.Detect(new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, numbered)]), '.').Table;
         check(numberedTable is not null && numberedTable.HeaderBottom < 212 && numberedTable.Rows.Count == 2 && numberedTable.Rows[0].Cells.Values.Any(text => text.Contains("IMPRIMANTA")),
             "Geometric engine: the row of column numbers is not a row, and the first row's name above its figures is not part of the header");
 
@@ -294,7 +294,7 @@ public static class GridChecks
         twoPages.AddRange([Word(2, "Poz", 40, 80), Word(2, "Produs", 120, 80), Word(2, "Garantie", 330, 80), Word(2, "Serie", 450, 80),
             Word(2, "1", 40, 100, 4), Word(2, "Cablu retea", 120, 100), Word(2, "24", 335, 100, 10), Word(2, "1234", 455, 100, 20), Word(2, "2", 40, 114, 4), Word(2, "Priza dubla", 120, 114), Word(2, "12", 335, 114, 10), Word(2, "5678", 455, 114, 20)]);
         var annexed = InvoiceTableReader.Detect(new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, twoPages.Where(word => word.Page == 1).ToList()),
-            new InvoicePageData(2, 595, 842, InvoiceSources.Text, twoPages.Where(word => word.Page == 2).ToList())]), '.', InvoiceEngines.B).Table;
+            new InvoicePageData(2, 595, 842, InvoiceSources.Text, twoPages.Where(word => word.Page == 2).ToList())]), '.').Table;
         check(annexed is not null && annexed.HeaderPage == 1 && annexed.Rows.Count == 4 && annexed.Rows.All(row => row.Page == 1), "Geometric engine: the table of an annex on the next page is not read as part of the invoice's table");
     }
 }

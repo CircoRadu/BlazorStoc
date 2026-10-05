@@ -349,12 +349,10 @@ public static partial class InvoiceTableReader
 
     // ---- whole table of a document ----
 
-    public static (InvoiceTable? Table, IReadOnlySet<InvoiceWord> Consumed) Detect(InvoiceDocument document, char? decimalHint, InvoiceEngineOptions? options = null)
+    public static (InvoiceTable? Table, IReadOnlySet<InvoiceWord> Consumed) Detect(InvoiceDocument document, char? decimalHint)
     {
-        options ??= InvoiceEngines.Default;
-        HeaderBand? best = null;
-        // The geometric engine looks for the table by its structure first (rows of figures under each other, the header over them, the columns from the rules or the gutters).
-        if (options.GridFirst) best = InvoiceGridDetector.Find(document);
+        // The table is looked for by its structure first (rows of figures under each other, the header over them, the columns from the rules or the gutters).
+        HeaderBand? best = InvoiceGridDetector.Find(document);
         if (best is null)
             foreach (var page in document.Pages)
             {
@@ -374,11 +372,11 @@ public static partial class InvoiceTableReader
         }
         if (best is null) return (null, new HashSet<InvoiceWord>());
         var columns = ColumnsFrom(best);
-        var read = ReadRows(document, columns, best.Page, best.Bottom, decimalHint, options: options);
+        var read = ReadRows(document, columns, best.Page, best.Bottom, decimalHint);
         // Columns the labels did not name are given the meaning their numbers show: quantity x price = value on every row.
-        var inferred = options.InferMeanings ? InferMeanings(read.Columns, read.Rows, decimalHint) : read.Columns.ToList();
+        var inferred = InferMeanings(read.Columns, read.Rows, decimalHint);
         if (inferred.Zip(read.Columns).Any(pair => pair.First.Meaning != pair.Second.Meaning))
-            read = ReadRows(document, inferred, best.Page, best.Bottom, decimalHint, options: options);
+            read = ReadRows(document, inferred, best.Page, best.Bottom, decimalHint);
         var consumed = new HashSet<InvoiceWord>(read.Consumed);
         var left = read.Columns.Min(column => column.Left) - 6;
         var right = read.Columns.Max(column => column.Right) + 6;
@@ -397,50 +395,24 @@ public static partial class InvoiceTableReader
     // Reads the rows of the table that starts under headerBottom on headerPage and continues on the following pages. Both row
     // strategies are tried and the one whose rows pass the arithmetic checks best is kept.
     public static InvoiceTableRead ReadRows(InvoiceDocument document, IReadOnlyList<InvoiceColumn> columns, int headerPage, double headerBottom,
-        char? decimalHint, string? forcedSplit = null, InvoiceEngineOptions? options = null)
+        char? decimalHint, string? forcedSplit = null)
     {
         InvoiceTableRead? best = null;
-        var valuesInScore = (options ?? InvoiceEngines.Default).ValuesInScore;
         foreach (var split in forcedSplit is null ? new[] { InvoiceRowSplit.Top, InvoiceRowSplit.Mid } : [forcedSplit])
         {
-            var read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, split, useIndex: true, valuesInScore: valuesInScore);
+            var read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, split, useIndex: true);
             if (read.Rows.Count == 0 && columns.Any(column => column.Meaning == InvoiceColumnMeanings.Index))
-                read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, split, useIndex: false, valuesInScore: valuesInScore);
+                read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, split, useIndex: false);
             if (best is null || read.Score > best.Score + 0.001) best = read;
         }
         // A table drawn with horizontal rules: each box between two successive rules is a row (the rows have no fixed height; also when a template
-        // reads the file), whatever the running numbers say (a scan reads a "1" as
-        // "]"). Kept only when its rows pass the arithmetic checks better than the strategies above.
+        // reads the file), whatever the running numbers say (a scan reads a "1" as "]"). The geometry alone decides, not the values that were read:
+        // the rules win when they frame at least two rows, unless the running numbers found more rows than the rules frame (two rows glued in one box).
         if (RuledBands(document, columns, headerPage, headerBottom) is { Count: >= 2 })
         {
-            var read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, InvoiceRowSplit.Top, useIndex: false, ruled: true, valuesInScore: valuesInScore);
-            // The rules are the table's own drawing of its rows: they win unless they give more rows with problems than the other reading
-            // (the score cannot decide: it counts rows, and a reading that mistakes the row of column numbers for goods has one more).
-            // They also win when the other reading has more problems than they do: rows glued together or cut in two by a strategy that
-            // ignores the rules fail the arithmetic, and the rules then give more rows than it, not fewer.
-            // A row of a column that holds one amount per row with several amounts in it is two or more rows glued together (checked by the
-            // arithmetic only when the template reads the columns the check needs).
-            var flagged = (InvoiceTableRead item) => item.Rows.Count(row => row.Flags.Count > 0);
-            var glued = (InvoiceTableRead item) => item.Rows.Count(row => item.Columns.Any(column =>
-                column.Meaning is InvoiceColumnMeanings.Quantity or InvoiceColumnMeanings.UnitPrice &&
-                row.Cells.GetValueOrDefault(column.Id, "").Split(' ', StringSplitOptions.RemoveEmptyEntries).Count(token => token.Any(char.IsAsciiDigit)) >= 2));
-            // The geometric engine decides by the geometry alone: the rules win when they frame at least two rows, unless the running numbers found more
-            // rows than the rules frame (two rows glued in one box).
-            if (!valuesInScore) { if (read.Rows.Count >= 2 && (!best!.UsedIndex || read.Rows.Count >= best.Rows.Count)) best = read; }
-            else if (read.Rows.Count >= 2 && flagged(read) <= flagged(best!) &&
-                (read.Rows.Count <= best!.Rows.Count + 1 || flagged(read) < flagged(best) || glued(read) < glued(best))) best = read;
+            var read = ReadRows(document, columns, headerPage, headerBottom, decimalHint, InvoiceRowSplit.Top, useIndex: false, ruled: true);
+            if (read.Rows.Count >= 2 && (!best!.UsedIndex || read.Rows.Count >= best.Rows.Count)) best = read;
         }
-        // Rows that still fail the arithmetic may have a column that sits at another height than its row: read it by order instead.
-        if (valuesInScore && best!.Rows.Any(row => row.Flags.Contains(ArithmeticFlag)))
-            foreach (var meaning in new[] { InvoiceColumnMeanings.Quantity, InvoiceColumnMeanings.UnitPrice, InvoiceColumnMeanings.Value })
-            {
-                var index = best.Columns.ToList().FindIndex(column => column.Meaning == meaning && column.RowMapping == InvoiceRowMapping.Band);
-                if (index < 0) continue;
-                var trial = best.Columns.ToList();
-                trial[index] = trial[index] with { RowMapping = InvoiceRowMapping.Sequence };
-                var read = ReadRows(document, trial, headerPage, headerBottom, decimalHint, best.RowSplit, best.UsedIndex, valuesInScore: valuesInScore);
-                if (read.Score > best.Score + 0.001) best = read;
-            }
         return best;
     }
 
@@ -590,7 +562,7 @@ public static partial class InvoiceTableReader
     }
 
     private static InvoiceTableRead ReadRows(InvoiceDocument document, IReadOnlyList<InvoiceColumn> columns, int headerPage, double headerBottom,
-        char? hint, string split, bool useIndex, bool ruled = false, bool valuesInScore = true)
+        char? hint, string split, bool useIndex, bool ruled = false)
     {
         var ruledBands = ruled ? new List<(double Top, double Bottom)>() : null;
         var refined = columns.ToList();
@@ -751,7 +723,7 @@ public static partial class InvoiceTableReader
         // read the next invoice of the supplier.
         refined = WidenColumns(refined, rowCells);
         var checkedRows = Validate(rows, refined, hint);
-        var score = valuesInScore ? Score(checkedRows, refined, hint) : GeometricScore(checkedRows, usedIndex);
+        var score = GeometricScore(checkedRows, usedIndex);
         return new InvoiceTableRead(refined, checkedRows, split, usedIndex, score - 0.15 * misalignment, consumed);
     }
 
@@ -997,18 +969,4 @@ public static partial class InvoiceTableReader
     // The score of a reading by its geometry alone: one point for each row that was found, and a half for rows told apart by a running number
     // (a table numbered 1, 2, 3 ... is surer than rows guessed from the spacing). What was read in the cells, or whether it adds up, is not counted.
     private static double GeometricScore(IReadOnlyList<InvoiceTableRow> rows, bool usedIndex) => rows.Count == 0 ? 0 : rows.Count + (usedIndex ? 0.5 : 0);
-
-    private static double Score(IReadOnlyList<InvoiceTableRow> rows, IReadOnlyList<InvoiceColumn> columns, char? hint)
-    {
-        if (rows.Count == 0) return 0;
-        var score = 0.0;
-        foreach (var row in rows)
-        {
-            score += 1;
-            score -= row.Flags.Count * 0.6;
-            var filled = row.Cells.Values.Count(value => value.Length > 0);
-            score += 0.05 * filled;
-        }
-        return score;
-    }
 }

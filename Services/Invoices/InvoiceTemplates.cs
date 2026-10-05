@@ -579,7 +579,7 @@ public static class InvoiceTemplateEngine
     }
 
     // Reads a file with a template: the value of every used field (from its region, moved by the alignment) and the rows of the table.
-    public static InvoiceExtraction Apply(InvoiceTemplateDefinition definition, InvoiceDocument document, InvoiceEngineOptions? options = null)
+    public static InvoiceExtraction Apply(InvoiceTemplateDefinition definition, InvoiceDocument document)
     {
         var alignment = Align(definition, document);
         var warnings = new List<string>();
@@ -601,7 +601,7 @@ public static class InvoiceTemplateEngine
         {
             var page = PageOf(table.HeaderPage);
             var (tableColumns, headerBottom) = TableGeometry(table, page, alignment, document);
-            var read = InvoiceTableReader.ReadRows(document, tableColumns, page.Number, headerBottom, hint, table.RowSplit, options);
+            var read = InvoiceTableReader.ReadRows(document, tableColumns, page.Number, headerBottom, hint, table.RowSplit);
             // The columns keep the positions of the template; only the rows come from this file.
             columns = tableColumns;
             rows = read.Rows;

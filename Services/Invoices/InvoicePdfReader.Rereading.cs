@@ -9,7 +9,7 @@ namespace BlazorStoc.Services;
 // Reads again the numbers of the table that the page-wide OCR did not read as numbers.
 public interface IInvoiceNumberRereader
 {
-    Task<InvoiceReadResult> RereadNumbersAsync(InvoiceReadResult read, InvoiceEngineOptions? options = null, CancellationToken cancellationToken = default);
+    Task<InvoiceReadResult> RereadNumbersAsync(InvoiceReadResult read, CancellationToken cancellationToken = default);
 }
 
 // The OCR reads a whole page and is tuned for text: in a cell of a table the digits of a blurry or small print come out as letters, signs and gaps ("ear tet" for
@@ -73,10 +73,10 @@ public sealed partial class InvoicePdfReader
     [GeneratedRegex(@"^-?\d[\d.,]*\d$|^\d$")]
     private static partial Regex ReadNumber();
 
-    public async Task<InvoiceReadResult> RereadNumbersAsync(InvoiceReadResult read, InvoiceEngineOptions? options = null, CancellationToken cancellationToken = default)
+    public async Task<InvoiceReadResult> RereadNumbersAsync(InvoiceReadResult read, CancellationToken cancellationToken = default)
     {
         if (read.SourcePdf is null || read.Document.Pages.All(page => page.Source != InvoiceSources.Ocr)) return read;
-        var table = InvoiceAnalyzer.Analyze(read.Document, options).Table;
+        var table = InvoiceAnalyzer.Analyze(read.Document).Table;
         if (table is null || table.Rows.Count == 0) return read;
         var hint = InvoiceValues.DecimalStyle(read.Document.AllWords.Select(word => word.Text));
         var debug = Environment.GetEnvironmentVariable("INVOICE_OCR_DEBUG") == "1";

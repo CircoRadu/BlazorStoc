@@ -2,8 +2,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace BlazorStoc.Services;
 
-// The OCR laboratory inside the invoice pickup page (only when switched on: Invoices:Lab = true): the engine can be chosen, the engines are measured
-// side by side against the reference geometry of the file, and what the user corrected on the page can be saved as that reference.
+// The OCR laboratory inside the invoice pickup page (only when switched on: Invoices:Lab = true): the reading is measured
+// against the reference geometry of the file, and what the user corrected on the page can be saved as that reference.
 public sealed class InvoiceLabSettings(IConfiguration configuration)
 {
     public bool Enabled => string.Equals(configuration["Invoices:Lab"], "true", StringComparison.OrdinalIgnoreCase);
@@ -12,7 +12,7 @@ public sealed class InvoiceLabSettings(IConfiguration configuration)
     public string? ReferencesDirectory => string.IsNullOrWhiteSpace(configuration["Invoices:LabReferencesDirectory"]) ? null : configuration["Invoices:LabReferencesDirectory"]!.Trim();
 }
 
-public sealed record InvoiceLabResult(InvoiceEngineOptions Engine, InvoiceTable? Table, IReadOnlyList<InvoiceSeparator> Separators, int RowsWithProblems, InvoiceReferenceMatch? Match);
+public sealed record InvoiceLabResult(InvoiceTable? Table, IReadOnlyList<InvoiceSeparator> Separators, int RowsWithProblems, InvoiceReferenceMatch? Match);
 
 public static class InvoiceLab
 {
@@ -43,13 +43,12 @@ public static class InvoiceLab
         Separators = [.. separators.OrderBy(separator => separator.Page).ThenBy(separator => separator.Y).Select(separator => new ReferenceSeparator { Page = separator.Page, Y = Math.Round(separator.Y, 1) })]
     };
 
-    // Every engine on the document, measured against the reference when there is one.
-    public static IReadOnlyList<InvoiceLabResult> Evaluate(InvoiceDocument document, InvoiceReference? reference) =>
-        [.. InvoiceEngines.All.Select(engine =>
-        {
-            var analysis = InvoiceAnalyzer.Analyze(document, engine);
-            var separators = analysis.Table is { } table ? InvoiceTableReader.SeparatorsFromRows(table.Rows, table.Columns, document.Pages) : [];
-            var problems = analysis.Table?.Rows.Count(row => row.Flags.Count > 0) ?? 0;
-            return new InvoiceLabResult(engine, analysis.Table, separators, problems, reference is null ? null : InvoiceReferenceComparer.Compare(reference, analysis.Table, separators));
-        })];
+    // The reading of the document, measured against the reference when there is one.
+    public static InvoiceLabResult Evaluate(InvoiceDocument document, InvoiceReference? reference)
+    {
+        var analysis = InvoiceAnalyzer.Analyze(document);
+        var separators = analysis.Table is { } table ? InvoiceTableReader.SeparatorsFromRows(table.Rows, table.Columns, document.Pages) : [];
+        var problems = analysis.Table?.Rows.Count(row => row.Flags.Count > 0) ?? 0;
+        return new InvoiceLabResult(analysis.Table, separators, problems, reference is null ? null : InvoiceReferenceComparer.Compare(reference, analysis.Table, separators));
+    }
 }

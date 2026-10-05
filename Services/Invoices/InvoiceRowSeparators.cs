@@ -139,9 +139,9 @@ public static partial class InvoiceTableReader
 // Reads an invoice for the pickup: the template (or the automatic proposal) gives the fields and the columns, the demarcation lines give the rows.
 public static class InvoicePickupReader
 {
-    public static InvoicePickupReading Read(InvoiceTemplateDefinition definition, InvoiceDocument document, InvoiceEngineOptions? options = null)
+    public static InvoicePickupReading Read(InvoiceTemplateDefinition definition, InvoiceDocument document)
     {
-        var extraction = InvoiceTemplateEngine.Apply(definition, document, options);
+        var extraction = InvoiceTemplateEngine.Apply(definition, document);
         var separators = InvoiceTableReader.SeparatorsFromRows(extraction.Rows, extraction.Columns, document.Pages);
         return new InvoicePickupReading(extraction, separators, definition.Table?.NameCodeSeparator ?? "");
     }

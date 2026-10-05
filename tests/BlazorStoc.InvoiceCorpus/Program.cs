@@ -11,19 +11,15 @@ var showWords = args.Contains("--words");
 var transfer = args.Contains("--transfer");
 var templateIndex = Array.IndexOf(args, "--template");
 var templateFile = templateIndex >= 0 && templateIndex + 1 < args.Length ? args[templateIndex + 1] : null;
-// --compare [--engine A|B|both] [--references <dir>] [--write-reference]: the engines side by side (InvoiceEngines), each measured against
+// --compare [--references <dir>] [--write-reference]: the reading measured against
 // the reference geometry of the file (<references>/<name>.reference.json, by default a "references" folder next to the PDF) by the lines between
-// the rows and the edges of the columns, never by the values read. --write-reference writes a draft reference from the first engine when the
+// the rows and the edges of the columns, never by the values read. --write-reference writes a draft reference when the
 // file has none; the draft is then corrected by hand (move a line, fix an edge, rename a label).
 var compare = args.Contains("--compare") || args.Contains("--write-reference");
 var writeReference = args.Contains("--write-reference");
-var engineIndex = Array.IndexOf(args, "--engine");
-var engineName = engineIndex >= 0 && engineIndex + 1 < args.Length ? args[engineIndex + 1] : "both";
-var engines = engineName.Equals("both", StringComparison.OrdinalIgnoreCase) ? InvoiceEngines.All
-    : InvoiceEngines.Find(engineName) is { } chosenEngine ? [chosenEngine] : throw new ArgumentException($"Motor necunoscut: {engineName} (A, B sau both).");
 var referencesIndex = Array.IndexOf(args, "--references");
 var referencesDirectory = referencesIndex >= 0 && referencesIndex + 1 < args.Length ? args[referencesIndex + 1] : null;
-var scores = new Dictionary<string, List<(string File, double Score)>>();
+var scores = new List<(string File, double Score)>();
 // The files the user left out (a layout the application does not have to read) are listed in <directory>/exclude.txt, one file name per line (# starts a comment).
 var excludeList = Directory.Exists(target) ? Path.Combine(target, "exclude.txt") : null;
 var excluded = excludeList is not null && File.Exists(excludeList)
@@ -40,7 +36,7 @@ foreach (var file in files)
         await using var stream = File.OpenRead(file);
         var read = await reader.ReadAsync(stream);
         // --reread: the numbers of the table that the OCR did not read as numbers are read again cell by cell (what the application does after reading a file).
-        if (args.Contains("--reread")) read = await reader.RereadNumbersAsync(read, engineName.Equals("both", StringComparison.OrdinalIgnoreCase) ? null : engines[0]);
+        if (args.Contains("--reread")) read = await reader.RereadNumbersAsync(read);
         var imagesIndex = Array.IndexOf(args, "--images");
         if (imagesIndex >= 0 && imagesIndex + 1 < args.Length)
         {
@@ -51,36 +47,32 @@ foreach (var file in files)
         }
         if (compare)
         {
-            // The engines side by side on this file, measured against the reference of the file when there is one.
+            // The reading of this file, measured against the reference of the file when there is one.
             var referenceFile = Path.Combine(referencesDirectory ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(file))!, "references"), Path.GetFileNameWithoutExtension(file) + ".reference.json");
             var reference = File.Exists(referenceFile) ? InvoiceReference.FromJson(File.ReadAllText(referenceFile)) : null;
-            foreach (var engine in engines)
+            var timer0 = System.Diagnostics.Stopwatch.StartNew();
+            var analysis0 = InvoiceAnalyzer.Analyze(read.Document);
+            var separators0 = analysis0.Table is { } found ? InvoiceTableReader.SeparatorsFromRows(found.Rows, found.Columns, read.Document.Pages) : [];
+            var flagged = analysis0.Table?.Rows.Count(row => row.Flags.Count > 0) ?? 0;
+            if (writeReference && reference is null && analysis0.Table is { } draftTable)
             {
-                var timer0 = System.Diagnostics.Stopwatch.StartNew();
-                var analysis0 = InvoiceAnalyzer.Analyze(read.Document, engine);
-                var separators0 = analysis0.Table is { } found ? InvoiceTableReader.SeparatorsFromRows(found.Rows, found.Columns, read.Document.Pages) : [];
-                var flagged = analysis0.Table?.Rows.Count(row => row.Flags.Count > 0) ?? 0;
-                if (writeReference && reference is null && engine == engines[0] && analysis0.Table is { } draftTable)
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(referenceFile)!);
-                    File.WriteAllText(referenceFile, InvoiceReference.From(Path.GetFileName(file), draftTable, separators0).ToJson());
-                    Console.WriteLine($"  [{engine.Id}] draft reference written: {referenceFile}");
-                }
-                var rowsText = $"rows {analysis0.Table?.Rows.Count.ToString() ?? "-"}";
-                if (reference is null) Console.WriteLine($"  [{engine.Id}] table={(analysis0.Table is null ? "NO" : "yes")} {rowsText}, lines {separators0.Count}, rows with problems in the values {flagged}, {timer0.ElapsedMilliseconds} ms (no reference)");
-                else
-                {
-                    var match = InvoiceReferenceComparer.Compare(reference, analysis0.Table, separators0);
-                    Console.WriteLine($"  [{engine.Id}] table={(match.TableFound ? "yes" : "NO")} rows {match.RowsFound}/{match.RowsExpected}, lines P={match.SeparatorPrecision:F2} R={match.SeparatorRecall:F2}, " +
-                        $"columns P={match.ColumnPrecision:F2} R={match.ColumnRecall:F2} (meaning right {match.ColumnMeaningsRight}/{match.ColumnsMatched}), score {match.Score:F3}; rows with problems in the values {flagged}, {timer0.ElapsedMilliseconds} ms");
-                    if (!scores.TryGetValue(engine.Id, out var list)) scores[engine.Id] = list = [];
-                    list.Add((Path.GetFileName(file), match.Score));
-                }
+                Directory.CreateDirectory(Path.GetDirectoryName(referenceFile)!);
+                File.WriteAllText(referenceFile, InvoiceReference.From(Path.GetFileName(file), draftTable, separators0).ToJson());
+                Console.WriteLine($"  draft reference written: {referenceFile}");
+            }
+            var rowsText = $"rows {analysis0.Table?.Rows.Count.ToString() ?? "-"}";
+            if (reference is null) Console.WriteLine($"  table={(analysis0.Table is null ? "NO" : "yes")} {rowsText}, lines {separators0.Count}, rows with problems in the values {flagged}, {timer0.ElapsedMilliseconds} ms (no reference)");
+            else
+            {
+                var match = InvoiceReferenceComparer.Compare(reference, analysis0.Table, separators0);
+                Console.WriteLine($"  table={(match.TableFound ? "yes" : "NO")} rows {match.RowsFound}/{match.RowsExpected}, lines P={match.SeparatorPrecision:F2} R={match.SeparatorRecall:F2}, " +
+                    $"columns P={match.ColumnPrecision:F2} R={match.ColumnRecall:F2} (meaning right {match.ColumnMeaningsRight}/{match.ColumnsMatched}), score {match.Score:F3}; rows with problems in the values {flagged}, {timer0.ElapsedMilliseconds} ms");
+                scores.Add((Path.GetFileName(file), match.Score));
             }
             continue;
         }
         var timer = System.Diagnostics.Stopwatch.StartNew();
-        var analysis = InvoiceAnalyzer.Analyze(read.Document, engineName.Equals("both", StringComparison.OrdinalIgnoreCase) ? null : engines[0]);
+        var analysis = InvoiceAnalyzer.Analyze(read.Document);
         Console.WriteLine($"  analysis {timer.ElapsedMilliseconds} ms");
         loaded.Add((Path.GetFileName(file), read.Document, analysis));
         foreach (var page in read.Document.Pages)
@@ -118,7 +110,7 @@ foreach (var file in files)
         {
             // The columns the pickup shows, drawn on the page picture: where each column is, with its id and meaning; columns with the same extent are drawn one inside the other.
             var proposalForOverlay = InvoiceTemplateDraft.FromAnalysis(analysis).ToDefinition(read.Document);
-            var shown = InvoicePickupReader.Read(proposalForOverlay, read.Document, engineName.Equals("both", StringComparison.OrdinalIgnoreCase) ? null : engines[0]);
+            var shown = InvoicePickupReader.Read(proposalForOverlay, read.Document);
             Directory.CreateDirectory(args[overlayIndex + 1]);
             var page = analysis.Table.HeaderPage;
             using var picture = OpenCvSharp.Cv2.ImDecode(read.PagePreviews[page - 1], OpenCvSharp.ImreadModes.Color);
@@ -147,7 +139,7 @@ foreach (var file in files)
         {
             // The reading of the pickup page without a saved template: the automatic proposal made a template, read with the demarcation lines of the rows.
             var proposal = InvoiceTemplateDraft.FromAnalysis(analysis).ToDefinition(read.Document);
-            var reading = InvoicePickupReader.Read(proposal, read.Document, engineName.Equals("both", StringComparison.OrdinalIgnoreCase) ? null : engines[0]);
+            var reading = InvoicePickupReader.Read(proposal, read.Document);
             Console.WriteLine($"  PICKUP extraction rows: {string.Join(", ", reading.Extraction.Rows.Select(row => $"top {row.Top:F1} bottom {row.Bottom:F1}"))}; header bottom {analysis.Table!.HeaderBottom:F1}");
             Console.WriteLine($"  PICKUP columns: {string.Join(", ", reading.Extraction.Columns.Select(column => $"{column.Meaning} {column.Left:F0}-{column.Right:F0} zone {column.ZoneTop:F1}/{column.ZoneBottom:F1}"))}; analysis rows top {string.Join(",", analysis.Table!.Rows.Select(row => row.Top.ToString("F1")))}");
             Console.WriteLine($"  PICKUP lines: {string.Join(", ", reading.Separators.Select(separator => $"p{separator.Page} y={separator.Y:F1}"))}");
@@ -192,15 +184,7 @@ if (compare && scores.Count > 0)
 {
     Console.WriteLine();
     Console.WriteLine("==== SUMMARY (files with a reference)");
-    foreach (var (engineId, list) in scores.OrderBy(item => item.Key))
-        Console.WriteLine($"  engine {engineId}: mean score {list.Average(item => item.Score):F3} over {list.Count} file(s), {list.Count(item => item.Score >= 0.999)} exact");
-    if (scores.Count == 2)
-    {
-        var first = scores.First().Value.ToDictionary(item => item.File, item => item.Score);
-        var second = scores.Last().Value.ToDictionary(item => item.File, item => item.Score);
-        foreach (var name in first.Keys.Where(second.ContainsKey).Where(name => Math.Abs(first[name] - second[name]) > 0.0005))
-            Console.WriteLine($"  differs: {name}: {scores.First().Key} {first[name]:F3} vs {scores.Last().Key} {second[name]:F3}");
-    }
+    Console.WriteLine($"  mean score {scores.Average(item => item.Score):F3} over {scores.Count} file(s), {scores.Count(item => item.Score >= 0.999)} exact");
 }
 
 if (transfer)

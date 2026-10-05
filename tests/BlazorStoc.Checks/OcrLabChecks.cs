@@ -2,19 +2,15 @@ using BlazorStoc.Services;
 
 namespace BlazorStoc.Checks;
 
-// The OCR laboratory: the two table engines side by side, the reference geometry they are measured against, and the file store of templates.
+// The OCR laboratory: the table engine, the reference geometry it is measured against, and the file store of templates.
 public static class OcrLabChecks
 {
     public static async Task RunAsync(Action<bool, string> check, InvoicePdfReader reader)
     {
         Console.WriteLine("=== OCR laboratory ===");
-        check(InvoiceEngines.All.Select(engine => engine.Id).SequenceEqual(["A", "B"]) && InvoiceEngines.Find("b") == InvoiceEngines.B && InvoiceEngines.Find("x") is null &&
-              InvoiceEngines.A.ValuesInScore && InvoiceEngines.A.InferMeanings && !InvoiceEngines.B.ValuesInScore && InvoiceEngines.B.GridFirst && !InvoiceEngines.A.GridFirst && InvoiceEngines.Default == InvoiceEngines.B,
-            "OCR lab: engine A scores with the values; engine B looks for the table by its geometry first and does not score by values; B is the default");
-
-        // Both engines read generated invoices of several layouts the same way.
+        // The engine reads generated invoices of several layouts.
         InvoiceSpec[] specs = [new(Rows: 6), new("en-plain", 7), new("ro-lines", 4, ExtraAddressLines: 3), new("en-plain", 35, RowsFirstPage: 20, RepeatHeader: true)];
-        var identical = true;
+        var allRows = true;
         InvoiceDocument? sampleDocument = null;
         InvoiceAnalysis? sampleAnalysis = null;
         foreach (var spec in specs)
@@ -22,14 +18,12 @@ public static class OcrLabChecks
             var invoice = InvoiceFixtures.Make(spec, InvoiceFixtures.MakeRows(spec.Rows, 5));
             using var stream = new MemoryStream(invoice.Pdf);
             var read = await reader.ReadAsync(stream);
-            var a = InvoiceAnalyzer.Analyze(read.Document, InvoiceEngines.A);
-            var b = InvoiceAnalyzer.Analyze(read.Document, InvoiceEngines.B);
-            if (a.Table is null || b.Table is null || a.Table.Rows.Count != invoice.Rows.Count || b.Table.Rows.Count != invoice.Rows.Count ||
-                !a.Table.Rows.Select(row => row.Top).SequenceEqual(b.Table.Rows.Select(row => row.Top))) identical = false;
+            var analysis = InvoiceAnalyzer.Analyze(read.Document);
+            if (analysis.Table is null || analysis.Table.Rows.Count != invoice.Rows.Count) allRows = false;
             sampleDocument ??= read.Document;
-            sampleAnalysis ??= a;
+            sampleAnalysis ??= analysis;
         }
-        check(identical, "OCR lab: on clean generated invoices (ruled, plain, extra address lines, two pages) both engines find the rows and put them in the same places");
+        check(allRows, "OCR lab: on clean generated invoices (ruled, plain, extra address lines, two pages) the engine finds all the rows");
 
         // The reference: what an engine found, written as JSON, read back, and compared.
         var table = sampleAnalysis!.Table!;

@@ -141,7 +141,7 @@ public static class PickupWizardChecks
         check(gone.FindAll("img").Count == 0, "Invoice window of an unknown or expired file shows no pages");
         check(cut.FindAll(".lab-panel").Count == 0, "OCR lab: the laboratory panel is not shown unless it is switched on");
 
-        // The OCR laboratory (Invoices:Lab = true): engines side by side, the reference saved from the page, the engine chosen.
+        // The OCR laboratory (Invoices:Lab = true): the reading against the reference, the reference saved from the page.
         var referencesDirectory = Path.Combine(Path.GetTempPath(), "blazorstoc-references-" + Guid.NewGuid().ToString("N"));
         try
         {
@@ -163,20 +163,16 @@ public static class PickupWizardChecks
             lab.WaitForAssertion(() => lab.Find("input[type=file]"), TimeSpan.FromSeconds(10));
             lab.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(invoice.Pdf, "factura-lab.pdf", null, "application/pdf"));
             lab.WaitForAssertion(() => { if (lab.FindAll(".lab-panel").Count == 0 || lab.FindAll("tbody tr").Count < 4) throw new Exception("pending"); }, TimeSpan.FromSeconds(60));
-            var engineRows = lab.FindAll(".lab-table tbody tr");
-            check(engineRows.Count == 2 && engineRows[0].TextContent.StartsWith("A") && engineRows[1].TextContent.StartsWith("B") && lab.Markup.Contains("fără referință pentru acest fișier") &&
-                  lab.FindAll("input[type=radio][name='lab-engine']").Count == 2 && lab.FindAll(".lab-table tr.lab-current").Count == 1,
-                "OCR lab: the panel shows both engines on the file (without a reference first) and the engine of the reading is marked");
+            var labRows = lab.FindAll(".lab-table tbody tr");
+            check(labRows.Count == 1 && lab.Markup.Contains("fără referință pentru acest fișier") && lab.FindAll("input[type=radio]").Count == 0 && lab.FindAll(".lab-table tr.lab-current").Count == 1,
+                "OCR lab: the panel shows the reading of the file (without a reference first), with no choice of engine");
             lab.FindAll("button").First(button => button.TextContent.Contains("Salvează ca referință")).Click();
             var referenceFile = Path.Combine(referencesDirectory, "factura-lab.reference.json");
             check(File.Exists(referenceFile) && InvoiceReference.FromJson(File.ReadAllText(referenceFile)) is { } saved && saved.File == "factura-lab.pdf" && saved.RowCount == invoice.Rows.Count && saved.Columns.Count >= 5,
                 "OCR lab: \"Salvează ca referință\" writes the columns, the header and the lines of the page into <file>.reference.json");
             lab.WaitForAssertion(() => { if (lab.Markup.Contains("fără referință pentru acest fișier")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
-            var scored = lab.FindAll(".lab-table tbody tr").Select(row => row.QuerySelectorAll("td")[5].TextContent.Trim()).ToArray();
-            check(scored.All(text => double.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out var value) && value > 0.9), "OCR lab: with the reference saved, both engines are measured against it");
-            lab.FindAll("input[type=radio][name='lab-engine']")[1].Change(true);
-            lab.WaitForAssertion(() => { if (!lab.FindAll(".lab-table tr")[2].ClassList.Contains("lab-current")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
-            check(lab.FindAll("tbody tr").Count >= invoice.Rows.Count && lab.Markup.Contains("motorul B"), "OCR lab: choosing engine B reads the table again with it");
+            var scored = lab.FindAll(".lab-table tbody tr").Select(row => row.QuerySelectorAll("td")[4].TextContent.Trim()).ToArray();
+            check(scored.All(text => double.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out var value) && value > 0.9), "OCR lab: with the reference saved, the reading is measured against it");
         }
         finally { if (Directory.Exists(referencesDirectory)) Directory.Delete(referencesDirectory, recursive: true); }
     }
