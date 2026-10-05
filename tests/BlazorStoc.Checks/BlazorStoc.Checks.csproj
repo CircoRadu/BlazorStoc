@@ -22,4 +22,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="bunit" Version="2.11.3" />
+  </ItemGroup>
 </Project>

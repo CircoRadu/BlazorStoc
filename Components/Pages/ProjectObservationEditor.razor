@@ -17,7 +17,7 @@
                 <label class="full-width" for="observation-content">Conținut<InputTextArea id="observation-content" @bind-Value="input.Content" maxlength="8000" rows="6" /><ValidationMessage For="() => input.Content" /></label>
                 @if (Original is not null)
                 {
-                    <ChangeReasonField Id="observation-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
+                    <ChangeReasonField Id="observation-change-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" />
                 }
             </div>
             <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează observația")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
@@ -40,6 +40,10 @@
     // "Părăsește editarea": the leave warning closes the form without saving (Task 1).
     private Task DiscardAsync() => Closed.InvokeAsync();
     private ProjectObservationInput input = new();
+    // The reason of an edit: the summary of the changes made in the form (one on each line, following the form) or a text the user writes.
+    private bool reasonAuto = true;
+    private string customReason = "";
+    private string AutoSummary => Original is null ? "" : ChangeReasonSummary.Build([new("Denumire observație", Original.Name, input.Name), new("Conținut", Original.Content, input.Content)]);
     private bool saving;
     private IReadOnlyList<AuditChange>? pendingChanges;
     private string? error, reasonError;
@@ -55,7 +59,8 @@
     private async Task SaveAsync()
     {
         if (saving) return;
-        reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
+        if (Original is not null) input.Reason = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
+        reasonError = Original is null ? null : ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason);
         if (reasonError is not null) return;
         if (Original is not null)
         {

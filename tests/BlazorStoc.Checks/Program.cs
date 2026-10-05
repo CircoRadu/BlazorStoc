@@ -24,6 +24,16 @@ if (Environment.GetEnvironmentVariable("INVOICE_CHECKS_ONLY") == "1")
     Console.WriteLine("Invoice checks finished.");
     return;
 }
+// COMPONENT_CHECKS_ONLY=1 runs only the Razor component checks (bUnit).
+if (Environment.GetEnvironmentVariable("COMPONENT_CHECKS_ONLY") == "1")
+{
+    await ComponentChecks.RunAsync(Check);
+    await PickupWizardChecks.RunAsync(Check);
+    await ProductGroupsChecks.RunAsync(Check);
+    ReasonSummaryChecks.Run(Check);
+    Console.WriteLine("Component checks finished.");
+    return;
+}
 ProductInput ProductEdit(Product product, string reason = "Test automat") { var input = ProductInput.From(product); input.Reason = reason; return input; }
 WebUserInput UserEdit(WebUser user, string reason = "Test automat") { var input = WebUserInput.From(user); input.Reason = reason; return input; }
 BeneficiaryInput LegalInput(string name, string cui) => new() { Name = name, Cui = cui, Address = "Strada Test 1, Bucuresti", Phone = "0721 000 111" };
@@ -2338,6 +2348,10 @@ async Task RunMaintenanceGateChecksAsync()
         "The tile provider comes from the configuration (only https with {z}/{x}/{y}); anything unusable falls back to the default, the zoom range is kept valid");
 }
 
+await ComponentChecks.RunAsync(Check);
+await PickupWizardChecks.RunAsync(Check);
+await ProductGroupsChecks.RunAsync(Check);
+ReasonSummaryChecks.Run(Check);
 await InvoiceChecks.RunAsync(Check);
 
 // Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped

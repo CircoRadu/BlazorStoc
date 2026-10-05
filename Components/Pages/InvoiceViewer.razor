@@ -1,0 +1,55 @@
+@page "/produse/preluare-factura/factura/{SessionId:guid}"
+@layout Layout.PopoutLayout
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IAccessControl Access
+@inject IInvoiceAnalysisStore Store
+
+<PageTitle>Factura preluată · BlazorStoc</PageTitle>
+
+@* The invoice under pickup in a window of its own (opened from step 2 of the pickup), to compare its values with the table while correcting them. *@
+@if (!loaded)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div></div>
+}
+else if (session is null)
+{
+    <div class="empty-state"><h3>Factura nu mai este disponibilă</h3><p>Fișierul se păstrează în memorie cât timp preluarea este deschisă (cel mult 30 de minute fără activitate). Închide fereastra și reia preluarea.</p></div>
+}
+else
+{
+    <div class="invoice-viewer-bar">
+        <strong>@session.FileName</strong>
+        <span class="muted">@session.Document.Pages.Count @(session.Document.Pages.Count == 1 ? "pagină" : "pagini")</span>
+        <label class="muted">Mărime
+            <select @bind="zoom" aria-label="Mărimea paginilor">
+                <option value="1">Potrivit în fereastră</option>
+                <option value="1.5">150%</option>
+                <option value="2">200%</option>
+                <option value="3">300%</option>
+            </select></label>
+    </div>
+    <div class="invoice-viewer-pages">
+        @foreach (var sheet in session.Document.Pages)
+        {
+            <img src="@($"/media/invoice-analysis/{session.Id}/{sheet.Number}")" alt="Pagina @sheet.Number a facturii" draggable="false"
+                 style="width: calc((100vw - 32px) * @zoom)" />
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+    private InvoiceAnalysisSession? session;
+    private bool loaded;
+    private string zoom = "1";
+
+    // The session belongs to the user who opened the file (the same rule as the page pictures); this window has a circuit of its own, so it reads the store directly.
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await Access.CanManageProductsAsync() ? await Access.GetUsernameAsync() : null;
+        session = user is null ? null : Store.Get(SessionId, user);
+        loaded = true;
+    }
+}

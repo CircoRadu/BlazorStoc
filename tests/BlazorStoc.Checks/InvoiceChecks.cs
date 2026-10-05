@@ -438,6 +438,7 @@ public static class InvoiceChecks
             ("Cantitatea", InvoiceColumnMeanings.Quantity), ("Qty", InvoiceColumnMeanings.Quantity), ("Pretul net al articolului", InvoiceColumnMeanings.UnitPrice), ("Pret unitar (fara TVA)", InvoiceColumnMeanings.UnitPrice),
             ("Unit price", InvoiceColumnMeanings.UnitPrice), ("Valoare neta", InvoiceColumnMeanings.Value), ("Valoare (fara TVA)", InvoiceColumnMeanings.Value), ("Amount", InvoiceColumnMeanings.Value),
             ("Valoare TVA", InvoiceColumnMeanings.VatAmount), ("Cota TVA", InvoiceColumnMeanings.VatRate), ("Cod articol", InvoiceColumnMeanings.Code), ("Cantitate de baza", InvoiceColumnMeanings.Ignore),
+            ("Denumirea produselor sau a serviciilor", InvoiceColumnMeanings.Name), ("Denumirea proauseior sau a serviciilor", InvoiceColumnMeanings.Name),
             ("Tara provenient", InvoiceColumnMeanings.Ignore), ("Moneda", InvoiceColumnMeanings.Currency), ("Xyzzy", "")
         ];
         var wrong = columns.Where(item => InvoiceVocabulary.MatchColumn(item.Item1).Meaning != item.Item2).Select(item => $"{item.Item1} -> {InvoiceVocabulary.MatchColumn(item.Item1).Meaning}").ToList();

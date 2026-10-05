@@ -28,6 +28,29 @@ foreach (var file in files)
         foreach (var page in read.Document.Pages)
         {
             Console.WriteLine($"  page {page.Number}: {page.Source}, {page.Width:F0}x{page.Height:F0} pt, {page.Words.Count} words");
+            if (args.Contains("--header"))
+            {
+                // Why a header is or is not found: the rules the OCR drew, and every candidate band with its cells, their meanings and the score.
+                Console.WriteLine($"    rules: {page.Rules?.Count(rule => rule.Vertical) ?? 0} vertical, {page.Rules?.Count(rule => !rule.Vertical) ?? 0} horizontal");
+                foreach (var rule in page.Rules ?? []) Console.WriteLine($"      {(rule.Vertical ? "V" : "H")} at {rule.Position:F1} from {rule.From:F1} to {rule.To:F1}");
+                var layoutLines = InvoiceLayout.BuildLines(page.Words);
+                foreach (var line in layoutLines) Console.WriteLine($"    line y={line.Y:F1} h={line.Height:F1} numeric={InvoiceTableReader.IsMostlyNumericForDebug(line)}: {string.Join(' ', line.Words.Select(word => word.Text))}");
+                for (var start = 0; start < layoutLines.Count; start++)
+                    for (var length = 1; length <= 3 && start + length <= layoutLines.Count; length++)
+                    {
+                        var slice = layoutLines.Skip(start).Take(length).ToList();
+                        foreach (var withRules in new[] { false, true })
+                        {
+                            var cells = withRules && page.Rules is { Count: > 0 } ? InvoiceTableReader.BuildRuledCells(slice, page.Rules) : InvoiceTableReader.BuildCells(slice);
+                            if (cells is null || cells.Count < 3) continue;
+                            var known = cells.Count(cell => cell.Meaning.Length > 0 && cell.Meaning != InvoiceColumnMeanings.Ignore);
+                            if (known < 2) continue;
+                            var band = InvoiceTableReader.Evaluate(page.Number, slice, withRules ? page.Rules : null);
+                            Console.WriteLine($"    BAND lines {start}..{start + length - 1} rules={withRules} score={(band is null ? "none" : band.Score.ToString("F2"))}: " +
+                                string.Join(" | ", cells.Select(cell => $"[{cell.Meaning}:{cell.MatchScore:F1}] {cell.Label}")));
+                        }
+                    }
+            }
             if (showWords)
                 foreach (var word in page.Words.OrderBy(word => Math.Round(word.CenterY / 3)).ThenBy(word => word.X))
                     Console.WriteLine($"    y={word.Y,6:F1} x={word.X,6:F1} w={word.Width,5:F1} h={word.Height,4:F1} o={word.Order,4} {word.Text}");

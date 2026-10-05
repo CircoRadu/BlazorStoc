@@ -19,7 +19,7 @@
                 <label for="vehicle-rovinieta">Data expirare rovinietă *<PickOnlyDate Id="vehicle-rovinieta" @bind-Value="input.RovinietaExpiry" Min="@MinDate" /><ValidationMessage For="() => input.RovinietaExpiry" /></label>
                 @if (Original is not null)
                 {
-                    <ChangeReasonField Id="vehicle-change-reason" @bind-Value="input.Reason" Error="@reasonError" Disabled="saving" />
+                    <ChangeReasonField Id="vehicle-change-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" />
                 }
             </div>
             <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează vehiculul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
@@ -43,6 +43,12 @@
     // "Părăsește editarea": the leave warning closes the form without saving.
     private Task DiscardAsync() => Closed.InvokeAsync();
     private VehicleInput input = new();
+    // The reason of an edit: the summary of the changes made in the form (one on each line, following the form) or a text the user writes.
+    private bool reasonAuto = true;
+    private string customReason = "";
+    private string AutoSummary => Original is null ? "" : ChangeReasonSummary.Build(VehicleRules.Changes(Original,
+        Original with { PlateNumber = input.PlateNumber, Description = input.Description, ItpExpiry = input.ItpExpiry ?? Original.ItpExpiry,
+                        InsuranceExpiry = input.InsuranceExpiry ?? Original.InsuranceExpiry, RovinietaExpiry = input.RovinietaExpiry ?? Original.RovinietaExpiry }));
     private bool saving;
     private IReadOnlyList<AuditChange>? pendingChanges;
     private string? error, reasonError;
@@ -65,7 +71,8 @@
     private async Task SaveAsync()
     {
         if (saving) return;
-        reasonError = Original is null ? null : ChangeReasonRules.ValidationError(input.Reason);
+        if (Original is not null) input.Reason = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
+        reasonError = Original is null ? null : ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason);
         if (reasonError is not null) return;
         if (Original is not null)
         {

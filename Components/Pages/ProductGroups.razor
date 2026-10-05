@@ -5,6 +5,7 @@
 @inject IProductRepository Repository
 @inject IAccessControl Access
 @inject ILogger<ProductGroups> Logger
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Categorii produse · BlazorStoc</PageTitle>
@@ -23,23 +24,14 @@
         <div class="catalog-heading"><h2 id="category-editor-title">@(creatingCategory ? "Adaugă categorie" : $"Editează categoria „{editingCategory}”")</h2></div>
         <div class="editor-grid">
             <label class="full-width" for="category-name">Denumire categorie *<input id="category-name" maxlength="100" @bind="categoryName" disabled="@saving" /></label>
-            @if (!creatingCategory) { <ChangeReasonField Id="category-reason" @bind-Value="reason" Disabled="@saving" /> }
+            @if (!creatingCategory) { <ChangeReasonField Id="category-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Disabled="@saving" /> }
         </div>
         <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveCategoryAsync">@(creatingCategory ? "Adaugă categoria" : "Salvează categoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
     </section>
 }
-else if (creatingSubcategory || editingSubcategory is not null)
+else if (editingSubcategory is not null)
 {
-    <section class="product-editor" aria-labelledby="subcategory-editor-title">
-        <UnsavedChangesTracker @ref="groupTracker" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
-        <div class="catalog-heading"><h2 id="subcategory-editor-title">@(creatingSubcategory ? $"Adaugă subcategorie în „{targetCategory}”" : $"Editează subcategoria „{editingSubcategory!.Subcategory}”")</h2></div>
-        <div class="editor-grid">
-            <label for="subcategory-name">Denumire subcategorie *<input id="subcategory-name" maxlength="100" @bind="subcategoryName" disabled="@saving" /></label>
-            <label for="subcategory-category">Categorie *<select id="subcategory-category" @bind="targetCategory" disabled="@(saving || creatingSubcategory)">@foreach (var category in Categories) { <option value="@category">@category</option> }</select></label>
-            @if (!creatingSubcategory) { <ChangeReasonField Id="subcategory-reason" @bind-Value="reason" Disabled="@saving" /> }
-        </div>
-        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
-    </section>
+    @SubcategoryEditor
 }
 
 @if (pendingChanges is not null)
@@ -88,6 +80,7 @@ else
                         }
                         </tbody></table></div>
                     }
+                    @if (creatingSubcategory && string.Equals(targetCategory, category, StringComparison.Ordinal)) { @SubcategoryEditor }
                 </ChildContent>
             </CollapsibleSection>
         }
@@ -101,6 +94,12 @@ else
     private ProductGroup? editingSubcategory;
     private bool creatingCategory, creatingSubcategory;
     private string categoryName = "", subcategoryName = "", targetCategory = "", reason = "";
+    // The reason of an edit: the summary of the changes made in the form (one on each line, following the form) or a text the user writes.
+    private bool reasonAuto = true;
+    private string customReason = "";
+    private string AutoSummary => editingCategory is not null ? ChangeReasonSummary.Build([new("Categorie", editingCategory, categoryName)])
+        : editingSubcategory is not null ? ChangeReasonSummary.Build([new("Subcategorie", editingSubcategory.Subcategory, subcategoryName), new("Categorie", editingSubcategory.Category, targetCategory)])
+        : "";
     private string? error, notice;
     private bool loading, saving;
     private IReadOnlyList<AuditChange>? pendingChanges;
@@ -114,6 +113,18 @@ else
     private bool IsEditing => creatingCategory || creatingSubcategory || editingCategory is not null || editingSubcategory is not null;
     private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
         .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+
+    // The form of a subcategory: for a new one it opens inside its category, under the last subcategory; for an edit it opens above the list.
+    private RenderFragment SubcategoryEditor => @<section class="product-editor" aria-labelledby="subcategory-editor-title">
+        <UnsavedChangesTracker @ref="groupTracker" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
+        <div class="catalog-heading"><h2 id="subcategory-editor-title">@(creatingSubcategory ? $"Adaugă subcategorie în „{targetCategory}”" : $"Editează subcategoria „{editingSubcategory!.Subcategory}”")</h2></div>
+        <div class="editor-grid">
+            <label for="subcategory-name">Denumire subcategorie *<input id="subcategory-name" maxlength="100" @bind="subcategoryName" disabled="@saving" /></label>
+            <label for="subcategory-category">Categorie *<select id="subcategory-category" @bind="targetCategory" disabled="@(saving || creatingSubcategory)">@foreach (var category in Categories) { <option value="@category">@category</option> }</select></label>
+            @if (!creatingSubcategory) { <ChangeReasonField Id="subcategory-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Disabled="@saving" /> }
+        </div>
+        <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
+    </section>;
 
     protected override async Task OnInitializedAsync()
     {
@@ -159,10 +170,25 @@ else
     }
 
     private void CreateCategory() { CancelEdit(); creatingCategory = true; categoryName = ""; notice = null; }
-    private void CreateSubcategory(string category) { CancelEdit(); creatingSubcategory = true; targetCategory = category; subcategoryName = ""; notice = null; }
+    // The form opens inside the category (under its last subcategory), so the category is opened and the form is brought into view.
+    private void CreateSubcategory(string category)
+    {
+        CancelEdit(); creatingSubcategory = true; targetCategory = category; subcategoryName = ""; notice = null;
+        SetCategoryExpanded(category, true);
+        showNewSubcategory = true;
+    }
+    private bool showNewSubcategory;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!showNewSubcategory) return;
+        showNewSubcategory = false;
+        try { await JS.InvokeVoidAsync("blazorStocScrollTo", "subcategory-name"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
+    }
     private void EditCategory(string category) { CancelEdit(); editingCategory = category; categoryName = category; notice = null; }
     private void EditSubcategory(ProductGroup group) { CancelEdit(); editingSubcategory = group; subcategoryName = group.Subcategory; targetCategory = group.Category; notice = null; }
-    private void CancelEdit() { pendingChanges = null; creatingCategory = creatingSubcategory = false; editingCategory = null; editingSubcategory = null; reason = ""; error = null; }
+    private void CancelEdit() { pendingChanges = null; creatingCategory = creatingSubcategory = false; editingCategory = null; editingSubcategory = null; reason = ""; customReason = ""; reasonAuto = true; error = null; }
 
     // Renaming or moving existing groups needs an explicit confirmation of the changed fields; creating one is saved directly.
     private Task RequestSaveCategoryAsync()
@@ -171,7 +197,8 @@ else
         if (creatingCategory) return SaveCategoryAsync();
         if (editingCategory is null) return Task.CompletedTask;
         error = null;
-        if (ChangeReasonRules.ValidationError(reason) is { } reasonError) { error = reasonError; return Task.CompletedTask; }
+        reason = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
+        if (ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason) is { } reasonError) { error = reasonError; return Task.CompletedTask; }
         pendingChanges = SaveSummary.Changed(new AuditChange("Categorie", editingCategory, TextNormalization.ForObjectNameOrCode(categoryName)));
         return Task.CompletedTask;
     }
@@ -182,7 +209,8 @@ else
         if (creatingSubcategory) return SaveSubcategoryAsync();
         if (editingSubcategory is null) return Task.CompletedTask;
         error = null;
-        if (ChangeReasonRules.ValidationError(reason) is { } reasonError) { error = reasonError; return Task.CompletedTask; }
+        reason = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
+        if (ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason) is { } reasonError) { error = reasonError; return Task.CompletedTask; }
         pendingChanges = SaveSummary.Changed(
             new("Subcategorie", editingSubcategory.Subcategory, TextNormalization.ForObjectNameOrCode(subcategoryName)),
             new("Categorie", editingSubcategory.Category, TextNormalization.ForObjectNameOrCode(targetCategory)));

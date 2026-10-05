@@ -203,26 +203,43 @@ else if (step == 2)
 {
     <section class="wizard-panel" aria-label="@StepTitles[1]">
         <h2>@StepTitles[1]</h2>
-        <p class="muted">Rândurile preluate din <strong>@session?.FileName</strong> pot fi corectate. Pentru fiecare, se caută în catalog produsul cu același cod; dacă nu există, se oferă cele mai apropiate, sau se pregătește un produs nou (se adaugă în catalog abia la pasul 3).</p>
+        <p class="muted">Rândurile preluate din <strong>@session?.FileName</strong> pot fi corectate. Pentru fiecare, se caută în catalog produsul cu același cod; dacă nu există, se oferă cele mai apropiate, sau se pregătește un produs nou (se adaugă în catalog abia la pasul 3). Cantitățile și prețurile care nu sunt citite ca număr au fundal roșu.</p>
+        @if (session is not null)
+        {
+            <p><a class="refresh button-link" href="@ViewerUrl" target="invoice-viewer" rel="noopener"
+                  onclick="window.open(this.href, 'invoice-viewer', 'popup=yes,width=1000,height=900'); return false;">Afișează factura într-o fereastră nouă</a>
+                <span class="muted">Fereastra se poate muta lângă acest tabel, ca să confrunți valorile cu factura.</span></p>
+        }
         @if (step2Error is not null) { <div class="error-banner" role="alert">@step2Error</div> }
         @if (step2Loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se caută produsele în catalog</h3></div> }
-        else
+        else if (step2Error is null)
         {
             <p class="muted">@pick.Count(item => item.ProductId is not null || item.Staged is not null) din @pick.Count rânduri au un produs ales sau pregătit. Nimic nu se salvează în acest pas; salvarea se face la pasul 3.</p>
             <div class="table-scroll">
                 <table class="pickup-match">
-                    <thead><tr><th>#</th>@foreach (var column in ShownColumns) { <th>@column.Title</th> }<th>Produs din catalog</th></tr></thead>
+                    <thead><tr><th>#</th>@foreach (var column in ShownColumns) { <th class="@ColumnClass(column)">@column.Title</th> }<th>Produs din catalog</th></tr></thead>
                     <tbody>
                         @for (var index = 0; index < pick.Count; index++)
                         {
                             var at = index;
                             var item = pick[index];
+                            var rowHasBadNumber = ShownColumns.Any(column => NotANumber(column, item.Cells.GetValueOrDefault(column.Id, "")));
+                            var warningColumnId = (ShownColumns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Name) ?? ShownColumns.First()).Id;
                             <tr>
                                 <td>@(index + 1)</td>
                                 @foreach (var column in ShownColumns)
                                 {
                                     var id = column.Id;
-                                    <td><input class="pickup-cell" aria-label="@column.Title, rândul @(index + 1)" value="@item.Cells.GetValueOrDefault(id, "")" @onchange="args => EditCell(at, id, args.Value?.ToString() ?? string.Empty)" /></td>
+                                    var notNumber = NotANumber(column, item.Cells.GetValueOrDefault(id, ""));
+                                    var cellText = item.Cells.GetValueOrDefault(id, "");
+                                    <td class="@ColumnClass(column)">
+                                        @if (column.Meaning == InvoiceColumnMeanings.Name)
+                                        {
+                                            @* The name is shown whole: the field grows in height with the text. *@
+                                            <textarea class="pickup-cell pickup-name" rows="@NameRows(cellText)" aria-label="@column.Title, rândul @(index + 1)" value="@cellText" @onchange="args => EditCell(at, id, args.Value?.ToString() ?? string.Empty)"></textarea>
+                                        }
+                                        else {<input class="pickup-cell @(notNumber ? "invalid" : "")" data-numeric="@(IsNumeric(column) ? "" : null)" inputmode="@(IsNumeric(column) ? "decimal" : null)" aria-label="@column.Title, rândul @(index + 1)" aria-invalid="@(notNumber ? "true" : null)" title="@(notNumber ? "Valoarea nu este citită ca număr: corecteaz-o după factură." : null)" value="@item.Cells.GetValueOrDefault(id, "")" @onchange="args => EditCell(at, id, args.Value?.ToString() ?? string.Empty)" />}
+                                        @if (rowHasBadNumber && id == warningColumnId) { <p class="pickup-row-warning" role="alert"><span class="pickup-warning-icon" aria-hidden="true">!</span> Atenție: unele valori din acest rând nu sunt numere (câmpurile cu fundal roșu). Corectați-le.</p> }</td>
                                 }
                                 <td class="pickup-product">
                                     @if (item.Match.Exact is { } exact)
@@ -305,14 +322,17 @@ else
 <div class="wizard-nav">
     <button type="button" class="refresh" disabled="@(step == 1)" @onclick="PreviousStep">← Pasul precedent</button>
     <span class="muted">Pasul @step din @StepTitles.Length@(step == 1 && !CanLeaveStep1 ? " · citește o factură cu tabel și păstrează cel puțin un rând pentru a continua" : step == 2 && !CanLeaveStep2 ? " · alege sau pregătește un produs pentru cel puțin un rând" : "")</span>
-    <button type="button" class="primary" disabled="@(step == StepTitles.Length || (step == 1 && !CanLeaveStep1) || (step == 2 && !CanLeaveStep2))" @onclick="NextStep">Pasul următor →</button>
+    @if (step < StepTitles.Length)
+    {
+        <button type="button" class="primary" disabled="@((step == 1 && !CanLeaveStep1) || (step == 2 && !CanLeaveStep2))" @onclick="NextStep">Pasul următor →</button>
+    }
 </div>
 
 @code {
     private static readonly string[] StepTitles = ["Citirea facturii", "Potrivirea produselor", "Confirmare"];
     private int step = 1;
     private bool CanLeaveStep1 => session is not null && reading is not null && rows.Count - excluded.Count > 0;
-    private bool CanLeaveStep2 => !step2Loading && pick.Any(item => item.ProductId is not null || item.Staged is not null);
+    private bool CanLeaveStep2 => !step2Loading && step2Error is null && pick.Any(item => item.ProductId is not null || item.Staged is not null);
 
     private async Task NextStep()
     {
@@ -339,8 +359,7 @@ else
     {
         if (QuantityColumnId is not { } id) return (null, "Șablonul nu citește o coloană cu cantitatea.");
         var text = line.Cells.GetValueOrDefault(id, "");
-        var hint = InvoiceValues.DecimalStyle(session!.Document.AllWords.Select(word => word.Text));
-        if (InvoiceValues.ParseNumber(text, hint) is not { } number) return (null, "Cantitatea „" + text + "” nu este un număr.");
+        if (InvoiceValues.ParseNumber(text, NumberHint) is not { } number) return (null, "Cantitatea „" + text + "” nu este un număr.");
         if (number != decimal.Truncate(number) || number < 1 || number > StockMovementRules.MaxQuantity)
             return (null, $"Cantitatea trebuie să fie un număr întreg între 1 și {StockMovementRules.MaxQuantity:N0} (este „{text}”). Corecteaz-o în pasul 2.");
         return ((int)number, null);
@@ -350,9 +369,8 @@ else
     private void PrepareSummary()
     {
         finalizeError = finalizeNotice = null;
-        var hint = InvoiceValues.DecimalStyle(session!.Document.AllWords.Select(word => word.Text));
         foreach (var line in pick.Where(item => !item.DescriptionEdited))
-            line.EntryDescription = overlay is null ? "" : InvoiceProductDescription.RenderRow(overlay, reading!.Extraction.Fields, WithCode(line), hint);
+            line.EntryDescription = overlay is null ? "" : InvoiceProductDescription.RenderRow(overlay, reading!.Extraction.Fields, WithCode(line), NumberHint);
     }
 
     // The cells of the row, with the product code as the pickup found it (so that <Cod produs> has a value whether or not the template has a code column).
@@ -421,7 +439,7 @@ else
                 }
                 catch (Exception exception)
                 {
-                    Logger.LogError("Invoice pickup saving failed ({ErrorType}).", exception.GetType().Name);
+                    Logger.LogError("Invoice pickup saving failed ({ErrorType}, database error {ErrorCode}).", exception.GetType().Name, (exception as MySqlConnector.MySqlException)?.ErrorCode);
                     line.Result = (line.CreatedProductId is not null ? "Produsul a fost adăugat, dar intrarea nu a putut fi salvată. " : "") + "Salvarea nu a putut fi confirmată; verifică în catalog înainte să reîncerci.";
                 }
             }
@@ -445,6 +463,9 @@ else
     private sealed class PickRow
     {
         public required Dictionary<string, string> Cells { get; init; }
+        // The row of step 1 this one was made from (as read, before any correction): going back to step 1 and forward again keeps
+        // the work done on the rows that are still taken (corrections, chosen or prepared products, descriptions).
+        public string SourceKey { get; init; } = "";
         public InvoiceProductMatch Match { get; set; } = new("", null, []);
         public int? ProductId { get; set; }
         public StagedProduct? Staged { get; set; }
@@ -473,18 +494,29 @@ else
         {
             catalog = await ProductsRepository.GetProductsAsync(lifetime.Token);
             groups = await ProductsRepository.GetGroupsAsync(lifetime.Token);
-            pick = [.. rows.Where((_, index) => !excluded.Contains(index)).Select(row => new PickRow { Cells = new Dictionary<string, string>(row.Cells) })];
-            foreach (var item in pick) Rematch(item);
+            var previous = pick.ToList();
+            pick = [.. rows.Where((_, index) => !excluded.Contains(index)).Select(row =>
+            {
+                var key = SourceKey(row);
+                var again = previous.FindIndex(item => item.SourceKey == key);
+                if (again < 0) return new PickRow { Cells = new Dictionary<string, string>(row.Cells), SourceKey = key };
+                var kept = previous[again];
+                previous.RemoveAt(again);
+                return kept;
+            })];
+            foreach (var item in pick) Rematch(item);   // also against the catalog as it is now
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception)
         {
             Logger.LogError("Invoice pickup product lookup failed ({ErrorType}).", exception.GetType().Name);
             step2Error = "Catalogul de produse nu a putut fi citit. Reîncearcă prin „Pasul precedent” și „Pasul următor”.";
-            pick = [];
         }
         finally { step2Loading = false; }
     }
+
+    private static string SourceKey(InvoiceTableRow row) =>
+        row.Page.ToString(CultureInfo.InvariantCulture) + "|" + string.Join("\u001f", row.Cells.OrderBy(cell => cell.Key, StringComparer.Ordinal).Select(cell => cell.Key + "=" + cell.Value));
 
     private void Rematch(PickRow item)
     {
@@ -498,8 +530,26 @@ else
 
     private void EditCell(int index, string columnId, string value)
     {
+        if (ShownColumns.FirstOrDefault(column => column.Id == columnId) is { } column && IsNumeric(column)) value = NumbersOnly(value);
         pick[index].Cells[columnId] = value;
         Rematch(pick[index]);
+    }
+
+    // Quantity, prices and taxes are read as numbers, so only numbers can be typed in them: digits and one comma (numeric-field.js refuses the
+    // rest as it is typed; this is the same rule for what reaches the server in another way). A dot of the text as it was read stays.
+    private static bool IsNumeric(ShownColumn column) => column.Meaning is InvoiceColumnMeanings.Quantity or InvoiceColumnMeanings.UnitPrice or InvoiceColumnMeanings.Value
+        or InvoiceColumnMeanings.ValueWithVat or InvoiceColumnMeanings.VatAmount or InvoiceColumnMeanings.VatRate or InvoiceColumnMeanings.Discount;
+
+    internal static string NumbersOnly(string value)
+    {
+        var comma = false;
+        var result = new System.Text.StringBuilder();
+        foreach (var character in value)
+        {
+            if (char.IsAsciiDigit(character) || character == '.') result.Append(character);
+            else if (character == ',' && !comma) { result.Append(character); comma = true; }
+        }
+        return result.ToString();
     }
 
     private string NewProductDescription(PickRow item)
@@ -521,7 +571,48 @@ else
         return Task.CompletedTask;
     }
 
-    private sealed record ShownColumn(string Id, string Title);
+    private sealed record ShownColumn(string Id, string Title, string Meaning);
+
+    // The invoice itself, in a window of its own (opened by the link of step 2): the pages of the file under pickup.
+    private string ViewerUrl => $"/produse/preluare-factura/factura/{session!.Id}";
+
+    // The decimal separator the invoice uses for its own numbers, found once per file.
+    private char? numberHint;
+    private Guid? numberHintFor;
+    private char? NumberHint
+    {
+        get
+        {
+            if (numberHintFor != session!.Id) { numberHint = InvoiceValues.DecimalStyle(session.Document.AllWords.Select(word => word.Text)); numberHintFor = session.Id; }
+            return numberHint;
+        }
+    }
+
+    // Lines needed by a name in its field (about 40 characters a line; browsers that size the field to its text ignore this).
+    private static int NameRows(string text) => Math.Clamp((text.Length + 39) / 40, 1, 8);
+
+    // The name gets the room; the code a medium field; the unit is the shortest; quantity, prices and taxes are short.
+    private static string ColumnClass(ShownColumn column) => column.Meaning switch
+    {
+        InvoiceColumnMeanings.Name => "pickup-col-name",
+        InvoiceColumnMeanings.Code => "pickup-col-code",
+        InvoiceColumnMeanings.Unit => "pickup-col-unit",
+        _ => "pickup-col-short"
+    };
+
+    // Quantities and amounts must be numbers (missing is not acceptable for the first three); discounts and VAT may be empty.
+    private bool NotANumber(ShownColumn column, string text)
+    {
+        switch (column.Meaning)
+        {
+            case InvoiceColumnMeanings.Quantity or InvoiceColumnMeanings.UnitPrice or InvoiceColumnMeanings.Value or InvoiceColumnMeanings.ValueWithVat:
+                return InvoiceValues.ParseNumber(text, NumberHint) is null;
+            case InvoiceColumnMeanings.VatAmount or InvoiceColumnMeanings.Discount:
+                return text.Trim().Length > 0 && InvoiceValues.ParseNumber(text, NumberHint) is null;
+            default:
+                return false;
+        }
+    }
 
     private bool loading = true, busy, addMode;
     private string? loadError, error, notice, templateInfo;
@@ -550,8 +641,8 @@ else
         get
         {
             var columns = reading!.Extraction.Columns.Where(column => column.Meaning != InvoiceColumnMeanings.Ignore).ToList();
-            foreach (var column in columns) yield return new ShownColumn(column.Id, column.Label.Length > 0 ? column.Label : InvoiceVocabulary.ColumnTitle(column.Meaning));
-            if (columns.All(column => column.Id != "code") && rows.Any(row => row.Cells.ContainsKey("code"))) yield return new ShownColumn("code", InvoiceVocabulary.ColumnTitle(InvoiceColumnMeanings.Code));
+            foreach (var column in columns) yield return new ShownColumn(column.Id, column.Label.Length > 0 ? column.Label : InvoiceVocabulary.ColumnTitle(column.Meaning), column.Meaning);
+            if (columns.All(column => column.Id != "code") && rows.Any(row => row.Cells.ContainsKey("code"))) yield return new ShownColumn("code", InvoiceVocabulary.ColumnTitle(InvoiceColumnMeanings.Code), InvoiceColumnMeanings.Code);
         }
     }
 
@@ -583,6 +674,7 @@ else
         try
         {
             DiscardSession();
+            pick = []; finished = false; finalizeNotice = finalizeError = null;   // another file: nothing of the previous pickup applies
             await using var stream = file.OpenReadStream(InvoiceAnalysisRules.MaxFileSizeBytes, lifetime.Token);
             session = await Analysis.AnalyzeAsync(stream, file.Name, lifetime.Token);
             suggestions = InvoiceTemplateSuggestions.Rank(await Templates.GetAllAsync(lifetime.Token), session.Document);
@@ -685,7 +777,7 @@ else
         return columns.Where(column => column.Meaning != InvoiceColumnMeanings.Ignore);
     }
 
-    private void ClearReading() { session = null; reading = null; overlay = null; excluded.Clear(); separators = []; rows = []; templateInfo = null; suggestions = []; chosen = null; selectedId = ""; }
+    private void ClearReading() { pick = []; session = null; reading = null; overlay = null; excluded.Clear(); separators = []; rows = []; templateInfo = null; suggestions = []; chosen = null; selectedId = ""; }
 
     private void Select(string id) => selectedId = selectedId == id ? "" : id;
 

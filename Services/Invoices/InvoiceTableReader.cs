@@ -71,6 +71,8 @@ public static partial class InvoiceTableReader
         return widened is not null && widened.Score >= best.Score - 0.5 ? widened : best;
     }
 
+    internal static bool IsMostlyNumericForDebug(TextLine line) => IsMostlyNumeric(line);
+
     private static bool IsMostlyNumeric(TextLine line)
     {
         var segments = InvoiceLayout.Segments(line, 0);
@@ -502,7 +504,7 @@ public static partial class InvoiceTableReader
                     expected = firstNumber;
                 foreach (var cell in cells.Where(cell => cell.Column == indexColumn).OrderBy(cell => cell.Segment.CenterY))
                 {
-                    var number = ParseIndex(cell.Segment.Text);
+                    var number = ParseRunningNumber(cell.Segment.Text, expected);
                     if (number == expected) { anchors.Add((number.Value, cell.Segment.CenterY, cell.Segment.Height, cell)); expected++; }
                 }
             }
@@ -569,6 +571,14 @@ public static partial class InvoiceTableReader
         return new InvoiceTableRead(refined, checkedRows, split, usedIndex, Score(checkedRows, refined, hint) - 0.15 * misalignment, consumed);
     }
 
+    // A running number as a scan gives it: with a quote or a bar stuck to it ("„1", "|2|"), and the first "1" read as a bracket or a bar.
+    internal static int? ParseRunningNumber(string text, int expected)
+    {
+        var plain = text.Trim();
+        if (expected == 1 && plain is "]" or "[" or "|" or "!" or "l" or "I") return 1;
+        return ParseIndex(plain.Trim('„', '“', '”', '"', '\'', '’', '‘', '`', '|', '_', ' '));
+    }
+
     internal static int? ParseIndex(string text)
     {
         var trimmed = text.Trim().TrimEnd('.', ')', ':');
@@ -600,13 +610,26 @@ public static partial class InvoiceTableReader
     {
         var height = Math.Max(1, anchors.Average(anchor => anchor.Height));
         var bands = new List<(double, double)>();
+        // Where a row starts, by the line of its running number: the line between two rows is drawn halfway through the space between the last
+        // line of text of the row above and the first line of the row that starts at its number (rows of several lines are not cut, and a
+        // gap larger than a line is shared equally). A row whose neighbours cannot be measured falls back to just above its number.
+        double Boundary(int index)
+        {
+            var first = anchors[index].Y;
+            var below = cells.Where(cell => Math.Abs(cell.Segment.CenterY - first) <= 0.6 * height).Select(cell => cell.Segment.Words.Min(word => word.Y)).DefaultIfEmpty(double.NaN).Min();
+            var above = cells.Where(cell => cell.Segment.CenterY >= anchors[index - 1].Y - 0.6 * height && cell.Segment.CenterY < first - 0.6 * height)
+                .Select(cell => cell.Segment.Words.Max(word => word.Bottom)).DefaultIfEmpty(double.NaN).Max();
+            var fallback = first - 0.45 * height;
+            if (double.IsNaN(above) || double.IsNaN(below) || below <= above) return fallback;
+            return Math.Min((above + below) / 2, first - 0.2 * height);
+        }
         for (var index = 0; index < anchors.Count; index++)
         {
             // The first row of the table takes what is above its number (down to the header); on a following page nothing above it is a row.
             var top = index == 0 ? (firstRowOpen ? double.NegativeInfinity : anchors[0].Y - (split == InvoiceRowSplit.Mid ? 1.0 : 0.45) * height)
-                : split == InvoiceRowSplit.Mid ? (anchors[index - 1].Y + anchors[index].Y) / 2 : anchors[index].Y - 0.45 * height;
+                : split == InvoiceRowSplit.Mid ? (anchors[index - 1].Y + anchors[index].Y) / 2 : Boundary(index);
             var bottom = index + 1 < anchors.Count
-                ? split == InvoiceRowSplit.Mid ? (anchors[index].Y + anchors[index + 1].Y) / 2 : anchors[index + 1].Y - 0.45 * height
+                ? split == InvoiceRowSplit.Mid ? (anchors[index].Y + anchors[index + 1].Y) / 2 : Boundary(index + 1)
                 : LastRowEnd(cells, anchors, height);
             bands.Add((top, bottom));
         }

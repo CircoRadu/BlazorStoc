@@ -1,8 +1,14 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **02 octombrie 2026 (preluare factura, sabloane de factura fara versiuni, editare in sub-tab propriu)**
+Data: **05 octombrie 2026 (preluare factura: corectii si facilitati, motiv automat la editari, tabel Secpral/Emproium)**
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
+
+## Preluare factura: corectii, motiv automat la editari, tabel Secpral/Emproium - 05.10.2026
+
+Implementat (vezi `IMPLEMENTED.md`, ultima intrare). Fisiere principale: `Components/Pages/InvoicePickup.razor` (pasul 2: campuri numerice, mesaj pe rand, fereastra cu factura, starea pastrata intre pasi), `Components/Pages/InvoiceViewer.razor`, `wwwroot/numeric-field.js`, `Components/Shared/ChangeReasonField.razor` + `Services/ChangeReasonSummary.cs` (motiv automat; folosit in editorii de produs, beneficiar, utilizator, vehicul, proiect, observatie, categorii si miscari de stoc), `Components/Pages/ProductGroups.razor` (formularul de subcategorie in categorie), `Services/Invoices/InvoiceVocabulary.cs` (antete lungi), `Services/Invoices/InvoiceTableReader.cs` (`ParseRunningNumber`, `Boundary`).
+- **Validari:** suita completa 761 de verificari trece cu facturile reale sarite; teste bUnit noi pentru wizard, formularul de produs, pagina de categorii si motivele automate; corpusul real: singura diferenta fata de inainte este tabelul gasit la Secpral si randurile separate la Emproium.
+- **Riscuri / urmatorul pas:** verificarea pe Emproium cu valori reale ramane picata (OCR ilizibil pe randul 1); decizia de reorganizare a fluxului OCR (geometria tabelului intai, valorile nu intra in scor, antetul facturii inainte de tabel) nu este luata - vezi rezumatul din discutie; editarea unei miscari de stoc cu motiv automat nu are test automat.
 
 ## Preluare factura ca wizard in 3 pasi - 03.10.2026
 

@@ -131,7 +131,9 @@ public static class InvoiceVocabulary
                 var score = phraseTokens.Length + (phraseTokens.Length == tokens.Length ? 0.5 : 0) - 0.05 * (tokens.Length - phraseTokens.Length);
                 // A phrase that only covers a small part of a long label says little ("Nume articol/Descriere articol" is a name, but
                 // a sentence that happens to contain "total" is not a value column).
-                if (tokens.Length > phraseTokens.Length * 3 + 1) score -= 1;
+                // A label that opens with the phrase is its heading, however long ("Denumirea produselor sau a serviciilor", whose middle word an
+                // OCR read wrongly): it is not that penalty's case.
+                if (tokens.Length > phraseTokens.Length * 3 + 1 && start > 0) score -= 1;
                 if (score > bestScore) { best = meaning; bestScore = score; }
             }
         return (best, bestScore);

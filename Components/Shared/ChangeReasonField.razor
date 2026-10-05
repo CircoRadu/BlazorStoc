@@ -1,12 +1,30 @@
 @using BlazorStoc.Services
 
-<label class="change-reason-field @CssClass" for="@Id">
-    <span>Motivare modificare *</span>
-    <textarea id="@Id" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@Disabled"
-              value="@Value" @oninput="ValueInputAsync" aria-required="true" aria-describedby="@DescriptionId"></textarea>
-    <small id="@DescriptionId">Descrie motivul editării sau al ștergerii. Informația va fi păstrată în jurnalul de activitate.</small>
-    @if (Error is not null) { <span class="validation-message" role="alert">@Error</span> }
-</label>
+@if (AutoText is null)
+{
+    <label class="change-reason-field @CssClass" for="@Id">
+        <span>Motivare modificare *</span>
+        <textarea id="@Id" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@Disabled"
+                  value="@Value" @oninput="ValueInputAsync" aria-required="true" aria-describedby="@DescriptionId"></textarea>
+        <small id="@DescriptionId">Descrie motivul editării sau al ștergerii. Informația va fi păstrată în jurnalul de activitate.</small>
+        @if (Error is not null) { <span class="validation-message" role="alert">@Error</span> }
+    </label>
+}
+else
+{
+    @* The reason is chosen by radio buttons: the summary the form builds from the user's changes (read only, updated as the form changes), or a text of the user's own. *@
+    <fieldset class="change-reason-field reason-choice @CssClass" aria-describedby="@DescriptionId">
+        <legend>Motivare modificare *</legend>
+        <label class="reason-option"><input type="radio" name="@($"{Id}-mode")" checked="@UseAuto" disabled="@Disabled" @onchange="() => SetModeAsync(true)" /> <span>Generată automat din modificările făcute în formular</span></label>
+        <textarea id="@($"{Id}-auto")" class="reason-auto" readonly rows="@AutoRows" aria-label="Motivarea generată automat" placeholder="Nicio modificare făcută încă."
+                  value="@AutoText"></textarea>
+        <label class="reason-option"><input type="radio" name="@($"{Id}-mode")" checked="@(!UseAuto)" disabled="@Disabled" @onchange="() => SetModeAsync(false)" /> <span>Scrisă de mine</span></label>
+        <textarea id="@Id" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@(Disabled || UseAuto)" aria-label="Motivarea scrisă de utilizator"
+                  value="@Value" @oninput="ValueInputAsync" aria-required="@(UseAuto ? "false" : "true")"></textarea>
+        <small id="@DescriptionId">Motivul ales este păstrat în jurnalul de activitate.</small>
+        @if (Error is not null) { <span class="validation-message" role="alert">@Error</span> }
+    </fieldset>
+}
 
 @code {
     [Parameter, EditorRequired] public string Id { get; set; } = "";
@@ -15,11 +33,22 @@
     [Parameter] public string? Error { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public string CssClass { get; set; } = "full-width";
+    // Not null: the field offers the choice between this generated text (one change on each line) and a text written by the user.
+    [Parameter] public string? AutoText { get; set; }
+    [Parameter] public bool UseAuto { get; set; } = true;
+    [Parameter] public EventCallback<bool> UseAutoChanged { get; set; }
     private string DescriptionId => $"{Id}-description";
+    private int AutoRows => Math.Clamp((AutoText ?? "").Split('\n').Length, 2, 8);
 
     private async Task ValueInputAsync(ChangeEventArgs args)
     {
         Value = args.Value?.ToString() ?? string.Empty;
         await ValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task SetModeAsync(bool auto)
+    {
+        UseAuto = auto;
+        await UseAutoChanged.InvokeAsync(auto);
     }
 }
