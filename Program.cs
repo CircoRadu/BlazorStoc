@@ -161,6 +161,7 @@ builder.Services.AddSingleton<IInventoryPickupOcrService, InventoryPickupOcrServ
 builder.Services.AddSingleton<IInvoicePdfReader, InvoicePdfReader>();
 builder.Services.AddSingleton<IInvoiceAnalysisStore, InvoiceAnalysisStore>();
 builder.Services.AddScoped<IInvoiceAnalysisService, InvoiceAnalysisService>();
+builder.Services.AddSingleton<InvoiceLabSettings>();
 builder.Services.AddScoped<IInvoiceTemplateStore>(services => new MariaInvoiceTemplateStore(services.GetRequiredService<IConfiguration>()));
 builder.Services.AddScoped<IInvoiceTemplateService, InvoiceTemplateService>();
 builder.Services.AddScoped<IInventoryPickupBuilder, InventoryPickupBuilder>();

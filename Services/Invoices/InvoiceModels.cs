@@ -21,7 +21,10 @@ public sealed record InvoiceWord(int Page, string Text, double X, double Y, doub
 // one is at y = Position and spans x From..To. Found in scans (OpenCV); a hint for the table's columns, never required.
 public sealed record InvoiceRule(bool Vertical, double Position, double From, double To);
 
-public sealed record InvoicePageData(int Number, double Width, double Height, string Source, IReadOnlyList<InvoiceWord> Words, IReadOnlyList<InvoiceRule>? Rules = null);
+// OcrSkew (degrees) and OcrTurn (0, 90, 180, 270 clockwise): how the scan was straightened and turned to get the frame its words are in, so that the same picture
+// can be made again (the cells of the table are read again from it).
+public sealed record InvoicePageData(int Number, double Width, double Height, string Source, IReadOnlyList<InvoiceWord> Words, IReadOnlyList<InvoiceRule>? Rules = null,
+    double OcrSkew = 0, int OcrTurn = 0);
 
 public sealed record InvoiceDocument(IReadOnlyList<InvoicePageData> Pages)
 {

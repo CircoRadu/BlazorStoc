@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using BlazorStoc.Components.Pages;
 using BlazorStoc.Services;
 using Bunit;
@@ -46,6 +47,7 @@ public static class PickupWizardChecks
         context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         context.Services.AddScoped<UnsavedChanges>();
+        context.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 
         var cut = context.Render<InvoicePickup>();
         cut.WaitForAssertion(() => cut.Find("input[type=file]"), TimeSpan.FromSeconds(10));
@@ -137,5 +139,45 @@ public static class PickupWizardChecks
         var gone = context.Render<InvoiceViewer>(parameters => parameters.Add(p => p.SessionId, Guid.NewGuid()));
         gone.WaitForAssertion(() => { if (!gone.Markup.Contains("nu mai este disponibilă")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         check(gone.FindAll("img").Count == 0, "Invoice window of an unknown or expired file shows no pages");
+        check(cut.FindAll(".lab-panel").Count == 0, "OCR lab: the laboratory panel is not shown unless it is switched on");
+
+        // The OCR laboratory (Invoices:Lab = true): engines side by side, the reference saved from the page, the engine chosen.
+        var referencesDirectory = Path.Combine(Path.GetTempPath(), "blazorstoc-references-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var labContext = new BunitContext();
+            labContext.JSInterop.Mode = JSRuntimeMode.Loose;
+            labContext.Services.AddLogging();
+            labContext.Services.AddSingleton<IAccessControl>(access);
+            labContext.Services.AddSingleton<IInvoiceAnalysisStore>(new InvoiceAnalysisStore(TimeProvider.System));
+            labContext.Services.AddScoped<IInvoiceAnalysisService>(provider => new InvoiceAnalysisService(new InvoicePdfReader(new TestTessdata()), provider.GetRequiredService<IInvoiceAnalysisStore>(), access));
+            labContext.Services.AddSingleton<IInvoiceTemplateService>(new NoTemplates());
+            labContext.Services.AddSingleton<IProductRepository>(repository);
+            labContext.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
+            labContext.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
+            labContext.Services.AddScoped<UnsavedChanges>();
+            labContext.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+                { ["Invoices:Lab"] = "true", ["Invoices:LabReferencesDirectory"] = referencesDirectory }).Build()));
+
+            var lab = labContext.Render<InvoicePickup>();
+            lab.WaitForAssertion(() => lab.Find("input[type=file]"), TimeSpan.FromSeconds(10));
+            lab.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(invoice.Pdf, "factura-lab.pdf", null, "application/pdf"));
+            lab.WaitForAssertion(() => { if (lab.FindAll(".lab-panel").Count == 0 || lab.FindAll("tbody tr").Count < 4) throw new Exception("pending"); }, TimeSpan.FromSeconds(60));
+            var engineRows = lab.FindAll(".lab-table tbody tr");
+            check(engineRows.Count == 2 && engineRows[0].TextContent.StartsWith("A") && engineRows[1].TextContent.StartsWith("B") && lab.Markup.Contains("fără referință pentru acest fișier") &&
+                  lab.FindAll("input[type=radio][name='lab-engine']").Count == 2 && lab.FindAll(".lab-table tr.lab-current").Count == 1,
+                "OCR lab: the panel shows both engines on the file (without a reference first) and the engine of the reading is marked");
+            lab.FindAll("button").First(button => button.TextContent.Contains("Salvează ca referință")).Click();
+            var referenceFile = Path.Combine(referencesDirectory, "factura-lab.reference.json");
+            check(File.Exists(referenceFile) && InvoiceReference.FromJson(File.ReadAllText(referenceFile)) is { } saved && saved.File == "factura-lab.pdf" && saved.RowCount == invoice.Rows.Count && saved.Columns.Count >= 5,
+                "OCR lab: \"Salvează ca referință\" writes the columns, the header and the lines of the page into <file>.reference.json");
+            lab.WaitForAssertion(() => { if (lab.Markup.Contains("fără referință pentru acest fișier")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+            var scored = lab.FindAll(".lab-table tbody tr").Select(row => row.QuerySelectorAll("td")[5].TextContent.Trim()).ToArray();
+            check(scored.All(text => double.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out var value) && value > 0.9), "OCR lab: with the reference saved, both engines are measured against it");
+            lab.FindAll("input[type=radio][name='lab-engine']")[1].Change(true);
+            lab.WaitForAssertion(() => { if (!lab.FindAll(".lab-table tr")[2].ClassList.Contains("lab-current")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+            check(lab.FindAll("tbody tr").Count >= invoice.Rows.Count && lab.Markup.Contains("motorul B"), "OCR lab: choosing engine B reads the table again with it");
+        }
+        finally { if (Directory.Exists(referencesDirectory)) Directory.Delete(referencesDirectory, recursive: true); }
     }
 }

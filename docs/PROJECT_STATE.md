@@ -1,8 +1,15 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **05 octombrie 2026 (preluare factura: corectii si facilitati, motiv automat la editari, tabel Secpral/Emproium)**
+Data: **05 octombrie 2026 (motor geometric pentru tabelul facturii, laborator OCR, recitirea numerelor; preluare factura: corectii si facilitati, motiv automat la editari, tabel Secpral/Emproium)**
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
+
+## Motor geometric pentru tabelul facturii, laborator OCR, recitirea numerelor - 05.10.2026
+
+Implementat pe ramura `experiment/ocr-geometrie` (vezi `IMPLEMENTED.md`, ultima intrare, si `docs/RAPORT_CODEX_DETECTIE.md`). Fisiere principale: `Services/Invoices/InvoiceEngines.cs`, `InvoiceGridDetector.cs`, `InvoiceTableReader.cs`, `InvoicePdfReader.cs`, `InvoicePdfReader.Rereading.cs` (nou), `InvoiceRowSeparators.cs`, `InvoiceTemplates.cs`, `InvoiceReference.cs`, `InvoiceLab.cs`, `FileInvoiceTemplateStore.cs`, `Components/Pages/InvoicePickup.razor` (panou de laborator); teste `GridChecks.cs`, `OcrLabChecks.cs`.
+- **Motor:** B (geometric) este cel al aplicatiei; A ramane pentru comparatie in laborator. Pe corpusul real B gaseste tabele pe care A nu le gaseste (Facturis, SKM) si citeste Telesystem 908159 cu 10 randuri (A: 5). Propunere nedecisa: scoaterea lui A din interfata dupa ce B citeste si antetul bilingv (acum exclus din teste).
+- **Validari:** suita completa 821 de verificari trec cu facturile reale sarite. Cu mostrele reale: verificarea pe scanarea Emproium ramane picata (CUI si „Total fara TVA" din antet nepotrivite dupa OCR; tabelul si suma randurilor sunt corecte). Corpusul: numarul de coloane si de randuri nu s-a schimbat nicaieri din cauza recitirii, doar celulele a 6 fisiere.
+- **Riscuri / urmatorul pas:** blocurile suprapuse cu acelasi antet (fise SKM) nu sunt unite intr-un tabel; scrisul de mana nu e citit (lasat deoparte la cererea utilizatorului); coloane neutilizate duplicate pe overlay la GS, Mondoplast, Telesystem 682100; proforma citita cu 2 randuri din 3 in pasul 1; treapta „antetul facturii inainte de tabel" si maparea separata de citire nu sunt implementate. Verificarile in browser: `docs/TESTE_RAMASE.md`, N45.
 
 ## Preluare factura: corectii, motiv automat la editari, tabel Secpral/Emproium - 05.10.2026
 

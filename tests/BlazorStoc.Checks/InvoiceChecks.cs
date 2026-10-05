@@ -335,6 +335,8 @@ public static class InvoiceChecks
 
         await ScansAsync(check, reader, Field, Cell, RowsMatch);
         await RealSamplesAsync(check, reader);
+        GridChecks.Run(check);
+        await OcrLabChecks.RunAsync(check, reader);
         Store(check);
         await ServiceAsync(check);
         AuditRules(check);
@@ -563,6 +565,33 @@ public static class InvoiceChecks
             }
         }
 
+        // Reading the numbers of the table again, cell by cell: a clean scan is not changed by it, a blurry one is not made worse (and the table is the same).
+        foreach (var (name, pdf) in variants.Where(item => item.Name.StartsWith("straight", StringComparison.Ordinal) || item.Name.StartsWith("blurry", StringComparison.Ordinal) || item.Name.StartsWith("pale", StringComparison.Ordinal)))
+        {
+            using var stream = new MemoryStream(pdf);
+            var read = await reader.ReadAsync(stream);
+            var before = InvoiceAnalyzer.Analyze(read.Document);
+            var again = await reader.RereadNumbersAsync(read);
+            var after = InvoiceAnalyzer.Analyze(again.Document);
+            int Exact(InvoiceAnalysis analysis) => analysis.Table is { } table ? table.Rows.Count(row => english.Any(expected => InvoiceValues.ParseNumber(cell(table, row, InvoiceColumnMeanings.Value), '.') == expected.Value)) : 0;
+            var changedCells = before.Table is { } first && after.Table is { } second ? first.Rows.Zip(second.Rows).Sum(pair => pair.First.Cells.Count(item => pair.Second.Cells.GetValueOrDefault(item.Key) != item.Value)) : 0;
+            check(before.Table is not null && after.Table is not null && after.Table.Rows.Count == before.Table.Rows.Count && Exact(after) >= Exact(before) &&
+                  (!name.StartsWith("straight", StringComparison.Ordinal) || changedCells == 0),
+                $"Invoice scan ({name}): reading the numbers again keeps the table and does not lose a value ({Exact(before)} -> {Exact(after)} values exact, {changedCells} cells changed)");
+        }
+
+        // A picture of an invoice with a few real words of text around it (a page printed from a browser to PDF): the text layer has enough words to look
+        // like a text page, but the invoice is the picture, so the page is read with OCR.
+        using var strayStream = new MemoryStream(InvoiceFixtures.Scan(source.Pdf, strayText: true));
+        var strayRead = await reader.ReadAsync(strayStream);
+        var strayAnalysis = InvoiceAnalyzer.Analyze(strayRead.Document);
+        var strayTable = strayAnalysis.Table;
+        check(strayRead.Document.Pages[0].Source == InvoiceSources.Ocr && strayTable is not null && strayTable.Rows.Count == english.Count,
+            $"Invoice scan (picture with a few words of text over it): the text layer does not make the page a text page, it is read with OCR and the table is found ({strayTable?.Rows.Count ?? 0} rows)");
+        // And a page whose text layer is the invoice stays a text page even with a picture (a logo, a stamp) on it.
+        using var textStream = new MemoryStream(source.Pdf);
+        check((await reader.ReadAsync(textStream)).Document.Pages[0].Source == InvoiceSources.Text, "Invoice text page: a real text layer is still read directly, not by OCR");
+
         // Romanian text with diacritics is read with the Romanian data (ron + eng together).
         var romanian = InvoiceFixtures.Make(new InvoiceSpec("ro-lines", 4, SupplierName: "Întreprinderea Țăranu și Ștefănescu SRL", SupplierCui: "RO40404040", Number: "ȘT 12"), InvoiceFixtures.MakeRows(4, 21));
         using var romanianStream = new MemoryStream(InvoiceFixtures.Scan(romanian.Pdf, dpi: 250));
@@ -576,6 +605,16 @@ public static class InvoiceChecks
     }
 
     // ---- the real sample invoices (kept outside the repository: they hold a supplier's data) ----
+
+    // The names in <directory>/exclude.txt (one file name per line, # starts a comment), compared without regard to case.
+    internal static HashSet<string> ExcludedSamples(string directory)
+    {
+        var list = Path.Combine(directory, "exclude.txt");
+        return File.Exists(list)
+            ? new HashSet<string>(File.ReadAllLines(list).Select(line => line.Split('#')[0].Trim()).Where(line => line.Length > 0), StringComparer.OrdinalIgnoreCase)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    }
+
     private static async Task RealSamplesAsync(Action<bool, string> check, InvoicePdfReader reader)
     {
         var directory = Environment.GetEnvironmentVariable("INVOICE_CORPUS_DIR") ?? @"D:\_BlazTest\Facturi furnizori";
@@ -585,10 +624,14 @@ public static class InvoiceChecks
             return;
         }
         var loaded = new List<(string Name, InvoiceDocument Document, InvoiceAnalysis Analysis)>();
-        foreach (var file in Directory.GetFiles(directory, "*.pdf").OrderBy(name => name))
+        // The files the user left out of the tests (a layout the application does not have to read) are listed in exclude.txt next to the samples.
+        var excluded = ExcludedSamples(directory);
+        foreach (var file in Directory.GetFiles(directory, "*.pdf").Where(file => !excluded.Contains(Path.GetFileName(file))).OrderBy(name => name))
         {
             await using var stream = File.OpenRead(file);
             var read = await reader.ReadAsync(stream);
+            // As the application reads a file: the numbers of the table that the OCR did not read as numbers are read again, cell by cell.
+            read = await reader.RereadNumbersAsync(read);
             loaded.Add((Path.GetFileName(file), read.Document, InvoiceAnalyzer.Analyze(read.Document)));
         }
         foreach (var (name, document, analysis) in loaded)
@@ -601,7 +644,8 @@ public static class InvoiceChecks
             var totalNet = InvoiceValues.ParseNumber(analysis.Fields.FirstOrDefault(field => field.Meaning == InvoiceFieldMeanings.TotalNet)?.Value, hint);
             check(table is { Rows.Count: > 0 } && table.Columns.Any(column => column.Meaning == InvoiceColumnMeanings.Name) && totalNet is not null && Math.Abs(sum - totalNet.Value) <= 0.05m &&
                   analysis.SupplierCui.Length > 0 && analysis.Fields.Any(field => field.Meaning == InvoiceFieldMeanings.InvoiceNumber),
-                $"Real sample invoice [{name}]: table, rows summing to the total without VAT ({sum:0.00}), supplier tax id and number are found");
+                $"Real sample invoice [{name}]: table, rows summing to the total without VAT ({sum:0.00}), supplier tax id and number are found " +
+                $"(rows {table?.Rows.Count ?? 0}, name column {table?.Columns.Any(column => column.Meaning == InvoiceColumnMeanings.Name)}, total without VAT {totalNet?.ToString() ?? "not found"}, tax id '{analysis.SupplierCui}', number {analysis.Fields.Any(field => field.Meaning == InvoiceFieldMeanings.InvoiceNumber)})");
         }
         var failures = new List<string>();
         foreach (var source in loaded)

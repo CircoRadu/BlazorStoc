@@ -4,11 +4,11 @@ namespace BlazorStoc.Services;
 // of the rest of the page. The proposal is only a starting point - the user confirms or corrects it in the interactive template.
 public static class InvoiceAnalyzer
 {
-    public static InvoiceAnalysis Analyze(InvoiceDocument document)
+    public static InvoiceAnalysis Analyze(InvoiceDocument document, InvoiceEngineOptions? options = null)
     {
         var hint = InvoiceValues.DecimalStyle(document.AllWords.Select(word => word.Text));
         var warnings = new List<string>();
-        var (table, consumed) = InvoiceTableReader.Detect(document, hint);
+        var (table, consumed) = InvoiceTableReader.Detect(document, hint, options);
         if (table is null) warnings.Add("Nu s-a găsit tabelul cu liniile facturii; poți adăuga coloanele manual.");
         else if (table.ByStructure) warnings.Add("Antetul tabelului nu a fost recunoscut după etichete (alt limbaj sau alt format): tabelul a fost găsit după numerotarea liniilor. Verifică sensul fiecărei coloane.");
         else if (table.Rows.Count == 0) warnings.Add("Antetul tabelului a fost găsit, dar nu s-au putut citi rânduri sub el.");

@@ -39,8 +39,11 @@ internal static class InvoiceFieldFinder
                     var section = SectionOf(headings, label.Box);
                     // "Furnizor: SC TELESYSTEM SRL": the party word is the label and the rest the party's name.
                     if (meaningKey is null && InvoiceVocabulary.MatchSection(label.Text) is { } leadSection) { section = leadSection; meaningKey = "@name"; confidence = 0.9; }
+                    var meaning = InvoiceVocabulary.ResolveFieldMeaning(meaningKey, section);
+                    // A total is an amount: a sentence that happens to follow the words "de plata" (a note under the table) is not the total.
+                    if (meaning is InvoiceFieldMeanings.Total or InvoiceFieldMeanings.TotalNet or InvoiceFieldMeanings.TotalVat && !System.Text.RegularExpressions.Regex.IsMatch(value.Text.Trim(), @"^[-+]?\d")) meaning = "";
                     fields.Add(new InvoiceHeaderField($"f{page.Number}_{fields.Count + 1}", label.Text, value.Text, label.Box, value.Box,
-                        InvoiceVocabulary.ResolveFieldMeaning(meaningKey, section), section ?? "", confidence, InvoiceValues.KindOf(value.Text, hint)));
+                        meaning, section ?? "", confidence, InvoiceValues.KindOf(value.Text, hint)));
                 }
             }
         }

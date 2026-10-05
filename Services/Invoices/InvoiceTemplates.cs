@@ -579,7 +579,7 @@ public static class InvoiceTemplateEngine
     }
 
     // Reads a file with a template: the value of every used field (from its region, moved by the alignment) and the rows of the table.
-    public static InvoiceExtraction Apply(InvoiceTemplateDefinition definition, InvoiceDocument document)
+    public static InvoiceExtraction Apply(InvoiceTemplateDefinition definition, InvoiceDocument document, InvoiceEngineOptions? options = null)
     {
         var alignment = Align(definition, document);
         var warnings = new List<string>();
@@ -601,7 +601,7 @@ public static class InvoiceTemplateEngine
         {
             var page = PageOf(table.HeaderPage);
             var (tableColumns, headerBottom) = TableGeometry(table, page, alignment, document);
-            var read = InvoiceTableReader.ReadRows(document, tableColumns, page.Number, headerBottom, hint, table.RowSplit);
+            var read = InvoiceTableReader.ReadRows(document, tableColumns, page.Number, headerBottom, hint, table.RowSplit, options);
             // The columns keep the positions of the template; only the rows come from this file.
             columns = tableColumns;
             rows = read.Rows;
@@ -705,11 +705,25 @@ public static class InvoiceTemplateEngine
         if (matchedMeaningful < Math.Max(2, (meaningful + 1) / 2)) return (fallback, fallbackBottom);
 
         var dx = TextLine.Median(table.Columns.Where(column => matches.ContainsKey(column.Id)).Select(column => matches[column.Id].Left - column.Left * page.Width));
+        // A column keeps the width the template gave it, which may be more than its label (a name runs under the whole width of its column, a number is wider than its
+        // heading), moved as the template is (the alignment), when that still holds the label of the column and no label of another: else it is the label's own extent.
         var columns = new List<InvoiceColumn>();
+        (double Left, double Right) Extent(InvoiceTemplateColumn column, HeaderCell cell)
+        {
+            var left = column.Left * page.Width + alignment.TableDx;
+            var right = column.Right * page.Width + alignment.TableDx;
+            var centre = (cell.Left + cell.Right) / 2;
+            var holdsOthers = matches.Any(other => other.Key != column.Id && (other.Value.Left + other.Value.Right) / 2 >= left && (other.Value.Left + other.Value.Right) / 2 <= right);
+            return centre >= left && centre <= right && !holdsOthers ? (Math.Min(left, cell.Left), Math.Max(right, cell.Right)) : (cell.Left, cell.Right);
+        }
         foreach (var column in table.Columns)
         {
             var meaning = column.Use ? column.Meaning : InvoiceColumnMeanings.Ignore;
-            if (matches.TryGetValue(column.Id, out var cell)) columns.Add(new InvoiceColumn(column.Id, column.Label, meaning, cell.Left, cell.Right, column.RowMapping));
+            if (matches.TryGetValue(column.Id, out var cell))
+            {
+                var (extentLeft, extentRight) = Extent(column, cell);
+                columns.Add(new InvoiceColumn(column.Id, column.Label, meaning, extentLeft, extentRight, column.RowMapping));
+            }
             else columns.Add(new InvoiceColumn(column.Id, column.Label, meaning, column.Left * page.Width + dx, column.Right * page.Width + dx, column.RowMapping));
         }
         // Header cells the template does not know: kept as unused columns so that their text does not land in a neighbour.

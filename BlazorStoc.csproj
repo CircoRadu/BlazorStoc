@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="BlazorStoc.InvoiceCorpus" />
+    <InternalsVisibleTo Include="BlazorStoc.Checks" />
   </ItemGroup>
 
   <ItemGroup>

@@ -93,7 +93,7 @@ public static class InvoiceVocabulary
         (InvoiceColumnMeanings.Discount, ["discount", "reducere", "rabat", "disc"]),
         (InvoiceColumnMeanings.Currency, ["moneda", "valuta", "currency", "wahrung"]),
         // Recognised so that they are not mistaken for something else; the user sees them as unused columns.
-        (InvoiceColumnMeanings.Ignore, ["cantitate de baza", "tara provenient", "tara", "country", "tara de origine", "cod nc8", "cn", "nr comanda", "observatii"])
+        (InvoiceColumnMeanings.Ignore, ["cantitate de baza", "tara provenient", "tara", "country", "tara de origine", "cod nc8", "cn", "nr comanda", "observatii", "timbru verde", "timbru verde fara tva"])
     ];
 
     // Words that show that a line of text is the header of a table of goods (used to tell the header band from the rest).
@@ -126,7 +126,7 @@ public static class InvoiceVocabulary
             {
                 var phraseTokens = PhraseTokens(phrase);
                 if (phraseTokens.Length == 0) continue;
-                var start = FindPhrase(tokens, 0, phraseTokens);
+                var start = FindPhrase(tokens, 0, phraseTokens, fuzzy: true);
                 if (start < 0) continue;
                 var score = phraseTokens.Length + (phraseTokens.Length == tokens.Length ? 0.5 : 0) - 0.05 * (tokens.Length - phraseTokens.Length);
                 // A phrase that only covers a small part of a long label says little ("Nume articol/Descriere articol" is a name, but
@@ -136,18 +136,33 @@ public static class InvoiceVocabulary
                 if (tokens.Length > phraseTokens.Length * 3 + 1 && start > 0) score -= 1;
                 if (score > bestScore) { best = meaning; bestScore = score; }
             }
+        // A label whose words an OCR run together or broke apart ("Pretunitar ret unitar" for "Pret unitar"): the letters of the whole label, closed up, contain a long phrase.
+        if (bestScore <= 0)
+        {
+            var closed = string.Concat(tokens);
+            foreach (var (meaning, phrases) in ColumnPhrases)
+                foreach (var phrase in phrases)
+                {
+                    var phraseTokens = PhraseTokens(phrase);
+                    var closedPhrase = string.Concat(phraseTokens);
+                    if (closedPhrase.Length < 8 || !closed.Contains(closedPhrase, StringComparison.Ordinal)) continue;
+                    var score = 0.8 * phraseTokens.Length;
+                    if (score > bestScore) { best = meaning; bestScore = score; }
+                }
+        }
         return (best, bestScore);
     }
 
     // Index of the first label word where the phrase matches word by word, or -1. from: first label word that may start the phrase.
-    public static int FindPhrase(string[] tokens, int from, string[] phrase)
+    public static int FindPhrase(string[] tokens, int from, string[] phrase, bool fuzzy = false)
     {
         for (var start = from; start + phrase.Length <= tokens.Length; start++)
-            if (PhraseAt(tokens, start, phrase)) return start;
+            if (PhraseAt(tokens, start, phrase, fuzzy)) return start;
         return -1;
     }
 
-    public static bool PhraseAt(string[] tokens, int start, string[] phrase)
+    // fuzzy: a word that the OCR misread by a letter or two still matches a long word of the phrase ("CANTIITATEA" for "cantitate", "proauseior" for "produselor").
+    public static bool PhraseAt(string[] tokens, int start, string[] phrase, bool fuzzy = false)
     {
         if (start + phrase.Length > tokens.Length) return false;
         for (var i = 0; i < phrase.Length; i++)
@@ -156,9 +171,30 @@ public static class InvoiceVocabulary
             var wanted = phrase[i];
             if (token == wanted) continue;
             if (wanted.Length >= 4 && token.StartsWith(wanted, StringComparison.Ordinal) && token.Length <= wanted.Length + 4) continue;
+            if (fuzzy && wanted.Length >= 7 && Math.Abs(token.Length - wanted.Length) <= 2 && EditDistance(token, wanted, wanted.Length >= 9 ? 2 : 1) <= (wanted.Length >= 9 ? 2 : 1)) continue;
             return false;
         }
         return true;
+    }
+
+    // The number of single-letter changes (insert, delete, change) that turn one word into the other, or max + 1 when it is more than max.
+    private static int EditDistance(string left, string right, int max)
+    {
+        var previous = Enumerable.Range(0, right.Length + 1).ToArray();
+        for (var i = 1; i <= left.Length; i++)
+        {
+            var current = new int[right.Length + 1];
+            current[0] = i;
+            var rowMinimum = current[0];
+            for (var j = 1; j <= right.Length; j++)
+            {
+                current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + (left[i - 1] == right[j - 1] ? 0 : 1));
+                rowMinimum = Math.Min(rowMinimum, current[j]);
+            }
+            if (rowMinimum > max) return max + 1;
+            previous = current;
+        }
+        return previous[right.Length];
     }
 
     // Labels of the fields outside the table. A Meaning starting with "@" is a party attribute: it depends on the section (supplier / buyer).

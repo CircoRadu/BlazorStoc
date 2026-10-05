@@ -231,7 +231,9 @@ internal static class InvoiceFixtures
 
     // The page rendered to a picture and saved as a PDF that has only that picture: what a scanner produces. rotation: 0/90/180/270 turns
     // the sheet, skewDegrees tilts it, inkStrength below 1 makes the ink pale (a washed-out scan, pencil), blurSigma (pixels) softens it (out of focus).
-    public static byte[] Scan(byte[] textPdf, double skewDegrees = 0, int rotation = 0, int dpi = 200, double inkStrength = 1.0, double blurSigma = 0)
+    // strayText: real text (a text layer) drawn over the picture at the top and the bottom, as a browser prints the date, the title and the address
+    // of the page around a picture of an invoice.
+    public static byte[] Scan(byte[] textPdf, double skewDegrees = 0, int rotation = 0, int dpi = 200, double inkStrength = 1.0, double blurSigma = 0, bool strayText = false)
     {
         using var input = new MemoryStream(textPdf);
 #pragma warning disable CA1416
@@ -269,7 +271,15 @@ internal static class InvoiceFixtures
         page.Height = XUnit.FromPoint(pixelHeight * 72.0 / dpi);
         using (var g = XGraphics.FromPdfPage(page))
         using (var image = XImage.FromStream(new MemoryStream(png)))
+        {
             g.DrawImage(image, 0, 0, page.Width.Point, page.Height.Point);
+            if (strayText)
+            {
+                var small = new XFont("PT Sans", 7, XFontStyleEx.Regular);
+                g.DrawString("10/5/26, 12:11 PM   Images of invoices, invoice models, invoice templates | Example site", small, XBrushes.Black, 20, 8, XStringFormats.TopLeft);
+                g.DrawString("https://example.test/about/invoice-images/   2/25   printed from the browser", small, XBrushes.Black, 20, page.Height.Point - 16, XStringFormats.TopLeft);
+            }
+        }
         using var output = new MemoryStream();
         document.Save(output);
         Dump(output.ToArray(), $"scan-skew{skewDegrees}-rot{rotation}-ink{inkStrength}-blur{blurSigma}-dpi{dpi}");
