@@ -3,7 +3,7 @@
 
 @* Task 1: shown when an action would leave an edit form with unsaved changes. The safe answer (green) comes first
    and takes the focus; Escape means "back to editing". *@
-<div class="delete-overlay" @onkeydown="KeyDownAsync">
+<div class="delete-overlay unsaved-overlay" @onkeydown="KeyDownAsync">
     <section class="delete-dialog unsaved-changes-dialog" role="alertdialog" aria-modal="true" tabindex="-1" @ref="dialog"
              aria-labelledby="@TitleId" aria-describedby="@DescriptionId">
         <h2 id="@TitleId">@(Adding ? "Adăugarea nu a fost finalizată" : "Editarea nu a fost finalizată")</h2>

@@ -66,6 +66,17 @@ Cerut de utilizator la 30.09.2026, ca urmare a comparatiei cu Preluarea situatie
 - **6.2 Liniile desenate ca indiciu suplimentar pentru coloane:** linii verticale si orizontale detectate in pagina (PDF cu text: desenele din pagina, cu PdfPig; scanare: detectarea de linii din OpenCV, ca in inventar, `FindGridLines`/`FindDividers`) devin indiciu pentru limitele coloanelor si ale randurilor, alaturi de alinierea cuvintelor, fara sa fie obligatorii. Util la tabele dense, fara spatiu intre coloane, unde doua coloane se unesc intr-un singur segment. Limita dintre doua coloane se aseaza pe linia verticala cea mai apropiata dintre antetele lor; un rand cu linii orizontale isi ia inaltimea din linii. Teste: fixtura cu coloane lipite (text fara spatiu) si linii desenate, pe care citirea fara linii amesteca valorile; raportul de corpus arata daca liniile au fost folosite.
 - **Verificare:** fixturile noi in `tests/BlazorStoc.Checks/InvoiceFixtures.cs`, rularea suitei (inclusiv cele trei facturi reale din `INVOICE_CORPUS_DIR`, care nu trebuie sa se schimbe), o scanare reala palida, daca utilizatorul o aduce (`docs/TESTE_RAMASE.md`, N28).
 
+## Task 6 - Robustete la erori si la caderea aplicatiei pe server
+
+Cerut de utilizator la 06.10.2026, dupa analiza comportamentului la exceptii (vezi raspunsul din sesiune): o exceptie obisnuita inchide doar circuitul utilizatorului (banner „Conexiunea cu aplicatia a fost intrerupta"), exceptiile din serviciile de fundal sunt prinse, dar o exceptie in afara oricarui `try` (sarcina lansata fara asteptare, temporizator, `async void`) opreste procesul, iar nimic nu il reporneste; jurnalul este numai pe consola.
+
+- **Supervizor cu repornire automata:** serviciu Windows, `systemd` sau container cu `restart: always`, dupa locul unde se instaleaza aplicatia (de clarificat: Windows, QNAP sau Linux; Docker si QNAP sunt in afara fazei curente). Reteta de instalare in `docs/`.
+- **Jurnal in fisier** cu rotire si retentie (de exemplu Serilog) si handler global `AppDomain.UnhandledException` care scrie eroarea inainte de oprire; stack trace-urile nu se arata utilizatorilor (ramane `DetailedErrors` oprit).
+- **`ErrorBoundary`** in jurul continutului paginii din layout: o eroare dintr-o componenta arata „Eroare in aceasta pagina, reincarca" fara sa inchida tot circuitul.
+- **Endpoint `/health`** (verifica baza de date) pentru monitorizare si pentru supervizor.
+- **Ajutor comun pentru sarcinile lansate fara asteptare** (`_ = InvokeAsync(...)`, `Task.Run`, `async void`): prinde si logheaza exceptiile; auditul celor ~22 de locuri din `Services`, `Components` si `Program.cs`.
+- **De verificat:** comportamentul la pornire cu baza de date indisponibila, eliberarea blocarilor de operatie si de produs cand circuitul cade (battement de inima), testul de cadere simulata cu repornire.
+
 ## Observații pentru etapa de implementare
 
 - Schema bazei de date și scripturile aferente se stabilesc în etapa dedicată integrării MariaDB.

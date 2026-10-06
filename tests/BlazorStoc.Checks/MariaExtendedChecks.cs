@@ -41,6 +41,7 @@ public static class MariaExtendedChecks
             await Section("Expiry notifications: templates, engine, take over, reminder", () => NotificationsAsync(configuration, admin, audit, probe));
             await Section("Notification settings: clean-up of old resolved notifications", () => NotificationSettingsAsync(configuration, admin, audit, probe));
             await Section("Invoice templates: create, versions, unique names, concurrency, delete, journal", () => InvoiceTemplatesAsync(configuration, admin, audit, probe));
+            await Section("Suppliers and invoices: unique tax id, sources, edits, invoices, entries tied to invoices, delete rules, journal, archive", () => SuppliersAsync(configuration, admin, audit, probe));
         }
         finally
         {
@@ -98,7 +99,7 @@ public static class MariaExtendedChecks
             await service.DeleteAsync(renamed, "Motiv de test");
             Check(await store.GetAsync(first.Info.Id) is null && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM invoice_template_versions WHERE template_id=@id", ("@id", first.Info.Id)) == 0 && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM invoice_template_models WHERE template_id=@id", ("@id", first.Info.Id)) == 0, "Deleting a template removes its versions with it");
             var deleted = (await audit.GetEventsAsync()).FirstOrDefault(item => item.TimestampUtc >= started && item.Action == AuditActions.DeleteInvoiceTemplate && item.EntityId == first.Info.Id.ToString());
-            Check(deleted is not null && deleted.Motif == "Motiv de test" && deleted.Details.Contains("Versiuni salvate: 2", StringComparison.Ordinal), "The deletion is journaled with its reason");
+            Check(deleted is not null && deleted.Motif == "Motiv de test" && deleted.Details.Contains("Furnizor", StringComparison.Ordinal) && deleted.Details.Contains($"Furnizor nou {suffix}", StringComparison.Ordinal), "The deletion is journaled with its reason and the supplier (no saved versions to count any more)");
             var createdEvent = (await audit.GetEventsAsync()).First(item => item.TimestampUtc >= started && item.Action == AuditActions.CreateInvoiceTemplate && item.EntityId == first.Info.Id.ToString());
             var removals = await audit.RemovalTimesAsync([createdEvent]);
             Check(removals.ContainsKey(AuditNavigation.ObjectKey(AuditEntities.InvoiceTemplate, first.Info.Id.ToString())) && AuditNavigation.TargetUrl(createdEvent, removals) is null && AuditNavigation.TargetUrl(createdEvent) is not null,
@@ -109,6 +110,179 @@ public static class MariaExtendedChecks
         finally
         {
             await ExecuteAsync(probe, "DELETE FROM invoice_templates WHERE supplier_cui=@cui", ("@cui", cui));
+        }
+    }
+
+    // ---- Suppliers and their invoices ----------------------------------------------------------------------------------------------
+
+    private static async Task SuppliersAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var suffix = Suffix();
+        var category = $"Ext Furnizori Cat {suffix}";
+        var subcategory = $"Ext Furnizori Sub {suffix}";
+        var products = new MariaProductRepository(configuration, admin, audit);
+        var movements = new MariaStockMovementRepository(configuration, admin, audit);
+        var suppliers = new MariaSupplierRepository(configuration, admin, audit);
+        var invoices = new MariaSupplierInvoiceRepository(configuration, admin, audit);
+        var normalUser = new TestAccessControl(false, "utilizator.normal");
+        var asUser = new MariaSupplierRepository(configuration, normalUser, audit);
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        string NewCui() => SupplierChecks.ValidCui(Random.Shared.Next(1_000_000, 9_999_999));
+        var cuiA = NewCui(); var cuiB = NewCui(); var cuiD = NewCui();
+        while (cuiB == cuiA) cuiB = NewCui();
+        while (cuiD == cuiA || cuiD == cuiB) cuiD = NewCui();
+        var vatDigits = Random.Shared.NextInt64(100_000_000, 999_999_999).ToString();
+        await products.CreateCategoryAsync(category);
+        await products.CreateSubcategoryAsync(category, subcategory);
+        var product = await products.CreateAsync(new ProductInput { Name = $"Ext Furnizori {suffix}", Category = category, Subcategory = subcategory });
+        var supplierIds = new List<int>();
+        var templateStore = new MariaInvoiceTemplateStore(configuration);
+        var templateService = new InvoiceTemplateService(templateStore, admin, audit);
+        try
+        {
+            // A user without the administrator role creates (and later edits) suppliers.
+            var a = await asUser.CreateAsync(new SupplierInput { Name = $"Furnizor A {suffix}", Cui = "RO " + cuiA, Address = "Strada 1", Phone = "0721 000 111", Source = SupplierSources.Anaf });
+            supplierIds.Add(a.Id);
+            Check(a.Id > 0 && a.Cui == cuiA && a.Country == "RO" && a.Source == SupplierSources.Anaf && a.VerifiedUtc is not null && a.Version == 0, "A supplier is saved with its CUI reduced to digits, its source and the time of the ANAF reading");
+            var listed = (await suppliers.GetSuppliersAsync()).Single(item => item.Id == a.Id);
+            Check(listed.Name == a.Name && listed.Phone == "0721000111" && listed.Address == "Strada 1" && listed.InvoiceCount == 0 && listed.MovementCount == 0 && !listed.InUse && listed.VerifiedUtc!.Value.Kind == DateTimeKind.Utc,
+                "The supplier is read back with its data and nothing refers to it yet");
+
+            // One supplier for one tax id, however it is written; two sessions saving the same CUI at once: exactly one wins.
+            var duplicate = await Rejects<SupplierOperationException>(() => suppliers.CreateAsync(new SupplierInput { Name = "Alt nume", Cui = cuiA }), "The same CUI under another name is refused (the pair name + CUI is not the key: the CUI is)");
+            Check(duplicate!.Message.Contains(a.Name, StringComparison.Ordinal), "The refusal names the supplier already stored");
+            await Rejects<SupplierOperationException>(() => suppliers.CreateAsync(new SupplierInput { Name = a.Name, Cui = "ro" + cuiA }), "The same CUI written with the RO prefix is refused");
+            await Rejects<SupplierOperationException>(() => suppliers.CreateAsync(new SupplierInput { Name = "x", Cui = "9" }), "A CUI that is too short is refused");
+            var attempts = await Task.WhenAll(Enumerable.Range(0, 2).Select(async index =>
+            {
+                try { return await new MariaSupplierRepository(configuration, admin, audit).CreateAsync(new SupplierInput { Name = $"Furnizor B {suffix} {index}", Cui = cuiB }); }
+                catch (SupplierOperationException) { return null; }
+            }));
+            Check(attempts.Count(item => item is not null) == 1, "Two sessions saving the same CUI at the same time: exactly one supplier is created");
+            var b = attempts.Single(item => item is not null)!;
+            supplierIds.Add(b.Id);
+            Check(await ScalarLongAsync(probe, "SELECT COUNT(*) FROM suppliers WHERE normalized_cui=@cui", ("@cui", cuiB)) == 1, "The database holds the CUI once (unique key)");
+
+            // A supplier of another member state: the VAT identifier with its prefix, always entered by hand.
+            var foreign = await suppliers.CreateAsync(new SupplierInput { Country = "DE", Name = $"Lieferant {suffix}", Cui = vatDigits, Source = SupplierSources.Anaf });
+            supplierIds.Add(foreign.Id);
+            Check(foreign.Cui == "DE" + vatDigits && foreign.Country == "DE" && foreign.Source == SupplierSources.Manual && foreign.VerifiedUtc is null && foreign.IsExternal, "A supplier of another member state is saved with its VAT identifier and as entered by hand");
+            await Rejects<SupplierOperationException>(() => suppliers.CreateAsync(new SupplierInput { Country = "DE", Name = "x", Cui = "de " + vatDigits }), "The same VAT identifier is refused");
+
+            // Edits: reason, version, ANAF read again, duplicates.
+            var edit = SupplierInput.From(a); edit.Name = $"Furnizor A modificat {suffix}"; edit.Source = SupplierSources.AnafEdited; edit.Reason = "Motiv de test";
+            var updated = await asUser.UpdateAsync(a, edit);
+            Check(updated.Version == a.Version + 1 && updated.Name == edit.Name && updated.Source == SupplierSources.AnafEdited && updated.VerifiedUtc == a.VerifiedUtc, "A user without the administrator role edits a supplier (version up, source edited, ANAF time unchanged)");
+            await Rejects<SupplierOperationException>(() => asUser.UpdateAsync(a, edit), "Editing a supplier changed in the meantime (stale version) is refused");
+            var noReason = SupplierInput.From(updated); noReason.Name = "Fara motiv";
+            await Rejects<SupplierOperationException>(() => asUser.UpdateAsync(updated, noReason), "An edit without its reason is refused");
+            var toDuplicate = SupplierInput.From(b); toDuplicate.Cui = cuiA; toDuplicate.Reason = "Motiv de test";
+            await Rejects<SupplierOperationException>(() => asUser.UpdateAsync(b, toDuplicate), "Changing a CUI to one already registered is refused");
+            await Task.Delay(1100);
+            var recheck = SupplierInput.From(updated); recheck.Source = SupplierSources.Anaf; recheck.AnafRecheck = true; recheck.Reason = "Reverificare ANAF";
+            var rechecked = await asUser.UpdateAsync(updated, recheck);
+            Check(rechecked.Source == SupplierSources.Anaf && rechecked.VerifiedUtc > a.VerifiedUtc && rechecked.Version == updated.Version + 1, "Reading the data from ANAF again makes it \"from ANAF\" and records the new time");
+            var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.Supplier && item.EntityId == a.Id.ToString()).ToList();
+            Check(events.Any(item => item.Action == AuditActions.CreateSupplier && item.ActorUsername == "utilizator.normal" && item.Details.Contains("Sursa datelor: Date preluate din ANAF", StringComparison.Ordinal)) &&
+                  events.Any(item => item.Action == AuditActions.EditSupplier && item.Details.Contains("Denumire:", StringComparison.Ordinal) && item.Details.Contains("Preluate din ANAF, editate manual", StringComparison.Ordinal) && item.Motif == "Motiv de test") &&
+                  events.Any(item => item.Action == AuditActions.RecheckSupplier && item.Details.Contains("Ultima verificare ANAF", StringComparison.Ordinal) && item.Motif == "Reverificare ANAF"),
+                "The journal names each operation exactly: \"Adăugare furnizor\", \"Modificare furnizor\" (old and new values, source) and \"Reverificare furnizor ANAF\"");
+
+            // Invoices: number + date + supplier, recorded once per supplier.
+            var invoice = await new MariaSupplierInvoiceRepository(configuration, normalUser, audit).CreateAsync(new SupplierInvoiceInput { SupplierId = a.Id, Number = $"FT {suffix}", Date = today.AddDays(-1) });
+            Check(invoice.Id > 0 && invoice.SupplierId == a.Id && invoice.SupplierName == rechecked.Name && invoice.Number == $"FT {suffix}" && invoice.Date == today.AddDays(-1) && invoice.CreatedBy == "utilizator.normal",
+                "An invoice is recorded with its supplier, number and date of issue (a user without the administrator role can)");
+            var again = await Rejects<SupplierInvoiceOperationException>(() => invoices.CreateAsync(new SupplierInvoiceInput { SupplierId = a.Id, Number = $"ft{suffix}", Date = today }), "The same invoice number of the same supplier (other letter case, no space) is refused");
+            Check(again!.Message.Contains("a fost deja preluată", StringComparison.Ordinal) && again.Message.Contains(rechecked.Name, StringComparison.Ordinal), "The refusal says the invoice was already taken, and from whom");
+            var otherSupplierInvoice = await invoices.CreateAsync(new SupplierInvoiceInput { SupplierId = b.Id, Number = $"FT {suffix}", Date = today });
+            Check(otherSupplierInvoice.Id != invoice.Id, "The same number of another supplier is another invoice");
+            await Rejects<SupplierInvoiceOperationException>(() => invoices.CreateAsync(new SupplierInvoiceInput { SupplierId = a.Id, Number = "Viitor", Date = today.AddDays(1) }), "An invoice dated in the future is refused");
+            await Rejects<SupplierInvoiceOperationException>(() => invoices.CreateAsync(new SupplierInvoiceInput { SupplierId = 2_000_000_000, Number = "X1", Date = today }), "An invoice of a supplier that does not exist is refused");
+            var race = await Task.WhenAll(Enumerable.Range(0, 2).Select(async _ =>
+            {
+                try { await new MariaSupplierInvoiceRepository(configuration, admin, audit).CreateAsync(new SupplierInvoiceInput { SupplierId = a.Id, Number = $"CC {suffix}", Date = today }); return true; }
+                catch (SupplierInvoiceOperationException) { return false; }
+            }));
+            Check(race.Count(item => item) == 1, "Two sessions recording the same invoice at the same time: exactly one is recorded");
+            var invoiceEvent = (await audit.GetEventsAsync()).FirstOrDefault(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.SupplierInvoice && item.Action == AuditActions.RecordSupplierInvoice && item.EntityId == invoice.Id.ToString());
+            Check(invoiceEvent is not null && invoiceEvent.Details.Contains($"Număr factură: FT {suffix}", StringComparison.Ordinal) && invoiceEvent.Details.Contains("Data emiterii: " + StockMovementRules.DisplayDate(today.AddDays(-1)), StringComparison.Ordinal),
+                "The journal records \"Înregistrare factură furnizor\" with the supplier, the number and the date");
+
+            // Entries: tied to an invoice, or free.
+            var linked = await movements.CreateAsync(product.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today, Quantity = 3, Description = "Ext intrare cu factura", InvoiceId = invoice.Id });
+            Check(linked.Movement.InvoiceId == invoice.Id && linked.Movement.InvoiceNumber == invoice.Number && linked.Movement.SupplierName == rechecked.Name && linked.Movement.SupplierId == a.Id && linked.Stock == 3,
+                "An entry is tied to an invoice (the stock rises as usual)");
+            var reread = await movements.GetAsync(linked.Movement.Id);
+            Check(reread is { HasInvoice: true } && reread.InvoiceId == invoice.Id && reread.SupplierName == rechecked.Name, "The entry read back carries its invoice and supplier");
+            var free = await movements.CreateAsync(product.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today, Quantity = 2, Description = "Ext intrare libera" });
+            Check(!free.Movement.HasInvoice && free.Movement.InvoiceNumber is null && free.Stock == 5, "An entry without an invoice (a free entry) is still possible");
+            await Rejects<StockMovementOperationException>(() => movements.CreateAsync(product.Id, new StockMovementInput { Kind = StockMovementKind.Exit, Date = today, Quantity = 1, Description = "Ext iesire", Destination = ExitDestination.GenericSale, InvoiceId = invoice.Id }), "An exit cannot be tied to an invoice");
+            await Rejects<StockMovementOperationException>(() => movements.CreateAsync(product.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today, Quantity = 1, Description = "Ext factura lipsa", InvoiceId = 2_000_000_000 }), "An entry tied to an invoice that does not exist is refused");
+            Check((await movements.GetPageAsync(product.Id, new StockMovementQuery())).Stock == 5, "The refused entries leave the stock unchanged");
+            var movementEdit = StockMovementInput.From(linked.Movement); movementEdit.Quantity = 4; movementEdit.Reason = "Ext corectie cantitate";
+            var editedEntry = await movements.UpdateAsync(linked.Movement, movementEdit);
+            Check(editedEntry.Movement.InvoiceId == invoice.Id && (await movements.GetAsync(editedEntry.Movement.Id))!.InvoiceId == invoice.Id, "Editing an entry keeps its invoice");
+            var entryEvent = (await audit.GetEventsAsync()).FirstOrDefault(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.StockMovement && item.Action == AuditActions.Create && item.EntityId == linked.Movement.Id.ToString());
+            Check(entryEvent is not null && entryEvent.Details.Contains($"Factură: FT {suffix} · {rechecked.Name}", StringComparison.Ordinal), "The journal of the entry names its invoice and supplier");
+            var invoiceList = await invoices.GetForSupplierAsync(a.Id);
+            Check(invoiceList.Count == 2 && invoiceList.Single(item => item.Id == invoice.Id).MovementCount == 1 && invoiceList.Any(item => item.Number == $"CC {suffix}" && item.MovementCount == 0), "The invoices of a supplier are listed with the number of entries tied to each");
+
+            // A partly taken invoice is found again (by any writing of its number) with what was taken from it.
+            var found = await invoices.FindAsync(a.Id, $" ft{suffix} ");
+            var takenBefore = await invoices.GetEntriesAsync(invoice.Id);
+            Check(found?.Id == invoice.Id && await invoices.FindAsync(b.Id, $"FT {suffix}") is { } onB && onB.Id == otherSupplierInvoice.Id && await invoices.FindAsync(a.Id, "inexistent") is null &&
+                  takenBefore.Count == 1 && takenBefore[0].ProductId == product.Id && takenBefore[0].Quantity == 4 && takenBefore[0].MovementId == linked.Movement.Id && (await invoices.GetEntriesAsync(otherSupplierInvoice.Id)).Count == 0,
+                "A partly taken invoice is found again by its number (any writing) and lists what was taken from it");
+
+            // What ties a supplier: invoices and entries; the tax id stays; only an administrator deletes.
+            listed = (await suppliers.GetSuppliersAsync()).Single(item => item.Id == a.Id);
+            Check(listed.InvoiceCount == 2 && listed.MovementCount == 1 && listed.InUse, "The supplier list counts the invoices and the entries tied to a supplier");
+            var blocked = await Rejects<SupplierOperationException>(() => suppliers.DeleteAsync(listed, "Motiv de test"), "A supplier with invoices and entries cannot be deleted");
+            Check(blocked!.Message.Contains("2 facturi", StringComparison.Ordinal) && blocked.Message.Contains("o intrare de stoc", StringComparison.Ordinal), "The refusal says what ties the supplier");
+            var newCui = SupplierInput.From(listed); newCui.Cui = NewCui(); newCui.Reason = "Motiv de test";
+            var locked = await Rejects<SupplierOperationException>(() => asUser.UpdateAsync(listed, newCui), "The CUI of a supplier with invoices cannot be changed");
+            Check(locked!.Message == SupplierRules.CuiLockedMessage, "The refusal explains that the CUI is locked");
+            var renameUsed = SupplierInput.From(listed); renameUsed.Phone = "0722 333 444"; renameUsed.Reason = "Telefon nou";
+            Check((await asUser.UpdateAsync(listed, renameUsed)).Phone == "0722333444", "The other data of a supplier with invoices can still be corrected");
+            await Rejects<AccessDeniedException>(() => asUser.DeleteAsync(foreign, "Motiv de test"), "A user without the administrator role cannot delete a supplier, even one nothing refers to");
+            Check((await suppliers.GetAsync(foreign.Id)) is not null, "The supplier survived the refused deletion");
+
+            // A template of the supplier (by its CUI) ties it as well.
+            var d = await suppliers.CreateAsync(new SupplierInput { Name = $"Furnizor D {suffix}", Cui = cuiD });
+            supplierIds.Add(d.Id);
+            var template = await templateService.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon furnizor {suffix}", SupplierName = d.Name, SupplierCui = cuiD, Definition = InvoiceDefinition() });
+            Check((await suppliers.GetSuppliersAsync()).Single(item => item.Id == d.Id).TemplateCount == 1, "An invoice template made for the CUI of a supplier is counted as tying it");
+            var withTemplate = (await suppliers.GetSuppliersAsync()).Single(item => item.Id == d.Id);
+            var byTemplate = await Rejects<SupplierOperationException>(() => suppliers.DeleteAsync(withTemplate, "Motiv de test"), "A supplier with an invoice template cannot be deleted");
+            Check(byTemplate!.Message.Contains("un șablon de factură", StringComparison.Ordinal), "The refusal names the template");
+            await templateService.DeleteAsync(template.Info, "Curatare test");
+            var deletable = (await suppliers.GetSuppliersAsync()).Single(item => item.Id == d.Id);
+            await suppliers.DeleteAsync(deletable, "Motiv de stergere test");
+            supplierIds.Remove(d.Id);
+            Check(await suppliers.GetAsync(d.Id) is null && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM archive_suppliers WHERE original_id=@id", ("@id", d.Id)) == 1, "An administrator deletes a supplier nothing refers to: it moves to the archive, once");
+            var deletion = (await audit.GetEventsAsync()).FirstOrDefault(item => item.TimestampUtc >= started && item.Action == AuditActions.Delete && item.EntityType == AuditEntities.Supplier && item.EntityId == d.Id.ToString());
+            Check(deletion is not null && deletion.Motif == "Motiv de stergere test" && deletion.Details.Contains(cuiD, StringComparison.Ordinal), "The deletion is journaled with its reason");
+            await Rejects<SupplierOperationException>(() => suppliers.DeleteAsync(deletable, "din nou"), "Deleting a supplier that is already gone is refused");
+            await Rejects<SupplierOperationException>(() => suppliers.DeleteAsync(foreign with { Version = foreign.Version + 5 }, "Motiv de test"), "Deleting a supplier changed in the meantime (stale version) is refused");
+
+            // Deleting an entry keeps the invoice (and the supplier stays tied); the archive keeps the invoice of the entry.
+            await DeleteMovementsNewestFirstAsync(movements, product.Id);
+            Check(await ScalarLongAsync(probe, "SELECT COUNT(*) FROM archive_stock_movements WHERE original_id=@id AND invoice_id=@invoice", ("@id", linked.Movement.Id), ("@invoice", invoice.Id)) == 1, "A deleted entry is archived with its invoice");
+            Check((await suppliers.GetSuppliersAsync()).Single(item => item.Id == a.Id) is { InvoiceCount: 2, MovementCount: 0, InUse: true }, "After its entries are gone the supplier is still tied by its invoices");
+        }
+        finally
+        {
+            await DeleteMovementsNewestFirstAsync(movements, product.Id);
+            foreach (var template in (await templateStore.ListAsync()).Where(item => item.SupplierCui == cuiD).ToList()) await ExecuteAsync(probe, "DELETE FROM invoice_templates WHERE id=@id", ("@id", template.Id));
+            foreach (var id in supplierIds)
+            {
+                await ExecuteAsync(probe, "DELETE FROM supplier_invoices WHERE supplier_id=@id", ("@id", id));
+                await ExecuteAsync(probe, "DELETE FROM suppliers WHERE id=@id", ("@id", id));
+            }
+            await products.DeleteAsync((await products.GetProductAsync(product.Id))!, "Ext curatare");
+            await ExecuteAsync(probe, "DELETE FROM subcategories WHERE name=@n", ("@n", subcategory));
+            await ExecuteAsync(probe, "DELETE FROM categories WHERE name=@n", ("@n", category));
         }
     }
 

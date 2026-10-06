@@ -778,3 +778,9 @@ tr.selectable-row { cursor: pointer; }
 tr.selectable-row:hover { background: #f4f9f7; }
 tr.selectable-row.selected { background: #eaf5f1; }
 tr.selectable-row input, tr.selectable-row a { cursor: auto; }
+/* Avertizarea de modificari nesalvate sta peste orice alta fereastra (dialogul de editare al unei miscari, fereastra de creare a sablonului): fara asta se desena sub ele. */
+.delete-overlay.unsaved-overlay { z-index: 70; }
+
+.pickup-invoice-head { margin:0 0 16px; padding:12px 14px; border:1px solid #d9e2de; border-radius:8px; }
+.verify-field { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+.verify-field small { color:var(--muted); font-weight:400; }

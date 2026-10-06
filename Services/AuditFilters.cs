@@ -24,7 +24,7 @@ public static class AuditFilterOptions
         (AuditEntities.WorkPoint, "Puncte de lucru (ștergeri)"), (AuditEntities.ServicePhoto, "Fotografii puncte de lucru (ștergeri)"),
         (AuditEntities.ServiceContract, "Contracte mentenanță (ștergeri)"), (AuditEntities.ServiceIntervention, "Intervenții mentenanță (ștergeri)"),
         (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă"),
-        (AuditEntities.InvoiceTemplate, "Șabloane facturi")
+        (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori")
     ];
 
     public static readonly IReadOnlyList<(string Value, string Label)> Actions =
@@ -55,7 +55,9 @@ public static class AuditFilterOptions
         (AuditActions.AddInterventionPhoto, AuditActions.AddInterventionPhoto),
         (AuditActions.CreateInvoiceTemplate, AuditActions.CreateInvoiceTemplate), (AuditActions.EditInvoiceTemplate, AuditActions.EditInvoiceTemplate),
         (AuditActions.EditInvoiceTemplateDetails, AuditActions.EditInvoiceTemplateDetails), (AuditActions.DeleteInvoiceTemplate, AuditActions.DeleteInvoiceTemplate),
-        (AuditActions.ActivateInvoiceTemplate, AuditActions.ActivateInvoiceTemplate), (AuditActions.DeactivateInvoiceTemplate, AuditActions.DeactivateInvoiceTemplate)
+        (AuditActions.ActivateInvoiceTemplate, AuditActions.ActivateInvoiceTemplate), (AuditActions.DeactivateInvoiceTemplate, AuditActions.DeactivateInvoiceTemplate),
+        (AuditActions.CreateSupplier, AuditActions.CreateSupplier), (AuditActions.EditSupplier, AuditActions.EditSupplier),
+        (AuditActions.RecheckSupplier, AuditActions.RecheckSupplier), (AuditActions.RecordSupplierInvoice, AuditActions.RecordSupplierInvoice)
     ];
 }
 

@@ -30,6 +30,9 @@ if (Environment.GetEnvironmentVariable("COMPONENT_CHECKS_ONLY") == "1")
     await ComponentChecks.RunAsync(Check);
     await PickupWizardChecks.RunAsync(Check);
     await PickupWizardChecks.TemplateFlowAsync(Check);
+    SupplierChecks.Rules(Check);
+    await SupplierChecks.ComponentsAsync(Check);
+    await SupplierChecks.PickupAsync(Check);
     await ProductGroupsChecks.RunAsync(Check);
     ReasonSummaryChecks.Run(Check);
     Console.WriteLine("Component checks finished.");
@@ -2352,6 +2355,9 @@ async Task RunMaintenanceGateChecksAsync()
 await ComponentChecks.RunAsync(Check);
 await PickupWizardChecks.RunAsync(Check);
 await PickupWizardChecks.TemplateFlowAsync(Check);
+SupplierChecks.Rules(Check);
+await SupplierChecks.ComponentsAsync(Check);
+await SupplierChecks.PickupAsync(Check);
 await ProductGroupsChecks.RunAsync(Check);
 ReasonSummaryChecks.Run(Check);
 await InvoiceChecks.RunAsync(Check);

@@ -1,0 +1,93 @@
+@page "/furnizori/{Id:int}"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject ISupplierRepository Suppliers
+@inject ISupplierInvoiceRepository Invoices
+@inject UnsavedChanges Guard
+@inject ILogger<SupplierDetail> Logger
+@implements IDisposable
+
+<PageTitle>@(supplier?.Name ?? "Furnizor") · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
+<a class="nav-back" href="/furnizori"><span>←</span> Furnizori</a>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă furnizorul</h3></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+}
+else if (supplier is null)
+{
+    <div class="empty-state"><span class="empty-icon">⌂</span><h3>Furnizorul nu mai există</h3><p>A fost șters sau identificatorul din adresă nu este valid.</p></div>
+}
+else
+{
+    <div class="page-heading">
+        <div><p class="eyebrow">FURNIZOR</p><h1>@supplier.Name</h1>
+            <p class="muted">@SupplierCountries.Name(supplier.Country) · @supplier.Identifier@(supplier.Address.Length > 0 ? $" · {supplier.Address}" : "")@(supplier.Phone.Length > 0 ? $" · tel. {supplier.Phone}" : "")</p>
+            @if (supplier.RegistryNumber.Length > 0 || supplier.PostalCode.Length > 0 || supplier.CaenCode.Length > 0)
+            {
+                <p class="muted">@string.Join(" · ", new[] { supplier.RegistryNumber.Length > 0 ? $"Reg. Com. {supplier.RegistryNumber}" : null, supplier.PostalCode.Length > 0 ? $"Cod poștal {supplier.PostalCode}" : null, supplier.CaenCode.Length > 0 ? $"CAEN {supplier.CaenCode}" : null }.Where(part => part is not null))</p>
+            }
+            <p><span class="anaf-source @SupplierSources.CssClass(supplier.Source)"><span aria-hidden="true">@SupplierSources.Icon(supplier.Source)</span> @SupplierSources.Label(supplier.Source)</span>
+                @if (supplier.VerifiedUtc is not null) { <span class="muted"> · ultima citire din ANAF: @SupplierRules.DisplayTime(supplier.VerifiedUtc)</span> }</p></div>
+        <div class="heading-actions"><button class="refresh" disabled="@editing" @onclick="OpenEditor">Editează</button></div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (editing) { <SupplierEditor @key="editorKey" Original="supplier" Saved="SavedAsync" Closed="CloseEditor" /> }
+
+    <section class="catalog">
+        <div class="catalog-heading"><h2>Facturi preluate <span>@invoices.Count</span></h2><small>Numărul și data emiterii facturilor din care s-au preluat intrări în stoc</small></div>
+        @if (invoices.Count == 0) { <div class="empty-state"><h3>Nicio factură preluată de la acest furnizor</h3><p>Facturile apar aici după „Preluare factură” din Produse.</p></div> }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>NR. FACTURĂ</th><th>DATA EMITERII</th><th class="number">INTRĂRI ÎN STOC</th><th>PRELUATĂ DE</th><th>LA DATA</th></tr></thead><tbody>
+            @foreach (var invoice in invoices)
+            {
+                <tr @key="invoice.Id"><td><strong>@invoice.Number</strong></td><td>@StockMovementRules.DisplayDate(invoice.Date)</td><td class="number">@invoice.MovementCount</td><td>@invoice.CreatedBy</td><td>@SupplierRules.DisplayTime(invoice.CreatedUtc)</td></tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Supplier? supplier;
+    private IReadOnlyList<SupplierInvoice> invoices = [];
+    private bool loading = true, editing;
+    private string? error, notice;
+    private Guid editorKey;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            supplier = await Suppliers.GetAsync(Id, lifetime.Token);
+            invoices = supplier is null ? [] : await Invoices.GetForSupplierAsync(Id, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Supplier loading failed ({ErrorType}).", exception.GetType().Name); error = "Furnizorul nu a putut fi încărcat."; }
+        finally { loading = false; }
+    }
+
+    private void OpenEditor() { editorKey = Guid.NewGuid(); editing = true; notice = null; }
+    private Task CloseEditor() { editing = false; return Task.CompletedTask; }
+    private async Task SavedAsync(Supplier saved)
+    {
+        editing = false;
+        await LoadAsync();
+        notice = "Furnizorul a fost actualizat.";
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

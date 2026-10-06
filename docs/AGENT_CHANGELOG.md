@@ -1396,3 +1396,11 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 - **Neverificat:** contul „Utilizator" in browser, `ProductMovements` (acelasi tipar de re-randare), comutatoarele pe telefon; vezi `docs/TESTE_RAMASE.md` N46.
 - **Commit:** `claude: sabloane de facturi pentru utilizatori obisnuiti, creare in fereastra la preluare, comutatoare On/Off, corectii motor facturi, categorii`
 - **Predat catre:** claude
+
+## 2026-10-06T08:30:00.0000000Z - claude
+
+- **Rezumat:** `ProductMovements`: avertizarea de modificari nesalvate apare peste dialogul de editare (`unsaved-overlay`, z-index 70) si dialogul se inchide la „Paraseste editarea" (re-randare in `DiscardEditAsync`/`DiscardAddAsync`); Task 6 nou in `TODO.md` (robustete la erori); regula „Economie de tokeni" in `CLAUDE.md`.
+- **Fisiere:** `Components/Pages/ProductMovements.razor`, `Components/Shared/UnsavedChangesDialog.razor`, `wwwroot/app.css`, `CLAUDE.md`, `TODO.md`, `IMPLEMENTED.md`, `docs/PROJECT_STATE.md`, `docs/TESTE_RAMASE.md`.
+- **Validare:** teste de componente trec; verificat in browser (preview 5087).
+- **Commit:** `claude: miscari de stoc - avertizarea de modificari nesalvate peste dialog, inchiderea la parasire; task robustete; reguli de economie de tokeni`
+- **Predat catre:** claude

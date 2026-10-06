@@ -9,6 +9,8 @@
 @inject IInvoiceTemplateService Templates
 @inject IProductRepository ProductsRepository
 @inject IStockMovementRepository Movements
+@inject ISupplierRepository Suppliers
+@inject ISupplierInvoiceRepository SupplierInvoices
 @inject IProductImageStore ImageStore
 @inject IJSRuntime JS
 @inject InvoiceLabSettings Lab
@@ -282,6 +284,60 @@ else if (step == 2)
         @if (step2Loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se caută produsele în catalog</h3></div> }
         else if (step2Error is null)
         {
+            <section class="pickup-invoice-head" aria-label="Datele facturii">
+                <h3>Datele facturii</h3>
+                <p class="muted">Citite din factură și <strong>neverificate</strong> până le confirmi, fiecare în parte, cu comutatorul de lângă ele. Orice modificare readuce câmpul la „neverificat”. Fără cele trei confirmări nu se poate trece la pasul 3.@(NumberFromOcr ? " Factura este o scanare citită prin OCR: o literă sau o cifră citită greșit ar duce la o factură nouă în loc de cea deja preluată, deci verifică atent numărul." : "")</p>
+                @if (supplierError is not null) { <div class="error-banner" role="alert">@supplierError</div> }
+                <div class="editor-grid">
+                    <div class="verify-field">
+                        <label for="pickup-invoice-number">Număr factură *
+                            <input id="pickup-invoice-number" maxlength="@SupplierInvoiceRules.MaxNumberLength" disabled="@InvoiceLocked" value="@invoiceNumber" @oninput="NumberEdited" autocomplete="off" /></label>
+                        @VerifyBadge(numberVerified)
+                        <ToggleSwitch Value="numberVerified" ValueChanged="@(value => numberVerified = value && NumberValid)" Disabled="@(InvoiceLocked || !NumberValid)" OnText="Verificat" OffText="Neverificat" AriaLabel="Confirmă că numărul facturii este verificat" />
+                    </div>
+                    <div class="verify-field">
+                        <label for="pickup-supplier-cui">CUI furnizor *
+                            <input id="pickup-supplier-cui" maxlength="20" disabled="@InvoiceLocked" value="@supplierCuiText" @oninput="CuiEdited" autocomplete="off" /></label>
+                        @VerifyBadge(cuiVerified)
+                        <ToggleSwitch Value="cuiVerified" ValueChanged="@(value => cuiVerified = value && ResolvedSupplier is not null)" Disabled="@(InvoiceLocked || ResolvedSupplier is null)" OnText="Verificat" OffText="Neverificat" AriaLabel="Confirmă că CUI-ul furnizorului este verificat" />
+                        <small id="pickup-supplier-name">@(ResolvedSupplier is { } resolved ? $"Furnizor din registru: {resolved.Name} · {SupplierCountries.Name(resolved.Country)}" : "Niciun furnizor din registru cu acest CUI.")@(invoiceSupplierName.Length > 0 ? $" Citit din factură: {invoiceSupplierName}." : "")</small>
+                    </div>
+                    <div class="verify-field">
+                        <label class="movement-date">Data emiterii *
+                            <PickOnlyDate Id="pickup-invoice-date" Value="invoiceDate" ValueChanged="@((DateOnly? picked) => DateEdited(picked))" Disabled="@InvoiceLocked" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
+                        @VerifyBadge(dateVerified)
+                        <ToggleSwitch Value="dateVerified" ValueChanged="@(value => dateVerified = value && DateValid)" Disabled="@(InvoiceLocked || !DateValid)" OnText="Verificat" OffText="Neverificat" AriaLabel="Confirmă că data facturii este verificată" />
+                    </div>
+                </div>
+                @if (ResolvedSupplier is null && supplierCuiText.Trim().Length > 0 && !InvoiceLocked)
+                {
+                    <div class="invoice-warning" role="status">⚠ Furnizorul cu acest CUI nu este în registru.
+                        <button type="button" class="refresh" @onclick="() => OpenAddSupplier(true)">+ Adaugă furnizorul</button></div>
+                }
+                @if (!InvoiceLocked) { <p><button type="button" class="refresh" @onclick="() => OpenAddSupplier(false)">+ Adaugă alt furnizor</button></p> }
+                @if (similarInvoices.Count > 0 && createdInvoice is null)
+                {
+                    <div class="invoice-warning" role="alert">
+                        <p><strong>⚠ Nu există factura @invoiceNumber la acest furnizor, dar există una cu număr asemănător.</strong> Dacă este aceeași factură (numărul a fost citit greșit), continuă pe ea:</p>
+                        @foreach (var similar in similarInvoices)
+                        {
+                            <button type="button" class="refresh" disabled="@InvoiceLocked" @onclick="() => UseSimilarAsync(similar)">Da, este factura @similar.Number din @StockMovementRules.DisplayDate(similar.Date)</button>
+                        }
+                        <p class="muted">Dacă este o factură diferită, lasă numărul cum este: se înregistrează o factură nouă.</p>
+                    </div>
+                }
+                @if (existingInvoice is not null && createdInvoice is null)
+                {
+                    <div class="invoice-warning" role="status">
+                        <p><strong>⚠ Factura @existingInvoice.Number din @StockMovementRules.DisplayDate(existingInvoice.Date) a furnizorului @existingInvoice.SupplierName a mai fost preluată@(takenEntries.Count == 0 ? ", dar fără intrări în stoc" : $" ({takenEntries.Count} {(takenEntries.Count == 1 ? "intrare" : "intrări")})").</strong>
+                            Preluarea continuă pe aceeași factură; produsele deja preluate sunt marcate la pasul 3 și nu se preiau din nou decât dacă alegi asta.</p>
+                        @if (takenEntries.Count > 0)
+                        {
+                            <ul>@foreach (var entry in takenEntries) { <li>@entry.ProductName · @entry.Quantity buc. · @StockMovementRules.DisplayDate(entry.Date)</li> }</ul>
+                        }
+                    </div>
+                }
+            </section>
             <p class="muted">@pick.Count(item => item.ProductId is not null || item.Staged is not null) din @pick.Count rânduri au un produs ales sau pregătit. Nimic nu se salvează în acest pas; salvarea se face la pasul 3.</p>
             <div class="table-scroll">
                 <table class="pickup-match">
@@ -358,9 +414,17 @@ else
 {
     <section class="wizard-panel" aria-label="@StepTitles[2]">
         <h2>@StepTitles[2]</h2>
-        <p class="muted">Sumarul alegerilor din pasul 2. Abia la „Finalizează preluarea” se adaugă produsele noi în catalog și se înregistrează intrările în stoc.</p>
+        <p class="muted">Sumarul alegerilor din pasul 2. Abia la „Finalizează preluarea” se înregistrează factura, se adaugă produsele noi în catalog și se înregistrează intrările în stoc, legate de factură.</p>
         @if (finalizeError is not null) { <div class="error-banner" role="alert">@finalizeError</div> }
         @if (finalizeNotice is not null) { <div class="success-banner" role="status">@finalizeNotice</div> }
+
+        <h3>Factura și furnizorul</h3>
+        <p>Factura <strong>@invoiceNumber</strong> din <strong>@(invoiceDate is { } issued ? StockMovementRules.DisplayDate(issued) : "—")</strong>, furnizor <strong>@(ResolvedSupplier?.Name ?? "—")</strong> (@(ResolvedSupplier?.Identifier ?? "—")); verificate la pasul 2.</p>
+        @if (existingInvoice is not null && createdInvoice is null)
+        {
+            <div class="invoice-warning" role="status">⚠ Factura a mai fost preluată@(takenEntries.Count == 0 ? ", dar fără intrări în stoc" : $" ({takenEntries.Count} {(takenEntries.Count == 1 ? "intrare" : "intrări")})"): preluarea continuă pe ea, iar produsele deja preluate sunt marcate mai jos și nu se preiau din nou decât dacă alegi asta.</div>
+        }
+        @if (createdInvoice is not null) { <p class="success-banner" role="status">Factura @createdInvoice.Number a furnizorului @createdInvoice.SupplierName a fost înregistrată; intrările de mai jos i se leagă.</p> }
 
         <h3>1. Produse noi (@NewLines.Count)</h3>
         @if (NewLines.Count == 0) { <p class="muted">Niciun produs nou.</p> }
@@ -387,9 +451,19 @@ else
     </section>
 }
 
+@if (addingSupplier)
+{
+    <div class="invoice-modal-backdrop">
+        <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă furnizor">
+            <SupplierEditor @key="addSupplierKey" InitialCui="@(addFromInvoice ? supplierCuiText : "")" InitialName="@(addFromInvoice ? invoiceSupplierName : "")"
+                            Saved="SupplierAddedAsync" Closed="CloseAddSupplier" />
+        </div>
+    </div>
+}
+
 <div class="wizard-nav">
     <button type="button" class="refresh" disabled="@(step == 1)" @onclick="PreviousStep">← Pasul precedent</button>
-    <span class="muted">Pasul @step din @StepTitles.Length@(step == 1 && !CanLeaveStep1 ? " · citește o factură cu tabel și păstrează cel puțin un rând pentru a continua" : step == 2 && !CanLeaveStep2 ? " · alege sau pregătește un produs pentru cel puțin un rând" : "")</span>
+    <span class="muted">Pasul @step din @StepTitles.Length@(step == 1 && !CanLeaveStep1 ? " · citește o factură cu tabel și păstrează cel puțin un rând pentru a continua" : step == 2 && !CanLeaveStep2 ? " · alege sau pregătește un produs pentru cel puțin un rând" : "")@(step == 2 && !HeaderConfirmed && !step2Loading ? " · confirmă numărul facturii, CUI-ul furnizorului și data" : "")</span>
     @if (step < StepTitles.Length)
     {
         <button type="button" class="primary" disabled="@((step == 1 && !CanLeaveStep1) || (step == 2 && !CanLeaveStep2))" @onclick="NextStep">Pasul următor →</button>
@@ -400,13 +474,13 @@ else
     private static readonly string[] StepTitles = ["Citirea facturii", "Potrivirea produselor", "Confirmare"];
     private int step = 1;
     private bool CanLeaveStep1 => session is not null && reading is not null && rows.Count - excluded.Count > 0;
-    private bool CanLeaveStep2 => !step2Loading && step2Error is null && pick.Any(item => item.ProductId is not null || item.Staged is not null);
+    private bool CanLeaveStep2 => !step2Loading && step2Error is null && pick.Any(item => item.ProductId is not null || item.Staged is not null) && HeaderConfirmed;
 
     private async Task NextStep()
     {
         if (step >= StepTitles.Length || (step == 1 && !CanLeaveStep1) || (step == 2 && !CanLeaveStep2)) return;
         step++;
-        if (step == 2) await BuildPickAsync();
+        if (step == 2) { await BuildPickAsync(); await LoadSuppliersAsync(); }
         else if (step == 3) PrepareSummary();
     }
 
@@ -418,7 +492,162 @@ else
 
     private List<PickRow> NewLines => pick.Where(item => item.Staged is not null).ToList();
     private List<PickRow> ExistingLines => pick.Where(item => item.Staged is null && item.ProductId is not null).ToList();
-    private bool CanFinalize => !finished && (NewLines.Count + ExistingLines.Count) > 0;
+    // Rows whose product was already taken from this invoice are left out unless the user chose to take them again.
+    private int? TakenQuantity(PickRow line) => line.Staged is null && line.ProductId is { } id && takenEntries.Where(entry => entry.ProductId == id).Sum(entry => entry.Quantity) is > 0 and var sum ? sum : null;
+    private bool Skipped(PickRow line) => !line.Done && !line.RetakeAnyway && TakenQuantity(line) is not null;
+    private bool CanFinalize => !finished && NewLines.Concat(ExistingLines).Any(line => !Skipped(line)) && supplierId is not null && invoiceNumber.Trim().Length > 0 && invoiceDate is not null;
+
+    // ---- the invoice and its supplier: recorded with the first entry, every entry is tied to it ----
+
+    private IReadOnlyList<Supplier> supplierList = [];
+    private int? supplierId;
+    private string invoiceNumber = "";
+    private DateOnly? invoiceDate;
+    private SupplierInvoice? createdInvoice, existingInvoice;
+    private IReadOnlyList<InvoiceEntry> takenEntries = [];
+    private IReadOnlyList<SupplierInvoice> similarInvoices = [];
+    private bool NumberFromOcr => session?.Analysis.Source == InvoiceSources.Ocr;
+
+    // "Yes, it is the same invoice": the number of the stored invoice replaces the one read (and is to be confirmed again).
+    private async Task UseSimilarAsync(SupplierInvoice invoice)
+    {
+        invoiceNumber = invoice.Number;
+        numberVerified = false;
+        await RefreshExistingInvoiceAsync();
+    }
+
+    // The number, the supplier's CUI and the date are checked by the user in step 2, each on its own: they start as "neverificat" and any edit
+    // of one of them puts it back there. Step 3 is reached only when all three are confirmed (and valid).
+    private string supplierCuiText = "";
+    private bool numberVerified, cuiVerified, dateVerified;
+    private bool NumberValid => invoiceNumber.Trim().Length > 0;
+    private bool DateValid => invoiceDate is not null;
+    private Supplier? ResolvedSupplier => supplierList.FirstOrDefault(supplier => supplier.Id == supplierId);
+    private bool HeaderConfirmed => numberVerified && cuiVerified && dateVerified && NumberValid && DateValid && ResolvedSupplier is not null;
+
+    private RenderFragment VerifyBadge(bool verified) => @<span class="anaf-source @(verified ? "ok" : "warn")"><span aria-hidden="true">@(verified ? "✓" : "⚠")</span> @(verified ? "Verificat" : "Neverificat")</span>;
+
+    // The supplier of the CUI as typed: a Romanian CUI by its digits, a VAT identifier of another state by its letters and digits.
+    private void ResolveSupplier()
+    {
+        var digits = SupplierRules.CuiDigits(supplierCuiText);
+        var compact = SupplierRules.CompactKey(supplierCuiText);
+        supplierId = supplierList.FirstOrDefault(supplier => supplier.IsExternal ? compact.Length > 0 && SupplierRules.CompactKey(supplier.Cui) == compact
+            : digits.Length > 0 && SupplierRules.CuiDigits(supplier.Cui) == digits)?.Id;
+    }
+
+    private async Task NumberEdited(ChangeEventArgs e)
+    {
+        invoiceNumber = e.Value?.ToString() ?? "";
+        numberVerified = false;
+        await RefreshExistingInvoiceAsync();
+    }
+
+    private async Task CuiEdited(ChangeEventArgs e)
+    {
+        supplierCuiText = e.Value?.ToString() ?? "";
+        cuiVerified = false;
+        ResolveSupplier();
+        await RefreshExistingInvoiceAsync();
+    }
+
+    private Task DateEdited(DateOnly? picked)
+    {
+        invoiceDate = picked;
+        dateVerified = false;
+        return Task.CompletedTask;
+    }
+    private string? supplierError;
+    private string invoiceSupplierCui = "", invoiceSupplierName = "";
+    private Guid? headerPrefilledFor;
+    private bool addingSupplier, addFromInvoice;
+    private int addSupplierKey;
+
+    // Once the invoice is recorded the choice is fixed: a retry of the rows that failed goes to the same invoice.
+    private bool InvoiceLocked => finalizing || finished || createdInvoice is not null;
+
+    private async Task LoadSuppliersAsync()
+    {
+        supplierError = null;
+        try { supplierList = await Suppliers.GetSuppliersAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Supplier list loading failed ({ErrorType}).", exception.GetType().Name);
+            supplierError = "Registrul de furnizori nu a putut fi citit. Reia „Pasul precedent” și „Pasul următor”.";
+            supplierList = [];
+        }
+        if (headerPrefilledFor != session?.Id) { PrefillInvoiceHeader(); headerPrefilledFor = session?.Id; }
+        else ResolveSupplier();
+        await RefreshExistingInvoiceAsync();
+    }
+
+    // The number, the date and the supplier as the template read them from the invoice (the user checks and corrects them).
+    private void PrefillInvoiceHeader()
+    {
+        string FieldValue(string meaning) => reading?.Extraction.Fields.FirstOrDefault(field => field.Meaning == meaning && field.Value.Trim().Length > 0)?.Value.Trim() ?? "";
+        invoiceNumber = TextNormalization.ForObjectNameOrCode(FieldValue(InvoiceFieldMeanings.InvoiceNumber));
+        invoiceDate = InvoiceValues.ParseDate(FieldValue(InvoiceFieldMeanings.InvoiceDate)) is { } date && date >= StockMovementRules.EarliestDate && date <= StockMovementRules.Today ? date : null;
+        invoiceSupplierCui = InvoiceValues.NormalizeCui(FieldValue(InvoiceFieldMeanings.SupplierCui)) is { Length: > 0 } fromField ? fromField
+            : session?.Analysis.SupplierCui is { Length: > 0 } fromAnalysis ? fromAnalysis
+            : chosen?.Info.SupplierCui ?? "";
+        invoiceSupplierName = FieldValue(InvoiceFieldMeanings.SupplierName) is { Length: > 0 } nameField ? nameField
+            : session?.Analysis.SupplierName is { Length: > 0 } fromAnalysisName ? fromAnalysisName
+            : chosen?.Info.SupplierName ?? "";
+        supplierCuiText = invoiceSupplierCui;
+        numberVerified = cuiVerified = dateVerified = false;   // read, not yet checked by the user
+        ResolveSupplier();
+    }
+
+    // The invoice of this supplier and number may have been taken before, in part: what was taken is read, so the pickup continues on the same
+    // invoice and the products already taken are marked.
+    private async Task RefreshExistingInvoiceAsync()
+    {
+        if (createdInvoice is not null) return;
+        existingInvoice = null; takenEntries = []; similarInvoices = [];
+        if (supplierId is null || invoiceNumber.Trim().Length == 0) return;
+        try
+        {
+            existingInvoice = await SupplierInvoices.FindAsync(supplierId.Value, invoiceNumber, lifetime.Token);
+            if (existingInvoice is not null)
+            {
+                takenEntries = await SupplierInvoices.GetEntriesAsync(existingInvoice.Id, lifetime.Token);
+                if (invoiceDate != existingInvoice.Date) { invoiceDate = existingInvoice.Date; dateVerified = false; }   // the stored date; to be confirmed
+            }
+            else
+            {
+                // OCR can misread the number: invoices of this supplier with a look-alike number (and the same date, when it is known) are offered.
+                similarInvoices = [.. (await SupplierInvoices.GetForSupplierAsync(supplierId.Value, lifetime.Token))
+                    .Where(item => SupplierInvoiceRules.LooksLike(invoiceNumber, item.Number) && (invoiceDate is null || item.Date == invoiceDate))];
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Reading the invoice taken earlier failed ({ErrorType}).", exception.GetType().Name);
+            existingInvoice = null; takenEntries = [];
+            supplierError = "Nu s-a putut verifica dacă factura a mai fost preluată. Reia „Pasul precedent” și „Pasul următor”.";
+        }
+    }
+
+    private void OpenAddSupplier(bool fromInvoice) { addFromInvoice = fromInvoice; addSupplierKey++; addingSupplier = true; }
+    private Task CloseAddSupplier() { addingSupplier = false; return Task.CompletedTask; }
+
+    // The supplier was saved in the window: it is offered and chosen at once.
+    private async Task SupplierAddedAsync(Supplier saved)
+    {
+        addingSupplier = false;
+        supplierCuiText = saved.Cui;   // the supplier's own tax id is now in the field: to be confirmed
+        cuiVerified = false;
+        await LoadSuppliersAsync();
+    }
+
+    private void ResetInvoiceHeader()
+    {
+        createdInvoice = existingInvoice = null; takenEntries = []; similarInvoices = []; supplierId = null; invoiceNumber = ""; invoiceDate = null; headerPrefilledFor = null;
+        invoiceSupplierCui = invoiceSupplierName = supplierCuiText = "";
+        numberVerified = cuiVerified = dateVerified = false;
+    }
 
     private string? QuantityColumnId => reading?.Extraction.Columns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Quantity)?.Id;
 
@@ -465,6 +694,11 @@ else
         </header>
         <label class="full-width">Descrierea intrării în stoc
             <textarea rows="2" maxlength="@StockMovementRules.MaxDescriptionLength" disabled="@(finalizing || line.Done)" @bind="line.EntryDescription" @bind:event="oninput" @bind:after="() => line.DescriptionEdited = true"></textarea></label>
+        @if (TakenQuantity(line) is { } taken && !line.Done)
+        {
+            <div class="invoice-warning" role="status">⚠ Din această factură s-au preluat deja @taken buc. din acest produs.
+                <ToggleSwitch Value="line.RetakeAnyway" ValueChanged="@(value => line.RetakeAnyway = value)" OnText="Se preia din nou" OffText="Nu se preia din nou" Disabled="@(finalizing || finished)" AriaLabel="Preia din nou produsul deja preluat" /></div>
+        }
         @if (line.Result is not null) { <p class="@(line.Done ? "success-banner" : "error-banner")" role="status">@line.Result</p> }
     </article>;
 
@@ -474,14 +708,32 @@ else
     {
         if (finalizing || finished) return;
         finalizeError = finalizeNotice = null;
-        var lines = NewLines.Concat(ExistingLines).Where(line => !line.Done).ToList();
+        var lines = NewLines.Concat(ExistingLines).Where(line => !line.Done && !Skipped(line)).ToList();
         foreach (var line in lines)
             if (QuantityOf(line).Error is { } problem) { finalizeError = problem; return; }
         if (NewLines.Any(line => !line.Done) && newDate is null || ExistingLines.Any(line => !line.Done) && existingDate is null) { finalizeError = "Alege data intrării."; return; }
+        if (supplierId is null) { finalizeError = SupplierInvoiceRules.SupplierRequiredMessage; return; }
+        if (invoiceNumber.Trim().Length == 0) { finalizeError = SupplierInvoiceRules.NumberRequiredMessage; return; }
+        if (invoiceDate is null) { finalizeError = SupplierInvoiceRules.DateRequiredMessage; return; }
         finalizing = true;
         StateHasChanged();
         try
         {
+            // The invoice is recorded once, before the first entry (a retry after an error reuses it); an invoice already taken is refused here, so
+            // nothing is added to the stock twice.
+            if (createdInvoice is null && existingInvoice is not null) createdInvoice = existingInvoice;   // a partly taken invoice is continued
+            if (createdInvoice is null)
+            {
+                try { createdInvoice = await SupplierInvoices.CreateAsync(new SupplierInvoiceInput { SupplierId = supplierId, Number = invoiceNumber, Date = invoiceDate }, lifetime.Token); }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+                catch (Exception exception) when (exception is SupplierInvoiceOperationException or AccessDeniedException) { finalizeError = exception.Message; return; }
+                catch (Exception exception)
+                {
+                    Logger.LogError("Invoice recording failed ({ErrorType}, database error {ErrorCode}).", exception.GetType().Name, (exception as MySqlConnector.MySqlException)?.ErrorCode);
+                    finalizeError = "Factura nu a putut fi înregistrată. Nimic nu a fost salvat; verifică și reîncearcă.";
+                    return;
+                }
+            }
             foreach (var line in lines)
             {
                 var isNew = line.Staged is not null;
@@ -495,7 +747,7 @@ else
                         productId = created.Id;
                         if (line.Staged.Image is { } image) await ImageStore.SaveAsync(created.Id, image, lifetime.Token);
                     }
-                    var input = new StockMovementInput { Kind = StockMovementKind.Entry, Date = isNew ? newDate : existingDate, Quantity = QuantityOf(line).Quantity, Description = line.EntryDescription };
+                    var input = new StockMovementInput { Kind = StockMovementKind.Entry, Date = isNew ? newDate : existingDate, Quantity = QuantityOf(line).Quantity, Description = line.EntryDescription, InvoiceId = createdInvoice!.Id };
                     await Movements.CreateAsync(productId!.Value, input, lifetime.Token);
                     line.Done = true;
                     line.Result = isNew ? "Produs adăugat în catalog și intrare înregistrată." : "Intrare înregistrată.";
@@ -511,8 +763,9 @@ else
                     line.Result = (line.CreatedProductId is not null ? "Produsul a fost adăugat, dar intrarea nu a putut fi salvată. " : "") + "Salvarea nu a putut fi confirmată; verifică în catalog înainte să reîncerci.";
                 }
             }
-            var all = NewLines.Concat(ExistingLines).ToList();
-            if (all.All(line => line.Done)) { finished = true; finalizeNotice = $"Preluarea a fost finalizată: {all.Count} {(all.Count == 1 ? "intrare înregistrată" : "intrări înregistrate")}."; }
+            var all = NewLines.Concat(ExistingLines).Where(line => line.Done || !Skipped(line)).ToList();
+            var skippedCount = NewLines.Concat(ExistingLines).Count(Skipped);
+            if (all.All(line => line.Done)) { finished = true; finalizeNotice = $"Preluarea a fost finalizată: {all.Count} {(all.Count == 1 ? "intrare înregistrată" : "intrări înregistrate")}, legate de factura {createdInvoice!.Number} a furnizorului {createdInvoice.SupplierName}." + (skippedCount > 0 ? $" {skippedCount} {(skippedCount == 1 ? "rând deja preluat nu a fost preluat din nou" : "rânduri deja preluate nu au fost preluate din nou")}." : ""); }
             else finalizeError = "Unele rânduri nu au fost salvate; vezi mesajele de sub ele. Cele salvate nu se salvează a doua oară la o nouă încercare.";
         }
         finally { finalizing = false; }
@@ -522,6 +775,7 @@ else
     {
         await DiscardAsync();
         pick = []; finished = false; finalizeNotice = null; finalizeError = null; step = 1;
+        ResetInvoiceHeader();
         newDate = existingDate = StockMovementRules.Today;
     }
     private void PreviousStep() { if (step > 1) step--; }
@@ -541,6 +795,8 @@ else
         public string EntryDescription { get; set; } = "";
         public bool DescriptionEdited { get; set; }
         public int? CreatedProductId { get; set; }
+        // The product was already taken from this invoice: it is skipped unless the user chooses to take it again.
+        public bool RetakeAnyway { get; set; }
         public bool Done { get; set; }
         public string? Result { get; set; }
     }
@@ -744,7 +1000,7 @@ else
         try
         {
             DiscardSession();
-            pick = []; finished = false; finalizeNotice = finalizeError = null;   // another file: nothing of the previous pickup applies
+            pick = []; finished = false; finalizeNotice = finalizeError = null; ResetInvoiceHeader();   // another file: nothing of the previous pickup applies
             await using var stream = file.OpenReadStream(InvoiceAnalysisRules.MaxFileSizeBytes, lifetime.Token);
             session = await Analysis.AnalyzeAsync(stream, file.Name, lifetime.Token);
             creatingTemplate = false;
@@ -839,6 +1095,7 @@ else
             : chosen is not null ? InvoiceTemplateDraft.FromDefinition(definition, session!.Document, chosen.Info.SupplierName, chosen.Info.SupplierCui)
             : InvoiceTemplateDraft.FromAnalysis(session!.Analysis);
         excluded.Clear();
+        if (createdInvoice is null) headerPrefilledFor = null;   // another reading of the file: the number, date and supplier are read again
         ResetSeparators();
     }
 
@@ -927,7 +1184,7 @@ else
     // columns are read too; they are only without a meaning until the label is recognised or named). A saved template keeps hiding the columns it does not use.
     private bool ShowUnnamedColumns => chosen is null;
 
-    private void ClearReading() { pick = []; session = null; reading = null; overlay = null; excluded.Clear(); separators = []; rows = []; templateInfo = null; suggestions = []; allTemplates = []; creatingTemplate = false; chosen = null; selectedId = ""; }
+    private void ClearReading() { pick = []; session = null; reading = null; overlay = null; excluded.Clear(); separators = []; rows = []; templateInfo = null; suggestions = []; allTemplates = []; creatingTemplate = false; chosen = null; selectedId = ""; ResetInvoiceHeader(); }
 
     private void Select(string id) => selectedId = selectedId == id ? "" : id;
 

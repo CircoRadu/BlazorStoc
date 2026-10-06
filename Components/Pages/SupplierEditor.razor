@@ -1,0 +1,280 @@
+@using BlazorStoc.Services
+@inject ISupplierRepository Repository
+@inject IAnafService Anaf
+@inject ILogger<SupplierEditor> Logger
+@implements IDisposable
+
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="supplier-editor-title">
+    <div class="catalog-heading"><h2 id="supplier-editor-title">@(Original is null ? "Adaugă furnizor" : $"Editează furnizorul #{Original.Id}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="supplier-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="supplier-country">Țara furnizorului *
+                    <InputSelect id="supplier-country" Value="input.Country" ValueChanged="@((string selected) => CountryChanged(selected))" ValueExpression="() => input.Country" disabled="@(saving || Locked)">
+                        @foreach (var country in SupplierCountries.All) { <option value="@country.Code">@(country.Name + " (" + country.Code + ")")</option> }
+                    </InputSelect>
+                    <small>România: CUI verificat în ANAF. Alt stat membru UE: cod de TVA, introdus manual.</small>
+                </label>
+                <div class="beneficiary-cui-row">
+                    <label for="supplier-cui">@(input.IsExternal ? "Cod de TVA *" : "CUI *")</label>
+                    <div class="beneficiary-cui-line">
+                        <InputTextLive id="supplier-cui" @bind-Value="input.Cui" maxlength="20" autocomplete="off" disabled="@(saving || Locked)" />
+                        @if (!input.IsExternal)
+                        {
+                            <button type="button" class="refresh" disabled="@(fetching || saving || input.Cui.Trim().Length == 0)" @onclick="FetchFromAnafAsync">@(fetching ? "Se interoghează ANAF…" : Original is null ? "Preia date din ANAF" : "Preia din nou din ANAF")</button>
+                        }
+                    </div>
+                    <small>@(input.IsExternal ? $"Începe cu {input.Country} (de exemplu {input.Country}123456789); prefixul se adaugă singur dacă lipsește." : "2–10 cifre, opțional precedate de RO. CUI-ul identifică furnizorul: nu poate exista de două ori.")</small>
+                    @if (Locked) { <small class="muted">@SupplierRules.CuiLockedMessage</small> }
+                    <ValidationMessage For="() => input.Cui" />
+                </div>
+                <div class="anaf-source-cell" role="status" aria-live="polite">
+                    <span class="anaf-source @SupplierSources.CssClass(CurrentSource)"><span aria-hidden="true">@SupplierSources.Icon(CurrentSource)</span> @SupplierSources.Label(CurrentSource)</span>
+                </div>
+                @if (anafMessage is not null) { <div class="anaf-message @(anafMessageKind) beneficiary-anaf-message" role="@(anafMessageKind == "error" ? "alert" : "status")">@anafMessage</div> }
+                @if (anafWarning is not null) { <div class="anaf-message warn beneficiary-anaf-message" role="status">@anafWarning</div> }
+                <label for="supplier-name">Denumire *<InputTextLive id="supplier-name" @bind-Value="input.Name" maxlength="200" autocomplete="organization" /><ValidationMessage For="() => input.Name" /></label>
+                <label for="supplier-address">Adresă<InputTextLive id="supplier-address" @bind-Value="input.Address" maxlength="300" autocomplete="street-address" /><ValidationMessage For="() => input.Address" /></label>
+                <label for="supplier-phone">Număr de telefon<InputTextLive id="supplier-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="tel" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
+                <label for="supplier-registry">Nr. Registrul Comerțului<InputTextLive id="supplier-registry" @bind-Value="input.RegistryNumber" maxlength="40" autocomplete="off" /><small>De exemplu J40/1234/2020.</small><ValidationMessage For="() => input.RegistryNumber" /></label>
+                @if (!input.IsExternal)
+                {
+                    <label for="supplier-postal">Cod poștal<InputTextLive id="supplier-postal" @bind-Value="input.PostalCode" maxlength="10" autocomplete="postal-code" inputmode="numeric" /><small>5 sau 6 cifre.</small><ValidationMessage For="() => input.PostalCode" /></label>
+                    <label for="supplier-caen">Cod CAEN<InputTextLive id="supplier-caen" @bind-Value="input.CaenCode" maxlength="4" autocomplete="off" inputmode="numeric" /><small>3 sau 4 cifre.</small><ValidationMessage For="() => input.CaenCode" /></label>
+                }
+                @if (Original is not null)
+                {
+                    <ChangeReasonField Id="supplier-change-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" />
+                }
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează furnizorul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+@if (pendingChanges is not null && Original is not null)
+{
+    <SaveConfirmationDialog Title="Salvezi modificările furnizorului?" ObjectLabel="@Original.Name" Changes="pendingChanges"
+                            Reason="@input.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
+
+@code {
+    [Parameter] public Supplier? Original { get; set; }
+    // A new supplier opened from the invoice pickup starts with the tax id and the name read from the invoice (ANAF is asked at once).
+    [Parameter] public string InitialCui { get; set; } = "";
+    [Parameter] public string InitialName { get; set; } = "";
+    [Parameter] public EventCallback<Supplier> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    private UnsavedChangesTracker? tracker;
+    private string CurrentSnapshot() => FormSnapshot.Of(input);
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private SupplierInput input = new();
+    private bool reasonAuto = true;
+    private string customReason = "";
+    private bool saving, fetching, fetchedFromAnaf;
+    private IReadOnlyList<AuditChange>? pendingChanges;
+    private string? error, reasonError, anafMessage, anafWarning;
+    private string anafMessageKind = "ok";
+    // ANAF's data for the CUI in `snapshotCui` (as it answered, or as stored for a record saved earlier unchanged from ANAF): the data counts as
+    // "preluate din ANAF" only while every value ANAF supplied is still unchanged in the form. A failed attempt (service error / CUI unknown to
+    // ANAF) is remembered with the CUI it was made for.
+    private AnafCompany? anafSnapshot;
+    private AnafLookupOutcome? failure;
+    private string failureCui = "";
+    private readonly CancellationTokenSource lifetime = new();
+
+    private bool Locked => Original is { InUse: true };
+
+    protected override Task OnInitializedAsync()
+    {
+        if (Original is null)
+        {
+            input = new() { Cui = InitialCui, Name = InitialName };
+        }
+        else
+        {
+            input = SupplierInput.From(Original);
+            if (Original.Source == SupplierSources.Anaf)
+                anafSnapshot = new(Original.Cui, Original.Name, Original.Address, Original.RegistryNumber, Original.Phone, Original.PostalCode, Original.CaenCode);
+        }
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Opened from the pickup with the CUI of the invoice: ask ANAF at once (a valid CUI only; nothing is sent otherwise).
+        if (!firstRender || Original is not null || InitialCui.Length == 0) return;
+        if (SupplierRules.CuiProblem(input.Country, input.Cui) is { } problem)
+        {
+            // A CUI read from a scan can have a wrong digit: it is said at once, and ANAF is not asked about it.
+            anafMessageKind = "warn";
+            anafMessage = "CUI-ul citit din factură nu pare corect: " + problem + " Corectează-l după factură.";
+        }
+        else await FetchFromAnafAsync();
+        StateHasChanged();
+    }
+
+    private static string Norm(string? value) => TextNormalization.ForObjectNameOrCode(value);
+    private string Digits => SupplierRules.CuiDigits(input.Cui);
+
+    private bool HasSnapshot => !input.IsExternal && anafSnapshot is { } snapshot && Digits == SupplierRules.CuiDigits(snapshot.Cui);
+    private AnafLookupOutcome? ActiveFailure => !input.IsExternal && failure is not null && failureCui == Digits ? failure : null;
+
+    private bool SnapshotUnchanged => anafSnapshot is { } snapshot &&
+        Same(snapshot.Name, input.Name) && Same(snapshot.Address, input.Address) &&
+        Same(snapshot.RegistryNumber, input.RegistryNumber) && Same(BeneficiaryRules.NormalizePhone(snapshot.Phone), BeneficiaryRules.NormalizePhone(input.Phone)) &&
+        Same(BeneficiaryRules.CompactValue(snapshot.PostalCode), BeneficiaryRules.CompactValue(input.PostalCode)) &&
+        Same(BeneficiaryRules.CompactValue(snapshot.CaenCode), BeneficiaryRules.CompactValue(input.CaenCode));
+
+    // Values ANAF did not supply (empty) may be typed by hand without turning the data into "edited".
+    private static bool Same(string snapshotValue, string current) =>
+        snapshotValue.Length == 0 || string.Equals(Norm(snapshotValue), Norm(current), StringComparison.OrdinalIgnoreCase);
+
+    // What the record was before, but only while its tax id is the same one.
+    private string? OriginalSource => Original is { } original && original.Country == input.Country &&
+        SupplierRules.IdentityKey(original.Country, original.Cui) == SupplierRules.IdentityKey(input.Country, input.Cui) ? original.Source : null;
+
+    private string CurrentSource => SupplierRules.ResolveSource(input.IsExternal, HasSnapshot, SnapshotUnchanged, ActiveFailure, OriginalSource);
+
+    private void CountryChanged(string country)
+    {
+        input.Country = country;
+        if (input.IsExternal) { anafSnapshot = null; failure = null; anafMessage = anafWarning = null; fetchedFromAnaf = false; }
+    }
+
+    private async Task<AnafLookupOutcome> FetchAsync()
+    {
+        fetching = true;
+        anafMessage = anafWarning = null;
+        var requested = Digits;
+        var outcome = AnafLookupOutcome.Unavailable;
+        try
+        {
+            var result = await Anaf.LookupCompanyAsync(requested, lifetime.Token);
+            outcome = result.Outcome;
+            if (result.Company is { } company)
+            {
+                input.Name = Norm(company.Name);
+                if (company.Address.Length > 0) input.Address = Norm(company.Address);
+                if (company.RegistryNumber.Length > 0) input.RegistryNumber = Norm(company.RegistryNumber).ToUpperInvariant();
+                if (company.Phone.Length > 0) input.Phone = BeneficiaryRules.NormalizePhone(company.Phone);
+                if (company.PostalCode.Length > 0) input.PostalCode = BeneficiaryRules.CompactValue(company.PostalCode);
+                if (company.CaenCode.Length > 0) input.CaenCode = BeneficiaryRules.CompactValue(company.CaenCode);
+                anafSnapshot = company with { Cui = requested };
+                failure = null;
+                fetchedFromAnaf = true;
+                anafMessageKind = "ok";
+                anafMessage = "Datele au fost preluate din ANAF. Completează manual ce nu a returnat ANAF (de exemplu telefonul), dacă ai nevoie.";
+                anafWarning = result.Warning;
+            }
+            else
+            {
+                anafSnapshot = null;
+                failure = outcome is AnafLookupOutcome.Unavailable or AnafLookupOutcome.NotFound ? outcome : null;
+                failureCui = requested;
+                anafMessageKind = outcome == AnafLookupOutcome.InvalidCui ? "error" : "warn";
+                anafMessage = outcome switch
+                {
+                    AnafLookupOutcome.NotFound => "CUI-ul nu este înregistrat în ANAF. Furnizorul se poate salva cu datele introduse manual; va fi marcat în registru.",
+                    AnafLookupOutcome.Unavailable => (result.Error ?? "ANAF nu a putut răspunde.") + " Furnizorul se poate salva cu datele introduse manual; va fi marcat în registru, ca să fie verificat mai târziu.",
+                    _ => result.Error ?? "CUI-ul nu este valid."
+                };
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { anafMessageKind = "error"; anafMessage = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("ANAF lookup for a supplier failed ({ErrorType}).", exception.GetType().Name);
+            outcome = AnafLookupOutcome.Unavailable;
+            anafSnapshot = null;
+            failure = outcome;
+            failureCui = requested;
+            anafMessageKind = "warn";
+            anafMessage = "Datele nu au putut fi preluate din ANAF. Furnizorul se poate salva cu datele introduse manual; va fi marcat în registru.";
+        }
+        finally { fetching = false; }
+        return outcome;
+    }
+
+    private async Task FetchFromAnafAsync()
+    {
+        if (fetching || saving || input.IsExternal) return;
+        if (SupplierRules.CuiProblem(input.Country, input.Cui) is { } problem) { anafMessageKind = "error"; anafMessage = problem; return; }
+        await FetchAsync();
+    }
+
+    private string AutoSummary => Original is null ? "" : ChangeReasonSummary.Build(SupplierRules.Changes(Original, Preview()));
+
+    private Supplier Preview() => new(Original?.Id ?? 0, input.Name, SupplierRules.NormalizeCui(input.Country, input.Cui), input.Country, Original?.Version ?? 0,
+        input.Address, input.Phone, input.RegistryNumber, input.PostalCode, input.CaenCode, CurrentSource, Original?.VerifiedUtc);
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    private async Task SaveAsync()
+    {
+        if (saving || fetching) return;
+        if (Original is not null) input.Reason = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
+        reasonError = Original is null ? null : ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason);
+        if (reasonError is not null) return;
+        // A new Romanian supplier is checked in ANAF before it is saved: found -> the form is filled and shown for a last look; ANAF down or CUI
+        // unknown -> it is saved as a manual entry with the reason recorded.
+        if (Original is null && !input.IsExternal && !HasSnapshot && ActiveFailure is null)
+        {
+            error = null;
+            if (await FetchAsync() == AnafLookupOutcome.Found)
+            {
+                anafMessage = "Datele au fost preluate din ANAF și completate în formular. Verifică-le și apasă din nou „Salvează furnizorul”.";
+                return;
+            }
+        }
+        input.Source = CurrentSource;
+        input.AnafRecheck = fetchedFromAnaf;
+        if (Original is not null)
+        {
+            // Saving over existing data needs an explicit confirmation of the changed fields.
+            error = null;
+            try
+            {
+                var value = input.Validated(true);
+                var preview = Preview() with { Cui = value.Cui, Name = value.Name, Address = value.Address, Phone = value.Phone, RegistryNumber = value.RegistryNumber, PostalCode = value.PostalCode, CaenCode = value.CaenCode, Source = value.Source };
+                pendingChanges = SaveSummary.Changed(SupplierRules.Changes(Original, preview).ToArray());
+            }
+            catch (SupplierOperationException exception) { error = exception.Message; }
+            return;
+        }
+        await PersistAsync();
+    }
+
+    private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
+    private Task CancelConfirmation() { pendingChanges = null; return Task.CompletedTask; }
+
+    private async Task PersistAsync()
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        Supplier? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (SupplierOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Supplier saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Furnizorul nu a putut fi salvat. Datele formularului au fost păstrate; actualizează lista înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

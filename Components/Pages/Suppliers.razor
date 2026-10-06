@@ -1,0 +1,164 @@
+@page "/furnizori"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject UnsavedChanges Guard
+@inject ISupplierRepository Repository
+@inject IAccessControl Access
+@inject NavigationManager Navigation
+@inject ILogger<Suppliers> Logger
+@implements IDisposable
+
+<PageTitle>Furnizori · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
+<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Furnizori</h1><p class="muted">Registrul furnizorilor ale căror facturi se preiau în stoc. Un furnizor se identifică prin CUI (sau codul de TVA al unui stat UE) și nu poate apărea de două ori.</p></div><div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă furnizor</button></div></div>
+@if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (editing) { <SupplierEditor @key="editorKey" Original="editingSupplier" Saved="SupplierSavedAsync" Closed="CloseEditorAsync" /> }
+
+<section class="metrics users-metrics" aria-label="Rezumat furnizori">
+    <article><span>Total furnizori</span><strong>@(loaded ? suppliers.Count.ToString() : "—")</strong><small>În registrul disponibil</small><i>⌂</i></article>
+    <article><span>Date din ANAF</span><strong>@(loaded ? suppliers.Count(supplier => SupplierSources.IsVerified(supplier.Source)).ToString() : "—")</strong><small>Preluate și nemodificate</small><i>✓</i></article>
+    <article><span>De verificat</span><strong>@(loaded ? suppliers.Count(supplier => SupplierSources.NeedsCheck(supplier.Source)).ToString() : "—")</strong><small>Introduși manual sau editați după ANAF</small><i>⚠</i></article>
+    <article><span>Alte state UE</span><strong>@(loaded ? suppliers.Count(supplier => supplier.IsExternal).ToString() : "—")</strong><small>Identificați prin cod de TVA</small><i>◇</i></article>
+</section>
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Registru furnizori <span>@Filtered.Count</span></h2><small>Un furnizor se șterge numai de un administrator și numai dacă nu are facturi, intrări de stoc sau șabloane legate</small></div>
+    <div class="filters">
+        <label class="search-box"><span>⌕</span><input aria-label="Caută furnizori" placeholder="Caută după denumire, CUI, adresă sau telefon…" @bind="query" @bind:event="oninput" /></label>
+        <ToggleSwitch @bind-Value="onlyToCheck" OnText="Doar cei de verificat" OffText="Toți furnizorii" AriaLabel="Arată doar furnizorii de verificat" />
+    </div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă furnizorii</h3></div> }
+    else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">⌂</span><h3>Nu există furnizori pentru căutarea curentă</h3><p>Adaugă primul furnizor sau schimbă căutarea și filtrul.</p></div> }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>FURNIZOR</th><th>CUI / COD TVA</th><th>SURSA DATELOR</th><th>ADRESĂ</th><th>TELEFON</th><th>FACTURI</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var supplier in Filtered)
+        {
+            <tr @key="supplier.Id">
+                <td><a class="category-table-link" href="@SupplierNavigation.SupplierUrl(supplier.Id)"><strong>@supplier.Name</strong></a></td>
+                <td><span class="role-badge limited">@supplier.Identifier</span></td>
+                <td><span class="anaf-source @SupplierSources.CssClass(supplier.Source)"><span aria-hidden="true">@SupplierSources.Icon(supplier.Source)</span> @SupplierSources.Label(supplier.Source)</span></td>
+                <td>@(supplier.Address.Length == 0 ? "—" : supplier.Address)</td>
+                <td>@(supplier.Phone.Length == 0 ? "—" : supplier.Phone)</td>
+                <td>@(supplier.InvoiceCount == 0 ? "—" : $"{supplier.InvoiceCount} ({supplier.MovementCount} {(supplier.MovementCount == 1 ? "intrare" : "intrări")})")</td>
+                <td><div class="row-buttons">
+                    <button class="row-action edit" aria-label="Editează @supplier.Name" title="Editează" disabled="@(editing || deleting is not null)" @onclick="() => OpenEditorAsync(supplier)">✎</button>
+                    <button class="row-action delete" aria-label="Șterge @supplier.Name" title="@DeleteHint(supplier)" disabled="@(!canDelete || supplier.InUse)" @onclick="() => RequestDeleteAsync(supplier)">×</button>
+                </div></td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi furnizorul?" Subject="Furnizorul"
+                              ObjectLabel="@($"{deleting.Name} · {deleting.Identifier}")"
+                              Description="Furnizorii care au facturi, intrări de stoc sau șabloane de factură legate nu pot fi șterși."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteSupplierAsync"
+                              Cancelled="CancelDeleteAsync" />
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
+    [SupplyParameterFromQuery(Name = "adauga")] public string? AddFlag { get; set; }
+    private bool addFlagHandled;
+    private IReadOnlyList<Supplier> suppliers = Array.Empty<Supplier>();
+    private Supplier? editingSupplier, deleting;
+    private string query = "";
+    private bool onlyToCheck;
+    private bool loading, syncing, loaded, editing, deleteBusy, canDelete;
+    private string? error, notice, deleteError;
+    private Guid editorKey;
+    private readonly CancellationTokenSource lifetime = new();
+    private List<Supplier> Filtered => SupplierSearch.Filter(suppliers, query, onlyToCheck).ToList();
+
+    // Only an administrator deletes; the button of a supplier that is in use says why it cannot be used.
+    private string DeleteHint(Supplier supplier) =>
+        !canDelete ? "Doar administratorul poate șterge furnizori"
+        : supplier.InUse ? SupplierRules.DeleteBlockedMessage(supplier.InvoiceCount, supplier.MovementCount, supplier.TemplateCount)
+        : "Șterge";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { canDelete = await Access.IsAdministratorAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        await LoadAsync(true);
+        _ = SynchronizePeriodicallyAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!addFlagHandled && AddFlag == "1" && loaded)
+        {
+            addFlagHandled = true;
+            await OpenEditorAsync(null);
+            return;
+        }
+        if (EditId is > 0 && loaded && (!editing || editingSupplier?.Id != EditId.Value))
+        {
+            var requested = suppliers.FirstOrDefault(supplier => supplier.Id == EditId.Value);
+            if (requested is not null) await OpenEditorAsync(requested);
+            else error = "Furnizorul solicitat pentru editare nu mai există.";
+        }
+    }
+
+    private Task RetryLoadAsync() => LoadAsync(true);
+    private async Task LoadAsync(bool showLoading)
+    {
+        if (syncing) return;
+        syncing = true;
+        if (showLoading) loading = true;
+        error = null;
+        try { suppliers = await Repository.GetSuppliersAsync(lifetime.Token); loaded = true; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Supplier loading failed ({ErrorType}).", exception.GetType().Name); error = "Furnizorii nu au putut fi încărcați."; }
+        finally { loading = false; syncing = false; }
+    }
+
+    private async Task SynchronizePeriodicallyAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(lifetime.Token))
+                await InvokeAsync(async () => { if (!editing && deleting is null) { await LoadAsync(false); StateHasChanged(); } });
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+    }
+
+    private Task OpenEditorAsync(Supplier? supplier) { editingSupplier = supplier; editorKey = Guid.NewGuid(); editing = true; notice = null; return Task.CompletedTask; }
+    private Task CloseEditorAsync()
+    {
+        editing = false; editingSupplier = null;
+        if (EditId is not null) { EditId = null; if (!Guard.IsDiscarding) Navigation.NavigateTo("/furnizori"); }
+        return Task.CompletedTask;
+    }
+    private async Task SupplierSavedAsync(Supplier supplier)
+    {
+        var created = editingSupplier is null;
+        await CloseEditorAsync();
+        await LoadAsync(false);   // the counts (invoices, entries) come with the list
+        notice = created ? "Furnizorul a fost adăugat." : "Furnizorul a fost actualizat.";
+    }
+    private Task RequestDeleteAsync(Supplier supplier) { deleting = supplier; deleteError = null; notice = null; return Task.CompletedTask; }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+    private async Task DeleteSupplierAsync(string reason)
+    {
+        if (deleteBusy || deleting is null) return;
+        deleteBusy = true;
+        deleteError = null;
+        try { await Repository.DeleteAsync(deleting, reason, lifetime.Token); suppliers = suppliers.Where(supplier => supplier.Id != deleting.Id).ToArray(); deleting = null; notice = "Furnizorul a fost mutat în arhivă."; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (SupplierOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Supplier deletion failed ({ErrorType}).", exception.GetType().Name); deleteError = "Furnizorul nu a putut fi șters. Actualizează lista și reîncearcă."; }
+        finally { deleteBusy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

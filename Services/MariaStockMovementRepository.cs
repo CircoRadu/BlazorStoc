@@ -18,12 +18,15 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         SELECT m.id,m.product_id,m.kind,m.quantity,m.movement_date,m.description,m.beneficiary_id,b.name,m.project_id,p.name,
                m.operator,m.version,m.created_utc,m.updated_utc,
                EXISTS(SELECT 1 FROM stock_movement_history h WHERE h.movement_id=m.id),
-               m.destination,m.vehicle_id,dv.plate_number,m.source_vehicle_id,sv.plate_number
+               m.destination,m.vehicle_id,dv.plate_number,m.source_vehicle_id,sv.plate_number,
+               m.invoice_id,si.`number`,su.name,si.supplier_id
         FROM stock_movements m
         LEFT JOIN beneficiaries b ON b.id=m.beneficiary_id
         LEFT JOIN projects p ON p.id=m.project_id
         LEFT JOIN vehicles dv ON dv.id=m.vehicle_id
         LEFT JOIN vehicles sv ON sv.id=m.source_vehicle_id
+        LEFT JOIN supplier_invoices si ON si.id=m.invoice_id
+        LEFT JOIN suppliers su ON su.id=si.supplier_id
         """;
 
     public async Task<StockMovementPage> GetPageAsync(int productId, StockMovementQuery query, CancellationToken cancellationToken = default)
@@ -238,22 +241,24 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                 if (value.Quantity!.Value > held)
                     throw new StockMovementOperationException(StockMovementRules.NotEnoughInVehicleMessage(sourcePlate!, held));
             }
+            var (invoiceNumber, supplierName, supplierId) = await ResolveInvoiceAsync(connection, transaction, value.InvoiceId, cancellationToken).ConfigureAwait(false);
             await using var insert = Command(connection, transaction, """
                 INSERT INTO stock_movements
                     (product_id,beneficiary_id,project_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc,
-                     destination,vehicle_id,source_vehicle_id)
+                     destination,vehicle_id,source_vehicle_id,invoice_id)
                 VALUES(@product,@beneficiary,@project,@quantity,@created,@kind,@date,@description,@operator,0,@created,
-                       @destination,@vehicle,@sourceVehicle)
+                       @destination,@vehicle,@sourceVehicle,@invoice)
                 """, ("@product", productId), ("@beneficiary", value.BeneficiaryId), ("@project", value.ProjectId),
                 ("@quantity", value.Quantity), ("@created", nowText), ("@kind", (int)value.Kind),
                 ("@date", StockMovementRules.StorageDate(value.Date!.Value)), ("@description", value.Description),
                 ("@operator", actor.Username), ("@destination", (int?)value.Destination), ("@vehicle", value.VehicleId),
-                ("@sourceVehicle", value.SourceVehicleId));
+                ("@sourceVehicle", value.SourceVehicleId), ("@invoice", value.InvoiceId));
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var id = checked((int)insert.LastInsertedId);
             var movement = new StockMovement(id, productId, value.Kind, value.Quantity!.Value, value.Date.Value, value.Description,
                 value.BeneficiaryId, beneficiaryName, value.ProjectId, projectName, actor.Username, 0, now, now, false,
-                value.Destination, value.VehicleId, vehiclePlate, value.SourceVehicleId, sourcePlate);
+                value.Destination, value.VehicleId, vehiclePlate, value.SourceVehicleId, sourcePlate,
+                value.InvoiceId, invoiceNumber, supplierName, supplierId);
             await EnsureVehicleStocksNotNegativeAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
             var stock = await ApplyStockAsync(connection, transaction, productId, movement.Effect, cancellationToken).ConfigureAwait(false);
             return (movement, stock, productCode);
@@ -467,6 +472,20 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         return (beneficiaryName, projectName);
     }
 
+    // The invoice an entry is taken from, read under the transaction (so it cannot disappear before the entry is written).
+    private static async Task<(string? Number, string? SupplierName, int? SupplierId)> ResolveInvoiceAsync(MySqlConnection connection,
+        MySqlTransaction transaction, int? invoiceId, CancellationToken token)
+    {
+        if (invoiceId is not { } id) return (null, null, null);
+        await using var command = Command(connection, transaction, """
+            SELECT si.`number`,su.name,si.supplier_id FROM supplier_invoices si INNER JOIN suppliers su ON su.id=si.supplier_id WHERE si.id=@id
+            """, ("@id", id));
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        if (!await reader.ReadAsync(token).ConfigureAwait(false))
+            throw new StockMovementOperationException("Factura aleasă nu mai există. Actualizează pagina și reia operația.");
+        return (reader.GetString(0), reader.GetString(1), ToInt32(reader.GetInt64(2)));
+    }
+
     private static async Task<(string? VehiclePlate, string? SourcePlate)> ResolveVehiclesAsync(MySqlConnection connection,
         MySqlTransaction transaction, StockMovementInput value, CancellationToken token)
     {
@@ -558,7 +577,9 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             Convert.ToBoolean(reader.GetValue(14)),
             reader.IsDBNull(15) ? null : (ExitDestination)ToInt32(reader.GetInt64(15)),
             reader.IsDBNull(16) ? null : ToInt32(reader.GetInt64(16)), reader.IsDBNull(17) ? null : reader.GetString(17),
-            reader.IsDBNull(18) ? null : ToInt32(reader.GetInt64(18)), reader.IsDBNull(19) ? null : reader.GetString(19));
+            reader.IsDBNull(18) ? null : ToInt32(reader.GetInt64(18)), reader.IsDBNull(19) ? null : reader.GetString(19),
+            reader.IsDBNull(20) ? null : ToInt32(reader.GetInt64(20)), reader.IsDBNull(21) ? null : reader.GetString(21),
+            reader.IsDBNull(22) ? null : reader.GetString(22), reader.IsDBNull(23) ? null : ToInt32(reader.GetInt64(23)));
     }
 
     private static DateTime ReadUpdated(MySqlDataReader reader, DateTime fallback)

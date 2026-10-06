@@ -20,7 +20,8 @@ public static class ArchiveSchemaRegistry
             new ArchiveEntitySchema(AuditEntities.WorkPoint, "archive_work_points", true, true),
             new ArchiveEntitySchema(AuditEntities.ServicePhoto, "archive_service_photos", false, true),
             new ArchiveEntitySchema(AuditEntities.ServiceContract, "archive_service_contracts", true, false),
-            new ArchiveEntitySchema(AuditEntities.ServiceIntervention, "archive_service_interventions", true, true)
+            new ArchiveEntitySchema(AuditEntities.ServiceIntervention, "archive_service_interventions", true, true),
+            new ArchiveEntitySchema(AuditEntities.Supplier, "archive_suppliers", false, false)
         }.ToDictionary(schema => schema.EntityType, StringComparer.Ordinal);
 
     public static IReadOnlyCollection<ArchiveEntitySchema> All { get; } = Schemas.Values.ToArray();
@@ -164,6 +165,13 @@ public static class ArchiveRequests
             .Concat((photos ?? []).Select(photo => ArchiveRelationSnapshot.Create(AuditEntities.ServicePhoto, photo.Id.ToString(), photo)));
         return new(ArchiveSnapshot.Create(AuditEntities.Beneficiary, value.Id.ToString(), value.Version, value, relations),
             $"#{value.Id} · {value.Name}", details, motif);
+    }
+
+    // A supplier is archived only when nothing refers to it (no invoice, entry or template), so it has no relations.
+    public static ArchiveRequest Supplier(Supplier value, string motif)
+    {
+        var details = AuditDetails.Identification(("Denumire", value.Name), ("CUI / cod TVA", value.Cui));
+        return new(ArchiveSnapshot.Create(AuditEntities.Supplier, value.Id.ToString(), value.Version, value), SupplierRules.Target(value), details, motif);
     }
 
     public static ArchiveRequest WorkPoint(WorkPoint value, string beneficiaryName, IEnumerable<ServicePhoto> photos, string motif)

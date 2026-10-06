@@ -25,8 +25,11 @@ public sealed record StockMovement(int Id, int ProductId, StockMovementKind Kind
     string Description, int? BeneficiaryId, string? BeneficiaryName, int? ProjectId, string? ProjectName,
     string Operator, long Version, DateTime CreatedUtc, DateTime UpdatedUtc, bool Modified = false,
     ExitDestination? Destination = null, int? VehicleId = null, string? VehiclePlate = null,
-    int? SourceVehicleId = null, string? SourceVehiclePlate = null)
+    int? SourceVehicleId = null, string? SourceVehiclePlate = null,
+    int? InvoiceId = null, string? InvoiceNumber = null, string? SupplierName = null, int? SupplierId = null)
 {
+    // An entry taken from a supplier's invoice (Preluare factura) carries the invoice; an entry without one is a free entry.
+    [JsonIgnore] public bool HasInvoice => InvoiceId is not null;
     // Signed effect on the total product stock: entries add, exits subtract, except a transfer into a vehicle (0).
     [JsonIgnore] public int Effect => StockMovementRules.Effect(Kind, Destination, Quantity);
     // A move between vehicles or a return to the warehouse (made from the vehicle page); edited without the destination picker.
@@ -46,6 +49,9 @@ public sealed class StockMovementInput
     // Destination vehicle (only for ExitDestination.Vehicle) and source vehicle (null = the warehouse).
     public int? VehicleId { get; set; }
     public int? SourceVehicleId { get; set; }
+    // The invoice an entry is taken from (set only when the entry is created by the invoice pickup; null = a free entry). It is not changed
+    // when a movement is edited.
+    public int? InvoiceId { get; set; }
     public string Reason { get; set; } = "";
 
     public StockMovementInput Clone() => (StockMovementInput)MemberwiseClone();
@@ -59,7 +65,7 @@ public sealed class StockMovementInput
         Destination = movement.Kind == StockMovementKind.Exit
             ? movement.Destination ?? (movement.BeneficiaryId is not null ? ExitDestination.Beneficiary : null)
             : null,
-        VehicleId = movement.VehicleId, SourceVehicleId = movement.SourceVehicleId
+        VehicleId = movement.VehicleId, SourceVehicleId = movement.SourceVehicleId, InvoiceId = movement.InvoiceId
     };
 }
 
@@ -223,9 +229,11 @@ public static class StockMovementRules
                 errors.Add("Beneficiarul și proiectul se pot alege numai la ieșire.");
             if (destination is not null || vehicleId is not null || sourceVehicleId is not null)
                 errors.Add("Destinația și sursa se pot alege numai la ieșire.");
+            if (input.InvoiceId is <= 0) errors.Add("Factura aleasă nu este validă.");
         }
         else
         {
+            if (input.InvoiceId is not null) errors.Add("Factura se poate alege numai la intrare.");
             if (destination is not { } chosen || !Enum.IsDefined(chosen)) errors.Add(DestinationRequiredMessage);
             else if (chosen == ExitDestination.Beneficiary)
             {
@@ -259,7 +267,7 @@ public static class StockMovementRules
             Kind = kind, Date = input.Date, Quantity = input.Quantity, Description = description,
             BeneficiaryId = beneficiaryId, ProjectId = projectId, Reason = reason,
             Destination = kind == StockMovementKind.Exit ? destination : null,
-            VehicleId = vehicleId, SourceVehicleId = sourceVehicleId
+            VehicleId = vehicleId, SourceVehicleId = sourceVehicleId, InvoiceId = kind == StockMovementKind.Entry ? input.InvoiceId : null
         };
     }
 
@@ -281,6 +289,7 @@ public static class StockMovementRules
         if (movement.BeneficiaryName is not null) values.Add(("Beneficiar", movement.BeneficiaryName));
         if (movement.ProjectName is not null) values.Add(("Proiect", movement.ProjectName));
         if (movement.VehiclePlate is not null) values.Add(("Vehicul", movement.VehiclePlate));
+        if (movement.InvoiceNumber is not null) values.Add(("Factură", movement.SupplierName is null ? movement.InvoiceNumber : $"{movement.InvoiceNumber} · {movement.SupplierName}"));
         if (movement.Kind == StockMovementKind.Exit) values.Add(("Sursă", SourceLabel(movement)));
         return AuditDetails.Identification(values.ToArray());
     }

@@ -107,6 +107,14 @@ internal static class MariaArchivePersistence
                     """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", beneficiary.Id),
                     ("@name", beneficiary.Name), ("@cui", beneficiary.Cui), ("@version", beneficiary.Version)).ConfigureAwait(false);
                 break;
+            case AuditEntities.Supplier:
+                var supplier = ArchiveJson.Entity<Supplier>(snapshot);
+                await ExecuteAsync(connection, transaction, """
+                    INSERT INTO archive_suppliers(archive_id,original_id,name,cui,country,source,version)
+                    VALUES(@archiveId,@id,@name,@cui,@country,@source,@version)
+                    """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", supplier.Id), ("@name", supplier.Name),
+                    ("@cui", supplier.Cui), ("@country", supplier.Country), ("@source", supplier.Source), ("@version", supplier.Version)).ConfigureAwait(false);
+                break;
             case AuditEntities.User:
                 var user = ArchiveJson.Entity<WebUser>(snapshot);
                 var passwordHash = snapshot.ProtectedValues.SingleOrDefault(value =>
@@ -155,16 +163,16 @@ internal static class MariaArchivePersistence
                 await ExecuteAsync(connection, transaction, """
                     INSERT INTO archive_stock_movements
                         (archive_id,original_id,product_id,kind,quantity,movement_date,description,beneficiary_id,project_id,operator,version,
-                         destination,vehicle_id,source_vehicle_id)
+                         destination,vehicle_id,source_vehicle_id,invoice_id)
                     VALUES(@archiveId,@id,@product,@kind,@quantity,@date,@description,@beneficiary,@project,@operator,@version,
-                           @destination,@vehicle,@sourceVehicle)
+                           @destination,@vehicle,@sourceVehicle,@invoice)
                     """, token, ("@archiveId", operation.Id.ToString("D")), ("@id", movement.Id), ("@product", movement.ProductId),
                     ("@kind", (int)movement.Kind), ("@quantity", movement.Quantity),
                     ("@date", StockMovementRules.StorageDate(movement.Date)), ("@description", movement.Description),
                     ("@beneficiary", movement.BeneficiaryId), ("@project", movement.ProjectId),
                     ("@operator", movement.Operator), ("@version", movement.Version),
                     ("@destination", (int?)movement.Destination), ("@vehicle", movement.VehicleId),
-                    ("@sourceVehicle", movement.SourceVehicleId)).ConfigureAwait(false);
+                    ("@sourceVehicle", movement.SourceVehicleId), ("@invoice", movement.InvoiceId)).ConfigureAwait(false);
                 break;
             case AuditEntities.Vehicle:
                 var vehicle = ArchiveJson.Entity<Vehicle>(snapshot);

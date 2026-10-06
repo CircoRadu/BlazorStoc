@@ -157,7 +157,12 @@ else
                                 <td>@StockMovementRules.DisplayDate(m.Date)</td>
                                 <td><span class="kind-label @(m.Kind == StockMovementKind.Entry ? "in" : "out")">@StockMovementRules.KindLabel(m.Kind)@(m.Modified ? "[*]" : "")</span></td>
                                 <td class="number">@m.Quantity</td>
-                                <td class="movement-text">@m.Description</td>
+                                <td class="movement-text">@m.Description
+                                    @if (m.InvoiceNumber is not null)
+                                    {
+                                        <span class="movement-project movement-invoice"> · factura @m.InvoiceNumber@if (m.SupplierId is { } supplierId && m.SupplierName is not null) { <text> · </text><a class="category-table-link" href="@SupplierNavigation.SupplierUrl(supplierId)">@m.SupplierName</a> }</span>
+                                    }
+                                </td>
                                 <td>
                                     @if (m.BeneficiaryName is not null)
                                     {
@@ -716,8 +721,9 @@ else
     private UnsavedChangesTracker? addTracker, editTracker;
     private string AddSnapshot() => FormSnapshot.Of(form, useProject);
     private string EditSnapshot() => FormSnapshot.Of(editForm, editUseProject);
-    private Task DiscardAddAsync() { form = NewForm(); useProject = false; addSuggestion = null; formError = null; addTracker?.Rebase(); return Task.CompletedTask; }
-    private Task DiscardEditAsync() { CloseEdit(); return Task.CompletedTask; }
+    // Both are called by the leave dialog (another component), so the page asks for its own re-render to show the form or dialog closed.
+    private async Task DiscardAddAsync() { form = NewForm(); useProject = false; addSuggestion = null; formError = null; addTracker?.Rebase(); await InvokeAsync(StateHasChanged); }
+    private async Task DiscardEditAsync() { CloseEdit(); await InvokeAsync(StateHasChanged); }
     private Task RequestCloseEditAsync() => editTracker is null ? DiscardEditAsync() : editTracker.RunAfterConfirmAsync(DiscardEditAsync);
     private void ImageKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape") imagePreview = false; }
     private void RequestDelete(StockMovement movement) { notice = null; deleteError = null; deleting = movement; }

@@ -75,10 +75,16 @@ public sealed class AnafState
 
 public sealed record AnafRequest(string Url, string Method, IReadOnlyDictionary<string, string> Headers, string Body, string Cui);
 public sealed record AnafCompany(string Cui, string Name, string Address, string RegistryNumber, string Phone, string PostalCode, string CaenCode);
-public sealed record AnafCompanyResult(AnafCompany? Company, string? Error, string? Warning);
+// Found: the company data. NotFound: ANAF answered and does not know the CUI (not an outage). InvalidCui: the text is not a CUI.
+// Unavailable: ANAF could not answer or the integration cannot be used (not configured, disabled, error status, timeout, an answer the
+// configuration cannot read): the data may be typed by hand and is marked as such.
+public enum AnafLookupOutcome { Found, NotFound, InvalidCui, Unavailable }
+
+public sealed record AnafCompanyResult(AnafCompany? Company, string? Error, string? Warning, AnafLookupOutcome Outcome = AnafLookupOutcome.Found);
 public sealed record AnafMappedValue(string Label, string Path, string Type, string? Value);
+// CuiNotFound: ANAF answered normally and listed the requested CUI among those it does not know.
 public sealed record AnafTestResult(bool Ok, int? StatusCode, long DurationMs, AnafRequest? Request, string Raw,
-    IReadOnlyList<AnafMappedValue> Mapped, IReadOnlyList<string> Errors, DateTimeOffset At);
+    IReadOnlyList<AnafMappedValue> Mapped, IReadOnlyList<string> Errors, DateTimeOffset At, bool CuiNotFound = false);
 
 public static partial class AnafRules
 {
@@ -87,6 +93,7 @@ public static partial class AnafRules
     public const string TypeText = "text";
     public const string TypeBoolean = "boolean";
     public const int MaxResponseBytes = 2_000_000;
+    public const int FormTimeoutSeconds = 12;
     public static readonly string[] Methods = ["POST", "PUT", "GET"];
     public static readonly string[] DateFormats = ["yyyy-MM-dd", "yyyyMMdd", "dd.MM.yyyy"];
     private static readonly string[] ReservedHeaders = ["host", "content-length", "connection", "authorization", "cookie", "transfer-encoding"];
@@ -204,6 +211,14 @@ public static partial class AnafRules
     public static string Fingerprint(AnafConfig c) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(c))));
 
+    // An entry of the "not found" list: the CUI itself, or an object that carries it.
+    private static string? UnknownCui(JsonElement item) => item.ValueKind switch
+    {
+        JsonValueKind.Number or JsonValueKind.String => item.ToString(),
+        JsonValueKind.Object when item.TryGetProperty("cui", out var inner) => inner.ToString(),
+        _ => null
+    };
+
     public static AnafTestResult Interpret(AnafConfig c, AnafRequest request, int status, long durationMs, string raw)
     {
         var now = DateTimeOffset.Now;
@@ -221,7 +236,10 @@ public static partial class AnafRules
             if (found is { ValueKind: JsonValueKind.Array } list)
                 foreach (var item in list.EnumerateArray())
                     if (item.ValueKind == JsonValueKind.Object && Pick(item, c.Identity) is { } id && id.ToString() == request.Cui) { match = item; break; }
-            if (match is null) errors.Add("CUI-ul solicitat nu a fost găsit prin maparea configurată.");
+            // The CUI is among those ANAF reports as unknown (the list holds numbers or objects with the CUI).
+            var cuiNotFound = match is null && Pick(root, c.NotFound) is { ValueKind: JsonValueKind.Array } unknown &&
+                unknown.EnumerateArray().Any(item => UnknownCui(item) == request.Cui);
+            if (match is null) errors.Add(cuiNotFound ? "CUI-ul solicitat nu este înregistrat în ANAF." : "CUI-ul solicitat nu a fost găsit prin maparea configurată.");
             var mapped = new List<AnafMappedValue>();
             if (match is not null)
                 foreach (var m in c.Mappings)
@@ -243,7 +261,7 @@ public static partial class AnafRules
                     mapped.Add(new AnafMappedValue(m.Label, m.Path, m.Type, text));
                 }
             var pretty = JsonSerializer.Serialize(root, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
-            return new(errors.Count == 0, status, durationMs, request, pretty, mapped, errors, now);
+            return new(errors.Count == 0, status, durationMs, request, pretty, mapped, errors, now, cuiNotFound);
         }
     }
 }
@@ -330,22 +348,29 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
         try { state = await store.ReadAsync(cancellationToken); }
         finally { store.FileGate.Release(); }
         if (state.Active is not { } active)
-            return new(null, "Preluarea din ANAF nu este configurată. Un administrator trebuie să activeze o configurație în Setări → Preluare date ANAF.", null);
+            return new(null, "Preluarea din ANAF nu este configurată. Un administrator trebuie să activeze o configurație în Setări → Preluare date ANAF.", null, AnafLookupOutcome.Unavailable);
         var config = active.Config;
-        if (!config.Enabled) return new(null, "Integrarea ANAF este dezactivată de administrator.", null);
+        if (!config.Enabled) return new(null, "Integrarea ANAF este dezactivată de administrator.", null, AnafLookupOutcome.Unavailable);
+        // Someone is waiting in a form: a slow ANAF is given the time of a form, not the (longer) one of the configuration test. The state was
+        // just read from the file, so this copy is ours.
+        config.Timeout = Math.Min(config.Timeout, AnafRules.FormTimeoutSeconds);
+        // A text that is not a CUI is the user's mistake, not an ANAF outage: nothing is sent.
+        if (AnafRules.NormalizeCui(config, cui) is null)
+            return new(null, "CUI-ul trebuie să conțină între 2 și 10 cifre, fără zero inițial.", null, AnafLookupOutcome.InvalidCui);
         AnafTestResult result;
         try
         {
             var request = AnafRules.Prepare(config, cui, DateOnly.FromDateTime(DateTime.Today));
             result = await SendAsync(config, request, cancellationToken);
         }
-        catch (AnafException ex) { return new(null, ex.Message, null); }
-        if (!result.Ok) return new(null, result.Errors.FirstOrDefault() ?? "Interogarea ANAF a eșuat.", null);
+        catch (AnafException ex) { return new(null, ex.Message, null, AnafLookupOutcome.Unavailable); }
+        if (result.CuiNotFound) return new(null, "CUI-ul nu este înregistrat în ANAF. Datele se pot introduce manual.", null, AnafLookupOutcome.NotFound);
+        if (!result.Ok) return new(null, result.Errors.FirstOrDefault() ?? "Interogarea ANAF a eșuat.", null, AnafLookupOutcome.Unavailable);
         string Value(string label) => result.Mapped.FirstOrDefault(m => string.Equals(m.Label, label, StringComparison.OrdinalIgnoreCase))?.Value ?? "";
         var company = new AnafCompany(result.Request!.Cui, Value("Denumire"), Value("Adresă fiscală"), Value("Nr. Registrul Comerțului"),
             Value("Telefon"), Value("Cod poștal"), Value("Cod CAEN"));
         var warning = Value("Inactiv fiscal") == "Da" ? "Atenție: ANAF raportează firma ca inactivă fiscal." : null;
-        return new(company, null, warning);
+        return new(company, null, warning, AnafLookupOutcome.Found);
     }
 
     private async Task<AnafTestResult> SendAsync(AnafConfig config, AnafRequest request, CancellationToken cancellationToken)

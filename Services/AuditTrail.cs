@@ -37,6 +37,9 @@ public static class AuditEntities
     public const string MapPinType = "TipPinHarta";
     // Settings -> Facturi: the saved invoice templates (layouts used to read supplier invoices).
     public const string InvoiceTemplate = "SablonFactura";
+    // Administrare -> Furnizori (the register of suppliers) and the invoices of suppliers that stock entries are taken from.
+    public const string Supplier = "Furnizor";
+    public const string SupplierInvoice = "FacturaFurnizor";
 }
 
 public static class AuditActions
@@ -112,6 +115,11 @@ public static class AuditActions
     public const string DeleteInvoiceTemplate = "Ștergere șablon factură";
     public const string ActivateInvoiceTemplate = "Activare șablon factură";
     public const string DeactivateInvoiceTemplate = "Dezactivare șablon factură";
+    // Suppliers: each kind of change is named exactly (data read again from ANAF is not an ordinary edit). Deleting a supplier is the archived "Ștergere".
+    public const string CreateSupplier = "Adăugare furnizor";
+    public const string EditSupplier = "Modificare furnizor";
+    public const string RecheckSupplier = "Reverificare furnizor ANAF";
+    public const string RecordSupplierInvoice = "Înregistrare factură furnizor";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
@@ -126,7 +134,8 @@ public static class AuditActions
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
-            or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate;
+            or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate
+            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -187,7 +196,9 @@ public static class AuditNavigation
         [AuditEntities.MapEngine] = _ => SettingsNavigation.MapEngineUrl,
         [AuditEntities.MapPinType] = SettingsNavigation.MapPinTypeUrl,
         // The saved templates sub-tab of Settings -> Facturi, the template highlighted.
-        [AuditEntities.InvoiceTemplate] = SettingsNavigation.InvoiceTemplateUrl
+        [AuditEntities.InvoiceTemplate] = SettingsNavigation.InvoiceTemplateUrl,
+        // The supplier page (its data and invoices). An invoice event stores the invoice id, which has no page of its own: plain text.
+        [AuditEntities.Supplier] = SupplierNavigation.SupplierUrl
     };
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)

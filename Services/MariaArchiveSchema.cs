@@ -33,7 +33,7 @@ public static class MariaArchiveSchema
     // manifest and of the canonical row hash. Add every future migration-created table here.
     private static readonly string[] MigratedTables = ["beneficiary_work_points", "notification_templates", "expiry_notifications", "notification_settings",
         "service_photos", "archive_work_points", "archive_service_photos", "service_contracts", "service_contract_points", "archive_service_contracts", "service_interventions", "archive_service_interventions",
-        "invoice_templates", "invoice_template_versions", "invoice_template_models"];
+        "invoice_templates", "invoice_template_versions", "invoice_template_models", "suppliers", "archive_suppliers", "supplier_invoices"];
 
     internal static readonly string[] RequiredTables = [.. BaselineTables, .. MigratedTables];
 

@@ -148,10 +148,11 @@ public static class BeneficiaryRules
         return text.StartsWith('+') ? "+" + digits : digits;
     }
 
-    // The stored uniqueness key: the CUI for a legal person, the full name (prefixed, so it can never equal a CUI) for an individual.
+    // The stored uniqueness key: the CUI digits for a legal person ("RO123", "ro 123" and "123" are the same one, as for suppliers), the full
+    // name (prefixed, so it can never equal a CUI) for an individual.
     public static string IdentityKey(BeneficiaryInput value) => value.IsIndividual
         ? "PF:" + TextNormalization.UniquenessKey(value.Name)
-        : TextNormalization.UniquenessKey(value.Cui);
+        : SupplierRules.CuiDigits(value.Cui) is { Length: > 0 } digits ? digits : TextNormalization.UniquenessKey(value.Cui);
 
     public static BeneficiaryOperationException DuplicateIdentity(BeneficiaryInput value, string? existingName) => new(value.IsIndividual
         ? (string.IsNullOrWhiteSpace(existingName) ? "Există deja o persoană fizică cu acest nume." : $"Există deja o persoană fizică cu acest nume: «{existingName}».")

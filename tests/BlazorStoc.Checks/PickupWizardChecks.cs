@@ -46,6 +46,7 @@ public static class PickupWizardChecks
         context.Services.AddSingleton<IProductRepository>(repository);
         context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
+        context.Services.AddSupplierFakes();
         context.Services.AddScoped<UnsavedChanges>();
         context.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 
@@ -115,7 +116,8 @@ public static class PickupWizardChecks
         check(cut.Markup.Contains("Produs nou pregătit") && cut.Find(".pickup-exact strong").TextContent == preparedName && Cell(0, quantityTitle).GetAttribute("value") == "2" && Cell(1, priceTitle).GetAttribute("value") == "12,5",
             "Pickup wizard: going back to step 1 and forward again keeps the prepared product and the corrected cells");
 
-        // Step 3, an edited description, then back to step 2 and forward again: nothing is lost.
+        // Step 3 needs the number, the CUI and the date confirmed in step 2; an edited description, then back to step 2 and forward again: nothing is lost.
+        SupplierTestServices.ConfirmHeader(cut);
         Click("Pasul următor");
         cut.WaitForAssertion(() => cut.Find("textarea"), TimeSpan.FromSeconds(10));
         cut.Find("textarea").Input("Descriere scrisa de utilizator");
@@ -155,6 +157,7 @@ public static class PickupWizardChecks
             labContext.Services.AddSingleton<IProductRepository>(repository);
             labContext.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
             labContext.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
+            labContext.Services.AddSupplierFakes();
             labContext.Services.AddScoped<UnsavedChanges>();
             labContext.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
                 { ["Invoices:Lab"] = "true", ["Invoices:LabReferencesDirectory"] = referencesDirectory }).Build()));
@@ -217,6 +220,7 @@ public static class PickupWizardChecks
         context.Services.AddSingleton<IProductRepository>(new DemoProductRepository(access));
         context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
+        context.Services.AddSupplierFakes();
         context.Services.AddScoped<UnsavedChanges>();
         context.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 
@@ -258,6 +262,7 @@ public static class PickupWizardChecks
         second.Services.AddSingleton<IProductRepository>(new DemoProductRepository(access));
         second.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         second.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
+        second.Services.AddSupplierFakes();
         second.Services.AddScoped<UnsavedChanges>();
         second.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
         var again = second.Render<InvoicePickup>();
