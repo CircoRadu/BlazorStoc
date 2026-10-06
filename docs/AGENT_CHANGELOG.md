@@ -1404,3 +1404,10 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 - **Validare:** teste de componente trec; verificat in browser (preview 5087).
 - **Commit:** `claude: miscari de stoc - avertizarea de modificari nesalvate peste dialog, inchiderea la parasire; task robustete; reguli de economie de tokeni`
 - **Predat catre:** claude
+
+## 2026-10-06T09:00:00.0000000Z - claude
+
+- **Rezumat:** valoarea unui camp citit la dreapta etichetei se opreste la bara verticala („Moneda: RON | Pagina 1 din 1" = „RON"); `WordsRightOf` in `Services/Invoices/InvoiceTemplates.cs`, test in `tests/BlazorStoc.Checks/InvoiceChecks.cs`.
+- **Validare:** suita completa 899 de verificari trec; neverificat in browser.
+- **Commit:** `claude: valoarea campului citit la dreapta etichetei se opreste la bara verticala`
+- **Predat catre:** claude

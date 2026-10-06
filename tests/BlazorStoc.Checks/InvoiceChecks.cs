@@ -69,6 +69,15 @@ public static class InvoiceChecks
         var unknownDraft = InvoiceTemplateDraft.FromAnalysis(withUnknownColumn);
         check(unknownDraft.Columns.Count == roAnalysis.Table!.Columns.Count && unknownDraft.Columns.All(column => column.Use) && unknownDraft.Columns[2].Meaning == InvoiceColumnMeanings.Other,
             "Invoice templates: every column found on the page starts as used by the import, also the one whose header is not recognised (it becomes an own-name column)");
+        // A value read to the right of its label ends at a vertical bar: "Moneda: RON | Pagina 1 din 1" gives "RON", not the rest of the line.
+        var barWords = new List<InvoiceWord>
+        {
+            new(1, "Moneda:", 50, 100, 40, 8, 0), new(1, "RON", 95, 100, 20, 8, 1), new(1, "|", 118, 100, 2, 8, 2), new(1, "Pagina", 123, 100, 30, 8, 3), new(1, "1", 156, 100, 5, 8, 4)
+        };
+        var barDocument = new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, barWords)]);
+        var barField = new InvoiceTemplateField("m", InvoiceFieldMeanings.Currency, "Moneda", true, 1, 95.0 / 595, 100.0 / 842, 20.0 / 595, 8.0 / 842, "Moneda", "text", false, InvoiceFieldModes.Right, 50.0 / 595, 100.0 / 842);
+        check(InvoiceTemplateEngine.ReadField(barField, barDocument, new InvoiceAlignment(0, 0, 0, 0, 0, 0)).Value == "RON",
+            "Invoice templates: a value read to the right of its label ends at a vertical bar (\"RON | Pagina 1\" is \"RON\")");
         check(roDraft.Fields.Where(field => field.Use && field.LabelText.Trim().Length > 0).All(field => InvoiceTemplateDraft.EffectiveLabel(field).StartsWith(field.LabelText.Trim().TrimEnd(':', ' '), StringComparison.Ordinal)),
             "Invoice analysis: the label of a found field is the text the file itself has beside it, not a title of a general vocabulary");
         // A used column keeps its own name as label, whatever its meaning ("Taxa verde" with the meaning VAT rate is <Taxa verde>).

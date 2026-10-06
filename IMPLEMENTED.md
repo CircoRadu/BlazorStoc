@@ -1688,3 +1688,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - **Corectie:** `UnsavedChangesDialog` are clasa `unsaved-overlay` (`z-index: 70` in `wwwroot/app.css`); `ProductMovements.DiscardEditAsync` si `DiscardAddAsync` apeleaza `InvokeAsync(StateHasChanged)`. Fara test automat (dependente multe; suprapunerea nu se vede in bUnit); verificat in browser inainte si dupa.
 - **Task nou in TODO:** „Robustete la erori si la caderea aplicatiei pe server" (supervizor, jurnal in fisier, ErrorBoundary, /health, sarcini fara asteptare).
 - **Reguli:** `CLAUDE.md` primeste „Economie de tokeni" (iesire filtrata, teste tintite, citiri pe intervale, un singur build, verificari in browser cu text, sesiune noua cand contextul nu mai e necesar).
+
+## Finalizat la 06.10.2026 12:00 - Valoarea unui camp citit la dreapta etichetei se opreste la bara verticala
+
+- **Defect:** in descrierea intrarii, „Moneda" aducea si „Pagina 1 din 1" (rand de factura „Moneda: RON | Pagina 1 din 1"): `InvoiceTemplateEngine.WordsRightOf` lua tot restul randului pana la un spatiu mare.
+- **Corectie:** citirea se opreste la un cuvant „|" (bordura/linia citita de OCR ca token) - `Services/Invoices/InvoiceTemplates.cs`; sabloanele deja salvate dau valoarea corecta fara refacere (citirea se face la fiecare aplicare). Test in `InvoiceChecks.cs`; suita completa 899 de verificari trec.
+- **Limita:** daca OCR nu citeste bara, valoarea tot preia restul randului (se ingusteaza campul pe pagina).

@@ -551,10 +551,17 @@ public static class InvoiceTemplateEngine
         var centre = label.Y + label.Height / 2;
         var line = page.Words.Where(word => word.X >= label.Right - 0.5 && Math.Abs(word.CenterY - centre) <= 0.55 * Math.Max(1, label.Height)).OrderBy(word => word.X).ToList();
         var result = new List<InvoiceWord>();
-        foreach (var word in line)
+        for (var index = 0; index < line.Count; index++)
         {
+            var word = line[index];
             if (result.Count == 0) { if (word.X - label.Right > 60 * Math.Max(1, label.Height)) break; }
-            else if (word.X - result[^1].Right > 1.5 * Math.Max(1, label.Height)) break;
+            else
+            {
+                if (word.X - result[^1].Right > 1.5 * Math.Max(1, label.Height)) break;
+                // The value ends at a vertical bar (a border or rule the OCR read as a character)
+                // ("RON | Pagina 1 din 1" is the value "RON").
+                if (word.Text.Trim() is "|" or "│" or "¦") break;
+            }
             result.Add(word);
         }
         return result;
