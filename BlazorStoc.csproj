@@ -3,6 +3,9 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <!-- Only Release is built in development: a plain "dotnet build" (or one asking for Debug) builds Release. -->
+    <Configurations>Release</Configurations>
+    <Configuration Condition="'$(Configuration)' == '' Or '$(Configuration)' == 'Debug'">Release</Configuration>
     <ImplicitUsings>enable</ImplicitUsings>
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**;keys/**;keys-test/**</DefaultItemExcludes>
   </PropertyGroup>

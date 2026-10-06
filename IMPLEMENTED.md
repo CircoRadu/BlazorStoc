@@ -1703,3 +1703,7 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - **Pasul 2 al preluarii:** CUI-ul este verificat de la sine cand furnizorul este in registru sau tocmai a fost adaugat; numarul si data raman de verificat, cu imagine decupata din PDF a regiunii din care s-au citit (`InvoiceRegionPicture`); randurile cu valori necitite ca numar arata imaginea randului, cu celulele incadrate.
 - **Mediu local:** pasul 3 pica cu `ColumnAccessDenied` cand contul `blazorstoc_restore` (definer al declansatoarelor) nu avea SELECT; s-a dat din nou `GRANT SELECT` (ca in `create-restore-account.sql`). `tools/clear-suppliers-dev.sql` goleste furnizorii, facturile si miscarile legate (rulat de utilizator, doar baza de dezvoltare).
 - **Verificari:** suita completa 915 de verificari trec, 0 esecuri; neverificat in browser: imaginea randului din tabel.
+
+## Finalizat la 06.10.2026 - Dezvoltare doar pe Release
+
+- `BlazorStoc.csproj`: `Configurations` = Release si configuratia implicita (sau Debug) devine Release; un `dotnet build` fara parametri construieste Release. Un `-c Debug` scris explicit nu poate fi blocat din proiect, deci regula ramane: nu se mai genereaza build Debug in aceasta faza (folderele Debug generate au fost sterse).

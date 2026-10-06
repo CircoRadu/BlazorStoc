@@ -840,6 +840,7 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 - Sabloanele sunt legate de furnizori prin `supplier_id`; recunoasterea furnizorului (CUI, nume, alias, aproximativ) are jurnal si export CSV; migrarile 14-17 (14 fara UPDATE, legarea cu contul aplicatiei).
 - Motorul nu mai citeste datele cumparatorului; seria se separa de numarul facturii.
 - Pasul 2: CUI verificat automat pentru furnizor din registru; imagini din PDF langa numar si data, si pentru randurile cu valori necitite ca numar.
+- Build: doar Release (csproj; nu se mai genereaza Debug).
 - De stiut: declansatoarele din baza locala apartin contului `blazorstoc_restore`, care are nevoie de `GRANT SELECT` pe `BlazorStoc`. De verificat in browser: imaginea randului din tabel (pasul 2).
 
 ## Următorul pas
