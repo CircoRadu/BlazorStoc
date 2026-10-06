@@ -108,7 +108,8 @@ else
     // Task 1: leaving an edit form with modified values (the reason alone does not count) asks for confirmation first.
     private UnsavedChangesTracker? groupTracker;
     private string CurrentSnapshot() => FormSnapshot.Values(categoryName, subcategoryName, targetCategory);
-    private Task DiscardEditAsync() { CancelEdit(); return Task.CompletedTask; }
+    // Called by the leave dialog (another component), so the page asks for its own re-render to close the form.
+    private async Task DiscardEditAsync() { CancelEdit(); await InvokeAsync(StateHasChanged); }
     private Task RequestCancelEditAsync() => groupTracker is null ? DiscardEditAsync() : groupTracker.RunAfterConfirmAsync(DiscardEditAsync);
     private bool IsEditing => creatingCategory || creatingSubcategory || editingCategory is not null || editingSubcategory is not null;
     private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
@@ -120,7 +121,14 @@ else
         <div class="catalog-heading"><h2 id="subcategory-editor-title">@(creatingSubcategory ? $"Adaugă subcategorie în „{targetCategory}”" : $"Editează subcategoria „{editingSubcategory!.Subcategory}”")</h2></div>
         <div class="editor-grid">
             <label for="subcategory-name">Denumire subcategorie *<input id="subcategory-name" maxlength="100" @bind="subcategoryName" disabled="@saving" /></label>
-            <label for="subcategory-category">Categorie *<select id="subcategory-category" @bind="targetCategory" disabled="@(saving || creatingSubcategory)">@foreach (var category in Categories) { <option value="@category">@category</option> }</select></label>
+            <fieldset class="category-choice" aria-labelledby="subcategory-category-legend">
+                <legend id="subcategory-category-legend">Categorie *</legend>
+                @foreach (var category in Categories)
+                {
+                    var option = category;
+                    <label class="category-option"><input type="radio" name="subcategory-category" checked="@string.Equals(targetCategory, option, StringComparison.Ordinal)" disabled="@(saving || creatingSubcategory)" @onchange="() => targetCategory = option" /> <span>@option</span></label>
+                }
+            </fieldset>
             @if (!creatingSubcategory) { <ChangeReasonField Id="subcategory-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Disabled="@saving" /> }
         </div>
         <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>

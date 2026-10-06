@@ -34,14 +34,8 @@ else if (loadError is null && Categories.Count == 0)
 else if (loadError is null)
 {
     <section class="catalog inventory-options">
-        <label class="check-label">
-            <input type="checkbox" @ref="selectAllCheckboxRef" checked="@AllState.Checked" aria-label="Selectează toate categoriile" @onchange="ToggleAllAsync" />
-            Selectează toate categoriile
-        </label>
-        <label class="check-label">
-            <input type="checkbox" checked="@selection.ExcludeZeroStock" @onchange="ToggleExcludeZeroAsync" />
-            Elimină din situația de inventar produsele cu stoc 0
-        </label>
+        <ToggleSwitch Value="@AllState.Checked" Mixed="@AllState.Indeterminate" ValueChanged="ToggleAllAsync" AriaLabel="Selectează toate categoriile">Selectează toate categoriile</ToggleSwitch>
+        <ToggleSwitch Value="@selection.ExcludeZeroStock" ValueChanged="ToggleExcludeZeroAsync">Elimină din situația de inventar produsele cu stoc 0</ToggleSwitch>
     </section>
 
     <div class="category-management-list inventory-category-list">
@@ -57,11 +51,8 @@ else if (loadError is null)
                                 ExpandedChanged="@(expanded => SetCategoryExpanded(category, expanded))">
                 <Header>
                     <span class="inventory-checkbox" @onclick:stopPropagation="true">
-                        <input type="checkbox" aria-label="@($"Selectează categoria {category}")"
-                               disabled="@(subcategoryNames.Count == 0)"
-                               checked="@selection.CategoryState(category, subcategoryNames).Checked"
-                               @ref="categoryCheckboxes[category]"
-                               @onchange="@(e => ToggleCategoryAsync(category, subcategoryNames, (bool)(e.Value ?? false)))" />
+                        @{ var categoryState = selection.CategoryState(category, subcategoryNames); }
+<RowSelect Selected="@categoryState.Checked" Mixed="@categoryState.Indeterminate" Disabled="@(subcategoryNames.Count == 0)" AriaLabel="@($"Selectează categoria {category}")"                                   SelectedChanged="@(value => ToggleCategoryAsync(category, subcategoryNames, value))" />
                     </span>
                     <span class="category-disclosure-text">
                         <span class="category-title">@category</span>
@@ -83,8 +74,8 @@ else if (loadError is null)
                         <div class="table-scroll"><table><thead><tr><th><span class="sr-only">Selectează</span></th><th>SUBCATEGORIE</th><th>PRODUSE</th></tr></thead><tbody>
                         @foreach (var group in Subcategories(category))
                         {
-                            <tr @key="@($"{group.Category}:{group.Subcategory}")">
-                                <td><input type="checkbox" aria-label="@($"Selectează subcategoria {group.Subcategory}")" checked="@selection.IsSelected(group.Category, group.Subcategory)" @onchange="@(e => ToggleSubcategoryAsync(group, (bool)(e.Value ?? false)))" /></td>
+                            <tr @key="@($"{group.Category}:{group.Subcategory}")" class="selectable-row @(selection.IsSelected(group.Category, group.Subcategory) ? "selected" : null)" @onclick="() => ToggleSubcategoryAsync(group, !selection.IsSelected(group.Category, group.Subcategory))">
+<td><RowSelect Selected="@selection.IsSelected(group.Category, group.Subcategory)" AriaLabel="@($"Selectează subcategoria {group.Subcategory}")" SelectedChanged="@(value => ToggleSubcategoryAsync(group, value))" /></td>
                                 <td><strong>@group.Subcategory</strong></td>
                                 <td>@ProductCount(group) produse</td>
                             </tr>
@@ -119,11 +110,9 @@ else if (loadError is null)
     private IReadOnlyList<Product> products = Array.Empty<Product>();
     private readonly InventorySelectionState selection = new();
     private readonly HashSet<string> expandedCategories = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, ElementReference> categoryCheckboxes = new(StringComparer.Ordinal);
-    private ElementReference selectAllCheckboxRef;
-    private bool loading, generating, indeterminateDirty;
+    private bool loading, generating;
     private string? loadError, error, notice;
-    private IJSObjectReference? indeterminateModule, previewModule;
+    private IJSObjectReference? previewModule;
     // The generated file is shown in a dialog with print / save. It is never stored on the server: the bytes are held
     // here only until they have been handed to the browser (OnAfterRenderAsync), then dropped; saving and printing work
     // on the browser's copy, which is released when the dialog closes.
@@ -190,30 +179,27 @@ else if (loadError is null)
         finally { loading = false; }
     }
 
-    private Task ToggleAllAsync(ChangeEventArgs e)
+    private Task ToggleAllAsync(bool value)
     {
-        selection.SetAll(CategoryEntries, e.Value is true);
-        indeterminateDirty = true;
+        selection.SetAll(CategoryEntries, value);
         return Task.CompletedTask;
     }
 
-    private Task ToggleExcludeZeroAsync(ChangeEventArgs e)
+    private Task ToggleExcludeZeroAsync(bool value)
     {
-        selection.ExcludeZeroStock = e.Value is true;
+        selection.ExcludeZeroStock = value;
         return Task.CompletedTask;
     }
 
     private Task ToggleCategoryAsync(string category, IReadOnlyList<string> subcategories, bool value)
     {
         selection.SetCategory(category, subcategories, value);
-        indeterminateDirty = true;
         return Task.CompletedTask;
     }
 
     private Task ToggleSubcategoryAsync(ProductGroup group, bool value)
     {
         selection.SetSubcategory(group.Category, group.Subcategory, value);
-        indeterminateDirty = true;
         return Task.CompletedTask;
     }
 
@@ -329,28 +315,11 @@ else if (loadError is null)
                 StateHasChanged();
             }
         }
-        if (!indeterminateDirty && !firstRender) return;
-        if (Categories.Count == 0) return;
-        try
-        {
-            indeterminateModule ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./checkbox-indeterminate.js");
-            indeterminateDirty = false;
-            await indeterminateModule.InvokeVoidAsync("setIndeterminate", lifetime.Token, selectAllCheckboxRef, AllState.Indeterminate);
-            foreach (var category in Categories)
-            {
-                if (!categoryCheckboxes.TryGetValue(category, out var elementRef)) continue;
-                var (_, indeterminate) = selection.CategoryState(category, SubcategoryNames(category));
-                await indeterminateModule.InvokeVoidAsync("setIndeterminate", lifetime.Token, elementRef, indeterminate);
-            }
-        }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-        catch (JSDisconnectedException) { }
     }
 
     public async ValueTask DisposeAsync()
     {
         lifetime.Cancel();
-        if (indeterminateModule is not null) try { await indeterminateModule.DisposeAsync(); } catch (JSDisconnectedException) { }
         previewBytes = null;
         if (previewModule is not null)
         {

@@ -7,10 +7,16 @@ namespace BlazorStoc.Services;
 // Reading of the values found on invoices: numbers with either separator convention, dates in the usual formats, tax identifiers.
 public static partial class InvoiceValues
 {
+    // OCR regularisation: in a dotted abbreviation ("C.U.I.", "C.I.F.") the capital I is read as a vertical bar ("C.U.|.", "C.|.F."): a bar
+    // stuck to a single letter and a dot on one side, with another letter and dot on the other side, is the letter I.
+    [GeneratedRegex(@"(?<=\b\p{L}\.)\||\|(?=\.\p{L}\b)")]
+    private static partial Regex OcrBarAsLetterI();
+
     // Lower case, without diacritics, every other character than a letter or digit turned into a single space ("Nr. crt." -> "nr crt").
     public static string Normalize(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return "";
+        text = OcrBarAsLetterI().Replace(text, "I");
         var decomposed = text.Normalize(NormalizationForm.FormD);
         var builder = new StringBuilder(decomposed.Length);
         var pendingSpace = false;
@@ -33,6 +39,17 @@ public static partial class InvoiceValues
 
     [GeneratedRegex(@"^[+-]?\d[\d .,' ]*$")]
     private static partial Regex NumberShape();
+
+    [GeneratedRegex(@"^(?<number>[+-]?\s*\d[\d .,']*?)\s+(?:[A-Za-z]{2,4}\.?)$")]
+    private static partial Regex NumberThenCurrency();
+
+    // "301.41 RON" -> "301.41": an amount followed by the currency's code. Other text, and numbers without a currency, are returned as they are.
+    public static string WithoutCurrency(string? text)
+    {
+        var trimmed = (text ?? "").Trim();
+        var match = NumberThenCurrency().Match(trimmed);
+        return match.Success && ParseNumber(match.Groups["number"].Value) is not null ? match.Groups["number"].Value.Trim() : trimmed;
+    }
 
     [GeneratedRegex(@"^[\(\[]?\s*([+-]?\s*\d[\d .,' ]*)\s*[\)\]]?\s*(?:%|[A-Za-z]{2,4}\.?)?$")]
     private static partial Regex NumberWithSuffix();

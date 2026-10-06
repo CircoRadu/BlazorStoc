@@ -176,4 +176,127 @@ public static class PickupWizardChecks
         }
         finally { if (Directory.Exists(referencesDirectory)) Directory.Delete(referencesDirectory, recursive: true); }
     }
+
+    private sealed class MemoryTemplates : IInvoiceTemplateService
+    {
+        private readonly List<InvoiceTemplateRecord> records = [];
+        public Task<IReadOnlyList<InvoiceTemplateRecord>> GetAllAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<InvoiceTemplateRecord>>([.. records]);
+        public Task<IReadOnlyList<InvoiceTemplateInfo>> ListAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<InvoiceTemplateInfo>>([.. records.Select(item => item.Info)]);
+        public Task<InvoiceTemplateRecord?> GetAsync(int id, CancellationToken cancellationToken = default) => Task.FromResult(records.FirstOrDefault(item => item.Info.Id == id));
+        public Task<InvoiceTemplateModel?> GetModelAsync(int id, CancellationToken cancellationToken = default) => Task.FromResult<InvoiceTemplateModel?>(null);
+        public Task<InvoiceTemplateRecord> CreateAsync(InvoiceTemplateInput input, CancellationToken cancellationToken = default)
+        {
+            var now = DateTime.UtcNow;
+            var info = new InvoiceTemplateInfo(records.Count + 1, input.Name.Trim(), input.SupplierName, InvoiceValues.NormalizeCui(input.SupplierCui), input.Definition!.SourceKind, true, 0, "test", now, "test", now);
+            var record = new InvoiceTemplateRecord(info, input.Definition);
+            records.Add(record);
+            return Task.FromResult(record);
+        }
+        public Task<InvoiceTemplateRecord> SaveAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<InvoiceTemplateInfo> SetActiveAsync(InvoiceTemplateInfo original, bool active, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<InvoiceTemplateInfo> UpdateDetailsAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task DeleteAsync(InvoiceTemplateInfo original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    // A file whose supplier has no template: the pickup warns, offers to create the template in a window over the page (on the file already read)
+    // and, once it is saved, goes back to the pickup and reads the file with it.
+    public static async Task TemplateFlowAsync(Action<bool, string> check)
+    {
+        var access = new TestAccessControl(false, "pickup.user");
+        var store = new InvoiceAnalysisStore(TimeProvider.System);
+        var templates = new MemoryTemplates();
+        var invoice = InvoiceFixtures.Make(new InvoiceSpec("ro-lines", 4, SupplierName: "Furnizor Nou SRL", SupplierCui: "RO87654321", Number: "FN 7"), InvoiceFixtures.MakeRows(4, 5));
+
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLogging();
+        context.Services.AddSingleton<IAccessControl>(access);
+        context.Services.AddSingleton<IInvoiceAnalysisStore>(store);
+        context.Services.AddScoped<IInvoiceAnalysisService>(_ => new InvoiceAnalysisService(new InvoicePdfReader(new TestTessdata()), store, access));
+        context.Services.AddSingleton<IInvoiceTemplateService>(templates);
+        context.Services.AddSingleton<IProductRepository>(new DemoProductRepository(access));
+        context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
+        context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
+        context.Services.AddScoped<UnsavedChanges>();
+        context.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
+
+        var cut = context.Render<InvoicePickup>();
+        cut.WaitForAssertion(() => cut.Find("input[type=file]"), TimeSpan.FromSeconds(10));
+        cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(invoice.Pdf, "factura-noua.pdf", null, "application/pdf"));
+        cut.WaitForAssertion(() => cut.Find(".no-template-warning"), TimeSpan.FromSeconds(60));
+        check(cut.Find(".no-template-warning").TextContent.Contains("Furnizor Nou SRL", StringComparison.Ordinal) && cut.FindAll(".template-popup").Count == 0 &&
+              cut.FindAll(".no-template-warning button").Any(button => button.TextContent.Contains("Creează șablon", StringComparison.Ordinal)),
+            "Pickup template flow: a file whose supplier has no template shows a warning with the supplier and the option to create the template");
+
+        cut.FindAll(".no-template-warning button").First(button => button.TextContent.Contains("Creează șablon", StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll(".template-popup .invoice-head").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+        check(cut.Find(".template-popup").TextContent.Contains("factura-noua.pdf", StringComparison.Ordinal) && cut.FindAll(".template-popup input[type=file]").Count == 0,
+            "Pickup template flow: the template is made in a window over the page, on the file already read (the file is not asked for again)");
+
+        cut.FindAll(".template-popup button.primary").First(button => button.TextContent.Contains("Salvează șablonul", StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll(".template-popup").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+        var saved = (await templates.GetAllAsync()).SingleOrDefault();
+        cut.WaitForAssertion(() => { if (cut.FindAll(".no-template-warning").Count != 0 || !cut.Markup.Contains("Șablon detectat", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+        check(saved is not null && saved.Info.SupplierCui == "87654321" && cut.Markup.Contains(saved.Info.Name, StringComparison.Ordinal) && cut.FindAll("tbody tr").Count == invoice.Rows.Count,
+            "Pickup template flow: after the template is saved the window closes, the pickup reads the file with the new template and the rows are still there");
+
+        // Rows are chosen with a click anywhere on them; the header has "Selectează tot" (partial while only some rows are chosen).
+        cut.FindAll("tr.selectable-row")[0].Click();
+        var oneOff = cut.FindAll("tr.selectable-row.row-off").Count == 1 && cut.Find(".row-select-all .row-select").ClassList.Contains("mixed") && cut.Find(".row-select-all").TextContent.Contains("Selectează tot", StringComparison.Ordinal);
+        cut.Find(".row-select-all .row-select").Click();
+        check(oneOff && cut.FindAll("tr.selectable-row.row-off").Count == 0 && cut.FindAll("tr.selectable-row.selected").Count == invoice.Rows.Count && cut.FindAll("th input[type=checkbox]").Count == 0,
+            "Pickup rows: a click on a row takes it out of the import or back in, the header shows a partial mark and \"Selectează tot\" takes every row back");
+
+        // Closing the window without saving leaves the automatic reading and the warning.
+        using var second = new BunitContext();
+        second.JSInterop.Mode = JSRuntimeMode.Loose;
+        second.Services.AddLogging();
+        second.Services.AddSingleton<IAccessControl>(access);
+        second.Services.AddSingleton<IInvoiceAnalysisStore>(store);
+        second.Services.AddScoped<IInvoiceAnalysisService>(_ => new InvoiceAnalysisService(new InvoicePdfReader(new TestTessdata()), store, access));
+        second.Services.AddSingleton<IInvoiceTemplateService>(new MemoryTemplates());
+        second.Services.AddSingleton<IProductRepository>(new DemoProductRepository(access));
+        second.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
+        second.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
+        second.Services.AddScoped<UnsavedChanges>();
+        second.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
+        var again = second.Render<InvoicePickup>();
+        again.WaitForAssertion(() => again.Find("input[type=file]"), TimeSpan.FromSeconds(10));
+        again.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(invoice.Pdf, "factura-noua.pdf", null, "application/pdf"));
+        again.WaitForAssertion(() => again.Find(".no-template-warning"), TimeSpan.FromSeconds(60));
+        again.FindAll(".no-template-warning button").First(button => button.TextContent.Contains("Creează șablon", StringComparison.Ordinal)).Click();
+        again.WaitForAssertion(() => again.Find(".template-popup .invoice-head"), TimeSpan.FromSeconds(10));
+        again.FindAll(".template-popup button").First(button => button.TextContent.Contains("Închide fără să creezi", StringComparison.Ordinal)).Click();
+        again.WaitForAssertion(() => { if (again.FindAll(".template-popup").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+        check(again.FindAll(".no-template-warning").Count == 1 && again.FindAll("tbody tr").Count == invoice.Rows.Count && store.Count > 0,
+            "Pickup template flow: closing the window without saving keeps the file and the automatic reading (the file stays in memory for the page)");
+
+        // Settings: a user without the administrator role reaches only the invoice templates (create and edit), with deleting left out.
+        foreach (var administrator in new[] { false })
+        {
+            var rights = new TestAccessControl(administrator, administrator ? "ana" : "ion");
+            using var settingsContext = new BunitContext();
+            settingsContext.JSInterop.Mode = JSRuntimeMode.Loose;
+            settingsContext.Services.AddLogging();
+            settingsContext.Services.AddSingleton<IAccessControl>(rights);
+            settingsContext.Services.AddSingleton<IInvoiceAnalysisStore>(new InvoiceAnalysisStore(TimeProvider.System));
+            settingsContext.Services.AddScoped<IInvoiceAnalysisService>(provider => new InvoiceAnalysisService(new InvoicePdfReader(new TestTessdata()), provider.GetRequiredService<IInvoiceAnalysisStore>(), rights));
+            var withTemplate = new MemoryTemplates();
+            await withTemplate.CreateAsync(new InvoiceTemplateInput { Name = "Existent", SupplierName = "Furnizor SRL", SupplierCui = "123456", Definition = new InvoiceTemplateDefinition(InvoiceTemplateDefinition.CurrentSchema, InvoiceSources.Text, 595, 842, [], [], null) });
+            settingsContext.Services.AddSingleton<IInvoiceTemplateService>(withTemplate);
+            settingsContext.Services.AddScoped<UnsavedChanges>();
+            var settings = settingsContext.Render<Settings>();
+            settings.WaitForAssertion(() => settings.Find("[role=tablist]"), TimeSpan.FromSeconds(10));
+            var tabs = settings.FindAll(".settings-tab").Select(tab => tab.TextContent.Trim()).ToArray();
+            settings.FindAll(".settings-subtab").First(tab => tab.TextContent.Contains("Șabloane salvate", StringComparison.Ordinal)).Click();
+            settings.WaitForAssertion(() => settings.Find("#subpanel-" + SettingsNavigation.InvoiceTemplatesSubtab + " table"), TimeSpan.FromSeconds(10));
+            var deleteButtons = settings.FindAll("button[aria-label='Șterge șablonul']").Count;
+            var editButtons = settings.FindAll("button[aria-label='Editează șablonul']").Count;
+            check(administrator
+                    ? tabs.Length == 4 && deleteButtons == 1 && editButtons == 1
+                    : tabs is ["Facturi"] && deleteButtons == 0 && editButtons == 1 && !settings.Markup.Contains("Preluare date ANAF", StringComparison.Ordinal),
+                administrator ? "Settings: the administrator has every tab and can delete a template" : "Settings: a user without the administrator role reaches only the invoice templates (create and edit, no delete)");
+        }
+
+    }
 }

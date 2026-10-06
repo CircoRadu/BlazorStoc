@@ -27,7 +27,7 @@
     <section class="catalog">
         <div class="catalog-heading"><h2>Scadențe pe puncte de lucru <span>@VisibleDue.Count</span></h2>
             <div class="heading-actions">
-                @if (offCount > 0) { <label class="check-label"><input type="checkbox" checked="@showOff" @onchange="ToggleOffAsync" /> Arată și contractele Off (@offCount)</label> }
+                @if (offCount > 0) { <ToggleSwitch Value="@showOff" ValueChanged="ToggleOffAsync">Arată și contractele Off (@offCount)</ToggleSwitch> }
             </div>
         </div>
         <div class="filters">
@@ -218,9 +218,9 @@ else
     }
 
     // The "Off" contracts are loaded once with the list and only shown or hidden by the switch.
-    private async Task ToggleOffAsync(ChangeEventArgs args)
+    private async Task ToggleOffAsync(bool value)
     {
-        showOff = args.Value is true;
+        showOff = value;
         await LoadDueAsync();
     }
 

@@ -15,7 +15,7 @@
         <div class="error-banner" role="alert">
             <p><strong>Unele puncte sunt acum în alt contract activ:</strong></p>
             <ul>@foreach (var conflict in Plan.Conflicts) { <li>«@conflict.WorkPointName» este în contractul activ <strong>@conflict.ContractLabel</strong></li> }</ul>
-            <label class="check-label"><input type="checkbox" @bind="removeConflicting" disabled="@Busy" /> Scoate aceste puncte din contractul reactivat</label>
+            <ToggleSwitch @bind-Value="removeConflicting" Disabled="@Busy">Scoate aceste puncte din contractul reactivat</ToggleSwitch>
         </div>
     }
     @if (Plan.Details.Points.Count == 0)

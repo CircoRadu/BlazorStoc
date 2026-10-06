@@ -54,10 +54,7 @@ else if (review is not null)
     else
     {
         <section class="catalog inventory-options">
-            <label class="check-label">
-                <input type="checkbox" checked="@AllSelected" @onchange="ToggleAllAsync" />
-                Selectează toate produsele
-            </label>
+            <ToggleSwitch Value="@AllSelected" ValueChanged="ToggleAllAsync">Selectează toate produsele</ToggleSwitch>
             <div class="heading-actions">
                 <button class="primary" disabled="@(!HasSelection || sending)" @onclick="OpenSendPopup">Trimite modificări în stoc</button>
             </div>
@@ -83,9 +80,8 @@ else if (review is not null)
                                     <tbody>
                                         @foreach (var line in group.Lines)
                                         {
-                                            <tr @key="line.ProductId">
-                                                <td><input type="checkbox" aria-label="@($"Selectează {line.ProductName}")"
-                                                           checked="@IsSelected(line)" @onchange="e => ToggleLine(line, (bool)(e.Value ?? false))" /></td>
+                                            <tr @key="line.ProductId" class="selectable-row @(IsSelected(line) ? "selected" : null)" @onclick="() => ToggleLine(line, !IsSelected(line))">
+<td><RowSelect Selected="@IsSelected(line)" AriaLabel="@($"Selectează {line.ProductName}")" SelectedChanged="@(value => ToggleLine(line, value))" /></td>
                                                 <td class="pickup-number">@(line.Number?.ToString(CultureInfo.InvariantCulture) ?? "—")</td>
                                                 <td>
                                                     @line.ProductName
@@ -93,7 +89,7 @@ else if (review is not null)
                                                 </td>
                                                 <td>@line.CurrentStock</td>
                                                 <td>
-                                                    <input type="number" class="pickup-value-input" aria-label="@($"Valoare reala pentru {line.ProductName}")"
+                                                    <input type="number" class="pickup-value-input" aria-label="@($"Valoare reala pentru {line.ProductName}")" @onclick:stopPropagation="true"
                                                            value="@EditedValue(line)" @onchange="e => SetEditedValue(line, e.Value?.ToString())" />
                                                 </td>
                                                 <td class="@(DifferenceClass(line))">@DifferenceLabel(line)</td>
@@ -247,9 +243,8 @@ else if (review is not null)
         _ => ""
     };
 
-    private Task ToggleAllAsync(ChangeEventArgs e)
+    private Task ToggleAllAsync(bool value)
     {
-        var value = e.Value is true;
         selectedProductIds.Clear();
         if (value && review is not null)
             foreach (var line in review.Lines)

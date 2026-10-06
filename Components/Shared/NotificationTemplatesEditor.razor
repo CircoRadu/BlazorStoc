@@ -28,7 +28,7 @@
                         @foreach (var source in SourcesOfCategory) { <option value="@source.Key">@source.EventName</option> }
                     </select></label>
                 <label for="template-days">Cu câte zile înainte de expirare *<input id="template-days" type="number" min="1" max="@ExpiryTemplateRules.MaxThreshold" step="1" @bind="input.ThresholdDays" /></label>
-                <label class="anaf-check"><input type="checkbox" @bind="input.Active" /> Șablon activ</label>
+                <ToggleSwitch @bind-Value="input.Active" OnText="Activ" OffText="Inactiv">Șablon activ</ToggleSwitch>
                 <label for="template-subject" class="anaf-wide">Subiect *<MarkedTextField @ref="subjectField" Id="template-subject" Value="@input.Subject" ValueChanged="value => input.Subject = value" OnFocus="() => subjectActive = true" MaxLength="@ExpiryTemplateRules.MaxSubject" Known="IsKnownMark" /></label>
                 <label for="template-body" class="anaf-wide">Text *<MarkedTextField @ref="bodyField" Id="template-body" Multiline="true" Rows="6" Value="@input.Body" ValueChanged="value => input.Body = value" OnFocus="() => subjectActive = false" MaxLength="@ExpiryTemplateRules.MaxBody" Known="IsKnownMark" /></label>
             </div>

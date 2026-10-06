@@ -33,6 +33,17 @@
     }
 </ol>
 
+@* The template of the supplier is made on the file already read, in a window over the pickup; once saved it is applied to the file. *@
+@if (creatingTemplate && session is not null)
+{
+    <div class="delete-overlay template-popup-overlay">
+        <section class="delete-dialog template-popup" role="dialog" aria-modal="true" aria-label="Creare șablon de factură">
+            <div class="heading-actions"><button type="button" class="refresh" @onclick="CloseTemplateCreation">✕ Închide fără să creezi șablonul</button></div>
+            <InvoiceTemplateWorkbench ExistingSession="session" SavedRecord="OnTemplateCreatedAsync" Closed="CloseTemplateCreation" />
+        </section>
+    </div>
+}
+
 @if (step == 1)
 {
 <FileDropZone Id="invoice-pickup-file" Accept=".pdf,application/pdf" Text="Alege factura PDF" OnChange="FileSelectedAsync" Disabled="@(loading || loadError is not null || busy)" />
@@ -61,7 +72,28 @@ else if (session is not null)
         <button type="button" class="danger" @onclick="DiscardAsync">Renunță și elimină fișierul</button>
     </section>
 
-    @if (templateInfo is not null)
+    @if (chosen is null && !Lab.Enabled)
+    {
+        <div class="invoice-warning no-template-warning" role="alert">
+            <p><strong>⚠ Nu există niciun șablon definit pentru furnizorul acestei facturi@(SupplierText.Length > 0 ? " (" + SupplierText + ")" : "").</strong> Factura este citită automat: verifică rândurile și coloanele.</p>
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@creatingTemplate" @onclick="OpenTemplateCreation">Creează șablon pentru acest furnizor</button>
+                @if (allTemplates.Any(template => template.Info.Active))
+                {
+                    <label class="muted">sau folosește un șablon existent:
+                        <select @onchange="ChooseAnyTemplate" aria-label="Folosește un șablon existent">
+                            <option value="" selected>— alege —</option>
+                            @foreach (var template in allTemplates.Where(template => template.Info.Active))
+                            {
+                                <option value="@template.Info.Id">@template.Info.Name · @SupplierLabel(template.Info)</option>
+                            }
+                        </select>
+                    </label>
+                }
+            </div>
+        </div>
+    }
+    else if (templateInfo is not null)
     {
         <div class="invoice-suggestions" role="status">
             <strong>@templateInfo</strong>
@@ -140,9 +172,9 @@ else if (session is not null)
                     <span class="muted">@(addMode ? "Apasă pe pagină, la înălțimea la care vrei linia." : "Trage o linie în sus sau în jos; trage capetele ei ca să o scurtezi sau să o lungești. Ce este sub ultima linie nu se citește.")</span>
                 </div>
                 <div class="invoice-draw-tools" role="group" aria-label="Ce din șablon se vede pe pagină">
-                    <label class="check-label"><input type="checkbox" checked="@showFields" @onchange="args => showFields = args.Value is true" /> <span>Câmpurile din antet</span></label>
-                    <label class="check-label"><input type="checkbox" checked="@showHeader" @onchange="args => showHeader = args.Value is true" /> <span>Capul de tabel</span></label>
-                    <label class="check-label"><input type="checkbox" checked="@showColumns" @onchange="args => showColumns = args.Value is true" /> <span>Coloanele</span></label>
+                    <button type="button" class="refresh @(showFields ? "active" : "")" aria-pressed="@(showFields ? "true" : "false")" title="Arată sau ascunde câmpurile din antet pe pagină" @onclick="() => showFields = !showFields">Câmpurile din antet</button>
+                    <button type="button" class="refresh @(showHeader ? "active" : "")" aria-pressed="@(showHeader ? "true" : "false")" title="Arată sau ascunde capul de tabel pe pagină" @onclick="() => showHeader = !showHeader">Capul de tabel</button>
+                    <button type="button" class="refresh @(showColumns ? "active" : "")" aria-pressed="@(showColumns ? "true" : "false")" title="Arată sau ascunde coloanele tabelului pe pagină" @onclick="() => showColumns = !showColumns">Coloanele</button>
                 </div>
                 <div class="invoice-page-wrap" style="aspect-ratio: @F(pageData.Width) / @F(pageData.Height)">
                     <img src="@ImageUrl(pageData.Number)" alt="Pagina @pageData.Number a facturii" draggable="false" />
@@ -212,15 +244,15 @@ else if (session is not null)
                     <div class="table-scroll">
                         <table>
                             <thead><tr>
-                                <th><input type="checkbox" aria-label="Preia toate rândurile" checked="@(excluded.Count == 0)" @onchange="args => ToggleAll(args.Value is true)" /></th>
+                                <th><span class="row-select-all"><RowSelect Selected="@(excluded.Count == 0)" Mixed="@(excluded.Count > 0 && excluded.Count < rows.Count)" AriaLabel="Preia toate rândurile" SelectedChanged="ToggleAll" />Selectează tot</span></th>
                                 <th>#</th>@foreach (var column in ShownColumns) { <th>@column.Title</th> }<th>Pagina</th></tr></thead>
                             <tbody>
                                 @for (var index = 0; index < rows.Count; index++)
                                 {
                                     var row = rows[index];
                                     var at = index;
-                                    <tr class="@(excluded.Contains(index) ? "row-off" : "")">
-                                        <td><input type="checkbox" aria-label="Preia rândul @(index + 1)" checked="@(!excluded.Contains(index))" @onchange="args => ToggleRow(at, args.Value is true)" /></td>
+                                    <tr class="selectable-row @(excluded.Contains(index) ? "row-off" : "selected")" @onclick="() => ToggleRow(at, excluded.Contains(at))">
+                                        <td><RowSelect Selected="@(!excluded.Contains(index))" AriaLabel="@($"Preia rândul {index + 1}")" SelectedChanged="@(value => ToggleRow(at, value))" /></td>
                                         <td>@(index + 1)</td>
                                         @foreach (var column in ShownColumns) { <td>@row.Cells.GetValueOrDefault(column.Id, "")</td> }
                                         <td>@row.Page @foreach (var flag in row.Flags) { <span class="uncertain-badge" title="@flag">⚠ @flag</span> }</td>
@@ -656,6 +688,8 @@ else
     private int currentPage = 1, separatorCounter;
     private InvoiceAnalysisSession? session;
     private InvoiceTemplateRecord? chosen;
+    private IReadOnlyList<InvoiceTemplateRecord> allTemplates = [];
+    private bool creatingTemplate;
     private IReadOnlyList<InvoiceTemplateSuggestion> suggestions = [];
     private InvoicePickupReading? reading;
     private List<InvoiceSeparator> separators = [];
@@ -713,7 +747,9 @@ else
             pick = []; finished = false; finalizeNotice = finalizeError = null;   // another file: nothing of the previous pickup applies
             await using var stream = file.OpenReadStream(InvoiceAnalysisRules.MaxFileSizeBytes, lifetime.Token);
             session = await Analysis.AnalyzeAsync(stream, file.Name, lifetime.Token);
-            suggestions = InvoiceTemplateSuggestions.Rank(await Templates.GetAllAsync(lifetime.Token), session.Document);
+            creatingTemplate = false;
+            allTemplates = await Templates.GetAllAsync(lifetime.Token);
+            suggestions = InvoiceTemplateSuggestions.Rank(allTemplates, session.Document);
             currentPage = session.Document.Pages[0].Number;
             chosen = Lab.Enabled ? null : suggestions.FirstOrDefault()?.Template;   // the laboratory starts from the automatic reading, the one that is measured against the reference
             LoadReading();
@@ -729,6 +765,46 @@ else
             ClearReading();
         }
         finally { busy = false; }
+    }
+
+    // The supplier named by the file itself (name and tax id), for the warning that no template exists for it.
+    private string SupplierText => session is null ? "" : string.Join(" · ", new[] { session.Analysis.SupplierName, session.Analysis.SupplierCui.Length > 0 ? "CUI " + session.Analysis.SupplierCui : "" }.Where(part => part.Length > 0));
+
+    // A template that the file was not matched with (made now, or chosen by hand from the whole list) is added to the proposals and used.
+    private void ApplyTemplate(InvoiceTemplateRecord template)
+    {
+        if (suggestions.All(item => item.Template.Info.Id != template.Info.Id))
+            suggestions = [new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, session!.Document)), .. suggestions];
+        chosen = template;
+        LoadReading();
+    }
+
+    private void ChooseAnyTemplate(ChangeEventArgs e)
+    {
+        if (session is null || !int.TryParse(e.Value?.ToString(), out var id)) return;
+        if (allTemplates.FirstOrDefault(item => item.Info.Id == id && item.Info.Active) is { } template) ApplyTemplate(template);
+    }
+
+    private void OpenTemplateCreation() { if (session is not null) creatingTemplate = true; }
+    private void CloseTemplateCreation() => creatingTemplate = false;
+
+    // The template made in the window was saved: the window closes and the template reads the file at once.
+    private async Task OnTemplateCreatedAsync(InvoiceTemplateRecord saved)
+    {
+        creatingTemplate = false;
+        if (session is null) return;
+        try
+        {
+            allTemplates = await Templates.GetAllAsync(lifetime.Token);
+            ApplyTemplate(allTemplates.FirstOrDefault(item => item.Info.Id == saved.Info.Id) ?? saved);
+            notice = $"Șablonul „{saved.Info.Name}” a fost creat și aplicat facturii.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Applying the created invoice template failed ({ErrorType}).", exception.GetType().Name);
+            error = "Șablonul a fost salvat, dar nu a putut fi aplicat facturii. Alege-l din listă.";
+        }
     }
 
     private void ChooseTemplate(ChangeEventArgs e)
@@ -851,7 +927,7 @@ else
     // columns are read too; they are only without a meaning until the label is recognised or named). A saved template keeps hiding the columns it does not use.
     private bool ShowUnnamedColumns => chosen is null;
 
-    private void ClearReading() { pick = []; session = null; reading = null; overlay = null; excluded.Clear(); separators = []; rows = []; templateInfo = null; suggestions = []; chosen = null; selectedId = ""; }
+    private void ClearReading() { pick = []; session = null; reading = null; overlay = null; excluded.Clear(); separators = []; rows = []; templateInfo = null; suggestions = []; allTemplates = []; creatingTemplate = false; chosen = null; selectedId = ""; }
 
     private void Select(string id) => selectedId = selectedId == id ? "" : id;
 

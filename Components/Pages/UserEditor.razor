@@ -21,7 +21,7 @@
                 <label for="user-role">Nivel de acces *<InputSelect id="user-role" @bind-Value="input.Role"><option value="@AccessRoles.LimitedUser">Utilizator — gestiune produse</option><option value="@AccessRoles.Administrator">Administrator — acces complet</option></InputSelect></label>
                 @if (Original is not null)
                 {
-                    <label class="check-label full-width" for="user-active"><InputCheckbox id="user-active" @bind-Value="input.IsActive" /> Cont activ</label>
+                    <ToggleSwitch Id="user-active" Class="full-width" @bind-Value="input.IsActive">Cont activ</ToggleSwitch>
                     <ChangeReasonField Id="user-change-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" />
                 }
             </div>

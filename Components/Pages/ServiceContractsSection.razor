@@ -19,7 +19,7 @@
 <section class="catalog">
     <div class="catalog-heading"><h2>Contracte de mentenanță <span>@Visible.Count</span></h2>
         <div class="heading-actions">
-            @if (OffCount > 0) { <label class="check-label"><input type="checkbox" @bind="showOff" /> Arată și contractele Off (@OffCount)</label> }
+            @if (OffCount > 0) { <ToggleSwitch @bind-Value="showOff">Arată și contractele Off (@OffCount)</ToggleSwitch> }
             @if (CanManage) { <button class="refresh" disabled="@Locked" @onclick="OpenAdd">+ Adaugă contract</button> }
         </div>
     </div>

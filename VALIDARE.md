@@ -489,3 +489,9 @@ Verificat la 25 septembrie 2026.
 - Migrarea 10 aplicata pe `blazorstoc_test` (`--migrate-schema`) si, la pornirea preview-ului 5087, pe baza reala `BlazorStoc`. Nimic nu a fost creat manual pe baza reala.
 - Browser (baza de test, port 5088): incarcarea unei facturi, suprapunerea, editarea, desenarea unui camp, salvarea, propunerea si aplicarea unui sablon pe factura altui furnizor, versiune noua, stergere cu motiv, jurnal.
 - Neverificat: scanari reale, desenare reala cu mouse-ul, ecran ingust, facturi reale de alte tipuri; vezi `docs/TESTE_RAMASE.md` (N28-N33).
+
+## Sabloane de facturi la preluare, acces pentru utilizatori obisnuiti, comutatoare On/Off (06.10.2026)
+
+- `tests/BlazorStoc.Checks`: 837 PASS (fara integrare MariaDB), cu cele 5 facturi reale din `INVOICE_CORPUS_DIR`; teste noi: normalizarea „C.U.|.", toate coloanele initial folosite, drepturile serviciului de sabloane (operator vs administrator vs fara acces), fluxul de preluare fara sablon (avertizare, fereastra, salvare si aplicare, inchidere fara salvare), tab-urile din Setari pentru utilizator obisnuit, selectia pe randuri, categorii (mutare, anulare, parasire).
+- Browser (preview 5087, administrator): preluare `905550.pdf` pana la sablon creat si aplicat, detectare automata la incarcarea repetata, lista din Setari, Inventar (comutatoare si selectie).
+- Neverificat: contul de utilizator obisnuit in browser, comutatoarele din celelalte pagini pe telefon; vezi `docs/TESTE_RAMASE.md` (N46).

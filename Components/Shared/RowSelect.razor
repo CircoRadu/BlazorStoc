@@ -1,0 +1,16 @@
+@* The choice mark of a row (or of a group of rows) in a table: a round button with a tick, announced as a pressed button. The row itself is
+   selected by a click anywhere on it (the page puts the click on the <tr>); this button is the keyboard way (Tab, then Space or Enter) and the
+   "select all" of the header. Mixed = only some of the rows below are chosen. *@
+<button type="button" class="row-select @(Selected ? "on" : null) @(Mixed ? "mixed" : null)" aria-pressed="@(Mixed ? "mixed" : Selected ? "true" : "false")" aria-label="@AriaLabel" disabled="@Disabled"
+        @onclick="ToggledAsync" @onclick:stopPropagation="true"><span aria-hidden="true">@(Mixed ? "–" : Selected ? "✓" : "")</span></button>
+
+@code {
+    [Parameter] public bool Selected { get; set; }
+    [Parameter] public bool Mixed { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    // Raised with the new state (true = chosen); a mixed mark becomes chosen.
+    [Parameter] public EventCallback<bool> SelectedChanged { get; set; }
+
+    private Task ToggledAsync() => SelectedChanged.InvokeAsync(Mixed || !Selected);
+}

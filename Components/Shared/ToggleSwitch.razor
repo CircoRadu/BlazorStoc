@@ -1,0 +1,26 @@
+@* The on/off selector used instead of every check box (the look of "Activ / Inactiv" in the list of saved templates): a sliding switch, reachable
+   and changed from the keyboard (Space), announced as a switch. Value/ValueChanged work with @bind-Value. The label (child content) is written after the
+   state word; Compact leaves out the state word (for a switch on each row of a table); Mixed shows a partial choice (some of the items below are chosen). *@
+<label class="row-toggle @(Value ? "on" : "off") @(Mixed ? "mixed" : null) @(ChildContent is null ? null : "labelled") @Class" title="@Title">
+    <input id="@Id" type="checkbox" role="switch" checked="@Value" disabled="@Disabled" aria-label="@AriaLabel" aria-checked="@(Mixed ? "mixed" : Value ? "true" : "false")" @onchange="ChangedAsync" />
+    <span class="toggle-track" aria-hidden="true"></span>
+    @if (!Compact) { <span class="row-toggle-text">@(Value ? OnText : OffText)</span> }
+    @if (ChildContent is not null) { <span class="row-toggle-label">@ChildContent</span> }
+</label>
+
+@code {
+    [Parameter] public bool Value { get; set; }
+    [Parameter] public EventCallback<bool> ValueChanged { get; set; }
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool Mixed { get; set; }
+    [Parameter] public string OnText { get; set; } = "On";
+    [Parameter] public string OffText { get; set; } = "Off";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private Task ChangedAsync(ChangeEventArgs args) => ValueChanged.InvokeAsync(args.Value is true);
+}

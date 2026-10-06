@@ -88,14 +88,14 @@ public interface IInvoiceAnalysisService
     void Discard(Guid id);
 }
 
-// Reads an uploaded PDF, proposes a template for it and keeps the session for its owner (the signed-in administrator).
+// Reads an uploaded PDF, proposes a template for it and keeps the session for its owner (the signed-in user).
 public sealed class InvoiceAnalysisService(IInvoicePdfReader reader, IInvoiceAnalysisStore store, IAccessControl access) : IInvoiceAnalysisService
 {
     private string? owner;
 
     public async Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default)
     {
-        // Settings -> Facturi (administrator) and Produse -> Preluare factura (any product operator) read files; saving templates stays administrator-only.
+        // Settings -> Facturi and Produse -> Preluare factura read files (any product operator); creating and changing templates is also open to every product operator, only deleting one is reserved for the administrator.
         await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var read = await reader.ReadAsync(pdf, cancellationToken).ConfigureAwait(false);

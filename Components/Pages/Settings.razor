@@ -1,16 +1,17 @@
 @page "/setari"
-@attribute [Authorize(Roles = AccessRoles.Administrator)]
+@attribute [Authorize(Roles = AccessRoles.Administrator + "," + AccessRoles.LimitedUser)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject UnsavedChanges Guard
 @inject IInvoiceTemplateService InvoiceTemplates
+@inject IAccessControl Access
 
 <PageTitle>Setări · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<div class="page-heading"><div><p class="eyebrow">ADMINISTRARE</p><h1>Setări</h1><p class="muted">Configurări și operații rezervate administratorului.</p></div></div>
+<div class="page-heading"><div><p class="eyebrow">@(isAdmin ? "ADMINISTRARE" : "FACTURI")</p><h1>Setări</h1><p class="muted">@(isAdmin ? "Configurări și operații rezervate administratorului." : "Șabloanele de citire a facturilor: creare și modificare.")</p></div></div>
 <section class="catalog settings-panel">
     <div class="settings-tabs" role="tablist" aria-label="Secțiuni setări" @onkeydown="OnTabKeyDown">
-        @foreach (var tab in Tabs)
+        @foreach (var tab in VisibleTabs)
         {
             var selected = tab.Id == activeTab;
             <button type="button" role="tab" id="tab-@tab.Id" class="settings-tab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" aria-controls="panel-@tab.Id" tabindex="@(selected ? 0 : -1)" @onclick="() => SelectTab(tab.Id)">@tab.Title</button>
@@ -38,13 +39,13 @@
                 </div>
             }
         </div>
-    @if (activeTab == AnafTab)
+    @if (isAdmin && activeTab == AnafTab)
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
             <AnafConfigurator />
         </div>
     }
-    else if (activeTab == NotificationsTab)
+    else if (isAdmin && activeTab == NotificationsTab)
     {
         <div role="tabpanel" id="panel-@NotificationsTab" aria-labelledby="tab-@NotificationsTab" class="settings-body">
             @SubtabBar(NotificationSubtabs, "Secțiuni notificări")
@@ -58,7 +59,7 @@
             }
         </div>
     }
-    else if (activeTab == MapTab)
+    else if (isAdmin && activeTab == MapTab)
     {
         <div role="tabpanel" id="panel-@MapTab" aria-labelledby="tab-@MapTab" class="settings-body">
             @SubtabBar(MapSubtabs, "Secțiuni hartă")
@@ -81,6 +82,16 @@
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi")];
     private string activeTab = AnafTab;
+
+    // The administrator has every tab; a user without that role only reaches the invoice templates (creating and changing them).
+    private bool isAdmin;
+    private (string Id, string Title)[] VisibleTabs => isAdmin ? Tabs : [.. Tabs.Where(tab => tab.Id == InvoicesTab)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAdmin = await Access.IsAdministratorAsync();
+        if (!isAdmin) activeTab = InvoicesTab;
+    }
 
     private const string TemplatesSubtab = SettingsNavigation.TemplatesSubtab;
     private const string SettingsSubtab = SettingsNavigation.SettingsSubtab;
@@ -157,7 +168,7 @@
         var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}";
         if (link == appliedLink) return;
         appliedLink = link;
-        if (Tabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
+        if (VisibleTabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
         if (InvoiceSubtabs.Any(tab => tab.Id == SubtabQuery)) invoiceSubtab = SubtabQuery!;
@@ -245,15 +256,16 @@
 
     private void OnTabKeyDown(KeyboardEventArgs args)
     {
-        var index = Array.FindIndex(Tabs, tab => tab.Id == activeTab);
+        var tabs = VisibleTabs;
+        var index = Array.FindIndex(tabs, tab => tab.Id == activeTab);
         index = args.Key switch
         {
-            "ArrowRight" => (index + 1) % Tabs.Length,
-            "ArrowLeft" => (index - 1 + Tabs.Length) % Tabs.Length,
+            "ArrowRight" => (index + 1) % tabs.Length,
+            "ArrowLeft" => (index - 1 + tabs.Length) % tabs.Length,
             "Home" => 0,
-            "End" => Tabs.Length - 1,
+            "End" => tabs.Length - 1,
             _ => index
         };
-        SelectTab(Tabs[index].Id);
+        SelectTab(tabs[index].Id);
     }
 }

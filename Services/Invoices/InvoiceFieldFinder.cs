@@ -42,7 +42,9 @@ internal static class InvoiceFieldFinder
                     var meaning = InvoiceVocabulary.ResolveFieldMeaning(meaningKey, section);
                     // A total is an amount: a sentence that happens to follow the words "de plata" (a note under the table) is not the total.
                     if (meaning is InvoiceFieldMeanings.Total or InvoiceFieldMeanings.TotalNet or InvoiceFieldMeanings.TotalVat && !System.Text.RegularExpressions.Regex.IsMatch(value.Text.Trim(), @"^[-+]?\d")) meaning = "";
-                    fields.Add(new InvoiceHeaderField($"f{page.Number}_{fields.Count + 1}", label.Text, value.Text, label.Box, value.Box,
+                    // A total is the amount alone, without the currency written after it ("32.68 RON"), as a template reads it.
+                    var valueText = meaning is InvoiceFieldMeanings.Total or InvoiceFieldMeanings.TotalNet or InvoiceFieldMeanings.TotalVat ? InvoiceValues.WithoutCurrency(value.Text) : value.Text;
+                    fields.Add(new InvoiceHeaderField($"f{page.Number}_{fields.Count + 1}", label.Text, valueText, label.Box, value.Box,
                         meaning, section ?? "", confidence, InvoiceValues.KindOf(value.Text, hint)));
                 }
             }

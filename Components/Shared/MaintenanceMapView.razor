@@ -54,7 +54,7 @@ else
         <label class="period-field">Scadență de la <PickOnlyDate Id="map-from" @bind-Value="from" @bind-Value:after="FiltersChangedAsync" /></label>
         <label class="period-field">până la <PickOnlyDate Id="map-to" @bind-Value="to" @bind-Value:after="FiltersChangedAsync" /></label>
         <button type="button" class="refresh" disabled="@(from is null && to is null)" @onclick="ClearPeriodAsync">Fără perioadă</button>
-        @if (offCount > 0) { <label class="check-label"><input type="checkbox" checked="@showOff" @onchange="ToggleOffAsync" /> Arată și contractele Off (@offCount)</label> }
+        @if (offCount > 0) { <ToggleSwitch Value="@showOff" ValueChanged="ToggleOffAsync">Arată și contractele Off (@offCount)</ToggleSwitch> }
     </div>
 </section>
 
@@ -333,9 +333,9 @@ else
 
     private async Task ClearPeriodAsync() { from = to = null; await FiltersChangedAsync(); }
 
-    private async Task ToggleOffAsync(ChangeEventArgs args)
+    private async Task ToggleOffAsync(bool value)
     {
-        showOff = args.Value is true;
+        showOff = value;
         await LoadAsync();
         await FiltersChangedAsync();
     }

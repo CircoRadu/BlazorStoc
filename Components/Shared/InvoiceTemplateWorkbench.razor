@@ -12,7 +12,11 @@
     <div class="heading-actions"><button type="button" class="refresh" disabled="@saving" title="Închide editarea șablonului și revino la lista de șabloane" @onclick="RequestCloseAsync">✕ Închide editarea</button></div>
     <p class="muted">Editezi elementele șablonului (câmpuri, coloane, descrierea intrării în stoc, denumirea și furnizorul). Fișierul model se afișează fără să fie analizat; analiza pornește doar din butonul „Analizează fișierul”. Dacă părăsești pagina fără să salvezi, ești avertizat.</p>
 }
-@if (!IsEditMode)
+@if (Embedded)
+{
+<p class="muted">Șablonul se face pe factura pe care ai încărcat-o la preluare: verifică ce se folosește și ce înseamnă fiecare element, apoi salvează. După salvare, șablonul se aplică de îndată facturii.</p>
+}
+else if (!IsEditMode)
 {
 <p class="muted">Încarcă o factură PDF (din program de facturare, din e-Factura sau scanată). Aplicația citește tabelul cu liniile facturii și câmpurile din antet și le arată pe pagină ca un șablon interactiv: alegi ce se folosește la importul facturii și ce înseamnă fiecare element. Fișierul se păstrează în memorie cât timp lucrezi aici; când salvezi șablonul, factura se salvează împreună cu el (model), ca să o ai din nou la editarea șablonului. Șablonul se leagă de furnizor: denumirea și CUI/CIF-ul vânzătorului sunt obligatorii.</p>
 }
@@ -22,6 +26,12 @@
 
 @if (session is null || draft is null)
 {
+    @if (Embedded)
+    {
+        <div class="invoice-busy" role="status"><div class="spinner"></div><p class="muted">Se încarcă factura în editor…</p></div>
+    }
+    else
+    {
     <section class="invoice-upload">
         @if (EditTemplateName is not null)
         {
@@ -31,6 +41,7 @@
         @if (busy) { <div class="invoice-busy" role="status"><div class="spinner"></div><p class="muted">@(IsEditMode ? "Se deschide fișierul pentru șablon… (o pagină scanată poate dura câteva secunde)" : "Se analizează fișierul… (o pagină scanată poate dura câteva secunde)")</p></div> }
         <p class="form-note">Sunt acceptate fișiere PDF de cel mult 20 MB și 30 de pagini. Facturile e-Factura în format XML vor fi acceptate la importul propriu-zis.</p>
     </section>
+}
 }
 else
 {
@@ -43,7 +54,7 @@ else
             {
                 <button type="button" class="refresh" disabled="@(busy || saving)" title="Analizează fișierul (câmpuri, tabel, șabloane potrivite) și așază șablonul pe el" @onclick="AnalyzeFileAsync">@(busy ? "Se analizează…" : "Analizează fișierul")</button>
             }
-            <button type="button" class="danger" disabled="@saving" @onclick="DiscardAsync">Renunță și elimină fișierul</button>
+            <button type="button" class="danger" disabled="@saving" @onclick="DiscardAsync">@(Embedded ? "Renunță la crearea șablonului" : "Renunță și elimină fișierul")</button>
         </div>
     </section>
     @if (existing is not null)
@@ -183,7 +194,7 @@ else
         <div class="invoice-panel">
             <details class="invoice-section">
                 <summary>Câmpuri din antet <span>@draft.Fields.Count(field => field.Use) folosite din @draft.Fields.Count</span></summary>
-                <label class="check-label invoice-weak-toggle"><input type="checkbox" @bind="showAllFields" /> <span>Arată toate câmpurile găsite (și cele fără sens recunoscut)</span></label>
+                <ToggleSwitch Class="invoice-weak-toggle" @bind-Value="showAllFields">Arată toate câmpurile găsite (și cele fără sens recunoscut)</ToggleSwitch>
                 @foreach (var group in FieldGroups.Where(group => draft.Fields.Any(field => IsShown(field) && FieldGroupOf(field) == group.Key)))
                 {
                 <div class="invoice-group" role="group" aria-label="@group.Title">
@@ -195,7 +206,7 @@ else
                         var selected = selectedKind == 'f' && selectedId == id;
                         <div class="invoice-item @(selected ? "selected" : "")" role="listitem" id="invoice-item-f-@id">
                             <div class="invoice-item-row">
-                                <label class="check-label"><input type="checkbox" checked="@field.Use" @onchange="args => SetFieldUse(field, args.Value is true)" aria-label="Folosit la import: @FieldTitle(field)" /></label>
+                                <ToggleSwitch Compact Value="@field.Use" ValueChanged="@(value => SetFieldUse(field, value))" AriaLabel="@("Folosit la import: " + FieldTitle(field))" />
                                 <button type="button" class="invoice-item-title" @onclick="() => Select('f', id)">
                                     <strong>@(field.Name.Length > 0 ? field.Name : "(fără denumire)")</strong>
                                     <span class="muted">@ShortValue(field.Value)</span>
@@ -221,8 +232,7 @@ else
                         var selected = selectedKind is 'c' or 'h' && selectedId == id;
                         <div class="invoice-item @(selected ? "selected" : "")" role="listitem" id="invoice-item-c-@id">
                             <div class="invoice-item-row">
-                                <label class="check-label"><input type="checkbox" checked="@column.Use"
-                                                                   @onchange="args => SetColumnUse(column, args.Value is true)" aria-label="Folosită la import: @ColumnTitle(column)" /></label>
+                                <ToggleSwitch Compact Value="@column.Use" ValueChanged="@(value => SetColumnUse(column, value))" AriaLabel="@("Folosită la import: " + ColumnTitle(column))" />
                                 <button type="button" class="invoice-item-title" @onclick="() => Select('c', id)">
                                     <strong>@(column.Label.Length > 0 ? column.Label : "(coloană fără denumire)")</strong>
                                 </button>
@@ -375,7 +385,7 @@ else
                         <select value="@pf.Kind" @onchange="args => { pf.Kind = args.Value?.ToString() ?? pf.Kind; Refresh(); }">
                             <option value="text" selected="@(pf.Kind == "text")">Text</option><option value="number" selected="@(pf.Kind == "number")">Număr</option><option value="date" selected="@(pf.Kind == "date")">Dată</option>
                         </select></label>
-                    <label class="check-label"><input type="checkbox" checked="@pf.Use" @onchange="args => SetFieldUse(pf, args.Value is true)" /> <span>Folosit la import</span></label>
+                    <ToggleSwitch Value="@pf.Use" ValueChanged="@(value => SetFieldUse(pf, value))">Folosit la import</ToggleSwitch>
                     <details class="full-width"><summary>Poziția regiunii (puncte PDF)</summary>
                         <div class="invoice-coords">
                             <label>X<input type="number" step="0.5" value="@F(pf.X)" @onchange="args => MoveField(pf, x: args.Value)" /></label>
@@ -446,6 +456,12 @@ else
     // Changes each time the user asks to edit a template (even the same one again), which is what loads its model.
     [Parameter] public int EditRequest { get; set; }
     [Parameter] public EventCallback Saved { get; set; }
+    // The template that was just saved (created or replaced), for a page that goes on with it (the invoice pickup applies it to its file).
+    [Parameter] public EventCallback<InvoiceTemplateRecord> SavedRecord { get; set; }
+    // A file already read by the page that shows this editor (the invoice pickup in a window): the template is made on that file, without
+    // uploading it again. The page owns the session, so it is not dropped when the editor is saved, closed or removed.
+    [Parameter] public InvoiceAnalysisSession? ExistingSession { get; set; }
+    private bool Embedded => ExistingSession is not null;
     // Raised when the editing of a saved template is closed without saving (the page then removes the "Editare șablon" sub-tab).
     [Parameter] public EventCallback Closed { get; set; }
 
@@ -586,6 +602,22 @@ else
     }
 
     protected override void OnInitialized() => reference = DotNetObjectReference.Create(this);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ExistingSession is not { } shared) return;
+        try
+        {
+            session = shared;
+            decimalHint = InvoiceValues.DecimalStyle(session.Document.AllWords.Select(word => word.Text));
+            suggestions = InvoiceTemplateSuggestions.Rank(await Templates.GetAllAsync(lifetime.Token), session.Document);
+            analyzed = true;
+            existing = null;
+            currentPage = session.Document.Pages[0].Number;
+            UseAutomaticProposal();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -1358,6 +1390,7 @@ else
             await DiscardSessionAsync();
             session = null; draft = null; preview = null; existing = null; suggestions = [];
             notice = $"Șablonul „{saved.Info.Name}” a fost salvat. Factura model a fost salvată împreună cu șablonul.";
+            await SavedRecord.InvokeAsync(saved);
             await Saved.InvokeAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -1373,6 +1406,8 @@ else
 
     private async Task DiscardAsync()
     {
+        // In a window over another page the file belongs to that page: giving up only closes the window.
+        if (Embedded) { await Closed.InvokeAsync(); return; }
         await DiscardSessionAsync();
         session = null; draft = null; preview = null; existing = null; suggestions = [];
         error = null; notice = "Analiza a fost abandonată, iar fișierul a fost eliminat din memorie.";
@@ -1380,14 +1415,14 @@ else
 
     private Task DiscardSessionAsync()
     {
-        if (session is not null) Analysis.Discard(session.Id);
+        if (session is not null && !Embedded) Analysis.Discard(session.Id);
         return Task.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
         lifetime.Cancel();
-        if (session is not null) Analysis.Discard(session.Id);
+        if (session is not null && !Embedded) Analysis.Discard(session.Id);
         try { await JS.InvokeVoidAsync("blazorStocInvoiceTemplate.unregister", ownerId); }
         catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
         reference?.Dispose();

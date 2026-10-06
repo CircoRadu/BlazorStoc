@@ -326,7 +326,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         new(ReadInfo(reader), InvoiceTemplateJson.Deserialize(reader.GetString(11)));
 }
 
-// Saves, changes and deletes templates for the signed-in administrator and writes the journal: every operation has its own action
+// Saves, changes and deletes templates for the signed-in user (creating and changing: any product operator; deleting: the administrator) and writes the journal: every operation has its own action
 // (see AuditActions), with what changed in the details.
 public interface IInvoiceTemplateService
 {
@@ -350,7 +350,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task<InvoiceTemplateRecord> CreateAsync(InvoiceTemplateInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await CheckUniqueNameAsync(input, null, cancellationToken).ConfigureAwait(false);
         var created = await store.CreateAsync(input, actor, cancellationToken).ConfigureAwait(false);
@@ -362,7 +362,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task<InvoiceTemplateRecord> SaveAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await CheckUniqueNameAsync(input, original.Id, cancellationToken).ConfigureAwait(false);
         var before = await store.GetAsync(original.Id, cancellationToken).ConfigureAwait(false);
@@ -383,7 +383,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
     // Chooses whether a template is used when invoices are read (a supplier may have several templates); journaled as its own operation.
     public async Task<InvoiceTemplateInfo> SetActiveAsync(InvoiceTemplateInfo original, bool active, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var saved = await store.SetActiveAsync(original, active, actor, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(audit, access, AuditEntities.InvoiceTemplate, Id(saved), saved.Name,
@@ -394,7 +394,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task<InvoiceTemplateInfo> UpdateDetailsAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await CheckUniqueNameAsync(input, original.Id, cancellationToken).ConfigureAwait(false);
         var saved = await store.UpdateDetailsAsync(original, input, actor, cancellationToken).ConfigureAwait(false);

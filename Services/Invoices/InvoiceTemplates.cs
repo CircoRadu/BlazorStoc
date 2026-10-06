@@ -170,7 +170,7 @@ public sealed class InvoiceTemplateDraft
             draft.HasIndexColumn = table.HasIndexColumn;
             draft.Columns = table.Columns.Select(column => new DraftColumn
             {
-                Id = column.Id, Label = column.Label, HeaderText = column.Label, Meaning = column.Meaning == InvoiceColumnMeanings.Ignore ? InvoiceColumnMeanings.Other : column.Meaning, Use = column.Meaning != InvoiceColumnMeanings.Ignore,
+                Id = column.Id, Label = column.Label, HeaderText = column.Label, Meaning = column.Meaning == InvoiceColumnMeanings.Ignore ? InvoiceColumnMeanings.Other : column.Meaning, Use = true,
                 Left = column.Left, Right = column.Right, RowMapping = column.RowMapping
             }).ToList();
         }
@@ -478,7 +478,14 @@ public static class InvoiceTemplateEngine
     // Reads one field of a template from a file. A field with a label is looked for by its label (the nearest occurrence of the label's words
     // to where the template had it) and its value is taken next to it, so a label that moved down two lines, or a longer value, still reads
     // right; a field without a label, or one whose label is not in the file, is read from its region moved by the alignment.
+    // An amount is read as the number alone: the currency written after it ("301.41 RON") is not part of the value.
     public static FieldRead ReadField(InvoiceTemplateField field, InvoiceDocument document, InvoiceAlignment alignment)
+    {
+        var read = ReadFieldText(field, document, alignment);
+        return field.Kind == "number" ? read with { Value = InvoiceValues.WithoutCurrency(read.Value) } : read;
+    }
+
+    private static FieldRead ReadFieldText(InvoiceTemplateField field, InvoiceDocument document, InvoiceAlignment alignment)
     {
         var page = document.Pages.FirstOrDefault(item => item.Number == field.Page) ?? document.Pages[0];
         var shifted = new InvoiceBox(page.Number, field.X * page.Width + alignment.PageDx, field.Y * page.Height + alignment.PageDy, field.Width * page.Width, field.Height * page.Height);

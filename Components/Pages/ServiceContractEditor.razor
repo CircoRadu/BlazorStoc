@@ -41,11 +41,11 @@
                         <td>
                             @if (row.Conflict is not null)
                             {
-                                <label class="check-label"><input type="checkbox" checked="@row.Move" @onchange="e => SetMove(row, (bool)(e.Value ?? false))" aria-label="@($"Mută aici punctul {row.Point.Name}")" /> Mută aici</label>
+                                <ToggleSwitch Value="@row.Move" ValueChanged="@(value => SetMove(row, value))" AriaLabel="@($"Mută aici punctul {row.Point.Name}")">Mută aici</ToggleSwitch>
                             }
                             else
                             {
-                                <input type="checkbox" checked="@row.Included" @onchange="e => SetIncluded(row, (bool)(e.Value ?? false))" aria-label="@($"Include punctul {row.Point.Name}")" />
+                                <ToggleSwitch Compact Value="@row.Included" ValueChanged="@(value => SetIncluded(row, value))" AriaLabel="@($"Include punctul {row.Point.Name}")" />
                             }
                         </td>
                         <td><strong>@row.Point.Name</strong>@if (row.Point.IsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }<br /><small class="muted">@row.Point.Address</small></td>

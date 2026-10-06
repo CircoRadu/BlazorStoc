@@ -29,6 +29,7 @@ if (Environment.GetEnvironmentVariable("COMPONENT_CHECKS_ONLY") == "1")
 {
     await ComponentChecks.RunAsync(Check);
     await PickupWizardChecks.RunAsync(Check);
+    await PickupWizardChecks.TemplateFlowAsync(Check);
     await ProductGroupsChecks.RunAsync(Check);
     ReasonSummaryChecks.Run(Check);
     Console.WriteLine("Component checks finished.");
@@ -2350,6 +2351,7 @@ async Task RunMaintenanceGateChecksAsync()
 
 await ComponentChecks.RunAsync(Check);
 await PickupWizardChecks.RunAsync(Check);
+await PickupWizardChecks.TemplateFlowAsync(Check);
 await ProductGroupsChecks.RunAsync(Check);
 ReasonSummaryChecks.Run(Check);
 await InvoiceChecks.RunAsync(Check);
@@ -2417,16 +2419,16 @@ sealed class FakeChangeSource : IChangeEventSource
     public Task PurgeAsync(long throughId, DateTime olderThanUtc, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
-sealed class TestAccessControl(bool administrator, string username) : IAccessControl
+sealed class TestAccessControl(bool administrator, string username, bool productOperator = true) : IAccessControl
 {
     public Task<bool> IsAdministratorAsync(CancellationToken cancellationToken = default) => Task.FromResult(administrator);
-    public Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+    public Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default) => Task.FromResult(productOperator);
     public Task<bool> CanManageBeneficiariesAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
     public Task<string?> GetUsernameAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(username);
     public Task EnsureAdministratorAsync(CancellationToken cancellationToken = default) => administrator
         ? Task.CompletedTask
         : Task.FromException(new AccessDeniedException("Test access denied"));
-    public Task EnsureProductOperatorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task EnsureProductOperatorAsync(CancellationToken cancellationToken = default) => productOperator ? Task.CompletedTask : Task.FromException(new AccessDeniedException("Test access denied"));
     public Task EnsureBeneficiaryOperatorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 

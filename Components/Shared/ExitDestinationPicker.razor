@@ -29,10 +29,7 @@
             }
         </div>
         <div class="relation-row">
-            <label class="relation-check" for="@($"{Prefix}-use-project")">
-                <input id="@($"{Prefix}-use-project")" type="checkbox" checked="@UseProject"
-                       disabled="@(Disabled || Model.BeneficiaryId is null)"
-                       @onchange="args => ProjectToggled.InvokeAsync(args.Value is true)" /> Proiect</label>
+            <ToggleSwitch Compact Class="relation-check" Id="@($"{Prefix}-use-project")" Value="@UseProject" Disabled="@(Disabled || Model.BeneficiaryId is null)" ValueChanged="ProjectToggled">Proiect</ToggleSwitch>
             @if (UseProject)
             {
                 <SearchableSelect Id="@($"{Prefix}-project")" Label="Proiect" Placeholder="Caută sau alege proiectul…"

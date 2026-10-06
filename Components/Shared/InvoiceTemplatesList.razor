@@ -1,6 +1,7 @@
 @using System.Globalization
 @using BlazorStoc.Services
 @inject IInvoiceTemplateService Service
+@inject IAccessControl Access
 @inject IJSRuntime JS
 @inject ILogger<InvoiceTemplatesList> Logger
 @implements IDisposable
@@ -25,7 +26,7 @@
             var focused = info.Id == FocusTemplateId;
             var open = expanded == info.Id;
             <tr @key="info.Id" id="invoice-template-@info.Id" class="@(focused ? "row-focus" : null)">
-                <td><label class="row-toggle @(info.Active ? "on" : "off")" title="@(info.Active ? "Șablonul este folosit la citirea facturilor. Apasă ca să nu mai fie folosit." : "Șablonul nu este folosit la citirea facturilor. Apasă ca să fie folosit.")"><input type="checkbox" role="switch" checked="@info.Active" disabled="@saving" aria-label="@($"Șablon activ: {info.Name}")" @onchange="args => SetActiveAsync(info, args.Value is true)" /><span class="toggle-track" aria-hidden="true"></span><span class="row-toggle-text">@(info.Active ? "Activ" : "Inactiv")</span></label></td>
+<td><ToggleSwitch Value="@info.Active" Disabled="@saving" OnText="Activ" OffText="Inactiv" AriaLabel="@($"Șablon activ: {info.Name}")" Title="@(info.Active ? "Șablonul este folosit la citirea facturilor. Apasă ca să nu mai fie folosit." : "Șablonul nu este folosit la citirea facturilor. Apasă ca să fie folosit.")" ValueChanged="@(active => SetActiveAsync(info, active))" /></td>
                 <td><strong>@info.Name</strong></td>
                 <td>@(info.SupplierName.Length > 0 ? info.SupplierName : "—")</td>
                 <td>@(info.SupplierCui.Length > 0 ? info.SupplierCui : "—")</td>
@@ -35,7 +36,7 @@
                 <td class="row-actions">
                     <button type="button" class="invoice-icon-btn" title="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-label="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleDetails(info.Id)">👁</button>
                     <button type="button" class="invoice-icon-btn" disabled="@saving" title="Editează șablonul (elementele, denumirea și furnizorul)" aria-label="Editează șablonul" @onclick="() => OnEditWithFile.InvokeAsync(template)">✎</button>
-                    <button type="button" class="invoice-icon-btn danger" disabled="@saving" title="Șterge șablonul" aria-label="Șterge șablonul" @onclick="() => deleting = info">🗑</button>
+                    @if (isAdmin) { <button type="button" class="invoice-icon-btn danger" disabled="@saving" title="Șterge șablonul" aria-label="Șterge șablonul" @onclick="() => deleting = info">🗑</button> }
                 </td>
             </tr>
             @if (open)
@@ -75,11 +76,16 @@
     private InvoiceTemplateInfo? deleting;
     private string? error, notice, deleteError;
     private int? expanded, scrolledTo;
-    private bool loading, saving, deleteBusy;
+    private bool loading, saving, deleteBusy, isAdmin;
 
     private static string Stamp(DateTime utc) => StockMovementRules.DisplayDate(DateOnly.FromDateTime(utc.ToLocalTime())) + " " + utc.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    // Every user who may use templates changes them; deleting one is for the administrator only.
+    protected override async Task OnInitializedAsync()
+    {
+        isAdmin = await Access.IsAdministratorAsync(lifetime.Token);
+        await LoadAsync();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

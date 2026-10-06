@@ -58,13 +58,24 @@ public static class ProductGroupsChecks
         check(page.FindAll("input[type=radio][name='subcategory-reason-mode']").Count == 2 && Auto("subcategory-reason") == "", "Categories page: the reason of a subcategory edit is chosen with radio buttons, the generated one empty until a change");
         page.Find("#subcategory-name").Change(original + " modificata");
         check(Auto("subcategory-reason") == $"Subcategorie: {original} → {original} modificata", "Categories page: the generated reason shows the renamed subcategory");
-        var originalCategory = ((AngleSharp.Html.Dom.IHtmlSelectElement)page.Find("#subcategory-category")).Value;
-        page.Find("#subcategory-category").Change(page.FindAll("#subcategory-category option").Select(option => option.GetAttribute("value")!).First(value => value != originalCategory));
+        // The category of a subcategory is chosen directly in the form (radio buttons), not from a list that opens.
+        check(page.FindAll("#subcategory-category").Count == 0 && page.FindAll("select").Count == 0, "Categories page: the category of a subcategory is not chosen from a drop-down list");
+        var choices = page.FindAll("input[type=radio][name='subcategory-category']");
+        var originalChoice = choices.Select((input, index) => (input, index)).First(item => item.input.HasAttribute("checked")).index;
+        void ChooseCategory(int index) => page.FindAll("input[type=radio][name='subcategory-category']")[index].Change(true);
+        ChooseCategory(originalChoice == 0 ? 1 : 0);
         check(Auto("subcategory-reason").Split('\n') is [var renamed, var moved] && renamed.StartsWith("Subcategorie: ") && moved.StartsWith("Categorie: "), "Categories page: renaming and moving a subcategory are two lines of the generated reason");
         page.Find("#subcategory-name").Change(original);
-        page.Find("#subcategory-category").Change(originalCategory);
+        ChooseCategory(originalChoice);
         check(Auto("subcategory-reason") == "", "Categories page: putting the changes back empties the generated reason");
+
+        // Moved to another category and cancelled: leaving without saving closes the form.
+        ChooseCategory(originalChoice == 0 ? 1 : 0);
         page.FindAll("button").First(button => button.TextContent.Contains("Anulează")).Click();
+        page.WaitForAssertion(() => page.Find(".unsaved-changes-dialog"), TimeSpan.FromSeconds(5));
+        page.Find(".unsaved-changes-dialog button.danger").Click();
+        page.WaitForAssertion(() => { if (page.FindAll("#subcategory-name").Count != 0 || page.FindAll(".unsaved-changes-dialog").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(true, "Categories page: a subcategory moved to another category and left without saving closes its form");
         page.FindAll("button").First(button => button.TextContent.Contains("Editează categoria")).Click();
         page.WaitForAssertion(() => page.Find("#category-name"), TimeSpan.FromSeconds(5));
         var categoryName = page.Find("#category-name").GetAttribute("value") ?? "";

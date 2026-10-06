@@ -21,7 +21,7 @@ else
     <fieldset class="anaf-section"><legend>1. Conexiune</legend>
         <div class="anaf-grid">
             <label>Denumire integrare<input @bind="config.Name" @bind:after="Edited" maxlength="100" /></label>
-            <label class="anaf-check"><input type="checkbox" @bind="config.Enabled" @bind:after="Edited" /> Integrare activată</label>
+            <ToggleSwitch @bind-Value="config.Enabled" @bind-Value:after="Edited" OnText="Activ" OffText="Inactiv">Integrare activată</ToggleSwitch>
             <label class="anaf-wide">Adresă serviciu (HTTPS, @AnafRules.ApprovedHost)<input @bind="config.Url" @bind:after="Edited" /></label>
             <label>Metodă HTTP<select @bind="config.Method" @bind:after="Edited">@foreach (var m in AnafRules.Methods) { <option value="@m">@m</option> }</select></label>
             <label>Timeout (secunde, 1–60)<input type="number" min="1" max="60" @bind="config.Timeout" @bind:after="Edited" /></label>
@@ -35,7 +35,7 @@ else
             var header = config.Headers[i];
             var index = i;
             <div class="anaf-row">
-                <label class="anaf-check"><input type="checkbox" aria-label="Antet activ" @bind="header.Enabled" @bind:after="Edited" /></label>
+                <ToggleSwitch Compact AriaLabel="Antet activ" @bind-Value="header.Enabled" @bind-Value:after="Edited" />
                 <input aria-label="Nume antet" placeholder="Nume" @bind="header.Name" @bind:after="Edited" />
                 <input aria-label="Valoare antet" placeholder="Valoare" @bind="header.Value" @bind:after="Edited" />
                 <button type="button" class="danger" aria-label="Șterge antetul @header.Name" @onclick="() => { config.Headers.RemoveAt(index); Edited(); }">Șterge</button>
@@ -46,8 +46,8 @@ else
 
     <fieldset class="anaf-section"><legend>2. Cerere</legend>
         <div class="anaf-grid">
-            <label class="anaf-check"><input type="checkbox" @bind="config.Trim" @bind:after="Edited" /> Elimină spațiile din CUI</label>
-            <label class="anaf-check"><input type="checkbox" @bind="config.StripRO" @bind:after="Edited" /> Elimină prefixul RO</label>
+            <ToggleSwitch @bind-Value="config.Trim" @bind-Value:after="Edited">Elimină spațiile din CUI</ToggleSwitch>
+            <ToggleSwitch @bind-Value="config.StripRO" @bind-Value:after="Edited">Elimină prefixul RO</ToggleSwitch>
             <label>Format dată interogare<select @bind="config.DateFormat" @bind:after="Edited">@foreach (var f in AnafRules.DateFormats) { <option value="@f">@f</option> }</select></label>
         </div>
         <label class="anaf-block">Șablon cerere (listă JSON; variabile <code>{{cui}}</code> și <code>{{data_interogare}}</code>)
@@ -70,7 +70,7 @@ else
                 <td><input aria-label="Denumire câmp" @bind="mapping.Label" @bind:after="Edited" /></td>
                 <td><input aria-label="Cale câmp" @bind="mapping.Path" @bind:after="Edited" /></td>
                 <td><select aria-label="Tip" @bind="mapping.Type" @bind:after="Edited"><option value="text">Text</option><option value="boolean">Da/Nu</option></select></td>
-                <td><input type="checkbox" aria-label="Obligatoriu" @bind="mapping.Required" @bind:after="Edited" /></td>
+                <td><ToggleSwitch Compact AriaLabel="Obligatoriu" @bind-Value="mapping.Required" @bind-Value:after="Edited" /></td>
                 <td><select aria-label="Politică la lipsă" @bind="mapping.Missing" @bind:after="Edited"><option value="keep">Păstrează</option><option value="clear">Golește</option><option value="error">Raportează eroare</option></select></td>
                 <td><select aria-label="Politică la actualizare" @bind="mapping.Update" @bind:after="Edited"><option value="empty">Doar dacă e gol</option><option value="overwrite">Suprascrie</option><option value="confirm">Cere confirmare</option></select></td>
                 <td><button type="button" class="danger" aria-label="Șterge maparea @mapping.Label" @onclick="() => { config.Mappings.RemoveAt(index); Edited(); }">Șterge</button></td>

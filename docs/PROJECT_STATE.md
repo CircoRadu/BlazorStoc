@@ -1,10 +1,18 @@
 # Starea curentă a proiectului
 
 Actualizat de: **Claude**
-Data: **05 octombrie 2026 (motor geometric pentru tabelul facturii, laborator OCR, recitirea numerelor; preluare factura: corectii si facilitati, motiv automat la editari, tabel Secpral/Emproium)**
+Data: **06 octombrie 2026 (sabloane de facturi pentru utilizatori obisnuiti, creare in fereastra la preluare, comutatoare On/Off, selectie pe randuri, corectii motor)**
 
 Actualizare 05.10.2026 (main): un singur motor de recunoastere a tabelului facturii, cel geometric (fostul B); motorul A, optiunile de motor si scorul pe valori au fost eliminate; sabloanele existente au fost sterse din baza de dezvoltare (de refacut cu motorul nou). Vezi IMPLEMENTED.md.
 Stare ciclu: **Dupa Task 2 (2.1-2.4), Task 3 (3.1-3.4 - complet la nivel de subtaskuri, un singur punct din criterii ramane partial, vezi mai jos) si corectiile de OCR pentru inclinare. Protocolul de dezvoltare: Claude nu mai face commit automat la finalul fiecarui task; commitul se face doar la cererea explicita a utilizatorului (vezi `CLAUDE.md`) - modificarile din aceasta sesiune raman necomise pana la cerere. Mod claude_only, fara predare catre Codex.**
+
+## Sabloane de facturi pentru utilizatori obisnuiti, creare in fereastra la preluare, comutatoare On/Off, corectii motor - 06.10.2026
+
+Implementat (vezi `IMPLEMENTED.md`, ultimele patru intrari din 06.10.2026). Fisiere principale: `Components/Pages/InvoicePickup.razor` (avertizare fara sablon, fereastra de creare, selectia pe randuri), `Components/Shared/InvoiceTemplateWorkbench.razor` (`ExistingSession`, `SavedRecord`), `Components/Shared/ToggleSwitch.razor` si `RowSelect.razor` (noi), `Components/Pages/Settings.razor` (tab Facturi pentru utilizator obisnuit), `Services/Invoices/InvoiceTemplateStore.cs` (drepturi), `InvoiceValues.cs`, `InvoiceAnalyzer.cs`, `InvoiceFieldFinder.cs`, `InvoiceTemplates.cs` (motor), `Components/Pages/ProductGroups.razor`, `wwwroot/app.css`; teste `InvoiceChecks.cs`, `PickupWizardChecks.cs`, `ProductGroupsChecks.cs`.
+- **Motor facturi:** verificarea pe scanarea Emproium (picata la 05.10.2026) trece: CUI-ul furnizorului si totalul fara TVA din subsol se gasesc ("C.U.|." = "C.U.I.", un "Total" singur sub coloana de valoare, primul CUI fara parte la facturile fara antet de furnizor); monedele dupa sume nu mai intra in valoarea unui camp numeric; toate coloanele gasite pornesc ca folosite.
+- **Acces:** utilizatorul obisnuit (rolul „Utilizator") creeaza, modifica, redenumeste, activeaza si dezactiveaza sabloane de facturi si vede din Setari numai tabul Facturi; stergerea sablonului si celelalte taburi raman ale administratorului. Decizie a utilizatorului din 06.10.2026.
+- **Validari:** suita completa 837 de verificari trec, inclusiv cele 5 facturi reale din `D:\_BlazTest\Facturi furnizori` si verificarea cu sabloane incrucisate (acum doar pe acelasi furnizor). Verificat in browser pe `D:\_BlazTest\905550.pdf`: avertizare, fereastra, salvare, aplicare, detectare automata la incarcarea repetata, lista din Setari; Inventar (comutator, selectie pe categorii).
+- **Riscuri / urmatorul pas:** vizualizarea cu rol „Utilizator" (Setari doar Facturi, fara stergere) este acoperita doar de teste, nu verificata in browser cu un cont real; sabloanele de facturi nu au restrictii de proprietar (orice utilizator le poate modifica pe ale altora); `ProductMovements.DiscardEditAsync` poate avea defectul de re-randare corectat la categorii; sablonul „SC TELESYSTEM SRL" (CUI 22460883) creat la test este in baza folosita de preview-ul 5087 (`blazorstoc_test`), nu in dump-ul `database/dev-data`.
 
 ## Motor geometric pentru tabelul facturii, laborator OCR, recitirea numerelor - 05.10.2026
 

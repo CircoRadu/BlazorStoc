@@ -63,6 +63,12 @@ public static class InvoiceChecks
               InvoiceProductDescription.UnknownMarks(roDraft.ProductDescription, InvoiceProductDescription.Labels(roDraft).Select(item => item.Label)).Count == 0 &&
               InvoiceProductDescription.ColumnLabels(roDraft).Select(item => item.Label).SequenceEqual(roDraft.Columns.Where(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore).Select(column => column.Label)),
             "Invoice templates: a new template's product description starts as the unit price, invoice number, date and supplier; every used column is a label under the name it has in the template (its header text in the file), none is mandatory");
+        // Every column found on the page starts as used, also one whose header the vocabulary does not know ("Taxa verde"): the user deletes or
+        // switches off what is not needed.
+        var withUnknownColumn = roAnalysis with { Table = roAnalysis.Table! with { Columns = [.. roAnalysis.Table!.Columns.Select((column, index) => index == 2 ? column with { Meaning = InvoiceColumnMeanings.Ignore } : column)] } };
+        var unknownDraft = InvoiceTemplateDraft.FromAnalysis(withUnknownColumn);
+        check(unknownDraft.Columns.Count == roAnalysis.Table!.Columns.Count && unknownDraft.Columns.All(column => column.Use) && unknownDraft.Columns[2].Meaning == InvoiceColumnMeanings.Other,
+            "Invoice templates: every column found on the page starts as used by the import, also the one whose header is not recognised (it becomes an own-name column)");
         check(roDraft.Fields.Where(field => field.Use && field.LabelText.Trim().Length > 0).All(field => InvoiceTemplateDraft.EffectiveLabel(field).StartsWith(field.LabelText.Trim().TrimEnd(':', ' '), StringComparison.Ordinal)),
             "Invoice analysis: the label of a found field is the text the file itself has beside it, not a title of a general vocabulary");
         // A used column keeps its own name as label, whatever its meaning ("Taxa verde" with the meaning VAT rate is <Taxa verde>).
@@ -429,6 +435,9 @@ public static class InvoiceChecks
         check(InvoiceValues.NormalizeCui("RO 22460883") == "22460883" && InvoiceValues.NormalizeCui("CUI: RO9178894") == "9178894" && InvoiceValues.NormalizeCui("9178894") == "9178894" && InvoiceValues.NormalizeCui("J40/1/2020") == "" && InvoiceValues.NormalizeCui(null) == "",
             "Invoice values: a tax id is reduced to its digits, other identifiers are not taken for one");
         check(InvoiceValues.Normalize("Șablon ȚARĂ Înregistrare, Nr.crt.") == "sablon tara inregistrare nr crt" && InvoiceValues.Normalize(" ") == "", "Invoice values: text is compared without case, diacritics and punctuation");
+        check(InvoiceValues.Normalize("C.U.|.:") == "c u i" && InvoiceValues.Normalize("C.|.F.") == "c i f" && InvoiceValues.Normalize("Total | Lei") == "total lei" &&
+              InvoiceVocabulary.MatchFieldLabelPrefix(InvoiceVocabulary.Tokens("C.U.|.")) is { Words: 3, Meaning: "@cui" },
+            "Invoice values: OCR reads the I of a dotted abbreviation as a bar (C.U.|. = C.U.I.), a bar elsewhere stays a separator");
     }
 
     private static void Vocabulary(Action<bool, string> check)
@@ -649,9 +658,10 @@ public static class InvoiceChecks
         }
         var failures = new List<string>();
         foreach (var source in loaded)
-            // A template belongs to a kind of file (the text of a PDF, or the recognised words of a scan): a supplier has one template for
-            // each, so a template is tried on files of its own kind.
-            foreach (var destination in loaded.Where(item => item.Name != source.Name && item.Analysis.Source == source.Analysis.Source))
+            // A template belongs to a supplier and to a kind of file (the text of a PDF, or the recognised words of a scan): a supplier has one
+            // template for each kind, so a template is tried on the file it was made from and on the other files of its own supplier and kind
+            // (invoices of another supplier have another layout: no template is meant to read them).
+            foreach (var destination in loaded.Where(item => item.Analysis.SupplierCui.Length > 0 && item.Analysis.SupplierCui == source.Analysis.SupplierCui && item.Analysis.Source == source.Analysis.Source))
             {
                 var definition = InvoiceTemplateJson.Deserialize(InvoiceTemplateJson.Serialize(InvoiceTemplateDraft.FromAnalysis(source.Analysis).ToDefinition(source.Document)));
                 var extraction = InvoiceTemplateEngine.Apply(definition, destination.Document);
@@ -763,6 +773,7 @@ public static class InvoiceChecks
         var store = new MemoryTemplateStore();
         var admin = new InvoiceTemplateService(store, new TestAccessControl(true, "ana"), trail);
         var limited = new InvoiceTemplateService(store, new TestAccessControl(false, "ion"), trail);
+        var outsider = new InvoiceTemplateService(store, new TestAccessControl(false, "vlad", productOperator: false), trail);
         async Task<bool> Throws<T>(Func<Task> action) where T : Exception { try { await action(); return false; } catch (T) { return true; } }
 
         var created = await admin.CreateAsync(new InvoiceTemplateInput { Name = "  Delta PDF  ", SupplierName = "Delta SRL", SupplierCui = "RO 12345678", Definition = SampleDefinition() });
@@ -780,8 +791,21 @@ public static class InvoiceChecks
               await Throws<InvoiceTemplateOperationException>(() => admin.CreateAsync(new InvoiceTemplateInput { Name = new string('x', 121), Definition = SampleDefinition() })) &&
               await Throws<InvoiceTemplateOperationException>(() => admin.CreateAsync(new InvoiceTemplateInput { Name = "Fără conținut" })),
             "Invoice template service: an empty name, a name over 120 characters and an empty definition are refused");
-        check(await Throws<AccessDeniedException>(() => limited.CreateAsync(new InvoiceTemplateInput { Name = "X", Definition = SampleDefinition() })) &&
-              await Throws<AccessDeniedException>(() => limited.DeleteAsync(created.Info, "motiv")), "Invoice template service: only an administrator changes templates");
+        // Any product operator makes and changes templates; only deleting one is reserved for the administrator.
+        var byOperator = await limited.CreateAsync(new InvoiceTemplateInput { Name = "De la utilizator", SupplierName = "Operator SRL", SupplierCui = "555001", Definition = SampleDefinition() });
+        var editedByOperator = await limited.SaveAsync(byOperator.Info, new InvoiceTemplateInput { Name = "De la utilizator 2", SupplierName = "Operator SRL", SupplierCui = "555001", Definition = SampleDefinition() });
+        var renamedByOperator = await limited.UpdateDetailsAsync(editedByOperator.Info, new InvoiceTemplateInput { Name = "De la utilizator 3", SupplierName = "Operator SRL", SupplierCui = "555001" });
+        var switchedByOperator = await limited.SetActiveAsync(renamedByOperator, false);
+        check(byOperator.Info.CreatedBy == "ion" && editedByOperator.Info.Name == "De la utilizator 2" && renamedByOperator.Name == "De la utilizator 3" && !switchedByOperator.Active &&
+              trail.Entries.Last().ActorUsername == "ion" && trail.Entries.Last().Action == AuditActions.DeactivateInvoiceTemplate,
+            "Invoice template service: a product operator creates, changes, renames and switches templates, and the journal names that user");
+        check(await Throws<AccessDeniedException>(() => limited.DeleteAsync(switchedByOperator, "motiv")), "Invoice template service: only an administrator deletes a template");
+        check(await Throws<AccessDeniedException>(() => outsider.CreateAsync(new InvoiceTemplateInput { Name = "X", Definition = SampleDefinition() })) &&
+              await Throws<AccessDeniedException>(() => outsider.SaveAsync(created.Info, new InvoiceTemplateInput { Name = "Y", Definition = SampleDefinition() })) &&
+              await Throws<AccessDeniedException>(() => outsider.SetActiveAsync(created.Info, false)) &&
+              await Throws<AccessDeniedException>(() => outsider.UpdateDetailsAsync(created.Info, new InvoiceTemplateInput { Name = "Z" })),
+            "Invoice template service: a user without access to products cannot create or change templates");
+        await admin.DeleteAsync(switchedByOperator, "curatare test");
 
         // The template is tied to the supplier (name and tax id) and keeps the invoice it was made from.
         check(await Throws<InvoiceTemplateOperationException>(() => admin.CreateAsync(new InvoiceTemplateInput { Name = "Fără furnizor", SupplierCui = "12345678", Definition = SampleDefinition() })) &&
@@ -822,8 +846,8 @@ public static class InvoiceChecks
         check(InvoiceTemplateSuggestions.Rank([(await admin.GetAsync(created.Info.Id))!], new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, [])])).Count == 0,
             "Invoice template service: a template that is switched off is never proposed for a file");
         var switchedOn = await admin.SetActiveAsync(switchedOff, true);
-        check(switchedOn.Active && trail.Entries.Last().Action == AuditActions.ActivateInvoiceTemplate && await Throws<AccessDeniedException>(() => limited.SetActiveAsync(switchedOn, false)),
-            "Invoice template service: it can be switched on again, only by an administrator");
+        check(switchedOn.Active && trail.Entries.Last().Action == AuditActions.ActivateInvoiceTemplate && await Throws<AccessDeniedException>(() => outsider.SetActiveAsync(switchedOn, false)),
+            "Invoice template service: it can be switched on again, and not by a user without access to products");
         renamed = switchedOn;
         await admin.DeleteAsync(renamed, "Nu mai este folosit");
         check(trail.Entries.Last() is { Action: var deleteAction, Motif: var motif, EntityId: var deletedId } && deleteAction == AuditActions.DeleteInvoiceTemplate && motif == "Nu mai este folosit" && deletedId == created.Info.Id.ToString(CultureInfo.InvariantCulture) &&

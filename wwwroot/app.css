@@ -629,6 +629,12 @@ input[type=file]::file-selector-button:hover { background: #0f6659; }
 @keyframes invoice-conflict { from { fill-opacity: .4; } to { fill-opacity: 1; } }
 .invoice-warning { margin: 0; padding: 8px 10px; border-radius: 8px; background: #fdecea; border: 1px solid #e1b4b0; color: #7a241b; font-size: 13px; }
 .invoice-warning-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+/* Fereastra de creare a unui sablon de factura peste pagina de preluare: aproape pe tot ecranul, cu derulare proprie. */
+.template-popup-overlay { z-index: 40; align-items: start; overflow: auto; padding: 2vh 0; }
+.delete-dialog.template-popup { width: min(1280px, 96vw); max-height: 96vh; overflow: auto; padding: 18px 22px 24px; }
+.template-popup .heading-actions { justify-content: flex-end; margin-bottom: 6px; }
+.no-template-warning p { margin: 0 0 8px; }
+.no-template-warning .editor-actions { margin-top: 6px; }
 .invoice-replace { display: grid; gap: 6px; margin: 8px 0; padding: 10px 12px; border: 1px solid #c9d6d2; border-radius: 8px; background: #f4faf8; }
 .invoice-section > summary:focus, .invoice-section > summary:focus-visible { outline: none; }
 .invoice-description-field { display:block; font-size:13px; font-weight:600; } .invoice-description-field textarea { display:block; width:100%; margin-top:8px; font:inherit; border:1px solid #e0e7e3; border-radius:6px; padding:10px; resize:vertical; }
@@ -670,6 +676,15 @@ input[type=file]::file-selector-button:hover { background: #0f6659; }
 .row-toggle-text { font-size: 12px; font-weight: 650; min-width: 52px; }
 .row-toggle.on .row-toggle-text { color: #0d6b5c; }
 .row-toggle.off .row-toggle-text { color: #7a8784; }
+/* ToggleSwitch: the label written after the state word may wrap, and a partial choice shows the knob in the middle. */
+.row-toggle.labelled { white-space: normal; align-items: center; font-size: 13px; font-weight: 600; }
+.row-toggle.labelled .row-toggle-text { min-width: 28px; }
+.row-toggle-label { font-weight: 600; }
+.row-toggle input:focus-visible + .toggle-track { outline: 3px solid #72b6a7; outline-offset: 2px; }
+.row-toggle.mixed .toggle-track { background: #74a89d; border-color: #4f8478; }
+.row-toggle.mixed .toggle-track::after { transform: translateX(8px); }
+.row-toggle.mixed .row-toggle-text { color: #4f6f68; }
+table .row-toggle, .inventory-checkbox .row-toggle { vertical-align: middle; }
 .mark-op { color: #7e22ce; font-weight: inherit; }
 .placeholder-chip.operation-chip, .placeholder-chip.column-chip { background: #fff; font-weight: 600; }
 
@@ -740,9 +755,26 @@ table.pickup-match textarea.pickup-name { display: block; resize: vertical; fiel
 .reason-choice .reason-option { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: .45rem; cursor: pointer; font-size: 12px; font-weight: 500; text-align: left; }
 .reason-choice .reason-option input[type=radio] { flex: none; width: 14px; height: 14px; min-height: 0; padding: 0; margin: 0; accent-color: var(--green); }
 .reason-choice .reason-option span { font-size: 12px; }
+/* Categoria unei subcategorii: alegere directa in formular (radiobox), nu intr-o lista care se deschide. */
+.product-editor fieldset.category-choice { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 10px; min-width: 0; }
+.category-choice legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+.editor-grid .category-choice label.category-option { display: inline-flex; flex-direction: row; align-items: center; gap: .45rem; cursor: pointer; font-size: 13px; font-weight: 500; padding: 8px 12px; border: 1px solid #e0e7e3; border-radius: 6px; background: white; }
+.editor-grid .category-choice label.category-option:has(input:checked) { border-color: var(--green); background: #f1f8f5; }
+.editor-grid .category-choice .category-option input[type=radio] { flex: none; display: inline-block; width: 14px; height: 14px; min-height: 0; padding: 0; margin: 0; accent-color: var(--green); }
 /* Laborator OCR in pagina de preluare (Invoices:Lab = true). */
 .lab-panel { border: 1px solid #c9d3d6; border-radius: 8px; padding: .75rem 1rem; margin: .75rem 0; display: grid; gap: .5rem; background: #f6f9f8; }
 .lab-head { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
 .lab-table { width: 100%; font-size: 12px; }
 .lab-table th, .lab-table td { padding: .3rem .6rem; text-align: left; }
 .lab-table tr.lab-current td { background: #e3f1ec; }
+/* Selectia pe randuri: randul se alege cu un clic oriunde pe el, marcajul rotund este calea de la tastatura si "Selecteaza tot" din antet. */
+.row-select { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1.5px solid #8fa09b; background: #fff; color: #fff; font-size: 13px; font-weight: 800; line-height: 1; cursor: pointer; vertical-align: middle; }
+.row-select.on { background: var(--green); border-color: #0d5d51; }
+.row-select.mixed { background: #74a89d; border-color: #4f8478; }
+.row-select:disabled { opacity: .5; cursor: default; }
+.row-select:focus-visible { outline: 3px solid #72b6a7; outline-offset: 2px; }
+.row-select-all { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; font-size: 12px; font-weight: 650; }
+tr.selectable-row { cursor: pointer; }
+tr.selectable-row:hover { background: #f4f9f7; }
+tr.selectable-row.selected { background: #eaf5f1; }
+tr.selectable-row input, tr.selectable-row a { cursor: auto; }
