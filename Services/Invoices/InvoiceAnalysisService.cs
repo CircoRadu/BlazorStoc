@@ -136,8 +136,22 @@ public static class InvoiceTemplateSuggestions
 {
     public const double MinLayoutScore = 0.5;
 
+    // The suggestions with the active templates of the supplier recognised for the file first (the best layout among them first), added even when
+    // their layout is below the threshold; the other suggestions follow.
+    public static IReadOnlyList<InvoiceTemplateSuggestion> PreferSupplier(IReadOnlyList<InvoiceTemplateSuggestion> ranked, IEnumerable<InvoiceTemplateRecord> templates,
+        InvoiceDocument document, Supplier supplier)
+    {
+        bool Of(InvoiceTemplateRecord template) => template.Info.Active && (template.Info.SupplierId == supplier.Id
+            || (template.Info.SupplierId is null && SupplierRules.CuiDigits(template.Info.SupplierCui) == SupplierRules.CuiDigits(supplier.Cui) && !supplier.IsExternal));
+        var own = templates.Where(Of)
+            .Select(template => ranked.FirstOrDefault(item => item.Template.Info.Id == template.Info.Id)
+                ?? new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, document, template.Info.SupplierName)))
+            .OrderByDescending(item => item.Match.Score).ThenBy(item => item.Template.Info.Name).ToList();
+        return own.Count == 0 ? ranked : [.. own, .. ranked.Where(item => !own.Any(mine => mine.Template.Info.Id == item.Template.Info.Id))];
+    }
+
     public static IReadOnlyList<InvoiceTemplateSuggestion> Rank(IEnumerable<InvoiceTemplateRecord> templates, InvoiceDocument document) =>
-        templates.Where(template => template.Info.Active).Select(template => new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, document)))
+        templates.Where(template => template.Info.Active).Select(template => new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, document, template.Info.SupplierName)))
             .Where(item => item.Match.SupplierMatch || item.Match.Score >= MinLayoutScore)
             .OrderByDescending(item => item.Match.SupplierMatch).ThenByDescending(item => item.Match.Score).ThenBy(item => item.Template.Info.Name).ToList();
 }

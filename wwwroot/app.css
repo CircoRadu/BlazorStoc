@@ -784,3 +784,5 @@ tr.selectable-row input, tr.selectable-row a { cursor: auto; }
 .pickup-invoice-head { margin:0 0 16px; padding:12px 14px; border:1px solid #d9e2de; border-radius:8px; }
 .verify-field { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
 .verify-field small { color:var(--muted); font-weight:400; }
+.pickup-region { display:block; max-width:100%; height:auto; border:1px solid var(--line, #d9dde3); border-radius:6px; background:#fff; }
+.pickup-row-picture { margin-top:.4rem; }

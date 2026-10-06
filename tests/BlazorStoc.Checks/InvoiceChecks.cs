@@ -140,9 +140,9 @@ public static class InvoiceChecks
         check(Field(roAnalysis, InvoiceFieldMeanings.InvoiceNumber) == "DIS 1042" && Field(roAnalysis, InvoiceFieldMeanings.InvoiceDate) == "05.10.2026" &&
               Field(roAnalysis, InvoiceFieldMeanings.DueDate) == "04.11.2026" && Field(roAnalysis, InvoiceFieldMeanings.Currency) == "RON",
             "Invoice analysis: number, issue date, due date and currency are found by their labels");
-        check(Field(roAnalysis, InvoiceFieldMeanings.SupplierName) == "Delta Instalatii SRL" && Field(roAnalysis, InvoiceFieldMeanings.BuyerName) == "Electric Standard Prest SRL" &&
-              roAnalysis.SupplierCui == "12345678" && InvoiceValues.NormalizeCui(Field(roAnalysis, InvoiceFieldMeanings.BuyerCui)) == "9178894",
-            "Invoice analysis: the supplier and the buyer are told apart by their headings (name, tax id)");
+        check(Field(roAnalysis, InvoiceFieldMeanings.SupplierName) == "Delta Instalatii SRL" && roAnalysis.SupplierCui == "12345678" &&
+              roAnalysis.Fields.All(field => !field.Meaning.StartsWith("buyer.", StringComparison.Ordinal)),
+            "Invoice analysis: the supplier is read by its heading (name, tax id) and the buyer's data is not read");
         check(InvoiceValues.ParseNumber(Field(roAnalysis, InvoiceFieldMeanings.TotalNet), ',') == ro.TotalNet && InvoiceValues.ParseNumber(Field(roAnalysis, InvoiceFieldMeanings.Total), ',') == ro.Total,
             "Invoice analysis: the totals are found (total without VAT, total to pay)");
 
@@ -471,11 +471,11 @@ public static class InvoiceChecks
         var (words, meaning) = InvoiceVocabulary.MatchFieldLabelPrefix(InvoiceVocabulary.Tokens("Data scadenta 2026-11-21"));
         check(words == 2 && meaning == InvoiceFieldMeanings.DueDate, "Invoice vocabulary: the longest label wins (Data scadenta is the due date, not the date)");
         // The header fields are grouped by party: the same label means the supplier's or the buyer's attribute by the heading it stands under.
-        check(InvoiceVocabulary.ResolveFieldMeaning("@address", InvoiceVocabulary.BuyerSection) == "buyer.address" &&
+        check(InvoiceVocabulary.ResolveFieldMeaning("@address", InvoiceVocabulary.BuyerSection) == "" &&
               InvoiceVocabulary.ResolveFieldMeaning("@phone", InvoiceVocabulary.SupplierSection) == "supplier.phone" &&
               InvoiceVocabulary.ResolveFieldMeaning("@address", null) == "" && InvoiceVocabulary.ResolveFieldMeaning(InvoiceFieldMeanings.Total, "supplier") == InvoiceFieldMeanings.Total &&
-              InvoiceVocabulary.FieldMeanings.Any(item => item.Key == "buyer.registry") && InvoiceVocabulary.FieldMeanings.Any(item => item.Key == "supplier.iban"),
-            "Invoice vocabulary: a party attribute (address, phone, bank...) belongs to the supplier or to the buyer by its heading; invoice-level labels do not");
+              !InvoiceVocabulary.FieldMeanings.Any(item => item.Key.StartsWith("buyer.", StringComparison.Ordinal)) && InvoiceVocabulary.FieldMeanings.Any(item => item.Key == "supplier.iban"),
+            "Invoice vocabulary: a party attribute (address, phone, bank...) belongs to the supplier by its heading (the buyer has none); invoice-level labels do not");
         check(InvoiceVocabulary.MatchSectionLead("Furnizor: SC TELESYSTEM SRL") == InvoiceVocabulary.SupplierSection &&
               InvoiceVocabulary.MatchSectionLead("Cumparator: ELECTRIC STANDARD PREST SRL") == InvoiceVocabulary.BuyerSection && InvoiceVocabulary.MatchSectionLead("Furnizor:") is null &&
               InvoiceVocabulary.MatchSectionLead("Total: 10") is null,

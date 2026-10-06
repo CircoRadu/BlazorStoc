@@ -49,7 +49,28 @@ internal static class InvoiceFieldFinder
                 }
             }
         }
-        return LimitSectionsToPartyBlocks(KeepBestPerMeaning(fields));
+        // The buyer's data (name, CUI, address, ...) is not read: the pickup needs the supplier and the invoice, and the buyer's tax id could be taken for the supplier's.
+        return LimitSectionsToPartyBlocks(KeepBestPerMeaning(SeparateSeries(fields)))
+            .Where(field => field.Section != InvoiceVocabulary.BuyerSection && InvoiceVocabulary.MatchSection(field.Label) != InvoiceVocabulary.BuyerSection).ToList();
+    }
+
+    // "Seria DC-FF-AV-TSY nr. 111094321": the label "seria" is the series, not the number. When the number follows on the same line behind "nr.",
+    // it is the invoice number and the series stays a field without a meaning (the user can still use it).
+    private static List<InvoiceHeaderField> SeparateSeries(List<InvoiceHeaderField> fields)
+    {
+        var result = fields.ToList();
+        for (var i = 0; i < result.Count; i++)
+        {
+            var series = result[i];
+            if (series.Meaning != InvoiceFieldMeanings.InvoiceNumber || InvoiceValues.Normalize(series.Label) is not ("seria" or "serie")) continue;
+            var numberIndex = result.FindIndex(item => item.Meaning.Length == 0 && InvoiceValues.Normalize(item.Label) == "nr" && item.LabelBox.Page == series.ValueBox.Page
+                && Math.Abs(item.LabelBox.Y - series.ValueBox.Y) <= Math.Max(series.ValueBox.Height, 4) && item.LabelBox.X >= series.ValueBox.X
+                && System.Text.RegularExpressions.Regex.IsMatch(item.Value.Trim(), @"^\d{1,12}$"));
+            if (numberIndex < 0) continue;
+            result[i] = series with { Meaning = "", Confidence = Math.Min(series.Confidence, 0.6) };
+            result[numberIndex] = result[numberIndex] with { Meaning = InvoiceFieldMeanings.InvoiceNumber, Confidence = 0.8 };
+        }
+        return result;
     }
 
     // A section is the block of lines under a VANZATOR/CUMPARATOR heading, not everything below it: invoice-level fields (number, dates,
@@ -60,7 +81,8 @@ internal static class InvoiceFieldFinder
                                                meaning.StartsWith(InvoiceVocabulary.BuyerSection + ".", StringComparison.Ordinal);
         // The block runs from the heading down through party lines that follow each other (gap up to 30 points); a party line far below
         // (the bank account in the payment notes) keeps its party but does not stretch the block over the totals in between.
-        var bottoms = fields.Where(field => IsParty(field.Meaning))
+        // The buyer's lines have no meaning any more, but they still make up the buyer's block (they are removed after the limit).
+        var bottoms = fields.Where(field => IsParty(field.Meaning) || (field.Section == InvoiceVocabulary.BuyerSection && field.Meaning.Length == 0))
             .GroupBy(field => (field.LabelBox.Page, field.Section))
             .ToDictionary(group => group.Key, group =>
             {

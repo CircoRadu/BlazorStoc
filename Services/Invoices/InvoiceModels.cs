@@ -83,8 +83,6 @@ public static class InvoiceFieldMeanings
     public const string SupplierName = "supplier.name";
     public const string SupplierCui = "supplier.cui";
     public const string SupplierRegistry = "supplier.registry";
-    public const string BuyerName = "buyer.name";
-    public const string BuyerCui = "buyer.cui";
     public const string InvoiceNumber = "invoice.number";
     public const string InvoiceDate = "invoice.date";
     public const string DueDate = "invoice.dueDate";

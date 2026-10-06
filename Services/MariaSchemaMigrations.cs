@@ -540,6 +540,77 @@ public static class MariaSchemaMigrations
             ("supplier_invoices", "issue_date"), ("supplier_invoices", "created_by"), ("supplier_invoices", "created_utc"),
             ("stock_movements", "invoice_id"), ("archive_stock_movements", "invoice_id")
         ])
+        ,
+        // A template is tied to its supplier by id (the name shown is the supplier's own, so a rename in the register reaches the template); the
+        // tax id column stays for matching. Templates of a supplier already in the register are linked here; a supplier with templates cannot be deleted (RESTRICT).
+        new(14, "Sabloane de facturi: legatura cu furnizorul prin supplier_id",
+        [
+            "ALTER TABLE `invoice_templates` ADD COLUMN IF NOT EXISTS `supplier_id` BIGINT NULL",
+            "ALTER TABLE `invoice_templates` ADD INDEX IF NOT EXISTS `ix_invoice_templates_supplier` (`supplier_id`)",
+            "ALTER TABLE `invoice_templates` ADD CONSTRAINT `fk_invoice_templates_supplier` FOREIGN KEY IF NOT EXISTS (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT ON UPDATE NO ACTION"
+        ],
+        [
+            ("invoice_templates", "supplier_id")
+        ])
+        ,
+        // Other names a supplier is written with on invoices; `alias_key` (the name without legal form, dots, case) is unique: an alias points to one supplier.
+        new(15, "Furnizori: denumiri alternative (alias-uri) pentru recunoasterea numelui de pe factura",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `supplier_aliases` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `supplier_id` BIGINT NOT NULL,
+              `alias` VARCHAR(200) NOT NULL,
+              `alias_key` VARCHAR(200) NOT NULL,
+              `created_by` VARCHAR(100) NOT NULL DEFAULT '',
+              `created_utc` VARCHAR(40) NOT NULL DEFAULT '',
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `uq_supplier_aliases_key` (`alias_key`),
+              KEY `ix_supplier_aliases_supplier` (`supplier_id`),
+              CONSTRAINT `fk_supplier_aliases_supplier` FOREIGN KEY (`supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("supplier_aliases", "id"), ("supplier_aliases", "supplier_id"), ("supplier_aliases", "alias"), ("supplier_aliases", "alias_key"),
+            ("supplier_aliases", "created_by"), ("supplier_aliases", "created_utc")
+        ])
+        ,
+        // What the recognition of the supplier proposed for an invoice and what the user chose (to see where the reading goes wrong); one row per invoice, removed with it.
+        new(16, "Furnizori: jurnal de recunoastere a furnizorului per factura preluata",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `supplier_recognitions` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `invoice_id` BIGINT NOT NULL,
+              `method` VARCHAR(10) NOT NULL,
+              `confidence` VARCHAR(10) NOT NULL,
+              `read_name` VARCHAR(200) NOT NULL DEFAULT '',
+              `read_cui` VARCHAR(30) NOT NULL DEFAULT '',
+              `recognized_supplier_id` BIGINT NULL,
+              `chosen_supplier_id` BIGINT NULL,
+              `corrected` TINYINT(1) NOT NULL DEFAULT 0,
+              `created_utc` VARCHAR(40) NOT NULL DEFAULT '',
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `uq_supplier_recognitions_invoice` (`invoice_id`),
+              CONSTRAINT `fk_supplier_recognitions_invoice` FOREIGN KEY (`invoice_id`) REFERENCES `supplier_invoices` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("supplier_recognitions", "id"), ("supplier_recognitions", "invoice_id"), ("supplier_recognitions", "method"), ("supplier_recognitions", "confidence"),
+            ("supplier_recognitions", "read_name"), ("supplier_recognitions", "read_cui"), ("supplier_recognitions", "recognized_supplier_id"),
+            ("supplier_recognitions", "chosen_supplier_id"), ("supplier_recognitions", "corrected"), ("supplier_recognitions", "created_utc")
+        ])
+        ,
+        // Whether the user chose another template than the one proposed automatically for the invoice.
+        new(17, "Furnizori: jurnalul de recunoastere retine si schimbarea sablonului propus",
+        [
+            "ALTER TABLE `supplier_recognitions` ADD COLUMN IF NOT EXISTS `template_changed` TINYINT(1) NOT NULL DEFAULT 0"
+        ],
+        [
+            ("supplier_recognitions", "template_changed")
+        ])
     ];
 }
 
@@ -589,7 +660,22 @@ public sealed class MariaSchemaMigrator(IConfiguration configuration, ILogger<Ma
             }
         }
         await NormalizeBeneficiaryKeysAsync(cancellationToken).ConfigureAwait(false);
+        await LinkTemplateSuppliersAsync(cancellationToken).ConfigureAwait(false);
         return new(true, applied, await FindMissingColumnsAsync(cancellationToken).ConfigureAwait(false));
+    }
+
+    // Templates of a supplier already in the register are linked to it by id (migration 14 adds the column; the migrator account has no UPDATE
+    // right, so the link is written with the application account). Idempotent.
+    private async Task LinkTemplateSuppliersAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = DatabaseConnections.Create(configuration);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("""
+            UPDATE `invoice_templates` t INNER JOIN `suppliers` s ON s.normalized_cui COLLATE utf8mb4_nopad_bin = t.supplier_cui COLLATE utf8mb4_nopad_bin AND s.country = 'RO'
+            SET t.supplier_id = s.id WHERE t.supplier_id IS NULL
+            """, connection) { CommandTimeout = 60 };
+        try { await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false); }
+        catch (MySqlException exception) when (exception.Number == 1054) { }   // the column is not there yet (migration not applied)
     }
 
     // The key of a legal-person beneficiary is the CUI digits ("RO123" and "123" are one). Rows saved with the old key are rewritten with the

@@ -30,6 +30,7 @@ if (Environment.GetEnvironmentVariable("COMPONENT_CHECKS_ONLY") == "1")
     await ComponentChecks.RunAsync(Check);
     await PickupWizardChecks.RunAsync(Check);
     await PickupWizardChecks.TemplateFlowAsync(Check);
+    await PickupWizardChecks.LinkButtonAsync(Check);
     SupplierChecks.Rules(Check);
     await SupplierChecks.ComponentsAsync(Check);
     await SupplierChecks.PickupAsync(Check);
@@ -2355,6 +2356,7 @@ async Task RunMaintenanceGateChecksAsync()
 await ComponentChecks.RunAsync(Check);
 await PickupWizardChecks.RunAsync(Check);
 await PickupWizardChecks.TemplateFlowAsync(Check);
+await PickupWizardChecks.LinkButtonAsync(Check);
 SupplierChecks.Rules(Check);
 await SupplierChecks.ComponentsAsync(Check);
 await SupplierChecks.PickupAsync(Check);
@@ -2370,7 +2372,7 @@ if (Environment.GetEnvironmentVariable("RUN_MARIA_INTEGRATION_CHECKS") == "1")
     var mariaConfigPath = Environment.GetEnvironmentVariable("MARIA_TEST_CONFIG_PATH")
         ?? throw new InvalidOperationException("Set MARIA_TEST_CONFIG_PATH to the test database's private config JSON.");
     var mariaConfiguration = new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddJsonFile(mariaConfigPath).Build();
-    await BlazorStoc.Checks.MariaIntegrationChecks.RunAsync(mariaConfiguration);
+    if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("MARIA_ONLY"))) await BlazorStoc.Checks.MariaIntegrationChecks.RunAsync(mariaConfiguration);
     await BlazorStoc.Checks.MariaExtendedChecks.RunAsync(mariaConfiguration);
 }
 

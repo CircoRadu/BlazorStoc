@@ -7,6 +7,7 @@
 @inject IAccessControl Access
 @inject NavigationManager Navigation
 @inject ILogger<Suppliers> Logger
+@inject IServiceProvider Services
 @implements IDisposable
 
 <PageTitle>Furnizori · BlazorStoc</PageTitle>
@@ -22,6 +23,29 @@
     <article><span>De verificat</span><strong>@(loaded ? suppliers.Count(supplier => SupplierSources.NeedsCheck(supplier.Source)).ToString() : "—")</strong><small>Introduși manual sau editați după ANAF</small><i>⚠</i></article>
     <article><span>Alte state UE</span><strong>@(loaded ? suppliers.Count(supplier => supplier.IsExternal).ToString() : "—")</strong><small>Identificați prin cod de TVA</small><i>◇</i></article>
 </section>
+
+@if (recognition is { Total: > 0 } summary)
+{
+    <details class="catalog" id="supplier-recognition-summary">
+        <summary><strong>Recunoașterea furnizorului la preluarea facturilor</strong> <span class="muted">· @summary.Total recunoașteri, @summary.Corrected corectate de utilizator</span></summary>
+        <p><a href="/api/furnizori/recunoastere.csv" download>Exportă jurnalul (CSV)</a></p>
+        @if (summary.ByMethod.Any(Suspect)) { <p class="invoice-warning" role="status">⚠ O metodă cu încredere „mare” depășește 5% corecții: pragurile recunoașterii merită revăzute.</p> }
+        <div class="table-wrap"><table>
+            <thead><tr><th>Metodă</th><th>Încredere</th><th>Facturi</th><th>Corectate</th><th>Rata</th><th>Șablon schimbat</th></tr></thead>
+            <tbody>
+                @foreach (var row in summary.ByMethod) { <tr><td>@SupplierRecognitionText.MethodName(row.Method)</td><td>@SupplierRecognitionText.ConfidenceName(row.Confidence)</td><td>@row.Total</td><td>@row.Corrected</td><td>@(Rate(row))%@(Suspect(row) ? " ⚠" : "")</td><td>@row.TemplateChanged</td></tr> }
+            </tbody>
+        </table></div>
+        @if (Unresolved(summary).Count > 0)
+        {
+            <p class="muted">Ultimele corecții nerezolvate (citit din factură → furnizorul ales):</p>
+            @if (aliasError is not null) { <div class="validation-message" role="alert">@aliasError</div> }
+            <ul>
+                @foreach (var fix in Unresolved(summary)) { <li>@StockMovementRules.DisplayDate(DateOnly.FromDateTime(fix.Utc)) · factura @fix.InvoiceNumber · „@(fix.ReadName.Length > 0 ? fix.ReadName : "—")” (CUI @(fix.ReadCui.Length > 0 ? fix.ReadCui : "—")) → <strong>@(fix.ChosenName.Length > 0 ? fix.ChosenName : "—")</strong>@(fix.RecognizedName.Length > 0 ? $" (propus: {fix.RecognizedName})" : " (nimic propus)") <button type="button" class="refresh" disabled="@(aliasBusy || fix.ReadName.Trim().Length == 0)" @onclick="() => RememberAliasAsync(fix)">Ține minte ca denumire alternativă</button></li> }
+            </ul>
+        }
+    </details>
+}
 
 <section class="catalog">
     <div class="catalog-heading"><h2>Registru furnizori <span>@Filtered.Count</span></h2><small>Un furnizor se șterge numai de un administrator și numai dacă nu are facturi, intrări de stoc sau șabloane legate</small></div>
@@ -73,6 +97,42 @@
     private bool loading, syncing, loaded, editing, deleteBusy, canDelete;
     private string? error, notice, deleteError;
     private Guid editorKey;
+    private SupplierRecognitionSummary? recognition;
+
+    private static int Rate(SupplierRecognitionCount row) => row.Total == 0 ? 0 : (int)Math.Round(100.0 * row.Corrected / row.Total);
+    // A "high" confidence that is corrected too often (at least 20 invoices, over 5%): the thresholds of the recognition need another look.
+    private static bool Suspect(SupplierRecognitionCount row) => row.Confidence == "high" && row.Total >= 20 && row.Corrected * 100 > row.Total * 5;
+
+    private string? aliasError;
+    private bool aliasBusy;
+
+    // Corrections whose read name is not yet a name or alias of the supplier the user chose (the others are resolved), at most 10.
+    private List<SupplierRecognitionCorrection> Unresolved(SupplierRecognitionSummary summary) =>
+        [.. summary.Recent.Where(fix => fix.ChosenSupplierId is { } id && fix.ReadName.Trim().Length > 0
+            && suppliers.FirstOrDefault(item => item.Id == id) is { } chosen && SupplierRules.AliasProblem(fix.ReadName, chosen, suppliers) is null).Take(10)];
+
+    private async Task RememberAliasAsync(SupplierRecognitionCorrection fix)
+    {
+        if (aliasBusy || suppliers.FirstOrDefault(item => item.Id == fix.ChosenSupplierId) is not { } chosen) return;
+        aliasBusy = true; aliasError = null;
+        try
+        {
+            await Repository.AddAliasAsync(chosen, fix.ReadName, lifetime.Token);
+            notice = $"Denumirea „{fix.ReadName}” a fost reținută pentru {chosen.Name}.";
+            await LoadAsync(false);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is SupplierOperationException or AccessDeniedException) { aliasError = exception.Message; }
+        finally { aliasBusy = false; }
+    }
+
+    private async Task LoadRecognitionAsync()
+    {
+        if (Services.GetService<ISupplierRecognitionLog>() is not { } log) return;
+        try { recognition = await log.SummaryAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("Supplier recognition summary failed ({ErrorType}).", exception.GetType().Name); }
+    }
     private readonly CancellationTokenSource lifetime = new();
     private List<Supplier> Filtered => SupplierSearch.Filter(suppliers, query, onlyToCheck).ToList();
 
@@ -87,6 +147,7 @@
         try { canDelete = await Access.IsAdministratorAsync(lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         await LoadAsync(true);
+        await LoadRecognitionAsync();
         _ = SynchronizePeriodicallyAsync();
     }
 

@@ -9,7 +9,7 @@ public sealed class InvoiceTemplateOperationException(string message) : Exceptio
 // templates and choose which ones are used). There are no versions: saving a template replaces it.
 // Version is the row's concurrency counter.
 public sealed record InvoiceTemplateInfo(int Id, string Name, string SupplierName, string SupplierCui, string SourceKind, bool Active, long Version,
-    string CreatedBy, DateTime CreatedUtc, string UpdatedBy, DateTime UpdatedUtc);
+    string CreatedBy, DateTime CreatedUtc, string UpdatedBy, DateTime UpdatedUtc, int? SupplierId = null);
 
 public sealed record InvoiceTemplateRecord(InvoiceTemplateInfo Info, InvoiceTemplateDefinition Definition);
 
@@ -22,6 +22,8 @@ public sealed class InvoiceTemplateInput
     public string Name { get; set; } = "";
     public string SupplierName { get; set; } = "";
     public string SupplierCui { get; set; } = "";
+    // The supplier of the register the template is tied to (null: looked up by the tax id).
+    public int? SupplierId { get; set; }
     public InvoiceTemplateDefinition? Definition { get; set; }
     // The invoice the template was made from (PDF), saved with the template; null keeps the model already saved.
     public string ModelFileName { get; set; } = "";
@@ -57,13 +59,31 @@ public static class InvoiceTemplateRules
         if (input.ModelContent is { Length: > MaxModelBytes }) throw new InvoiceTemplateOperationException(ModelTooLargeMessage);
         return new InvoiceTemplateInput
         {
-            Name = name, SupplierName = supplier, SupplierCui = cui, Definition = input.Definition,
+            Name = name, SupplierName = supplier, SupplierCui = cui, SupplierId = input.SupplierId, Definition = input.Definition,
             ModelFileName = (input.ModelFileName ?? "").Trim() is { Length: > 0 } modelName ? (modelName.Length > 255 ? modelName[..255] : modelName) : "model.pdf", ModelContent = input.ModelContent
         };
     }
 
     // Two names are the same when they differ only in letter case, spaces or diacritics.
     public static bool SameName(string left, string right) => InvoiceValues.Normalize(left) == InvoiceValues.Normalize(right);
+
+    // The definition after the supplier was renamed: the fields named with the old name and the entry description (which cites it, as text or
+    // as a <label> mark of such a field) take the new one. Null when nothing in the definition carried the old name.
+    public static InvoiceTemplateDefinition? RenameSupplier(InvoiceTemplateDefinition definition, string oldName, string newName)
+    {
+        oldName = (oldName ?? "").Trim(); newName = (newName ?? "").Trim();
+        if (oldName.Length == 0 || newName.Length == 0 || oldName == newName) return null;
+        var changed = false;
+        string Swap(string text)
+        {
+            if (text.Length == 0 || text.IndexOf(oldName, StringComparison.OrdinalIgnoreCase) < 0) return text;
+            changed = true;
+            return text.Replace(oldName, newName, StringComparison.OrdinalIgnoreCase);
+        }
+        var fields = definition.Fields.Select(field => field with { Name = Swap(field.Name), LabelText = Swap(field.LabelText) }).ToList();
+        var description = Swap(definition.ProductDescription ?? "");
+        return changed ? definition with { Fields = fields, ProductDescription = description } : null;
+    }
 
     public static string Describe(InvoiceTemplateDefinition definition) =>
         $"sursă: {(definition.SourceKind == InvoiceSources.Ocr ? "OCR" : "text")}; câmpuri folosite: {definition.UsedFieldCount}; coloane folosite: {definition.UsedColumnCount}" + ((definition.ProductDescription ?? "").Length > 0 ? $"; descriere intrare în stoc a produsului: {definition.ProductDescription}" : "");
@@ -87,7 +107,11 @@ public interface IInvoiceTemplateStore
 // migration 10 (MariaSchemaMigrations); this class never alters the schema.
 public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : IInvoiceTemplateStore
 {
-    private const string InfoColumns = "id, name, supplier_name, supplier_cui, source_kind, active, version, created_by, created_utc, updated_by, updated_utc";
+    // The supplier's name is the register's own when the template is linked (supplier_id), so a rename there is seen at once.
+    private const string InfoColumns = "t.id, t.name, COALESCE(s.name, t.supplier_name), t.supplier_cui, t.source_kind, t.active, t.version, t.created_by, t.created_utc, t.updated_by, t.updated_utc, t.supplier_id";
+    private const string From = "FROM invoice_templates t LEFT JOIN suppliers s ON s.id = t.supplier_id";
+    // The supplier of the input: the one given, else the Romanian supplier with the tax id.
+    private const string SupplierIdSql = "COALESCE(@supplierId, (SELECT id FROM suppliers WHERE normalized_cui=@cui AND country='RO' LIMIT 1))";
 
     private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
@@ -95,7 +119,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand($"SELECT {InfoColumns} FROM invoice_templates ORDER BY supplier_name, name, id", connection);
+        await using var command = new MySqlCommand($"SELECT {InfoColumns} {From} ORDER BY t.supplier_name, t.name, t.id", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<InvoiceTemplateInfo>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result.Add(ReadInfo(reader));
@@ -106,7 +130,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand($"SELECT {InfoColumns}, definition FROM invoice_templates WHERE id=@id", connection);
+        await using var command = new MySqlCommand($"SELECT {InfoColumns}, t.definition {From} WHERE t.id=@id", connection);
         command.Parameters.AddWithValue("@id", id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ? ReadRecord(reader) : null;
@@ -116,7 +140,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
     {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand($"SELECT {InfoColumns}, definition FROM invoice_templates ORDER BY supplier_name, name, id", connection);
+        await using var command = new MySqlCommand($"SELECT {InfoColumns}, t.definition {From} ORDER BY t.supplier_name, t.name, t.id", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<InvoiceTemplateRecord>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result.Add(ReadRecord(reader));
@@ -148,9 +172,9 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         {
             long id;
             await using (var insert = new MySqlCommand("""
-                INSERT INTO invoice_templates (name, supplier_name, supplier_cui, source_kind, version_number, definition, created_by, created_utc, updated_by, updated_utc, version)
-                VALUES (@name, @supplier, @cui, @source, 1, @definition, @actor, @now, @actor, @now, 0)
-                """, connection, transaction))
+                INSERT INTO invoice_templates (name, supplier_name, supplier_cui, supplier_id, source_kind, version_number, definition, created_by, created_utc, updated_by, updated_utc, version)
+                VALUES (@name, @supplier, @cui, SUPPLIER_ID, @source, 1, @definition, @actor, @now, @actor, @now, 0)
+                """.Replace("SUPPLIER_ID", SupplierIdSql), connection, transaction))
             {
                 Fill(insert, clean, definition, json);
                 insert.Parameters.AddWithValue("@actor", actor);
@@ -161,8 +185,9 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
             }
             await InsertModelAsync(connection, transaction, id, 1, clean, actor, now, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return new InvoiceTemplateRecord(new InvoiceTemplateInfo(checked((int)id), clean.Name, clean.SupplierName, clean.SupplierCui, definition.SourceKind, true, 0,
-                actor, MariaTimeText.Parse(now), actor, MariaTimeText.Parse(now)), definition);
+            return await GetAsync(checked((int)id), cancellationToken).ConfigureAwait(false)
+                ?? new InvoiceTemplateRecord(new InvoiceTemplateInfo(checked((int)id), clean.Name, clean.SupplierName, clean.SupplierCui, definition.SourceKind, true, 0,
+                    actor, MariaTimeText.Parse(now), actor, MariaTimeText.Parse(now), clean.SupplierId), definition);
         }
         catch
         {
@@ -185,10 +210,10 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         try
         {
             await using (var update = new MySqlCommand("""
-                UPDATE invoice_templates SET name=@name, supplier_name=@supplier, supplier_cui=@cui, source_kind=@source, definition=@definition,
+                UPDATE invoice_templates SET name=@name, supplier_name=@supplier, supplier_cui=@cui, supplier_id=SUPPLIER_ID, source_kind=@source, definition=@definition,
                     updated_by=@actor, updated_utc=@now, version=version+1
                 WHERE id=@id AND version=@oldVersion
-                """, connection, transaction))
+                """.Replace("SUPPLIER_ID", SupplierIdSql), connection, transaction))
             {
                 Fill(update, clean, definition, json);
                 update.Parameters.AddWithValue("@actor", actor);
@@ -202,11 +227,12 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
             }
             await InsertModelAsync(connection, transaction, original.Id, 1, clean, actor, now, cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
-            return new InvoiceTemplateRecord(original with
-            {
-                Name = clean.Name, SupplierName = clean.SupplierName, SupplierCui = clean.SupplierCui, SourceKind = definition.SourceKind,
-                Version = original.Version + 1, UpdatedBy = actor, UpdatedUtc = MariaTimeText.Parse(now)
-            }, definition);
+            return await GetAsync(original.Id, cancellationToken).ConfigureAwait(false)
+                ?? new InvoiceTemplateRecord(original with
+                {
+                    Name = clean.Name, SupplierName = clean.SupplierName, SupplierCui = clean.SupplierCui, SourceKind = definition.SourceKind,
+                    Version = original.Version + 1, UpdatedBy = actor, UpdatedUtc = MariaTimeText.Parse(now)
+                }, definition);
         }
         catch
         {
@@ -239,9 +265,10 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var update = new MySqlCommand("""
-            UPDATE invoice_templates SET name=@name, supplier_name=@supplier, supplier_cui=@cui, updated_by=@actor, updated_utc=@now, version=version+1
+            UPDATE invoice_templates SET name=@name, supplier_name=@supplier, supplier_cui=@cui, supplier_id=SUPPLIER_ID, updated_by=@actor, updated_utc=@now, version=version+1
             WHERE id=@id AND version=@oldVersion
-            """, connection);
+            """.Replace("SUPPLIER_ID", SupplierIdSql), connection);
+        update.Parameters.AddWithValue("@supplierId", clean.SupplierId is { } linkedId ? linkedId : DBNull.Value);
         update.Parameters.AddWithValue("@name", clean.Name);
         update.Parameters.AddWithValue("@supplier", clean.SupplierName);
         update.Parameters.AddWithValue("@cui", clean.SupplierCui);
@@ -253,9 +280,9 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         try { changed = await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false); }
         catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.DuplicateKeyEntry) { throw new InvoiceTemplateOperationException(InvoiceTemplateRules.DuplicateMessage); }
         if (changed != 1) throw new InvoiceTemplateOperationException(InvoiceTemplateRules.ConcurrentMessage);
-        return original with
+        return (await GetAsync(original.Id, cancellationToken).ConfigureAwait(false))?.Info ?? original with
         {
-            Name = clean.Name, SupplierName = clean.SupplierName, SupplierCui = clean.SupplierCui, Version = original.Version + 1, UpdatedBy = actor, UpdatedUtc = MariaTimeText.Parse(now)
+            Name = clean.Name, SupplierName = clean.SupplierName, SupplierCui = clean.SupplierCui, SupplierId = clean.SupplierId ?? original.SupplierId, Version = original.Version + 1, UpdatedBy = actor, UpdatedUtc = MariaTimeText.Parse(now)
         };
     }
 
@@ -276,6 +303,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         command.Parameters.AddWithValue("@name", clean.Name);
         command.Parameters.AddWithValue("@supplier", clean.SupplierName);
         command.Parameters.AddWithValue("@cui", clean.SupplierCui);
+        command.Parameters.AddWithValue("@supplierId", clean.SupplierId is { } linkedId ? linkedId : DBNull.Value);
         command.Parameters.AddWithValue("@source", definition.SourceKind);
         command.Parameters.AddWithValue("@definition", json);
     }
@@ -320,10 +348,11 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
 
     private static InvoiceTemplateInfo ReadInfo(MySqlDataReader reader) =>
         new(checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetBoolean(5), reader.GetInt64(6),
-            reader.GetString(7), MariaTimeText.Parse(reader.GetString(8)), reader.GetString(9), MariaTimeText.Parse(reader.GetString(10)));
+            reader.GetString(7), MariaTimeText.Parse(reader.GetString(8)), reader.GetString(9), MariaTimeText.Parse(reader.GetString(10)),
+            reader.IsDBNull(11) ? null : checked((int)reader.GetInt64(11)));
 
     private static InvoiceTemplateRecord ReadRecord(MySqlDataReader reader) =>
-        new(ReadInfo(reader), InvoiceTemplateJson.Deserialize(reader.GetString(11)));
+        new(ReadInfo(reader), InvoiceTemplateJson.Deserialize(reader.GetString(12)));
 }
 
 // Saves, changes and deletes templates for the signed-in user (creating and changing: any product operator; deleting: the administrator) and writes the journal: every operation has its own action
@@ -339,6 +368,11 @@ public interface IInvoiceTemplateService
     Task<InvoiceTemplateInfo> SetActiveAsync(InvoiceTemplateInfo original, bool active, CancellationToken cancellationToken = default);
     Task<InvoiceTemplateInfo> UpdateDetailsAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default);
     Task DeleteAsync(InvoiceTemplateInfo original, string reason, CancellationToken cancellationToken = default);
+    // The supplier with this tax id was renamed in the register: its templates take the new name, also inside the definition (field names and
+    // the entry description). Returns how many templates changed.
+    Task<int> RenameSupplierAsync(string supplierCui, string oldName, string newName, CancellationToken cancellationToken = default) => Task.FromResult(0);
+    // Ties a template made before suppliers were linked by id to a supplier of the register (its name and tax id become the supplier's own).
+    Task<InvoiceTemplateInfo> LinkSupplierAsync(InvoiceTemplateInfo original, Supplier supplier, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessControl access, IAuditTrail audit) : IInvoiceTemplateService
@@ -411,6 +445,42 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.InvoiceTemplate, AuditActions.DeleteInvoiceTemplate, Id(original), original.Name,
             AuditDetails.Identification(("Furnizor", Supplier(original))),
             (reason ?? string.Empty).Trim(), cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<InvoiceTemplateInfo> LinkSupplierAsync(InvoiceTemplateInfo original, Supplier supplier, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
+        await CheckUniqueNameAsync(new InvoiceTemplateInput { Name = original.Name, SupplierName = supplier.Name, SupplierCui = supplier.Cui }, original.Id, cancellationToken).ConfigureAwait(false);
+        var saved = await store.UpdateDetailsAsync(original, new InvoiceTemplateInput { Name = original.Name, SupplierName = supplier.Name, SupplierCui = supplier.Cui, SupplierId = supplier.Id }, actor, cancellationToken).ConfigureAwait(false);
+        await AuditRecorder.RecordEditAsync(audit, access, AuditEntities.InvoiceTemplate, Id(saved), saved.Name,
+            [new AuditChange("Furnizor", Supplier(original), Supplier(saved))], string.Empty, cancellationToken, AuditActions.LinkInvoiceTemplateSupplier).ConfigureAwait(false);
+        return saved;
+    }
+
+    public async Task<int> RenameSupplierAsync(string supplierCui, string oldName, string newName, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        var cui = InvoiceValues.NormalizeCui(supplierCui);
+        newName = (newName ?? "").Trim();
+        if (cui.Length == 0 || newName.Length == 0) return 0;
+        var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
+        var count = 0;
+        foreach (var template in (await store.GetAllAsync(cancellationToken).ConfigureAwait(false)).Where(item => item.Info.SupplierCui == cui))
+        {
+            // The name shown comes from the register, so the old name is the one given; the definition changes only where it carried it.
+            var definition = InvoiceTemplateRules.RenameSupplier(template.Definition, oldName, newName);
+            var saved = await store.SaveAsync(template.Info, new InvoiceTemplateInput
+            {
+                Name = template.Info.Name, SupplierName = newName, SupplierCui = cui, SupplierId = template.Info.SupplierId, Definition = definition ?? template.Definition
+            }, actor, cancellationToken).ConfigureAwait(false);
+            await AuditRecorder.RecordEditAsync(audit, access, AuditEntities.InvoiceTemplate, Id(saved.Info), saved.Info.Name,
+                [new AuditChange("Furnizor", oldName, newName),
+                 new AuditChange("Descriere intrare în stoc", template.Definition.ProductDescription ?? "", saved.Definition.ProductDescription ?? "")],
+                string.Empty, cancellationToken, AuditActions.RenameInvoiceTemplateSupplier).ConfigureAwait(false);
+            count++;
+        }
+        return count;
     }
 
     // A name is unique per supplier without regard to letter case, spaces or diacritics (the database key is case-sensitive).

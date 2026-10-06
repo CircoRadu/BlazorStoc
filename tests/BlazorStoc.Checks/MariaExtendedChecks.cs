@@ -42,6 +42,7 @@ public static class MariaExtendedChecks
             await Section("Notification settings: clean-up of old resolved notifications", () => NotificationSettingsAsync(configuration, admin, audit, probe));
             await Section("Invoice templates: create, versions, unique names, concurrency, delete, journal", () => InvoiceTemplatesAsync(configuration, admin, audit, probe));
             await Section("Suppliers and invoices: unique tax id, sources, edits, invoices, entries tied to invoices, delete rules, journal, archive", () => SuppliersAsync(configuration, admin, audit, probe));
+            await Section("Supplier recognition: template link, aliases, recognition log, CSV export", () => SupplierRecognitionAsync(configuration, admin, audit, probe));
         }
         finally
         {
@@ -114,6 +115,59 @@ public static class MariaExtendedChecks
     }
 
     // ---- Suppliers and their invoices ----------------------------------------------------------------------------------------------
+
+    private static async Task SupplierRecognitionAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var suffix = Suffix();
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var templates = new MariaInvoiceTemplateStore(configuration);
+        var service = new InvoiceTemplateService(templates, admin, audit);
+        var suppliers = new MariaSupplierRepository(configuration, admin, audit, invoiceTemplates: service);
+        var invoices = new MariaSupplierInvoiceRepository(configuration, admin, audit);
+        var log = new MariaSupplierRecognitionLog(configuration, admin);
+        var cui = SupplierChecks.ValidCui(Random.Shared.Next(1_000_000, 9_999_999));
+        InvoiceTemplateRecord? template = null; Supplier? supplier = null; SupplierInvoice? invoice = null;
+        try
+        {
+            // A template made before its supplier is in the register is not linked; the link is made later, with its own journal action.
+            template = await service.CreateAsync(new InvoiceTemplateInput { Name = $"Sablon legare {suffix}", SupplierName = $"Furnizor Legare {suffix}", SupplierCui = cui, Definition = InvoiceDefinition() });
+            Check(template.Info.SupplierId is null, "A template made for a tax id that is not in the register is not linked to a supplier");
+            supplier = await suppliers.CreateAsync(new SupplierInput { Name = $"Furnizor Legare {suffix} SRL", Cui = cui });
+            var linked = await service.LinkSupplierAsync(template.Info, supplier);
+            var reread = await templates.GetAsync(template.Info.Id);
+            var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.InvoiceTemplate && item.EntityId == template.Info.Id.ToString()).Select(item => item.Action).ToList();
+            Check(linked.SupplierId == supplier.Id && reread!.Info.SupplierId == supplier.Id && reread.Info.SupplierName == supplier.Name && events.Contains(AuditActions.LinkInvoiceTemplateSupplier),
+                "Linking a template to a supplier stores the supplier id, takes the supplier's name and is journaled as its own operation");
+
+            // An alias is kept for the supplier, found by name, and refused when it belongs to another supplier or is too short.
+            var withAlias = await suppliers.AddAliasAsync(supplier, $"Denumire Comerciala {suffix}");
+            Check(withAlias.AliasList.Count == 1 && SupplierRules.FindByName(await suppliers.GetSuppliersAsync(), $"SC Denumire Comerciala {suffix} SRL")?.Id == supplier.Id, "An alias is stored with the supplier and finds it by name");
+            await Rejects<SupplierOperationException>(() => suppliers.AddAliasAsync(supplier, $"denumire comerciala {suffix} s.r.l."), "The same alias (legal form, dots and case aside) is refused");
+
+            // The recognition log: the invoice, what was proposed and chosen, the changed template, the summary and the CSV.
+            invoice = await invoices.CreateAsync(new SupplierInvoiceInput { SupplierId = supplier.Id, Number = $"REC-{suffix}", Date = DateOnly.FromDateTime(DateTime.Now) });
+            await log.RecordAsync(new SupplierRecognitionEntry(invoice.Id, SupplierMatchMethod.Similar, "low", $"=Nume Citit {suffix}", cui, null, supplier.Id, TemplateChanged: true));
+            var summary = await log.SummaryAsync();
+            Check(summary.Total >= 1 && summary.ByMethod.Any(item => item.Method == "similar" && item.Confidence == "low" && item.TemplateChanged >= 1) &&
+                  summary.Recent.Any(item => item.InvoiceNumber == $"REC-{suffix}" && item.ChosenSupplierId == supplier.Id && item.ChosenName == supplier.Name),
+                "The recognition log counts the invoice by method and confidence, with the changed template, and lists the correction with the chosen supplier");
+            var csv = await log.ExportCsvAsync();
+            Check(csv.StartsWith("Data;Factura;Metoda", StringComparison.Ordinal) && csv.Contains($"\"REC-{suffix}\";\"similar\";\"low\";\"'=Nume Citit {suffix}\"", StringComparison.Ordinal) && csv.Contains(";da;da", StringComparison.Ordinal),
+                "The CSV export has the header and the row of the invoice, with the read name neutralised as a formula and corrected / template changed marked");
+            await log.RecordAsync(new SupplierRecognitionEntry(invoice.Id, SupplierMatchMethod.Cui, "high", "x", cui, supplier.Id, supplier.Id));
+            Check(await ScalarLongAsync(probe, "SELECT COUNT(*) FROM supplier_recognitions WHERE invoice_id=@id", ("@id", invoice.Id)) == 1, "One recognition per invoice: a second record for the same invoice is ignored");
+        }
+        finally
+        {
+            try
+            {
+                if (invoice is not null) await ScalarLongAsync(probe, "DELETE FROM supplier_invoices WHERE id=@id", ("@id", invoice.Id));
+                if (template is not null && await templates.GetAsync(template.Info.Id) is { } current) await service.DeleteAsync(current.Info, "Curatare test");
+                if (supplier is not null && await suppliers.GetAsync(supplier.Id) is { } leftover) await suppliers.DeleteAsync(leftover, "Curatare test");
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException) { Console.WriteLine("Cleanup of the recognition checks failed: " + exception.GetType().Name); }
+        }
+    }
 
     private static async Task SuppliersAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
     {
@@ -288,6 +342,8 @@ public static class MariaExtendedChecks
 
     private static async Task Section(string name, Func<Task> body)
     {
+        // MARIA_ONLY=<text of a section name> runs only the sections whose name contains it (a targeted run).
+        if (Environment.GetEnvironmentVariable("MARIA_ONLY") is { Length: > 0 } only && !name.Contains(only, StringComparison.OrdinalIgnoreCase)) return;
         Console.WriteLine("--- " + name + " ---");
         try { await body(); }
         catch (Exception exception)

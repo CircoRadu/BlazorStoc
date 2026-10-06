@@ -465,11 +465,13 @@ public static class InvoiceTemplateEngine
     }
 
     // How well a saved template fits a file: the share of its anchors found, and whether the supplier's tax id is in the file.
-    public static InvoiceTemplateMatch Match(InvoiceTemplateDefinition definition, string supplierCui, InvoiceDocument document)
+    public static InvoiceTemplateMatch Match(InvoiceTemplateDefinition definition, string supplierCui, InvoiceDocument document, string supplierName = "")
     {
         var alignment = Align(definition, document);
         var cui = InvoiceValues.NormalizeCui(supplierCui);
         var supplier = cui.Length > 0 && document.AllWords.Any(word => word.Text.Contains(cui, StringComparison.Ordinal));
+        // The CUI may be unread or misread (OCR): the supplier's name written in the file (legal form, dots and case aside) also recognises it.
+        if (!supplier && supplierName.Length > 0) supplier = SupplierRecognizer.NameInText(supplierName, SupplierRules.CompactKey(string.Concat(document.AllWords.Select(word => word.Text))));
         return new InvoiceTemplateMatch(Math.Round(alignment.Score, 2), supplier, alignment);
     }
 

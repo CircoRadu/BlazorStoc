@@ -199,8 +199,36 @@ public static class PickupWizardChecks
         public Task<InvoiceTemplateInfo> SetActiveAsync(InvoiceTemplateInfo original, bool active, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<InvoiceTemplateInfo> UpdateDetailsAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task DeleteAsync(InvoiceTemplateInfo original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<InvoiceTemplateInfo> LinkSupplierAsync(InvoiceTemplateInfo original, Supplier supplier, CancellationToken cancellationToken = default)
+        {
+            var index = records.FindIndex(item => item.Info.Id == original.Id);
+            var linked = original with { SupplierId = supplier.Id, SupplierName = supplier.Name, SupplierCui = supplier.Cui };
+            records[index] = records[index] with { Info = linked };
+            return Task.FromResult(linked);
+        }
     }
 
+
+    // A template made before suppliers were tied by id shows "Leagă de furnizor"; the button links it to the supplier of the register with the same CUI.
+    public static async Task LinkButtonAsync(Action<bool, string> check)
+    {
+        var rights = new TestAccessControl(false, "ion");
+        var templates = new MemoryTemplates();
+        await templates.CreateAsync(new InvoiceTemplateInput { Name = "Vechi", SupplierName = "Furnizor Test", SupplierCui = "12345678", Definition = new InvoiceTemplateDefinition(InvoiceTemplateDefinition.CurrentSchema, InvoiceSources.Text, 595, 842, [], [], null) });
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLogging();
+        context.Services.AddSingleton<IAccessControl>(rights);
+        context.Services.AddSingleton<IInvoiceTemplateService>(templates);
+        context.Services.AddSupplierFakes();
+        var cut = context.Render<BlazorStoc.Components.Shared.InvoiceTemplatesList>();
+        cut.WaitForAssertion(() => cut.Find("#invoice-template-1"), TimeSpan.FromSeconds(10));
+        var before = cut.FindAll("#invoice-template-1 button").Any(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal));
+        cut.FindAll("#invoice-template-1 button").First(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal)).Click();
+        cut.WaitForAssertion(() => { if (!cut.Markup.Contains("a fost legat de furnizorul", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+        check(before && !cut.FindAll("#invoice-template-1 button").Any(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal)) && cut.Markup.Contains("Furnizor Test SRL", StringComparison.Ordinal),
+            "Templates list: the \"Leagă de furnizor\" button links an unlinked template to the supplier of the register (the button then disappears, the supplier's own name is shown)");
+    }
     // A file whose supplier has no template: the pickup warns, offers to create the template in a window over the page (on the file already read)
     // and, once it is saved, goes back to the pickup and reads the file with it.
     public static async Task TemplateFlowAsync(Action<bool, string> check)
@@ -220,7 +248,10 @@ public static class PickupWizardChecks
         context.Services.AddSingleton<IProductRepository>(new DemoProductRepository(access));
         context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
-        context.Services.AddSupplierFakes();
+        var registered = new MemorySupplierRepository();
+        registered.Items.Add(new Supplier(1, "Furnizor Test SRL", "12345678"));
+        registered.Items.Add(new Supplier(2, "FURNIZOR NOU S.R.L.", "87654321"));
+        context.Services.AddSupplierFakes(registered);
         context.Services.AddScoped<UnsavedChanges>();
         context.Services.AddSingleton(new InvoiceLabSettings(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build()));
 
@@ -271,6 +302,15 @@ public static class PickupWizardChecks
         again.WaitForAssertion(() => again.Find(".no-template-warning"), TimeSpan.FromSeconds(60));
         again.FindAll(".no-template-warning button").First(button => button.TextContent.Contains("Creează șablon", StringComparison.Ordinal)).Click();
         again.WaitForAssertion(() => again.Find(".template-popup .invoice-head"), TimeSpan.FromSeconds(10));
+        check(again.FindAll("#template-supplier-missing").Count == 1 && again.Find("#template-supplier-missing").TextContent.Contains("Adaugă furnizorul", StringComparison.Ordinal),
+            "Pickup template flow: a supplier missing from the database is flagged in the Save section, with the option to add it");
+        again.Find("#template-supplier-missing button").Click();
+        check(again.FindAll(".template-popup .invoice-modal #supplier-name, .template-popup .invoice-modal input").Count > 3 && again.Markup.Contains("Adaugă furnizor", StringComparison.Ordinal),
+            "Pickup template flow: the add-supplier window opened from the template is filled in (the supplier form with the name and CUI of the invoice)");
+        again.Find(".template-popup .invoice-modal .catalog-heading button").Click();
+        again.FindAll(".template-popup button.primary").First(button => button.TextContent.Contains("Salvează șablonul", StringComparison.Ordinal)).Click();
+        check(again.Markup.Contains("Furnizorul nu este în baza de date", StringComparison.Ordinal),
+            "Pickup template flow: a template cannot be saved for a supplier that is not in the database");
         again.FindAll(".template-popup button").First(button => button.TextContent.Contains("Închide fără să creezi", StringComparison.Ordinal)).Click();
         again.WaitForAssertion(() => { if (again.FindAll(".template-popup").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         check(again.FindAll(".no-template-warning").Count == 1 && again.FindAll("tbody tr").Count == invoice.Rows.Count && store.Count > 0,
@@ -289,6 +329,7 @@ public static class PickupWizardChecks
             var withTemplate = new MemoryTemplates();
             await withTemplate.CreateAsync(new InvoiceTemplateInput { Name = "Existent", SupplierName = "Furnizor SRL", SupplierCui = "123456", Definition = new InvoiceTemplateDefinition(InvoiceTemplateDefinition.CurrentSchema, InvoiceSources.Text, 595, 842, [], [], null) });
             settingsContext.Services.AddSingleton<IInvoiceTemplateService>(withTemplate);
+            settingsContext.Services.AddSupplierFakes();
             settingsContext.Services.AddScoped<UnsavedChanges>();
             var settings = settingsContext.Render<Settings>();
             settings.WaitForAssertion(() => settings.Find("[role=tablist]"), TimeSpan.FromSeconds(10));

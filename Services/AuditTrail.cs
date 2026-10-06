@@ -115,11 +115,16 @@ public static class AuditActions
     public const string DeleteInvoiceTemplate = "Ștergere șablon factură";
     public const string ActivateInvoiceTemplate = "Activare șablon factură";
     public const string DeactivateInvoiceTemplate = "Dezactivare șablon factură";
+    // The supplier was renamed in the register: the name in its templates (and in their entry description) follows.
+    public const string LinkInvoiceTemplateSupplier = "Legare șablon factură de furnizor";
+    public const string RenameInvoiceTemplateSupplier = "Redenumire furnizor în șablon factură";
     // Suppliers: each kind of change is named exactly (data read again from ANAF is not an ordinary edit). Deleting a supplier is the archived "Ștergere".
     public const string CreateSupplier = "Adăugare furnizor";
     public const string EditSupplier = "Modificare furnizor";
     public const string RecheckSupplier = "Reverificare furnizor ANAF";
     public const string RecordSupplierInvoice = "Înregistrare factură furnizor";
+    public const string AddSupplierAlias = "Adăugare denumire alternativă furnizor";
+    public const string RemoveSupplierAlias = "Ștergere denumire alternativă furnizor";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
@@ -134,8 +139,8 @@ public static class AuditActions
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
-            or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate
-            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice;
+            or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
+            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;

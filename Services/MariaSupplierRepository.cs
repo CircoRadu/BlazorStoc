@@ -9,7 +9,8 @@ public sealed class MariaSupplierRepository(
     IConfiguration configuration,
     IAccessControl? accessControl = null,
     IAuditTrail? auditTrail = null,
-    IArchiveService? archiveService = null) : ISupplierRepository
+    IArchiveService? archiveService = null,
+    IInvoiceTemplateService? invoiceTemplates = null) : ISupplierRepository
 {
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
     private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
@@ -19,7 +20,7 @@ public sealed class MariaSupplierRepository(
         SELECT s.id,s.name,s.cui,s.country,s.version,s.address,s.phone,s.registry_number,s.postal_code,s.caen_code,s.`source`,s.verified_utc,
                (SELECT COUNT(*) FROM stock_movements m INNER JOIN supplier_invoices i ON i.id=m.invoice_id WHERE i.supplier_id=s.id),
                (SELECT COUNT(*) FROM supplier_invoices i WHERE i.supplier_id=s.id),
-               (SELECT COUNT(*) FROM invoice_templates t WHERE t.supplier_cui=s.normalized_cui AND s.country='RO')
+               (SELECT COUNT(*) FROM invoice_templates t WHERE t.supplier_id=s.id OR (t.supplier_id IS NULL AND t.supplier_cui=s.normalized_cui AND s.country='RO'))
         FROM suppliers s
         """;
 
@@ -32,7 +33,9 @@ public sealed class MariaSupplierRepository(
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<Supplier>();
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result.Add(Read(reader));
-        return result;
+        await reader.CloseAsync().ConfigureAwait(false);
+        var aliases = await AliasesAsync(connection, cancellationToken).ConfigureAwait(false);
+        return [.. result.Select(supplier => aliases.TryGetValue(supplier.Id, out var list) ? supplier with { Aliases = list } : supplier)];
     }
 
     public async Task<Supplier?> GetAsync(int id, CancellationToken cancellationToken = default)
@@ -40,7 +43,63 @@ public sealed class MariaSupplierRepository(
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        return await GetAsync(connection, null, id, false, cancellationToken).ConfigureAwait(false);
+        var supplier = await GetAsync(connection, null, id, false, cancellationToken).ConfigureAwait(false);
+        return supplier is null ? null : supplier with { Aliases = (await AliasesAsync(connection, cancellationToken).ConfigureAwait(false)).GetValueOrDefault(id) };
+    }
+
+    private static async Task<Dictionary<int, IReadOnlyList<string>>> AliasesAsync(MySqlConnection connection, CancellationToken token)
+    {
+        var found = new Dictionary<int, List<string>>();
+        await using var command = Command(connection, null, "SELECT supplier_id, alias FROM supplier_aliases ORDER BY alias, id");
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        while (await reader.ReadAsync(token).ConfigureAwait(false))
+        {
+            var id = checked((int)reader.GetInt64(0));
+            if (!found.TryGetValue(id, out var list)) found[id] = list = [];
+            list.Add(reader.GetString(1));
+        }
+        return found.ToDictionary(item => item.Key, item => (IReadOnlyList<string>)item.Value);
+    }
+
+    public async Task<Supplier> AddAliasAsync(Supplier supplier, string alias, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        var text = (alias ?? "").Trim();
+        var current = await GetAsync(supplier.Id, cancellationToken).ConfigureAwait(false) ?? throw new SupplierOperationException(SupplierRules.StaleMessage);
+        if (SupplierRules.AliasProblem(text, current, await GetSuppliersAsync(cancellationToken).ConfigureAwait(false)) is { } problem) throw new SupplierOperationException(problem);
+        var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
+        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new SupplierOperationException("Modificările sunt permise numai în baza BlazorStoc.");
+        await using (var connection = CreateConnection())
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var insert = Command(connection, null, "INSERT INTO supplier_aliases (supplier_id, alias, alias_key, created_by, created_utc) VALUES (@supplier, @alias, @key, @by, @now)",
+                ("@supplier", current.Id), ("@alias", text), ("@key", SupplierRules.NameKey(text)), ("@by", actor.Username), ("@now", MariaTimeText.Format(MariaTimeText.Now())));
+            try { await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false); }
+            catch (MySqlException exception) when (exception.Number == 1062) { throw new SupplierOperationException("Denumirea alternativă aparține deja unui furnizor."); }
+        }
+        await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Supplier, current.Id.ToString(), SupplierRules.Target(current),
+            [new AuditChange("Denumire alternativă", "—", text)], string.Empty, cancellationToken, AuditActions.AddSupplierAlias).ConfigureAwait(false);
+        return await GetAsync(current.Id, cancellationToken).ConfigureAwait(false) ?? current;
+    }
+
+    public async Task<Supplier> RemoveAliasAsync(Supplier supplier, string alias, CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new SupplierOperationException("Modificările sunt permise numai în baza BlazorStoc.");
+        var text = (alias ?? "").Trim();
+        int removed;
+        await using (var connection = CreateConnection())
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var delete = Command(connection, null, "DELETE FROM supplier_aliases WHERE supplier_id=@supplier AND alias_key=@key",
+                ("@supplier", supplier.Id), ("@key", SupplierRules.NameKey(text)));
+            removed = await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        var current = await GetAsync(supplier.Id, cancellationToken).ConfigureAwait(false) ?? throw new SupplierOperationException(SupplierRules.StaleMessage);
+        if (removed > 0)
+            await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Supplier, current.Id.ToString(), SupplierRules.Target(current),
+                [new AuditChange("Denumire alternativă", text, "—")], string.Empty, cancellationToken, AuditActions.RemoveSupplierAlias).ConfigureAwait(false);
+        return current;
     }
 
     public async Task<Supplier> CreateAsync(SupplierInput input, CancellationToken cancellationToken = default)
@@ -95,10 +154,17 @@ public sealed class MariaSupplierRepository(
                 throw new SupplierOperationException(SupplierRules.StaleMessage);
             return Build(original.Id, value, version, verified) with { MovementCount = current.MovementCount, InvoiceCount = current.InvoiceCount, TemplateCount = current.TemplateCount };
         }, cancellationToken, SupplierRules.IdentityKey(value.Country, value.Cui), original.Id).ConfigureAwait(false);
+        supplier = supplier with { Aliases = original.Aliases };   // aliases are changed by their own operations, not by saving the supplier
         var changes = SupplierRules.Changes(original, supplier)
             .Append(new AuditChange("Ultima verificare ANAF", SupplierRules.DisplayTime(original.VerifiedUtc), SupplierRules.DisplayTime(supplier.VerifiedUtc)));
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Supplier, supplier.Id.ToString(), SupplierRules.Target(supplier),
             changes, value.Reason, cancellationToken, value.AnafRecheck ? AuditActions.RecheckSupplier : AuditActions.EditSupplier).ConfigureAwait(false);
+        // The templates are tied to the supplier by its tax id; a new name goes into them too (and into their entry description).
+        if (invoiceTemplates is not null && supplier.Name != original.Name && supplier.TemplateCount > 0 && supplier.Country == SupplierCountries.Romania)
+        {
+            try { await invoiceTemplates.RenameSupplierAsync(supplier.Cui, original.Name, supplier.Name, cancellationToken).ConfigureAwait(false); }
+            catch (Exception exception) when (exception is InvoiceTemplateOperationException or AccessDeniedException or MySqlException) { }   // the supplier is saved; templates are matched by CUI anyway
+        }
         return supplier;
     }
 

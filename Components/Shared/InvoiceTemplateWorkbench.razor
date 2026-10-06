@@ -1,7 +1,9 @@
 @using System.Globalization
 @using BlazorStoc.Services
+@using BlazorStoc.Components.Pages
 @inject IInvoiceAnalysisService Analysis
 @inject IInvoiceTemplateService Templates
+@inject ISupplierRepository Suppliers
 @inject IJSRuntime JS
 @inject ILogger<InvoiceTemplateWorkbench> Logger
 @implements IAsyncDisposable
@@ -348,6 +350,16 @@ else
                     <label>CUI/CIF furnizor *<input @bind="supplierCui" @bind:event="oninput" maxlength="20" autocomplete="off" />
                         <small>@(InvoiceValues.NormalizeCui(supplierCui).Length == 0 ? "CUI/CIF-ul este obligatoriu: cu el se recunoaște furnizorul." : "CUI reținut: " + InvoiceValues.NormalizeCui(supplierCui))</small></label>
                 </div>
+                @if (RegistrySupplier is { } registered)
+                {
+                    <p class="form-note" id="template-supplier-registry">Furnizor din baza de date: <strong>@registered.Name</strong> (CUI @registered.Cui). Șablonul se leagă de el și poartă numele din baza de date; dacă numele furnizorului se schimbă acolo, se schimbă și în șablon.</p>
+                }
+                else if (registryLoaded)
+                {
+                    <div class="invoice-warning" role="status" id="template-supplier-missing">⚠ Furnizorul nu este în baza de date@(supplierName.Trim().Length > 0 ? " (" + supplierName.Trim() + ")" : ""). Adaugă-l: șablonul se leagă de furnizor, iar numele lui este cel returnat de ANAF sau cel introdus manual.
+                        <button type="button" class="refresh" @onclick="OpenAddSupplier">+ Adaugă furnizorul</button>
+                        @if (similarSupplier is { } nearSupplier) { <span id="template-similar-supplier"> Sau probabil <strong>@nearSupplier.Name</strong>: <button type="button" class="refresh" @onclick="UseSimilarSupplier">Folosește acest furnizor</button></span> }</div>
+                }
                 @foreach (var problem in problems) { <div class="validation-message" role="alert">@problem</div> }
                 <div class="editor-actions">
                     @if (existing is not null)
@@ -360,10 +372,18 @@ else
             </details>
         </div>
     </div>
+    @if (addingSupplier)
+    {
+        <div class="invoice-modal-backdrop">
+            <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă furnizor">
+                <SupplierEditor @key="addSupplierKey" InitialCui="@supplierCui" InitialName="@supplierName" Saved="SupplierAddedAsync" Closed="CloseAddSupplier" />
+            </div>
+        </div>
+    }
     @if (popupOpen && PopupField() is { } pf)
     {
-        <div class="invoice-modal-backdrop" @onclick="TryClosePopup">
-            <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare câmp" @onclick:stopPropagation="true">
+        <div class="invoice-modal-backdrop" @onmousedown="() => downOnBackdrop = true" @onclick="BackdropClickField">
+            <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare câmp" @onclick:stopPropagation="true" @onmousedown:stopPropagation="true" @onmousedown="() => downOnBackdrop = false">
                 <h4>Editare câmp @(InvoiceTemplateDraft.EffectiveLabel(pf) is { Length: > 0 } effectiveLabel ? "· etichetă: " + effectiveLabel : "")</h4>
                 <div class="editor-grid">
                     <label>Etichetă *<input value="@pf.Name" @onchange="args => RenameField(pf, args.Value?.ToString() ?? string.Empty)" maxlength="120" autocomplete="off" /></label>
@@ -404,8 +424,8 @@ else
     }
     else if (popupOpen && PopupColumn() is { } pc)
     {
-        <div class="invoice-modal-backdrop" @onclick="ClosePopup">
-            <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare coloană" @onclick:stopPropagation="true">
+        <div class="invoice-modal-backdrop" @onmousedown="() => downOnBackdrop = true" @onclick="BackdropClickColumn">
+            <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare coloană" @onclick:stopPropagation="true" @onmousedown:stopPropagation="true" @onmousedown="() => downOnBackdrop = false">
                 <h4>Editare coloană @(pc.Label.Length > 0 ? "· " + pc.Label : "")</h4>
                 <div class="editor-grid">
                     <label>Denumirea din antet<input value="@pc.Label" @onchange="args => RenameColumn(pc, args.Value?.ToString() ?? string.Empty)" maxlength="120" autocomplete="off" /></label>
@@ -497,14 +517,14 @@ else
     // A field is shown in the list and on the page when it means something, is used, was drawn by hand, or "show all" is on.
     private bool IsShown(DraftField field) => ConflictIds.Contains(field.Id) || showAllFields || field.Use || field.Manual || field.Meaning.Length > 0 || field.Confidence >= 0.85 || (selectedKind == 'f' && selectedId == field.Id);
 
-    // Header fields are listed by party: supplier, buyer (beneficiary), then the invoice's own data and anything else.
-    private static readonly (string Key, string Title)[] FieldGroups = [("supplier", "Furnizor (vânzător)"), ("buyer", "Beneficiar (cumpărător)"), ("other", "Date factură și altele")];
+    // Header fields are listed by party: the supplier, then the invoice's own data and anything else.
+    private static readonly (string Key, string Title)[] FieldGroups = [("supplier", "Furnizor (vânzător)"), ("other", "Date factură și altele")];
     // A field without a meaning of its own (or a custom one) is grouped by the heading it was found under (VANZATOR / CUMPARATOR).
     private static string FieldGroupOf(DraftField field) =>
         field.Meaning.Length > 0 && field.Meaning != InvoiceFieldMeanings.Custom ? PreviewGroupOf(field.Meaning)
-        : field.Section is InvoiceVocabulary.SupplierSection or InvoiceVocabulary.BuyerSection ? field.Section : "other";
+        : field.Section is InvoiceVocabulary.SupplierSection ? field.Section : "other";
     private static string PreviewGroupOf(string? meaning) =>
-        meaning is not null && meaning.StartsWith("supplier.", StringComparison.Ordinal) ? "supplier" : meaning is not null && meaning.StartsWith("buyer.", StringComparison.Ordinal) ? "buyer" : "other";
+        meaning is not null && meaning.StartsWith("supplier.", StringComparison.Ordinal) ? "supplier" : "other";
 
     // Each column has its own colour (golden-angle hues), so that where columns overlap the mix of colours shows it.
     private string ColumnColor(DraftColumn column) => $"hsl({(int)(Math.Max(0, draft!.Columns.IndexOf(column)) * 137.5 % 360)} 70% 42%)";
@@ -609,6 +629,7 @@ else
         try
         {
             session = shared;
+            await LoadRegistryAsync();
             decimalHint = InvoiceValues.DecimalStyle(session.Document.AllWords.Select(word => word.Text));
             suggestions = InvoiceTemplateSuggestions.Rank(await Templates.GetAllAsync(lifetime.Token), session.Document);
             analyzed = true;
@@ -694,6 +715,7 @@ else
             if (editing is not null)
             {
                 session = await Analysis.OpenAsync(stream, fileName, lifetime.Token);
+                await LoadRegistryAsync();
                 decimalHint = InvoiceValues.DecimalStyle(session.Document.AllWords.Select(word => word.Text));
                 suggestions = [];
                 analyzed = false;
@@ -704,6 +726,7 @@ else
             else
             {
                 session = await Analysis.AnalyzeAsync(stream, fileName, lifetime.Token);
+                await LoadRegistryAsync();
                 decimalHint = InvoiceValues.DecimalStyle(session.Document.AllWords.Select(word => word.Text));
                 suggestions = InvoiceTemplateSuggestions.Rank(await Templates.GetAllAsync(lifetime.Token), session.Document);
                 analyzed = true;
@@ -724,6 +747,77 @@ else
         finally { busy = false; }
     }
 
+    // ---- the supplier register: the template is tied to a supplier of the database, whose name it carries ----
+
+    private IReadOnlyList<Supplier> registry = [];
+    private bool registryLoaded, addingSupplier;
+    private int addSupplierKey;
+
+    private async Task LoadRegistryAsync()
+    {
+        try { registry = await Suppliers.GetSuppliersAsync(lifetime.Token); registryLoaded = true; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError("Supplier register loading failed ({ErrorType}).", exception.GetType().Name);
+            registry = []; registryLoaded = false;   // without the register the template is not blocked
+        }
+    }
+
+    // The supplier of the database for the tax id in the form; when it is not there (not read, or misread) the name read from the invoice is
+    // tried, with the legal form ignored (SC / S.C. / SRL / S.R.L.).
+    private Supplier? RegistrySupplier
+    {
+        get
+        {
+            var digits = SupplierRules.CuiDigits(supplierCui);
+            var compact = SupplierRules.CompactKey(supplierCui);
+            return registry.FirstOrDefault(item => item.IsExternal ? compact.Length > 0 && SupplierRules.CompactKey(item.Cui) == compact : digits.Length > 0 && SupplierRules.CuiDigits(item.Cui) == digits);
+        }
+    }
+
+    // A new template takes the supplier of the database when the invoice names it (by CUI or, failing that, by name): its name and tax id.
+    private Supplier? similarSupplier;
+
+    private void UseSimilarSupplier()
+    {
+        if (similarSupplier is not { } suggested) return;
+        supplierName = suggested.Name;
+        supplierCui = suggested.Cui;
+        similarSupplier = null;
+        Refresh();
+    }
+
+    private void AdoptRegistrySupplier()
+    {
+        similarSupplier = null;
+        var documentKey = session is null ? "" : SupplierRules.CompactKey(string.Concat(session.Document.AllWords.Select(word => word.Text)));
+        var recognized = SupplierRecognizer.Recognize(registry, supplierCui, supplierName, documentKey);
+        if (recognized.NeedsConfirmation) { similarSupplier = recognized.Supplier; return; }
+        var found = recognized.Supplier;
+        if (found is null) return;
+        supplierName = found.Name;
+        supplierCui = found.Cui;
+        if (templateName.Trim().Length == 0 || InvoiceTemplateRules.SameName(templateName, draft?.SupplierName ?? "")) templateName = found.Name;
+    }
+
+    private void OpenAddSupplier() { addSupplierKey++; addingSupplier = true; }
+    private Task CloseAddSupplier() { addingSupplier = false; return Task.CompletedTask; }
+
+    // The supplier was added in the window (its name is the one ANAF returned, or the one typed there): the template carries it.
+    private async Task SupplierAddedAsync(Supplier saved)
+    {
+        addingSupplier = false;
+        supplierName = saved.Name;
+        supplierCui = saved.Cui;
+        await LoadRegistryAsync();
+        // The CUI field read from the invoice (an OCR misreading, like the extra digit) takes the supplier's own, else Refresh() would write the misread one back.
+        if (draft is not null)
+            foreach (var field in draft.Fields.Where(item => item.Meaning == InvoiceFieldMeanings.SupplierCui)) field.Value = saved.Cui;
+        notice = $"Furnizorul „{saved.Name}” a fost adăugat în baza de date; șablonul se leagă de el.";
+        Refresh();
+    }
+
     private void UseAutomaticProposal()
     {
         existing = null;
@@ -731,6 +825,7 @@ else
         templateName = draft.SupplierName.Length > 0 ? draft.SupplierName : "";
         supplierName = draft.SupplierName;
         supplierCui = draft.SupplierCui;
+        AdoptRegistrySupplier();
         ResetSelection(); ResetHistory();
         Refresh();
     }
@@ -1053,6 +1148,12 @@ else
     private void OpenEdit(char kind, string id) { Select(kind, id); popupOpen = true; }
     private void ClosePopup() => popupOpen = false;
 
+    // A click closes the window only when the button was pressed AND released on the backdrop: pressing inside (selecting text in a field) and
+    // releasing outside must leave it open.
+    private bool downOnBackdrop;
+    private void BackdropClickField() { var close = downOnBackdrop; downOnBackdrop = false; if (close) TryClosePopup(); }
+    private void BackdropClickColumn() { var close = downOnBackdrop; downOnBackdrop = false; if (close) ClosePopup(); }
+
     private void Select(char kind, string id)
     {
         multiIds.Clear(); selectedKind = kind; selectedId = id;
@@ -1371,16 +1472,19 @@ else
         if (saving || session is null || draft is null) return;
         Refresh();
         if (problems.Count > 0) return;
+        if (registryLoaded && RegistrySupplier is null) { error = "Furnizorul nu este în baza de date: adaugă-l cu „+ Adaugă furnizorul” (secțiunea Salvare) înainte de a salva șablonul."; return; }
         saving = true; error = null; notice = null;
         try
         {
+            // The template carries the supplier's name as it is in the database (the single source: a rename there reaches the template).
+            if (RegistrySupplier is { } linked) { supplierName = linked.Name; supplierCui = linked.Cui; }
             draft.SupplierName = supplierName;
             draft.SupplierCui = supplierCui;
             // Where the rows of the table ended in this file is kept with the template, so that it can be shown later without reading the file.
             if (preview is not null && draft.HasTable && preview.Rows.Where(row => row.Page == draft.HeaderPage).ToList() is { Count: > 0 } headerRows) draft.BodyBottom = headerRows.Max(row => row.Bottom);
             var input = new InvoiceTemplateInput
             {
-                Name = newName ?? templateName, SupplierName = supplierName, SupplierCui = supplierCui, Definition = draft.ToDefinition(session.Document),
+                Name = newName ?? templateName, SupplierName = supplierName, SupplierCui = supplierCui, SupplierId = RegistrySupplier?.Id, Definition = draft.ToDefinition(session.Document),
                 ModelFileName = session.FileName, ModelContent = session.SourcePdf
             };
             var saved = !asNew && existing is not null

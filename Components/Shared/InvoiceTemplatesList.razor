@@ -1,5 +1,7 @@
 @using System.Globalization
 @using BlazorStoc.Services
+@using BlazorStoc.Components.Pages
+@inject ISupplierRepository Suppliers
 @inject IInvoiceTemplateService Service
 @inject IAccessControl Access
 @inject IJSRuntime JS
@@ -28,7 +30,7 @@
             <tr @key="info.Id" id="invoice-template-@info.Id" class="@(focused ? "row-focus" : null)">
 <td><ToggleSwitch Value="@info.Active" Disabled="@saving" OnText="Activ" OffText="Inactiv" AriaLabel="@($"Șablon activ: {info.Name}")" Title="@(info.Active ? "Șablonul este folosit la citirea facturilor. Apasă ca să nu mai fie folosit." : "Șablonul nu este folosit la citirea facturilor. Apasă ca să fie folosit.")" ValueChanged="@(active => SetActiveAsync(info, active))" /></td>
                 <td><strong>@info.Name</strong></td>
-                <td>@(info.SupplierName.Length > 0 ? info.SupplierName : "—")</td>
+                <td>@(info.SupplierName.Length > 0 ? info.SupplierName : "—")@if (info.SupplierId is null) { <br /><span class="notification-state">nelegat de un furnizor</span> <button type="button" class="refresh" disabled="@saving" @onclick="() => LinkAsync(info)">Leagă de furnizor</button> }</td>
                 <td>@(info.SupplierCui.Length > 0 ? info.SupplierCui : "—")</td>
                 <td>@(info.SourceKind == InvoiceSources.Ocr ? "Scanat (OCR)" : "PDF cu text")</td>
                 <td><small>@template.Definition.UsedFieldCount câmpuri · @template.Definition.UsedColumnCount coloane</small></td>
@@ -65,6 +67,15 @@
                               Description="Șablonul și toate versiunile lui salvate dispar. Facturile deja importate nu sunt afectate."
                               ConfirmationNote="Șablonul nu se arhivează: se șterge definitiv, iar operația este înregistrată în jurnal."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDelete" />
+}
+
+@if (linking is { } linkTarget)
+{
+    <div class="invoice-modal-backdrop">
+        <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă furnizor">
+            <SupplierEditor @key="linkKey" InitialCui="@linkTarget.SupplierCui" InitialName="@linkTarget.SupplierName" Saved="SupplierAddedAsync" Closed="CloseLinking" />
+        </div>
+    </div>
 }
 
 @code {
@@ -106,6 +117,52 @@
             error = "Șabloanele nu au putut fi încărcate.";
         }
         finally { loading = false; }
+    }
+
+    // ---- templates made before suppliers were tied by id: linked to the supplier of the register, added first when it is not there ----
+
+    private InvoiceTemplateInfo? linking;
+    private int linkKey;
+
+    private async Task LinkAsync(InvoiceTemplateInfo info)
+    {
+        if (saving) return;
+        error = notice = null;
+        try
+        {
+            var digits = SupplierRules.CuiDigits(info.SupplierCui);
+            var registry = await Suppliers.GetSuppliersAsync(lifetime.Token);
+            var found = registry.FirstOrDefault(item => !item.IsExternal && digits.Length > 0 && SupplierRules.CuiDigits(item.Cui) == digits)
+                        ?? SupplierRules.FindByName(registry, info.SupplierName);
+            if (found is not null) { await ApplyLinkAsync(info, found); return; }
+            linking = info; linkKey++;   // not in the register: the supplier is added first, in a window
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or SupplierOperationException) { error = exception.Message; }
+    }
+
+    private async Task SupplierAddedAsync(Supplier saved)
+    {
+        var info = linking;
+        linking = null;
+        if (info is not null) await ApplyLinkAsync(info, saved);
+    }
+
+    private Task CloseLinking() { linking = null; return Task.CompletedTask; }
+
+    private async Task ApplyLinkAsync(InvoiceTemplateInfo info, Supplier supplier)
+    {
+        saving = true;
+        try
+        {
+            await Service.LinkSupplierAsync(info, supplier, lifetime.Token);
+            notice = $"Șablonul „{info.Name}” a fost legat de furnizorul {supplier.Name}.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (InvoiceTemplateOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        finally { saving = false; }
+        await LoadAsync();
     }
 
     private void ToggleDetails(int id) => expanded = expanded == id ? null : id;

@@ -39,7 +39,6 @@ public static class InvoiceVocabulary
     public static readonly IReadOnlyList<InvoiceMeaningInfo> FieldMeanings =
     [
         .. PartyAttributes.Select(attribute => new InvoiceMeaningInfo(SupplierSection + "." + attribute.Key, "Furnizor — " + attribute.Title)),
-        .. PartyAttributes.Select(attribute => new InvoiceMeaningInfo(BuyerSection + "." + attribute.Key, "Beneficiar — " + attribute.Title)),
         new(InvoiceFieldMeanings.InvoiceNumber, "Număr factură"),
         new(InvoiceFieldMeanings.InvoiceDate, "Data emiterii"),
         new(InvoiceFieldMeanings.DueDate, "Data scadenței"),
@@ -274,7 +273,7 @@ public static class InvoiceVocabulary
     // The meaning a label has in a section ("@name" in the supplier section is the supplier's name).
     public static string ResolveFieldMeaning(string? labelMeaning, string? section) =>
         string.IsNullOrEmpty(labelMeaning) ? ""
-        : labelMeaning[0] == '@' ? (section is SupplierSection or BuyerSection ? section + "." + labelMeaning[1..] : "")
+        : labelMeaning[0] == '@' ? (section is SupplierSection ? section + "." + labelMeaning[1..] : "")
         : labelMeaning;
 
     // Words that begin the lines under the table (totals, payment instructions, notes): the table ends before them.

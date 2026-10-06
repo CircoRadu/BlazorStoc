@@ -4,6 +4,7 @@
 @using System.Globalization
 @using BlazorStoc.Services
 @using Microsoft.AspNetCore.Components.Forms
+@inject IServiceProvider Services
 @inject IAccessControl Access
 @inject IInvoiceAnalysisService Analysis
 @inject IInvoiceTemplateService Templates
@@ -273,7 +274,7 @@ else if (step == 2)
 {
     <section class="wizard-panel" aria-label="@StepTitles[1]">
         <h2>@StepTitles[1]</h2>
-        <p class="muted">Rândurile preluate din <strong>@session?.FileName</strong> pot fi corectate. Pentru fiecare, se caută în catalog produsul cu același cod; dacă nu există, se oferă cele mai apropiate, sau se pregătește un produs nou (se adaugă în catalog abia la pasul 3). Cantitățile și prețurile care nu sunt citite ca număr au fundal roșu.</p>
+        <p class="muted">Rândurile preluate din <strong>@session?.FileName</strong> pot fi corectate. Pentru fiecare, se caută în catalog produsul cu același cod; dacă nu există, se oferă cele mai apropiate, sau se pregătește un produs nou (se adaugă în catalog abia la pasul 3). Cantitățile și prețurile care nu sunt citite ca număr au fundal roșu; rândul respectiv este afișat sub avertisment, așa cum este în factură.</p>
         @if (session is not null)
         {
             <p><a class="refresh button-link" href="@ViewerUrl" target="invoice-viewer" rel="noopener"
@@ -286,7 +287,7 @@ else if (step == 2)
         {
             <section class="pickup-invoice-head" aria-label="Datele facturii">
                 <h3>Datele facturii</h3>
-                <p class="muted">Citite din factură și <strong>neverificate</strong> până le confirmi, fiecare în parte, cu comutatorul de lângă ele. Orice modificare readuce câmpul la „neverificat”. Fără cele trei confirmări nu se poate trece la pasul 3.@(NumberFromOcr ? " Factura este o scanare citită prin OCR: o literă sau o cifră citită greșit ar duce la o factură nouă în loc de cea deja preluată, deci verifică atent numărul." : "")</p>
+                <p class="muted">Numărul și data sunt citite din factură și <strong>neverificate</strong> până le confirmi, fiecare în parte, cu comutatorul de lângă ele, comparându-le cu imaginea regiunii din care au fost citite. CUI-ul este verificat de la sine când furnizorul este în registru (sau tocmai a fost adăugat). Orice modificare readuce câmpul la „neverificat”. Fără cele trei confirmări nu se poate trece la pasul 3.@(NumberFromOcr ? " Factura este o scanare citită prin OCR: o literă sau o cifră citită greșit ar duce la o factură nouă în loc de cea deja preluată, deci verifică atent numărul." : "")</p>
                 @if (supplierError is not null) { <div class="error-banner" role="alert">@supplierError</div> }
                 <div class="editor-grid">
                     <div class="verify-field">
@@ -294,19 +295,21 @@ else if (step == 2)
                             <input id="pickup-invoice-number" maxlength="@SupplierInvoiceRules.MaxNumberLength" disabled="@InvoiceLocked" value="@invoiceNumber" @oninput="NumberEdited" autocomplete="off" /></label>
                         @VerifyBadge(numberVerified)
                         <ToggleSwitch Value="numberVerified" ValueChanged="@(value => numberVerified = value && NumberValid)" Disabled="@(InvoiceLocked || !NumberValid)" OnText="Verificat" OffText="Neverificat" AriaLabel="Confirmă că numărul facturii este verificat" />
+                        @if (HeaderFieldPicture(InvoiceFieldMeanings.InvoiceNumber) is { } numberPicture) { <img class="pickup-region" src="@numberPicture" alt="Regiunea din factură din care s-a citit numărul" /> }
                     </div>
                     <div class="verify-field">
                         <label for="pickup-supplier-cui">CUI furnizor *
                             <input id="pickup-supplier-cui" maxlength="20" disabled="@InvoiceLocked" value="@supplierCuiText" @oninput="CuiEdited" autocomplete="off" /></label>
                         @VerifyBadge(cuiVerified)
                         <ToggleSwitch Value="cuiVerified" ValueChanged="@(value => cuiVerified = value && ResolvedSupplier is not null)" Disabled="@(InvoiceLocked || ResolvedSupplier is null)" OnText="Verificat" OffText="Neverificat" AriaLabel="Confirmă că CUI-ul furnizorului este verificat" />
-                        <small id="pickup-supplier-name">@(ResolvedSupplier is { } resolved ? $"Furnizor din registru: {resolved.Name} · {SupplierCountries.Name(resolved.Country)}" : "Niciun furnizor din registru cu acest CUI.")@(invoiceSupplierName.Length > 0 ? $" Citit din factură: {invoiceSupplierName}." : "")</small>
+                        <small id="pickup-supplier-name">@(ResolvedSupplier is { } resolved ? $"Furnizor din registru: {resolved.Name} · {SupplierCountries.Name(resolved.Country)}" : "Niciun furnizor din registru cu acest CUI.")@(invoiceSupplierName.Length > 0 ? $" Citit din factură: {invoiceSupplierName}." : "")@(supplierByName && ResolvedSupplier is not null ? " Furnizor identificat după nume (forma juridică ignorată); CUI-ul este cel din registru." : "")@(CuiInInvoice switch { true => " CUI-ul se regăsește în factură.", false => " ⚠ CUI-ul furnizorului nu se regăsește în textul facturii: verifică furnizorul.", _ => "" })</small>
                     </div>
                     <div class="verify-field">
                         <label class="movement-date">Data emiterii *
                             <PickOnlyDate Id="pickup-invoice-date" Value="invoiceDate" ValueChanged="@((DateOnly? picked) => DateEdited(picked))" Disabled="@InvoiceLocked" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
                         @VerifyBadge(dateVerified)
                         <ToggleSwitch Value="dateVerified" ValueChanged="@(value => dateVerified = value && DateValid)" Disabled="@(InvoiceLocked || !DateValid)" OnText="Verificat" OffText="Neverificat" AriaLabel="Confirmă că data facturii este verificată" />
+                        @if (HeaderFieldPicture(InvoiceFieldMeanings.InvoiceDate) is { } datePicture) { <img class="pickup-region" src="@datePicture" alt="Regiunea din factură din care s-a citit data" /> }
                     </div>
                 </div>
                 @if (ResolvedSupplier is null && supplierCuiText.Trim().Length > 0 && !InvoiceLocked)
@@ -314,6 +317,21 @@ else if (step == 2)
                     <div class="invoice-warning" role="status">⚠ Furnizorul cu acest CUI nu este în registru.
                         <button type="button" class="refresh" @onclick="() => OpenAddSupplier(true)">+ Adaugă furnizorul</button></div>
                 }
+                @if (recognition is { Supplier: not null, NeedsConfirmation: false } known && ResolvedSupplier?.Id == known.Supplier!.Id)
+                {
+                    <p class="muted" id="pickup-recognition">Furnizor recunoscut după @known.MethodText, încredere @known.ConfidenceText.@(known.Conflict ? " ⚠ Numele din factură indică alt furnizor: " + known.Other!.Name + ". Verifică furnizorul." : "")</p>
+                }
+                @if (similarSupplier is { } nearSupplier && ResolvedSupplier is null && !InvoiceLocked)
+                {
+                    <div class="invoice-warning" role="status" id="pickup-similar-supplier">Probabil furnizorul <strong>@nearSupplier.Name</strong> (nume citit din factură: @invoiceSupplierName).
+                        <button type="button" class="refresh" @onclick="UseSimilarSupplier" >Folosește acest furnizor</button></div>
+                }
+                @if (AliasOffer is { } offer && !InvoiceLocked)
+                {
+                    <div class="invoice-warning" role="status" id="pickup-alias-offer">Numele din factură („@offer”) diferă de cel din registru.
+                        <button type="button" class="refresh" @onclick="RememberAliasAsync">Ține minte această denumire pentru @ResolvedSupplier!.Name</button></div>
+                }
+                @if (aliasNotice.Length > 0) { <p class="success-banner" role="status">@aliasNotice</p> }
                 @if (!InvoiceLocked) { <p><button type="button" class="refresh" @onclick="() => OpenAddSupplier(false)">+ Adaugă alt furnizor</button></p> }
                 @if (similarInvoices.Count > 0 && createdInvoice is null)
                 {
@@ -363,7 +381,8 @@ else if (step == 2)
                                             <textarea class="pickup-cell pickup-name" rows="@NameRows(cellText)" aria-label="@column.Title, rândul @(index + 1)" value="@cellText" @onchange="args => EditCell(at, id, args.Value?.ToString() ?? string.Empty)"></textarea>
                                         }
                                         else {<input class="pickup-cell @(notNumber ? "invalid" : "")" data-numeric="@(IsNumeric(column) ? "" : null)" inputmode="@(IsNumeric(column) ? "decimal" : null)" aria-label="@column.Title, rândul @(index + 1)" aria-invalid="@(notNumber ? "true" : null)" title="@(notNumber ? "Valoarea nu este citită ca număr: corecteaz-o după factură." : null)" value="@item.Cells.GetValueOrDefault(id, "")" @onchange="args => EditCell(at, id, args.Value?.ToString() ?? string.Empty)" />}
-                                        @if (rowHasBadNumber && id == warningColumnId) { <p class="pickup-row-warning" role="alert"><span class="pickup-warning-icon" aria-hidden="true">!</span> Atenție: unele valori din acest rând nu sunt numere (câmpurile cu fundal roșu). Corectați-le.</p> }</td>
+                                        @if (rowHasBadNumber && id == warningColumnId) { <p class="pickup-row-warning" role="alert"><span class="pickup-warning-icon" aria-hidden="true">!</span> Atenție: unele valori din acest rând nu sunt numere (câmpurile cu fundal roșu). Corectați-le.</p>
+                                            @if (RowPicture(item, [.. ShownColumns.Where(column => NotANumber(column, item.Cells.GetValueOrDefault(column.Id, "")))]) is { } rowPicture) { <img class="pickup-region pickup-row-picture" src="@rowPicture" alt="Rândul din factură, cu valorile necitite ca număr încadrate" /> } }</td>
                                 }
                                 <td class="pickup-product">
                                     @if (item.Match.Exact is { } exact)
@@ -534,6 +553,8 @@ else
         var compact = SupplierRules.CompactKey(supplierCuiText);
         supplierId = supplierList.FirstOrDefault(supplier => supplier.IsExternal ? compact.Length > 0 && SupplierRules.CompactKey(supplier.Cui) == compact
             : digits.Length > 0 && SupplierRules.CuiDigits(supplier.Cui) == digits)?.Id;
+        // A supplier found in the register (by its CUI, its name, or just added) has its CUI verified by that very fact; the number and the date stay to be checked.
+        cuiVerified = supplierId is not null;
     }
 
     private async Task NumberEdited(ChangeEventArgs e)
@@ -547,6 +568,7 @@ else
     {
         supplierCuiText = e.Value?.ToString() ?? "";
         cuiVerified = false;
+        recognition = null;
         ResolveSupplier();
         await RefreshExistingInvoiceAsync();
     }
@@ -597,6 +619,95 @@ else
         supplierCuiText = invoiceSupplierCui;
         numberVerified = cuiVerified = dateVerified = false;   // read, not yet checked by the user
         ResolveSupplier();
+        // The CUI read from the invoice found no supplier (misread, or not read): the name read from the invoice is looked up in the register,
+        // legal form ignored (SC / S.C. / SRL / S.R.L.), and the supplier's own CUI is taken, to be checked against the text of the invoice.
+        // One recognition for CUI, name, alias and near miss (SupplierRecognizer), with its method and confidence.
+        BuildCuiSearchText();
+        recognition = SupplierRecognizer.Recognize(supplierList, invoiceSupplierCui, invoiceSupplierName, cuiSearchText);
+        initialRecognition = recognition;
+        supplierByName = false;
+        similarSupplier = null;
+        if (recognition.NeedsConfirmation) similarSupplier = recognition.Supplier;
+        else if (supplierId is null && recognition.Supplier is { } found)
+        {
+            supplierCuiText = found.Cui;
+            supplierId = found.Id;
+            supplierByName = true;
+        }
+        cuiVerified = ResolvedSupplier is not null;
+    }
+
+    private bool supplierByName;
+    private Supplier? similarSupplier;
+    private SupplierRecognition? recognition;
+    private SupplierRecognition? initialRecognition;   // what the recognition proposed when the invoice was read (kept when the user edits the CUI)
+    private int? autoTemplateId;
+    private bool templateChanged;
+
+    // The proposal and the final choice go to the recognition log (to see where the reading goes wrong); never blocks recording the invoice.
+    private async Task RecordRecognitionAsync(int invoiceId)
+    {
+        if (Services.GetService<ISupplierRecognitionLog>() is not { } log) return;
+        var proposed = initialRecognition ?? new SupplierRecognition(null, SupplierMatchMethod.None, "low");
+        try
+        {
+            await log.RecordAsync(new SupplierRecognitionEntry(invoiceId, proposed.Method, proposed.Confidence, invoiceSupplierName, invoiceSupplierCui, proposed.Supplier?.Id, supplierId, templateChanged), lifetime.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("Recording the supplier recognition failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    // The near-miss supplier is only proposed (the OCR may have misread a letter): the user confirms, and the CUI is then checked as usual.
+    private void UseSimilarSupplier()
+    {
+        if (similarSupplier is not { } suggested) return;
+        supplierCuiText = suggested.Cui;
+        cuiVerified = false;
+        similarSupplier = null;
+        ResolveSupplier();
+    }
+    private string aliasNotice = "";
+
+    // The name read from the invoice, when the supplier was chosen another way (CUI or by hand) and the name is not yet one of its names: the
+    // user can keep it as an alias, so the next invoice with that writing is recognised by name.
+    private string? AliasOffer =>
+        ResolvedSupplier is { } supplier && invoiceSupplierName.Trim() is { Length: > 0 } read && !supplierByName
+        && SupplierRules.AliasProblem(read, supplier, supplierList) is null ? read : null;
+
+    private async Task RememberAliasAsync()
+    {
+        if (AliasOffer is not { } read || ResolvedSupplier is not { } supplier) return;
+        try
+        {
+            await Suppliers.AddAliasAsync(supplier, read, lifetime.Token);
+            aliasNotice = $"Denumirea „{read}” a fost reținută pentru {supplier.Name}.";
+            supplierList = await Suppliers.GetSuppliersAsync(lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is SupplierOperationException or AccessDeniedException) { supplierError = exception.Message; }
+        catch (NotSupportedException) { }
+    }
+
+    // Whether the CUI of the supplier chosen from the register is written in the invoice (the text read from the file, or by OCR).
+    private bool? CuiInInvoice
+    {
+        get
+        {
+            if (ResolvedSupplier is not { } supplier || session is null) return null;
+            BuildCuiSearchText();
+            var key = supplier.IsExternal ? SupplierRules.CompactKey(supplier.Cui) : SupplierRules.CuiDigits(supplier.Cui);
+            if (key.Length == 0) return null;
+            return cuiSearchText.Length > 0 && cuiSearchText.Contains(key, StringComparison.Ordinal);
+        }
+    }
+
+    private Guid? cuiSearchFor;
+    private string cuiSearchText = "";
+
+    private void BuildCuiSearchText()
+    {
+        if (cuiSearchFor == session?.Id) return;
+        cuiSearchFor = session?.Id;
+        cuiSearchText = session is null ? "" : SupplierRules.CompactKey(string.Concat(session.Document.AllWords.Select(word => word.Text)));
     }
 
     // The invoice of this supplier and number may have been taken before, in part: what was taken is read, so the pickup continues on the same
@@ -640,6 +751,44 @@ else
         supplierCuiText = saved.Cui;   // the supplier's own tax id is now in the field: to be confirmed
         cuiVerified = false;
         await LoadSuppliersAsync();
+    }
+
+    // ---- pictures of the regions the values were read from (the user compares them with what was read) ----
+
+    private readonly Dictionary<string, string?> regionPictures = [];
+
+    private string? PageRegionPicture(string key, int pageNumber, InvoiceBox area, IEnumerable<InvoiceBox> outlines, double marginX = InvoiceRegionPicture.Margin)
+    {
+        if (session is null) return null;
+        if (regionPictures.TryGetValue(key, out var cached)) return cached;
+        var page = session.Document.Pages.FirstOrDefault(item => item.Number == pageNumber);
+        var picture = page is not null && pageNumber >= 1 && pageNumber <= session.Previews.Count
+            ? InvoiceRegionPicture.DataUri(session.Previews[pageNumber - 1], page, area, outlines, marginX) : null;
+        return regionPictures[key] = picture;
+    }
+
+    // The label and the value of a header field (number, date) as the template read them on this file, the value outlined.
+    private string? HeaderFieldPicture(string meaning)
+    {
+        if (overlay?.Fields.FirstOrDefault(item => item.Meaning == meaning && item.Use && item.Width > 0 && item.Height > 0) is not { } field) return null;
+        var left = field.LabelX > 0 && field.LabelX < field.X ? field.LabelX : field.X;
+        var top = field.LabelY > 0 ? Math.Min(field.LabelY, field.Y) : field.Y;
+        var area = new InvoiceBox(field.Page, left, top, Math.Max(1, field.X + field.Width - left), Math.Max(1, field.Y + field.Height - top));
+        return PageRegionPicture($"field|{meaning}|{field.Page}|{field.X:F1}|{field.Y:F1}", field.Page, area, [], 12);
+    }
+
+    // The table row as it stands on the page, the cells that are not read as numbers outlined.
+    private string? RowPicture(PickRow item, IReadOnlyList<ShownColumn> bad)
+    {
+        if (reading is null || item.Page < 1 || item.Bottom <= item.Top || bad.Count == 0) return null;
+        var columns = reading.Extraction.Columns.Where(column => ShownColumns.Any(shown => shown.Id == column.Id)).ToList();
+        if (columns.Count == 0) return null;
+        var left = columns.Min(column => column.Left);
+        var right = columns.Max(column => column.Right);
+        var outlines = columns.Where(column => bad.Any(shown => shown.Id == column.Id))
+            .Select(column => new InvoiceBox(item.Page, column.Left, item.Top, Math.Max(1, column.Right - column.Left), item.Bottom - item.Top)).ToList();
+        var area = new InvoiceBox(item.Page, left, item.Top, Math.Max(1, right - left), item.Bottom - item.Top);
+        return PageRegionPicture($"row|{item.Page}|{item.Top:F1}|{item.Bottom:F1}|{string.Join(",", bad.Select(shown => shown.Id))}", item.Page, area, outlines, 6);
     }
 
     private void ResetInvoiceHeader()
@@ -724,7 +873,11 @@ else
             if (createdInvoice is null && existingInvoice is not null) createdInvoice = existingInvoice;   // a partly taken invoice is continued
             if (createdInvoice is null)
             {
-                try { createdInvoice = await SupplierInvoices.CreateAsync(new SupplierInvoiceInput { SupplierId = supplierId, Number = invoiceNumber, Date = invoiceDate }, lifetime.Token); }
+                try
+                {
+                    createdInvoice = await SupplierInvoices.CreateAsync(new SupplierInvoiceInput { SupplierId = supplierId, Number = invoiceNumber, Date = invoiceDate }, lifetime.Token);
+                    await RecordRecognitionAsync(createdInvoice.Id);
+                }
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
                 catch (Exception exception) when (exception is SupplierInvoiceOperationException or AccessDeniedException) { finalizeError = exception.Message; return; }
                 catch (Exception exception)
@@ -788,6 +941,10 @@ else
         // The row of step 1 this one was made from (as read, before any correction): going back to step 1 and forward again keeps
         // the work done on the rows that are still taken (corrections, chosen or prepared products, descriptions).
         public string SourceKey { get; init; } = "";
+        // Where the row was read on the page (points; Top = Bottom = 0 when unknown): the picture shown with a warning.
+        public int Page { get; init; }
+        public double Top { get; init; }
+        public double Bottom { get; init; }
         public InvoiceProductMatch Match { get; set; } = new("", null, []);
         public int? ProductId { get; set; }
         public StagedProduct? Staged { get; set; }
@@ -823,7 +980,7 @@ else
             {
                 var key = SourceKey(row);
                 var again = previous.FindIndex(item => item.SourceKey == key);
-                if (again < 0) return new PickRow { Cells = new Dictionary<string, string>(row.Cells), SourceKey = key };
+                if (again < 0) return new PickRow { Cells = new Dictionary<string, string>(row.Cells), SourceKey = key, Page = row.Page, Top = row.Top, Bottom = row.Bottom };
                 var kept = previous[again];
                 previous.RemoveAt(again);
                 return kept;
@@ -1006,8 +1163,19 @@ else
             creatingTemplate = false;
             allTemplates = await Templates.GetAllAsync(lifetime.Token);
             suggestions = InvoiceTemplateSuggestions.Rank(allTemplates, session.Document);
+            // The supplier recognised with high confidence (CUI, name, alias) brings its own active templates to the front, even below the layout threshold.
+            try
+            {
+                var registered = await Suppliers.GetSuppliersAsync(lifetime.Token);
+                var recognized = SupplierRecognizer.Recognize(registered, session.Analysis.SupplierCui, session.Analysis.SupplierName,
+                    SupplierRules.CompactKey(string.Concat(session.Document.AllWords.Select(word => word.Text))));
+                if (recognized is { Supplier: { } known, Confidence: "high", NeedsConfirmation: false })
+                    suggestions = InvoiceTemplateSuggestions.PreferSupplier(suggestions, allTemplates, session.Document, known);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("Choosing the template by supplier failed ({ErrorType}).", exception.GetType().Name); }
             currentPage = session.Document.Pages[0].Number;
-            chosen = Lab.Enabled ? null : suggestions.FirstOrDefault()?.Template;   // the laboratory starts from the automatic reading, the one that is measured against the reference
+            chosen = Lab.Enabled ? null : suggestions.FirstOrDefault()?.Template;
+            autoTemplateId = chosen?.Info.Id; templateChanged = false;   // the laboratory starts from the automatic reading, the one that is measured against the reference
             LoadReading();
             RefreshLab();
         }
@@ -1030,7 +1198,7 @@ else
     private void ApplyTemplate(InvoiceTemplateRecord template)
     {
         if (suggestions.All(item => item.Template.Info.Id != template.Info.Id))
-            suggestions = [new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, session!.Document)), .. suggestions];
+            suggestions = [new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, session!.Document, template.Info.SupplierName)), .. suggestions];
         chosen = template;
         LoadReading();
     }
@@ -1067,6 +1235,7 @@ else
     {
         if (!int.TryParse(e.Value?.ToString(), out var id)) return;
         chosen = suggestions.FirstOrDefault(item => item.Template.Info.Id == id)?.Template ?? chosen;
+        if (autoTemplateId is not null) templateChanged = chosen?.Info.Id != autoTemplateId;   // the user chose another template than the one proposed
         LoadReading();
     }
 
@@ -1095,6 +1264,7 @@ else
             : chosen is not null ? InvoiceTemplateDraft.FromDefinition(definition, session!.Document, chosen.Info.SupplierName, chosen.Info.SupplierCui)
             : InvoiceTemplateDraft.FromAnalysis(session!.Analysis);
         excluded.Clear();
+        regionPictures.Clear();
         if (createdInvoice is null) headerPrefilledFor = null;   // another reading of the file: the number, date and supplier are read again
         ResetSeparators();
     }

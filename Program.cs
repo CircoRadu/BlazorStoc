@@ -142,7 +142,8 @@ builder.Services.AddScoped<IServicePhotoStore>(services => new MariaServicePhoto
 builder.Services.AddScoped<IServiceContractRepository>(services => new MariaServiceContractRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
 builder.Services.AddScoped<IServiceInterventionRepository>(services => new MariaServiceInterventionRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), timeProvider: services.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped<IBeneficiaryRepository>(services => new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
-builder.Services.AddScoped<ISupplierRepository>(services => new MariaSupplierRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
+builder.Services.AddScoped<ISupplierRepository>(services => new CachedSupplierRepository(new MariaSupplierRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IInvoiceTemplateService>())));
+builder.Services.AddScoped<ISupplierRecognitionLog>(services => new MariaSupplierRecognitionLog(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>()));
 builder.Services.AddScoped<ISupplierInvoiceRepository>(services => new MariaSupplierInvoiceRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<IExpiryNotificationRepository>(services => new MariaExpiryNotificationRepository(services.GetRequiredService<IConfiguration>()));
@@ -249,6 +250,8 @@ app.Use(async (context, next) =>
     await next();
 });
 app.MapStaticAssets().AllowAnonymous();
+app.MapGet("/api/furnizori/recunoastere.csv", async (ISupplierRecognitionLog log, CancellationToken token) =>
+    Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await log.ExportCsvAsync(token))).ToArray(), "text/csv; charset=utf-8", "recunoastere-furnizori.csv")).RequireAuthorization();
 app.MapGet("/health/live", () => Results.Text("healthy")).AllowAnonymous();
 // Polled by every open page (wwwroot/maintenance-watch.js): tells an already-open tab that a backup/restore has
 // started or ended, so it can be moved to the waiting page and brought back. Carries no names or details.

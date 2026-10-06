@@ -37,6 +37,15 @@
                 </div>
                 @if (anafMessage is not null) { <div class="anaf-message @(anafMessageKind) beneficiary-anaf-message" role="@(anafMessageKind == "error" ? "alert" : "status")">@anafMessage</div> }
                 @if (anafWarning is not null) { <div class="anaf-message warn beneficiary-anaf-message" role="status">@anafWarning</div> }
+                @if (duplicateByName is { } sameName)
+                {
+                    <div class="anaf-message warn beneficiary-anaf-message" role="alert" id="supplier-duplicate-name">⚠ Posibil duplicat: în registru există furnizorul <strong>@sameName.Name</strong> (@sameName.Identifier) cu același nume. CUI-ul citit din factură poate fi greșit; verifică înainte de a salva.</div>
+                }
+                @if (ReadNameDiffers)
+                {
+                    <div class="anaf-message beneficiary-anaf-message" role="status" id="supplier-read-name">Numele din ANAF este cel folosit. Citit din factură: <strong>@InitialName</strong>.
+                        <ToggleSwitch @bind-Value="rememberAlias">Ține minte numele din factură ca denumire alternativă</ToggleSwitch></div>
+                }
                 <label for="supplier-name">Denumire *<InputTextLive id="supplier-name" @bind-Value="input.Name" maxlength="200" autocomplete="organization" /><ValidationMessage For="() => input.Name" /></label>
                 <label for="supplier-address">Adresă<InputTextLive id="supplier-address" @bind-Value="input.Address" maxlength="300" autocomplete="street-address" /><ValidationMessage For="() => input.Address" /></label>
                 <label for="supplier-phone">Număr de telefon<InputTextLive id="supplier-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="tel" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
@@ -51,6 +60,25 @@
                     <ChangeReasonField Id="supplier-change-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" />
                 }
             </div>
+            @if (Original is not null)
+            {
+                <div class="supplier-aliases" id="supplier-aliases">
+                    <h3>Denumiri alternative</h3>
+                    <p class="muted">Alte scrieri ale numelui pe facturi (denumire comercială, prescurtare, grafie citită constant de OCR): factura se recunoaște după ele. Forma juridică, punctele și majusculele nu contează.</p>
+                    @if (aliases.Count == 0) { <p class="muted">Nicio denumire alternativă.</p> }
+                    <ul>
+                        @foreach (var alias in aliases)
+                        {
+                            <li><span>@alias</span> <button type="button" class="danger" disabled="@(saving || aliasBusy)" aria-label="@("Șterge denumirea " + alias)" @onclick="() => RemoveAliasAsync(alias)">Șterge</button></li>
+                        }
+                    </ul>
+                    <div class="editor-grid">
+                        <label for="supplier-alias-input">Denumire alternativă nouă<input id="supplier-alias-input" maxlength="@SupplierRules.MaxAliasLength" value="@aliasText" @oninput="args => aliasText = args.Value?.ToString() ?? string.Empty" autocomplete="off" /></label>
+                    </div>
+                    @if (aliasError.Length > 0) { <div class="validation-message" role="alert">@aliasError</div> }
+                    <button type="button" class="refresh" disabled="@(saving || aliasBusy || aliasText.Trim().Length == 0)" @onclick="AddAliasAsync">+ Adaugă denumirea</button>
+                </div>
+            }
             <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează furnizorul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
         </fieldset>
     </EditForm>
@@ -88,8 +116,39 @@
 
     private bool Locked => Original is { InUse: true };
 
+    // Aliases are saved at once by their own operations (they do not wait for "Salvează furnizorul" and do not change the supplier's version).
+    private List<string> aliases = [];
+    private string aliasText = "", aliasError = "";
+    private bool aliasBusy;
+
+    private async Task AddAliasAsync()
+    {
+        if (Original is null || aliasBusy) return;
+        aliasBusy = true; aliasError = "";
+        try
+        {
+            var updated = await Repository.AddAliasAsync(Original with { Aliases = aliases }, aliasText, lifetime.Token);
+            aliases = [.. updated.AliasList];
+            aliasText = "";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is SupplierOperationException or AccessDeniedException) { aliasError = exception.Message; }
+        finally { aliasBusy = false; }
+    }
+
+    private async Task RemoveAliasAsync(string alias)
+    {
+        if (Original is null || aliasBusy) return;
+        aliasBusy = true; aliasError = "";
+        try { aliases = [.. (await Repository.RemoveAliasAsync(Original with { Aliases = aliases }, alias, lifetime.Token)).AliasList]; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is SupplierOperationException or AccessDeniedException) { aliasError = exception.Message; }
+        finally { aliasBusy = false; }
+    }
+
     protected override Task OnInitializedAsync()
     {
+        aliases = [.. Original?.AliasList ?? []];
         if (Original is null)
         {
             input = new() { Cui = InitialCui, Name = InitialName };
@@ -197,6 +256,7 @@
             anafMessage = "Datele nu au putut fi preluate din ANAF. Furnizorul se poate salva cu datele introduse manual; va fi marcat în registru.";
         }
         finally { fetching = false; }
+        if (outcome == AnafLookupOutcome.Found && Original is null) await CheckDuplicateByNameAsync();
         return outcome;
     }
 
@@ -273,7 +333,33 @@
             error = "Furnizorul nu a putut fi salvat. Datele formularului au fost păstrate; actualizează lista înainte să reîncerci.";
         }
         finally { saving = false; }
+        if (saved is not null && Original is null && rememberAlias && ReadNameDiffers)
+        {
+            // The writing read from the invoice becomes an alias of the new supplier, so the next invoice with it is recognised by name.
+            try { saved = await Repository.AddAliasAsync(saved, InitialName, lifetime.Token); }
+            catch (Exception exception) when (exception is SupplierOperationException or AccessDeniedException or NotSupportedException) { }
+        }
         if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    // The name ANAF returned replaces the one read from the invoice (an OCR misreading ends up in the register otherwise); the read one is offered as an alias.
+    private bool rememberAlias = true;
+    private Supplier? duplicateByName;
+
+    private bool ReadNameDiffers => Original is null && fetchedFromAnaf && SupplierRules.NameKey(InitialName).Length >= SupplierRules.MinAliasKeyLength
+        && SupplierRules.NameKey(InitialName) != SupplierRules.NameKey(input.Name);
+
+    // A supplier of the register with this name (legal form aside) but another tax id: the CUI read from the invoice may be wrong.
+    private async Task CheckDuplicateByNameAsync()
+    {
+        duplicateByName = null;
+        try
+        {
+            var list = await Repository.GetSuppliersAsync(lifetime.Token);
+            if (SupplierRules.FindByName(list, input.Name) is { } found && SupplierRules.CuiDigits(found.Cui) != Digits) duplicateByName = found;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or SupplierOperationException) { }
     }
 
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }

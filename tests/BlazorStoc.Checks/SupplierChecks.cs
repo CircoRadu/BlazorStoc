@@ -25,6 +25,63 @@ public static class SupplierChecks
 
     public static void Rules(Action<bool, string> check)
     {
+        // The name read from an invoice meets the register apart from the legal form, dots, case and diacritics.
+        check(new[] { "S.C. ALFA S.R.L.", "SC Alfa SRL", "Alfa", "ALFA S.R.L", "s.c.alfa srl" }.Select(SupplierRules.NameKey).Distinct().Count() == 1 &&
+              SupplierRules.NameKey("Șantier Țară SRL") == SupplierRules.NameKey("SANTIER TARA S.R.L."),
+            "Suppliers: S.C./SC/S.R.L./SRL, dots, case and diacritics do not change the name key");
+        var byName = new[] { Existing(1, "ALFA CONSTRUCT S.R.L.", "9178894"), Existing(2, "Beta Trans SA", "22460883") };
+        check(SupplierRules.FindByName(byName, "SC Alfa Construct SRL")?.Id == 1 && SupplierRules.FindByName(byName, "S.C. BETA TRANS S.A.")?.Id == 2 &&
+              SupplierRules.FindByName(byName, "Gamma SRL") is null && SupplierRules.FindByName(byName, "SC SRL") is null,
+            "Suppliers: the register supplier is found by the name read from the invoice, and none when no name fits");
+        var withAlias = new[] { Existing(1, "ALFA CONSTRUCT S.R.L.", "9178894") with { Aliases = ["Alfa Group SA", "ALFA C."] }, Existing(2, "Beta Trans SA", "22460883") };
+        check(SupplierRules.FindByName(withAlias, "S.C. ALFA GROUP S.A.")?.Id == 1 && SupplierRules.FindByName(withAlias, "alfa c")?.Id == 1 &&
+              SupplierRules.AliasProblem("Beta Trans", withAlias[0], withAlias) is not null && SupplierRules.AliasProblem("SC SRL", withAlias[0], withAlias) is not null &&
+              SupplierRules.AliasProblem("Alfa Construct", withAlias[0], withAlias) is not null && SupplierRules.AliasProblem("Alfa Grup", withAlias[0], withAlias) is null,
+            "Suppliers: an alias finds the supplier by name; one that is too short, already the supplier's own or another supplier's is refused");
+        var near = new[] { Existing(1, "ALFA CONSTRUCT S.R.L.", "9178894"), Existing(2, "Beta Trans SA", "22460883"), Existing(3, "Betta Trans Grup SRL", "1234") };
+        check(SupplierRules.FindSimilarByName(near, "ALFA C0NSTRUCT SRL")?.Id == 1 && SupplierRules.FindSimilarByName(near, "Alfa Construt SRL")?.Id == 1 &&
+              SupplierRules.FindSimilarByName(near, "Gamma Instal SRL") is null && SupplierRules.FindSimilarByName(near, "Alfa") is null,
+            "Suppliers: a name misread by OCR (a digit for a letter, a missing letter) finds the near supplier; a different name or a very short one finds none");
+        var registry = new List<Supplier> { Existing(1, "ALFA CONSTRUCT S.R.L.", "9178894"), Existing(2, "Beta Trans SA", "22460883") with { Aliases = ["Betta"] } };
+        var both = SupplierRecognizer.Recognize(registry, "RO 9178894", "SC Alfa Construct SRL", "");
+        var conflict = SupplierRecognizer.Recognize(registry, "9178894", "Beta Trans SA", "");
+        var byAlias = SupplierRecognizer.Recognize(registry, "", "Betta SRL", "22460883");
+        var nearMiss = SupplierRecognizer.Recognize(registry, "", "ALFA C0NSTRUCT", "");
+        check(both is { Method: SupplierMatchMethod.Cui, Confidence: "high", Conflict: false } && conflict is { Conflict: true, Confidence: "low" } && conflict.Other?.Id == 2 &&
+              byAlias is { Method: SupplierMatchMethod.Alias, Confidence: "high" } && nearMiss is { NeedsConfirmation: true } && nearMiss.Supplier?.Id == 1,
+            "Suppliers: unified recognition (CUI and name agree = high; CUI and name disagree = conflict; alias confirmed by the CUI in the text = high; a near miss only needs confirmation)");
+        check(new SupplierRecognitionEntry(1, SupplierMatchMethod.Cui, "high", "Alfa", "9178894", 5, 5).Corrected == false &&
+              new SupplierRecognitionEntry(2, SupplierMatchMethod.Similar, "low", "Alfa", "", 5, 6).Corrected && new SupplierRecognitionEntry(3, SupplierMatchMethod.None, "low", "", "", null, 6).Corrected &&
+              SupplierRecognitionText.MethodName(SupplierRecognitionText.Key(SupplierMatchMethod.Alias)) == "denumire alternativă",
+            "Suppliers: the recognition log marks as corrected an invoice whose chosen supplier differs from the proposed one (or none was proposed)");
+        {
+            var def = new InvoiceTemplateDefinition(InvoiceTemplateDefinition.CurrentSchema, InvoiceSources.Text, 595, 842, [], [], null);
+            InvoiceTemplateRecord Template(int id, int? supplierId, string name) => new(new InvoiceTemplateInfo(id, name, "X", "9178894", InvoiceSources.Text, true, 0, "a", DateTime.UtcNow, "a", DateTime.UtcNow, supplierId), def);
+            var document = new InvoiceDocument([new InvoicePageData(1, 595, 842, InvoiceSources.Text, [])]);
+            var mine = Template(1, 1, "Al furnizorului"); var other = Template(2, 2, "Altul");
+            var preferred = InvoiceTemplateSuggestions.PreferSupplier([new InvoiceTemplateSuggestion(other, new InvoiceTemplateMatch(0.9, false, new InvoiceAlignment(0, 0, 0, 0, 0, 0)))], [mine, other], document, Existing(1, "Alfa SRL", "9178894"));
+            check(preferred.Count == 2 && preferred[0].Template.Info.Id == 1 && preferred[1].Template.Info.Id == 2,
+                "Pickup: the recognised supplier's own template comes first, even when its layout is below the threshold");
+        }
+        check(SupplierSearch.Filter([Existing(1, "Alfa SRL", "9178894") with { Aliases = ["Gamma Instal"] }, Existing(2, "Beta SA", "22460883")], "gamma inst").Select(item => item.Id).SequenceEqual([1]) &&
+              MariaSupplierRecognitionLog.Csv("=CMD()") == "\"'=CMD()\"" && MariaSupplierRecognitionLog.Csv("a\"b") == "\"a\"\"b\"",
+            "Suppliers: the search finds a supplier by its alias; the CSV export quotes values and neutralises formulas");
+        {
+            var memory = new MemorySupplierRepository();
+            memory.Items.Add(Existing(1, "Alfa SRL", "9178894"));
+            var cached = new CachedSupplierRepository(memory);
+            var first = cached.GetSuppliersAsync().GetAwaiter().GetResult().Count;
+            memory.Items.Add(Existing(2, "Beta SA", "22460883"));
+            var stale = cached.GetSuppliersAsync().GetAwaiter().GetResult().Count;
+            cached.CreateAsync(new SupplierInput { Name = "Gamma SRL", Cui = ValidCui(555123) }).GetAwaiter().GetResult();
+            check(first == 1 && stale == 1 && cached.GetSuppliersAsync().GetAwaiter().GetResult().Count == 3,
+                "Suppliers: the register is read once for a short time and read again after a write through the same circuit");
+        }
+        var renamedDefinition = InvoiceTemplateRules.RenameSupplier(new InvoiceTemplateDefinition(1, InvoiceSources.Text, 595, 842, [],
+            [new InvoiceTemplateField("f1", InvoiceFieldMeanings.SupplierName, "Alfa Construct SRL", true, 1, 0, 0, 1, 1, "Alfa Construct SRL", "text", false)], null, "<Alfa Construct SRL> - <Denumire>"), "Alfa Construct SRL", "Alfa Group SRL");
+        check(renamedDefinition is { ProductDescription: "<Alfa Group SRL> - <Denumire>" } && renamedDefinition.Fields[0].Name == "Alfa Group SRL" &&
+              InvoiceTemplateRules.RenameSupplier(renamedDefinition, "Altul", "Nou") is null,
+            "Invoice templates: a renamed supplier changes the field names and the entry description of its templates");
         // The control digit of the CUI: real CUIs pass, a mistyped digit does not.
         check(SupplierRules.HasValidCheckDigit("9178894") && SupplierRules.HasValidCheckDigit("22460883") && !SupplierRules.HasValidCheckDigit("9178895") &&
               !SupplierRules.HasValidCheckDigit("1") && !SupplierRules.HasValidCheckDigit("12345678901") && !SupplierRules.HasValidCheckDigit("91788a4"),
@@ -149,6 +206,17 @@ public static class SupplierChecks
     public static async Task ComponentsAsync(Action<bool, string> check)
     {
         var cui = ValidCui(917889);
+
+        // Opened from an invoice: ANAF is asked at once; its name replaces the misread one (offered as an alias) and a same-named supplier with another CUI is flagged.
+        {
+            var repository = new MemorySupplierRepository();
+            repository.Items.Add(new Supplier(1, "Test Furnizor S.R.L.", ValidCui(555123)));
+            using var context = EditorContext(repository, new ScriptedAnaf(FoundResult));
+            var cut = context.Render<SupplierEditor>(parameters => parameters.Add(p => p.InitialCui, cui).Add(p => p.InitialName, "TEST FURNIZR SRL"));
+            cut.WaitForAssertion(() => { if (cut.FindAll("#supplier-read-name").Count == 0 || cut.FindAll("#supplier-duplicate-name").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+            check(cut.Find("#supplier-name").GetAttribute("value") == "TEST FURNIZOR SRL" && cut.Find("#supplier-read-name").TextContent.Contains("TEST FURNIZR SRL") && cut.Find("#supplier-duplicate-name").TextContent.Contains("Test Furnizor S.R.L."),
+                "Supplier form from an invoice: the ANAF name replaces the misread one (kept as an alias option) and a same-named supplier with another CUI is flagged as a possible duplicate");
+        }
 
         // ANAF found: the form is filled, "from ANAF" while unchanged, "edited" once a value is changed by hand, back to "from ANAF" when restored.
         {
@@ -370,24 +438,26 @@ public static class SupplierChecks
             check(cut.Find("#pickup-supplier-cui").GetAttribute("value") == "12345678" && cut.Find("#pickup-invoice-number").GetAttribute("value") == "FT 1" && cut.Find("#pickup-invoice-date").GetAttribute("value") == "05.10.2026" &&
                   cut.Find("#pickup-supplier-name").TextContent.Contains("Furnizor Test SRL"),
                 "Pickup (step 2): the number, the supplier's CUI and the date of issue are read from the invoice into editable fields, and the supplier of the CUI is shown");
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.warn").Count == 3 && cut.FindAll(".pickup-invoice-head .anaf-source").All(badge => badge.TextContent.Contains("Neverificat")) && Switches().Count == 3 &&
+            check(cut.FindAll(".pickup-invoice-head .anaf-source.warn").Count == 2 && cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 1 && Switches()[1].GetAttribute("aria-checked") == "true" && Switches().Count == 3 &&
                   NextDisabled() && cut.Markup.Contains("confirmă numărul facturii, CUI-ul furnizorului și data"),
-                "Pickup (step 2): the three fields start as \"neverificat\" and the next step is closed until each one is confirmed");
+                "Pickup (step 2): the CUI of a supplier found in the register starts verified; the number and the date start as \"neverificat\" and the next step is closed until they are confirmed");
+            check(cut.FindAll(".pickup-invoice-head img.pickup-region").Count == 2 && cut.FindAll(".pickup-invoice-head img.pickup-region").All(image => (image.GetAttribute("src") ?? "").StartsWith("data:image/png;base64,")),
+                "Pickup (step 2): next to the number and the date there is a picture of the region of the invoice they were read from");
 
             // Each field is confirmed on its own.
             Switches()[0].Change(true);
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 1 && NextDisabled(), "Pickup (step 2): confirming the number alone does not open the next step");
-            Switches()[1].Change(true);
+            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 2 && NextDisabled(), "Pickup (step 2): confirming the number alone does not open the next step");
+            
             Switches()[2].Change(true);
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 3 && !NextDisabled(), "Pickup (step 2): with the number, the CUI and the date confirmed the next step opens");
+            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 3 && !NextDisabled(), "Pickup (step 2): with the number and the date confirmed (the CUI is verified by the register) the next step opens");
 
             // Editing a field puts that field (only) back to \"neverificat\" and closes the step again.
             cut.Find("#pickup-invoice-number").Input("FT 1 ");
             check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 2 && Switches()[0].GetAttribute("aria-checked") == "false" && NextDisabled(), "Pickup (step 2): editing the number makes it \"neverificat\" again (the other two stay confirmed)");
             Switches()[0].Change(true);
             cut.Find("#pickup-supplier-cui").Input("RO 12345678");
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 2 && Switches()[1].GetAttribute("aria-checked") == "false" && cut.Find("#pickup-supplier-name").TextContent.Contains("Furnizor Test SRL") && NextDisabled(),
-                "Pickup (step 2): editing the CUI makes it \"neverificat\" again; the supplier is found by the digits");
+            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 3 && Switches()[1].GetAttribute("aria-checked") == "true" && cut.Find("#pickup-supplier-name").TextContent.Contains("Furnizor Test SRL") && !NextDisabled(),
+                "Pickup (step 2): a CUI typed that is in the register is verified at once; the supplier is found by the digits");
             Switches()[1].Change(true);
             cut.Find("#pickup-supplier-cui").Input("99999999");
             check(cut.Find("#pickup-supplier-name").TextContent.Contains("Niciun furnizor din registru") && Switches()[1].HasAttribute("disabled") && NextDisabled() && cut.Markup.Contains("nu este în registru"),
@@ -434,7 +504,7 @@ public static class SupplierChecks
             cut.FindAll("button").First(button => button.TextContent.Contains("Da, este factura FT 1")).Click();
             cut.WaitForAssertion(() => { if (!cut.Markup.Contains("a mai fost preluată")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
             check(cut.Find("#pickup-invoice-number").GetAttribute("value") == "FT 1", "Pickup: choosing the look-alike invoice puts its number in place and continues on it");
-            check(cut.Markup.Contains("Produs preluat · ") && cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 0, "Pickup: an invoice taken before is recognized in step 2 and what was taken is listed; the number put in place is to be confirmed again");
+            check(cut.Markup.Contains("Produs preluat · ") && cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 1, "Pickup: an invoice taken before is recognized in step 2 and what was taken is listed; the number put in place is to be confirmed again");
             SupplierTestServices.ConfirmHeader(cut);
             cut.FindAll("button").First(button => button.TextContent.Contains("Pasul următor")).Click();
             cut.WaitForAssertion(() => cut.Find(".pickup-entry"), TimeSpan.FromSeconds(10));
@@ -467,8 +537,8 @@ public static class SupplierChecks
             cut.Find("form").Submit();
             cut.WaitForAssertion(() => { if (emptySuppliers.Items.Count != 1 || !cut.Find("#pickup-supplier-name").TextContent.Contains("Furnizor din registru")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
             check(emptySuppliers.Items.Single().Source == SupplierSources.Anaf && cut.Find("#pickup-supplier-name").TextContent.Contains("FURNIZOR TEST SRL") && !cut.Markup.Contains("nu este în registru") &&
-                  cut.FindAll(".pickup-invoice-head input[role=switch]")[1].GetAttribute("aria-checked") == "false",
-                "Pickup: the supplier saved in the window is found by its CUI at once, the report that it was missing is gone, and the CUI is still to be confirmed");
+                  cut.FindAll(".pickup-invoice-head input[role=switch]")[1].GetAttribute("aria-checked") == "true",
+                "Pickup: the supplier saved in the window is found by its CUI at once, the report that it was missing is gone, and the CUI is verified by that");
         }
 
         // A CUI read with a wrong digit (a scan) is said at once in the supplier form and ANAF is not asked about it.

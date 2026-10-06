@@ -835,6 +835,13 @@ Ciclul a fost pornit la cererea explicită a utilizatorului („implementează c
 - Administratorul are acces complet; utilizatorul limitat operează produse, beneficiari și proiecte, fără meniul Utilizatori.
 - Modificările persistente trebuie jurnalizate și entitățile șterse trebuie arhivate conform contractului existent.
 
+## Furnizori, recunoastere si pasul 2 al preluarii (06.10.2026)
+
+- Sabloanele sunt legate de furnizori prin `supplier_id`; recunoasterea furnizorului (CUI, nume, alias, aproximativ) are jurnal si export CSV; migrarile 14-17 (14 fara UPDATE, legarea cu contul aplicatiei).
+- Motorul nu mai citeste datele cumparatorului; seria se separa de numarul facturii.
+- Pasul 2: CUI verificat automat pentru furnizor din registru; imagini din PDF langa numar si data, si pentru randurile cu valori necitite ca numar.
+- De stiut: declansatoarele din baza locala apartin contului `blazorstoc_restore`, care are nevoie de `GRANT SELECT` pe `BlazorStoc`. De verificat in browser: imaginea randului din tabel (pasul 2).
+
 ## Următorul pas
 
 Următorul agent este **Codex**. Taskurile 0–9 sunt complete; `TODO.md` nu mai are taskuri active. Următorul pas îl stabilește utilizatorul (taskuri noi, verificare MariaDB pe un server real, teste cu două calculatoare).

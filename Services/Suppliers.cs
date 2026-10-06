@@ -53,8 +53,12 @@ public static class SupplierCountries
 // clash (the first has only digits). Name and the other fields are plain data: the same tax id is never two suppliers.
 public sealed record Supplier(int Id, string Name, string Cui, string Country = SupplierCountries.Romania, long Version = 0,
     string Address = "", string Phone = "", string RegistryNumber = "", string PostalCode = "", string CaenCode = "",
-    string Source = SupplierSources.Manual, DateTime? VerifiedUtc = null, int MovementCount = 0, int InvoiceCount = 0, int TemplateCount = 0)
+    string Source = SupplierSources.Manual, DateTime? VerifiedUtc = null, int MovementCount = 0, int InvoiceCount = 0, int TemplateCount = 0,
+    IReadOnlyList<string>? Aliases = null)
 {
+    // Other names the supplier is written with on invoices (commercial name, abbreviations, a spelling an OCR reads steadily): kept apart from
+    // the name, which stays the one of the register.
+    public IReadOnlyList<string> AliasList => Aliases ?? [];
     public bool IsExternal => Country != SupplierCountries.Romania;
     public string Identifier => IsExternal ? Cui : "CUI " + Cui;
     // What ties the supplier to the rest of the data: any of it forbids deleting it and changing its tax id.
@@ -157,6 +161,9 @@ public interface ISupplierRepository
     Task<Supplier> UpdateAsync(Supplier original, SupplierInput input, CancellationToken cancellationToken = default);
     // Administrator only; refused while the supplier has invoices, stock entries or invoice templates.
     Task DeleteAsync(Supplier original, string reason, CancellationToken cancellationToken = default);
+    // Aliases (other names read on invoices): each addition and removal is its own journaled operation; the supplier is returned with its aliases.
+    Task<Supplier> AddAliasAsync(Supplier supplier, string alias, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<Supplier> RemoveAliasAsync(Supplier supplier, string alias, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 public static class SupplierSearch
@@ -171,9 +178,59 @@ public static class SupplierSearch
         var digitsKey = key.StartsWith("RO", StringComparison.Ordinal) && key.Length > 2 ? key[2..] : key;
         return list.Where(supplier =>
             supplier.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            supplier.AliasList.Any(alias => alias.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
             (key.Length > 0 && (SupplierRules.CompactKey(supplier.Cui).Contains(key, StringComparison.Ordinal) || SupplierRules.CompactKey(supplier.Cui).Contains(digitsKey, StringComparison.Ordinal))) ||
             supplier.Address.Contains(query, StringComparison.OrdinalIgnoreCase) ||
             (BeneficiaryRules.NormalizePhone(query) is { Length: > 0 } phone && supplier.Phone.Contains(phone, StringComparison.Ordinal)));
+    }
+}
+
+public enum SupplierMatchMethod { None, Cui, Name, Alias, Similar }
+
+// How a supplier was recognised from what an invoice says. Confidence: "high" (the CUI, or a name together with its CUI found in the invoice),
+// "medium" (the CUI alone with an unrecognised name, or a name whose CUI could not be checked), "low" (a conflict between CUI and name, a name whose
+// CUI is not in the invoice, or a near miss). Conflict: the CUI and the name point to different suppliers (Other is the one the name points to).
+// NeedsConfirmation: only a suggestion (near miss).
+public sealed record SupplierRecognition(Supplier? Supplier, SupplierMatchMethod Method, string Confidence, bool Conflict = false, Supplier? Other = null)
+{
+    public bool NeedsConfirmation => Method == SupplierMatchMethod.Similar;
+    public string MethodText => Method switch
+    {
+        SupplierMatchMethod.Cui => "CUI", SupplierMatchMethod.Name => "nume", SupplierMatchMethod.Alias => "denumire alternativă", SupplierMatchMethod.Similar => "nume apropiat", _ => ""
+    };
+    public string ConfidenceText => Confidence switch { "high" => "mare", "medium" => "medie", _ => "scăzută" };
+}
+
+public static class SupplierRecognizer
+{
+    // documentKey: the compact key (SupplierRules.CompactKey) of the text of the invoice, or "" when it is not known.
+    public static SupplierRecognition Recognize(IReadOnlyList<Supplier> registry, string? cui, string? name, string documentKey)
+    {
+        var digits = SupplierRules.CuiDigits(cui);
+        var compact = SupplierRules.CompactKey(cui);
+        var byCui = registry.FirstOrDefault(item => item.IsExternal ? compact.Length > 0 && SupplierRules.CompactKey(item.Cui) == compact : digits.Length > 0 && SupplierRules.CuiDigits(item.Cui) == digits);
+        var nameKey = SupplierRules.NameKey(name);
+        var byName = SupplierRules.FindByName(registry, name);
+        if (byCui is not null)
+        {
+            if (byName is not null && byName.Id != byCui.Id) return new(byCui, SupplierMatchMethod.Cui, "low", true, byName);
+            return new(byCui, SupplierMatchMethod.Cui, byName is not null || nameKey.Length == 0 ? "high" : "medium");
+        }
+        if (byName is not null)
+        {
+            var method = SupplierRules.NameKey(byName.Name) == nameKey ? SupplierMatchMethod.Name : byName.AliasList.Any(alias => SupplierRules.NameKey(alias) == nameKey) ? SupplierMatchMethod.Alias : SupplierMatchMethod.Name;
+            var key = byName.IsExternal ? SupplierRules.CompactKey(byName.Cui) : SupplierRules.CuiDigits(byName.Cui);
+            var confidence = documentKey.Length == 0 ? "medium" : key.Length > 0 && documentKey.Contains(key, StringComparison.Ordinal) ? "high" : "low";
+            return new(byName, method, confidence);
+        }
+        return SupplierRules.FindSimilarByName(registry, name) is { } similar ? new(similar, SupplierMatchMethod.Similar, "low") : new(null, SupplierMatchMethod.None, "low");
+    }
+
+    // Whether the name of a supplier (the form without legal form) is written in the text of the invoice: the supplier of a template is then there too.
+    public static bool NameInText(string? supplierName, string documentKey)
+    {
+        var key = SupplierRules.NameKey(supplierName);
+        return key.Length >= 6 && documentKey.Contains(key, StringComparison.Ordinal);
     }
 }
 
@@ -190,6 +247,93 @@ public static partial class SupplierRules
     // Letters and digits only, upper case: the form in which two tax ids are compared.
     public static string CompactKey(string? value) =>
         new(TextNormalization.ForStorage(value).Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
+
+    private static readonly HashSet<string> LegalForms = new(StringComparer.Ordinal)
+    {
+        "SC", "SRL", "SRLD", "SA", "SCS", "SNC", "SCA", "PFA", "II", "IF", "RA", "SRLS", "OU", "GMBH", "LTD", "SPA", "SARL", "BV", "KFT"
+    };
+
+    // The name of a firm without what differs between writings of the same name: case, diacritics, dots and the legal form ("S.C. ALFA S.R.L.",
+    // "SC Alfa SRL" and "Alfa" give "ALFA"). Single letters written apart ("S R L") join first, so the dotted and the plain form meet.
+    public static string NameKey(string? name)
+    {
+        var folded = new string(InvoiceValues.Normalize(name ?? "").Select(c => char.IsLetterOrDigit(c) ? char.ToUpperInvariant(c) : ' ').ToArray());
+        var tokens = new List<string>();
+        var run = "";
+        foreach (var token in folded.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (token.Length == 1 && char.IsLetter(token[0])) { run += token; continue; }
+            if (run.Length > 0) { tokens.Add(run); run = ""; }
+            tokens.Add(token);
+        }
+        if (run.Length > 0) tokens.Add(run);
+        var kept = tokens.Where(token => !LegalForms.Contains(token)).ToList();
+        return string.Concat(kept);   // a text made only of legal forms has no key
+    }
+
+    // The supplier of the register whose name is the one read from an invoice: the same name apart from the legal form first, otherwise one
+    // name containing the other (only when a single supplier fits, so a short common word never picks one by chance).
+    public const int MinAliasKeyLength = 3;
+    public const int MaxAliasLength = 200;
+
+    // Why the alias cannot be kept for the supplier, or null: too short to tell suppliers apart, the supplier's own name or alias, or the name or
+    // alias of another supplier (an alias points to one supplier only).
+    public static string? AliasProblem(string? alias, Supplier supplier, IEnumerable<Supplier> all)
+    {
+        var text = (alias ?? "").Trim();
+        if (text.Length == 0) return "Scrie denumirea alternativă.";
+        if (text.Length > MaxAliasLength) return $"Denumirea alternativă poate avea cel mult {MaxAliasLength} de caractere.";
+        var key = NameKey(text);
+        if (key.Length < MinAliasKeyLength) return "Denumirea alternativă este prea scurtă pentru a deosebi furnizorii (cel puțin 3 litere sau cifre, fără forma juridică).";
+        if (key == NameKey(supplier.Name) || supplier.AliasList.Any(item => NameKey(item) == key)) return "Furnizorul are deja această denumire (sau una echivalentă: forma juridică, punctele și majusculele nu contează).";
+        var other = all.FirstOrDefault(item => item.Id != supplier.Id && (NameKey(item.Name) == key || item.AliasList.Any(known => NameKey(known) == key)));
+        return other is null ? null : $"Denumirea aparține deja furnizorului «{other.Name}».";
+    }
+
+    // Letters an OCR confuses with digits (and with each other) meet in one form before names are compared.
+    private static string OcrKey(string key) =>
+        new(key.Select(c => c switch { '0' => 'O', '1' or 'L' => 'I', '5' => 'S', '8' => 'B', '2' => 'Z', _ => c }).ToArray());
+
+    private static int EditDistance(string a, string b)
+    {
+        var previous = Enumerable.Range(0, b.Length + 1).ToArray();
+        for (var i = 1; i <= a.Length; i++)
+        {
+            var current = new int[b.Length + 1];
+            current[0] = i;
+            for (var j = 1; j <= b.Length; j++)
+                current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+            previous = current;
+        }
+        return previous[b.Length];
+    }
+
+    // The one supplier whose name or alias is a near miss of the name read (a misread letter or two): only a suggestion for the user to confirm.
+    // One mistake is allowed from 6 characters, two from 10; none when two suppliers are equally close.
+    public static Supplier? FindSimilarByName(IEnumerable<Supplier> suppliers, string? name)
+    {
+        var key = OcrKey(NameKey(name));
+        if (key.Length < 6) return null;
+        var allowed = key.Length >= 10 ? 2 : 1;
+        var best = suppliers.Select(supplier => (supplier, distance: supplier.AliasList.Append(supplier.Name).Select(text => OcrKey(NameKey(text)))
+                .Where(other => other.Length >= 6 && Math.Abs(other.Length - key.Length) <= allowed).Select(other => EditDistance(key, other)).DefaultIfEmpty(int.MaxValue).Min()))
+            .Where(item => item.distance <= allowed).OrderBy(item => item.distance).ToList();
+        return best.Count == 1 || (best.Count > 1 && best[0].distance < best[1].distance) ? best[0].supplier : null;
+    }
+
+    public static Supplier? FindByName(IEnumerable<Supplier> suppliers, string? name)
+    {
+        var key = NameKey(name);
+        if (key.Length < 3) return null;
+        var list = suppliers.Select(supplier => (supplier, key: NameKey(supplier.Name))).Where(item => item.key.Length >= 3).ToList();
+        // The name of the register, then its aliases: one supplier fitting settles it.
+        var exact = list.Where(item => item.key == key).Select(item => item.supplier)
+            .Concat(list.Where(item => item.supplier.AliasList.Any(alias => NameKey(alias) == key)).Select(item => item.supplier)).DistinctBy(item => item.Id).ToList();
+        if (exact.Count == 1) return exact[0];
+        if (exact.Count > 1) return null;
+        var partial = list.Where(item => key.Length >= 6 && item.key.Length >= 6 && (item.key.Contains(key, StringComparison.Ordinal) || key.Contains(item.key, StringComparison.Ordinal))).ToList();
+        return partial.Count == 1 ? partial[0].supplier : null;
+    }
 
     // The digits of a Romanian CUI/CIF: "RO 9178894", "ro9178894" and "9178894" are the same one; leading zeros do not count.
     public static string CuiDigits(string? value)
