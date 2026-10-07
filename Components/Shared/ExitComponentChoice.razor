@@ -1,0 +1,51 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@* The component of the project an exit goes to. Automatic by default (the only component whose offer has the product; "in afara ofertei" when none has it);
+   the user can choose any component (also for an equivalent product) or "în afara ofertei"; when several components have the product the choice is required.
+   Shown only for an exit to a project of a product, and only when the project has components. *@
+@if (choices.Count > 0)
+{
+    <div class="relation-row exit-component-choice">
+        <span class="relation-check">Componenta</span>
+        <select aria-label="Componenta proiectului pentru acest produs" disabled="@Disabled" @onchange="args => ChangedAsync(args.Value?.ToString())">
+            <option value="" selected="@(ComponentId is null && !OutsideOffer)">@AutomaticText</option>
+            @foreach (var choice in choices) { <option value="@choice.ComponentId" selected="@(ComponentId == choice.ComponentId)">@choice.Name@(choice.InOffer ? " (în ofertă)" : "")</option> }
+            <option value="outside" selected="@OutsideOffer">În afara ofertei</option>
+        </select>
+        @if (Ambiguous && ComponentId is null && !OutsideOffer) { <small class="form-note" role="alert">Produsul apare în mai multe componente: alege una.</small> }
+    </div>
+}
+
+@code {
+    [Parameter] public int? ProjectId { get; set; }
+    [Parameter] public int? ProductId { get; set; }
+    [Parameter] public int? ComponentId { get; set; }
+    [Parameter] public bool OutsideOffer { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<(int? ComponentId, bool OutsideOffer)> Changed { get; set; }
+
+    private IReadOnlyList<ComponentChoice> choices = [];
+    private (int?, int?) loadedFor;
+
+    private bool Ambiguous => choices.Count(choice => choice.InOffer) > 1;
+    private string AutomaticText => choices.Count(choice => choice.InOffer) switch
+    {
+        1 => $"Automat: {choices.First(choice => choice.InOffer).Name}",
+        0 => "Automat: în afara ofertei (sau nelegat, fără ofertă)",
+        _ => "— alege —"
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (ProjectId, ProductId)) return;
+        loadedFor = (ProjectId, ProductId);
+        choices = [];
+        if (ProjectId is not { } project || ProductId is not { } product || Services.GetService<IProjectComponentRepository>() is not { } repository) return;
+        try { choices = await repository.GetChoicesAsync(project, product); }
+        catch (Exception) { choices = []; }
+    }
+
+    private Task ChangedAsync(string? value) =>
+        value == "outside" ? Changed.InvokeAsync((null, true))
+        : Changed.InvokeAsync((int.TryParse(value, out var id) ? id : null, false));
+}

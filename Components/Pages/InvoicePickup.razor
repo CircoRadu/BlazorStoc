@@ -436,6 +436,13 @@ else
         <p class="muted">Sumarul alegerilor din pasul 2. Abia la „Finalizează preluarea” se înregistrează factura, se adaugă produsele noi în catalog și se înregistrează intrările în stoc, legate de factură.</p>
         @if (finalizeError is not null) { <div class="error-banner" role="alert">@finalizeError</div> }
         @if (finalizeNotice is not null) { <div class="success-banner" role="status">@finalizeNotice</div> }
+        @if (finished)
+        {
+            @foreach (var takenProduct in NewLines.Concat(ExistingLines).Where(line => line.Done && (line.CreatedProductId ?? line.ProductId) is not null).Select(line => (line.CreatedProductId ?? line.ProductId)!.Value).Distinct())
+            {
+                <ReserveSuggestions @key="@($"suggest-{takenProduct}")" ProductId="takenProduct" Trigger="1" />
+            }
+        }
 
         <h3>Factura și furnizorul</h3>
         <p>Factura <strong>@invoiceNumber</strong> din <strong>@(invoiceDate is { } issued ? StockMovementRules.DisplayDate(issued) : "—")</strong>, furnizor <strong>@(ResolvedSupplier?.Name ?? "—")</strong> (@(ResolvedSupplier?.Identifier ?? "—")); verificate la pasul 2.</p>
@@ -513,6 +520,9 @@ else
     private List<PickRow> ExistingLines => pick.Where(item => item.Staged is null && item.ProductId is not null).ToList();
     // Rows whose product was already taken from this invoice are left out unless the user chose to take them again.
     private int? TakenQuantity(PickRow line) => line.Staged is null && line.ProductId is { } id && takenEntries.Where(entry => entry.ProductId == id).Sum(entry => entry.Quantity) is > 0 and var sum ? sum : null;
+    // Stock of the existing product when it is negative (an operating error to be settled before the entry), else null.
+    private int? NegativeStock(PickRow line) =>
+        line.Staged is null && !line.Regularized && catalog.FirstOrDefault(product => product.Id == line.ProductId) is { Quantity: < 0 } found ? found.Quantity : null;
     private bool Skipped(PickRow line) => !line.Done && !line.RetakeAnyway && TakenQuantity(line) is not null;
     private bool CanFinalize => !finished && NewLines.Concat(ExistingLines).Any(line => !Skipped(line)) && supplierId is not null && invoiceNumber.Trim().Length > 0 && invoiceDate is not null;
 
@@ -843,6 +853,19 @@ else
         </header>
         <label class="full-width">Descrierea intrării în stoc
             <textarea rows="2" maxlength="@StockMovementRules.MaxDescriptionLength" disabled="@(finalizing || line.Done)" @bind="line.EntryDescription" @bind:event="oninput" @bind:after="() => line.DescriptionEdited = true"></textarea></label>
+        @if ((line.CreatedProductId ?? line.ProductId) is { } entryProduct && line.Staged is null)
+        {
+            <EntryComponentChoice @key="@($"component-{entryProduct}-{line.SourceKey}")" ProductId="entryProduct" ComponentId="line.ComponentId" ComponentIdChanged="id => line.ComponentId = id" Disabled="@(finalizing || line.Done)" />
+        }
+        @if (NegativeStock(line) is { } negativeStock && !line.Done && !Skipped(line) && !(Candidates.TryGetValue(line, out var linkedCandidate) && line.LinkCandidate))
+        {
+            <NegativeStockPanel Resolution="line.Neg" Stock="negativeStock" Disabled="@(finalizing || finished)" />
+        }
+        @if (Candidates.TryGetValue(line, out var candidate) && !line.Done && !Skipped(line))
+        {
+            <div class="invoice-warning" role="status">ℹ Există o intrare liberă a acestui produs, din @StockMovementRules.DisplayDate(candidate.Date) (@candidate.Quantity buc.@(candidate.SupplierName is not null ? $", {candidate.SupplierName}" : "")).
+                <ToggleSwitch Value="line.LinkCandidate" ValueChanged="@(value => line.LinkCandidate = value)" OnText="Se leagă intrarea existentă (stocul nu se modifică)" OffText="Se creează o intrare nouă" Disabled="@(finalizing || finished)" AriaLabel="Leagă intrarea liberă existentă de factură" /></div>
+        }
         @if (TakenQuantity(line) is { } taken && !line.Done)
         {
             <div class="invoice-warning" role="status">⚠ Din această factură s-au preluat deja @taken buc. din acest produs.
@@ -861,6 +884,10 @@ else
         foreach (var line in lines)
             if (QuantityOf(line).Error is { } problem) { finalizeError = problem; return; }
         if (NewLines.Any(line => !line.Done) && newDate is null || ExistingLines.Any(line => !line.Done) && existingDate is null) { finalizeError = "Alege data intrării."; return; }
+        var candidatesNow = Candidates;
+        foreach (var line in lines)
+            if (NegativeStock(line) is not null && !line.Neg.IsResolved && !(candidatesNow.ContainsKey(line) && line.LinkCandidate))
+            { finalizeError = $"Stoc negativ la «{catalog.FirstOrDefault(product => product.Id == line.ProductId)?.Name}»: alege «Trec stocul pe 0» sau introdu cantitatea reală din depozit."; return; }
         if (supplierId is null) { finalizeError = SupplierInvoiceRules.SupplierRequiredMessage; return; }
         if (invoiceNumber.Trim().Length == 0) { finalizeError = SupplierInvoiceRules.NumberRequiredMessage; return; }
         if (invoiceDate is null) { finalizeError = SupplierInvoiceRules.DateRequiredMessage; return; }
@@ -887,12 +914,29 @@ else
                     return;
                 }
             }
+            var candidates = Candidates;
             foreach (var line in lines)
             {
                 var isNew = line.Staged is not null;
                 try
                 {
+                    if (!isNew && line.LinkCandidate && candidates.TryGetValue(line, out var match))
+                    {
+                        var entry = await Movements.GetAsync(match.MovementId, lifetime.Token);
+                        if (entry is { InvoiceId: null })
+                        {
+                            await Movements.AttachToInvoiceAsync([entry], createdInvoice!.Id, "Preluare factură: intrarea liberă existentă a fost legată de factură (potrivire automată)", true, lifetime.Token);
+                            line.Done = true;
+                            line.Result = "Intrarea liberă existentă a fost legată de factură; stocul nu s-a modificat.";
+                            continue;
+                        }
+                    }
                     var productId = line.CreatedProductId ?? line.ProductId;
+                    if (!isNew && NegativeStock(line) is not null)
+                    {
+                        try { await Movements.RegularizeNegativeStockAsync(productId!.Value, line.Neg.RealQuantity, $"Preluare factură {invoiceNumber}", lifetime.Token); line.Regularized = true; }
+                        catch (StockMovementOperationException exception) when (exception.Message == StockMovementRules.StockNotNegativeMessage) { line.Regularized = true; }
+                    }
                     if (isNew && line.CreatedProductId is null)
                     {
                         var created = await ProductsRepository.CreateAsync(line.Staged!.Input, lifetime.Token);
@@ -900,7 +944,8 @@ else
                         productId = created.Id;
                         if (line.Staged.Image is { } image) await ImageStore.SaveAsync(created.Id, image, lifetime.Token);
                     }
-                    var input = new StockMovementInput { Kind = StockMovementKind.Entry, Date = isNew ? newDate : existingDate, Quantity = QuantityOf(line).Quantity, Description = line.EntryDescription, InvoiceId = createdInvoice!.Id };
+                    var input = new StockMovementInput { Kind = StockMovementKind.Entry, Date = isNew ? newDate : existingDate, Quantity = QuantityOf(line).Quantity, Description = line.EntryDescription, ProjectComponentId = line.ComponentId, InvoiceId = createdInvoice!.Id,
+                        InvoiceQuantity = QuantityOf(line).Quantity, DuplicateReason = line.RetakeAnyway && TakenQuantity(line) is not null ? "Produs preluat din nou la preluarea facturii, confirmat de utilizator" : "" };
                     await Movements.CreateAsync(productId!.Value, input, lifetime.Token);
                     line.Done = true;
                     line.Result = isNew ? "Produs adăugat în catalog și intrare înregistrată." : "Intrare înregistrată.";
@@ -950,15 +995,38 @@ else
         public StagedProduct? Staged { get; set; }
         // Step 3: the description of the stock entry (from the template, editable) and what happened when it was saved.
         public string EntryDescription { get; set; } = "";
+        // The component of a project whose offer this entry supplies (optional; proposed when the product is in a single component).
+        public int? ComponentId { get; set; }
         public bool DescriptionEdited { get; set; }
         public int? CreatedProductId { get; set; }
         // The product was already taken from this invoice: it is skipped unless the user chooses to take it again.
         public bool RetakeAnyway { get; set; }
+        // Negative stock of the product: the real quantity (or zero) the user stated, and whether the correction entry was already made.
+        public NegativeStockResolution Neg { get; } = new();
+        public bool Regularized { get; set; }
+        // A free entry found for this row: tied to the invoice (stock unchanged) instead of adding a second entry.
+        public bool LinkCandidate { get; set; } = true;
         public bool Done { get; set; }
         public string? Result { get; set; }
     }
 
     private List<PickRow> pick = [];
+    private IReadOnlyList<FreeEntry> freeEntries = [];
+    // Free entries that match a row (each proposed once); recomputed when a row, the supplier or the invoice date changes.
+    private Dictionary<PickRow, FreeEntry> Candidates
+    {
+        get
+        {
+            var result = new Dictionary<PickRow, FreeEntry>();
+            if (freeEntries.Count == 0) return result;
+            var used = new HashSet<int>();
+            foreach (var line in ExistingLines.Where(line => !line.Done && !Skipped(line)))
+                if (line.ProductId is { } productId && QuantityOf(line).Quantity is { } quantity
+                    && FreeEntryMatching.Find(freeEntries, productId, quantity, invoiceDate ?? StockMovementRules.Today, supplierId, used) is { } found)
+                { result[line] = found; used.Add(found.MovementId); }
+            return result;
+        }
+    }
     private IReadOnlyList<Product> catalog = [];
     private IReadOnlyList<ProductGroup> groups = [];
     private bool step2Loading;
@@ -975,6 +1043,7 @@ else
         {
             catalog = await ProductsRepository.GetProductsAsync(lifetime.Token);
             groups = await ProductsRepository.GetGroupsAsync(lifetime.Token);
+            try { freeEntries = await Movements.GetFreeEntriesAsync(new FreeEntryQuery(), lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { freeEntries = []; }
             var previous = pick.ToList();
             pick = [.. rows.Where((_, index) => !excluded.Contains(index)).Select(row =>
             {

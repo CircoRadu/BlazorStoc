@@ -67,3 +67,5 @@
 - Verificari: build Release reusit; suita in memorie 913 trecute, 0 esecuri (`tools\run-checks.ps1`); pe `blazorstoc_test` sectiunea „Suppliers and invoices” trece integral (corectare, copie veche, duplicat, motiv, drepturi, stergere blocata/permisa, jurnal); popup-ul de produse verificat de utilizator in preview.
 - Unelte: `CHECKS_ONLY=<grup>` (suppliers, pickup, groups, reasons, components, invoices, ui), `tools\run-checks.ps1`, `tools\log-task.ps1`; istoricul vechi mutat in `docs/arhiva/`.
 - Neverificat: pagina Facturi pe ecran ingust si cu rol „Utilizator”; vezi `docs/TESTE_RAMASE.md`.
+- 07.10.2026 (inainte de commit): suita in memorie 935 trecute, suita MariaDB `blazorstoc_test` 1505 trecute, 0 esecuri; migrarile 1-27 aplicate. Neverificat in browser: paginile si fluxurile din `Teste utilizator/` marcate 07.10.2026.
+

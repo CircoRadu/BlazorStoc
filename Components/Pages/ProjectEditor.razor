@@ -1,6 +1,7 @@
 @using BlazorStoc.Services
 @inject IProjectRepository Repository
 @inject ILogger<ProjectEditor> Logger
+@inject IServiceProvider Services
 @implements IDisposable
 
 <UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
@@ -18,6 +19,19 @@
                 }
                 <label class="full-width" for="project-name">Denumire proiect *<InputText id="project-name" @bind-Value="input.Name" maxlength="200" /><ValidationMessage For="() => input.Name" /></label>
                 <label class="full-width" for="project-observations">Observații<InputTextArea id="project-observations" @bind-Value="input.Observations" maxlength="4000" rows="4" /><ValidationMessage For="() => input.Observations" /></label>
+                @if (Original is null && chooseableTypes.Count > 0)
+                {
+                    <fieldset class="full-width component-choice">
+                        <legend>Componente (sisteme)</legend>
+                        <div class="component-choice-list">
+                            @foreach (var type in chooseableTypes)
+                            {
+                                <ToggleSwitch Value="chosenTypes.Contains(type.Id)" ValueChanged="value => ChooseType(type.Id, value)" AriaLabel="@($"Componentă: {type.Name}")">@type.Name</ToggleSwitch>
+                            }
+                        </div>
+                        <small class="form-note">Alege sistemele proiectului; se pot adăuga sau scoate și mai târziu, din pagina proiectului.</small>
+                    </fieldset>
+                }
                 @if (Original is not null)
                 {
                     <ChangeReasonField Id="project-change-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" />
@@ -84,6 +98,17 @@
     private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
     private Task CancelConfirmation() { pendingChanges = null; return Task.CompletedTask; }
 
+    private IReadOnlyList<SystemType> chooseableTypes = [];
+    private readonly HashSet<int> chosenTypes = [];
+    private void ChooseType(int id, bool value) { if (value) chosenTypes.Add(id); else chosenTypes.Remove(id); }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Original is not null || Services.GetService<ISystemTypeRepository>() is not { } typeRepository) return;
+        try { chooseableTypes = (await typeRepository.GetAllAsync(lifetime.Token)).Where(type => type.Active).ToList(); }
+        catch (Exception) { chooseableTypes = []; }
+    }
+
     private async Task PersistAsync()
     {
         if (saving) return;
@@ -95,6 +120,12 @@
             saved = Original is null
                 ? await Repository.CreateAsync(input, lifetime.Token)
                 : await Repository.UpdateAsync(Original, input, lifetime.Token);
+            if (Original is null && saved is not null && chosenTypes.Count > 0 && Services.GetService<IProjectComponentRepository>() is { } components)
+            {
+                try { await components.AddAsync(saved.Id, chosenTypes.ToList(), lifetime.Token); }
+                catch (Exception ex) when (ex is ProjectComponentException or AccessDeniedException)
+                { Logger.LogWarning("Components of the new project were not added ({ErrorType}).", ex.GetType().Name); }
+            }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (ProjectOperationException exception) { error = exception.Message; }

@@ -1,0 +1,47 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@inject ILogger<NetConsumptionSection> Logger
+@implements IDisposable
+@* Net consumption of a project or of a beneficiary per product: what left in exits to it minus what came back in returns tied to those exits.
+   The repository is resolved on demand and the section stays hidden when the user cannot read stock movements or there is nothing to show. *@
+@if (rows.Count > 0)
+{
+    <section class="catalog net-consumption" aria-label="Consum net">
+        <div class="catalog-heading"><h2>Consum net <span>@rows.Count</span></h2><small>Ieșiri minus retururi legate de ele, pe produs</small></div>
+        <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">IEȘIRI</th><th class="number">RETURURI</th><th class="number">CONSUM NET</th></tr></thead><tbody>
+        @foreach (var row in rows)
+        {
+            <tr @key="row.ProductId">
+                <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(row.ProductId)"><strong>@row.ProductName</strong></a></td>
+                <td class="number">@row.Exited</td>
+                <td class="number">@row.Returned</td>
+                <td class="number"><strong>@row.Net</strong></td>
+            </tr>
+        }
+        </tbody></table></div>
+    </section>
+}
+
+@code {
+    [Parameter] public int? ProjectId { get; set; }
+    [Parameter] public int? BeneficiaryId { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<NetConsumption> rows = [];
+    private (int? Project, int? Beneficiary) loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (ProjectId, BeneficiaryId)) return;
+        loadedFor = (ProjectId, BeneficiaryId);
+        rows = [];
+        var movements = Services.GetService<IStockMovementRepository>();
+        if (movements is null) return;
+        try { rows = await movements.GetNetConsumptionAsync(ProjectId, BeneficiaryId, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException) { }
+        catch (Exception ex) { Logger.LogWarning("Net consumption loading failed ({ErrorType}).", ex.GetType().Name); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

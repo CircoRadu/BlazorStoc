@@ -1,0 +1,100 @@
+@using BlazorStoc.Services
+@inject IProductRepository Products
+@inject IStockMovementRepository Movements
+@* Adds a product to an invoice by hand (the automatic reading was not wanted or did not work). The same checks as everywhere apply:
+   a product already taken from the invoice, or more than the quantity written on it, is added only with a reason. *@
+<div class="delete-overlay">
+    <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-entry-title">
+        <h2 id="manual-entry-title">Adaugă produs la factura @Invoice.Number</h2>
+        <p class="delete-object"><strong>@Invoice.SupplierName</strong> · emisă la @StockMovementRules.DisplayDate(Invoice.Date)</p>
+        <fieldset disabled="@busy">
+            <div class="editor-grid">
+                <div class="full-width">
+                    <span class="field-label">Produs *</span>
+                    <SearchableSelect Id="manual-product" Label="Produs" Placeholder="Caută produsul după cod sau denumire…" EmptyText="Niciun produs găsit."
+                                      Options="options" SelectedId="productId" SelectedIdChanged="id => { productId = id; input.ProjectComponentId = null; }" Disabled="busy" />
+                </div>
+                <div class="full-width"><EntryComponentChoice @key="productId" ProductId="productId" ComponentId="input.ProjectComponentId" ComponentIdChanged="id => input.ProjectComponentId = id" Disabled="busy" /></div>
+                <label for="manual-date">Data intrării *
+                    <PickOnlyDate Id="manual-date" @bind-Value="input.Date" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
+                <label for="manual-quantity">Cantitate *
+                    <InputNumber id="manual-quantity" TValue="int?" @bind-Value="input.Quantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
+                <label for="manual-invoice-quantity">Cantitate pe factură (opțional)
+                    <InputNumber id="manual-invoice-quantity" TValue="int?" @bind-Value="input.InvoiceQuantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
+                <label class="full-width" for="manual-description">Descriere *
+                    <InputTextArea id="manual-description" @bind-Value="input.Description" rows="2" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
+            </div>
+            @if (productId is { } chosen && stocks.GetValueOrDefault(chosen) is < 0 and var negative)
+            {
+                <NegativeStockPanel Resolution="negResolution" Stock="negative" Disabled="busy" />
+            }
+            @if (warning is not null)
+            {
+                <div class="invoice-warning" role="alert">
+                    <p>⚠ @warning.Message</p>
+                    <label class="full-width" for="manual-duplicate-reason">Motiv pentru intrarea nouă
+                        <InputTextArea id="manual-duplicate-reason" @bind-Value="duplicateReason" rows="2" maxlength="@ChangeReasonRules.MaximumLength" /></label>
+                </div>
+            }
+            @if (error is not null) { <div class="validation-message" role="alert">@error</div> }
+            <div class="editor-actions">
+                <button class="primary" type="button" @onclick="SaveAsync">@(busy ? "Se salvează…" : warning is null ? "Adaugă" : "Adaugă totuși")</button>
+                <button type="button" class="danger" @onclick="Cancelled">Închide</button>
+            </div>
+        </fieldset>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SupplierInvoice Invoice { get; set; } = default!;
+    [Parameter] public EventCallback<string> Done { get; set; }
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<SelectOption> options = [];
+    private readonly StockMovementInput input = new() { Kind = StockMovementKind.Entry, Date = StockMovementRules.Today };
+    private int? productId;
+    private readonly Dictionary<int, int> stocks = [];
+    private readonly NegativeStockResolution negResolution = new();
+    private string duplicateReason = "";
+    private string? error;
+    private InvoiceEntryWarningException? warning;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var all = await Products.GetProductsAsync();
+            foreach (var product in all) stocks[product.Id] = product.Quantity;
+            options = all.OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(product => new SelectOption(product.Id, string.IsNullOrWhiteSpace(product.Description) ? product.Name : $"{product.Name} · {product.Description}", product.Description)).ToArray();
+        }
+        catch (Exception) { error = "Lista produselor nu a putut fi încărcată."; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        error = null;
+        if (productId is null) { error = "Alege produsul."; return; }
+        if (warning is not null && ChangeReasonRules.ValidationError(duplicateReason) is { } reasonError) { error = reasonError; return; }
+        input.InvoiceId = Invoice.Id; input.DuplicateReason = warning is null ? "" : duplicateReason;
+        if (stocks.GetValueOrDefault(productId.Value) < 0 && !negResolution.IsResolved)
+        { error = "Stoc negativ: alege «Trec stocul pe 0» sau introdu cantitatea reală din depozit."; return; }
+        busy = true;
+        try
+        {
+            if (stocks.GetValueOrDefault(productId.Value) < 0)
+            {
+                await Movements.RegularizeNegativeStockAsync(productId.Value, negResolution.RealQuantity, $"Intrare manuală pe factura {Invoice.Number}");
+                stocks[productId.Value] = 0;
+            }
+            await Movements.CreateAsync(productId.Value, input);
+            await Done.InvokeAsync("Produsul a fost adăugat la factură.");
+        }
+        catch (InvoiceEntryWarningException exception) { warning = exception; }
+        catch (Exception exception) when (exception is StockMovementOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception) { error = "Intrarea nu a putut fi salvată. Verifică datele și reîncearcă."; }
+        finally { busy = false; }
+    }
+}

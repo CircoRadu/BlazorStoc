@@ -67,6 +67,8 @@
 
 @code {
     [Parameter] public Beneficiary? Original { get; set; }
+    // The name proposed for a new beneficiary (taken over from an offer).
+    [Parameter] public string InitialName { get; set; } = "";
     [Parameter] public EventCallback<Beneficiary> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
     private UnsavedChangesTracker? tracker;
@@ -89,7 +91,7 @@
 
     protected override Task OnInitializedAsync()
     {
-        input = Original is null ? new() : BeneficiaryInput.From(Original);
+        input = Original is null ? new() { Name = InitialName } : BeneficiaryInput.From(Original);
         if (Original is { AnafVerified: true })
             anafSnapshot = new(Original.Cui, Original.Name, Original.Address, Original.RegistryNumber, Original.Phone, Original.PostalCode, Original.CaenCode);
         return Task.CompletedTask;

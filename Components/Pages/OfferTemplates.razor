@@ -1,0 +1,331 @@
+@page "/oferte/sabloane"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IOfferTemplateRepository Repository
+@inject IAccessControl Access
+@inject ILogger<OfferTemplates> Logger
+@implements IDisposable
+
+<PageTitle>Șabloane de oferte · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">OFERTE · <a href="/oferte/preluare">Preluare ofertă</a></p><h1>Șabloane de oferte</h1><p class="muted">Un șablon spune unde sunt datele într-un deviz-ofertă Excel (.xlsx): antetul ofertei se citește după etichete, tabelul după etichetele coloanelor, iar secțiunile (Echipamente, Manoperă, Cheltuieli) se importă sau nu. Prețurile și TVA nu se citesc; unitatea de măsură servește doar ca să se deosebească produsele pe bucăți (cele din stoc) de metraje și ore.</p></div></div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (editing)
+{
+    <section class="catalog offer-template-editor" aria-label="Editor de șablon">
+        <div class="catalog-heading"><h2>@(original is null ? "Șablon nou" : $"Modifică șablonul {original.Name}")</h2><button type="button" class="danger" disabled="@busy" @onclick="CloseEditor">Închide</button></div>
+        <FileDropZone Id="offer-sample" Accept=".xlsx" Disabled="busy" OnChange="SampleChosenAsync" Text="Trage aici un fișier de probă .xlsx sau alege-l (nu se păstrează)" />
+        @if (workbook is not null && workbook.Sheets.Count > 1)
+        {
+            <label class="movement-page-size">Foaia
+                <select disabled="@busy" @onchange="SheetChanged">
+                    @foreach (var item in workbook.Sheets) { <option value="@item.Name" selected="@(item.Name == definition.Sheet)">@item.Name</option> }
+                </select></label>
+        }
+        @if (PreviewSheet is { } preview)
+        {
+            <div class="table-scroll offer-preview"><table><thead><tr><th>#</th>@for (var column = 1; column <= PreviewColumns(preview); column++) { <th class="@MappedClass(column)">@XlsxReader.ColumnLetter(column)</th> }</tr></thead><tbody>
+            @for (var row = 1; row <= Math.Min(preview.LastRow, 80); row++)
+            {
+                if (preview.RowIsEmpty(row)) continue;
+                <tr><th>@row</th>@for (var column = 1; column <= PreviewColumns(preview); column++) { <td class="@MappedClass(column)" title="@preview.Text(row, column)">@Short(preview.Text(row, column))</td> }</tr>
+            }
+            </tbody></table></div>
+        }
+        else
+        {
+            <p class="muted">Încarcă un fișier de probă ca să vezi foaia cu literele coloanelor și să se propună automat câmpurile; le poți completa și de mână.</p>
+        }
+
+        <fieldset disabled="@busy" class="editor-grid">
+            <label class="full-width" for="offer-template-name">Denumirea șablonului *<InputText id="offer-template-name" @bind-Value="name" maxlength="@OfferRules.NameMaximumLength" /></label>
+            <label for="offer-template-sheet">Foaia (goală = prima)<InputText id="offer-template-sheet" @bind-Value="definition.Sheet" maxlength="100" /></label>
+        </fieldset>
+
+        <h3>Coloanele tabelului</h3>
+        <p class="muted">Tabelul se găsește după etichetele din antetul lui (repetat în fiecare secțiune); scrie eticheta așa cum apare în fișier.</p>
+        <div class="table-scroll"><table><thead><tr><th>CÂMP</th><th>COLOANA</th><th>ETICHETA DIN ANTET</th></tr></thead><tbody>
+        @foreach (var key in OfferRules.ColumnKeys)
+        {
+            var current = key;
+            var required = key is "name" or "unit" or "quantity";
+            <tr>
+                <td>@OfferRules.ColumnLabel(key)@(required ? " *" : " (opțional)")</td>
+                <td><select aria-label="@($"Coloana pentru {OfferRules.ColumnLabel(key)}")" disabled="@busy" @onchange="args => SetColumn(current, args.Value?.ToString())">
+                    <option value="" selected="@(OfferRules.ColumnOf(definition, key).Length == 0)">—</option>
+                    @for (var index = 1; index <= 26; index++) { var letter = XlsxReader.ColumnLetter(index); <option value="@letter" selected="@(string.Equals(OfferRules.ColumnOf(definition, key), letter, StringComparison.OrdinalIgnoreCase))">@letter</option> }
+                </select></td>
+                <td><input aria-label="@($"Eticheta coloanei {OfferRules.ColumnLabel(key)}")" disabled="@busy" value="@definition.ColumnLabels.GetValueOrDefault(key, "")" @onchange="args => SetColumnLabel(current, args.Value?.ToString())" /></td>
+            </tr>
+        }
+        </tbody></table></div>
+
+        <h3>Antetul ofertei</h3>
+        <div class="table-scroll"><table><thead><tr><th>CÂMP</th><th>ETICHETA</th><th>VALOAREA ESTE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var field in definition.HeaderFields.ToList())
+        {
+            var item = field;
+            <tr>
+                <td>@OfferRules.FieldLabel(item.Key)</td>
+                <td><input aria-label="@($"Eticheta pentru {OfferRules.FieldLabel(item.Key)}")" disabled="@busy" @bind="item.Label" @bind:event="onchange" /></td>
+                <td><select disabled="@busy" @onchange="args => item.Position = args.Value?.ToString() ?? OfferHeaderField.Right">
+                    <option value="@OfferHeaderField.Right" selected="@(item.Position != OfferHeaderField.Below)">La dreapta etichetei</option>
+                    <option value="@OfferHeaderField.Below" selected="@(item.Position == OfferHeaderField.Below)">Sub etichetă</option>
+                </select></td>
+                <td><button type="button" class="row-action delete" disabled="@busy" @onclick="() => definition.HeaderFields.Remove(item)">Scoate</button></td>
+            </tr>
+        }
+        </tbody></table></div>
+        <div class="editor-actions">
+            @foreach (var key in new[] { OfferHeaderField.NumberKey, OfferHeaderField.TitleKey, OfferHeaderField.CategoryKey, OfferHeaderField.BeneficiaryKey })
+            {
+                var current = key;
+                if (definition.HeaderFields.Any(field => field.Key == current)) continue;
+                <button type="button" class="refresh" disabled="@busy" @onclick="() => definition.HeaderFields.Add(new OfferHeaderField { Key = current, Position = current == OfferHeaderField.TitleKey ? OfferHeaderField.Below : OfferHeaderField.Right })">+ @OfferRules.FieldLabel(current)</button>
+            }
+        </div>
+
+        <h3>Secțiuni</h3>
+        <div class="table-scroll"><table><thead><tr><th>SECȚIUNE</th><th>SE IMPORTĂ</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var section in definition.Sections.ToList())
+        {
+            var rule = section;
+            <tr>
+                <td><input aria-label="Denumirea secțiunii" disabled="@busy" @bind="rule.Name" @bind:event="onchange" /></td>
+                <td><ToggleSwitch @bind-Value="rule.Import" OnText="Da" OffText="Nu" AriaLabel="@($"Se importă secțiunea {rule.Name}")" Disabled="busy" /></td>
+                <td><button type="button" class="row-action delete" disabled="@busy" @onclick="() => definition.Sections.Remove(rule)">Scoate</button></td>
+            </tr>
+        }
+        </tbody></table></div>
+        <div class="editor-actions">
+            <button type="button" class="refresh" disabled="@busy" @onclick="() => definition.Sections.Add(new OfferSectionRule { Name = string.Empty, Import = true })">+ Secțiune</button>
+            @if (workbook is not null) { <button type="button" class="refresh" disabled="@busy" @onclick="AddDetectedSections">Preia secțiunile din fișier</button> }
+        </div>
+
+        <label class="full-width" for="offer-template-ignore">Rânduri ignorate (începutul unei celule, separate prin virgulă)
+            <input id="offer-template-ignore" disabled="@busy" value="@string.Join(", ", definition.IgnoreRows)" @onchange="args => definition.IgnoreRows = (args.Value?.ToString() ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList()" /></label>
+
+        @if (reading is not null)
+        {
+            <div class="info-banner" role="status">
+                <p><strong>Verificare pe fișier:</strong> număr „@reading.Field(OfferHeaderField.NumberKey)” · titlu „@reading.Field(OfferHeaderField.TitleKey)” · categoria „@reading.Field(OfferHeaderField.CategoryKey)” · beneficiar „@reading.Field(OfferHeaderField.BeneficiaryKey)”</p>
+                <ul>
+                    @foreach (var part in reading.Sections)
+                    {
+                        <li><strong>@part.Name</strong>: @part.Lines.Count linii (@part.Lines.Count(line => line.InStock) pe bucăți, @part.Lines.Count(line => !line.InStock) în afara stocului) — @(part.Import ? "se importă" : part.Known ? "nu se importă" : "secțiune necunoscută, nu se importă")</li>
+                    }
+                </ul>
+                @foreach (var problem in reading.Problems) { <p class="muted">@problem</p> }
+            </div>
+        }
+        <div class="editor-actions">
+            @if (workbook is not null) { <button type="button" class="refresh" disabled="@busy" @onclick="Verify">Verifică pe fișier</button> }
+            <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">@(busy ? "Se salvează…" : "Salvează șablonul")</button>
+        </div>
+    </section>
+}
+else
+{
+    <section class="catalog" aria-label="Șabloane salvate">
+        <div class="catalog-heading"><h2>Șabloane salvate <span>@templates.Count</span></h2><button type="button" class="primary" disabled="@(loading || busy)" @onclick="StartNew">+ Șablon nou</button></div>
+        @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+        else if (templates.Count == 0) { <div class="empty-state"><span class="empty-icon">▤</span><h3>Nu există șabloane</h3><p>Creează primul șablon pornind de la un deviz-ofertă .xlsx.</p></div> }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>DENUMIRE</th><th>FOAIA</th><th>COLOANE</th><th>SECȚIUNI IMPORTATE</th><th>ACTIV</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var template in templates)
+            {
+                <tr @key="template.Id" class="@(template.Active ? "" : "inactive-row")" id="@($"offer-template-{template.Id}")">
+                    <td><strong>@template.Name</strong></td>
+                    <td>@OfferRules.Describe(template.Definition, "sheet")</td>
+                    <td class="muted">@OfferRules.Describe(template.Definition, "columns")</td>
+                    <td class="muted">@(string.Join(", ", template.Definition.Sections.Where(section => section.Import).Select(section => section.Name)) is { Length: > 0 } imported ? imported : "—")</td>
+                    <td><ToggleSwitch Compact Value="template.Active" ValueChanged="value => SetActiveAsync(template, value)" Disabled="busy" AriaLabel="@($"Activ: {template.Name}")" /></td>
+                    <td>
+                        <button type="button" class="row-action edit" disabled="@busy" @onclick="() => StartEdit(template)">Modifică</button>
+                        @if (isAdministrator) { <button type="button" class="row-action delete" disabled="@busy" @onclick="() => deleting = template">Șterge</button> }
+                    </td>
+                </tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+}
+
+@if (deleting is not null)
+{
+    <div class="delete-overlay">
+        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="offer-template-delete-title">
+            <h2 id="offer-template-delete-title">Ștergi șablonul?</h2>
+            <p class="delete-object"><strong>@deleting.Name</strong></p>
+            <p>Șablonul se șterge definitiv; ofertele deja preluate nu se schimbă. Se înregistrează în jurnal.</p>
+            <div class="editor-actions">
+                <button type="button" class="danger" disabled="@busy" @onclick="DeleteAsync">@(busy ? "Se șterge…" : "Șterge șablonul")</button>
+                <button type="button" class="refresh" disabled="@busy" @onclick="() => deleting = null">Renunț</button>
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private const long MaxSampleBytes = 8L * 1024 * 1024;
+    [SupplyParameterFromQuery(Name = "sablon")] public int? TemplateId { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private List<OfferTemplateRecord> templates = [];
+    private bool loading = true, busy, editing, isAdministrator;
+    private string? error, notice;
+    private OfferTemplateRecord? original, deleting;
+    private string name = "";
+    private OfferTemplateDefinition definition = new();
+    private XlsxWorkbook? workbook;
+    private OfferReading? reading;
+
+    private XlsxSheet? PreviewSheet => workbook?.Sheet(definition.Sheet);
+    private static int PreviewColumns(XlsxSheet sheet) => Math.Min(Math.Max(sheet.LastColumn, 1), 16);
+    private static string Short(string text) => text.Length <= 38 ? text.Replace("\r\n", " ").Replace('\n', ' ') : text.Replace("\r\n", " ").Replace('\n', ' ')[..36] + "…";
+    private string MappedClass(int column) =>
+        OfferRules.ColumnKeys.Any(key => XlsxReader.ColumnIndex(OfferRules.ColumnOf(definition, key)) == column) ? "mapped-column" : "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
+            templates = [.. await Repository.GetAllAsync(lifetime.Token)];
+            if (TemplateId is { } id && templates.FirstOrDefault(item => item.Id == id) is { } requested) StartEdit(requested);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Offer templates loading failed ({ErrorType}).", ex.GetType().Name); error = "Șabloanele nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private void StartNew() { original = null; name = ""; definition = new OfferTemplateDefinition(); workbook = null; reading = null; error = null; notice = null; editing = true; }
+    private void StartEdit(OfferTemplateRecord template) { original = template; name = template.Name; definition = template.Definition.Clone(); workbook = null; reading = null; error = null; notice = null; editing = true; }
+    private void CloseEditor() { editing = false; reading = null; workbook = null; }
+
+    private void SetColumn(string key, string? letter)
+    {
+        letter = (letter ?? string.Empty).ToUpperInvariant();
+        switch (key)
+        {
+            case "number": definition.NumberColumn = letter; break;
+            case "type": definition.TypeColumn = letter; break;
+            case "name": definition.NameColumn = letter; break;
+            case "unit": definition.UnitColumn = letter; break;
+            case "quantity": definition.QuantityColumn = letter; break;
+        }
+        // The label of the column is proposed from the sample header row.
+        if (letter.Length > 0 && PreviewSheet is { } sheet && !definition.ColumnLabels.ContainsKey(key))
+            definition.ColumnLabels[key] = OfferTemplateEngine.LabelAt(sheet, XlsxReader.ColumnIndex(letter));
+    }
+
+    private void SetColumnLabel(string key, string? label) => definition.ColumnLabels[key] = (label ?? string.Empty).Trim();
+
+    private async Task SampleChosenAsync(InputFileChangeEventArgs args)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null; reading = null;
+        try
+        {
+            var file = args.File;
+            if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)) throw new XlsxFormatException(XlsxReader.NotXlsxMessage);
+            await using var input = file.OpenReadStream(MaxSampleBytes, lifetime.Token);
+            using var memory = new MemoryStream();
+            await input.CopyToAsync(memory, lifetime.Token);
+            memory.Position = 0;
+            workbook = XlsxReader.Read(memory);
+            var sheet = workbook.Sheet(definition.Sheet) ?? workbook.Sheets[0];
+            if (original is null && definition.NameColumn.Length == 0)
+            {
+                definition = OfferTemplateEngine.Suggest(sheet);
+                notice = "Câmpurile au fost propuse din fișier; verifică-le și completează ce lipsește.";
+            }
+            else definition.Sheet ??= sheet.Name;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (XlsxFormatException ex) { error = ex.Message; workbook = null; }
+        catch (IOException) { error = $"Fișierul depășește {MaxSampleBytes / (1024 * 1024)} MB sau nu a putut fi citit."; workbook = null; }
+        catch (Exception ex) { Logger.LogError("Offer sample reading failed ({ErrorType}).", ex.GetType().Name); error = XlsxReader.NotXlsxMessage; workbook = null; }
+        finally { busy = false; }
+    }
+
+    private void SheetChanged(ChangeEventArgs args) { definition.Sheet = args.Value?.ToString(); reading = null; }
+
+    private void AddDetectedSections()
+    {
+        if (PreviewSheet is not { } sheet) return;
+        var detected = OfferTemplateEngine.Suggest(sheet);
+        foreach (var section in detected.Sections)
+            if (!definition.Sections.Any(item => OfferRules.Key(item.Name) == OfferRules.Key(section.Name))) definition.Sections.Add(section);
+    }
+
+    private void Verify()
+    {
+        error = null;
+        if (workbook is null) return;
+        reading = OfferTemplateEngine.Apply(definition, workbook);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try
+        {
+            definition.Sections = [.. definition.Sections.Where(section => OfferRules.Key(section.Name).Length > 0)];
+            var saved = original is null ? await Repository.CreateAsync(name, definition, lifetime.Token) : await Repository.SaveAsync(original, name, definition, lifetime.Token);
+            templates = [.. await Repository.GetAllAsync(lifetime.Token)];
+            notice = original is null ? "Șablonul a fost creat." : "Șablonul a fost salvat.";
+            editing = false; workbook = null; reading = null; _ = saved;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is OfferTemplateException or AccessDeniedException) { error = ex.Message; await ReloadIfStaleAsync(ex.Message); }
+        catch (Exception ex) { Logger.LogError("Offer template saving failed ({ErrorType}).", ex.GetType().Name); error = "Șablonul nu a putut fi salvat. Datele din formular au fost păstrate."; }
+        finally { busy = false; }
+    }
+
+    private async Task SetActiveAsync(OfferTemplateRecord template, bool active)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try
+        {
+            var updated = await Repository.SetActiveAsync(template, active, lifetime.Token);
+            var index = templates.FindIndex(item => item.Id == updated.Id);
+            if (index >= 0) templates[index] = updated;
+            notice = active ? "Șablonul a fost activat." : "Șablonul a fost dezactivat: nu mai este ales automat la oferte noi.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is OfferTemplateException or AccessDeniedException) { error = ex.Message; await ReloadIfStaleAsync(ex.Message); }
+        catch (Exception ex) { Logger.LogError("Offer template activation failed ({ErrorType}).", ex.GetType().Name); error = "Operația nu a putut fi salvată."; }
+        finally { busy = false; }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (busy || deleting is null) return;
+        busy = true; error = null; notice = null;
+        try
+        {
+            await Repository.DeleteAsync(deleting, lifetime.Token);
+            templates.RemoveAll(item => item.Id == deleting.Id);
+            notice = "Șablonul a fost șters."; deleting = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is OfferTemplateException or AccessDeniedException) { error = ex.Message; deleting = null; await ReloadIfStaleAsync(ex.Message); }
+        catch (Exception ex) { Logger.LogError("Offer template deletion failed ({ErrorType}).", ex.GetType().Name); error = "Ștergerea nu a putut fi salvată."; deleting = null; }
+        finally { busy = false; }
+    }
+
+    private async Task ReloadIfStaleAsync(string message)
+    {
+        if (message != OfferTemplateMessages.Stale) return;
+        try { templates = [.. await Repository.GetAllAsync(lifetime.Token)]; } catch (Exception) { }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

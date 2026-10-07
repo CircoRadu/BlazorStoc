@@ -185,3 +185,10 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 - **Task:** Pagina Facturi (consultare, corectare, stergere, popup cu produse) si protocol de lucru cu context redus
 - **Rezumat:** `/facturi` in Administrare si pe pagina principala; `ISupplierInvoiceRepository` cu `GetAllAsync`/`UpdateAsync`/`DeleteAsync`; actiuni noi de jurnal; istoricul vechi mutat in `docs/arhiva/`, `docs/PROJECT_STATE.md` rescris compact, `docs/HARTA_COD.md`, `tools/run-checks.ps1`, `tools/log-task.ps1`, `CHECKS_ONLY` in teste, `agent-cycle.ps1 start` fara cerinta de tree curat.
 - **Teste:** suita in memorie 913 trecute; MariaDB `blazorstoc_test`, sectiunea „Suppliers and invoices”, trecuta; popup verificat de utilizator.
+
+## 2026-10-07T15:40:00.0000000Z - claude
+
+- **Task:** Stoc in bucati, iesiri/retur/storno, oferte, componente, situatia proiectului, rezervari
+- **Rezumat:** migrarile 19-27 (cauza iesirii, operatia de iesire, storno/retur, nomenclator, componente, sabloane de oferte, oferte, iesiri legate de componente, rezervari); pagini `/iesiri/multipla`, `/nomenclator`, `/oferte/*`, `/proiecte/{id}/situatie`; actiuni noi de jurnal; tabelele migrarilor 22-27 adaugate in lista de backup/restore; directorul `Teste utilizator/` cu „Ce s-a adaugat" / „Ce face acum".
+- **Teste:** suita in memorie 935 trecute; suita MariaDB 1505 trecute, 0 esecuri; neverificat in browser (vezi `docs/TESTE_RAMASE.md`).
+

@@ -21,6 +21,7 @@ else if (project is not null)
 {
     <a class="nav-back" href="@($"/proiecte/{Id}")"><span>←</span> @project.Name</a>
     <div class="page-heading"><div><p class="eyebrow">PROIECT · @project.Name</p><h1>Echipamente</h1><p class="muted">Materiale și echipamente scoase din inventar pentru acest proiect.</p></div></div>
+    <NetConsumptionSection ProjectId="Id" />
     <section class="catalog">
         @if (movements.Count == 0)
         {

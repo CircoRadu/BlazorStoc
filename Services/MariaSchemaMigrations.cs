@@ -611,6 +611,271 @@ public static class MariaSchemaMigrations
         [
             ("supplier_recognitions", "template_changed")
         ])
+        ,
+        // Entries without invoice: why (1 = awaited invoice ... 5 = other), the supplier it comes from (required for an awaited invoice) and a free
+        // reference. `supplier_invoice_lines` keeps the quantity written on the invoice for a product (known from the automatic pickup or typed by hand),
+        // to warn when the entries of the product on that invoice exceed it.
+        new(18, "Intrari libere: motiv, furnizor, referinta; cantitati facturate pe factura",
+        [
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `free_entry_type` TINYINT NULL",
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `free_supplier_id` BIGINT NULL",
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `reference` VARCHAR(200) NULL",
+            "ALTER TABLE `stock_movements` ADD INDEX IF NOT EXISTS `ix_stock_movements_free_supplier` (`free_supplier_id`)",
+            "ALTER TABLE `stock_movements` ADD CONSTRAINT `fk_stock_movements_free_supplier` FOREIGN KEY IF NOT EXISTS (`free_supplier_id`) REFERENCES `suppliers` (`id`) ON DELETE RESTRICT ON UPDATE NO ACTION",
+            """
+            CREATE TABLE IF NOT EXISTS `supplier_invoice_lines` (
+              `invoice_id` BIGINT NOT NULL,
+              `product_id` BIGINT NOT NULL,
+              `quantity` INT NOT NULL,
+              PRIMARY KEY (`invoice_id`, `product_id`),
+              CONSTRAINT `fk_invoice_lines_invoice` FOREIGN KEY (`invoice_id`) REFERENCES `supplier_invoices` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("stock_movements", "free_entry_type"), ("stock_movements", "free_supplier_id"), ("stock_movements", "reference"),
+            ("supplier_invoice_lines", "invoice_id"), ("supplier_invoice_lines", "product_id"), ("supplier_invoice_lines", "quantity")
+        ])
+        ,
+        // Exits over the stock: the optional cause (1 = entry not yet recorded, 2 = wrong stock in the database).
+        new(19, "Iesiri peste stoc: cauza optionala",
+        [
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `over_stock_cause` TINYINT NULL"
+        ],
+        [
+            ("stock_movements", "over_stock_cause")
+        ])
+        ,
+        // Every exit belongs to an operation (the id of its first exit; a single exit is an operation of one line). Older movements keep none.
+        new(20, "Iesiri: operatia din care fac parte (operation_id)",
+        [
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `operation_id` BIGINT NULL",
+            "ALTER TABLE `stock_movements` ADD INDEX IF NOT EXISTS `ix_stock_movements_operation` (`operation_id`)"
+        ],
+        [
+            ("stock_movements", "operation_id")
+        ])
+        ,
+        // Storno of an exit operation (the rows stay as a trace: when, by whom, why) and the exit a return from a beneficiary is tied to.
+        new(21, "Storno de operatie si retur legat de iesire",
+        [
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `voided_utc` VARCHAR(40) NULL",
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `void_reason` VARCHAR(500) NULL",
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `voided_by` VARCHAR(100) NULL",
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `return_of_movement_id` BIGINT NULL",
+            "ALTER TABLE `stock_movements` ADD INDEX IF NOT EXISTS `ix_stock_movements_return_of` (`return_of_movement_id`)"
+        ],
+        [
+            ("stock_movements", "voided_utc"), ("stock_movements", "void_reason"), ("stock_movements", "voided_by"), ("stock_movements", "return_of_movement_id")
+        ])
+        ,
+        // Nomenclator -> Tipuri de sisteme: the types (name, order, active) and their alternative names.
+        new(22, "Nomenclator: tipuri de sisteme si denumirile lor alternative",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `system_types` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `name` VARCHAR(100) NOT NULL,
+              `name_key` VARCHAR(100) NOT NULL,
+              `active` TINYINT(1) NOT NULL DEFAULT 1,
+              `sort_order` INT NOT NULL DEFAULT 0,
+              `version` BIGINT NOT NULL DEFAULT 0,
+              `created_utc` VARCHAR(40) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `ux_system_types_key` (`name_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS `system_type_aliases` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `system_type_id` BIGINT NOT NULL,
+              `alias` VARCHAR(100) NOT NULL,
+              `alias_key` VARCHAR(100) NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `ux_system_type_aliases_key` (`alias_key`),
+              CONSTRAINT `fk_system_type_aliases_type` FOREIGN KEY (`system_type_id`) REFERENCES `system_types` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("system_types", "id"), ("system_types", "name"), ("system_types", "name_key"), ("system_types", "active"), ("system_types", "sort_order"),
+            ("system_types", "version"), ("system_types", "created_utc"), ("system_types", "updated_utc"),
+            ("system_type_aliases", "id"), ("system_type_aliases", "system_type_id"), ("system_type_aliases", "alias"), ("system_type_aliases", "alias_key"),
+            ("system_type_aliases", "created_utc")
+        ])
+        ,
+        // The components of a project: the system types it is made of, with a simple state; taken out = archived with a reason (never deleted).
+        new(23, "Proiecte: componente (tipuri de sisteme) cu stare si arhivare",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `project_components` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `project_id` BIGINT NOT NULL,
+              `system_type_id` BIGINT NOT NULL,
+              `state` TINYINT NOT NULL DEFAULT 1,
+              `archived_utc` VARCHAR(40) NULL,
+              `archive_reason` VARCHAR(500) NULL,
+              `version` BIGINT NOT NULL DEFAULT 0,
+              `created_utc` VARCHAR(40) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `ux_project_components` (`project_id`, `system_type_id`),
+              CONSTRAINT `fk_project_components_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
+              CONSTRAINT `fk_project_components_type` FOREIGN KEY (`system_type_id`) REFERENCES `system_types` (`id`) ON DELETE RESTRICT ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("project_components", "id"), ("project_components", "project_id"), ("project_components", "system_type_id"), ("project_components", "state"),
+            ("project_components", "archived_utc"), ("project_components", "archive_reason"), ("project_components", "version"),
+            ("project_components", "created_utc"), ("project_components", "updated_utc")
+        ])
+        ,
+        // Module Oferte: templates of offer sheets (.xlsx); the definition (columns by letter, header labels, sections, ignored rows) is JSON.
+        new(24, "Oferte: sabloane de devize-oferta (xlsx)",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `offer_templates` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `name` VARCHAR(120) NOT NULL,
+              `name_key` VARCHAR(120) NOT NULL,
+              `active` TINYINT(1) NOT NULL DEFAULT 1,
+              `definition` LONGTEXT NOT NULL,
+              `version` BIGINT NOT NULL DEFAULT 0,
+              `created_by` VARCHAR(100) NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              `updated_by` VARCHAR(100) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `ux_offer_templates_key` (`name_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("offer_templates", "id"), ("offer_templates", "name"), ("offer_templates", "name_key"), ("offer_templates", "active"), ("offer_templates", "definition"),
+            ("offer_templates", "version"), ("offer_templates", "created_by"), ("offer_templates", "created_utc"), ("offer_templates", "updated_by"), ("offer_templates", "updated_utc")
+        ])
+        ,
+        // Offers taken over from a devize-oferta: the offer (a revision per row, same number = same offer), its lines, the ties between offer lines and
+        // catalog products that were confirmed (remembered for the next offers) and the alternative names of the beneficiaries seen in offers.
+        new(25, "Oferte preluate: oferta, liniile, potrivirile retinute si denumirile alternative ale beneficiarilor",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `offers` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `number` VARCHAR(60) NOT NULL,
+              `number_key` VARCHAR(60) NOT NULL,
+              `revision` INT NOT NULL,
+              `title` VARCHAR(300) NOT NULL DEFAULT '',
+              `category` VARCHAR(120) NOT NULL DEFAULT '',
+              `beneficiary_id` BIGINT NOT NULL,
+              `project_id` BIGINT NOT NULL,
+              `system_type_id` BIGINT NULL,
+              `template_id` BIGINT NULL,
+              `file_name` VARCHAR(260) NOT NULL DEFAULT '',
+              `created_by` VARCHAR(100) NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `ux_offers_number_revision` (`number_key`, `revision`),
+              KEY `ix_offers_project` (`project_id`),
+              CONSTRAINT `fk_offers_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS `offer_lines` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `offer_id` BIGINT NOT NULL,
+              `line_order` INT NOT NULL,
+              `section` VARCHAR(100) NOT NULL DEFAULT '',
+              `number` VARCHAR(20) NOT NULL DEFAULT '',
+              `product_type` VARCHAR(100) NOT NULL DEFAULT '',
+              `name` TEXT NOT NULL,
+              `name_key` VARCHAR(190) NOT NULL,
+              `unit` VARCHAR(30) NOT NULL DEFAULT '',
+              `quantity` DECIMAL(14,3) NOT NULL,
+              `in_stock` TINYINT(1) NOT NULL DEFAULT 1,
+              `product_id` BIGINT NULL,
+              PRIMARY KEY (`id`),
+              KEY `ix_offer_lines_offer` (`offer_id`, `line_order`),
+              KEY `ix_offer_lines_product` (`product_id`),
+              CONSTRAINT `fk_offer_lines_offer` FOREIGN KEY (`offer_id`) REFERENCES `offers` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS `offer_line_matches` (
+              `name_key` VARCHAR(190) NOT NULL,
+              `product_id` BIGINT NOT NULL,
+              `confirmed_by` VARCHAR(100) NOT NULL,
+              `confirmed_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`name_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS `beneficiary_aliases` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `beneficiary_id` BIGINT NOT NULL,
+              `alias` VARCHAR(200) NOT NULL,
+              `alias_key` VARCHAR(200) NOT NULL,
+              `created_by` VARCHAR(100) NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `ux_beneficiary_aliases_key` (`alias_key`),
+              CONSTRAINT `fk_beneficiary_aliases_beneficiary` FOREIGN KEY (`beneficiary_id`) REFERENCES `beneficiaries` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("offers", "id"), ("offers", "number"), ("offers", "number_key"), ("offers", "revision"), ("offers", "title"), ("offers", "category"), ("offers", "beneficiary_id"),
+            ("offers", "project_id"), ("offers", "system_type_id"), ("offers", "template_id"), ("offers", "file_name"), ("offers", "created_by"), ("offers", "created_utc"),
+            ("offer_lines", "id"), ("offer_lines", "offer_id"), ("offer_lines", "line_order"), ("offer_lines", "section"), ("offer_lines", "number"), ("offer_lines", "product_type"),
+            ("offer_lines", "name"), ("offer_lines", "name_key"), ("offer_lines", "unit"), ("offer_lines", "quantity"), ("offer_lines", "in_stock"), ("offer_lines", "product_id"),
+            ("offer_line_matches", "name_key"), ("offer_line_matches", "product_id"), ("offer_line_matches", "confirmed_by"), ("offer_line_matches", "confirmed_utc"),
+            ("beneficiary_aliases", "id"), ("beneficiary_aliases", "beneficiary_id"), ("beneficiary_aliases", "alias"), ("beneficiary_aliases", "alias_key"),
+            ("beneficiary_aliases", "created_by"), ("beneficiary_aliases", "created_utc")
+        ])
+        ,
+        // Exits to a project tied to a component of the project (or marked "in afara ofertei"); component_settled = how an exit left on a taken-out component was cleared.
+        new(26, "Iesiri legate de componente: componenta, in afara ofertei, lamurirea la scoaterea componentei",
+        [
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `project_component_id` BIGINT NULL",
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `outside_offer` TINYINT(1) NOT NULL DEFAULT 0",
+            "ALTER TABLE `stock_movements` ADD COLUMN IF NOT EXISTS `component_settled` TINYINT NULL",
+            "ALTER TABLE `stock_movements` ADD INDEX IF NOT EXISTS `ix_stock_movements_component` (`project_component_id`)"
+        ],
+        [
+            ("stock_movements", "project_component_id"), ("stock_movements", "outside_offer"), ("stock_movements", "component_settled")
+        ])
+        ,
+        // Rezervari pe proiect: pieces of a product held for a project (and optionally one of its components); they never change the stock.
+        new(27, "Rezervari pe proiect: stoc liber = stoc - rezervari",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `project_reservations` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `project_id` BIGINT NOT NULL,
+              `project_component_id` BIGINT NULL,
+              `component_key` BIGINT NOT NULL DEFAULT 0,
+              `product_id` BIGINT NOT NULL,
+              `quantity` INT NOT NULL,
+              `version` BIGINT NOT NULL DEFAULT 0,
+              `created_by` VARCHAR(100) NOT NULL,
+              `created_utc` VARCHAR(40) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `ux_project_reservations` (`project_id`, `product_id`, `component_key`),
+              KEY `ix_project_reservations_product` (`product_id`),
+              CONSTRAINT `fk_project_reservations_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
+              CONSTRAINT `fk_project_reservations_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("project_reservations", "id"), ("project_reservations", "project_id"), ("project_reservations", "project_component_id"), ("project_reservations", "component_key"),
+            ("project_reservations", "product_id"), ("project_reservations", "quantity"), ("project_reservations", "version"), ("project_reservations", "created_by"),
+            ("project_reservations", "created_utc"), ("project_reservations", "updated_utc")
+        ])
     ];
 }
 

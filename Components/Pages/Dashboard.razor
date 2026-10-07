@@ -1,5 +1,7 @@
 @page "/"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IStockMovementRepository Movements
 
 <PageTitle>Pagina principală · BlazorStoc</PageTitle>
 
@@ -12,17 +14,34 @@
 </div>
 
 <section class="main-menu-grid" aria-label="Secțiunile aplicației">
-    <a href="/produse"><span class="main-menu-icon">▦</span><div><h2>Produse și stocuri</h2><p>Consultă inventarul și gestionează produsele pe categorii.</p></div><span class="main-menu-arrow">→</span></a>
+    <a href="/produse"><span class="main-menu-icon">▦</span><div><h2>Produse și stocuri</h2><p>Consultă inventarul și gestionează produsele pe categorii.@if (toRegularize > 0) { <text> </text><strong class="awaiting-count" title="Produse cu stoc negativ după ieșiri peste stoc (tabul De regularizat)">@toRegularize @(toRegularize == 1 ? "produs de regularizat" : "produse de regularizat")</strong> }</p></div><span class="main-menu-arrow">→</span></a>
     <a href="/categorii"><span class="main-menu-icon">▤</span><div><h2>Categorii și subcategorii</h2><p>Editează denumirile și mută subcategoriile între categorii.</p></div><span class="main-menu-arrow">→</span></a>
     <a href="/inventar"><span class="main-menu-icon">▥</span><div><h2>Inventar</h2><p>Generează situația de inventar pentru numărarea stocului.</p></div><span class="main-menu-arrow">→</span></a>
     <a href="/beneficiari"><span class="main-menu-icon">♧</span><div><h2>Beneficiari</h2><p>Adaugă, editează și consultă beneficiarii.</p></div><span class="main-menu-arrow">→</span></a>
     <a href="/furnizori"><span class="main-menu-icon">⌂</span><div><h2>Furnizori</h2><p>Adaugă, editează și consultă furnizorii și facturile lor.</p></div><span class="main-menu-arrow">→</span></a>
-    <a href="/facturi"><span class="main-menu-icon">▤</span><div><h2>Facturi</h2><p>Consultă facturile preluate în stoc și intrările din fiecare.</p></div><span class="main-menu-arrow">→</span></a>
+    <a href="/facturi"><span class="main-menu-icon">▤</span><div><h2>Facturi</h2><p>Consultă facturile preluate în stoc și intrările din fiecare.@if (awaiting > 0) { <text> </text><strong class="awaiting-count" title="Intrări fără factură, în urmărire">@awaiting @(awaiting == 1 ? "intrare așteaptă" : "intrări așteaptă") factura</strong> }</p></div><span class="main-menu-arrow">→</span></a>
+    <a href="/oferte/preluare"><span class="main-menu-icon">▤</span><div><h2>Oferte</h2><p>Preia devizele-ofertă Excel (.xlsx) în proiecte; șabloanele lor sunt la Oferte → Șabloane.</p></div><span class="main-menu-arrow">→</span></a>
     <a href="/vehicule"><span class="main-menu-icon">▨</span><div><h2>Vehicule</h2><p>Administrează autovehiculele firmei și stocul aflat în ele.</p></div><span class="main-menu-arrow">→</span></a>
     <AuthorizeView Roles="Administrator">
         <Authorized>
             <a href="/utilizatori"><span class="main-menu-icon">♙</span><div><h2>Utilizatori</h2><p>Administrează accesul și rolurile utilizatorilor.</p></div><span class="main-menu-arrow">→</span></a>
+            <a href="/nomenclator"><span class="main-menu-icon">▦</span><div><h2>Nomenclator</h2><p>Tipurile de sisteme din proiecte și denumirile lor alternative.</p></div><span class="main-menu-arrow">→</span></a>
             <a href="/jurnal"><span class="main-menu-icon">≡</span><div><h2>Jurnal activitate</h2><p>Urmărește operațiunile efectuate în sistem.</p></div><span class="main-menu-arrow">→</span></a>
         </Authorized>
     </AuthorizeView>
 </section>
+
+@code {
+    // Entries recorded as "achizitie fara factura" that no invoice was tied to yet.
+    private int awaiting;
+    // Products with negative stock after exits over the stock.
+    private int toRegularize;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { awaiting = (await Movements.GetFreeEntriesAsync(new FreeEntryQuery(FreeEntryType.AwaitedInvoice))).Count; }
+        catch (Exception) { awaiting = 0; }
+        try { toRegularize = (await Movements.GetToRegularizeAsync()).Count; }
+        catch (Exception) { toRegularize = 0; }
+    }
+}

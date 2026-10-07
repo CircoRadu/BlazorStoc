@@ -1,0 +1,26 @@
+@using BlazorStoc.Services
+@* A product with negative stock: that cannot exist physically, it is an operating error. Before the next entry the user states the real quantity in
+   the warehouse (or sets the stock to zero); a correction entry then brings the stock there (see IStockMovementRepository.RegularizeNegativeStockAsync). *@
+<div class="invoice-warning negative-stock-panel" role="alert">
+    <p>⚠ @StockMovementRules.NegativeStockWarning(Stock)</p>
+    <div class="movement-kind">
+        <button type="button" class="settings-tab @(Resolution.Zero ? "active" : "")" aria-pressed="@Resolution.Zero" disabled="@Disabled" @onclick="ChooseZeroAsync">Trec stocul pe 0</button>
+        <label class="negative-stock-real">Cantitate reală în depozit
+            <InputNumber TValue="int?" Value="Resolution.Zero ? null : Resolution.Real" ValueChanged="RealChangedAsync" ValueExpression="() => Resolution.Real" min="0" max="@StockMovementRules.MaxQuantity" disabled="@Disabled" placeholder="introdu cantitatea" /></label>
+    </div>
+    @if (Resolution.IsResolved)
+    {
+        <small class="form-note" role="status">Depozitul va avea @Resolution.RealQuantity buc. după o intrare de corecție, făcută înainte de intrarea nouă.</small>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public NegativeStockResolution Resolution { get; set; } = new();
+    // Current stock of the product (negative).
+    [Parameter] public int Stock { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private async Task ChooseZeroAsync() { Resolution.Zero = true; Resolution.Real = null; await Changed.InvokeAsync(); }
+    private async Task RealChangedAsync(int? value) { Resolution.Zero = false; Resolution.Real = value; await Changed.InvokeAsync(); }
+}

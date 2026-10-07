@@ -19,7 +19,7 @@
 }
 else if (error is not null)
 {
-    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="() => LoadAsync()">Reîncearcă</button></div>
 }
 else if (user is null)
 {
@@ -59,7 +59,7 @@ else
     private LiveRefresh? live;
     protected override void OnInitialized() =>
         live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.User && change.EntityId == Id.ToString(),
-            () => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); }), () => editing,
+            () => InvokeAsync(async () => { await LoadAsync(false); StateHasChanged(); }), () => editing,
             () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(60));
     private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
 
@@ -68,9 +68,10 @@ else
         if (user is null || user.Id != Id) { editing = false; notice = null; await LoadAsync(); }
     }
 
-    private async Task LoadAsync()
+    private async Task LoadAsync(bool showLoading = true)
     {
-        loading = true; error = null;
+        if (showLoading) loading = true;
+        error = null;
         try
         {
             // The route is guarded by the administrator role; the check is repeated so the data is never read without it.

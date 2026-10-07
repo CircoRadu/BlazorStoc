@@ -1,0 +1,305 @@
+@page "/iesiri/multipla"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProductRepository Products
+@inject IStockMovementRepository Movements
+@inject IBeneficiaryRepository Beneficiaries
+@inject IProjectRepository ProjectsRepository
+@inject IVehicleRepository VehiclesRepository
+@inject IAccessControl Access
+@inject ILogger<ExitOperation> Logger
+@implements IDisposable
+@* The exit operation (the exit basket): one destination, one date and one reference for several products, each with its quantity and source
+   (warehouse or a vehicle). Saved all or nothing; every line follows the rules of a single exit (over the stock allowed and marked, a repeated
+   exit needs a reason). The warnings of all lines are gathered in a summary shown before saving. *@
+
+<PageTitle>Ieșire multiplă · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">STOC</p><h1>Ieșire multiplă</h1><p class="muted">Mai multe produse către aceeași destinație, într-o singură operație (se salvează toate sau niciuna).</p></div><div class="heading-actions"><a class="refresh" href="/produse">← Produse</a></div></div>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (success is not null)
+{
+    <div class="success-banner" role="status">@success@if (savedOperation is { } savedId) { <text> </text><a class="category-table-link" target="_blank" rel="noopener" href="@($"/api/iesiri/{savedId}/bon.pdf")">Deschide bonul de consum (PDF)</a> }</div>
+}
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+}
+else if (!canManage)
+{
+    <div class="empty-state"><h3>Acces restricționat</h3><p>Ieșirile din stoc pot fi înregistrate de utilizatorii care gestionează produsele.</p></div>
+}
+else
+{
+    <section class="catalog exit-operation">
+        <fieldset disabled="@(busy || preview is not null)">
+            <div class="movement-form-top">
+                <label class="movement-date" for="op-date">Data ieșirii *
+                    <PickOnlyDate Id="op-date" @bind-Value="common.Date" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
+                <label for="op-reference">Referință comună (aviz, bon, număr predare)
+                    <InputText id="op-reference" @bind-Value="common.Reference" maxlength="@StockMovementRules.MaxReferenceLength" /></label>
+            </div>
+            <ExitDestinationPicker @ref="picker" Prefix="op" Model="common" Beneficiaries="beneficiaries" Projects="projects" Vehicles="vehicles"
+                                   ShowSource="false" Disabled="busy || preview is not null" UseProject="useProject"
+                                   DestinationChanged="DestinationChangedAsync" BeneficiaryChanged="BeneficiaryChangedAsync"
+                                   ProjectToggled="ToggleProject" ProjectChanged="id => { common.ProjectId = id; return Task.CompletedTask; }" />
+            <label class="movement-description" for="op-description">Descriere comună (se folosește la liniile fără descriere proprie)
+                <InputTextArea id="op-description" @bind-Value="common.Description" rows="2" maxlength="@StockMovementRules.MaxDescriptionLength" /></label>
+
+            <h2>Produse</h2>
+            <div class="table-scroll"><table class="operation-lines"><thead><tr><th>#</th><th>PRODUS</th><th class="number">CANTITATE</th><th>SURSA</th><th>DESCRIERE (opțional)</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @for (var index = 0; index < lines.Count; index++)
+            {
+                var line = lines[index];
+                var position = index;
+                <tr @key="line.Key">
+                    <td>@(index + 1)</td>
+                    <td>
+                        <SearchableSelect Id="@($"op-product-{line.Key}")" Label="@($"Produs, linia {index + 1}")" Placeholder="Caută sau alege produsul…" EmptyText="Niciun produs găsit."
+                                          Options="ProductOptions" SelectedId="line.ProductId" SelectedIdChanged="id => ProductChangedAsync(line, id)" />
+                        @if (common.Destination == ExitDestination.Beneficiary && common.ProjectId is not null && line.ProductId is not null)
+                        {
+                            <ExitComponentChoice ProjectId="common.ProjectId" ProductId="line.ProductId" ComponentId="line.ComponentId" OutsideOffer="line.OutsideOffer" Disabled="busy"
+                                                 Changed="choice => { line.ComponentId = choice.ComponentId; line.OutsideOffer = choice.OutsideOffer; }" />
+                        }
+                        @if (ProductOf(line) is { } product)
+                        {
+                            <small class="form-note">Depozit: <strong>@WarehouseOf(product) buc.</strong>@(inVehicles.GetValueOrDefault(product.Id) > 0 ? $" · în mașini: {inVehicles[product.Id]} buc." : "")@(product.Quantity < 0 ? " · stoc negativ (de regularizat)" : "")</small>
+                        }
+                    </td>
+                    <td class="number"><input type="number" aria-label="@($"Cantitate, linia {index + 1}")" min="1" max="@StockMovementRules.MaxQuantity" @bind="line.Quantity" @bind:event="oninput" /></td>
+                    <td>
+                        <select aria-label="@($"Sursa, linia {index + 1}")" @onchange="args => SourceChanged(line, args.Value?.ToString())">
+                            <option value="" selected="@(line.SourceVehicleId is null)">Depozit</option>
+                            @foreach (var held in line.Held)
+                            {
+                                <option value="@held.VehicleId" selected="@(line.SourceVehicleId == held.VehicleId)">Mașina @held.PlateNumber · @held.Quantity buc.</option>
+                            }
+                        </select>
+                    </td>
+                    <td><input type="text" aria-label="@($"Descriere, linia {index + 1}")" @bind="line.Description" maxlength="@StockMovementRules.MaxDescriptionLength" /></td>
+                    <td><button type="button" class="danger" aria-label="@($"Scoate linia {index + 1}")" disabled="@(lines.Count == 1)" @onclick="() => RemoveLine(position)">×</button></td>
+                </tr>
+            }
+            </tbody></table></div>
+            <div class="editor-actions">
+                <button type="button" class="refresh" disabled="@(lines.Count >= StockMovementRules.MaxOperationLines)" @onclick="AddLine">+ Adaugă produs</button>
+                <button type="button" class="primary" @onclick="CheckAsync">@(busy ? "Se verifică…" : "Verifică și salvează")</button>
+            </div>
+        </fieldset>
+
+        @if (preview is not null)
+        {
+            <div class="invoice-warning" role="alert">
+                <p>⚠ Verifică înainte de salvare. Operația se salvează întreagă sau deloc.</p>
+                <ul class="operation-summary">
+                    @foreach (var item in preview)
+                    {
+                        var line = lines[item.Index];
+                        <li>
+                            <strong>Linia @(item.Index + 1) · @item.ProductName</strong>
+                            @if (item.OverStock > 0)
+                            {
+                                <span> — depășește stocul cu <strong>@item.OverStock buc.</strong>; stocul va fi @item.StockAfter buc. și produsul va apărea în „De regularizat”.</span>
+                                <fieldset class="cause-choice">
+                                    <legend>Cauza (opțional)</legend>
+                                    <label><input type="radio" name="@($"op-cause-{line.Key}")" checked="@(line.Cause is null)" @onchange="() => line.Cause = null" /> Necunoscută</label>
+                                    <label><input type="radio" name="@($"op-cause-{line.Key}")" checked="@(line.Cause == OverStockCause.UnrecordedEntry)" @onchange="() => line.Cause = OverStockCause.UnrecordedEntry" /> @StockMovementRules.CauseLabel(OverStockCause.UnrecordedEntry)</label>
+                                    <label><input type="radio" name="@($"op-cause-{line.Key}")" checked="@(line.Cause == OverStockCause.WrongStock)" @onchange="() => line.Cause = OverStockCause.WrongStock" /> @StockMovementRules.CauseLabel(OverStockCause.WrongStock)</label>
+                                </fieldset>
+                            }
+                            @if (item.ReservationExcess > 0 && item.Holders is not null)
+                            {
+                                <span> — ia <strong>@item.ReservationExcess buc.</strong> rezervate de alte proiecte (@string.Join(", ", item.Holders.Select(holder => $"{holder.ProjectName}: {holder.Quantity} buc."))).</span>
+                                <ReservationWarningChoice Prefix="@($"op-{line.Key}")" Choice="line.Reservation" Holders="item.Holders" Excess="item.ReservationExcess" Disabled="busy" />
+                            }
+                            @if (item.Duplicate) { <span> — aceeași ieșire a mai fost înregistrată azi (ieșire repetată).</span> }
+                        </li>
+                    }
+                </ul>
+                @if (preview.Any(item => item.Duplicate))
+                {
+                    <label class="full-width" for="op-duplicate-reason">Motiv pentru ieșirile repetate
+                        <InputTextArea id="op-duplicate-reason" @bind-Value="duplicateReason" rows="2" maxlength="@ChangeReasonRules.MaximumLength" /></label>
+                }
+                <div class="editor-actions">
+                    <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">@(busy ? "Se salvează…" : "Salvează operația")</button>
+                    <button type="button" class="danger" disabled="@busy" @onclick="BackToEditing">Modific</button>
+                </div>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private sealed class Line
+    {
+        public int Key { get; init; }
+        public int? ProductId { get; set; }
+        public int? Quantity { get; set; }
+        public int? SourceVehicleId { get; set; }
+        public string Description { get; set; } = "";
+        public OverStockCause? Cause { get; set; }
+        public ReservationChoice Reservation { get; } = new();
+        public int? ComponentId { get; set; }
+        public bool OutsideOffer { get; set; }
+        public IReadOnlyList<VehicleStock> Held { get; set; } = [];
+    }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, canManage, busy, useProject;
+    private string? error, success;
+    private IReadOnlyList<Product> products = [];
+    private IReadOnlyDictionary<int, int> inVehicles = new Dictionary<int, int>();
+    private IReadOnlyList<Beneficiary> beneficiaries = [];
+    private IReadOnlyList<Vehicle> vehicles = [];
+    private IReadOnlyList<Project> projects = [];
+    private StockMovementInput common = NewCommon();
+    private ExitDestinationPicker? picker;
+    private int nextKey;
+    private List<Line> lines = [];
+    private IReadOnlyList<ExitLinePreview>? preview;
+    private string duplicateReason = "";
+    private int? savedOperation;
+
+    private static StockMovementInput NewCommon() => new() { Kind = StockMovementKind.Exit, Date = StockMovementRules.Today, Destination = ExitDestination.Beneficiary };
+
+    protected override async Task OnInitializedAsync()
+    {
+        lines = [new Line { Key = nextKey++ }];
+        try
+        {
+            canManage = await Access.CanManageProductsAsync(lifetime.Token);
+            if (canManage) await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogError("Exit operation page loading failed ({ErrorType}).", ex.GetType().Name); error = "Pagina nu a putut fi încărcată. Verifică serverul și conexiunea la baza de date."; }
+        finally { loading = false; }
+    }
+
+    private async Task LoadAsync()
+    {
+        var productsTask = Products.GetProductsAsync(lifetime.Token);
+        var vehicleQuantities = Movements.GetQuantitiesInVehiclesAsync(lifetime.Token);
+        var beneficiariesTask = Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
+        var vehiclesTask = VehiclesRepository.GetVehiclesAsync(lifetime.Token);
+        await Task.WhenAll(productsTask, vehicleQuantities, beneficiariesTask, vehiclesTask);
+        products = (await productsTask).OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        inVehicles = await vehicleQuantities;
+        beneficiaries = (await beneficiariesTask).OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        vehicles = await vehiclesTask;
+    }
+
+    private IReadOnlyList<SelectOption> ProductOptions =>
+        products.Select(p => new SelectOption(p.Id, p.Name, $"{p.Category} {p.Subcategory}")).ToArray();
+    private Product? ProductOf(Line line) => line.ProductId is { } id ? products.FirstOrDefault(p => p.Id == id) : null;
+    private int WarehouseOf(Product product) => StockMovementRules.WarehouseStock(product.Quantity, inVehicles.GetValueOrDefault(product.Id));
+
+    private Task DestinationChangedAsync()
+    {
+        if (common.Destination != ExitDestination.Beneficiary) { projects = []; useProject = false; }
+        error = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task BeneficiaryChangedAsync(int? beneficiaryId)
+    {
+        common.BeneficiaryId = beneficiaryId; common.ProjectId = null;
+        projects = [];
+        if (beneficiaryId is { } id)
+        {
+            try { projects = await ProjectsRepository.GetForBeneficiaryAsync(id, lifetime.Token); }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+            catch (Exception ex) { Logger.LogError("Project list loading failed ({ErrorType}).", ex.GetType().Name); }
+        }
+    }
+
+    private Task ToggleProject(bool value)
+    {
+        useProject = value;
+        if (!value) common.ProjectId = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task ProductChangedAsync(Line line, int? productId)
+    {
+        line.ProductId = productId; line.SourceVehicleId = null; line.Held = [];
+        if (productId is { } id)
+        {
+            try { line.Held = await Movements.GetVehicleStocksAsync(id, lifetime.Token); }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+            catch (Exception ex) { Logger.LogError("Vehicle stock loading failed ({ErrorType}).", ex.GetType().Name); }
+        }
+    }
+
+    private static void SourceChanged(Line line, string? value) => line.SourceVehicleId = int.TryParse(value, out var id) ? id : null;
+    private void AddLine() => lines.Add(new Line { Key = nextKey++ });
+    private void RemoveLine(int index) { if (lines.Count > 1 && index >= 0 && index < lines.Count) lines.RemoveAt(index); }
+    private void BackToEditing() { preview = null; error = null; }
+
+    private string? LocalError()
+    {
+        if (picker?.ValidationError() is { } pickerError) return pickerError;
+        for (var index = 0; index < lines.Count; index++)
+            if (lines[index].ProductId is null || lines[index].Quantity is not > 0)
+                return StockMovementRules.LineMessage(index, "alege produsul și o cantitate mai mare ca zero.");
+        return null;
+    }
+
+    private IReadOnlyList<ExitOperationLine> BuildLines(IReadOnlySet<int>? duplicates = null) =>
+        lines.Select((line, index) => new ExitOperationLine(line.ProductId!.Value, new StockMovementInput
+        {
+            Kind = StockMovementKind.Exit, Date = common.Date, Quantity = line.Quantity,
+            Description = string.IsNullOrWhiteSpace(line.Description) ? common.Description : line.Description,
+            Destination = common.Destination, BeneficiaryId = common.BeneficiaryId, ProjectId = common.ProjectId, VehicleId = common.VehicleId,
+            SourceVehicleId = line.SourceVehicleId, Reference = common.Reference, OverStockCause = line.Cause,
+            ProjectComponentId = common.ProjectId is null ? null : line.ComponentId, OutsideOffer = common.ProjectId is not null && line.OutsideOffer,
+            DuplicateReason = duplicates?.Contains(index) == true ? duplicateReason : ""
+        }.WithReservation(line.Reservation, duplicates is not null))).ToList();
+
+    private async Task CheckAsync()
+    {
+        if (busy) return;
+        success = null; savedOperation = null; error = LocalError();
+        if (error is not null) return;
+        busy = true;
+        try
+        {
+            var result = await Movements.PreviewExitOperationAsync(BuildLines(), lifetime.Token);
+            if (result.All(item => item.OverStock == 0 && !item.Duplicate && item.ReservationExcess == 0)) { preview = result; busy = false; await SaveAsync(); return; }
+            preview = result; duplicateReason = "";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockMovementOperationException or AccessDeniedException) { error = ex.Message; preview = null; }
+        catch (Exception ex) { Logger.LogError("Exit operation check failed ({ErrorType}).", ex.GetType().Name); error = "Verificarea nu a putut fi făcută. Reîncearcă."; preview = null; }
+        finally { busy = false; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || preview is null) return;
+        var duplicates = preview.Where(item => item.Duplicate).Select(item => item.Index).ToHashSet();
+        if (duplicates.Count > 0 && ChangeReasonRules.ValidationError(duplicateReason) is { } problem) { error = problem; return; }
+        foreach (var item in preview.Where(item => item.ReservationExcess > 0))
+            if (lines[item.Index].Reservation.Validate() is { } reservationProblem) { error = $"Linia {item.Index + 1}: {reservationProblem}"; return; }
+        busy = true; error = null;
+        try
+        {
+            var result = await Movements.CreateExitOperationAsync(BuildLines(duplicates), lifetime.Token);
+            savedOperation = result.OperationId;
+            success = $"Operația #{result.OperationId} a fost salvată: {result.Movements.Count} {(result.Movements.Count == 1 ? "ieșire" : "ieșiri")}.";
+            preview = null; duplicateReason = "";
+            common = NewCommon(); projects = []; useProject = false;
+            lines = [new Line { Key = nextKey++ }];
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockMovementOperationException or AccessDeniedException) { error = ex.Message; preview = null; }
+        catch (Exception ex) { Logger.LogError("Exit operation saving failed ({ErrorType}).", ex.GetType().Name); error = "Operația nu a putut fi salvată. Nu s-a salvat nimic; reîncearcă."; preview = null; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+
+}

@@ -612,8 +612,97 @@ Neverificat automat: raspunsul real al ANAF pentru un CUI inexistent (forma list
 
 Beneficiari - cheia CUI fara prefix RO (06.10.2026): in browser, creeaza un beneficiar cu CUI `RO12345678`, apoi incearca `12345678` si `ro 12345678` -> mesajul de CUI duplicat. Pe o baza cu beneficiari existenti verifica ca nu raman chei cu prefix RO (`SELECT cui, normalized_cui FROM beneficiaries`); pe dev a fost verificat doar prin SQL.
 
-Pagina Facturi (07.10.2026): in browser, deschide `/facturi` si din Administrare si de pe pagina principala; verifica casetele de rezumat, filtrele (text, furnizor, date, doar fara intrari), deschiderea intrarilor unei facturi si aspectul pe ecran ingust; nu s-a rulat in browser.
+#### Pagina Facturi (07.10.2026)
+- **Ce s-a adaugat:** Pagina `/facturi` (din Administrare si de pe pagina principala): lista tuturor facturilor de furnizor, casete de rezumat, filtre si intrarile fiecarei facturi.
+- **Ce face acum:** Poti vedea si filtra toate facturile (text, furnizor, date, doar cele fara intrari) si deschide intrarile unei facturi; arata bine si pe ecran ingust.
+- **De verificat:** In browser: casetele de rezumat, filtrele, deschiderea intrarilor, ecranul ingust. Nu s-a rulat in browser.
 
-Facturi - corectare si stergere (07.10.2026): ca administrator, in `/facturi` corecteaza numarul, data si furnizorul unei facturi (jurnalul: cate un eveniment pe fel de schimbare), incearca un numar deja existent la acelasi furnizor (mesaj de duplicat), sterge o factura fara intrari (dispare din lista si din pagina furnizorului) si verifica ca butonul × este dezactivat la o factura cu intrari; ca utilizator limitat nu apar ✎ si ×. SQL-ul pe MariaDB reala nu a fost rulat (doar teste in memorie).
+#### Facturi - corectare si stergere (07.10.2026)
+- **Ce s-a adaugat:** Corectarea numarului, a datei si a furnizorului unei facturi si stergerea unei facturi fara intrari, din `/facturi`.
+- **Ce face acum:** Administratorul corecteaza o factura (jurnal cu cate un eveniment pe fel de schimbare), numarul duplicat la acelasi furnizor e refuzat, o factura fara intrari se sterge, iar una cu intrari nu (butonul × dezactivat); un utilizator limitat nu are ✎ si ×.
+- **De verificat:** Ca administrator si ca utilizator limitat, in browser, pasii de mai sus. SQL-ul pe MariaDB reala a fost rulat ulterior (vezi intrarea urmatoare).
 
-Facturi - SQL pe baza reala (07.10.2026): `UpdateAsync`/`DeleteAsync`/`GetAllAsync` au fost rulate pe `blazorstoc_test` (sectiunea „Suppliers and invoices”, MARIA_ONLY): corectare, copie veche, numar duplicat, motiv lipsa, acces interzis utilizatorului, jurnal exact, stergere blocata cu intrari si permisa fara - trec. Ramane doar verificarea vizuala in browser.
+#### Facturi - SQL pe baza reala (07.10.2026)
+- **Ce s-a adaugat:** Verificarea pe `blazorstoc_test` a corectarii, stergerii si listarii facturilor (sectiunea „Suppliers and invoices").
+- **Ce face acum:** Corectare, copie veche, numar duplicat, motiv lipsa, acces interzis, jurnal exact, stergere blocata cu intrari si permisa fara - toate trec pe baza reala.
+- **De verificat:** Ramane doar verificarea vizuala in browser.
+
+#### Intrari libere, furnizor/factura pe pagina de miscari, atasare la factura, factura asteptata (07.10.2026)
+- **Ce s-a adaugat:** Selector de provenienta la intrare (intrare libera cu motiv, factura existenta, factura noua), fila „Intrari fara factura", atasarea unei intrari la o factura, intrarea cu factura asteptata (cu notificare).
+- **Ce face acum:** O intrare se inregistreaza cu sau fara factura, iar cele fara factura raman in urmarire pana se leaga de factura furnizorului.
+- **De verificat:** Verificare vizuala in preview a formularului, filei si dialogurilor. Sectiunea MariaDB „Free entries" a rulat dupa acordarea drepturilor (vezi intrarea urmatoare).
+
+#### Drepturi migrator pe blazorstoc_test si verificare intrari libere (07.10.2026)
+- **Ce s-a adaugat:** Contul de migrare are drepturi DDL pe `blazorstoc_test`; migrarea 18 aplicata si sectiunea „Free entries" rulata.
+- **Ce face acum:** Testele MariaDB pentru intrari libere pot rula pe baza de test.
+- **De verificat:** Verificare vizuala in preview a formularului, filei „Intrari fara factura" si dialogurilor.
+
+#### Regularizare stoc negativ, iesiri peste stoc, scenarii de utilizare intrari/iesiri (07.10.2026)
+- **Ce s-a adaugat:** Panou de regularizare a stocului negativ, banda de avertizare, taburile paginii de miscari si scenarii de utilizare.
+- **Ce face acum:** O iesire peste stoc se inregistreaza oricand; produsul ramane in „De regularizat" pana se regularizeaza stocul.
+- **De verificat:** Verificare vizuala in preview a panoului, benzii si taburilor; scenariile 18-19 (preluare factura cu stoc negativ) doar prin cod, fara test de pagina.
+
+#### Iesiri: jurnal pe destinatie, referinta, filtre, iesire dublata, folosire din vehicul peste cantitate (07.10.2026)
+- **Ce s-a adaugat:** Campul Referinta la iesiri, jurnal cu actiunea exacta pe destinatie, filtrele Destinatie/Beneficiar/Vehicul, avertisment pentru iesire dublata, nota de depasire a cantitatii din masina.
+- **Ce face acum:** Iesirile au referinta (aviz, bon), se pot filtra, o iesire repetata in aceeasi zi cere motiv, iar jurnalul spune exact tipul iesirii.
+- **De verificat:** In previzualizare, pe pagina produsului: campul Referinta, filtrele, panoul de iesire dublata si nota de depasire a cantitatii din masina.
+
+#### Director Teste utilizator: ghiduri de testare pe componenta (07.10.2026)
+- **Ce s-a adaugat:** Directorul `Teste utilizator/` cu cate un fisier pe componenta si indexul `00_CUM_SE_FOLOSESTE.md`.
+- **Ce face acum:** Pasii de testare ai utilizatorului sunt pe componenta; la fiecare commit/push se actualizeaza (pasi noi cu data, cei confirmati se scot si trec aici) si directorul intra in commit si push.
+- **De verificat:** Nimic de testat; regula este in CLAUDE.md.
+
+#### Lista De regularizat, cauza iesirii peste stoc, notificare, contor, inventar, reimprospatare fara licarire (07.10.2026)
+- **Ce s-a adaugat:** Tab „De regularizat" pe pagina principala, cauza optionala a iesirii peste stoc, contor pe Dashboard, notificari, inventar care tine cont de stoc negativ, reimprospatare fara licarire.
+- **Ce face acum:** Produsele cu stoc negativ se vad intr-o lista cu cauza si vechime; paginile se actualizeaza singure fara sa palpaie.
+- **De verificat:** Pasii sunt in Teste utilizator/02, 05, 09, 10; reimprospatarea fara licarire: Teste utilizator/02 pasii 12-13.
+
+#### Operatia de iesire si iesirea multipla (cosul de iesiri) (07.10.2026)
+- **Ce s-a adaugat:** Pagina `/iesiri/multipla`: o operatie cu mai multe produse, o destinatie comuna si previzualizare inainte de salvare (se salveaza intreaga sau deloc).
+- **Ce face acum:** Mai multe produse ies intr-o singura operatie, cu avertismente (peste stoc, iesire repetata) afisate inainte de salvare.
+- **De verificat:** Pasii sunt in Teste utilizator/02 (sectiunea Iesire multipla).
+
+#### Bon de consum, storno de operatie, retur legat de iesire si consum net (07.10.2026)
+- **Ce s-a adaugat:** Bon de consum / aviz de predare (PDF), storno de operatie, retur legat de o iesire (partial), consum net pe proiect si beneficiar.
+- **Ce face acum:** Fiecare operatie de iesire are bon PDF; o operatie gresita se stornează (stocul revine, iesirile raman ca urma); returul scade consumul net.
+- **De verificat:** Pasii sunt in Teste utilizator/02.
+
+#### Nomenclator: Tipuri de sisteme (07.10.2026)
+- **Ce s-a adaugat:** Pagina `/nomenclator` cu tipurile de sisteme (adaugare, redenumire, activare, ordine, denumiri alternative).
+- **Ce face acum:** Exista o lista proprie de tipuri de sisteme din care se aleg componentele proiectelor.
+- **De verificat:** Pasii sunt in Teste utilizator/12_Nomenclator.md.
+
+#### Componente pe proiect (tipuri de sisteme, stari, arhivare) (07.10.2026)
+- **Ce s-a adaugat:** Sectiunea Componente pe pagina proiectului si alegerea componentelor la crearea proiectului.
+- **Ce face acum:** Un proiect are componente cu stare (Ofertata, In executie, Predata, Inchisa); scoaterea unei componente o arhiveaza cu motiv si poate fi reactivata.
+- **De verificat:** Pasii sunt in Teste utilizator/06_Beneficiari_si_proiecte.md.
+
+#### Oferte: sabloane de devize-oferta xlsx (07.10.2026)
+- **Ce s-a adaugat:** Pagina `/oferte/sabloane`: sabloane care spun ce coloane si sectiuni se citesc dintr-un fisier .xlsx de oferta.
+- **Ce face acum:** Un devizul-oferta .xlsx se citeste pe baza unui sablon propus automat si editabil.
+- **De verificat:** Pasii sunt in Teste utilizator/13_Oferte_sabloane.md.
+
+#### Oferte: preluarea devizului-oferta (asistent, beneficiar, proiect, componenta, linii, revizii) (07.10.2026)
+- **Ce s-a adaugat:** Asistentul in 5 pasi `/oferte/preluare` si lista `/oferte`: potrivire beneficiar si produse, creare proiect/componenta, revizii cu diferente.
+- **Ce face acum:** O oferta se preia cu liniile legate de produsele din catalog; acelasi numar de oferta nou devine revizie cu diferentele afisate.
+- **De verificat:** Pasii sunt in Teste utilizator/14_Oferte_preluare.md.
+
+#### Situatia proiectului pe componente (07.10.2026)
+- **Ce s-a adaugat:** Pagina `/proiecte/{id}/situatie`: pe componenta si linie de oferta, necesar, predat (net de retururi), din stoc, deficit si stare; lista de achizitie pe furnizor; export PDF si CSV; coloana „Predat X din Y" pe componente.
+- **Ce face acum:** Vezi dintr-o privire ce lipseste unui proiect si ce trebuie cumparat, fara preturi.
+- **De verificat:** In browser: pagina, exporturile PDF/CSV si coloana Predat din Componente (Teste utilizator/06).
+
+#### Legarea iesirilor de componente si regula de scoatere a componentei (07.10.2026)
+- **Ce s-a adaugat:** Selectorul „Componenta" la iesirea spre un proiect (formularul de pe produs si Iesire multipla) si dialogul de lamurire la scoaterea unei componente (migrarea 26).
+- **Ce face acum:** Iesirea se leaga automat de componenta (sau „in afara ofertei"), iar o componenta cu iesiri nelamurite nu se scoate pana nu alegi pe fiecare produs: retur in depozit, ramas la beneficiar, mutat sau consumat.
+- **De verificat:** In browser: selectorul si dialogul (Teste utilizator/06); migrarea 26 pe baza BlazorStoc se aplica la pornirea previzualizarii.
+
+#### Rezervari pe proiect si avertismente la iesire (07.10.2026)
+- **Ce s-a adaugat:** Rezervari pe proiect (migrarea 27): coloana „Din care rezervat" si butoane „Rezerva cat se poate" pe Situatie, rezervare manuala, lista rezervarilor cu scadere, „Rezervat / stoc liber" pe pagina produsului, avertisment la iesire, propuneri dupa intrare.
+- **Ce face acum:** O rezervare tine bucati pentru un proiect fara sa schimbe stocul si scade stocul liber; iesirea consuma intai rezervarea proiectului, iar daca ar lua bucati rezervate de alte proiecte avertizeaza (fara sa blocheze) si lasa sa continui sau sa scazi o rezervare cu motiv; scoaterea unei componente elibereaza rezervarile ei.
+- **De verificat:** In browser: Situatia proiectului, avertismentul la iesire (pagina produsului si Iesire multipla), propunerile dupa intrare, selectorul „Pentru oferta" (Teste utilizator/06); migrarea 27 pe baza BlazorStoc se aplica la pornirea previzualizarii.
+
+#### Rezervari si legarea de oferta la preluarea facturii (07.10.2026)
+- **Ce s-a adaugat:** Selectorul „Pentru oferta" in pasul 3 al preluarii facturii si in dialogul „Adauga produs la factura"; propuneri de rezervare dupa finalizarea preluarii.
+- **Ce face acum:** O intrare din factura poate fi legata de componenta ofertei pe care o aproviziona (propunere automata cand produsul e intr-o singura componenta) si apare in Situatie ca „Intrat pt. oferta"; dupa preluare vezi cine poate rezerva din stocul liber.
+- **De verificat:** In browser: selectorul si propunerile (Teste utilizator/03).

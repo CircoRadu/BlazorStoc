@@ -40,6 +40,10 @@ public static class AuditEntities
     // Administrare -> Furnizori (the register of suppliers) and the invoices of suppliers that stock entries are taken from.
     public const string Supplier = "Furnizor";
     public const string SupplierInvoice = "FacturaFurnizor";
+    // Nomenclator -> Tipuri de sisteme.
+    public const string SystemType = "TipSistem";
+    // Oferte -> Sabloane: the templates of offer sheets (.xlsx).
+    public const string OfferTemplate = "SablonOferta";
 }
 
 public static class AuditActions
@@ -128,6 +132,52 @@ public static class AuditActions
     public const string MoveSupplierInvoice = "Mutare factură la alt furnizor";
     public const string AddSupplierAlias = "Adăugare denumire alternativă furnizor";
     public const string RemoveSupplierAlias = "Ștergere denumire alternativă furnizor";
+    // Stock entries and invoices: a free entry (no invoice), its tie to an invoice and the entry the user confirmed against a warning.
+    public const string RecordFreeEntry = "Intrare liberă înregistrată";
+    public const string AttachEntryToInvoice = "Atașare intrare la factură";
+    public const string DetachEntryFromInvoice = "Detașare intrare de la factură";
+    public const string DuplicateEntryOnInvoice = "Intrare dublată pe factură (confirmat)";
+    // Negative stock is an operating error: before the next entry the user states the real quantity (or zero) and a correction entry brings the stock there.
+    public const string RegularizeNegativeStock = "Regularizare stoc negativ";
+    public const string ExitOverStock = "Ieșire peste stocul din depozit";
+    // Exits by destination (the "peste stoc" part, when there is one, is in the details) and the exit confirmed against the duplicate warning.
+    public const string ExitToBeneficiary = "Ieșire spre beneficiar";
+    public const string ExitToVehicle = "Ieșire spre vehicul";
+    public const string GenericSale = "Vânzare generică";
+    public const string StockCorrection = "Corecție stoc";
+    public const string DuplicateExit = "Ieșire dublată (confirmat)";
+    public const string ImportOffer = "Preluare ofertă";
+    public const string ReviseOffer = "Revizie ofertă";
+    public const string LinkOfferLine = "Legare linie ofertă de produs";
+    public const string AddBeneficiaryAlias = "Adăugare denumire alternativă beneficiar";
+    public const string CreateOfferTemplate = "Creare șablon ofertă";
+    public const string EditOfferTemplate = "Modificare șablon ofertă";
+    public const string ActivateOfferTemplate = "Activare șablon ofertă";
+    public const string DeactivateOfferTemplate = "Dezactivare șablon ofertă";
+    public const string DeleteOfferTemplate = "Ștergere șablon ofertă";
+    public const string AddProjectComponent = "Adăugare componentă proiect";
+    public const string ChangeProjectComponentState = "Modificare stare componentă proiect";
+    public const string ArchiveProjectComponent = "Arhivare componentă proiect";
+    public const string ReactivateProjectComponent = "Reactivare componentă proiect";
+    public const string ReserveStock = "Rezervare stoc";
+    public const string ReduceReservation = "Scădere rezervare";
+    public const string ReleaseReservation = "Eliberare rezervare";
+    public const string ReservationConsumed = "Rezervare consumată prin ieșire";
+    public const string ReservationReducedByExit = "Scădere rezervare la ieșire";
+    public const string ReservationReleasedByComponent = "Rezervare eliberată la scoaterea componentei";
+    public const string ComponentExitReturned = "Retur în depozit la scoaterea componentei";
+    public const string ComponentExitLeft = "Rămas la beneficiar la scoaterea componentei";
+    public const string ComponentExitMoved = "Mutare ieșire pe altă componentă";
+    public const string ComponentExitConsumed = "Consumat la scoaterea componentei";
+    public const string AddSystemType = "Adăugare tip de sistem";
+    public const string RenameSystemType = "Modificare denumire tip de sistem";
+    public const string ActivateSystemType = "Activare tip de sistem";
+    public const string DeactivateSystemType = "Dezactivare tip de sistem";
+    public const string MoveSystemType = "Schimbare ordine tip de sistem";
+    public const string AddSystemTypeAlias = "Adăugare denumire alternativă tip de sistem";
+    public const string RemoveSystemTypeAlias = "Ștergere denumire alternativă tip de sistem";
+    public const string VoidExitOperation = "Stornare operație de ieșire";
+    public const string ReturnFromBeneficiary = "Retur de la beneficiar";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
@@ -143,7 +193,13 @@ public static class AuditActions
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
-            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias;
+            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias
+            or RecordFreeEntry or AttachEntryToInvoice or DetachEntryFromInvoice or DuplicateEntryOnInvoice or RegularizeNegativeStock or ExitOverStock
+            or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary
+            or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
+            or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
+            or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
+            or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -206,7 +262,9 @@ public static class AuditNavigation
         // The saved templates sub-tab of Settings -> Facturi, the template highlighted.
         [AuditEntities.InvoiceTemplate] = SettingsNavigation.InvoiceTemplateUrl,
         // The supplier page (its data and invoices). An invoice event stores the invoice id, which has no page of its own: plain text.
-        [AuditEntities.Supplier] = SupplierNavigation.SupplierUrl
+        [AuditEntities.Supplier] = SupplierNavigation.SupplierUrl,
+        [AuditEntities.SystemType] = SystemTypeNavigation.PageUrl,
+        [AuditEntities.OfferTemplate] = OfferNavigation.TemplateUrl
     };
 
     public static string? TargetUrl(AuditEvent entry, IReadOnlyDictionary<string, DateTime>? removals = null)

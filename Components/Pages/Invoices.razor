@@ -36,6 +36,17 @@
     <article><span>Fără intrări</span><strong>@(loaded ? invoices.Count(invoice => invoice.MovementCount == 0).ToString() : "—")</strong><small>Nicio intrare în stoc legată</small><i>⚠</i></article>
 </section>
 
+<div class="settings-tabs" role="tablist" aria-label="Secțiuni facturi">
+    <button type="button" role="tab" class="settings-tab @(tab == 0 ? "active" : "")" aria-selected="@(tab == 0)" @onclick="() => tab = 0">Facturi</button>
+    <button type="button" role="tab" class="settings-tab @(tab == 1 ? "active" : "")" aria-selected="@(tab == 1)" @onclick="() => tab = 1">Intrări fără factură</button>
+</div>
+
+@if (tab == 1)
+{
+    <FreeEntriesTab IsAdmin="isAdmin" Changed="OnFreeEntriesChangedAsync" InitialSupplierId="Supplier" />
+}
+else
+{
 <section class="catalog">
     <div class="catalog-heading"><h2>Registru facturi <span>@Filtered.Count</span></h2><small>@(isAdmin ? "O factură fără intrări în stoc se poate șterge; numărul, data și furnizorul se pot corecta" : "Consultare; o factură se preia din Produse → Preluare factură")</small></div>
     <div class="filters">
@@ -70,6 +81,7 @@
         </tbody></table></div>
     }
 </section>
+}
 
 @if (openInvoice is { } shown)
 {
@@ -86,9 +98,17 @@
                 @foreach (var entry in entries) { <tr @key="entry.MovementId"><td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(entry.ProductId)">@entry.ProductName</a></td><td class="number">@entry.Quantity</td><td>@StockMovementRules.DisplayDate(entry.Date)</td></tr> }
                 </tbody></table></div>
             }
-            <div class="editor-actions"><button type="button" class="primary" @onclick="CloseEntries">Închide</button></div>
+            <div class="editor-actions">
+                @if (CanAddManually) { <button type="button" class="refresh" @onclick="() => manualFor = shown">Adaugă produs manual</button> }
+                <button type="button" class="primary" @onclick="CloseEntries">Închide</button>
+            </div>
         </section>
     </div>
+}
+
+@if (manualFor is not null)
+{
+    <InvoiceManualEntryDialog Invoice="manualFor" Cancelled="() => manualFor = null" Done="ManualDoneAsync" />
 }
 
 @if (deleting is not null)
@@ -101,6 +121,12 @@
 
 @code {
     private readonly CancellationTokenSource lifetime = new();
+    private int tab;
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabName { get; set; }
+    [SupplyParameterFromQuery(Name = "furnizor")] public int? Supplier { get; set; }
+    protected override void OnParametersSet() { if (TabName == "fara-factura") tab = 1; }
+    private SupplierInvoice? manualFor;
+    private bool CanAddManually { get; set; } = true;
     private IReadOnlyList<SupplierInvoice> invoices = [];
     private IReadOnlyList<SelectOption> supplierOptions = [];
     private IReadOnlyList<InvoiceEntry> entries = [];
@@ -213,6 +239,15 @@
     }
 
     private void CloseEntries() => openInvoice = null;
+
+    private async Task ManualDoneAsync(string message)
+    {
+        manualFor = null; notice = message;
+        if (openInvoice is { } shown) await OpenAsync(shown);
+        await LoadAsync();
+    }
+
+    private async Task OnFreeEntriesChangedAsync(string message) { notice = message; await LoadAsync(); }
 
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
 }

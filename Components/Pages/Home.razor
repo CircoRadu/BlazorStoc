@@ -16,13 +16,23 @@
 
 <PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<div class="page-heading"><div><p class="eyebrow">INVENTAR CENTRALIZAT</p><h1>Produse și stocuri</h1><p class="muted">Găsește rapid produsele și verifică disponibilitatea lor.</p></div><div class="heading-actions"><a class="refresh" href="/">← Meniu principal</a>@if (canManage) { <a class="refresh" href="/categorii">Administrează categorii</a><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă produs</button> }<button class="refresh" disabled="@(loading || editing || deleting is not null)" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
+<div class="page-heading"><div><p class="eyebrow">INVENTAR CENTRALIZAT</p><h1>Produse și stocuri</h1><p class="muted">Găsește rapid produsele și verifică disponibilitatea lor.</p></div><div class="heading-actions"><a class="refresh" href="/">← Meniu principal</a>@if (canManage) { <a class="refresh" href="/iesiri/multipla">Ieșire multiplă</a><a class="refresh" href="/categorii">Administrează categorii</a><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă produs</button> }<button class="refresh" disabled="@(loading || editing || deleting is not null)" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
 @if (lockMessage is not null) { <div class="info-banner" role="status">@lockMessage</div> }
 @if (lockLost && editing) { <div class="info-banner" role="status">Blocarea editării a fost pierdută (a expirat sau a fost eliberată de un administrator). Poți continua, dar la salvare se verifică versiunea produsului.</div> }
 @if (editing) { <ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" /> }
+<div class="settings-tabs" role="tablist" aria-label="Secțiuni produse">
+    <button type="button" role="tab" class="settings-tab @(!regularizeTab ? "active" : "")" aria-selected="@(!regularizeTab)" @onclick="() => regularizeTab = false">Catalog</button>
+    <button type="button" role="tab" class="settings-tab @(regularizeTab ? "active" : "")" aria-selected="@regularizeTab" @onclick="() => regularizeTab = true">De regularizat@(toRegularize > 0 ? $" ({toRegularize})" : "")</button>
+</div>
+@if (regularizeTab)
+{
+    <ToRegularizeTab Changed="CountToRegularizeAsync" />
+}
+else
+{
 <section class="metrics" aria-label="Rezumat inventar">
     <article><span>Produse în selecție</span><strong>@(loaded ? ScopedProducts.Count.ToString("N0") : "—")</strong><small>@SelectionDescription</small><i>▦</i></article>
     <article><span>Categorii</span><strong>@(loaded ? ScopedProducts.Select(p => p.Category).Distinct(StringComparer.OrdinalIgnoreCase).Count().ToString() : "—")</strong><small>În selecția curentă</small><i>▤</i></article>
@@ -36,6 +46,7 @@ else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon
 else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td><button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)">↗</button></td></tr> }</tbody></table></div> }
 <footer class="table-footer"><span>@Filtered.Count @(Filtered.Count == 1 ? "rezultat" : "rezultate")</span><div class="pagination"><button disabled="@(page <= 1)" @onclick="() => page--" aria-label="Pagina anterioară">‹</button><span>Pagina @(page) din @Pages</span><button disabled="@(page >= Pages)" @onclick="() => page++" aria-label="Pagina următoare">›</button></div></footer></section>
 <p class="workspace-note"><span class="status-dot"></span> Date din BlazorStoc <span>·</span> Catalog și gestiune produse</p>
+}
 
 @if (imagePreview is not null)
 {
@@ -54,6 +65,15 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
                               Cancelled="CancelDeleteAsync" />
 }
 @code {
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabName { get; set; }
+    private bool regularizeTab;
+    private int toRegularize;
+    private async Task CountToRegularizeAsync()
+    {
+        try { toRegularize = (await Movements.GetToRegularizeAsync(null, lifetime.Token)).Count; }
+        catch (Exception) { toRegularize = 0; }
+        await InvokeAsync(StateHasChanged);
+    }
     [SupplyParameterFromQuery(Name = "categorie")] public string? CategoryQuery { get; set; }
     [SupplyParameterFromQuery(Name = "subcategorie")] public string? SubcategoryQuery { get; set; }
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
@@ -98,7 +118,9 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private LiveRefresh? live, liveLocks;
     protected override async Task OnInitializedAsync()
     {
+        regularizeTab = TabName == "de-regularizat";
         await LoadAsync();
+        await CountToRegularizeAsync();
         // Product edit locks (Task 9): taken and released by other sessions, refreshed on their events and every 15 s
         // because a lock also ends silently when its lease expires.
         liveLocks = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == ChangeEntities.ProductLock,

@@ -1,0 +1,35 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@* An entry can be tied to the component of a project whose offer it supplies (optional). When the product is in the offer of exactly one component, that component
+   is proposed (visible in the list and easy to undo). The tie is information: it does not change the stock. *@
+@if (candidates.Count > 0)
+{
+    <div class="relation-row entry-component-choice">
+        <span class="relation-check">Pentru oferta</span>
+        <select aria-label="Componenta de proiect pe care o aprovizionează intrarea" disabled="@Disabled" @onchange="args => ComponentIdChanged.InvokeAsync(int.TryParse(args.Value?.ToString(), out var id) ? id : null)">
+            <option value="" selected="@(ComponentId is null)">— nelegată de o ofertă —</option>
+            @foreach (var item in candidates) { <option value="@item.ComponentId" selected="@(ComponentId == item.ComponentId)">@item.ProjectName — @item.Name</option> }
+        </select>
+        @if (candidates.Count == 1 && ComponentId == candidates[0].ComponentId) { <small class="form-note">Propunere: produsul apare într-o singură componentă.</small> }
+    </div>
+}
+
+@code {
+    [Parameter] public int? ComponentId { get; set; }
+    [Parameter] public EventCallback<int?> ComponentIdChanged { get; set; }
+    [Parameter] public int? ProductId { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+
+    private IReadOnlyList<OfferComponent> candidates = [];
+    private int? loadedFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == ProductId) return;
+        loadedFor = ProductId; candidates = [];
+        if (ProductId is not { } product || Services.GetService<IProjectComponentRepository>() is not { } repository) return;
+        try { candidates = await repository.GetComponentsWithProductAsync(product); }
+        catch (Exception) { candidates = []; }
+        if (candidates.Count == 1 && ComponentId is null) await ComponentIdChanged.InvokeAsync(candidates[0].ComponentId);
+    }
+}

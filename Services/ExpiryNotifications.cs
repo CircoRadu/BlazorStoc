@@ -33,6 +33,8 @@ public interface IExpirySource
     string DateChangedReason(DateOnly from, DateOnly to, ExpiryInstance current) =>
         $"Data {DateLabel} {EventName} s-a modificat de la {StockMovementRules.DisplayDate(from)} la {StockMovementRules.DisplayDate(to)}.";
     // The subject and text the template form proposes for this source.
+    // The "days before expiry" the template form proposes for a new template of this source.
+    int DefaultThresholdDays => 30;
     string DefaultSubject => ExpiryTemplateRules.DefaultSubject;
     string DefaultBody => ExpiryTemplateRules.DefaultBody;
     // Placeholders specific to this source; the common ones are added by ExpiryTemplateRules.
@@ -73,6 +75,8 @@ public static class ExpirySourceKeys
     public const string VehicleRovinieta = "vehicul.rovinieta";
     public const string MaintenanceDue = "mentenanta.scadenta";
     public const string ContractExpiry = "contract.expirare";
+    public const string AwaitedInvoice = "intrare.factura-asteptata";
+    public const string OverStock = "stoc.iesiri-peste-stoc";
 }
 
 public sealed record NotificationTemplate(int Id, string SourceKey, string Subject, string Body, int ThresholdDays, bool Active, long Version);

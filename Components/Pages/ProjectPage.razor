@@ -46,6 +46,8 @@ else if (project is not null)
         <section class="catalog"><div class="catalog-heading"><h2>Observații generale</h2></div><p class="section-text">@project.Observations</p></section>
     }
 
+    <ProjectComponentsSection ProjectId="Id" />
+
     <section class="catalog">
         <div class="catalog-heading"><h2>Conținutul proiectului</h2><small>Creat @project.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · actualizat @project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</small></div>
         <div class="heading-actions section-actions"><button class="primary" disabled="@addingObservation" @onclick="OpenAddObservationAsync">+ Adaugă observație</button></div>
@@ -54,6 +56,7 @@ else if (project is not null)
             <div class="section-inline-editor"><ProjectObservationEditor @key="observationEditorKey" ProjectId="Id" Original="null" Saved="ObservationSavedAsync" Closed="() => addingObservation = false" /></div>
         }
         <div class="table-scroll"><table><thead><tr><th>ELEMENT</th><th>DETALII</th></tr></thead><tbody>
+            <tr><td><a class="category-table-link" href="@($"/proiecte/{Id}/situatie")"><strong>Situația proiectului</strong></a></td><td class="muted">Necesar, predat, stoc, deficit pe componente și lista de achiziție</td></tr>
             <tr><td><a class="category-table-link" href="@($"/proiecte/{Id}/echipamente")"><strong>Echipamente</strong></a></td><td class="muted">Materiale și echipamente scoase din inventar pentru acest proiect</td></tr>
             @if (observationsLoading)
             {

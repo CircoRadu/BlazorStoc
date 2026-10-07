@@ -1,0 +1,99 @@
+@using BlazorStoc.Services
+@inject IStockMovementRepository Movements
+@inject ISupplierInvoiceRepository InvoiceRepository
+@inject ISupplierRepository SupplierRepository
+@* Administrator only: ties free entries to an invoice (several at once) or frees one entry from its invoice. The stock does not change;
+   each entry is its own event in the journal and the reason is required. *@
+<div class="delete-overlay">
+    <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="link-title">
+        <h2 id="link-title">@(Detach ? "Detașează intrarea de la factură" : Entries.Count == 1 ? "Atașează intrarea la factură" : $"Atașează {Entries.Count} intrări la factură")</h2>
+        <ul class="link-entries">
+            @foreach (var entry in Entries)
+            {
+                <li>@entry.Quantity buc. · @StockMovementRules.DisplayDate(entry.Date) · @entry.Description@(entry.InvoiceNumber is not null ? $" · factura {entry.InvoiceNumber}" : "")</li>
+            }
+        </ul>
+        <fieldset disabled="@busy">
+            @if (!Detach)
+            {
+                <div class="editor-grid">
+                    <div>
+                        <span class="field-label">Furnizor *</span>
+                        <SearchableSelect Id="link-supplier" Label="Furnizor" Placeholder="Caută sau alege furnizorul…" EmptyText="Niciun furnizor găsit."
+                                          Options="options" SelectedId="supplierId" SelectedIdChanged="SupplierChangedAsync" Disabled="busy" />
+                    </div>
+                    <label for="link-invoice">Factura *
+                        <select id="link-invoice" disabled="@(busy || supplierId is null)" @onchange="args => invoiceId = int.TryParse(args.Value?.ToString(), out var id) ? id : null">
+                            <option value="" selected="@(invoiceId is null)">@(supplierId is null ? "— alege întâi furnizorul —" : invoices.Count == 0 ? "— furnizorul nu are facturi —" : "— alege factura —")</option>
+                            @foreach (var invoice in invoices) { <option value="@invoice.Id" selected="@(invoiceId == invoice.Id)">@invoice.Label (@invoice.MovementCount @(invoice.MovementCount == 1 ? "intrare" : "intrări"))</option> }
+                        </select></label>
+                </div>
+                @if (MismatchSupplier is { } mismatch) { <small class="form-note" role="status">⚠ Intrarea a fost înregistrată pentru furnizorul «@mismatch»; factura aleasă este a altui furnizor. Explică în motiv.</small> }
+            }
+            <label class="full-width" for="link-reason">Motivare *
+                <InputTextArea id="link-reason" @bind-Value="reason" rows="2" maxlength="@ChangeReasonRules.MaximumLength" /></label>
+            <small class="form-note">Dacă cantitățile intrărilor diferă de cele de pe factură, spune în motiv de ce. Stocul nu se modifică.</small>
+            @if (error is not null) { <div class="validation-message" role="alert">@error</div> }
+            <div class="editor-actions">
+                <button class="primary" type="button" @onclick="SaveAsync">@(busy ? "Se salvează…" : Detach ? "Detașează" : "Atașează")</button>
+                <button type="button" class="danger" @onclick="Cancelled">Anulează</button>
+            </div>
+        </fieldset>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<StockMovement> Entries { get; set; } = [];
+    [Parameter] public bool Detach { get; set; }
+    [Parameter] public EventCallback<string> Done { get; set; }
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private IReadOnlyList<SelectOption> options = [];
+    private IReadOnlyList<SupplierInvoice> invoices = [];
+    private int? supplierId, invoiceId;
+    private string reason = "";
+    private string? error;
+    private bool busy;
+
+    private string? MismatchSupplier => invoiceId is not null && supplierId is { } chosen
+        ? Entries.FirstOrDefault(entry => entry.FreeSupplierId is { } free && free != chosen)?.FreeSupplierName : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Detach) return;
+        try
+        {
+            options = (await SupplierRepository.GetSuppliersAsync()).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(item => new SelectOption(item.Id, item.Name, item.Cui)).ToArray();
+            var same = Entries.Select(entry => entry.FreeSupplierId).Distinct().ToList();
+            if (same.Count == 1 && same[0] is { } id) await SupplierChangedAsync(id);
+        }
+        catch (Exception) { error = "Lista furnizorilor nu a putut fi încărcată."; }
+    }
+
+    private async Task SupplierChangedAsync(int? id)
+    {
+        supplierId = id; invoiceId = null; invoices = [];
+        if (id is { } value)
+            try { invoices = await InvoiceRepository.GetForSupplierAsync(value); }
+            catch (Exception) { error = "Facturile furnizorului nu au putut fi încărcate."; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        error = null;
+        if (!Detach && invoiceId is null) { error = "Alege factura."; return; }
+        if (ChangeReasonRules.ValidationError(reason) is { } reasonError) { error = reasonError; return; }
+        busy = true;
+        try
+        {
+            if (Detach) await Movements.DetachFromInvoiceAsync(Entries[0], reason);
+            else await Movements.AttachToInvoiceAsync(Entries, invoiceId!.Value, reason);
+            await Done.InvokeAsync(Detach ? "Intrarea a fost detașată de la factură." : Entries.Count == 1 ? "Intrarea a fost atașată la factură." : $"{Entries.Count} intrări au fost atașate la factură.");
+        }
+        catch (Exception exception) when (exception is StockMovementOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception) { error = "Operația nu a putut fi salvată. Verifică și reîncearcă."; }
+        finally { busy = false; }
+    }
+}

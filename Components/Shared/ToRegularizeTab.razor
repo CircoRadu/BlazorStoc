@@ -1,0 +1,132 @@
+@using BlazorStoc.Services
+@inject IStockMovementRepository Movements
+@inject ILogger<ToRegularizeTab> Logger
+@implements IDisposable
+@* Tab "De regularizat" of the products page: products whose stock is negative after exits over the stock (an operating error: an entry not
+   recorded, or a wrong stock in the database). The action is the same operation as the strip on the product page (RegularizeNegativeStockAsync). *@
+<section class="catalog" aria-label="Produse de regularizat">
+    <div class="catalog-heading"><h2>De regularizat <span>@items.Count</span></h2><small>Produse cu stoc negativ după ieșiri peste stoc, cele mai vechi primele</small></div>
+    <div class="filters">
+        <fieldset class="movement-kind">
+            <legend class="sr-only">Cauza</legend>
+            <label><input type="radio" name="reg-cause" checked="@(causeFilter == CauseAll)" @onchange="() => SetCauseAsync(CauseAll)" /> Toate</label>
+            <label><input type="radio" name="reg-cause" checked="@(causeFilter == CauseUnrecorded)" @onchange="() => SetCauseAsync(CauseUnrecorded)" /> Intrare neoperată</label>
+            <label><input type="radio" name="reg-cause" checked="@(causeFilter == CauseWrong)" @onchange="() => SetCauseAsync(CauseWrong)" /> Stoc greșit în bază</label>
+            <label><input type="radio" name="reg-cause" checked="@(causeFilter == CauseNone)" @onchange="() => SetCauseAsync(CauseNone)" /> Fără cauză</label>
+        </fieldset>
+        <label class="movement-page-size">Vechime
+            <select @onchange="AgeChangedAsync">
+                <option value="0" selected="@(olderThan == 0)">Oricât</option>
+                <option value="7" selected="@(olderThan == 7)">Cel puțin 7 zile</option>
+                <option value="14" selected="@(olderThan == 14)">Cel puțin 14 zile</option>
+                <option value="30" selected="@(olderThan == 30)">Cel puțin 30 zile</option>
+            </select></label>
+    </div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (loading && !loaded) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă lista</h3></div> }
+    else if (items.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">✓</span><h3>Nimic de regularizat</h3><p>Niciun produs nu are stoc negativ după ieșiri peste stoc@(FilterActive ? " pentru filtrele alese" : "").</p></div>
+    }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">STOC</th><th class="number">IEȘIRI PESTE STOC</th><th>DE LA</th><th class="number">VECHIME</th><th>CAUZA</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var item in items)
+        {
+            <tr @key="item.ProductId">
+                <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(item.ProductId)"><strong>@item.ProductName</strong></a></td>
+                <td class="number"><span class="stock-badge negative">@item.Stock</span></td>
+                <td class="number">@item.OverStockExits</td>
+                <td>@StockMovementRules.DisplayDate(item.Since)</td>
+                <td class="number">@(item.Days(today)) zile</td>
+                <td>@(item.Cause is { } cause ? StockMovementRules.CauseLabel(cause) : "—")</td>
+                <td>
+                    @if (item.CanRegularize)
+                    {
+                        <button type="button" class="primary" @onclick="() => Open(item)">Regularizează</button>
+                    }
+                    else
+                    {
+                        <a class="category-table-link" title="Stocul total nu este negativ (produsul e în mașini sau negativ într-o mașină): se corectează din ieșirile produsului" href="@StockMovementNavigation.ProductUrl(item.ProductId)">Deschide produsul</a>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (regularizing is not null)
+{
+    <div class="delete-overlay">
+        <section class="delete-dialog" role="dialog" aria-modal="true" aria-label="Regularizare stoc">
+            <h2>Regularizare stoc</h2>
+            <p class="delete-object"><strong>@regularizing.ProductName</strong></p>
+            <NegativeStockPanel Resolution="resolution" Stock="regularizing.Stock" Disabled="busy" Changed="() => dialogError = null" />
+            @if (dialogError is not null) { <div class="error-banner" role="alert">@dialogError</div> }
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@(busy || !resolution.IsResolved)" @onclick="RegularizeAsync">@(busy ? "Se salvează…" : "Regularizează stocul acum")</button>
+                <button type="button" class="danger" disabled="@busy" @onclick="Close">Renunț</button>
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private const int CauseAll = 0, CauseUnrecorded = 1, CauseWrong = 2, CauseNone = 3;
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<RegularizationItem> items = [];
+    private int causeFilter, olderThan;
+    private bool loading, loaded, busy;
+    private string? error, notice, dialogError;
+    private RegularizationItem? regularizing;
+    private readonly NegativeStockResolution resolution = new();
+    private DateOnly today = StockMovementRules.Today;
+
+    private bool FilterActive => causeFilter != CauseAll || olderThan != 0;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private RegularizationQuery Query() => new(
+        causeFilter switch { CauseUnrecorded => OverStockCause.UnrecordedEntry, CauseWrong => OverStockCause.WrongStock, _ => null },
+        causeFilter == CauseNone, olderThan > 0 ? olderThan : null);
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null; today = StockMovementRules.Today;
+        try { items = await Movements.GetToRegularizeAsync(Query(), lifetime.Token); loaded = true; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("To-regularize list loading failed ({ErrorType}).", ex.GetType().Name); error = "Lista nu a putut fi încărcată. Reîncearcă peste câteva momente."; }
+        finally { loading = false; }
+    }
+
+    private async Task SetCauseAsync(int value) { causeFilter = value; await LoadAsync(); }
+    private async Task AgeChangedAsync(ChangeEventArgs args) { olderThan = int.TryParse(args.Value?.ToString(), out var days) ? days : 0; await LoadAsync(); }
+
+    private void Open(RegularizationItem item) { regularizing = item; resolution.Zero = false; resolution.Real = null; dialogError = null; notice = null; }
+    private void Close() { if (!busy) regularizing = null; }
+
+    private async Task RegularizeAsync()
+    {
+        if (busy || regularizing is null || !resolution.IsResolved) return;
+        busy = true; dialogError = null;
+        try
+        {
+            await Movements.RegularizeNegativeStockAsync(regularizing.ProductId, resolution.RealQuantity, "Regularizare din lista De regularizat", lifetime.Token);
+            notice = $"Stocul produsului {regularizing.ProductName} a fost regularizat.";
+            regularizing = null;
+            await LoadAsync();
+            await Changed.InvokeAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockMovementOperationException or AccessDeniedException) { dialogError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Stock regularization failed ({ErrorType}).", ex.GetType().Name); dialogError = "Regularizarea nu a putut fi salvată. Reîncarcă lista și reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

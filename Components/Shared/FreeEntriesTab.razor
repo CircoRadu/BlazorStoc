@@ -1,0 +1,141 @@
+@using BlazorStoc.Services
+@inject IStockMovementRepository Movements
+@inject ILogger<FreeEntriesTab> Logger
+@implements IDisposable
+@* The "Intrari fara factura" tab of the Facturi page: every entry recorded with a reason but without an invoice. The administrator ties
+   several of them to one invoice at once (stock unchanged); everyone else sees what is still waiting. *@
+<section class="catalog" aria-labelledby="free-entries-title">
+    <div class="catalog-heading"><h2 id="free-entries-title">Intrări fără factură <span>@Filtered.Count</span></h2>
+        <small>@(IsAdmin ? "Alege intrările și leagă-le de factura primită; stocul nu se modifică" : "Intrări înregistrate fără factură, în urmărire")</small></div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
+    <div class="filters">
+        <label>Motiv
+            <select @onchange="TypeChanged">
+                <option value="" selected="@(!type.HasValue && !unspecified)">Toate cu motiv</option>
+                @foreach (var item in Enum.GetValues<FreeEntryType>()) { <option value="@((int)item)" selected="@(type == item)">@StockMovementRules.FreeTypeLabel(item)</option> }
+                <option value="0" selected="@unspecified">Înregistrate fără motiv (vechi)</option>
+            </select></label>
+        <label>Furnizor
+            <select @onchange="SupplierChanged">
+                <option value="" selected="@(supplierId is null)">Toți</option>
+                @foreach (var supplier in Suppliers) { <option value="@supplier.Id" selected="@(supplierId == supplier.Id)">@supplier.Name</option> }
+            </select></label>
+        <label>Vechime
+            <select @onchange="AgeChanged">
+                <option value="" selected="@(olderThan is null)">Oricât</option>
+                <option value="7" selected="@(olderThan == 7)">Peste 7 zile</option>
+                <option value="14" selected="@(olderThan == 14)">Peste 14 zile</option>
+                <option value="30" selected="@(olderThan == 30)">Peste 30 de zile</option>
+            </select></label>
+    </div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă intrările</h3></div> }
+    else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▤</span><h3>Nu există intrări fără factură pentru filtrele curente</h3></div> }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr>
+            @if (IsAdmin) { <th><span class="sr-only">Selectează</span></th> }
+            <th>DATA</th><th>PRODUS</th><th class="number">BUC.</th><th>MOTIV</th><th>FURNIZOR</th><th>REFERINȚĂ</th><th>DESCRIERE</th><th>OPERATOR</th></tr></thead><tbody>
+        @foreach (var entry in Filtered)
+        {
+            <tr @key="entry.MovementId">
+                @if (IsAdmin) { <td><RowSelect Selected="@selected.Contains(entry.MovementId)" AriaLabel="@($"Selectează intrarea {entry.ProductName} din {StockMovementRules.DisplayDate(entry.Date)}")" SelectedChanged="@(value => Toggle(entry.MovementId, value))" /></td> }
+                <td>@StockMovementRules.DisplayDate(entry.Date)</td>
+                <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(entry.ProductId)">@entry.ProductName</a></td>
+                <td class="number">@entry.Quantity</td>
+                <td>@(entry.Type is { } kind ? StockMovementRules.FreeTypeLabel(kind) : "—")</td>
+                <td>@if (entry.SupplierId is { } id && entry.SupplierName is not null) { <a class="category-table-link" href="@SupplierNavigation.SupplierUrl(id)">@entry.SupplierName</a> } else { <text>—</text> }</td>
+                <td>@(entry.Reference ?? "—")</td>
+                <td class="movement-text">@entry.Description</td>
+                <td>@entry.Operator</td>
+            </tr>
+        }
+        </tbody></table></div>
+        @if (IsAdmin)
+        {
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@(selected.Count == 0)" @onclick="OpenLinkAsync">Atașează la factură (@selected.Count)</button>
+            </div>
+        }
+    }
+</section>
+
+@if (linking is not null)
+{
+    <EntryInvoiceLinkDialog Entries="linking" Cancelled="CancelLink" Done="LinkDoneAsync" />
+}
+
+@code {
+    [Parameter] public bool IsAdmin { get; set; }
+    // From the link of the notification: only the entries of that supplier.
+    [Parameter] public int? InitialSupplierId { get; set; }
+    [Parameter] public EventCallback<string> Changed { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<FreeEntry> entries = [];
+    private readonly HashSet<int> selected = [];
+    private FreeEntryType? type;
+    private bool unspecified, loading;
+    private int? supplierId, olderThan;
+    private string? error, notice;
+    private IReadOnlyList<StockMovement>? linking;
+
+    private IEnumerable<(int Id, string Name)> SupplierPairs => entries.Where(entry => entry.SupplierId is not null).GroupBy(entry => entry.SupplierId!.Value)
+        .Select(group => (group.Key, group.First().SupplierName!)).OrderBy(pair => pair.Item2, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<(int Id, string Name)> Suppliers => SupplierPairs;
+    private List<FreeEntry> Filtered => entries.ToList();
+
+    protected override Task OnInitializedAsync() { supplierId = InitialSupplierId; return LoadAsync(); }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            entries = await Movements.GetFreeEntriesAsync(new FreeEntryQuery(type, supplierId, olderThan, unspecified), lifetime.Token);
+            selected.IntersectWith(entries.Select(entry => entry.MovementId));
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Free entries loading failed ({ErrorType}).", exception.GetType().Name); error = "Intrările nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private async Task TypeChanged(ChangeEventArgs args)
+    {
+        var text = args.Value?.ToString();
+        unspecified = text == "0";
+        type = int.TryParse(text, out var value) && Enum.IsDefined(typeof(FreeEntryType), value) ? (FreeEntryType)value : null;
+        await LoadAsync();
+    }
+    private async Task SupplierChanged(ChangeEventArgs args) { supplierId = int.TryParse(args.Value?.ToString(), out var id) ? id : null; await LoadAsync(); }
+    private async Task AgeChanged(ChangeEventArgs args) { olderThan = int.TryParse(args.Value?.ToString(), out var days) ? days : null; await LoadAsync(); }
+
+    private void Toggle(int id, bool value) { if (value) selected.Add(id); else selected.Remove(id); }
+
+    private async Task OpenLinkAsync()
+    {
+        error = null;
+        try
+        {
+            var found = new List<StockMovement>();
+            foreach (var id in selected)
+                if (await Movements.GetAsync(id, lifetime.Token) is { } movement) found.Add(movement);
+            if (found.Count == 0) { error = StockMovementRules.NothingToAttachMessage; return; }
+            linking = found;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Free entry loading failed ({ErrorType}).", exception.GetType().Name); error = "Intrările alese nu au putut fi citite."; }
+    }
+
+    private void CancelLink() => linking = null;
+
+    private async Task LinkDoneAsync(string message)
+    {
+        linking = null; selected.Clear(); notice = message;
+        await LoadAsync();
+        await Changed.InvokeAsync(message);
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

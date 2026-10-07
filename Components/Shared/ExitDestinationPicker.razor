@@ -71,6 +71,8 @@
         <small class="form-note">@(Model.Destination == ExitDestination.GenericSale ? "Vânzare fără beneficiar sau proiect." : "Corecție a stocului, fără beneficiar, proiect sau vehicul.")</small>
     }
 
+    @if (ShowSource)
+    {
     <fieldset class="destination-group" disabled="@Disabled">
         <legend>Sursa produsului *</legend>
         <div class="destination-options">
@@ -85,7 +87,8 @@
             <small class="form-note">Transferul dintr-o mașină în alta se face din pagina vehiculului.</small>
         }
     </fieldset>
-    @if (sourceIsVehicle)
+    }
+    @if (ShowSource && sourceIsVehicle)
     {
         <div class="relation-row">
             <span class="relation-check">Mașina sursă</span>
@@ -123,6 +126,8 @@
     [Parameter] public IReadOnlyList<Vehicle> Vehicles { get; set; } = Array.Empty<Vehicle>();
     [Parameter] public IReadOnlyList<VehicleStock> VehicleStocks { get; set; } = Array.Empty<VehicleStock>();
     [Parameter] public bool Disabled { get; set; }
+    // False when the source is chosen elsewhere (the exit operation chooses it for each product).
+    [Parameter] public bool ShowSource { get; set; } = true;
     [Parameter] public bool UseProject { get; set; }
     // A movement being edited already accounts for its own quantity in the source vehicle: it is added back.
     [Parameter] public int? EditingSourceVehicleId { get; set; }

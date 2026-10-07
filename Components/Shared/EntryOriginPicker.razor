@@ -1,0 +1,206 @@
+@using BlazorStoc.Services
+@inject ISupplierInvoiceRepository InvoiceRepository
+@inject ISupplierRepository SupplierRepository
+@inject NavigationManager Navigation
+@* Where an entry comes from: free (no invoice, with a reason), an invoice already recorded, or a new invoice typed by hand. The
+   automatic reading of a PDF invoice stays a separate flow (the "Preia din PDF" button), so a failed or unwanted reading never blocks the entry. *@
+<div class="entry-origin">
+    <div class="settings-tabs origin-tabs" role="tablist" aria-label="Proveniența intrării">
+        <button type="button" role="tab" class="settings-tab @(origin == Origin.Free ? "active" : "")" aria-selected="@(origin == Origin.Free)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Free)">Intrare liberă</button>
+        <button type="button" role="tab" class="settings-tab @(origin == Origin.Existing ? "active" : "")" aria-selected="@(origin == Origin.Existing)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Existing)">Factură existentă</button>
+        <button type="button" role="tab" class="settings-tab @(origin == Origin.New ? "active" : "")" aria-selected="@(origin == Origin.New)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.New)">Factură nouă (manual)</button>
+        <a class="refresh origin-pdf" href="/produse/preluare-factura">Preia din PDF</a>
+    </div>
+    @if (origin == Origin.Free)
+    {
+        <div class="editor-grid">
+            <label for="@($"{Prefix}-free-type")">Motivul intrării libere *
+                <select id="@($"{Prefix}-free-type")" disabled="@Disabled" @onchange="FreeTypeChanged">
+                    <option value="" selected="@(Model.FreeType is null)">— alege motivul —</option>
+                    @foreach (var type in Enum.GetValues<FreeEntryType>()) { <option value="@((int)type)" selected="@(Model.FreeType == type)">@StockMovementRules.FreeTypeLabel(type)</option> }
+                </select></label>
+            <div>
+                <span class="field-label">Furnizor@(Model.FreeType == FreeEntryType.AwaitedInvoice ? " *" : " (opțional)")</span>
+                <SearchableSelect Id="@($"{Prefix}-free-supplier")" Label="Furnizor" Placeholder="Caută sau alege furnizorul…" EmptyText="Niciun furnizor găsit."
+                                  Options="SupplierOptions" SelectedId="Model.FreeSupplierId" SelectedIdChanged="FreeSupplierChanged" Disabled="Disabled" />
+            </div>
+            <label class="full-width" for="@($"{Prefix}-reference")">Referință (opțional)
+                <InputText id="@($"{Prefix}-reference")" @bind-Value="Model.Reference" maxlength="@StockMovementRules.MaxReferenceLength" placeholder="Aviz, bon, persoană, document…" /></label>
+        </div>
+        @if (Model.FreeType == FreeEntryType.FromBeneficiary && ReturnableExits.Count > 0)
+        {
+            <label class="full-width" for="@($"{Prefix}-return-of")">Ieșirea returnată (opțional)
+                <select id="@($"{Prefix}-return-of")" disabled="@Disabled" @onchange="ReturnOfChanged">
+                    <option value="" selected="@(Model.ReturnOfMovementId is null)">— nu e legat de o ieșire —</option>
+                    @foreach (var exit in ReturnableExits)
+                    {
+                        <option value="@exit.MovementId" selected="@(Model.ReturnOfMovementId == exit.MovementId)">@ExitLabel(exit)</option>
+                    }
+                </select></label>
+            <small class="form-note">Un retur legat de o ieșire scade consumul net al proiectului și al beneficiarului; poate fi parțial.</small>
+        }
+        @if (Model.FreeType == FreeEntryType.AwaitedInvoice)
+        {
+            <small class="form-note">Intrarea rămâne în urmărire până se leagă de factura furnizorului; o notificare te anunță dacă factura întârzie.</small>
+        }
+    }
+    else if (origin == Origin.Existing)
+    {
+        <div class="editor-grid">
+            <div>
+                <span class="field-label">Furnizor *</span>
+                <SearchableSelect Id="@($"{Prefix}-invoice-supplier")" Label="Furnizor" Placeholder="Caută sau alege furnizorul…" EmptyText="Niciun furnizor găsit."
+                                  Options="SupplierOptions" SelectedId="invoiceSupplierId" SelectedIdChanged="InvoiceSupplierChangedAsync" Disabled="Disabled" />
+            </div>
+            <label for="@($"{Prefix}-invoice")">Factura *
+                <select id="@($"{Prefix}-invoice")" disabled="@(Disabled || invoiceSupplierId is null)" @onchange="InvoiceChanged">
+                    <option value="" selected="@(Model.InvoiceId is null)">@(invoiceSupplierId is null ? "— alege întâi furnizorul —" : invoices.Count == 0 ? "— furnizorul nu are facturi —" : "— alege factura —")</option>
+                    @foreach (var invoice in invoices) { <option value="@invoice.Id" selected="@(Model.InvoiceId == invoice.Id)">@invoice.Label (@invoice.MovementCount @(invoice.MovementCount == 1 ? "intrare" : "intrări"))</option> }
+                </select></label>
+            <label for="@($"{Prefix}-invoice-quantity")">Cantitate pe factură (opțional)
+                <InputNumber id="@($"{Prefix}-invoice-quantity")" TValue="int?" @bind-Value="Model.InvoiceQuantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
+        </div>
+    }
+    else
+    {
+        <div class="editor-grid">
+            <div>
+                <span class="field-label">Furnizor *</span>
+                <SearchableSelect Id="@($"{Prefix}-new-supplier")" Label="Furnizor" Placeholder="Caută sau alege furnizorul…" EmptyText="Niciun furnizor găsit."
+                                  Options="SupplierOptions" SelectedId="invoiceSupplierId" SelectedIdChanged="NewSupplierChanged" Disabled="Disabled" />
+            </div>
+            <label for="@($"{Prefix}-new-number")">Număr factură *
+                <InputText id="@($"{Prefix}-new-number")" @bind-Value="newNumber" maxlength="@SupplierInvoiceRules.MaxNumberLength" /></label>
+            <label for="@($"{Prefix}-new-date")">Data emiterii *
+                <PickOnlyDate Id="@($"{Prefix}-new-date")" @bind-Value="newDate" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
+            <label for="@($"{Prefix}-new-quantity")">Cantitate pe factură (opțional)
+                <InputNumber id="@($"{Prefix}-new-quantity")" TValue="int?" @bind-Value="Model.InvoiceQuantity" min="1" max="@StockMovementRules.MaxQuantity" /></label>
+        </div>
+        <small class="form-note">Dacă factura aceluiași furnizor cu același număr există deja, intrarea continuă pe ea; o factură se înregistrează o singură dată.</small>
+    }
+</div>
+
+@code {
+    private enum Origin { Free, Existing, New }
+
+    [Parameter, EditorRequired] public StockMovementInput Model { get; set; } = new();
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string Prefix { get; set; } = "add";
+    [Parameter] public EventCallback Changed { get; set; }
+    // Exits to a beneficiary of the product that a return ("Primit de la beneficiar") can be tied to.
+    [Parameter] public IReadOnlyList<ReturnableExit> ReturnableExits { get; set; } = [];
+
+    private Origin origin = Origin.Free;
+    private StockMovementInput? lastModel;
+    private IReadOnlyList<Supplier> suppliers = [];
+    private IReadOnlyList<SelectOption> SupplierOptions = [];
+    private int? invoiceSupplierId;
+    private IReadOnlyList<SupplierInvoice> invoices = [];
+    private string newNumber = "";
+    private DateOnly? newDate = StockMovementRules.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            suppliers = (await SupplierRepository.GetSuppliersAsync()).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+            SupplierOptions = suppliers.Select(item => new SelectOption(item.Id, item.Name, item.Cui)).ToArray();
+        }
+        catch (Exception) { suppliers = []; }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(lastModel, Model)) { if (lastModel is not null) ResetOrigin(); lastModel = Model; }
+    }
+
+    private void ResetOrigin() { origin = Origin.Free; invoiceSupplierId = null; invoices = []; newNumber = ""; newDate = StockMovementRules.Today; }
+
+    private void ClearOrigin()
+    {
+        Model.InvoiceId = null; Model.FreeType = null; Model.FreeSupplierId = null; Model.Reference = null; Model.InvoiceQuantity = null; Model.DuplicateReason = "";
+        Model.ReturnOfMovementId = null;
+    }
+
+    private async Task SetOrigin(Origin value)
+    {
+        if (origin == value) return;
+        origin = value; ClearOrigin(); invoiceSupplierId = null; invoices = [];
+        await Changed.InvokeAsync();
+    }
+
+    private async Task FreeTypeChanged(ChangeEventArgs args)
+    {
+        Model.FreeType = int.TryParse(args.Value?.ToString(), out var value) && Enum.IsDefined(typeof(FreeEntryType), value) ? (FreeEntryType)value : null;
+        if (Model.FreeType != FreeEntryType.FromBeneficiary) Model.ReturnOfMovementId = null;
+        await Changed.InvokeAsync();
+    }
+
+    private async Task ReturnOfChanged(ChangeEventArgs args)
+    {
+        Model.ReturnOfMovementId = int.TryParse(args.Value?.ToString(), out var id) ? id : null;
+        await Changed.InvokeAsync();
+    }
+
+    private static string ExitLabel(ReturnableExit exit) =>
+        $"{StockMovementRules.DisplayDate(exit.Date)} · {exit.BeneficiaryName ?? "—"}{(exit.ProjectName is null ? "" : $" / {exit.ProjectName}")}"
+        + $"{(string.IsNullOrWhiteSpace(exit.Reference) ? "" : $" · {exit.Reference}")} · rămase {exit.Remaining} din {exit.Quantity} buc. (operația #{exit.OperationId})";
+
+    private async Task FreeSupplierChanged(int? id) { Model.FreeSupplierId = id; await Changed.InvokeAsync(); }
+
+    private async Task InvoiceSupplierChangedAsync(int? id)
+    {
+        invoiceSupplierId = id; Model.InvoiceId = null; invoices = [];
+        if (id is { } supplierId) await LoadInvoicesAsync(supplierId);
+        await Changed.InvokeAsync();
+    }
+
+    private async Task NewSupplierChanged(int? id) { invoiceSupplierId = id; await Changed.InvokeAsync(); }
+
+    private async Task LoadInvoicesAsync(int supplierId)
+    {
+        try { invoices = await InvoiceRepository.GetForSupplierAsync(supplierId); }
+        catch (Exception) { invoices = []; }
+    }
+
+    private async Task InvoiceChanged(ChangeEventArgs args)
+    {
+        Model.InvoiceId = int.TryParse(args.Value?.ToString(), out var id) ? id : null;
+        await Changed.InvokeAsync();
+    }
+
+    // Null when the origin is complete; the message to show otherwise.
+    public string? ValidationError()
+    {
+        if (origin == Origin.Free)
+        {
+            if (Model.FreeType is null) return "Alege motivul intrării libere.";
+            if (Model.FreeType == FreeEntryType.AwaitedInvoice && Model.FreeSupplierId is null) return StockMovementRules.AwaitedSupplierRequiredMessage;
+            return null;
+        }
+        if (origin == Origin.Existing) return Model.InvoiceId is null ? "Alege factura." : null;
+        try { SupplierInvoiceRules.Validated(new SupplierInvoiceInput { SupplierId = invoiceSupplierId, Number = newNumber, Date = newDate }); return null; }
+        catch (SupplierInvoiceOperationException exception) { return exception.Message; }
+    }
+
+    // A new invoice is recorded (or the existing one with that number is continued) right before the entry; afterwards the picker shows it as an existing one.
+    public async Task<string?> PrepareAsync(CancellationToken token)
+    {
+        if (origin != Origin.New) return null;
+        try
+        {
+            var input = SupplierInvoiceRules.Validated(new SupplierInvoiceInput { SupplierId = invoiceSupplierId, Number = newNumber, Date = newDate });
+            var invoice = await InvoiceRepository.FindAsync(input.SupplierId!.Value, input.Number, token)
+                          ?? await InvoiceRepository.CreateAsync(input, token);
+            Model.InvoiceId = invoice.Id;
+            origin = Origin.Existing; invoiceSupplierId = invoice.SupplierId;
+            await LoadInvoicesAsync(invoice.SupplierId);
+            newNumber = ""; StateHasChanged();
+            return null;
+        }
+        catch (Exception exception) when (exception is SupplierInvoiceOperationException or AccessDeniedException) { return exception.Message; }
+    }
+
+    // After a saved entry: the invoice list is refreshed (entry counts) and the invoice stays chosen for the next entry.
+    public async Task RefreshAsync() { if (origin == Origin.Existing && invoiceSupplierId is { } supplierId) { await LoadInvoicesAsync(supplierId); StateHasChanged(); } }
+}

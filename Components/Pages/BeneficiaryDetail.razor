@@ -107,6 +107,8 @@ else if (beneficiary is not null)
         </tbody></table></div>
     </section>
 
+    <NetConsumptionSection BeneficiaryId="Id" />
+
     <ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" />

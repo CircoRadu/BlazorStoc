@@ -16,9 +16,12 @@ param(
     [string]$MariaRoot = 'C:\Dev\BlazorStoc-MariaDB',
     [string]$SecretsDir,
     [string]$MariaBinDir,
-    [switch]$NoPublish
+    [switch]$NoPublish,
+    [switch]$CleanAssets
 )
 $ErrorActionPreference = 'Stop'
+$clock = [Diagnostics.Stopwatch]::StartNew()
+function Write-Step([string]$Name) { Write-Output ("[{0,5:N1}s] {1}" -f $clock.Elapsed.TotalSeconds, $Name) }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $SecretsDir) { $SecretsDir = Join-Path $repo 'local-secrets' }
 $config = Join-Path $SecretsDir 'application-connection.private.json'
@@ -36,14 +39,22 @@ foreach ($listener in @(Get-NetTCPConnection -State Listen -LocalPort $Port -Err
 }
 
 if (-not $NoPublish -or -not (Test-Path (Join-Path $build 'BlazorStoc.dll'))) {
-    # Stale compressed-asset caches otherwise survive a change of static files.
-    Remove-Item (Join-Path $repo 'obj\Release\net9.0\compressed'), (Join-Path $repo 'obj\Release\net9.0\staticwebassets') -Recurse -Force -ErrorAction SilentlyContinue
+    # Stale compressed-asset caches otherwise survive a change of static files. Clearing them forces every static asset to be compressed
+    # again (the slowest part of the publish), so it is done only when a file of wwwroot is newer than the last publish (or with -CleanAssets).
+    $published = Join-Path $build 'BlazorStoc.dll'
+    $staticChanged = $CleanAssets -or -not (Test-Path $published) -or
+        (Get-ChildItem (Join-Path $repo 'wwwroot') -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\lib\\' -and $_.LastWriteTimeUtc -gt (Get-Item $published).LastWriteTimeUtc } | Select-Object -First 1)
+    if ($staticChanged) {
+        Remove-Item (Join-Path $repo 'obj\Release\net9.0\compressed'), (Join-Path $repo 'obj\Release\net9.0\staticwebassets') -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Step 'static files changed: asset caches cleared'
+    }
     Push-Location $repo
     try {
         & dotnet publish BlazorStoc.csproj -c Release -o $build
         if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
     }
     finally { Pop-Location }
+    Write-Step 'published'
 }
 
 $env:Database__PrivateConfigPath = $config
@@ -60,6 +71,7 @@ for ($attempt = 0; $attempt -lt 40 -and -not $page; $attempt++) {
     Start-Sleep -Milliseconds 750
     try { $page = Invoke-WebRequest "http://127.0.0.1:$Port/Account/Login" -UseBasicParsing -TimeoutSec 5 } catch { }
 }
+Write-Step 'application answers'
 if (-not $page) { throw "The preview did not answer on port $Port; see preview-$Port.stderr.log and preview-$Port.stdout.log." }
 $stylesheet = [regex]::Match($page.Content, 'href="([^"]*app[^"]*\.css)"').Groups[1].Value
 if ($stylesheet) {

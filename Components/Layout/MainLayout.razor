@@ -50,6 +50,7 @@
                 <ChildContent>
                     <a class="@(productsMenuSection && !onInvoicePickupPage ? "active" : "")" href="/produse">Stoc</a>
                     <NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink>
+                    <NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink>
                 </ChildContent>
             </CollapsibleSection>
             <CollapsibleSection Id="inventory-menu"
@@ -78,9 +79,10 @@
                     <NavLink href="/furnizori" Match="NavLinkMatch.Prefix">Furnizori</NavLink>
                     <NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink>
                     <NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink>
-                    <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection>
+            <NavLink class="nav-item" href="/oferte" Match="NavLinkMatch.Prefix"><span>▤</span> Oferte <span class="nav-arrow">→</span></NavLink>
             <NavLink class="nav-item" href="/mentenanta" Match="NavLinkMatch.Prefix"><span>⚒</span> Mentenanță <span class="nav-arrow">→</span></NavLink>
             <NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink>
             <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>

@@ -1,0 +1,53 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@inject ILogger<ReserveSuggestions> Logger
+@* After an entry: projects whose need for the product is covered by free stock but not reserved yet, with a button to reserve for each. Nothing is reserved without the click. *@
+@if (suggestions.Count > 0)
+{
+    <div class="info-banner reserve-suggestions" role="status">
+        <p>Stocul liber acoperă necesarul unor proiecte care nu au rezervat produsul:</p>
+        <ul>
+            @foreach (var item in suggestions)
+            {
+                <li>@item.ProjectName — <button type="button" class="row-action edit" disabled="@busy" @onclick="() => ReserveAsync(item)">Rezervă @item.Quantity buc. pentru proiectul @item.ProjectName</button></li>
+            }
+        </ul>
+        @if (error is not null) { <p class="muted" role="alert">@error</p> }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public int ProductId { get; set; }
+    // Changed after every entry saved on the page: the suggestions are recomputed.
+    [Parameter] public int Trigger { get; set; }
+    [Parameter] public EventCallback Reserved { get; set; }
+
+    private IReadOnlyList<ReserveSuggestion> suggestions = [];
+    private int loadedTrigger = -1;
+    private bool busy;
+    private string? error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedTrigger == Trigger) return;
+        loadedTrigger = Trigger; suggestions = []; error = null;
+        if (Trigger == 0 || Services.GetService<IProjectSituationReader>() is not { } reader) return;
+        try { suggestions = await reader.GetReserveSuggestionsAsync(ProductId); }
+        catch (Exception ex) { Logger.LogWarning("Reserve suggestions failed ({ErrorType}).", ex.GetType().Name); suggestions = []; }
+    }
+
+    private async Task ReserveAsync(ReserveSuggestion item)
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try
+        {
+            await Services.GetRequiredService<IReservationRepository>().ReserveAsync(item.ProjectId, item.ComponentId, item.ProductId, item.Quantity);
+            suggestions = [.. suggestions.Where(other => other != item)];
+            await Reserved.InvokeAsync();
+        }
+        catch (Exception ex) when (ex is ReservationException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Reservation from suggestion failed ({ErrorType}).", ex.GetType().Name); error = "Rezervarea nu a putut fi făcută."; }
+        finally { busy = false; }
+    }
+}

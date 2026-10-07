@@ -18,7 +18,8 @@ public sealed class MariaSupplierRepository(
     // The columns of a supplier and, after them, what refers to it (entries through its invoices, invoices, templates by CUI).
     private const string Select = """
         SELECT s.id,s.name,s.cui,s.country,s.version,s.address,s.phone,s.registry_number,s.postal_code,s.caen_code,s.`source`,s.verified_utc,
-               (SELECT COUNT(*) FROM stock_movements m INNER JOIN supplier_invoices i ON i.id=m.invoice_id WHERE i.supplier_id=s.id),
+               (SELECT COUNT(*) FROM stock_movements m INNER JOIN supplier_invoices i ON i.id=m.invoice_id WHERE i.supplier_id=s.id)
+               + (SELECT COUNT(*) FROM stock_movements m WHERE m.free_supplier_id=s.id),
                (SELECT COUNT(*) FROM supplier_invoices i WHERE i.supplier_id=s.id),
                (SELECT COUNT(*) FROM invoice_templates t WHERE t.supplier_id=s.id OR (t.supplier_id IS NULL AND t.supplier_cui=s.normalized_cui AND s.country='RO'))
         FROM suppliers s

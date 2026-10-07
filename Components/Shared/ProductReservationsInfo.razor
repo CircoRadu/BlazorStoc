@@ -1,0 +1,26 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@* The reservations that hold pieces of a product (what lowers the free stock). Hidden when there are none. *@
+@if (holders.Count > 0)
+{
+    <p class="muted product-reservations" role="status">Rezervat: <strong>@holders.Sum(item => item.Quantity) buc.</strong> (@string.Join(", ", holders.Select(item => $"{item.ProjectName}: {item.Quantity}"))) · stoc liber: <strong>@ReservationRules.Free(Stock, holders.Sum(item => item.Quantity)) buc.</strong></p>
+}
+
+@code {
+    [Parameter, EditorRequired] public int ProductId { get; set; }
+    [Parameter] public int Stock { get; set; }
+    // Changes when the page changed the stock or the reservations: the list is read again.
+    [Parameter] public int Version { get; set; }
+
+    private IReadOnlyList<ReservationHolder> holders = [];
+    private (int, int) loadedFor = (-1, -1);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (ProductId, Version + Stock * 1000)) return;
+        loadedFor = (ProductId, Version + Stock * 1000);
+        if (Services.GetService<IReservationRepository>() is not { } repository) return;
+        try { holders = await repository.GetHoldersAsync(ProductId); }
+        catch (Exception) { holders = []; }
+    }
+}

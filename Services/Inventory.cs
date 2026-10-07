@@ -91,7 +91,8 @@ public sealed class InventoryReportBuilder(IProductRepository products, IStockMo
                     .Select(product => new InventoryLine(product.Name,
                         StockMovementRules.WarehouseStock(product.Quantity, inVehicles.GetValueOrDefault(product.Id))))
                     .Where(line => !request.ExcludeZeroStock || line.Quantity != 0)
-                    .OrderBy(line => line.Code, StringComparer.OrdinalIgnoreCase)
+                    // Products with negative stock come first: they are the ones to count and regularize (see the "De regularizat" tab).
+                    .OrderBy(line => line.IsNegative ? 0 : 1).ThenBy(line => line.Code, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 if (lines.Count == 0) continue;
                 subcategorySections.Add(new InventorySubcategorySection(group.Subcategory, lines));

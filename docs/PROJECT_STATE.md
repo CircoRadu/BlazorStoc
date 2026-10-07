@@ -11,13 +11,17 @@ Actualizat: 07.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 
 ## Ultimul lucru facut (07.10.2026)
 
-- Pagina Facturi `/facturi` (Administrare + pagina principala, vizibila tuturor): lista, filtre, numarul facturii deschide o fereastra cu produsele preluate (link la intrarile produsului); administratorul corecteaza numar/data/furnizor si sterge facturile fara intrari (jurnal cu actiuni exacte).
-- Protocolul de lucru cu context redus: `PROTOCOL_CLAUDE_OPTIMIZAT.md` (in directorul parinte), cu `tools/run-checks.ps1` si `tools/log-task.ps1`.
+- Stoc doar pe bucati; operatia de iesire / iesirea multipla, bon PDF, storno, retur, consum net; lista „De regularizat" (cauza iesirii peste stoc).
+- Nomenclator „Tipuri de sisteme" (`/nomenclator`), componente pe proiect, sabloane de oferte xlsx (`/oferte/sabloane`), preluarea ofertelor (`/oferte/preluare`, `/oferte`, revizii cu diferente).
+- Situatia proiectului pe componente (`/proiecte/{id}/situatie`, export PDF/CSV, lista de achizitie), iesiri legate de componente (migrarea 26) cu lamurire la scoaterea componentei.
+- Rezervari pe proiect (migrarea 27): stoc liber = stoc - rezervari, consum la iesire, avertisment fara blocare, propuneri dupa intrare, intrari legate de oferta (si la preluarea facturii).
+- Backup/restore: tabelele migrarilor 22-27 au fost adaugate in lista tabelelor (`MariaArchiveSchema.MigratedTables`).
+- Pagina Facturi `/facturi`; protocol cu context redus (`PROTOCOL_CLAUDE_OPTIMIZAT.md`, `tools/run-checks.ps1`, `tools/log-task.ps1`).
 
 ## Validari
 
-- Suita in memorie: 913 verificari trecute, 0 esecuri (07.10.2026). MariaDB `blazorstoc_test`: sectiunea „Suppliers and invoices” trece integral (rulata cu `MARIA_ONLY`); suita MariaDB completa nu a fost rerulata la aceasta data.
-- Neverificat: pagina Facturi in browser (aspect, fereastra produselor), rol „Utilizator” in browser.
+- Suita in memorie: 935 verificari trecute; suita MariaDB `blazorstoc_test`: 1505 trecute, 0 esecuri (07.10.2026, inainte de commit). Migrarile 1-27 aplicate pe `blazorstoc_test` si pe `BlazorStoc`.
+- Neverificat in browser: tot ce e in `Teste utilizator/` marcat 07.10.2026 (utilizatorul nu a testat inca nimic).
 
 ## Preview
 
@@ -26,7 +30,7 @@ Actualizat: 07.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 ## Probleme deschise
 
 - Verificari ramase: `docs/TESTE_RAMASE.md` (cazurile N45, N47 si cele de pe pagina Facturi); drepturile contului migrator pe baza de teste.
-- Taskuri active: `TODO.md` (primul: fisierul modelului de sablon, partial implementat altfel - de reevaluat).
+- Taskuri active: `TODO.md` (primul: completari - iesire rapida, „Unde sunt bucatile", stoc minim, export consum; ultimul: sablon de import factura XML).
 
 ## Urmatorul pas
 

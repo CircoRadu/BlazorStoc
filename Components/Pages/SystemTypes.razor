@@ -1,0 +1,145 @@
+@page "/nomenclator"
+@attribute [Authorize(Roles = AccessRoles.Administrator)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject ISystemTypeRepository Repository
+@inject ILogger<SystemTypes> Logger
+@implements IDisposable
+
+<PageTitle>Nomenclator · Tipuri de sisteme · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">NOMENCLATOR</p><h1>Tipuri de sisteme</h1><p class="muted">Sistemele din care sunt făcute proiectele (antiefracție, TVCI, control acces, incendiu, rețelistică…). Un tip nu se șterge: se dezactivează și nu mai apare la alegeri noi. Denumirile alternative (de exemplu „CCTV” pentru „TVCI”) ajută la recunoașterea lor în oferte.</p></div></div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Tipuri de sisteme <span>@types.Count</span></h2></div>
+    <form class="filters" @onsubmit="AddAsync" @onsubmit:preventDefault>
+        <label class="search-box"><span>＋</span><input aria-label="Denumirea tipului nou" placeholder="Denumirea unui tip nou de sistem…" maxlength="@SystemTypeRules.NameMaximumLength" disabled="@busy" @bind="newName" @bind:event="oninput" /></label>
+        <button type="submit" class="primary" disabled="@(busy || string.IsNullOrWhiteSpace(newName))">Adaugă tipul</button>
+    </form>
+    @if (loading)
+    {
+        <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+    }
+    else if (types.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>Nu există tipuri de sisteme</h3><p>Adaugă primul tip de mai sus.</p></div>
+    }
+    else
+    {
+        <div class="table-scroll"><table class="system-types"><thead><tr><th>ORDINE</th><th>DENUMIRE</th><th>DENUMIRI ALTERNATIVE</th><th>STARE</th></tr></thead><tbody>
+        @for (var index = 0; index < types.Count; index++)
+        {
+            var type = types[index];
+            var position = index;
+            <tr @key="type.Id" class="@(type.Active ? "" : "inactive-row")" id="@($"system-type-{type.Id}")">
+                <td>
+                    <button type="button" class="row-action" aria-label="@($"Mută {type.Name} mai sus")" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(type, -1)">▲</button>
+                    <button type="button" class="row-action" aria-label="@($"Mută {type.Name} mai jos")" disabled="@(busy || position == types.Count - 1)" @onclick="() => MoveAsync(type, 1)">▼</button>
+                </td>
+                <td>
+                    @if (renamingId == type.Id)
+                    {
+                        <form @onsubmit="() => RenameAsync(type)" @onsubmit:preventDefault>
+                            <input aria-label="@($"Denumirea nouă a tipului {type.Name}")" maxlength="@SystemTypeRules.NameMaximumLength" disabled="@busy" @bind="renameText" @bind:event="oninput" />
+                            <button type="submit" class="primary" disabled="@busy">Salvează</button>
+                            <button type="button" class="refresh" disabled="@busy" @onclick="() => renamingId = null">Renunț</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <strong>@type.Name</strong>
+                        <button type="button" class="row-action edit" aria-label="@($"Redenumește {type.Name}")" disabled="@busy" @onclick="() => StartRename(type)">Redenumește</button>
+                    }
+                </td>
+                <td>
+                    @foreach (var alias in type.Aliases)
+                    {
+                        <span class="alias-chip">@alias <button type="button" class="alias-remove" aria-label="@($"Șterge denumirea alternativă {alias}")" disabled="@busy" @onclick="() => RemoveAliasAsync(type, alias)">×</button></span>
+                    }
+                    <form class="alias-add" @onsubmit="() => AddAliasAsync(type)" @onsubmit:preventDefault>
+                        <input aria-label="@($"Denumire alternativă pentru {type.Name}")" placeholder="+ denumire alternativă" maxlength="@SystemTypeRules.NameMaximumLength" disabled="@busy"
+                               value="@AliasText(type.Id)" @oninput="args => aliasTexts[type.Id] = args.Value?.ToString() ?? string.Empty" />
+                    </form>
+                </td>
+                <td><ToggleSwitch Compact Value="type.Active" ValueChanged="value => SetActiveAsync(type, value)" Disabled="busy" AriaLabel="@($"Activ: {type.Name}")" /></td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private List<SystemType> types = [];
+    private bool loading = true, busy;
+    private string? error, notice;
+    private string newName = "";
+    private int? renamingId;
+    private string renameText = "";
+    private readonly Dictionary<int, string> aliasTexts = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunAsync(async () => { types = [.. await Repository.GetAllAsync(lifetime.Token)]; }, null);
+        loading = false;
+    }
+
+    private string AliasText(int id) => aliasTexts.GetValueOrDefault(id, string.Empty);
+
+    private void Replace(SystemType updated)
+    {
+        var index = types.FindIndex(type => type.Id == updated.Id);
+        if (index >= 0) types[index] = updated; else types.Add(updated);
+    }
+
+    // Runs one operation: busy while it runs, the message of a refused operation (or a stale version) is shown, the list is reloaded after a stale version.
+    private async Task RunAsync(Func<Task> operation, string? success)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try { await operation(); notice = success; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is SystemTypeOperationException or AccessDeniedException)
+        {
+            error = ex.Message;
+            if (ex.Message == SystemTypeRules.StaleMessage) { try { types = [.. await Repository.GetAllAsync(lifetime.Token)]; } catch (Exception) { } }
+        }
+        catch (Exception ex) { Logger.LogError("System type operation failed ({ErrorType}).", ex.GetType().Name); error = "Operația nu a putut fi salvată. Reîncarcă pagina și reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private Task AddAsync() => RunAsync(async () =>
+    {
+        var created = await Repository.CreateAsync(newName, lifetime.Token);
+        types.Add(created); newName = "";
+    }, "Tipul a fost adăugat.");
+
+    private void StartRename(SystemType type) { renamingId = type.Id; renameText = type.Name; error = null; notice = null; }
+
+    private Task RenameAsync(SystemType type) => RunAsync(async () =>
+    {
+        Replace(await Repository.RenameAsync(type, renameText, lifetime.Token));
+        renamingId = null;
+    }, "Denumirea a fost modificată.");
+
+    private Task SetActiveAsync(SystemType type, bool active) => RunAsync(async () => Replace(await Repository.SetActiveAsync(type, active, lifetime.Token)),
+        active ? "Tipul a fost activat." : "Tipul a fost dezactivat: nu mai apare la alegeri noi.");
+
+    private Task MoveAsync(SystemType type, int direction) => RunAsync(async () =>
+    {
+        await Repository.MoveAsync(type, direction, lifetime.Token);
+        types = [.. await Repository.GetAllAsync(lifetime.Token)];
+    }, null);
+
+    private Task AddAliasAsync(SystemType type) => RunAsync(async () =>
+    {
+        Replace(await Repository.AddAliasAsync(type, AliasText(type.Id), lifetime.Token));
+        aliasTexts.Remove(type.Id);
+    }, "Denumirea alternativă a fost adăugată.");
+
+    private Task RemoveAliasAsync(SystemType type, string alias) => RunAsync(async () => Replace(await Repository.RemoveAliasAsync(type, alias, lifetime.Token)),
+        "Denumirea alternativă a fost ștearsă.");
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

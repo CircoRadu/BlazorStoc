@@ -99,5 +99,36 @@ public static class ComponentChecks
         check(noChange.Markup.Contains("Nu ai făcut nicio modificare."), "Product edit: with the generated reason and no change there is nothing to save");
         var noCode = context.Render<ProductEditor>(parameters => parameters.Add(p => p.Staging, true).Add(p => p.Groups, stale));
         check(noCode.FindAll("#product-image-search").Count == 0, "Product form: without a code there is no picture search link");
+
+        // Usage scenarios of the entry form: negative stock must be settled (zero or the real quantity); an entry says where it comes from.
+        var resolution = new NegativeStockResolution();
+        var changes = 0;
+        var panel = context.Render<Components.Shared.NegativeStockPanel>(parameters => parameters.Add(p => p.Resolution, resolution).Add(p => p.Stock, -3)
+            .Add(p => p.Changed, () => { changes++; }));
+        check(panel.Markup.Contains("Stoc curent -3") && !resolution.IsResolved, "Negative stock panel: warns with the current stock and starts unresolved");
+        panel.FindAll("button").First(button => button.TextContent.Contains("pe 0")).Click();
+        check(resolution.IsResolved && resolution.RealQuantity == 0 && changes == 1, "Negative stock panel: \"set to zero\" resolves with the real quantity 0");
+        panel.Find("input").Change("4");
+        check(resolution.IsResolved && !resolution.Zero && resolution.RealQuantity == 4, "Negative stock panel: a typed real quantity replaces the zero choice");
+
+        var memorySuppliers = new MemorySupplierRepository();
+        var picked = await memorySuppliers.CreateAsync(new SupplierInput { Name = "Furnizor Componenta SRL", Cui = SupplierChecks.ValidCui(1234567) });
+        using var entryContext = new BunitContext();
+        entryContext.JSInterop.Mode = JSRuntimeMode.Loose;
+        entryContext.Services.AddLogging();
+        entryContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
+        entryContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
+        var entryInput = new StockMovementInput { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
+        var origin = entryContext.Render<Components.Shared.EntryOriginPicker>(parameters => parameters.Add(p => p.Model, entryInput));
+        check(origin.FindAll("[role=tab]").Count == 3 && origin.Markup.Contains("Preia din PDF"), "Entry origin: three tabs and the separate button for the PDF pickup");
+        check(origin.Instance.ValidationError() == "Alege motivul intrării libere.", "Entry origin: a free entry needs its reason");
+        entryInput.FreeType = FreeEntryType.AwaitedInvoice;
+        check(origin.Instance.ValidationError() == StockMovementRules.AwaitedSupplierRequiredMessage, "Entry origin: an awaited invoice needs its supplier");
+        entryInput.FreeSupplierId = picked.Id;
+        check(origin.Instance.ValidationError() is null, "Entry origin: an awaited invoice with its supplier is complete");
+        origin.FindAll("[role=tab]")[1].Click();
+        check(entryInput.FreeType is null && entryInput.FreeSupplierId is null && origin.Instance.ValidationError() == "Alege factura.", "Entry origin: switching to an existing invoice clears the free reason and asks for the invoice");
+        origin.FindAll("[role=tab]")[2].Click();
+        check(origin.Instance.ValidationError() is { Length: > 0 }, "Entry origin: a new invoice typed by hand needs supplier, number and date");
     }
 }

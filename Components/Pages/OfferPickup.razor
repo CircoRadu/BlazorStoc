@@ -1,0 +1,428 @@
+@page "/oferte/preluare"
+@page "/oferte"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IOfferRepository Offers
+@inject IOfferTemplateRepository TemplateStore
+@inject IBeneficiaryRepository Beneficiaries
+@inject IProjectRepository Projects
+@inject ISystemTypeRepository SystemTypes
+@inject IProductRepository ProductStore
+@inject IAccessControl Access
+@inject ILogger<OfferPickup> Logger
+@implements IDisposable
+
+<PageTitle>Preluare ofertă · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">OFERTE</p><h1>Preluare ofertă</h1><p class="muted">Un deviz-ofertă Excel (.xlsx) se citește cu un șablon, se leagă de beneficiar, proiect și componentă, iar liniile în bucăți se potrivesc cu produsele din catalog. Același număr de ofertă este o revizie a ofertei existente.</p></div><div class="heading-actions"><a class="refresh" href="/oferte/sabloane">Șabloane de oferte</a></div></div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+
+<div class="settings-tabs" role="tablist" aria-label="Pașii preluării">
+    @foreach (var (number, label) in Steps)
+    {
+        var target = number;
+        <button type="button" role="tab" class="settings-tab @(step == number ? "active" : "")" aria-selected="@(step == number)" disabled="@(busy || number > maxStep || result is not null)" @onclick="() => step = target">@number. @label</button>
+    }
+</div>
+
+@if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+else if (result is not null)
+{
+    <section class="catalog">
+        <div class="success-banner" role="status">
+            Oferta @result.Offer.Number a fost preluată (revizia @result.Offer.Revision) în proiectul <a class="category-table-link" href="@($"/proiecte/{result.ProjectId}")">@result.Offer.ProjectName</a>:
+            @result.LinkedLines linii legate de produse, @result.ToPurchaseLines de achiziționat, @result.OutOfStockLines în afara stocului.
+        </div>
+        @if (result.Diff is { } finished) { <p class="muted">Față de revizia @finished.PreviousRevision: @finished.Added adăugate, @finished.Removed scoase, @finished.QuantityChanged cu cantitate schimbată.</p> }
+        <div class="editor-actions"><a class="primary" href="/oferte/preluare" @onclick="Restart" @onclick:preventDefault>Preia altă ofertă</a></div>
+    </section>
+}
+else if (step == 1)
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>1. Fișierul ofertei</h2></div>
+        <FileDropZone Id="offer-file" Accept=".xlsx" Disabled="busy" OnChange="FileChosenAsync" Text="Trage aici devizul-ofertă .xlsx sau alege-l" />
+        @if (workbook is not null)
+        {
+            @if (templates.Count == 0)
+            {
+                <div class="invoice-warning" role="alert"><p>⚠ Nu există niciun șablon activ. <a href="/oferte/sabloane">Creează un șablon</a> pornind de la acest fișier, apoi reia preluarea.</p></div>
+            }
+            else
+            {
+                <label class="movement-page-size">Șablon
+                    <select disabled="@busy" @onchange="TemplateChangedAsync">
+                        @foreach (var template in templates) { <option value="@template.Id" selected="@(template.Id == templateId)">@template.Name</option> }
+                    </select></label>
+                @if (!templateFits) { <div class="invoice-warning" role="alert"><p>⚠ Etichetele fișierului nu se potrivesc cu niciun șablon activ; citirea poate fi greșită. Alege alt șablon sau <a href="/oferte/sabloane">creează unul</a>.</p></div> }
+            }
+            @if (reading is not null)
+            {
+                <div class="editor-grid">
+                    <label for="offer-number">Număr ofertă *<InputText id="offer-number" @bind-Value="number" maxlength="60" /></label>
+                    <label for="offer-title">Titlu<InputText id="offer-title" @bind-Value="title" maxlength="300" /></label>
+                    <label for="offer-category">Categoria (sistem)<InputText id="offer-category" @bind-Value="category" maxlength="120" /></label>
+                    <label for="offer-beneficiary-text">Beneficiar din ofertă<InputText id="offer-beneficiary-text" @bind-Value="beneficiaryText" maxlength="200" /></label>
+                </div>
+                <ul class="operation-summary">
+                    @foreach (var part in reading.Sections)
+                    {
+                        <li><strong>@part.Name</strong>: @part.Lines.Count linii — @(part.Import ? "se importă" : part.Known ? "nu se importă" : "secțiune necunoscută, nu se importă")</li>
+                    }
+                </ul>
+                @foreach (var problem in reading.Problems) { <p class="muted">@problem</p> }
+                @if (existing is not null)
+                {
+                    <div class="info-banner" role="status">Oferta nr. @existing.Number există (revizia @existing.Revision, proiect „@existing.ProjectName”): aceasta va fi <strong>revizia @(existing.Revision + 1)</strong>.</div>
+                }
+                <div class="editor-actions"><button type="button" class="primary" disabled="@(busy || number.Trim().Length == 0 || reading.StockLines.Count() == 0 && reading.Sections.All(part => !part.Import))" @onclick="ToBeneficiaryAsync">Pasul următor</button></div>
+            }
+        }
+    </section>
+}
+else if (step == 2)
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>2. Beneficiarul</h2></div>
+        <p>În ofertă: <strong>@(beneficiaryText.Length == 0 ? "—" : beneficiaryText)</strong>@if (recognizedByAlias) { <span class="muted"> · recunoscut după o denumire alternativă din oferte anterioare</span> }</p>
+        @if (candidates.Count > 0)
+        {
+            <fieldset class="destination-group">
+                <legend>Beneficiari asemănători</legend>
+                @foreach (var candidate in candidates)
+                {
+                    var item = candidate.Beneficiary;
+                    <label><input type="radio" name="offer-beneficiary" checked="@(beneficiaryId == item.Id)" @onchange="() => SelectBeneficiary(item.Id)" />
+                        <strong>@item.Name</strong> · @(item.IsIndividual ? $"Persoană fizică · CUI {item.Cui}" : $"CUI {item.Cui}") <span class="muted">· @((int)Math.Round(candidate.Score * 100))% asemănare</span></label>
+                }
+            </fieldset>
+        }
+        else { <p class="muted">Niciun beneficiar existent nu seamănă cu denumirea din ofertă.</p> }
+        <div class="relation-row">
+            <span class="relation-check">Alt beneficiar</span>
+            <SearchableSelect Id="offer-beneficiary-search" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
+                              Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="id => { SelectBeneficiary(id); return Task.CompletedTask; }" />
+            <button type="button" class="refresh add-related" disabled="@busy" @onclick="() => addingBeneficiary = true">+ Beneficiar nou</button>
+        </div>
+        @if (beneficiaryId is not null && OfferRules.Key(beneficiaryText).Length > 0 && OfferRules.Key(beneficiaryText) != OfferRules.Key(ChosenBeneficiary?.Name))
+        {
+            <ToggleSwitch @bind-Value="rememberAlias" OnText="Reține denumirea din ofertă pentru oferte viitoare" OffText="Nu reține denumirea din ofertă" AriaLabel="Reține denumirea din ofertă ca denumire alternativă" />
+        }
+        <div class="editor-actions">
+            <button type="button" class="refresh" disabled="@busy" @onclick="() => step = 1">Înapoi</button>
+            <button type="button" class="primary" disabled="@(busy || beneficiaryId is null)" @onclick="ToProjectAsync">Pasul următor</button>
+        </div>
+    </section>
+}
+else if (step == 3)
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>3. Proiectul și componenta</h2></div>
+        <fieldset class="destination-group">
+            <legend>Proiect pentru @ChosenBeneficiary?.Name</legend>
+            @foreach (var project in projects)
+            {
+                var item = project;
+                <label><input type="radio" name="offer-project" checked="@(projectId == item.Id)" @onchange="() => { projectId = item.Id; newProject = false; }" /> @item.Name</label>
+            }
+            <label><input type="radio" name="offer-project" checked="@newProject" @onchange="() => { newProject = true; projectId = null; }" /> Proiect nou</label>
+        </fieldset>
+        @if (newProject)
+        {
+            <label class="full-width" for="offer-new-project">Denumirea proiectului nou (titlul ofertei)<InputText id="offer-new-project" @bind-Value="newProjectName" maxlength="200" /></label>
+        }
+        <label class="movement-page-size">Componenta (tipul de sistem) pentru categoria „@category”
+            <select disabled="@busy" @onchange="args => systemTypeId = int.TryParse(args.Value?.ToString(), out var id) ? id : null">
+                <option value="" selected="@(systemTypeId is null)">— fără componentă —</option>
+                @foreach (var type in systemTypes) { <option value="@type.Id" selected="@(systemTypeId == type.Id)">@type.Name</option> }
+            </select></label>
+        @if (systemTypeId is null) { <small class="form-note">Categoria „@category” nu corespunde niciunui tip de sistem din <a href="/nomenclator">Nomenclator</a> (nici ca denumire alternativă): alege manual sau lasă fără componentă.</small> }
+        else if (ComponentNote() is { } note) { <small class="form-note">@note</small> }
+        <div class="editor-actions">
+            <button type="button" class="refresh" disabled="@busy" @onclick="() => step = 2">Înapoi</button>
+            <button type="button" class="primary" disabled="@(busy || (!newProject && projectId is null) || (newProject && newProjectName.Trim().Length == 0))" @onclick="ToLinesAsync">Pasul următor</button>
+        </div>
+    </section>
+}
+else if (step == 4)
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>4. Liniile ofertei <span>@pickLines.Count</span></h2><small>Liniile în bucăți se leagă de un produs din catalog sau rămân „de achiziționat”; metrajele și orele sunt în afara stocului</small></div>
+        <div class="table-scroll"><table><thead><tr><th>#</th><th>DENUMIRE DIN OFERTĂ</th><th class="number">CANT.</th><th>PRODUS DIN CATALOG</th></tr></thead><tbody>
+        @for (var index = 0; index < pickLines.Count; index++)
+        {
+            var line = pickLines[index];
+            <tr @key="line.Key">
+                <td>@(index + 1)</td>
+                <td class="movement-text"><strong>@FirstLine(line.Line.Name)</strong>@if (RestOf(line.Line.Name) is { Length: > 0 } rest) { <small class="muted" style="white-space: pre-line; display: block">@rest</small> }<small class="muted">@line.Section · @line.Line.Unit</small></td>
+                <td class="number">@OfferDiffRules.Format(line.Line.Quantity)</td>
+                <td>
+                    @if (!line.Line.InStock)
+                    {
+                        <span class="stock-badge">în afara stocului</span>
+                    }
+                    else
+                    {
+                        <SearchableSelect Id="@($"offer-line-product-{line.Key}")" Label="@($"Produs pentru linia {index + 1}")" Placeholder="De achiziționat (fără produs)…" EmptyText="Niciun produs găsit."
+                                          Options="ProductOptions" SelectedId="line.ProductId" SelectedIdChanged="id => SetProduct(line, id)" />
+                        @if (line.ProductId is null) { <small class="muted">De achiziționat</small> }
+                        else if (line.Origin == "reținut") { <small class="muted">Legătură reținută din oferte anterioare</small> }
+                        else if (line.Origin == "propus") { <small class="muted">Propus automat — verifică</small> }
+                        @foreach (var candidate in line.Candidates.Where(item => item.Product.Id != line.ProductId))
+                        {
+                            var proposed = candidate;
+                            <button type="button" class="row-action" title="Alege produsul propus" @onclick="() => SetProduct(line, proposed.Product.Id)">@proposed.Product.Name (@((int)Math.Round(proposed.Score * 100))%)</button>
+                        }
+                        <button type="button" class="row-action edit" disabled="@busy" @onclick="() => StartNewProduct(line)">Produs nou</button>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody></table></div>
+        <div class="editor-actions">
+            <button type="button" class="refresh" disabled="@busy" @onclick="() => step = 3">Înapoi</button>
+            <button type="button" class="primary" disabled="@busy" @onclick="ToSummaryAsync">Pasul următor</button>
+        </div>
+    </section>
+}
+else if (step == 5)
+{
+    <section class="catalog">
+        <div class="catalog-heading"><h2>5. Rezumat</h2></div>
+        <ul class="operation-summary">
+            <li>Oferta <strong>@number</strong>@(existing is null ? "" : $" — revizia {existing.Revision + 1}") · @title</li>
+            <li>Beneficiar: <strong>@ChosenBeneficiary?.Name</strong>@(rememberAlias && OfferRules.Key(beneficiaryText) != OfferRules.Key(ChosenBeneficiary?.Name) && beneficiaryText.Length > 0 ? $" (se reține denumirea „{beneficiaryText}”)" : "")</li>
+            <li>Proiect: <strong>@(newProject ? $"{newProjectName} (nou)" : projects.FirstOrDefault(item => item.Id == projectId)?.Name)</strong> · Componentă: <strong>@(systemTypes.FirstOrDefault(item => item.Id == systemTypeId)?.Name ?? "—")</strong></li>
+            <li>@pickLines.Count(item => item.Line.InStock && item.ProductId is not null) linii legate de produse · @pickLines.Count(item => item.Line.InStock && item.ProductId is null) de achiziționat · @pickLines.Count(item => !item.Line.InStock) în afara stocului</li>
+        </ul>
+        @if (diff is not null)
+        {
+            <div class="info-banner" role="status">
+                <p>Față de revizia @diff.PreviousRevision: <strong>+@diff.Added</strong> adăugate, <strong>−@diff.Removed</strong> scoase, <strong>~@diff.QuantityChanged</strong> cu cantitate schimbată, @diff.Unchanged neschimbate.</p>
+                @if (diff.Details.Count > 0) { <ul class="operation-summary">@foreach (var detail in diff.Details.Take(30)) { <li>@detail</li> }</ul> }
+                <small class="muted">Ieșirile deja făcute pe proiect nu se leagă automat de oferta nouă.</small>
+            </div>
+        }
+        <div class="editor-actions">
+            <button type="button" class="refresh" disabled="@busy" @onclick="() => step = 4">Înapoi</button>
+            <button type="button" class="primary" disabled="@busy" @onclick="ImportAsync">@(busy ? "Se preia…" : "Preia oferta")</button>
+        </div>
+    </section>
+}
+
+@if (addingBeneficiary)
+{
+    <div class="delete-overlay"><div class="delete-dialog"><BeneficiaryEditor InitialName="@beneficiaryText" Saved="BeneficiaryAddedAsync" Closed="() => { addingBeneficiary = false; return Task.CompletedTask; }" /></div></div>
+}
+@if (newProductFor is not null)
+{
+    <div class="delete-overlay"><div class="delete-dialog"><ProductEditor InitialName="@NewProductName" InitialDescription="@NewProductDescription" Groups="groups" Saved="ProductAddedAsync" Closed="() => { newProductFor = null; return Task.CompletedTask; }" /></div></div>
+}
+
+@code {
+    private sealed class PickLine
+    {
+        public int Key { get; init; }
+        public string Section { get; init; } = "";
+        public OfferLine Line { get; init; } = null!;
+        public int? ProductId { get; set; }
+        public string Origin { get; set; } = "";
+        public IReadOnlyList<ProductCandidate> Candidates { get; set; } = [];
+    }
+
+    private const long MaxFileBytes = 8L * 1024 * 1024;
+    private static readonly (int, string)[] Steps = [(1, "Fișier"), (2, "Beneficiar"), (3, "Proiect"), (4, "Linii"), (5, "Rezumat")];
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, busy, templateFits = true, recognizedByAlias, rememberAlias = true, newProject, addingBeneficiary;
+    private int step = 1, maxStep = 1;
+    private string? error;
+    private string fileName = "", number = "", title = "", category = "", beneficiaryText = "", newProjectName = "";
+    private XlsxWorkbook? workbook;
+    private IReadOnlyList<OfferTemplateRecord> templates = [];
+    private int? templateId, beneficiaryId, projectId, systemTypeId;
+    private OfferReading? reading;
+    private OfferRecord? existing;
+    private OfferDiff? diff;
+    private IReadOnlyList<Beneficiary> beneficiaries = [];
+    private IReadOnlyList<BeneficiaryCandidate> candidates = [];
+    private IReadOnlyList<Project> projects = [];
+    private IReadOnlyList<SystemType> systemTypes = [];
+    private IReadOnlyList<Product> products = [];
+    private IReadOnlyList<ProductGroup> groups = [];
+    private List<PickLine> pickLines = [];
+    private PickLine? newProductFor;
+    private OfferImportResult? result;
+    private int nextKey;
+
+    private Beneficiary? ChosenBeneficiary => beneficiaries.FirstOrDefault(item => item.Id == beneficiaryId);
+    private IReadOnlyList<SelectOption> BeneficiaryOptions => beneficiaries.Select(item => new SelectOption(item.Id, item.Name, $"{item.Cui}")).ToArray();
+    private IReadOnlyList<SelectOption> ProductOptions => products.OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).Select(item => new SelectOption(item.Id, item.Name, $"{item.Category} {item.Subcategory}")).ToArray();
+    private static string FirstLine(string name) => name.Split('\n')[0].Trim();
+    private static string RestOf(string name) { var index = name.IndexOf('\n'); return index < 0 ? "" : name[(index + 1)..].Trim(); }
+    private string NewProductName => newProductFor is null ? "" : Limit(FirstLine(newProductFor.Line.Name), 100);
+    private string NewProductDescription => newProductFor is null ? "" : RestOf(newProductFor.Line.Name);
+    private static string Limit(string text, int length) => text.Length <= length ? text : text[..length];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            templates = [.. (await TemplateStore.GetAllAsync(lifetime.Token)).Where(item => item.Active)];
+            beneficiaries = [.. (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)];
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Offer pickup loading failed ({ErrorType}).", ex.GetType().Name); error = "Pagina nu a putut fi încărcată."; }
+        finally { loading = false; }
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is OfferException or XlsxFormatException or AccessDeniedException or ProjectOperationException or ProjectComponentException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Offer pickup failed ({ErrorType}).", ex.GetType().Name); error = "Operația nu a putut fi făcută. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private Task FileChosenAsync(InputFileChangeEventArgs args) => Run(async () =>
+    {
+        var file = args.File;
+        if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)) throw new XlsxFormatException(XlsxReader.NotXlsxMessage);
+        await using var input = file.OpenReadStream(MaxFileBytes, lifetime.Token);
+        using var memory = new MemoryStream();
+        await input.CopyToAsync(memory, lifetime.Token);
+        memory.Position = 0;
+        workbook = XlsxReader.Read(memory);
+        fileName = file.Name; maxStep = 1;
+        var chosen = OfferTemplateEngine.Choose(templates, item => item.Definition, item => item.Active, workbook);
+        templateFits = chosen is not null;
+        templateId = (chosen ?? templates.FirstOrDefault())?.Id;
+        await ApplyTemplateAsync();
+    });
+
+    private Task TemplateChangedAsync(ChangeEventArgs args) => Run(async () =>
+    {
+        templateId = int.TryParse(args.Value?.ToString(), out var id) ? id : null;
+        var chosen = templates.FirstOrDefault(item => item.Id == templateId);
+        templateFits = chosen is not null && workbook is not null && OfferTemplateEngine.Score(chosen.Definition, workbook) >= 0.999;
+        await ApplyTemplateAsync();
+    });
+
+    private async Task ApplyTemplateAsync()
+    {
+        reading = null; existing = null;
+        var template = templates.FirstOrDefault(item => item.Id == templateId);
+        if (template is null || workbook is null) return;
+        reading = OfferTemplateEngine.Apply(template.Definition, workbook);
+        number = reading.Field(OfferHeaderField.NumberKey); title = reading.Field(OfferHeaderField.TitleKey);
+        category = reading.Field(OfferHeaderField.CategoryKey); beneficiaryText = reading.Field(OfferHeaderField.BeneficiaryKey);
+        if (number.Length > 0) existing = await Offers.GetLatestAsync(number, lifetime.Token);
+    }
+
+    private Task ToBeneficiaryAsync() => Run(async () =>
+    {
+        existing = number.Trim().Length > 0 ? await Offers.GetLatestAsync(number.Trim(), lifetime.Token) : null;
+        recognizedByAlias = false; beneficiaryId = null;
+        candidates = OfferBeneficiaryMatcher.Rank(beneficiaryText, beneficiaries);
+        if (await Offers.FindBeneficiaryByAliasAsync(beneficiaryText, lifetime.Token) is { } byAlias && beneficiaries.Any(item => item.Id == byAlias)) { beneficiaryId = byAlias; recognizedByAlias = true; }
+        else if (candidates.Count > 0 && candidates[0].Score >= 1.0) beneficiaryId = candidates[0].Beneficiary.Id;
+        rememberAlias = true; step = 2; maxStep = Math.Max(maxStep, 2);
+    });
+
+    private void SelectBeneficiary(int? id) { beneficiaryId = id; recognizedByAlias = false; }
+
+    private async Task BeneficiaryAddedAsync(Beneficiary created)
+    {
+        addingBeneficiary = false;
+        try { beneficiaries = [.. (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)]; } catch (Exception) { }
+        candidates = OfferBeneficiaryMatcher.Rank(beneficiaryText, beneficiaries);
+        SelectBeneficiary(created.Id);
+    }
+
+    private Task ToProjectAsync() => Run(async () =>
+    {
+        projects = await Projects.GetForBeneficiaryAsync(beneficiaryId!.Value, lifetime.Token);
+        systemTypes = [.. (await SystemTypes.GetAllAsync(lifetime.Token)).Where(item => item.Active)];
+        if (systemTypeId is null || systemTypes.All(item => item.Id != systemTypeId))
+            systemTypeId = category.Length > 0 && await SystemTypes.FindAsync(category, lifetime.Token) is { Active: true } type ? type.Id : null;
+        var sameName = projects.FirstOrDefault(item => OfferRules.Key(item.Name) == OfferRules.Key(title));
+        if (existing is not null && projects.Any(item => item.Id == existing.ProjectId)) { projectId = existing.ProjectId; newProject = false; }
+        else if (sameName is not null) { projectId = sameName.Id; newProject = false; }
+        else { projectId = null; newProject = true; }
+        if (newProjectName.Length == 0) newProjectName = title;
+        step = 3; maxStep = Math.Max(maxStep, 3);
+    });
+
+    private string? ComponentNote()
+    {
+        if (newProject || projectId is null) return "Componenta se adaugă la proiectul nou.";
+        return "Componenta se adaugă la proiect dacă nu există (sau se reactivează dacă a fost scoasă).";
+    }
+
+    private Task ToLinesAsync() => Run(async () =>
+    {
+        products = await ProductStore.GetProductsAsync(lifetime.Token);
+        groups = await ProductStore.GetGroupsAsync(lifetime.Token);
+        var remembered = await Offers.GetRememberedMatchesAsync(lifetime.Token);
+        var previous = pickLines.ToDictionary(item => item.Section + "|" + OfferLineRules.LineKey(item.Line.Name) + "|" + item.Line.Row, item => item);
+        pickLines = [];
+        foreach (var part in reading!.Sections.Where(part => part.Import))
+            foreach (var line in part.Lines)
+            {
+                var pick = new PickLine { Key = nextKey++, Section = part.Name, Line = line };
+                if (line.InStock)
+                {
+                    pick.Candidates = OfferProductMatcher.Rank(line.Name, products);
+                    if (remembered.TryGetValue(OfferLineRules.LineKey(line.Name), out var productId) && products.Any(item => item.Id == productId)) { pick.ProductId = productId; pick.Origin = "reținut"; }
+                    else if (pick.Candidates.Count > 0 && pick.Candidates[0].Score >= OfferProductMatcher.AutoScore) { pick.ProductId = pick.Candidates[0].Product.Id; pick.Origin = "propus"; }
+                    if (previous.TryGetValue(part.Name + "|" + OfferLineRules.LineKey(line.Name) + "|" + line.Row, out var kept)) { pick.ProductId = kept.ProductId; pick.Origin = kept.Origin; }
+                }
+                pickLines.Add(pick);
+            }
+        if (pickLines.Count == 0) throw new OfferException(OfferMessages.NoLines);
+        step = 4; maxStep = Math.Max(maxStep, 4);
+    });
+
+    private void StartNewProduct(PickLine line) => newProductFor = line;
+    private static Task SetProduct(PickLine line, int? id) { line.ProductId = id; line.Origin = id is null ? "" : "ales"; return Task.CompletedTask; }
+
+    private async Task ProductAddedAsync(Product created)
+    {
+        try { products = await ProductStore.GetProductsAsync(lifetime.Token); } catch (Exception) { }
+        if (newProductFor is not null) { newProductFor.ProductId = created.Id; newProductFor.Origin = "ales"; }
+        newProductFor = null;
+    }
+
+    private Task ToSummaryAsync() => Run(async () =>
+    {
+        diff = number.Trim().Length > 0 ? await Offers.DiffAsync(number.Trim(), BuildLines(), lifetime.Token) : null;
+        step = 5; maxStep = Math.Max(maxStep, 5);
+    });
+
+    private List<OfferImportLine> BuildLines() => [.. pickLines.Select(item => new OfferImportLine
+    {
+        Section = item.Section, Number = item.Line.Number, ProductType = item.Line.ProductType, Name = item.Line.Name, Unit = item.Line.Unit,
+        Quantity = item.Line.Quantity, InStock = item.Line.InStock, ProductId = item.Line.InStock ? item.ProductId : null
+    })];
+
+    private Task ImportAsync() => Run(async () =>
+    {
+        result = await Offers.ImportAsync(new OfferImportRequest
+        {
+            Number = number, Title = title, Category = category, FileName = fileName, TemplateId = templateId, BeneficiaryId = beneficiaryId!.Value,
+            BeneficiaryText = beneficiaryText, RememberBeneficiaryAlias = rememberAlias, ProjectId = newProject ? null : projectId, NewProjectName = newProject ? newProjectName : "",
+            SystemTypeId = systemTypeId, Lines = BuildLines()
+        }, lifetime.Token);
+    });
+
+    private void Restart()
+    {
+        result = null; step = 1; maxStep = 1; workbook = null; reading = null; existing = null; diff = null; pickLines = []; beneficiaryId = null; projectId = null;
+        number = title = category = beneficiaryText = newProjectName = fileName = ""; systemTypeId = null; error = null;
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

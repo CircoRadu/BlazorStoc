@@ -1,0 +1,214 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@inject ILogger<ProjectComponentsSection> Logger
+@implements IDisposable
+@* The components of a project (types of systems from the nomenclator): added from the active types not yet in the project, a simple state each,
+   taken out = archived with a reason (reactivable). Hidden when the repositories are not available for the user. *@
+@if (components is not null)
+{
+    <section class="catalog project-components" aria-label="Componentele proiectului">
+        <div class="catalog-heading"><h2>Componente <span>@Visible.Count</span></h2><small>Sistemele din care e făcut proiectul; oferta, necesarul și predatul se completează în etapele următoare</small></div>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+        <div class="filters">
+            <label class="movement-page-size">Adaugă un sistem
+                <select disabled="@busy" @onchange="args => chosenType = int.TryParse(args.Value?.ToString(), out var id) ? id : null">
+                    <option value="" selected="@(chosenType is null)">— alege —</option>
+                    @foreach (var type in Available) { <option value="@type.Id" selected="@(chosenType == type.Id)">@type.Name</option> }
+                </select></label>
+            <button type="button" class="primary" disabled="@(busy || chosenType is null)" @onclick="AddAsync">Adaugă componenta</button>
+            <ToggleSwitch @bind-Value="showArchived" OnText="Arată și arhivate" OffText="Doar active" AriaLabel="Arată componentele arhivate" />
+            <a class="refresh" href="@($"/proiecte/{ProjectId}/situatie")">Situația proiectului</a>
+        </div>
+        @if (Visible.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">▦</span><h3>Proiectul nu are componente</h3><p>Alege un sistem din listă și adaugă-l.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>SISTEM</th><th>STARE</th><th>PREDAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var component in Visible)
+            {
+                <tr @key="component.Id" class="@(component.Archived ? "inactive-row" : "")">
+                    <td><strong>@component.SystemTypeName</strong>@if (component.Archived) { <small class="muted" title="@component.ArchiveReason"> · arhivată: @component.ArchiveReason</small> }</td>
+                    <td>
+                        <select aria-label="@($"Starea componentei {component.SystemTypeName}")" disabled="@(busy || component.Archived)" @onchange="args => SetStateAsync(component, args.Value?.ToString())">
+                            @foreach (var state in Enum.GetValues<ComponentState>()) { <option value="@((int)state)" selected="@(component.State == state)">@ProjectComponentRules.StateLabel(state)</option> }
+                        </select>
+                    </td>
+                    <td class="muted">@Delivered(component)</td>
+                    <td>
+                        @if (component.Archived) { <button type="button" class="row-action edit" disabled="@busy" @onclick="() => ReactivateAsync(component)">Reactivează</button> }
+                        else { <button type="button" class="row-action delete" disabled="@busy" aria-label="@($"Scoate componenta {component.SystemTypeName}")" @onclick="() => StartArchive(component)">Scoate</button> }
+                    </td>
+                </tr>
+            }
+            </tbody></table></div>
+            @if (situation is { OutsideOffer.Count: > 0 })
+            {
+                <p class="muted">În afara ofertei: @situation.OutsideOffer.Count produs(e) predate care nu apar în oferte (până când ieșirile se leagă de componente, se arată la nivel de proiect).</p>
+            }
+        }
+    </section>
+
+    @if (archiving is not null)
+    {
+        <div class="delete-overlay">
+            <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="component-archive-title">
+                <h2 id="component-archive-title">Scoți componenta?</h2>
+                <p class="delete-object"><strong>@archiving.SystemTypeName</strong></p>
+                <p>Componenta se arhivează (nu se șterge): oferta și liniile ei se păstrează și o poți reactiva oricând. Se înregistrează în jurnal.</p>
+                @if (archiveError is not null) { <div class="error-banner" role="alert">@archiveError</div> }
+                @if (pendingExits.Count > 0)
+                {
+                    <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">LA BENEFICIAR</th><th>CE SE ÎNTÂMPLĂ CU EL</th></tr></thead><tbody>
+                    @foreach (var exit in pendingExits)
+                    {
+                        <tr @key="exit.MovementId">
+                            <td>@exit.ProductName<small class="muted"> · ieșirea din @StockMovementRules.DisplayDate(exit.Date)@(string.IsNullOrWhiteSpace(exit.Reference) ? "" : $" · {exit.Reference}")</small></td>
+                            <td class="number">@exit.Remaining buc.</td>
+                            <td>
+                                <select aria-label="@($"Ce se întâmplă cu {exit.ProductName}")" disabled="@busy" @onchange="args => ChooseAction(exit.MovementId, args.Value?.ToString())">
+                                    <option value="" selected="@(!actions.ContainsKey(exit.MovementId))">— alege —</option>
+                                    <option value="@((int)ComponentExitAction.ReturnToWarehouse)" selected="@(actions.GetValueOrDefault(exit.MovementId) == ComponentExitAction.ReturnToWarehouse)">Retur în depozit</option>
+                                    <option value="@((int)ComponentExitAction.LeftAtBeneficiary)" selected="@(actions.GetValueOrDefault(exit.MovementId) == ComponentExitAction.LeftAtBeneficiary)">Rămas la beneficiar (predat definitiv)</option>
+                                    <option value="@((int)ComponentExitAction.MoveToComponent)" selected="@(actions.GetValueOrDefault(exit.MovementId) == ComponentExitAction.MoveToComponent)">Mutat pe altă componentă</option>
+                                    <option value="@((int)ComponentExitAction.Consumed)" selected="@(actions.GetValueOrDefault(exit.MovementId) == ComponentExitAction.Consumed)">Consumat</option>
+                                </select>
+                                @if (actions.GetValueOrDefault(exit.MovementId) == ComponentExitAction.MoveToComponent && actions.ContainsKey(exit.MovementId))
+                                {
+                                    <select aria-label="@($"Componenta pentru {exit.ProductName}")" disabled="@busy" @onchange="args => ChooseTarget(exit.MovementId, args.Value?.ToString())">
+                                        <option value="" selected="@(!targets.ContainsKey(exit.MovementId))">— componenta —</option>
+                                        @foreach (var other in Visible.Where(item => !item.Archived && item.Id != archiving!.Id)) { <option value="@other.Id" selected="@(targets.GetValueOrDefault(exit.MovementId) == other.Id)">@other.SystemTypeName</option> }
+                                    </select>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody></table></div>
+                }
+                <label class="full-width" for="component-archive-reason">Motivul *
+                    <InputTextArea id="component-archive-reason" @bind-Value="archiveReason" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@busy" /></label>
+                <div class="editor-actions">
+                    <button type="button" class="danger" disabled="@busy" @onclick="ArchiveAsync">@(busy ? "Se salvează…" : pendingExits.Count > 0 ? "Lămurește și scoate componenta" : "Scoate componenta")</button>
+                    <button type="button" class="refresh" disabled="@busy" @onclick="() => archiving = null">Renunț</button>
+                </div>
+            </section>
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public int ProjectId { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private List<ProjectComponent>? components;
+    private IReadOnlyList<SystemType> types = [];
+    private int? chosenType, loadedFor;
+    private bool busy, showArchived;
+    private string? error, notice, archiveError;
+    private ProjectComponent? archiving;
+    private IReadOnlyList<ComponentExit> pendingExits = [];
+    private readonly Dictionary<int, ComponentExitAction> actions = [];
+    private readonly Dictionary<int, int> targets = [];
+    private ProjectSituation? situation;
+    private string archiveReason = "";
+
+    private List<ProjectComponent> Visible => [.. (components ?? []).Where(component => showArchived || !component.Archived)];
+    private IEnumerable<SystemType> Available => types.Where(type => type.Active && components!.All(component => component.SystemTypeId != type.Id));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == ProjectId) return;
+        loadedFor = ProjectId; components = null;
+        var repository = Services.GetService<IProjectComponentRepository>();
+        var typeRepository = Services.GetService<ISystemTypeRepository>();
+        if (repository is null || typeRepository is null) return;
+        try
+        {
+            types = await typeRepository.GetAllAsync(lifetime.Token);
+            components = [.. await repository.GetForProjectAsync(ProjectId, true, lifetime.Token)];
+            // The situation is a convenience: without it (no right, an error) the column stays empty.
+            try { situation = await Services.GetRequiredService<IProjectSituationReader>().GetAsync(ProjectId, lifetime.Token); } catch (Exception ex) when (ex is not OperationCanceledException) { situation = null; }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException) { components = null; }
+        catch (Exception ex) { Logger.LogWarning("Project components loading failed ({ErrorType}).", ex.GetType().Name); components = null; }
+    }
+
+    private string Delivered(ProjectComponent component)
+    {
+        if (component.Archived || situation is null) return "";
+        var found = situation.Components.FirstOrDefault(item => item.SystemTypeId == component.SystemTypeId);
+        return found is null ? "fără ofertă" : $"{ProjectSituationRules.Format(found.Delivered)} din {ProjectSituationRules.Format(found.Needed)}";
+    }
+
+    private IProjectComponentRepository Repository => Services.GetRequiredService<IProjectComponentRepository>();
+
+    private async Task RunAsync(Func<Task> operation, string? success)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try { await operation(); notice = success; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is ProjectComponentException or AccessDeniedException)
+        {
+            error = ex.Message; archiveError = archiving is null ? null : ex.Message;
+            if (ex.Message == ProjectComponentRules.StaleMessage) await ReloadAsync();
+        }
+        catch (Exception ex) { Logger.LogError("Project component operation failed ({ErrorType}).", ex.GetType().Name); error = "Operația nu a putut fi salvată. Reîncarcă pagina și reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private async Task ReloadAsync()
+    {
+        try { components = [.. await Repository.GetForProjectAsync(ProjectId, true, lifetime.Token)]; } catch (Exception) { }
+    }
+
+    private void Replace(ProjectComponent updated)
+    {
+        var index = components!.FindIndex(item => item.Id == updated.Id);
+        if (index >= 0) components[index] = updated; else components.Add(updated);
+    }
+
+    private Task AddAsync() => RunAsync(async () =>
+    {
+        foreach (var added in await Repository.AddAsync(ProjectId, [chosenType!.Value], lifetime.Token)) Replace(added);
+        chosenType = null;
+    }, "Componenta a fost adăugată.");
+
+    private Task SetStateAsync(ProjectComponent component, string? value) =>
+        int.TryParse(value, out var state) ? RunAsync(async () => Replace(await Repository.SetStateAsync(component, (ComponentState)state, lifetime.Token)), "Starea a fost modificată.") : Task.CompletedTask;
+
+    private Task ReactivateAsync(ProjectComponent component) => RunAsync(async () => Replace(await Repository.ReactivateAsync(component, lifetime.Token)), "Componenta a fost reactivată.");
+
+    private void ChooseAction(int movementId, string? value)
+    {
+        if (int.TryParse(value, out var action)) actions[movementId] = (ComponentExitAction)action; else { actions.Remove(movementId); targets.Remove(movementId); }
+    }
+
+    private void ChooseTarget(int movementId, string? value)
+    {
+        if (int.TryParse(value, out var target)) targets[movementId] = target; else targets.Remove(movementId);
+    }
+
+    private void StartArchive(ProjectComponent component) { pendingExits = []; actions.Clear(); targets.Clear(); archiving = component; archiveReason = ""; archiveError = null; error = null; notice = null; }
+
+    private Task ArchiveAsync() => RunAsync(async () =>
+    {
+        // With exits to clear, every product needs an action first; they are applied, then the component is taken out.
+        if (pendingExits.Count > 0)
+        {
+            if (pendingExits.Any(exit => !actions.ContainsKey(exit.MovementId) || (actions[exit.MovementId] == ComponentExitAction.MoveToComponent && !targets.ContainsKey(exit.MovementId))))
+                throw new ProjectComponentException("Alege o acțiune (și componenta, la mutare) pentru fiecare produs.");
+            await Repository.ResolveExitsAsync(archiving!, [.. pendingExits.Select(exit => new ComponentExitResolution(exit.MovementId, actions[exit.MovementId], targets.GetValueOrDefault(exit.MovementId)))], lifetime.Token);
+            pendingExits = [];
+        }
+        try { Replace(await Repository.ArchiveAsync(archiving!, archiveReason, lifetime.Token)); }
+        catch (ProjectComponentHasExitsException blocked) { pendingExits = blocked.Exits; actions.Clear(); targets.Clear(); throw; }
+        archiving = null;
+        situation = await Services.GetRequiredService<IProjectSituationReader>().GetAsync(ProjectId, lifetime.Token);
+    }, "Componenta a fost scoasă (arhivată).");
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

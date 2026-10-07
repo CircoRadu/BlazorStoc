@@ -154,7 +154,11 @@ else
         input.SourceKey = only.Length == 1 ? only[0].Key : "";
     }
 
-    private void EventChanged(ChangeEventArgs args) => input.SourceKey = args.Value?.ToString() ?? "";
+    private void EventChanged(ChangeEventArgs args)
+    {
+        input.SourceKey = args.Value?.ToString() ?? "";
+        if (original is null && SelectedSource is { } chosen) input.ThresholdDays = chosen.DefaultThresholdDays;
+    }
 
     private MarkedTextField? subjectField, bodyField;
 

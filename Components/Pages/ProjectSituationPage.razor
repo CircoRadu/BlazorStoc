@@ -1,0 +1,210 @@
+@page "/proiecte/{Id:int}/situatie"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IProjectSituationReader Reader
+@inject IReservationRepository Reservations
+@inject IProjectComponentRepository ComponentRepository
+@inject IProductRepository ProductRepository
+@inject ILogger<ProjectSituationPage> Logger
+@implements IDisposable
+
+<PageTitle>Situația proiectului @(situation?.ProjectName is { } name ? $"· {name}" : "") · BlazorStoc</PageTitle>
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se calculează situația</h3></div>
+}
+else if (error is not null)
+{
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+}
+else if (situation is not null)
+{
+    <a class="nav-back" href="@($"/proiecte/{Id}")"><span>←</span> @situation.ProjectName</a>
+    <div class="page-heading">
+        <div><p class="eyebrow">PROIECT · @situation.ProjectName</p><h1>Situația proiectului</h1>
+            <p class="muted">Necesar din ultima revizie a fiecărei oferte, predat (net de retururi), stoc și deficit; prețurile nu sunt luate în calcul.</p></div>
+        <div class="heading-actions">
+            <button type="button" class="refresh" @onclick="LoadAsync">Actualizează</button>
+            <a class="primary" href="@($"/api/proiecte/{Id}/situatie.pdf")" target="_blank">Export PDF</a>
+            <a class="refresh" href="@($"/api/proiecte/{Id}/situatie.csv")">Export CSV</a>
+        </div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (actionError is not null) { <div class="error-banner" role="alert">@actionError</div> }
+    @if (situation.IsEmpty)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>Proiectul nu are încă o ofertă</h3><p>Preia o ofertă din <a href="/oferte/preluare">Preluare ofertă</a> ca să apară necesarul.</p></div>
+    }
+    @foreach (var component in situation.Components)
+    {
+        <section class="catalog" aria-label="@component.Name">
+            <div class="catalog-heading"><h2>@component.Name</h2><small>predat @ProjectSituationRules.Format(component.Delivered) din @ProjectSituationRules.Format(component.Needed) (bucăți)</small></div>
+            <div class="heading-actions section-actions"><button type="button" class="refresh" disabled="@busy" @onclick="() => ReserveComponentAsync(component)">Rezervă cât se poate pentru componentă</button></div>
+            <div class="table-scroll"><table><thead><tr><th>SECȚIUNE</th><th>DENUMIRE</th><th class="number">NECESAR</th><th class="number">PREDAT</th><th class="number">DIN STOC</th><th class="number">DIN CARE REZERVAT</th><th class="number">INTRAT PT. OFERTĂ</th><th class="number">DEFICIT</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var line in component.Lines)
+            {
+                <tr>
+                    <td class="muted">@line.Section</td>
+                    <td>@ProjectSituationRules.FirstLine(line.Name)@if (line.ProductId is null && line.InStock) { <small class="muted"> · de achiziționat</small> }</td>
+                    <td class="number">@ProjectSituationRules.Format(line.Quantity) @line.Unit</td>
+                    <td class="number">@(line.InStock ? ProjectSituationRules.Format(line.Delivered) : "—")</td>
+                    <td class="number">@(line.InStock ? ProjectSituationRules.Format(line.FromStock) : "—")</td>
+                    <td class="number">@(line.InStock ? ProjectSituationRules.Format(line.Reserved) : "—")</td>
+                    <td class="number">@(line.InStock && line.Received > 0 ? ProjectSituationRules.Format(line.Received) : "—")</td>
+                    <td class="number">@(line.InStock ? ProjectSituationRules.Format(line.Deficit) : "—")</td>
+                    <td>@ProjectSituationRules.StateLabel(line.State)</td>
+                    <td>@if (CanReserve(line)) { <button type="button" class="row-action edit" disabled="@busy" @onclick="() => ReserveLineAsync(component, line)">Rezervă cât se poate</button> }</td>
+                </tr>
+            }
+            </tbody></table></div>
+        </section>
+    }
+    <section class="catalog" aria-label="Rezervările proiectului">
+        <div class="catalog-heading"><h2>Rezervările proiectului <span>@reservations.Count</span></h2><small>Rezervarea nu schimbă stocul: scade stocul liber; ieșirea pentru acest proiect o consumă prima</small></div>
+        <div class="filters">
+            <div class="relation-row">
+                <SearchableSelect Id="reserve-product" Label="Produs de rezervat" Placeholder="Caută sau alege produsul…" EmptyText="Niciun produs găsit." Options="ProductOptions"
+                                  SelectedId="manualProduct" SelectedIdChanged="id => { manualProduct = id; return Task.CompletedTask; }" Disabled="busy" />
+            </div>
+            <label class="movement-page-size">Componenta
+                <select disabled="@busy" @onchange="args => manualComponent = int.TryParse(args.Value?.ToString(), out var id) ? id : null">
+                    <option value="" selected="@(manualComponent is null)">Fără componentă</option>
+                    @foreach (var component in activeComponents) { <option value="@component.Id" selected="@(manualComponent == component.Id)">@component.SystemTypeName</option> }
+                </select></label>
+            <label class="movement-page-size">Cantitate <input type="number" min="1" max="@StockMovementRules.MaxQuantity" @bind="manualQuantity" @bind:event="oninput" disabled="@busy" /></label>
+            <button type="button" class="primary" disabled="@(busy || manualProduct is null || manualQuantity is null)" @onclick="ReserveManualAsync">Rezervă</button>
+        </div>
+        @if (reservations.Count == 0)
+        {
+            <p class="muted">Proiectul nu are rezervări.</p>
+        }
+        else
+        {
+            <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th>COMPONENTĂ</th><th class="number">REZERVAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            @foreach (var reservation in reservations)
+            {
+                <tr @key="reservation.Id">
+                    <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(reservation.ProductId)">@reservation.ProductName</a></td>
+                    <td class="muted">@(reservation.ComponentName ?? "—")</td>
+                    <td class="number">@reservation.Quantity buc.</td>
+                    <td>
+                        @if (reducing == reservation.Id)
+                        {
+                            <input type="number" aria-label="Cantitatea scăzută" min="1" max="@reservation.Quantity" @bind="reduceQuantity" @bind:event="oninput" disabled="@busy" />
+                            <input type="text" aria-label="Motivul scăderii" placeholder="Motiv scurt" maxlength="@ReservationRules.ReasonMaximumLength" @bind="reduceReason" @bind:event="oninput" disabled="@busy" />
+                            <button type="button" class="danger" disabled="@busy" @onclick="() => ReduceAsync(reservation)">Scade</button>
+                            <button type="button" class="refresh" disabled="@busy" @onclick="() => reducing = null">Renunț</button>
+                        }
+                        else { <button type="button" class="row-action delete" disabled="@busy" @onclick="() => StartReduce(reservation)">Scade / eliberează</button> }
+                    </td>
+                </tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+    @if (situation.OutsideOffer.Count > 0)
+    {
+        <section class="catalog" aria-label="În afara ofertei">
+            <div class="catalog-heading"><h2>În afara ofertei <span>@situation.OutsideOffer.Count</span></h2><small>Predate proiectului, dar care nu apar (sau depășesc necesarul) în oferte</small></div>
+            <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">PREDAT</th></tr></thead><tbody>
+            @foreach (var item in situation.OutsideOffer)
+            {
+                <tr><td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(item.ProductId)">@item.ProductName</a></td><td class="number">@item.Quantity</td></tr>
+            }
+            </tbody></table></div>
+        </section>
+    }
+    @if (situation.Purchase.Count > 0)
+    {
+        <section class="catalog" aria-label="Lista de achiziție">
+            <div class="catalog-heading"><h2>Lista de achiziție</h2><small>Deficitul, grupat pe ultimul furnizor din care s-a făcut intrarea produsului</small></div>
+            @foreach (var group in situation.Purchase)
+            {
+                <h3>@group.Supplier</h3>
+                <div class="table-scroll"><table><thead><tr><th>DENUMIRE</th><th class="number">CANTITATE</th></tr></thead><tbody>
+                @foreach (var item in group.Items)
+                {
+                    <tr><td>@item.Name</td><td class="number">@ProjectSituationRules.Format(item.Quantity) @item.Unit</td></tr>
+                }
+                </tbody></table></div>
+            }
+        </section>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private ProjectSituation? situation;
+    private bool loading = true, busy;
+    private string? error, notice, actionError, reduceReason = "";
+    private IReadOnlyList<Reservation> reservations = [];
+    private IReadOnlyList<ProjectComponent> activeComponents = [];
+    private IReadOnlyList<Product> products = [];
+    private int? manualProduct, manualComponent, manualQuantity, reducing, reduceQuantity;
+
+    private IReadOnlyList<SelectOption> ProductOptions => products.Select(product => new SelectOption(product.Id, product.Name)).ToArray();
+    private static bool CanReserve(SituationLine line) => line is { InStock: true, ProductId: not null } && line.Quantity - line.Delivered - line.Reserved > 0;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            situation = await Reader.GetAsync(Id, lifetime.Token);
+            reservations = await Reservations.GetForProjectAsync(Id, lifetime.Token);
+            activeComponents = await ComponentRepository.GetForProjectAsync(Id, false, lifetime.Token);
+            if (products.Count == 0) products = await ProductRepository.GetProductsAsync(lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is OfferException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Project situation failed ({ErrorType}).", ex.GetType().Name); error = "Situația nu a putut fi calculată. Reîncearcă."; }
+        finally { loading = false; }
+    }
+
+    private async Task RunAsync(Func<Task> operation, string success)
+    {
+        if (busy) return;
+        busy = true; notice = null; actionError = null;
+        try { await operation(); notice = success; situation = await Reader.GetAsync(Id, lifetime.Token); reservations = await Reservations.GetForProjectAsync(Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is ReservationException or AccessDeniedException or OfferException) { actionError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Reservation operation failed ({ErrorType}).", ex.GetType().Name); actionError = "Operația nu a putut fi salvată. Reîncarcă pagina și reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private int? ComponentIdOf(SituationComponent component) => activeComponents.FirstOrDefault(item => item.SystemTypeId == component.SystemTypeId)?.Id;
+
+    private Task ReserveLineAsync(SituationComponent component, SituationLine line) => RunAsync(async () =>
+        await Reservations.ReserveAsync(Id, ComponentIdOf(component), line.ProductId!.Value, (int)Math.Ceiling(line.Quantity - line.Delivered - line.Reserved), lifetime.Token, capToFree: true), "Rezervarea a fost făcută (cât a permis stocul liber).");
+
+    private Task ReserveComponentAsync(SituationComponent component) => RunAsync(async () =>
+    {
+        foreach (var line in component.Lines.Where(CanReserve))
+        {
+            try { await Reservations.ReserveAsync(Id, ComponentIdOf(component), line.ProductId!.Value, (int)Math.Ceiling(line.Quantity - line.Delivered - line.Reserved), lifetime.Token, capToFree: true); }
+            catch (ReservationException) { /* nothing free for this product: the others are still reserved */ }
+        }
+    }, "Rezervările s-au făcut cât a permis stocul liber.");
+
+    private Task ReserveManualAsync() => RunAsync(async () =>
+    {
+        await Reservations.ReserveAsync(Id, manualComponent, manualProduct!.Value, manualQuantity!.Value, lifetime.Token);
+        manualProduct = null; manualQuantity = null;
+    }, "Rezervarea a fost făcută.");
+
+    private void StartReduce(Reservation reservation) { reducing = reservation.Id; reduceQuantity = reservation.Quantity; reduceReason = ""; actionError = null; notice = null; }
+
+    private Task ReduceAsync(Reservation reservation) => RunAsync(async () =>
+    {
+        await Reservations.ReduceAsync(reservation.Id, reduceQuantity ?? 0, reduceReason, lifetime.Token);
+        reducing = null;
+    }, "Rezervarea a fost scăzută.");
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

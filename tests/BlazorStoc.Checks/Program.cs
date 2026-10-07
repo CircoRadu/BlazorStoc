@@ -24,6 +24,10 @@ void Check(bool condition, string message)
 var checkGroups = new Dictionary<string, Func<Task>>(StringComparer.OrdinalIgnoreCase)
 {
     ["invoices"] = async () => await InvoiceChecks.RunAsync(Check),
+    ["offers"] = () => { BlazorStoc.Checks.OfferChecks.Run(Check); BlazorStoc.Checks.OfferChecks.RunSituation(Check); return Task.CompletedTask; },
+    // Only the extended MariaDB sections (with MARIA_ONLY, one section): needs RUN_MARIA_INTEGRATION_CHECKS=1 and MARIA_TEST_CONFIG_PATH.
+    ["maria"] = async () => await BlazorStoc.Checks.MariaExtendedChecks.RunAsync(new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+        .AddJsonFile(Environment.GetEnvironmentVariable("MARIA_TEST_CONFIG_PATH") ?? throw new InvalidOperationException("Set MARIA_TEST_CONFIG_PATH.")).Build()),
     ["components"] = async () => await ComponentChecks.RunAsync(Check),
     ["pickup"] = async () =>
     {
@@ -46,7 +50,7 @@ if (Environment.GetEnvironmentVariable("COMPONENT_CHECKS_ONLY") == "1") selected
 if (selectedGroups.Count > 0)
 {
     var names = selectedGroups.SelectMany(name => name.Equals("ui", StringComparison.OrdinalIgnoreCase)
-        ? checkGroups.Keys.Where(key => !key.Equals("invoices", StringComparison.OrdinalIgnoreCase)) : [name]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        ? checkGroups.Keys.Where(key => !key.Equals("invoices", StringComparison.OrdinalIgnoreCase) && !key.Equals("maria", StringComparison.OrdinalIgnoreCase)) : [name]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     var unknown = names.Where(name => !checkGroups.ContainsKey(name)).ToList();
     if (unknown.Count > 0) throw new ArgumentException($"CHECKS_ONLY: unknown group(s) {string.Join(", ", unknown)}; known: {string.Join(", ", checkGroups.Keys)}, ui.");
     foreach (var name in names) await checkGroups[name]();
@@ -1183,6 +1187,31 @@ try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, StockMo
 catch (StockMovementOperationException) { Check(true, "Movement quantity has an upper limit"); }
 try { StockMovementRules.Validated(MovementInput(StockMovementKind.Entry, 1, beneficiaryId: 1), StockMovementKind.Entry, false); throw new Exception("Entry with beneficiary accepted"); }
 catch (StockMovementOperationException) { Check(true, "Beneficiary and project are refused for entries"); }
+{
+    StockMovementInput Free(Action<StockMovementInput> change) { var input = MovementInput(StockMovementKind.Entry, 2, "Intrare libera"); change(input); return input; }
+    bool Refused(StockMovementInput input, StockMovementKind kind = StockMovementKind.Entry) { try { StockMovementRules.Validated(input, kind, false); return false; } catch (StockMovementOperationException) { return true; } }
+    var donation = StockMovementRules.Validated(Free(input => { input.FreeType = FreeEntryType.Donation; input.Reference = "  Bon 12  "; }), StockMovementKind.Entry, false);
+    var awaited = StockMovementRules.Validated(Free(input => { input.FreeType = FreeEntryType.AwaitedInvoice; input.FreeSupplierId = 4; }), StockMovementKind.Entry, false);
+    Check(donation.FreeType == FreeEntryType.Donation && donation.FreeSupplierId is null && donation.Reference == "Bon 12" && awaited.FreeSupplierId == 4,
+        "A free entry keeps its reason and reference; the supplier is optional except for an awaited invoice");
+    Check(Refused(Free(input => input.FreeType = FreeEntryType.AwaitedInvoice)) && Refused(Free(input => input.FreeSupplierId = 4))
+          && Refused(Free(input => { input.InvoiceId = 3; input.FreeType = FreeEntryType.Other; })) && Refused(Free(input => input.FreeType = (FreeEntryType)99))
+          && Refused(Free(input => input.Reference = new string('x', StockMovementRules.MaxReferenceLength + 1))),
+        "An awaited invoice needs its supplier; a supplier needs a reason; an invoice entry has no free reason; the reference has a limit");
+    var rows = new List<(int, DateOnly, StockMovementKind, ExitDestination?, int?, int, int?)>
+    {
+        (1, new DateOnly(2026, 1, 1), StockMovementKind.Exit, ExitDestination.GenericSale, null, 3, null),
+        (2, new DateOnly(2026, 1, 5), StockMovementKind.Entry, null, null, 14, null),
+        (3, new DateOnly(2026, 1, 6), StockMovementKind.Exit, ExitDestination.Vehicle, null, 4, 7),
+        (4, new DateOnly(2026, 1, 7), StockMovementKind.Exit, ExitDestination.GenericSale, 7, 3, null),
+        (5, new DateOnly(2026, 1, 8), StockMovementKind.Exit, ExitDestination.GenericSale, 7, 2, null)
+    };
+    var overIds = StockMovementRules.OverStockExits(rows, 7);
+    Check(overIds.SetEquals([1, 5]) && StockMovementRules.OverStockExits(rows, 7 + 3).SetEquals([5]) && StockMovementRules.WarehouseEffect(StockMovementKind.Exit, ExitDestination.WarehouseReturn, 7, 2) == 2,
+        "An exit is over the stock when the warehouse could not cover it at its date; an entry dated before heals it; use from a vehicle does not count");
+    var exitWithReason = MovementInput(StockMovementKind.Exit, 1, destination: ExitDestination.GenericSale); exitWithReason.FreeType = FreeEntryType.Other;
+    Check(Refused(exitWithReason, StockMovementKind.Exit), "An exit has no free-entry reason");
+}
 try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1, projectId: 1), StockMovementKind.Exit, false); throw new Exception("Project without beneficiary accepted"); }
 catch (StockMovementOperationException) { Check(true, "A project requires a beneficiary"); }
 try { StockMovementRules.Validated(MovementInput(StockMovementKind.Exit, 1), StockMovementKind.Exit, true); throw new Exception("Edit without reason accepted"); }
@@ -1459,7 +1488,7 @@ Check(ProductLockRules.LeaseSeconds >= 60 && ProductLockRules.LeaseSeconds <= 12
         "An unselected subcategory (Tăiere) of a partially selected category is left out of the report");
     var consumablesSection = report.Categories.Single(c => c.Category == "Consumabile");
     var fixareLines = consumablesSection.Subcategories.Single().Lines;
-    Check(fixareLines.Select(line => line.Code).SequenceEqual(["Diblu", "Șurub"]), "Products are ordered by code, case-insensitively");
+    Check(fixareLines.Select(line => line.Code).SequenceEqual(["Șurub", "Diblu"]), "Products with negative stock come first, the others by code, case-insensitively");
     Check(fixareLines.Single(line => line.Code == "Diblu").Quantity == 6, "The warehouse value excludes the quantity held by vehicles");
     Check(fixareLines.Single(line => line.Code == "Șurub") is { Quantity: -3, IsNegative: true }, "Negative stock is kept and flagged");
     Check(report.ProductCount == 3 && report.NegativeCount == 1, "The report totals count every line and the negative ones separately");
@@ -2376,6 +2405,8 @@ await SupplierChecks.ComponentsAsync(Check);
 await SupplierChecks.PickupAsync(Check);
 await ProductGroupsChecks.RunAsync(Check);
 ReasonSummaryChecks.Run(Check);
+BlazorStoc.Checks.OfferChecks.Run(Check);
+BlazorStoc.Checks.OfferChecks.RunSituation(Check);
 await InvoiceChecks.RunAsync(Check);
 
 // Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped
@@ -2482,6 +2513,17 @@ sealed class FakeInventoryStockMovementRepository(IReadOnlyDictionary<int, int> 
     public Task<StockMovementResult> CreateAsync(int productId, StockMovementInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<StockMovementResult> UpdateAsync(StockMovement original, StockMovementInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<int> DeleteAsync(StockMovement original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<StockMovementResult> RegularizeNegativeStockAsync(int productId, int realWarehouseQuantity, string context, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<ExitOperationDetails?> GetOperationAsync(int operationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task VoidExitOperationAsync(int operationId, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<ReturnableExit>> GetReturnableExitsAsync(int productId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ReturnableExit>>([]);
+    public Task<IReadOnlyList<NetConsumption>> GetNetConsumptionAsync(int? projectId, int? beneficiaryId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<NetConsumption>>([]);
+    public Task<IReadOnlyList<ExitLinePreview>> PreviewExitOperationAsync(IReadOnlyList<ExitOperationLine> lines, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<ExitOperationResult> CreateExitOperationAsync(IReadOnlyList<ExitOperationLine> lines, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<RegularizationItem>> GetToRegularizeAsync(RegularizationQuery? query = null, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<RegularizationItem>>([]);
+    public Task<IReadOnlyList<FreeEntry>> GetFreeEntriesAsync(FreeEntryQuery query, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FreeEntry>>([]);
+    public Task<IReadOnlyList<StockMovement>> AttachToInvoiceAsync(IReadOnlyList<StockMovement> entries, int invoiceId, string reason, bool viaPickup = false, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<StockMovement> DetachFromInvoiceAsync(StockMovement entry, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 // Records every movement CreateAsync receives (Task 1's inventory pickup applier checks), and can be told to fail
@@ -2509,6 +2551,17 @@ sealed class FakeInventoryPickupMovementRepository(IReadOnlyDictionary<int, int>
     public Task<IReadOnlyDictionary<int, int>> GetMovementCountsByVehicleAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<StockMovementResult> UpdateAsync(StockMovement original, StockMovementInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<int> DeleteAsync(StockMovement original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<StockMovementResult> RegularizeNegativeStockAsync(int productId, int realWarehouseQuantity, string context, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<ExitOperationDetails?> GetOperationAsync(int operationId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task VoidExitOperationAsync(int operationId, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<ReturnableExit>> GetReturnableExitsAsync(int productId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ReturnableExit>>([]);
+    public Task<IReadOnlyList<NetConsumption>> GetNetConsumptionAsync(int? projectId, int? beneficiaryId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<NetConsumption>>([]);
+    public Task<IReadOnlyList<ExitLinePreview>> PreviewExitOperationAsync(IReadOnlyList<ExitOperationLine> lines, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<ExitOperationResult> CreateExitOperationAsync(IReadOnlyList<ExitOperationLine> lines, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<RegularizationItem>> GetToRegularizeAsync(RegularizationQuery? query = null, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<RegularizationItem>>([]);
+    public Task<IReadOnlyList<FreeEntry>> GetFreeEntriesAsync(FreeEntryQuery query, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<FreeEntry>>([]);
+    public Task<IReadOnlyList<StockMovement>> AttachToInvoiceAsync(IReadOnlyList<StockMovement> entries, int invoiceId, string reason, bool viaPickup = false, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<StockMovement> DetachFromInvoiceAsync(StockMovement entry, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 
 sealed class TestAuditTrail : IAuditTrail

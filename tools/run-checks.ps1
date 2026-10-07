@@ -36,7 +36,7 @@ try {
         'maria' {
             Set-Env 'RUN_MARIA_INTEGRATION_CHECKS' '1'
             Set-Env 'MARIA_TEST_CONFIG_PATH' (Join-Path $repo 'local-secrets\test-database.private.json')
-            if ($Section) { Set-Env 'MARIA_ONLY' $Section }
+            if ($Section) { Set-Env 'MARIA_ONLY' $Section; Set-Env 'CHECKS_ONLY' 'maria' }   # only the MariaDB sections, not the whole in-memory suite
         }
     }
     if ($Group) { Set-Env 'CHECKS_ONLY' $Group }

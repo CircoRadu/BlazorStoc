@@ -156,6 +156,24 @@ builder.Services.AddScoped<IMapConfigurationService, MapConfigurationService>();
 builder.Services.AddScoped<IMaintenanceNotificationReader, MariaMaintenanceNotificationReader>();
 builder.Services.AddScoped<IExpirySource>(services => new MaintenanceDueSource(services.GetRequiredService<IMaintenanceNotificationReader>()));
 builder.Services.AddScoped<IExpirySource>(services => new ContractExpirySource(services.GetRequiredService<IMaintenanceNotificationReader>()));
+builder.Services.AddScoped<IAwaitedEntryReader>(services => new MariaAwaitedEntryReader(services.GetRequiredService<IConfiguration>()));
+builder.Services.AddScoped<IExpirySource>(services => new AwaitedInvoiceSource(services.GetRequiredService<IAwaitedEntryReader>()));
+builder.Services.AddSingleton<IConsumptionNotePdfWriter, ConsumptionNotePdfWriter>();
+builder.Services.AddSingleton<IProjectSituationPdfWriter, ProjectSituationPdfWriter>();
+builder.Services.AddScoped<IReservationRepository>(services => new MariaReservationRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
+builder.Services.AddScoped<IProjectSituationReader>(services => new MariaProjectSituationReader(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IProjectRepository>(),
+    services.GetRequiredService<IProjectComponentRepository>(), services.GetRequiredService<IOfferRepository>(), services.GetRequiredService<IStockMovementRepository>(),
+    services.GetRequiredService<IProductRepository>(), services.GetRequiredService<IReservationRepository>(), services.GetRequiredService<IAccessControl>()));
+builder.Services.AddScoped<IOfferRepository>(services => new MariaOfferRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IProjectRepository>(),
+    services.GetRequiredService<IProjectComponentRepository>(), services.GetRequiredService<IBeneficiaryRepository>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
+builder.Services.AddScoped<IOfferTemplateRepository>(services => new MariaOfferTemplateRepository(services.GetRequiredService<IConfiguration>(),
+    services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
+builder.Services.AddScoped<IProjectComponentRepository>(services => new MariaProjectComponentRepository(services.GetRequiredService<IConfiguration>(),
+    services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IStockMovementRepository>()));
+builder.Services.AddScoped<ISystemTypeRepository>(services => new MariaSystemTypeRepository(services.GetRequiredService<IConfiguration>(),
+    services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
+builder.Services.AddScoped<IOverStockReader>(services => new MariaOverStockReader(services.GetRequiredService<IConfiguration>()));
+builder.Services.AddScoped<IExpirySource>(services => new OverStockSource(services.GetRequiredService<IOverStockReader>()));
 builder.Services.AddScoped<IExpiryNotificationService, ExpiryNotificationService>();
 builder.Services.AddScoped<IInventoryReportBuilder, InventoryReportBuilder>();
 builder.Services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();
@@ -255,6 +273,34 @@ app.MapGet("/api/furnizori/recunoastere.csv", async (ISupplierRecognitionLog log
 app.MapGet("/health/live", () => Results.Text("healthy")).AllowAnonymous();
 // Polled by every open page (wwwroot/maintenance-watch.js): tells an already-open tab that a backup/restore has
 // started or ended, so it can be moved to the waiting page and brought back. Carries no names or details.
+// Bon de consum / aviz de predare of an exit operation (opens in the browser's PDF viewer).
+app.MapGet("/api/iesiri/{operationId:int}/bon.pdf", async (int operationId, IStockMovementRepository movements, IConsumptionNotePdfWriter writer, CancellationToken token) =>
+{
+    try
+    {
+        var operation = await movements.GetOperationAsync(operationId, token);
+        return operation is null ? Results.NotFound() : Results.File(writer.Write(operation, DateTime.Now), "application/pdf");
+    }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization();
+// Situatia proiectului: PDF and CSV exports (the same calculation as the page).
+app.MapGet("/api/proiecte/{projectId:int}/situatie.pdf", async (int projectId, IProjectSituationReader reader, IProjectSituationPdfWriter writer, CancellationToken token) =>
+{
+    try { return Results.File(writer.Write(await reader.GetAsync(projectId, token), DateTime.Now), "application/pdf"); }
+    catch (OfferException) { return Results.NotFound(); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization();
+app.MapGet("/api/proiecte/{projectId:int}/situatie.csv", async (int projectId, IProjectSituationReader reader, CancellationToken token) =>
+{
+    try
+    {
+        var situation = await reader.GetAsync(projectId, token);
+        var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(ProjectSituationRules.ToCsv(situation))).ToArray();
+        return Results.File(bytes, "text/csv; charset=utf-8", $"situatie-proiect-{projectId}.csv");
+    }
+    catch (OfferException) { return Results.NotFound(); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization();
 app.MapGet("/api/maintenance", (HttpContext context) =>
 {
     context.Response.Headers.CacheControl = "no-store";

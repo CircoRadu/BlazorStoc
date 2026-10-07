@@ -24,7 +24,8 @@ public static class AuditFilterOptions
         (AuditEntities.WorkPoint, "Puncte de lucru (ștergeri)"), (AuditEntities.ServicePhoto, "Fotografii puncte de lucru (ștergeri)"),
         (AuditEntities.ServiceContract, "Contracte mentenanță (ștergeri)"), (AuditEntities.ServiceIntervention, "Intervenții mentenanță (ștergeri)"),
         (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă"),
-        (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori")
+        (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori"),
+        (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.OfferTemplate, "Șabloane oferte")
     ];
 
     public static readonly IReadOnlyList<(string Value, string Label)> Actions =
@@ -61,7 +62,30 @@ public static class AuditFilterOptions
         (AuditActions.RecheckSupplier, AuditActions.RecheckSupplier), (AuditActions.RecordSupplierInvoice, AuditActions.RecordSupplierInvoice),
         (AuditActions.EditSupplierInvoiceNumber, AuditActions.EditSupplierInvoiceNumber), (AuditActions.EditSupplierInvoiceDate, AuditActions.EditSupplierInvoiceDate),
         (AuditActions.MoveSupplierInvoice, AuditActions.MoveSupplierInvoice),
-        (AuditActions.AddSupplierAlias, AuditActions.AddSupplierAlias), (AuditActions.RemoveSupplierAlias, AuditActions.RemoveSupplierAlias)
+        (AuditActions.AddSupplierAlias, AuditActions.AddSupplierAlias), (AuditActions.RemoveSupplierAlias, AuditActions.RemoveSupplierAlias),
+        (AuditActions.RecordFreeEntry, AuditActions.RecordFreeEntry), (AuditActions.AttachEntryToInvoice, AuditActions.AttachEntryToInvoice),
+        (AuditActions.DetachEntryFromInvoice, AuditActions.DetachEntryFromInvoice), (AuditActions.DuplicateEntryOnInvoice, AuditActions.DuplicateEntryOnInvoice),
+        (AuditActions.RegularizeNegativeStock, AuditActions.RegularizeNegativeStock), (AuditActions.ExitOverStock, AuditActions.ExitOverStock),
+        (AuditActions.ExitToBeneficiary, AuditActions.ExitToBeneficiary), (AuditActions.ExitToVehicle, AuditActions.ExitToVehicle),
+        (AuditActions.GenericSale, AuditActions.GenericSale), (AuditActions.StockCorrection, AuditActions.StockCorrection),
+        (AuditActions.DuplicateExit, AuditActions.DuplicateExit), (AuditActions.VoidExitOperation, AuditActions.VoidExitOperation),
+        (AuditActions.ReturnFromBeneficiary, AuditActions.ReturnFromBeneficiary),
+        (AuditActions.ImportOffer, AuditActions.ImportOffer), (AuditActions.ReviseOffer, AuditActions.ReviseOffer), (AuditActions.LinkOfferLine, AuditActions.LinkOfferLine),
+        (AuditActions.AddBeneficiaryAlias, AuditActions.AddBeneficiaryAlias),
+        (AuditActions.CreateOfferTemplate, AuditActions.CreateOfferTemplate), (AuditActions.EditOfferTemplate, AuditActions.EditOfferTemplate),
+        (AuditActions.ActivateOfferTemplate, AuditActions.ActivateOfferTemplate), (AuditActions.DeactivateOfferTemplate, AuditActions.DeactivateOfferTemplate),
+        (AuditActions.DeleteOfferTemplate, AuditActions.DeleteOfferTemplate),
+        (AuditActions.AddProjectComponent, AuditActions.AddProjectComponent), (AuditActions.ChangeProjectComponentState, AuditActions.ChangeProjectComponentState),
+        (AuditActions.ArchiveProjectComponent, AuditActions.ArchiveProjectComponent), (AuditActions.ReactivateProjectComponent, AuditActions.ReactivateProjectComponent),
+        (AuditActions.ReserveStock, AuditActions.ReserveStock), (AuditActions.ReduceReservation, AuditActions.ReduceReservation), (AuditActions.ReleaseReservation, AuditActions.ReleaseReservation),
+        (AuditActions.ReservationConsumed, AuditActions.ReservationConsumed), (AuditActions.ReservationReducedByExit, AuditActions.ReservationReducedByExit),
+        (AuditActions.ReservationReleasedByComponent, AuditActions.ReservationReleasedByComponent),
+        (AuditActions.ComponentExitReturned, AuditActions.ComponentExitReturned), (AuditActions.ComponentExitLeft, AuditActions.ComponentExitLeft),
+        (AuditActions.ComponentExitMoved, AuditActions.ComponentExitMoved), (AuditActions.ComponentExitConsumed, AuditActions.ComponentExitConsumed),
+        (AuditActions.AddSystemType, AuditActions.AddSystemType), (AuditActions.RenameSystemType, AuditActions.RenameSystemType),
+        (AuditActions.ActivateSystemType, AuditActions.ActivateSystemType), (AuditActions.DeactivateSystemType, AuditActions.DeactivateSystemType),
+        (AuditActions.MoveSystemType, AuditActions.MoveSystemType), (AuditActions.AddSystemTypeAlias, AuditActions.AddSystemTypeAlias),
+        (AuditActions.RemoveSystemTypeAlias, AuditActions.RemoveSystemTypeAlias)
     ];
 }
 
