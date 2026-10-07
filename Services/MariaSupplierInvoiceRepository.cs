@@ -32,6 +32,26 @@ public sealed class MariaSupplierInvoiceRepository(
         return result;
     }
 
+    public async Task<IReadOnlyList<SupplierInvoice>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, null, """
+            SELECT i.id,i.supplier_id,s.name,i.`number`,i.issue_date,i.created_by,i.created_utc,
+                   (SELECT COUNT(*) FROM stock_movements m WHERE m.invoice_id=i.id)
+            FROM supplier_invoices i INNER JOIN suppliers s ON s.id=i.supplier_id
+            ORDER BY i.issue_date DESC, i.id DESC
+            """);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var result = new List<SupplierInvoice>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result.Add(new(checked((int)reader.GetInt64(0)), checked((int)reader.GetInt64(1)), reader.GetString(2), reader.GetString(3),
+                StockMovementRules.ParseStorageDate(reader.GetString(4)), reader.GetString(5), MariaTimeText.Parse(reader.GetString(6)),
+                Convert.ToInt32(reader.GetValue(7))));
+        return result;
+    }
+
     public async Task<SupplierInvoice?> FindAsync(int supplierId, string number, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
@@ -96,6 +116,72 @@ public sealed class MariaSupplierInvoiceRepository(
             invoice.Id.ToString(), SupplierInvoiceRules.Target(invoice.SupplierName, invoice.Number), SupplierInvoiceRules.Identification(invoice), string.Empty,
             cancellationToken).ConfigureAwait(false);
         return invoice;
+    }
+
+    public async Task<SupplierInvoice> UpdateAsync(SupplierInvoice original, SupplierInvoiceInput input, string reason, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        var motif = ChangeReasonRules.Normalize(reason);
+        if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new SupplierInvoiceOperationException(reasonError);
+        var value = SupplierInvoiceRules.Validated(input);
+        var updated = await WriteAsync(async (connection, transaction) =>
+        {
+            await using (var row = Command(connection, transaction, "SELECT supplier_id,`number`,issue_date FROM supplier_invoices WHERE id=@id FOR UPDATE", ("@id", original.Id)))
+            await using (var reader = await row.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || checked((int)reader.GetInt64(0)) != original.SupplierId
+                    || reader.GetString(1) != original.Number || StockMovementRules.ParseStorageDate(reader.GetString(2)) != original.Date)
+                    throw new SupplierInvoiceOperationException(SupplierInvoiceRules.StaleMessage);
+            }
+            string supplierName;
+            await using (var supplier = Command(connection, transaction, "SELECT name FROM suppliers WHERE id=@id FOR UPDATE", ("@id", value.SupplierId!.Value)))
+                supplierName = await supplier.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
+                    ?? throw new SupplierInvoiceOperationException(SupplierInvoiceRules.SupplierMissingMessage);
+            await using (var duplicate = Command(connection, transaction,
+                "SELECT issue_date FROM supplier_invoices WHERE supplier_id=@supplier AND normalized_number=@key AND id<>@id LIMIT 1",
+                ("@supplier", value.SupplierId.Value), ("@key", SupplierInvoiceRules.NumberKey(value.Number)), ("@id", original.Id)))
+                if (await duplicate.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string issued)
+                    throw new SupplierInvoiceOperationException(SupplierInvoiceRules.DuplicateMessage(supplierName, value.Number, StockMovementRules.ParseStorageDate(issued)));
+            await using var update = Command(connection, transaction,
+                "UPDATE supplier_invoices SET supplier_id=@supplier,`number`=@number,normalized_number=@key,issue_date=@date WHERE id=@id",
+                ("@supplier", value.SupplierId.Value), ("@number", value.Number), ("@key", SupplierInvoiceRules.NumberKey(value.Number)),
+                ("@date", SupplierInvoiceRules.StorageDate(value.Date!.Value)), ("@id", original.Id));
+            await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            return original with { SupplierId = value.SupplierId.Value, SupplierName = supplierName, Number = value.Number, Date = value.Date.Value };
+        }, cancellationToken, value).ConfigureAwait(false);
+        var target = SupplierInvoiceRules.Target(updated.SupplierName, updated.Number);
+        foreach (var (action, field) in new[] { (AuditActions.EditSupplierInvoiceNumber, "Număr factură"), (AuditActions.EditSupplierInvoiceDate, "Data emiterii"), (AuditActions.MoveSupplierInvoice, "Furnizor") })
+        {
+            var changes = SupplierInvoiceRules.Changes(original, updated).Where(change => change.Field == field).ToArray();
+            if (changes.Any(change => change.Before != change.After))
+                await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.SupplierInvoice, updated.Id.ToString(), target, changes, motif, cancellationToken, action).ConfigureAwait(false);
+        }
+        return updated;
+    }
+
+    public async Task DeleteAsync(SupplierInvoice original, string reason, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        var motif = ChangeReasonRules.Normalize(reason);
+        if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new SupplierInvoiceOperationException(reasonError);
+        await WriteAsync(async (connection, transaction) =>
+        {
+            await using (var row = Command(connection, transaction, "SELECT supplier_id,`number`,issue_date FROM supplier_invoices WHERE id=@id FOR UPDATE", ("@id", original.Id)))
+            await using (var reader = await row.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false) || checked((int)reader.GetInt64(0)) != original.SupplierId
+                    || reader.GetString(1) != original.Number || StockMovementRules.ParseStorageDate(reader.GetString(2)) != original.Date)
+                    throw new SupplierInvoiceOperationException(SupplierInvoiceRules.StaleMessage);
+            }
+            await using (var count = Command(connection, transaction, "SELECT COUNT(*) FROM stock_movements WHERE invoice_id=@id", ("@id", original.Id)))
+                if (Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) is var movements and > 0)
+                    throw new SupplierInvoiceOperationException(SupplierInvoiceRules.DeleteBlockedMessage(movements));
+            await using var delete = Command(connection, transaction, "DELETE FROM supplier_invoices WHERE id=@id", ("@id", original.Id));
+            await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            return true;
+        }, cancellationToken, new SupplierInvoiceInput()).ConfigureAwait(false);
+        await AuditRecorder.RecordDeleteAsync(auditTrail, accessControl, AuditEntities.SupplierInvoice, original.Id.ToString(),
+            SupplierInvoiceRules.Target(original.SupplierName, original.Number), SupplierInvoiceRules.Identification(original), motif, cancellationToken).ConfigureAwait(false);
     }
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token, SupplierInvoiceInput value) =>

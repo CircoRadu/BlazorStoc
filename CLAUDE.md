@@ -8,6 +8,8 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
 
 > **Calculator nou sau mediu lipsa (02 octombrie 2026):** daca .NET 9, MariaDB-ul local sau fisierele `local-secrets/*.private.json` lipsesc, nu improviza: urmeaza `docs/SETUP_DEZVOLTARE.md` (scripturile `tools/setup-dev-environment.ps1`, `tools/dev-mariadb.ps1`, `tools/start-preview.ps1`). Repository-ul este privat si parolele sunt doar de dezvoltare: `local-secrets/`, `keys/`, `data/` si `database/dev-data/` (dump al bazei fara jurnal + fisierele aplicatiei) SE COMIT, ca pe alt calculator sa nu se introduca parole noi; parolele totusi nu se afiseaza si nu se trimit in chat. Inainte de fiecare push se ruleaza `tools/export-dev-data.ps1`.
 
+> **Context redus (07 octombrie 2026, prevaleaza asupra pasilor 1-4 de mai jos):** citeste la inceputul unui task doar `docs/PROJECT_STATE.md` (starea scurta, 2-5 KB) si taskul relevant din `TODO.md`; `docs/HARTA_COD.md` spune unde se afla fiecare modul. `IMPLEMENTED.md`, `docs/AGENT_CHANGELOG.md`, `VALIDARE.md`, `docs/TESTE_RAMASE.md` si `docs/arhiva/` NU se citesc integral: cauti cu `rg -n` dupa titlu si citesti intervalul. Starea Git se ia din `git status --short`, nu dintr-un instantaneu scris. Teste: `tools\run-checks.ps1` (log complet in fisier, in context doar rezumatul). Documentare: `tools\log-task.ps1`. Alte reguli: `..\PROTOCOL_CLAUDE_OPTIMIZAT.md`. `agent-cycle.ps1 start` nu mai cere working tree curat (avertizeaza doar).
+
 ## Înainte de orice modificare
 
 1. Citește `docs/SEQUENTIAL_COLLABORATION.md`, `docs/PROJECT_STATE.md`, `TODO.md` și ultimele intrări din `docs/AGENT_CHANGELOG.md`.

@@ -17,26 +17,40 @@ void Check(bool condition, string message)
     if (!condition) throw new Exception(message);
     Console.WriteLine("PASS: " + message);
 }
-// INVOICE_CHECKS_ONLY=1 runs only the invoice template checks (fast loop while working on them).
-if (Environment.GetEnvironmentVariable("INVOICE_CHECKS_ONLY") == "1")
+// CHECKS_ONLY=<group>[,<group>...] runs only the named groups of the checks that live in their own files (a fast loop while working on one
+// area); the checks written below in this file (products, beneficiaries, vehicles, journal...) run only in the full run.
+// Groups: suppliers, pickup, groups, reasons, components, invoices, or "ui" (every group except invoices). Older switches stay as aliases:
+// INVOICE_CHECKS_ONLY=1 = invoices, COMPONENT_CHECKS_ONLY=1 = ui. An unknown group name fails the run.
+var checkGroups = new Dictionary<string, Func<Task>>(StringComparer.OrdinalIgnoreCase)
 {
-    await InvoiceChecks.RunAsync(Check);
-    Console.WriteLine("Invoice checks finished.");
-    return;
-}
-// COMPONENT_CHECKS_ONLY=1 runs only the Razor component checks (bUnit).
-if (Environment.GetEnvironmentVariable("COMPONENT_CHECKS_ONLY") == "1")
+    ["invoices"] = async () => await InvoiceChecks.RunAsync(Check),
+    ["components"] = async () => await ComponentChecks.RunAsync(Check),
+    ["pickup"] = async () =>
+    {
+        await PickupWizardChecks.RunAsync(Check);
+        await PickupWizardChecks.TemplateFlowAsync(Check);
+        await PickupWizardChecks.LinkButtonAsync(Check);
+    },
+    ["suppliers"] = async () =>
+    {
+        SupplierChecks.Rules(Check);
+        await SupplierChecks.ComponentsAsync(Check);
+        await SupplierChecks.PickupAsync(Check);
+    },
+    ["groups"] = async () => await ProductGroupsChecks.RunAsync(Check),
+    ["reasons"] = () => { ReasonSummaryChecks.Run(Check); return Task.CompletedTask; }
+};
+var selectedGroups = (Environment.GetEnvironmentVariable("CHECKS_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+if (Environment.GetEnvironmentVariable("INVOICE_CHECKS_ONLY") == "1") selectedGroups.Add("invoices");
+if (Environment.GetEnvironmentVariable("COMPONENT_CHECKS_ONLY") == "1") selectedGroups.Add("ui");
+if (selectedGroups.Count > 0)
 {
-    await ComponentChecks.RunAsync(Check);
-    await PickupWizardChecks.RunAsync(Check);
-    await PickupWizardChecks.TemplateFlowAsync(Check);
-    await PickupWizardChecks.LinkButtonAsync(Check);
-    SupplierChecks.Rules(Check);
-    await SupplierChecks.ComponentsAsync(Check);
-    await SupplierChecks.PickupAsync(Check);
-    await ProductGroupsChecks.RunAsync(Check);
-    ReasonSummaryChecks.Run(Check);
-    Console.WriteLine("Component checks finished.");
+    var names = selectedGroups.SelectMany(name => name.Equals("ui", StringComparison.OrdinalIgnoreCase)
+        ? checkGroups.Keys.Where(key => !key.Equals("invoices", StringComparison.OrdinalIgnoreCase)) : [name]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    var unknown = names.Where(name => !checkGroups.ContainsKey(name)).ToList();
+    if (unknown.Count > 0) throw new ArgumentException($"CHECKS_ONLY: unknown group(s) {string.Join(", ", unknown)}; known: {string.Join(", ", checkGroups.Keys)}, ui.");
+    foreach (var name in names) await checkGroups[name]();
+    Console.WriteLine($"Checks finished (groups: {string.Join(", ", names)}).");
     return;
 }
 ProductInput ProductEdit(Product product, string reason = "Test automat") { var input = ProductInput.From(product); input.Reason = reason; return input; }

@@ -59,6 +59,8 @@ public static class AuditFilterOptions
         (AuditActions.RenameInvoiceTemplateSupplier, AuditActions.RenameInvoiceTemplateSupplier), (AuditActions.LinkInvoiceTemplateSupplier, AuditActions.LinkInvoiceTemplateSupplier),
         (AuditActions.CreateSupplier, AuditActions.CreateSupplier), (AuditActions.EditSupplier, AuditActions.EditSupplier),
         (AuditActions.RecheckSupplier, AuditActions.RecheckSupplier), (AuditActions.RecordSupplierInvoice, AuditActions.RecordSupplierInvoice),
+        (AuditActions.EditSupplierInvoiceNumber, AuditActions.EditSupplierInvoiceNumber), (AuditActions.EditSupplierInvoiceDate, AuditActions.EditSupplierInvoiceDate),
+        (AuditActions.MoveSupplierInvoice, AuditActions.MoveSupplierInvoice),
         (AuditActions.AddSupplierAlias, AuditActions.AddSupplierAlias), (AuditActions.RemoveSupplierAlias, AuditActions.RemoveSupplierAlias)
     ];
 }

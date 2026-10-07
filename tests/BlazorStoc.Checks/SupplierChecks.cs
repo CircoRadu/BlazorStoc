@@ -145,6 +145,32 @@ public static class SupplierChecks
         check(SupplierInvoiceRules.LooksLike("FT 1O42", "FT 1042") && SupplierInvoiceRules.LooksLike("FT I", "FT 1") && SupplierInvoiceRules.LooksLike("FT 1043", "FT 1042") && SupplierInvoiceRules.LooksLike("FT 10422", "FT 1042") &&
               SupplierInvoiceRules.LooksLike("FT 142", "FT 1042") && !SupplierInvoiceRules.LooksLike("ft1042", "FT 1042") && !SupplierInvoiceRules.LooksLike("A1", "A2") && !SupplierInvoiceRules.LooksLike("FT 1042", "GH 7788") && !SupplierInvoiceRules.LooksLike("", "FT 1"),
             "Invoices: a number that looks like another one (OCR look-alikes, one character more, less or different) is told apart from the same number and from different ones");
+        SupplierInvoice[] register =
+        [
+            new(1, 1, "Alfa SRL", "FT 1042", new DateOnly(2026, 9, 1), "ana", DateTime.UtcNow, 2),
+            new(2, 2, "Beta SA", "B-7", new DateOnly(2026, 10, 3), "ana", DateTime.UtcNow, 0)
+        ];
+        check(SupplierInvoiceSearch.Filter(register, "ft1042").Select(item => item.Id).SequenceEqual([1]) && SupplierInvoiceSearch.Filter(register, "beta").Select(item => item.Id).SequenceEqual([2]) &&
+              SupplierInvoiceSearch.Filter(register, "", supplierId: 1).Count() == 1 && SupplierInvoiceSearch.Filter(register, null, from: new DateOnly(2026, 10, 1)).Select(item => item.Id).SequenceEqual([2]) &&
+              SupplierInvoiceSearch.Filter(register, null, to: new DateOnly(2026, 9, 30)).Select(item => item.Id).SequenceEqual([1]) && SupplierInvoiceSearch.Filter(register, null, withoutEntries: true).Select(item => item.Id).SequenceEqual([2]) &&
+              SupplierInvoiceSearch.Filter(register, null).Count() == 2,
+            "Invoices page: the filter matches number or supplier, supplier, issue-date interval and invoices without entries");
+        var editSuppliers = new MemorySupplierRepository();
+        editSuppliers.Items.AddRange([Existing(1, "Alfa SRL", "11111111"), Existing(2, "Beta SA", "22222222")]);
+        var editRepository = new MemorySupplierInvoiceRepository(editSuppliers);
+        editRepository.Items.AddRange([register[0] with { MovementCount = 0 }, register[1] with { MovementCount = 3 }]);
+        var moved = editRepository.UpdateAsync(editRepository.Items[0], new SupplierInvoiceInput { SupplierId = 2, Number = "FT 1043", Date = new DateOnly(2026, 9, 2) }, "corectie").GetAwaiter().GetResult();
+        check(moved.SupplierName == "Beta SA" && moved.Number == "FT 1043" && moved.Date == new DateOnly(2026, 9, 2) && editRepository.Items[0].SupplierId == 2 &&
+              Throws(() => editRepository.UpdateAsync(register[0], new SupplierInvoiceInput { SupplierId = 2, Number = "x", Date = new DateOnly(2026, 9, 2) }, "motiv").GetAwaiter().GetResult()) &&
+              Throws(() => editRepository.UpdateAsync(moved, new SupplierInvoiceInput { SupplierId = 2, Number = "b 7", Date = moved.Date }, "motiv").GetAwaiter().GetResult()) &&
+              Throws(() => editRepository.UpdateAsync(moved, new SupplierInvoiceInput { SupplierId = 2, Number = "Z", Date = moved.Date }, " ").GetAwaiter().GetResult()),
+            "Invoices page: a correction changes number, date and supplier; a stale copy, a duplicate number and a missing reason are refused");
+        check(SupplierInvoiceRules.Changes(register[0], moved).Count(change => change.Before != change.After) == 3 &&
+              AuditActions.IsCreateOrEdit(AuditActions.MoveSupplierInvoice) && AuditActions.IsCreateOrEdit(AuditActions.EditSupplierInvoiceNumber) && AuditActions.IsCreateOrEdit(AuditActions.EditSupplierInvoiceDate),
+            "Invoices page: each kind of correction is its own journal action");
+        check(Throws(() => editRepository.DeleteAsync(editRepository.Items[1], "motiv").GetAwaiter().GetResult()) && editRepository.Items.Count == 2 &&
+              editRepository.DeleteAsync(editRepository.Items[0], "motiv").IsCompletedSuccessfully && editRepository.Items.Count == 1,
+            "Invoices page: an invoice with entries in stock is not deleted, one without entries is");
         var today = new DateOnly(2026, 10, 6);
         check(Throws(() => SupplierInvoiceRules.Validated(new SupplierInvoiceInput { SupplierId = null, Number = "1", Date = today }, today)) && Throws(() => SupplierInvoiceRules.Validated(new SupplierInvoiceInput { SupplierId = 1, Number = " ", Date = today }, today)) &&
               Throws(() => SupplierInvoiceRules.Validated(new SupplierInvoiceInput { SupplierId = 1, Number = "---", Date = today }, today)) && Throws(() => SupplierInvoiceRules.Validated(new SupplierInvoiceInput { SupplierId = 1, Number = "1", Date = null }, today)) &&
@@ -636,6 +662,33 @@ internal sealed class MemorySupplierInvoiceRepository(MemorySupplierRepository s
 
     public Task<IReadOnlyList<SupplierInvoice>> GetForSupplierAsync(int supplierId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<SupplierInvoice>>([.. Items.Where(item => item.SupplierId == supplierId)]);
+
+    public Task<SupplierInvoice> UpdateAsync(SupplierInvoice original, SupplierInvoiceInput input, string reason, CancellationToken cancellationToken = default)
+    {
+        if (ChangeReasonRules.ValidationError(reason) is { } reasonError) throw new SupplierInvoiceOperationException(reasonError);
+        var value = SupplierInvoiceRules.Validated(input);
+        var current = Items.FirstOrDefault(item => item.Id == original.Id);
+        if (current is null || !SupplierInvoiceRules.SameAs(current, original)) throw new SupplierInvoiceOperationException(SupplierInvoiceRules.StaleMessage);
+        var supplier = suppliers.Items.FirstOrDefault(item => item.Id == value.SupplierId) ?? throw new SupplierInvoiceOperationException(SupplierInvoiceRules.SupplierMissingMessage);
+        if (Items.FirstOrDefault(item => item.Id != current.Id && item.SupplierId == supplier.Id && SupplierInvoiceRules.NumberKey(item.Number) == SupplierInvoiceRules.NumberKey(value.Number)) is { } existing)
+            throw new SupplierInvoiceOperationException(SupplierInvoiceRules.DuplicateMessage(supplier.Name, value.Number, existing.Date));
+        var updated = current with { SupplierId = supplier.Id, SupplierName = supplier.Name, Number = value.Number, Date = value.Date!.Value };
+        Items[Items.IndexOf(current)] = updated;
+        return Task.FromResult(updated);
+    }
+
+    public Task DeleteAsync(SupplierInvoice original, string reason, CancellationToken cancellationToken = default)
+    {
+        if (ChangeReasonRules.ValidationError(reason) is { } reasonError) throw new SupplierInvoiceOperationException(reasonError);
+        var current = Items.FirstOrDefault(item => item.Id == original.Id);
+        if (current is null || !SupplierInvoiceRules.SameAs(current, original)) throw new SupplierInvoiceOperationException(SupplierInvoiceRules.StaleMessage);
+        if (current.MovementCount > 0) throw new SupplierInvoiceOperationException(SupplierInvoiceRules.DeleteBlockedMessage(current.MovementCount));
+        Items.Remove(current);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<SupplierInvoice>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SupplierInvoice>>([.. Items.OrderByDescending(item => item.Date)]);
 
     public Task<SupplierInvoice> CreateAsync(SupplierInvoiceInput input, CancellationToken cancellationToken = default)
     {

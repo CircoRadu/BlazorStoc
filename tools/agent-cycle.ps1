@@ -65,7 +65,8 @@ switch ($Action) {
         Require-Agent
         if ([string]::IsNullOrWhiteSpace($Task)) { throw 'Parametrul -Task este obligatoriu la start.' }
         $dirty = @(Invoke-Git -Arguments @('status', '--porcelain'))
-        if ($dirty.Count -gt 0) { throw "Working tree-ul nu este curat. Finalizează sau recuperează ciclul existent înainte de start.`n$($dirty -join "`n")" }
+        # Din 29.09.2026 modificarile necomise ale sesiunilor Claude nu blocheaza startul (commitul se face numai la cererea utilizatorului): se semnaleaza, nu se opresc.
+        if ($dirty.Count -gt 0) { Write-Host "Atentie: $($dirty.Count) fisiere cu modificari necomise (se pastreaza; nu se sterg si nu se suprascriu fara sa fie intelese)." }
         $state = Read-State
         if ($state.status -ne 'ready_for_handoff') { throw "Starea curentă este '$($state.status)', nu 'ready_for_handoff'." }
         if ($state.nextAgent -and $state.nextAgent -ne $Agent) {

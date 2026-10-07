@@ -123,6 +123,9 @@ public static class AuditActions
     public const string EditSupplier = "Modificare furnizor";
     public const string RecheckSupplier = "Reverificare furnizor ANAF";
     public const string RecordSupplierInvoice = "Înregistrare factură furnizor";
+    public const string EditSupplierInvoiceNumber = "Modificare număr factură";
+    public const string EditSupplierInvoiceDate = "Modificare dată factură";
+    public const string MoveSupplierInvoice = "Mutare factură la alt furnizor";
     public const string AddSupplierAlias = "Adăugare denumire alternativă furnizor";
     public const string RemoveSupplierAlias = "Ștergere denumire alternativă furnizor";
 
@@ -140,7 +143,7 @@ public static class AuditActions
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
-            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias;
+            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;

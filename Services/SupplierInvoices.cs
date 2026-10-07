@@ -26,12 +26,36 @@ public sealed record InvoiceEntry(int MovementId, int ProductId, string ProductN
 public interface ISupplierInvoiceRepository
 {
     Task<IReadOnlyList<SupplierInvoice>> GetForSupplierAsync(int supplierId, CancellationToken cancellationToken = default);
+    // Every invoice taken, newest first (the Facturi page).
+    Task<IReadOnlyList<SupplierInvoice>> GetAllAsync(CancellationToken cancellationToken = default);
     // The invoice of the supplier with that number (any writing of it), or null: a partly taken invoice is continued, not recorded again.
     Task<SupplierInvoice?> FindAsync(int supplierId, string number, CancellationToken cancellationToken = default);
     // What was already taken from the invoice, oldest first.
     Task<IReadOnlyList<InvoiceEntry>> GetEntriesAsync(int invoiceId, CancellationToken cancellationToken = default);
     // Records the invoice; throws SupplierInvoiceOperationException when the supplier already has an invoice with that number.
     Task<SupplierInvoice> CreateAsync(SupplierInvoiceInput input, CancellationToken cancellationToken = default);
+    // Administrator only. Changes the number, the date and/or the supplier of the invoice (each kind is its own event in the journal);
+    // throws when the invoice was changed or deleted meanwhile, or when the supplier already has that number.
+    Task<SupplierInvoice> UpdateAsync(SupplierInvoice original, SupplierInvoiceInput input, string reason, CancellationToken cancellationToken = default);
+    // Administrator only. An invoice with entries in stock cannot be deleted.
+    Task DeleteAsync(SupplierInvoice original, string reason, CancellationToken cancellationToken = default);
+}
+
+public static class SupplierInvoiceSearch
+{
+    // Text matches the number or the supplier (letters and digits only, any case); supplierId and the issue-date interval are optional.
+    // "Without entries" keeps only the invoices nothing was taken from.
+    public static IEnumerable<SupplierInvoice> Filter(IEnumerable<SupplierInvoice> invoices, string? text, int? supplierId = null,
+        DateOnly? from = null, DateOnly? to = null, bool withoutEntries = false)
+    {
+        var key = SupplierRules.CompactKey(text);
+        return invoices.Where(invoice =>
+            (key.Length == 0 || SupplierRules.CompactKey(invoice.Number).Contains(key, StringComparison.Ordinal)
+                || SupplierRules.CompactKey(invoice.SupplierName).Contains(key, StringComparison.Ordinal))
+            && (supplierId is null || invoice.SupplierId == supplierId)
+            && (from is null || invoice.Date >= from) && (to is null || invoice.Date <= to)
+            && (!withoutEntries || invoice.MovementCount == 0));
+    }
 }
 
 public static class SupplierInvoiceRules
@@ -87,6 +111,20 @@ public static class SupplierInvoiceRules
         if (errors.Count > 0) throw new SupplierInvoiceOperationException(string.Join(" ", errors));
         return new SupplierInvoiceInput { SupplierId = input.SupplierId, Number = number, Date = input.Date };
     }
+
+    public const string StaleMessage = "Factura a fost modificată sau ștearsă între timp. Actualizează lista și reia operația.";
+    public static string DeleteBlockedMessage(int movementCount) =>
+        $"Factura are {movementCount} {(movementCount == 1 ? "intrare" : "intrări")} în stoc și nu poate fi ștearsă.";
+
+    // The same invoice as the one the user opened (the row has no version: number, date and supplier are compared).
+    public static bool SameAs(SupplierInvoice a, SupplierInvoice b) =>
+        a.Id == b.Id && a.SupplierId == b.SupplierId && a.Number == b.Number && a.Date == b.Date;
+
+    public static IReadOnlyList<AuditChange> Changes(SupplierInvoice before, SupplierInvoice after) =>
+    [
+        new("Furnizor", before.SupplierName, after.SupplierName), new("Număr factură", before.Number, after.Number),
+        new("Data emiterii", StockMovementRules.DisplayDate(before.Date), StockMovementRules.DisplayDate(after.Date))
+    ];
 
     public static string Target(string supplierName, string number) => $"Factura {number} · {supplierName}";
 

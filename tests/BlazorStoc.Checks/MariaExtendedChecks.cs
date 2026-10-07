@@ -289,6 +289,32 @@ public static class MariaExtendedChecks
                   takenBefore.Count == 1 && takenBefore[0].ProductId == product.Id && takenBefore[0].Quantity == 4 && takenBefore[0].MovementId == linked.Movement.Id && (await invoices.GetEntriesAsync(otherSupplierInvoice.Id)).Count == 0,
                 "A partly taken invoice is found again by its number (any writing) and lists what was taken from it");
 
+            // Facturi page: the register of all invoices, corrections and deletion (administrator only).
+            var register = await invoices.GetAllAsync();
+            Check(register.Any(item => item.Id == invoice.Id && item.MovementCount == 1) && register.Any(item => item.Id == otherSupplierInvoice.Id && item.SupplierId == b.Id),
+                "The register of all invoices lists them with the number of entries tied to each");
+            var ccInvoice = (await invoices.GetForSupplierAsync(a.Id)).Single(item => item.Number == $"CC {suffix}");
+            var correction = await invoices.UpdateAsync(ccInvoice, new SupplierInvoiceInput { SupplierId = b.Id, Number = $"CC {suffix} B", Date = today.AddDays(-2) }, "Motiv de test");
+            var rereadCc = (await invoices.GetAllAsync()).Single(item => item.Id == ccInvoice.Id);
+            Check(correction.SupplierId == b.Id && rereadCc.SupplierId == b.Id && rereadCc.Number == $"CC {suffix} B" && rereadCc.Date == today.AddDays(-2) && rereadCc.SupplierName == correction.SupplierName,
+                "An invoice is corrected (number, date, supplier) and read back as corrected");
+            await Rejects<SupplierInvoiceOperationException>(() => invoices.UpdateAsync(ccInvoice, new SupplierInvoiceInput { SupplierId = b.Id, Number = "Alt", Date = today }, "Motiv de test"), "A correction of a copy that was changed meanwhile (stale) is refused");
+            await Rejects<SupplierInvoiceOperationException>(() => invoices.UpdateAsync(correction, new SupplierInvoiceInput { SupplierId = b.Id, Number = $"ft {suffix}", Date = today }, "Motiv de test"), "A correction to a number the supplier already has is refused");
+            await Rejects<SupplierInvoiceOperationException>(() => invoices.UpdateAsync(correction, new SupplierInvoiceInput { SupplierId = b.Id, Number = "Alt", Date = today }, " "), "A correction without its reason is refused");
+            await Rejects<AccessDeniedException>(() => new MariaSupplierInvoiceRepository(configuration, normalUser, audit).UpdateAsync(correction, new SupplierInvoiceInput { SupplierId = b.Id, Number = "Alt", Date = today }, "Motiv de test"), "A user without the administrator role cannot correct an invoice");
+            await Rejects<AccessDeniedException>(() => new MariaSupplierInvoiceRepository(configuration, normalUser, audit).DeleteAsync(correction, "Motiv de test"), "A user without the administrator role cannot delete an invoice");
+            var correctionEvents = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.SupplierInvoice && item.EntityId == ccInvoice.Id.ToString()).ToList();
+            Check(correctionEvents.Any(item => item.Action == AuditActions.EditSupplierInvoiceNumber && item.Details.Contains($"CC {suffix} → CC {suffix} B", StringComparison.Ordinal) && item.Motif == "Motiv de test") &&
+                  correctionEvents.Any(item => item.Action == AuditActions.EditSupplierInvoiceDate && item.Details.Contains("Data emiterii:", StringComparison.Ordinal)) &&
+                  correctionEvents.Any(item => item.Action == AuditActions.MoveSupplierInvoice && item.Details.Contains("Furnizor:", StringComparison.Ordinal)),
+                "The journal names each kind of invoice correction exactly, with old and new values and the reason");
+            await Rejects<SupplierInvoiceOperationException>(() => invoices.DeleteAsync(invoice, "Motiv de test"), "An invoice with entries in stock is not deleted");
+            await invoices.DeleteAsync(correction, "Motiv de test");
+            Check((await invoices.GetAllAsync()).All(item => item.Id != ccInvoice.Id) && (await audit.GetEventsAsync()).Any(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.SupplierInvoice && item.Action == AuditActions.Delete && item.EntityId == ccInvoice.Id.ToString() && item.Motif == "Motiv de test"),
+                "An invoice without entries is deleted, with a journal event holding the reason");
+            await Rejects<SupplierInvoiceOperationException>(() => invoices.DeleteAsync(correction, "Motiv de test"), "Deleting an invoice already deleted is refused");
+            await invoices.CreateAsync(new SupplierInvoiceInput { SupplierId = a.Id, Number = $"CC {suffix}", Date = today });   // the supplier keeps two invoices for the checks below
+
             // What ties a supplier: invoices and entries; the tax id stays; only an administrator deletes.
             listed = (await suppliers.GetSuppliersAsync()).Single(item => item.Id == a.Id);
             Check(listed.InvoiceCount == 2 && listed.MovementCount == 1 && listed.InUse, "The supplier list counts the invoices and the entries tied to a supplier");

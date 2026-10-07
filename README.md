@@ -190,3 +190,9 @@ Lucrul pentru NAS/QNAP, Docker și publicarea în containere rămân explicit î
 
 - Toate mesajele afișate utilizatorului sunt în limba română: validări, erori, dialoguri, texte de stare, dialogul de reconectare, paginile de eroare HTTP și mesajele native ale browserului pentru câmpurile de formular (`wwwroot/romanian-ui.js`). Mesajele tehnice din jurnalul serverului pot rămâne în engleză. Cultura aplicației este `ro-RO`.
 - Un mesaj nou se scrie direct în română (`ErrorMessage`, excepții de operare, câmpuri `error`/`notice`); `BlazorStoc.Checks` verifică automat că literalele acestea nu conțin cuvinte englezești frecvente.
+
+## Unelte de lucru (07.10.2026)
+
+- `toolsun-checks.ps1` ruleaza testele cu rezumat (`-Group`, `-Mode maria -Section`, `-Show`); logul complet ramane in `artifacts\check-logs`.
+- `tools\log-task.ps1` adauga un task finalizat in `IMPLEMENTED.md`; `tools\start-preview.ps1` publica si porneste preview-ul (5087).
+- Harta codului: `docs/HARTA_COD.md`; istoricul vechi: `docs/arhiva/INDEX.md`.

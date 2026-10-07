@@ -786,3 +786,4 @@ tr.selectable-row input, tr.selectable-row a { cursor: auto; }
 .verify-field small { color:var(--muted); font-weight:400; }
 .pickup-region { display:block; max-width:100%; height:auto; border:1px solid var(--line, #d9dde3); border-radius:6px; background:#fff; }
 .pickup-row-picture { margin-top:.4rem; }
+button.link-like { background:none; border:0; padding:0; font:inherit; font-weight:650; cursor:pointer; text-align:left; }

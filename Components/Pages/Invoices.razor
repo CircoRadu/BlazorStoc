@@ -1,0 +1,218 @@
+@page "/facturi"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject ISupplierInvoiceRepository Repository
+@inject ISupplierRepository SupplierRepository
+@inject IAccessControl Access
+@inject ILogger<Invoices> Logger
+@implements IDisposable
+
+<PageTitle>Facturi · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Facturi</h1><p class="muted">Facturile furnizorilor din care s-au preluat intrări în stoc. Apasă pe numărul unei facturi ca să vezi produsele preluate din ea.</p></div></div>
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (editing is not null)
+{
+    <section class="product-editor" aria-labelledby="invoice-editor-title">
+        <div class="catalog-heading"><h2 id="invoice-editor-title">Editează factura @editing.Number</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseEditor">Închide</button></div>
+        @if (editorError is not null) { <div class="error-banner" role="alert">@editorError</div> }
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label>Furnizor *<SearchableSelect Options="allSupplierOptions" SelectedId="editSupplierId" SelectedIdChanged="@((int? id) => editSupplierId = id)" Placeholder="Alege furnizorul" EmptyText="Niciun furnizor." /></label>
+                <label for="invoice-number">Număr factură *<input id="invoice-number" maxlength="@SupplierInvoiceRules.MaxNumberLength" autocomplete="off" @bind="editNumber" @bind:event="oninput" /></label>
+                <label>Data emiterii *<PickOnlyDate Id="invoice-date" @bind-Value="editDate" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
+                <ChangeReasonField Id="invoice-change-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" />
+            </div>
+            <div class="form-actions"><button type="button" class="primary" disabled="@saving" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează")</button></div>
+        </fieldset>
+    </section>
+}
+@if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
+
+<section class="metrics users-metrics" aria-label="Rezumat facturi">
+    <article><span>Total facturi</span><strong>@(loaded ? invoices.Count.ToString() : "—")</strong><small>Preluate în stoc</small><i>▤</i></article>
+    <article><span>Luna aceasta</span><strong>@(loaded ? invoices.Count(invoice => invoice.CreatedUtc.Year == DateTime.UtcNow.Year && invoice.CreatedUtc.Month == DateTime.UtcNow.Month).ToString() : "—")</strong><small>Preluate în luna curentă</small><i>◷</i></article>
+    <article><span>Furnizori</span><strong>@(loaded ? invoices.Select(invoice => invoice.SupplierId).Distinct().Count().ToString() : "—")</strong><small>Cu cel puțin o factură</small><i>⌂</i></article>
+    <article><span>Fără intrări</span><strong>@(loaded ? invoices.Count(invoice => invoice.MovementCount == 0).ToString() : "—")</strong><small>Nicio intrare în stoc legată</small><i>⚠</i></article>
+</section>
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Registru facturi <span>@Filtered.Count</span></h2><small>@(isAdmin ? "O factură fără intrări în stoc se poate șterge; numărul, data și furnizorul se pot corecta" : "Consultare; o factură se preia din Produse → Preluare factură")</small></div>
+    <div class="filters">
+        <label class="search-box"><span>⌕</span><input aria-label="Caută facturi" placeholder="Caută după număr sau furnizor…" @bind="query" @bind:event="oninput" /></label>
+        <SearchableSelect Options="supplierOptions" SelectedId="supplierId" SelectedIdChanged="SupplierChanged" Placeholder="Toți furnizorii" EmptyText="Niciun furnizor." />
+        <label class="period-field">De la <PickOnlyDate Id="invoices-from" @bind-Value="fromDate" /></label>
+        <label class="period-field">până la <PickOnlyDate Id="invoices-to" @bind-Value="toDate" /></label>
+        <ToggleSwitch @bind-Value="withoutEntries" OnText="Doar fără intrări" OffText="Toate facturile" AriaLabel="Arată doar facturile fără intrări" />
+    </div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă facturile</h3></div> }
+    else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▤</span><h3>Nu există facturi pentru filtrele curente</h3><p>Facturile apar aici după „Preluare factură” din Produse.</p></div> }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>NR. FACTURĂ</th><th>FURNIZOR</th><th>DATA EMITERII</th><th class="number">INTRĂRI ÎN STOC</th><th>PRELUATĂ DE</th><th>LA DATA</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var invoice in Filtered)
+        {
+            <tr @key="invoice.Id">
+                <td><button type="button" class="category-table-link link-like" title="Arată produsele preluate din factură" @onclick="() => OpenAsync(invoice)"><strong>@invoice.Number</strong></button></td>
+                <td><a class="category-table-link" href="@SupplierNavigation.SupplierUrl(invoice.SupplierId)">@invoice.SupplierName</a></td>
+                <td>@StockMovementRules.DisplayDate(invoice.Date)</td>
+                <td class="number">@invoice.MovementCount</td>
+                <td>@invoice.CreatedBy</td>
+                <td>@SupplierRules.DisplayTime(invoice.CreatedUtc)</td>
+                <td><div class="row-buttons">
+                    @if (isAdmin)
+                    {
+                        <button class="row-action edit" aria-label="Editează factura @invoice.Number" title="Editează" disabled="@(saving || deleting is not null)" @onclick="() => OpenEditor(invoice)">✎</button>
+                        <button class="row-action delete" aria-label="Șterge factura @invoice.Number" title="@(invoice.MovementCount > 0 ? SupplierInvoiceRules.DeleteBlockedMessage(invoice.MovementCount) : "Șterge")" disabled="@(invoice.MovementCount > 0 || saving)" @onclick="() => RequestDelete(invoice)">×</button>
+                    }</div></td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (openInvoice is { } shown)
+{
+    <div class="delete-overlay">
+        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-entries-title">
+            <h2 id="invoice-entries-title">Factura @shown.Number</h2>
+            <p class="delete-object"><strong>@shown.SupplierName</strong> · emisă la @StockMovementRules.DisplayDate(shown.Date)</p>
+            @if (entriesLoading) { <div role="status"><div class="spinner"></div></div> }
+            else if (entriesError is not null) { <div class="validation-message" role="alert">@entriesError</div> }
+            else if (entries.Count == 0) { <p class="muted">Din această factură nu s-a preluat nicio intrare în stoc.</p> }
+            else
+            {
+                <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">CANTITATE</th><th>DATA INTRĂRII</th></tr></thead><tbody>
+                @foreach (var entry in entries) { <tr @key="entry.MovementId"><td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(entry.ProductId)">@entry.ProductName</a></td><td class="number">@entry.Quantity</td><td>@StockMovementRules.DisplayDate(entry.Date)</td></tr> }
+                </tbody></table></div>
+            }
+            <div class="editor-actions"><button type="button" class="primary" @onclick="CloseEntries">Închide</button></div>
+        </section>
+    </div>
+}
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi factura?" Subject="Factura"
+                              ObjectLabel="@($"{deleting.Number} · {deleting.SupplierName}")"
+                              Description="Se șterg doar facturile din care nu s-a preluat nicio intrare în stoc."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDelete" />
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<SupplierInvoice> invoices = [];
+    private IReadOnlyList<SelectOption> supplierOptions = [];
+    private IReadOnlyList<InvoiceEntry> entries = [];
+    private string query = "";
+    private int? supplierId;
+    private SupplierInvoice? openInvoice;
+    private DateOnly? fromDate, toDate;
+    private bool withoutEntries, loading, loaded, entriesLoading;
+    private string? error, entriesError, notice, editorError, reasonError, deleteError;
+    private bool isAdmin, saving, deleteBusy, reasonAuto = true;
+    private SupplierInvoice? editing, deleting;
+    private IReadOnlyList<SelectOption> allSupplierOptions = [];
+    private int? editSupplierId;
+    private string editNumber = "", customReason = "";
+    private DateOnly? editDate;
+
+    private SupplierInvoice Preview() => editing! with
+    {
+        SupplierId = editSupplierId ?? editing.SupplierId,
+        SupplierName = allSupplierOptions.FirstOrDefault(option => option.Id == editSupplierId)?.Text ?? editing.SupplierName,
+        Number = TextNormalization.ForObjectNameOrCode(editNumber), Date = editDate ?? editing.Date
+    };
+    private string AutoSummary => editing is null ? "" : ChangeReasonSummary.Build(SupplierInvoiceRules.Changes(editing, Preview()));
+
+    private async Task OpenEditor(SupplierInvoice invoice)
+    {
+        notice = null; editorError = null; reasonError = null; customReason = ""; reasonAuto = true;
+        editing = invoice; editSupplierId = invoice.SupplierId; editNumber = invoice.Number; editDate = invoice.Date;
+        try { allSupplierOptions = [.. (await SupplierRepository.GetSuppliersAsync(lifetime.Token)).Select(supplier => new SelectOption(supplier.Id, supplier.Name)).OrderBy(option => option.Text, StringComparer.CurrentCultureIgnoreCase)]; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Supplier loading failed ({ErrorType}).", exception.GetType().Name); editorError = "Furnizorii nu au putut fi încărcați."; }
+    }
+
+    private void CloseEditor() { editing = null; editorError = null; }
+
+    private async Task SaveAsync()
+    {
+        if (editing is null || saving) return;
+        editorError = null;
+        reasonError = ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason);
+        if (reasonError is not null) return;
+        saving = true;
+        try
+        {
+            await Repository.UpdateAsync(editing, new SupplierInvoiceInput { SupplierId = editSupplierId, Number = editNumber, Date = editDate },
+                ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason), lifetime.Token);
+            editing = null;
+            notice = "Factura a fost actualizată.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is SupplierInvoiceOperationException or AccessDeniedException) { editorError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Invoice update failed ({ErrorType}).", exception.GetType().Name); editorError = "Factura nu a putut fi salvată. Actualizează lista și reîncearcă."; }
+        finally { saving = false; }
+    }
+
+    private void RequestDelete(SupplierInvoice invoice) { deleting = invoice; deleteError = null; notice = null; }
+    private void CancelDelete() { deleting = null; deleteError = null; }
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleteBusy || deleting is null) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            await Repository.DeleteAsync(deleting, reason, lifetime.Token);
+            deleting = null;
+            notice = "Factura a fost ștearsă.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is SupplierInvoiceOperationException or AccessDeniedException) { deleteError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Invoice deletion failed ({ErrorType}).", exception.GetType().Name); deleteError = "Factura nu a putut fi ștearsă. Actualizează lista și reîncearcă."; }
+        finally { deleteBusy = false; }
+    }
+
+    private List<SupplierInvoice> Filtered => SupplierInvoiceSearch.Filter(invoices, query, supplierId, fromDate, toDate, withoutEntries).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { isAdmin = await Access.IsAdministratorAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            invoices = await Repository.GetAllAsync(lifetime.Token);
+            supplierOptions = [.. invoices.GroupBy(invoice => invoice.SupplierId).Select(group => new SelectOption(group.Key, group.First().SupplierName))
+                .OrderBy(option => option.Text, StringComparer.CurrentCultureIgnoreCase)];
+            loaded = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Invoice loading failed ({ErrorType}).", exception.GetType().Name); error = "Facturile nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private void SupplierChanged(int? id) => supplierId = id;
+
+    private async Task OpenAsync(SupplierInvoice invoice)
+    {
+        openInvoice = invoice; entries = []; entriesError = null; entriesLoading = true;
+        try { entries = await Repository.GetEntriesAsync(invoice.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Invoice entries loading failed ({ErrorType}).", exception.GetType().Name); entriesError = "Produsele facturii nu au putut fi încărcate."; }
+        finally { if (openInvoice?.Id == invoice.Id) entriesLoading = false; }
+    }
+
+    private void CloseEntries() => openInvoice = null;
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}
