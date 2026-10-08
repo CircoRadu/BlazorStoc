@@ -46,6 +46,8 @@ Actualizat: 08.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 
 ## Probleme deschise
 
+- Propunere de studiu, neimplementata: selectarea liniilor ofertei la pasul 4 si stergerea unei oferte din proiect (`docs/PROPUNERE_OFERTE_SELECTIE_STERGERE.md`); asteapta deciziile din sectiunea 5.
+
 - Verificari ramase: `docs/TESTE_RAMASE.md` (cazurile N45, N47 si cele de pe pagina Facturi); drepturile contului migrator pe baza de teste.
 - Taskuri active: `TODO.md` (primul: fisierul facturii pe server; ultimul: sablon de import factura XML).
 
