@@ -26,8 +26,8 @@
     <div class="catalog-heading">
         <h2>Backupuri disponibile <span>@rows.Count</span></h2>
         <div class="editor-actions">
-            <button type="button" class="refresh" disabled="@Busy" @onclick="BackupNowAsync" title="Face un backup nou pe server; dacă „Copiere pe NAS” este Activ, îl copiază și pe NAS">Fă backup acum</button>
-            @if (nasEnabled) { <button type="button" class="refresh" disabled="@(Busy || nasLoading)" @onclick="LoadNasAsync">Reîmprospătează NAS</button> }
+            <button type="button" class="refresh act-confirm" disabled="@Busy" @onclick="BackupNowAsync" title="Face un backup nou pe server; dacă „Copiere pe NAS” este Activ, îl copiază și pe NAS">Fă backup acum</button>
+            @if (nasEnabled) { <button type="button" class="refresh act-reload" disabled="@(Busy || nasLoading)" @onclick="LoadNasAsync">Reîmprospătează NAS</button> }
             <button class="primary" disabled="@(selected is null || Busy)" @onclick="OpenRestorePopup">Restaurează baza de date</button>
         </div>
     </div>
@@ -76,7 +76,7 @@
                             <td class="row-actions">
                                 @if (nasEnabled && nasRead && row.OnLocal && !row.OnNas)
                                 {
-                                    <button type="button" class="refresh" disabled="@Busy" @onclick="() => CopyToNasAsync(row)">Copiază pe NAS</button>
+                                    <button type="button" class="refresh act-confirm" disabled="@Busy" @onclick="() => CopyToNasAsync(row)">Copiază pe NAS</button>
                                 }
                                 @if (row.CanDelete)
                                 {

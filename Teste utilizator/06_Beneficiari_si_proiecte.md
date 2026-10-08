@@ -121,3 +121,24 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 2. Proiect -> observatie -> fisier.
 3. Stergere beneficiar/proiect cu motiv; cu miscari legate se refuza sau se arhiveaza.
 4. Doua sesiuni pe aceeasi observatie: blocarea editarii.
+
+### 08.10.2026 - Preluare din ANAF: CUI inexistent
+
+**Ce s-a schimbat:** ANAF raspunde cu HTTP 404 (si corpul obisnuit `notFound`) cand CUI-ul nu exista; aplicatia citea asta ca „adresa serviciului este gresita”. Acum se afiseaza „CUI-ul nu este inregistrat in ANAF. Datele se pot introduce manual.”; un 404 fara corpul ANAF ramane eroare de adresa.
+
+| Nr | Pas | Rezultat asteptat | Confirmat |
+|---|---|---|---|
+| 1 | Beneficiar nou/editare, persoana juridica, CUI inexistent (ex. RO10000002), „Preia date din ANAF” | Mesajul „CUI-ul nu este inregistrat in ANAF...”, fara mentiune despre adresa serviciului | |
+| 2 | Acelasi lucru cu un CUI real | Datele firmei se completeaza | |
+
+### 08.10.2026 - Preluare din ANAF: reguli pe camp si versiunile configuratiei
+
+**Ce s-a schimbat:** (1) Setari -> Preluare date ANAF: coloana „Folosit in” arata ce face fiecare camp (Formular / Avertisment / Doar informativ); „Cand ANAF nu trimite campul” are doua variante (Pastreaza valoarea din formular / Opreste preluarea), „Cand ANAF da alta valoare” are trei (Cere confirmare / Pastreaza valoarea mea / Ia valoarea din ANAF). (2) La „Preia date din ANAF”: campul gol se completeaza, valoarea egala nu schimba nimic, restul dupa regula; „Cere confirmare” deschide dialogul „Date diferite in ANAF” cu alegere pe fiecare camp. Implicit: denumire, adresa, cod postal = confirmare; telefon = pastrez valoarea mea; nr. registrului si CAEN = valoarea din ANAF. La furnizor nou (din factura sau la prima salvare) denumirea din ANAF o inlocuieste pe cea citita/tastata. (3) Versiunile configuratiei: coloana „Creata prin”, slider „Activa” (activeaza o versiune veche) si iconita de stergere (nu pentru versiunea activa; cere motiv; jurnal „Stergere versiune configuratie ANAF” / „Activare versiune configuratie ANAF”).
+
+| Nr | Pas | Rezultat asteptat | Confirmat |
+|---|---|---|---|
+| 3 | Setari -> Preluare date ANAF: priveste tabelul de mapari | Coloana „Folosit in”; denumirea campurilor folosite nu se poate schimba; la campurile „Doar informativ” politica de actualizare e inactiva | |
+| 4 | Beneficiar existent cu adresa modificata manual: „Preia date din ANAF” | Dialogul „Date diferite in ANAF”: valoarea ta, cea din ANAF, slider pe fiecare camp; fara slider pornit, „Aplica alegerea” nu schimba nimic | |
+| 5 | Acelasi lucru cu telefonul scris de mana | Telefonul ramane al tau; mesajul spune „S-au pastrat valorile tale pentru: Telefon” | |
+| 6 | Setari -> ANAF -> Versiuni: porneste sliderul „Activa” la o versiune veche | Versiunea devine activa (apare o versiune noua cu „Revenire la versiunea #N”), editorul se incarca cu ea | |
+| 7 | Sterge o versiune inactiva (iconita cos, motiv) | Dispare din lista; versiunea activa nu are iconita activa; jurnalul o consemneaza | |

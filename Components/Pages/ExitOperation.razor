@@ -17,12 +17,12 @@
 
 @if (Embedded)
 {
-    <div class="page-heading"><div><h2>Ieșire din stoc</h2><p class="muted">Se salvează o operație (toate liniile sau niciuna), ca în „Ieșire multiplă”.</p></div><div class="heading-actions"><button type="button" class="refresh" disabled="@busy" @onclick="() => OnClosed.InvokeAsync()">Închide</button></div></div>
+    <div class="page-heading"><div><h2>Ieșire din stoc</h2><p class="muted">Se salvează o operație (toate liniile sau niciuna), ca în „Ieșire multiplă”.</p></div><div class="heading-actions"><button type="button" class="refresh act-close" disabled="@busy" @onclick="() => OnClosed.InvokeAsync()">Închide</button></div></div>
 }
 else
 {
 <PageTitle>Ieșire multiplă · BlazorStoc</PageTitle>
-<div class="page-heading"><div><p class="eyebrow">STOC</p><h1>Ieșire multiplă</h1><p class="muted">Mai multe produse către aceeași destinație, într-o singură operație (se salvează toate sau niciuna).</p></div><div class="heading-actions"><a class="refresh" href="/produse">← Produse</a></div></div>
+<div class="page-heading"><div><p class="eyebrow">STOC</p><h1>Ieșire multiplă</h1><p class="muted">Mai multe produse către aceeași destinație, într-o singură operație (se salvează toate sau niciuna).</p></div><div class="heading-actions"><a class="refresh act-nav" href="/produse">← Produse</a></div></div>
 }
 
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -88,12 +88,12 @@ else
                         </select>
                     </td>
                     <td><input type="text" aria-label="@($"Descriere, linia {index + 1}")" @bind="line.Description" maxlength="@StockMovementRules.MaxDescriptionLength" /></td>
-                    <td><button type="button" class="danger" aria-label="@($"Scoate linia {index + 1}")" disabled="@(lines.Count == 1)" @onclick="() => RemoveLine(position)">×</button></td>
+                    <td><button type="button" class="danger" aria-label="@($"Scoate linia {index + 1}")" disabled="@(lines.Count == 1)" @onclick="() => RemoveLine(position)" title="@($"Scoate linia {index + 1}")">×</button></td>
                 </tr>
             }
             </tbody></table></div>
             <div class="editor-actions">
-                <button type="button" class="refresh" disabled="@(lines.Count >= StockMovementRules.MaxOperationLines)" @onclick="AddLine">+ Adaugă produs</button>
+                <button type="button" class="refresh act-confirm" disabled="@(lines.Count >= StockMovementRules.MaxOperationLines)" @onclick="AddLine">+ Adaugă produs</button>
                 <button type="button" class="primary" @onclick="CheckAsync">@(busy ? "Se verifică…" : "Verifică și salvează")</button>
             </div>
         </fieldset>

@@ -62,3 +62,13 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
    ```
 
 4. După commit, oprește lucrul. Nu începe următorul task în același ciclu.
+
+## Butoane colorate dupa tipul actiunii si padding (regula permanenta, 08 octombrie 2026)
+
+- Un buton secundar nu mai ramane alb: `class="refresh act-<tip>"` coloreaza dupa actiune: `act-confirm` (verde: salveaza, adauga, preia, seteaza), `act-reload` (albastru: actualizeaza, verifica, testeaza, reincearca), `act-nav` (gri-albastrui: inapoi, spre alta pagina), `act-edit` (galben: editeaza, redenumeste), `act-close` (rosu deschis: inchide, renunta, anuleaza), `act-export` (violet: export, descarca). `primary` (verde plin) ramane pentru actiunea principala, `danger` (rosu plin) pentru stergere.
+- Un buton nou de tip `refresh` primeste obligatoriu una dintre aceste clase; iconitele de pe randurile tabelelor raman cele din regula iconitelor.
+- Tot ce se pune direct intr-un card `.catalog` (zona de fisier, rand de filtre, text, banner) are padding lateral de 24 px (`.catalog > ...` il da implicit); un text cu fundal colorat (insigna, total) are padding propriu, minim 6 px sus/jos si 12 px lateral.
+- Cardurile paginii de produs stau in doua coloane: produsul in stanga, restul (unde sunt bucatile, rezervari, formularul de miscare) unul sub altul in coloana lata.
+- Numaratoarea unui set (taburi de categorie, titluri de sectiune, liste) se arata ca insigna `<span class="count-badge">N</span>` (acelasi stil ca numarul din titlul unui card, de exemplu „Registru furnizori 1”), nu in paranteze. Un element urmat de alt element pe acelasi rand (nume + insigna, buton + nota) are spatiu intre ele (min. 8 px).
+- Dupa un rand de butoane (`.editor-actions`) urmeaza spatiu (18 px, 28 px inaintea unui titlu): textul explicativ, titlul sau cardul urmator nu stau lipite de butoane. Un comutator (On/Off) este totdeauna `ToggleSwitch`, nu o casuta bifabila simpla.
+- Butoanele alaturate au intotdeauna aceeasi inaltime: 40 px (32 px in randuri de tabel), fixata in CSS pentru `primary`, `danger`, `refresh`, `secondary`; un simbol din buton nu il face mai inalt. Orice buton de actiune nou foloseste una dintre aceste clase (plus `act-...` pentru `refresh`), niciodata un `button` fara clasa langa alte butoane.

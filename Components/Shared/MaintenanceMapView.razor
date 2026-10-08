@@ -15,8 +15,8 @@
     <div class="page-heading map-popout-heading">
         <div><h1>Harta mentenanței</h1><p class="muted map-updated @(refreshFailed ? "failed" : null)" role="status" aria-live="polite">@UpdateText</p></div>
         <div class="heading-actions">
-            <a class="refresh" href="/mentenanta">Deschide aplicația</a>
-            <button class="refresh" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button>
+            <a class="refresh act-nav" href="/mentenanta">Deschide aplicația</a>
+            <button class="refresh act-reload" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button>
         </div>
     </div>
 }
@@ -26,9 +26,9 @@ else
         <div><p class="eyebrow">SERVICE</p><h1>Harta mentenanței</h1><p class="muted">Punctele de lucru acoperite de contracte, la coordonatele lor. Culoarea marker-ului arată scadența, insigna arată contractul.</p>
             <p class="muted map-updated @(refreshFailed ? "failed" : null)" role="status" aria-live="polite">@UpdateText</p></div>
         <div class="heading-actions">
-            <a class="refresh" href="/mentenanta">← Scadențe și registru</a>
-            <a class="refresh" href="@MaintenanceMapRules.WindowUrl" target="@MaintenanceMapRules.WindowName" data-map-popout title="Deschide harta într-o fereastră separată, care poate rămâne deschisă pe alt monitor cât folosești aplicația">⧉ Fereastră separată</a>
-            <button class="refresh" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button>
+            <a class="refresh act-nav" href="/mentenanta">← Scadențe și registru</a>
+            <a class="refresh act-nav" href="@MaintenanceMapRules.WindowUrl" target="@MaintenanceMapRules.WindowName" data-map-popout title="Deschide harta într-o fereastră separată, care poate rămâne deschisă pe alt monitor cât folosești aplicația">⧉ Fereastră separată</a>
+            <button class="refresh act-reload" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button>
         </div>
     </div>
 }
@@ -53,7 +53,7 @@ else
         </select>
         <label class="period-field">Scadență de la <PickOnlyDate Id="map-from" @bind-Value="from" @bind-Value:after="FiltersChangedAsync" /></label>
         <label class="period-field">până la <PickOnlyDate Id="map-to" @bind-Value="to" @bind-Value:after="FiltersChangedAsync" /></label>
-        <button type="button" class="refresh" disabled="@(from is null && to is null)" @onclick="ClearPeriodAsync">Fără perioadă</button>
+        <button type="button" class="refresh act-nav" disabled="@(from is null && to is null)" @onclick="ClearPeriodAsync">Fără perioadă</button>
         @if (offCount > 0) { <ToggleSwitch Value="@showOff" ValueChanged="ToggleOffAsync">Arată și contractele Off (@offCount)</ToggleSwitch> }
     </div>
 </section>
@@ -69,12 +69,12 @@ else
             {
                 <span><i class="mm-key-badge" style="background:@type.Color;color:@type.Foreground">@type.Glyph</i> @type.Name</span>
             }
-            <button type="button" class="refresh" disabled="@(Markers.Count == 0)" @onclick="FitAsync">Încadrează rezultatele</button>
+            <button type="button" class="refresh act-reload" disabled="@(Markers.Count == 0)" @onclick="FitAsync">Încadrează rezultatele</button>
         </div>
         @if (tilesFailed)
         {
             <div class="error-banner" role="alert">Fundalul hărții nu poate fi încărcat (furnizorul de hărți nu răspunde sau nu există conexiune la internet). Punctele rămân afișate.
-                <button type="button" class="refresh" @onclick="RetryTilesAsync">Reîncearcă</button></div>
+                <button type="button" class="refresh act-reload" @onclick="RetryTilesAsync">Reîncearcă</button></div>
         }
         <div class="map-canvas-wrap">
             <div @ref="mapElement" class="map-canvas" role="application" aria-label="Harta punctelor de lucru cu mentenanță"></div>
@@ -89,7 +89,7 @@ else
             var today = Today;
             var due = row.Point.Point.NextDue;
             var dueState = ServiceDueRules.State(due, today, dueThreshold);
-            <div class="map-panel-heading"><h2>@row.Point.WorkPointName</h2><button type="button" class="link-button" aria-label="Închide detaliile" @onclick="ClearSelectionAsync">×</button></div>
+            <div class="map-panel-heading"><h2>@row.Point.WorkPointName</h2><button type="button" class="link-button" aria-label="Închide detaliile" @onclick="ClearSelectionAsync" title="Închide detaliile">×</button></div>
             <p><a class="category-table-link" href="@($"/beneficiari/{row.BeneficiaryId}")"><strong>@row.BeneficiaryName</strong></a></p>
             <p class="muted">@row.Point.WorkPointAddress<br />Coordonate: @MaintenanceMapRules.CoordinatesText(row)</p>
             <dl class="map-facts">
@@ -103,7 +103,7 @@ else
                 <dt>Ultima intervenție de mentenanță</dt><dd>@(row.LastIntervention is { } last ? StockMovementRules.DisplayDate(last) : "nicio intervenție")</dd>
             </dl>
             <div class="map-panel-actions">
-                <a class="refresh" href="@($"/beneficiari/{row.BeneficiaryId}")">Fișa beneficiarului</a>
+                <a class="refresh act-nav" href="@($"/beneficiari/{row.BeneficiaryId}")">Fișa beneficiarului</a>
                 <a class="primary" href="@MaintenanceMapRules.AddInterventionUrl(row.BeneficiaryId, row.Point.Point.WorkPointId)">+ Înregistrează intervenție</a>
             </div>
             @if (sameLocation.Count > 0)
@@ -142,7 +142,7 @@ else
                 <td><strong>@item.Point.WorkPointName</strong><br /><small class="muted">@item.Point.WorkPointAddress</small></td>
                 <td>@item.Contract.Label</td>
                 <td>@StockMovementRules.DisplayDate(item.Point.Point.NextDue)</td>
-                <td><a class="refresh" href="@($"/beneficiari/{item.BeneficiaryId}")">Deschide fișa pentru coordonate</a></td>
+                <td><a class="refresh act-nav" href="@($"/beneficiari/{item.BeneficiaryId}")">Deschide fișa pentru coordonate</a></td>
             </tr>
         }
         </tbody></table></div>

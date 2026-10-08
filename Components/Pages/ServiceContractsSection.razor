@@ -20,7 +20,7 @@
     <div class="catalog-heading"><h2>Contracte de mentenanță <span>@Visible.Count</span></h2>
         <div class="heading-actions">
             @if (OffCount > 0) { <ToggleSwitch @bind-Value="showOff">Arată și contractele Off (@OffCount)</ToggleSwitch> }
-            @if (CanManage) { <button class="refresh" disabled="@Locked" @onclick="OpenAdd">+ Adaugă contract</button> }
+            @if (CanManage) { <button class="refresh act-confirm" disabled="@Locked" @onclick="OpenAdd">+ Adaugă contract</button> }
         </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -51,9 +51,9 @@
                 @if (CanManage)
                 {
                     <td>
-                        <button class="refresh" disabled="@Locked" @onclick="() => OpenEdit(details)">Editează</button>
-                        @if (contract.IsActive) { <button class="refresh" disabled="@Locked" @onclick="() => DeactivateAsync(contract)">Dezactivează</button> }
-                        else { <button class="refresh" disabled="@Locked" @onclick="() => OpenActivationAsync(contract)">Activează</button> }
+                        <button class="refresh act-edit" disabled="@Locked" @onclick="() => OpenEdit(details)">Editează</button>
+                        @if (contract.IsActive) { <button class="refresh act-edit" disabled="@Locked" @onclick="() => DeactivateAsync(contract)">Dezactivează</button> }
+                        else { <button class="refresh act-confirm" disabled="@Locked" @onclick="() => OpenActivationAsync(contract)">Activează</button> }
                         <button class="danger" disabled="@Locked" @onclick="() => OpenDelete(contract)">Șterge</button>
                     </td>
                 }

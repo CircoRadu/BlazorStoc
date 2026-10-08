@@ -11,7 +11,7 @@
         @if (SelectedId is not null && !Disabled)
         {
             <button type="button" class="searchable-select-clear" aria-label="Șterge selecția (@Label)" tabindex="-1"
-                    @onmousedown:preventDefault @onclick="ClearAsync">×</button>
+                    @onmousedown:preventDefault @onclick="ClearAsync" title="Șterge selecția (@Label)">×</button>
         }
     </div>
     @if (open)

@@ -16,7 +16,7 @@
 @if (FocusTemplateId is { } wanted && !loading && templates.All(item => item.Info.Id != wanted)) { <div class="error-banner" role="status">Șablonul #@wanted nu mai există (a fost șters).</div> }
 
 <section class="catalog">
-    <div class="catalog-heading"><h3>Șabloane <span>@templates.Count</span></h3><button type="button" class="refresh" disabled="@loading" @onclick="LoadAsync">Actualizează</button></div>
+    <div class="catalog-heading"><h3>Șabloane <span>@templates.Count</span></h3><button type="button" class="refresh act-reload" disabled="@loading" @onclick="LoadAsync">Actualizează</button></div>
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă șabloanele</h3></div> }
     else if (templates.Count == 0) { <div class="empty-state"><div class="empty-icon" aria-hidden="true">▤</div><h3>Nu există șabloane salvate</h3><p>Încarcă o factură în pagina „Generare șablon factură” și salvează șablonul creat.</p></div> }
     else
@@ -30,7 +30,7 @@
             <tr @key="info.Id" id="invoice-template-@info.Id" class="@(focused ? "row-focus" : null)">
 <td><ToggleSwitch Value="@info.Active" Disabled="@saving" OnText="Activ" OffText="Inactiv" AriaLabel="@($"Șablon activ: {info.Name}")" Title="@(info.Active ? "Șablonul este folosit la citirea facturilor. Apasă ca să nu mai fie folosit." : "Șablonul nu este folosit la citirea facturilor. Apasă ca să fie folosit.")" ValueChanged="@(active => SetActiveAsync(info, active))" /></td>
                 <td><strong>@info.Name</strong></td>
-                <td>@(info.SupplierName.Length > 0 ? info.SupplierName : "—")@if (info.SupplierId is null) { <br /><span class="notification-state">nelegat de un furnizor</span> <button type="button" class="refresh" disabled="@saving" @onclick="() => LinkAsync(info)">Leagă de furnizor</button> }</td>
+                <td>@(info.SupplierName.Length > 0 ? info.SupplierName : "—")@if (info.SupplierId is null) { <br /><span class="notification-state">nelegat de un furnizor</span> <button type="button" class="refresh act-confirm" disabled="@saving" @onclick="() => LinkAsync(info)">Leagă de furnizor</button> }</td>
                 <td>@(info.SupplierCui.Length > 0 ? info.SupplierCui : "—")</td>
                 <td>@(info.SourceKind == InvoiceSources.Ocr ? "Scanat (OCR)" : "PDF cu text")</td>
                 <td><small>@template.Definition.UsedFieldCount câmpuri · @template.Definition.UsedColumnCount coloane</small></td>

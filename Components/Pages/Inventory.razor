@@ -99,7 +99,7 @@ else if (loadError is null)
             @if (previewError is not null) { <div class="validation-message" role="alert">@previewError</div> }
             <div class="editor-actions">
                 <button type="button" class="primary" @onclick="PrintPreviewAsync">Imprimă</button>
-                <button type="button" class="refresh" @onclick="SavePreviewAsync">Salvează</button>
+                <button type="button" class="refresh act-confirm" @onclick="SavePreviewAsync">Salvează</button>
                 <button type="button" class="danger" @onclick="ClosePreviewAsync">Închide</button>
             </div>
         </section>

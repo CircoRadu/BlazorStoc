@@ -12,7 +12,7 @@
 @* Consumption export: what was handed over (exits to beneficiaries minus returns) per product, for a project, a beneficiary and/or a period; shown here and downloaded as CSV. *@
 
 <PageTitle>Export consum · BlazorStoc</PageTitle>
-<div class="page-heading"><div><p class="eyebrow">STOC</p><h1>Export consum</h1><p class="muted">Ce s-a predat beneficiarilor (ieșiri minus retururi), pe proiect, beneficiar și perioadă.</p></div><div class="heading-actions"><a class="refresh" href="/produse">← Produse</a></div></div>
+<div class="page-heading"><div><p class="eyebrow">STOC</p><h1>Export consum</h1><p class="muted">Ce s-a predat beneficiarilor (ieșiri minus retururi), pe proiect, beneficiar și perioadă.</p></div><div class="heading-actions"><a class="refresh act-nav" href="/produse">← Produse</a></div></div>
 
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 
@@ -38,7 +38,7 @@ else
         </div>
         <div class="editor-actions">
             <button type="button" class="primary" disabled="@busy" @onclick="ShowAsync">@(busy ? "Se încarcă…" : "Arată consumul")</button>
-            <a class="refresh" href="@CsvUrl">Descarcă CSV</a>
+            <a class="refresh act-export" href="@CsvUrl">Descarcă CSV</a>
         </div>
         </div>
     </section>

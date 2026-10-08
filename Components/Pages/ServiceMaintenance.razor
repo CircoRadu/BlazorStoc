@@ -13,13 +13,13 @@
 <PageTitle>Mentenanță · BlazorStoc</PageTitle>
 <div class="page-heading">
     <div><p class="eyebrow">SERVICE</p><h1>Mentenanță</h1><p class="muted">Scadențele punctelor de lucru acoperite de contracte active și registrul intervențiilor. Intervențiile se înregistrează din fișa beneficiarului.</p></div>
-    <div class="heading-actions"><a class="refresh" href="/mentenanta/harta">⌖ Harta</a><button class="refresh" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button></div>
+    <div class="heading-actions"><a class="refresh act-nav" href="/mentenanta/harta">⌖ Harta</a><button class="refresh act-reload" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button></div>
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 
 <div class="settings-tabs" role="tablist" aria-label="Mentenanță">
-    <button type="button" role="tab" id="tab-due" class="settings-tab @(showRegister ? "" : "active")" aria-selected="@(showRegister ? "false" : "true")" aria-controls="panel-maintenance" @onclick="ShowDue">Scadente (@dueRows.Count)</button>
-    <button type="button" role="tab" id="tab-register" class="settings-tab @(showRegister ? "active" : "")" aria-selected="@(showRegister ? "true" : "false")" aria-controls="panel-maintenance" @onclick="ShowRegisterAsync">Registru intervenții@(registerLoaded ? $" ({register.TotalCount})" : "")</button>
+    <button type="button" role="tab" id="tab-due" class="settings-tab @(showRegister ? "" : "active")" aria-selected="@(showRegister ? "false" : "true")" aria-controls="panel-maintenance" @onclick="ShowDue">Scadente <span class="count-badge">@dueRows.Count</span></button>
+    <button type="button" role="tab" id="tab-register" class="settings-tab @(showRegister ? "active" : "")" aria-selected="@(showRegister ? "true" : "false")" aria-controls="panel-maintenance" @onclick="ShowRegisterAsync">Registru intervenții@if (registerLoaded) { <text> </text><span class="count-badge">@register.TotalCount</span> }</button>
 </div>
 
 <div id="panel-maintenance" role="tabpanel" aria-labelledby="@(showRegister ? "tab-register" : "tab-due")">
@@ -82,7 +82,7 @@ else
             </select>
             <label class="period-field">De la <PickOnlyDate Id="register-from" @bind-Value="from" @bind-Value:after="ApplyFiltersAsync" /></label>
             <label class="period-field">Până la <PickOnlyDate Id="register-to" @bind-Value="to" @bind-Value:after="ApplyFiltersAsync" /></label>
-            <button type="button" class="refresh" disabled="@(from is null && to is null)" @onclick="ClearPeriodAsync">Fără perioadă</button>
+            <button type="button" class="refresh act-nav" disabled="@(from is null && to is null)" @onclick="ClearPeriodAsync">Fără perioadă</button>
         </div>
         @if (loading && !registerLoaded)
         {

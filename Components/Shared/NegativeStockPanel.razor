@@ -6,8 +6,13 @@
     <div class="movement-kind">
         <button type="button" class="settings-tab @(Resolution.Zero ? "active" : "")" aria-pressed="@Resolution.Zero" disabled="@Disabled" @onclick="ChooseZeroAsync">Trec stocul pe 0</button>
         <label class="negative-stock-real">Cantitate reală în depozit
-            <InputNumber TValue="int?" Value="Resolution.Zero ? null : Resolution.Real" ValueChanged="RealChangedAsync" ValueExpression="() => Resolution.Real" min="0" max="@StockMovementRules.MaxQuantity" disabled="@Disabled" placeholder="introdu cantitatea" /></label>
+            <input type="number" inputmode="numeric" step="1" min="0" max="@StockMovementRules.MaxQuantity" disabled="@Disabled" placeholder="introdu cantitatea"
+                   aria-invalid="@(invalid ? "true" : null)" value="@(Resolution.Zero ? "" : Resolution.Real?.ToString(System.Globalization.CultureInfo.InvariantCulture))" @oninput="RealInputAsync" /></label>
     </div>
+    @if (invalid)
+    {
+        <div class="validation-message" role="alert">@StockMovementRules.RealQuantityMessage</div>
+    }
     @if (Resolution.IsResolved)
     {
         <small class="form-note" role="status">Depozitul va avea @Resolution.RealQuantity buc. după o intrare de corecție, făcută înainte de intrarea nouă.</small>
@@ -21,6 +26,23 @@
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public EventCallback Changed { get; set; }
 
-    private async Task ChooseZeroAsync() { Resolution.Zero = true; Resolution.Real = null; await Changed.InvokeAsync(); }
-    private async Task RealChangedAsync(int? value) { Resolution.Zero = false; Resolution.Real = value; await Changed.InvokeAsync(); }
+    // A negative or non-integer quantity cannot be the real quantity of a warehouse: it is flagged at once and the regularization stays off.
+    // The value is read on every keystroke, so a valid quantity activates "Regularizează" without leaving the field.
+    private bool invalid;
+
+    private async Task ChooseZeroAsync() { Resolution.Zero = true; Resolution.Real = null; invalid = false; await Changed.InvokeAsync(); }
+
+    private async Task RealInputAsync(ChangeEventArgs args)
+    {
+        var text = args.Value?.ToString()?.Trim() ?? "";
+        Resolution.Zero = false;
+        if (text.Length == 0) { Resolution.Real = null; invalid = false; }
+        else if (int.TryParse(text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
+        {
+            Resolution.Real = value;
+            invalid = value is < 0 or > StockMovementRules.MaxQuantity;
+        }
+        else { Resolution.Real = null; invalid = true; }
+        await Changed.InvokeAsync();
+    }
 }

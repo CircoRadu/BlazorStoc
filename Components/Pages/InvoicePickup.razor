@@ -42,7 +42,7 @@
 {
     <div class="delete-overlay template-popup-overlay">
         <section class="delete-dialog template-popup" role="dialog" aria-modal="true" aria-label="Creare șablon de factură">
-            <div class="heading-actions"><button type="button" class="refresh" @onclick="CloseTemplateCreation">✕ Închide fără să creezi șablonul</button></div>
+            <div class="heading-actions"><button type="button" class="refresh act-close" @onclick="CloseTemplateCreation">✕ Închide fără să creezi șablonul</button></div>
             <InvoiceTemplateWorkbench ExistingSession="session" SavedRecord="OnTemplateCreatedAsync" Closed="CloseTemplateCreation" />
         </section>
     </div>
@@ -120,7 +120,7 @@ else if (session is not null)
     {
         <section class="lab-panel" aria-label="Laborator OCR">
             <div class="lab-head"><strong>Laborator OCR</strong>
-                <button type="button" class="refresh" disabled="@(reading is null)" @onclick="SaveReference">Salvează ca referință</button>
+                <button type="button" class="refresh act-confirm" disabled="@(reading is null)" @onclick="SaveReference">Salvează ca referință</button>
             </div>
             @if (labNotice is not null) { <p class="muted" role="status">@labNotice</p> }
             <table class="lab-table">
@@ -170,15 +170,15 @@ else if (session is not null)
                     </div>
                 }
                 <div class="invoice-draw-tools">
-                    <button type="button" class="refresh @(addMode ? "active" : "")" aria-pressed="@(addMode ? "true" : "false")" @onclick="() => addMode = !addMode">─ Adaugă linie de demarcare</button>
+                    <button type="button" class="refresh act-confirm @(addMode ? "active" : "")" aria-pressed="@(addMode ? "true" : "false")" @onclick="() => addMode = !addMode">─ Adaugă linie de demarcare</button>
                     <button type="button" class="danger" disabled="@(selectedId.Length == 0)" @onclick="DeleteSelected">Șterge linia selectată</button>
-                    <button type="button" class="refresh" @onclick="ResetSeparators">Liniile propuse automat</button>
+                    <button type="button" class="refresh act-nav" @onclick="ResetSeparators">Liniile propuse automat</button>
                     <span class="muted">@(addMode ? "Apasă pe pagină, la înălțimea la care vrei linia." : "Trage o linie în sus sau în jos; trage capetele ei ca să o scurtezi sau să o lungești. Ce este sub ultima linie nu se citește.")</span>
                 </div>
                 <div class="invoice-draw-tools" role="group" aria-label="Ce din șablon se vede pe pagină">
-                    <button type="button" class="refresh @(showFields ? "active" : "")" aria-pressed="@(showFields ? "true" : "false")" title="Arată sau ascunde câmpurile din antet pe pagină" @onclick="() => showFields = !showFields">Câmpurile din antet</button>
-                    <button type="button" class="refresh @(showHeader ? "active" : "")" aria-pressed="@(showHeader ? "true" : "false")" title="Arată sau ascunde capul de tabel pe pagină" @onclick="() => showHeader = !showHeader">Capul de tabel</button>
-                    <button type="button" class="refresh @(showColumns ? "active" : "")" aria-pressed="@(showColumns ? "true" : "false")" title="Arată sau ascunde coloanele tabelului pe pagină" @onclick="() => showColumns = !showColumns">Coloanele</button>
+                    <button type="button" class="refresh act-nav @(showFields ? "active" : "")" aria-pressed="@(showFields ? "true" : "false")" title="Arată sau ascunde câmpurile din antet pe pagină" @onclick="() => showFields = !showFields">Câmpurile din antet</button>
+                    <button type="button" class="refresh act-nav @(showHeader ? "active" : "")" aria-pressed="@(showHeader ? "true" : "false")" title="Arată sau ascunde capul de tabel pe pagină" @onclick="() => showHeader = !showHeader">Capul de tabel</button>
+                    <button type="button" class="refresh act-nav @(showColumns ? "active" : "")" aria-pressed="@(showColumns ? "true" : "false")" title="Arată sau ascunde coloanele tabelului pe pagină" @onclick="() => showColumns = !showColumns">Coloanele</button>
                 </div>
                 <div class="invoice-page-wrap" style="aspect-ratio: @F(pageData.Width) / @F(pageData.Height)">
                     <img src="@ImageUrl(pageData.Number)" alt="Pagina @pageData.Number a facturii" draggable="false" />
@@ -278,7 +278,7 @@ else if (step == 2)
         <p class="muted">Rândurile preluate din <strong>@session?.FileName</strong> pot fi corectate. Pentru fiecare, se caută în catalog produsul cu același cod; dacă nu există, se oferă cele mai apropiate, sau se pregătește un produs nou (se adaugă în catalog abia la pasul 3). Cantitățile și prețurile care nu sunt citite ca număr au fundal roșu; rândul respectiv este afișat sub avertisment, așa cum este în factură.</p>
         @if (session is not null)
         {
-            <p><a class="refresh button-link" href="@ViewerUrl" target="invoice-viewer" rel="noopener"
+            <p><a class="refresh act-nav button-link" href="@ViewerUrl" target="invoice-viewer" rel="noopener"
                   onclick="window.open(this.href, 'invoice-viewer', 'popup=yes,width=1000,height=900'); return false;">Afișează factura într-o fereastră nouă</a>
                 <span class="muted">Fereastra se poate muta lângă acest tabel, ca să confrunți valorile cu factura.</span></p>
         }
@@ -316,7 +316,7 @@ else if (step == 2)
                 @if (ResolvedSupplier is null && supplierCuiText.Trim().Length > 0 && !InvoiceLocked)
                 {
                     <div class="invoice-warning" role="status">⚠ Furnizorul cu acest CUI nu este în registru.
-                        <button type="button" class="refresh" @onclick="() => OpenAddSupplier(true)">+ Adaugă furnizorul</button></div>
+                        <button type="button" class="refresh act-confirm" @onclick="() => OpenAddSupplier(true)">+ Adaugă furnizorul</button></div>
                 }
                 @if (recognition is { Supplier: not null, NeedsConfirmation: false } known && ResolvedSupplier?.Id == known.Supplier!.Id)
                 {
@@ -325,22 +325,22 @@ else if (step == 2)
                 @if (similarSupplier is { } nearSupplier && ResolvedSupplier is null && !InvoiceLocked)
                 {
                     <div class="invoice-warning" role="status" id="pickup-similar-supplier">Probabil furnizorul <strong>@nearSupplier.Name</strong> (nume citit din factură: @invoiceSupplierName).
-                        <button type="button" class="refresh" @onclick="UseSimilarSupplier" >Folosește acest furnizor</button></div>
+                        <button type="button" class="refresh act-confirm" @onclick="UseSimilarSupplier" >Folosește acest furnizor</button></div>
                 }
                 @if (AliasOffer is { } offer && !InvoiceLocked)
                 {
                     <div class="invoice-warning" role="status" id="pickup-alias-offer">Numele din factură („@offer”) diferă de cel din registru.
-                        <button type="button" class="refresh" @onclick="RememberAliasAsync">Ține minte această denumire pentru @ResolvedSupplier!.Name</button></div>
+                        <button type="button" class="refresh act-confirm" @onclick="RememberAliasAsync">Ține minte această denumire pentru @ResolvedSupplier!.Name</button></div>
                 }
                 @if (aliasNotice.Length > 0) { <p class="success-banner" role="status">@aliasNotice</p> }
-                @if (!InvoiceLocked) { <p><button type="button" class="refresh" @onclick="() => OpenAddSupplier(false)">+ Adaugă alt furnizor</button></p> }
+                @if (!InvoiceLocked) { <p><button type="button" class="refresh act-confirm" @onclick="() => OpenAddSupplier(false)">+ Adaugă alt furnizor</button></p> }
                 @if (similarInvoices.Count > 0 && createdInvoice is null)
                 {
                     <div class="invoice-warning" role="alert">
                         <p><strong>⚠ Nu există factura @invoiceNumber la acest furnizor, dar există una cu număr asemănător.</strong> Dacă este aceeași factură (numărul a fost citit greșit), continuă pe ea:</p>
                         @foreach (var similar in similarInvoices)
                         {
-                            <button type="button" class="refresh" disabled="@InvoiceLocked" @onclick="() => UseSimilarAsync(similar)">Da, este factura @similar.Number din @StockMovementRules.DisplayDate(similar.Date)</button>
+                            <button type="button" class="refresh act-confirm" disabled="@InvoiceLocked" @onclick="() => UseSimilarAsync(similar)">Da, este factura @similar.Number din @StockMovementRules.DisplayDate(similar.Date)</button>
                         }
                         <p class="muted">Dacă este o factură diferită, lasă numărul cum este: se înregistrează o factură nouă.</p>
                     </div>
@@ -394,7 +394,7 @@ else if (step == 2)
                                     {
                                         <div class="pickup-exact"><span class="stock-badge low"><span>●</span> Produs nou pregătit</span> <strong>@staged.Input.Name</strong>
                                             <small class="muted">@staged.Input.Category / @staged.Input.Subcategory · nu e în catalog încă, se adaugă la finalizare</small>
-                                            <button type="button" class="refresh" @onclick="() => OpenNewProduct(at)">Modifică</button>
+                                            <button type="button" class="refresh act-edit" @onclick="() => OpenNewProduct(at)">Modifică</button>
                                             <button type="button" class="danger" @onclick="() => item.Staged = null">Renunță</button></div>
                                     }
                                     else
@@ -408,7 +408,7 @@ else if (step == 2)
                                                     <span><strong>@candidate.Product.Name</strong> <small class="muted">@candidate.Product.Description · stoc @candidate.Product.Quantity buc. · @((int)Math.Round(candidate.Score * 100))% asemănare</small></span></label>
                                             }
                                             <label class="pickup-alternative"><input type="radio" name="@("pick-" + index)" checked="@(item.ProductId is null)" @onchange="() => item.ProductId = null" /> <span>Niciunul dintre ele</span></label>
-                                            <button type="button" class="refresh" @onclick="() => OpenNewProduct(at)">+ Pregătește un produs nou</button>
+                                            <button type="button" class="refresh act-confirm" @onclick="() => OpenNewProduct(at)">+ Pregătește un produs nou</button>
                                         </fieldset>
                                     }
                                 </td>
@@ -453,7 +453,7 @@ else
         }
         @if (createdInvoice is not null) { <p class="success-banner" role="status">Factura @createdInvoice.Number a furnizorului @createdInvoice.SupplierName a fost înregistrată; intrările de mai jos i se leagă.</p> }
 
-        <h3>1. Produse noi (@NewLines.Count)</h3>
+        <h3>1. Produse noi <span class="count-badge">@NewLines.Count</span></h3>
         @if (NewLines.Count == 0) { <p class="muted">Niciun produs nou.</p> }
         else
         {
@@ -462,7 +462,7 @@ else
             @foreach (var line in NewLines) { @EntryCard(line) }
         }
 
-        <h3>2. Produse existente introduse în stoc (@ExistingLines.Count)</h3>
+        <h3>2. Produse existente introduse în stoc <span class="count-badge">@ExistingLines.Count</span></h3>
         @if (ExistingLines.Count == 0) { <p class="muted">Niciun produs existent.</p> }
         else
         {
@@ -489,7 +489,7 @@ else
 }
 
 <div class="wizard-nav">
-    <button type="button" class="refresh" disabled="@(step == 1)" @onclick="PreviousStep">← Pasul precedent</button>
+    <button type="button" class="refresh act-nav" disabled="@(step == 1)" @onclick="PreviousStep">← Pasul precedent</button>
     <span class="muted">Pasul @step din @StepTitles.Length@(step == 1 && !CanLeaveStep1 ? " · citește o factură cu tabel și păstrează cel puțin un rând pentru a continua" : step == 2 && !CanLeaveStep2 ? " · alege sau pregătește un produs pentru cel puțin un rând" : "")@(step == 2 && !HeaderConfirmed && !step2Loading ? " · confirmă numărul facturii, CUI-ul furnizorului și data" : "")</span>
     @if (step < StepTitles.Length)
     {

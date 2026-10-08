@@ -26,7 +26,7 @@
     {
         <div class="contract-global-date">
             <label for="activation-global-due">Reprogramează toate punctele la<PickOnlyDate Id="activation-global-due" @bind-Value="globalDue" Disabled="Busy" /></label>
-            <button type="button" class="refresh" disabled="@(globalDue is null || Busy)" @onclick="ApplyGlobalDue">Aplică tuturor</button>
+            <button type="button" class="refresh act-confirm" disabled="@(globalDue is null || Busy)" @onclick="ApplyGlobalDue">Aplică tuturor</button>
         </div>
         <div class="table-scroll"><table><thead><tr><th>PUNCT DE LUCRU</th><th>SCADENȚA CURENTĂ</th><th>NOUA SCADENȚĂ</th></tr></thead><tbody>
         @foreach (var point in Plan.Details.Points)

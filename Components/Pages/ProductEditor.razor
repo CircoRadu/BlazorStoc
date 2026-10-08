@@ -18,7 +18,7 @@
                 <label class="full-width" for="product-code">@ProductCode.Label *<InputText id="product-code" @bind-Value="input.Name" @oninput="args => input.Name = args.Value?.ToString() ?? string.Empty" maxlength="100" autocomplete="off" aria-describedby="product-code-note" /><small id="product-code-note" class="form-note">Introdu codul stabilit de producător. Codul trebuie să fie unic în catalog.</small><ValidationMessage For="() => input.Name" /></label>
                 <label for="product-category">Categorie *<InputSelect id="product-category" @bind-Value="input.Category" @bind-Value:after="CategoryChangedAsync">@foreach (var category in Categories) { <option value="@category">@category</option> }</InputSelect><ValidationMessage For="() => input.Category" /></label>
                 <label for="product-subcategory">Subcategorie *<InputSelect id="product-subcategory" @bind-Value="input.Subcategory">@foreach (var subcategory in Subcategories) { <option value="@subcategory">@subcategory</option> }</InputSelect><ValidationMessage For="() => input.Subcategory" /></label>
-                <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>@if (Original is null) { <text> sau <button type="button" class="refresh" @onclick="OpenCategories">Adaugă categorie / subcategorie</button> (se deschide într-o fereastră separată)</text> }.</p>
+                <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>@if (Original is null) { <text> sau <button type="button" class="refresh act-confirm" @onclick="OpenCategories">Adaugă categorie / subcategorie</button> (se deschide într-o fereastră separată)</text> }.</p>
                 @if (!HasSelectableGroup) { <p class="validation-message full-width" role="alert">Nu există nicio combinație categorie–subcategorie disponibilă. Creează mai întâi o subcategorie în pagina dedicată.</p> }
                 <label class="full-width" for="product-description">Descriere<InputTextArea id="product-description" @bind-Value="input.Description" @oninput="args => input.Description = args.Value?.ToString() ?? string.Empty" maxlength="1000" rows="3" /><ValidationMessage For="() => input.Description" /></label>
                 <div class="product-image-editor full-width">
@@ -30,12 +30,12 @@
                         <FileDropZone Id="product-image-input" OnChange="ImageSelectedAsync" Accept="image/jpeg,image/png,image/webp,image/gif" Text="Alege imaginea" />
                         <div class="clipboard-zone" @ref="pasteArea" tabindex="0">
                             <span>Lipește aici imaginea cu <kbd>Ctrl</kbd> + <kbd>V</kbd></span>
-                            <button type="button" class="refresh" @onclick="ReadClipboardAsync">Preia imaginea din clipboard</button>
+                            <button type="button" class="refresh act-confirm" @onclick="ReadClipboardAsync">Preia imaginea din clipboard</button>
                         </div>
                         <div class="image-web-search">
                             @if (ImageSearchUrl is { } searchUrl)
                             {
-                                <a class="refresh" href="@searchUrl" target="product-image-search" rel="noopener noreferrer" id="product-image-search"
+                                <a class="refresh act-confirm" href="@searchUrl" target="product-image-search" rel="noopener noreferrer" id="product-image-search"
                                    onclick="window.open(this.href, 'product-image-search', 'popup=yes,width=1100,height=800'); return false;">🔍 Caută imaginea pe internet după codul „@input.Name.Trim()”</a>
                                 <small>Se deschide într-o fereastră separată cu rezultatele căutării de imagini. Deschide pagina potrivită, copiază imaginea (clic dreapta → Copiază imaginea) și lipește-o în câmpul de mai sus.</small>
                             }

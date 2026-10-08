@@ -9,6 +9,12 @@ Actualizat: 08.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (08.10.2026, a treia parte)
+
+- ANAF: reguli pe camp aplicate in formulare (`AnafApplyRules`, dialogul „Date diferite in ANAF”), coloana „Folosit in”, versiunile configuratiei cu slider de activare si stergere (jurnal exact), HTTP 404 cu corp `notFound` = CUI inexistent (nu adresa gresita).
+- Pagina produsului: taburi Intrare/Iesire (golesc formularul la schimbare), filtre ca in Jurnal (cautare, liste, etichete „Filtre active”, valori filtrabile in tabel, stare in adresa, filtru pe zi), carduri in doua coloane, validare cantitate reala la stoc negativ.
+- Interfata: butoane colorate dupa actiune si de aceeasi inalime (40 / 32 px), insigne `count-badge`, spatiu dupa randuri de butoane, liste de alegere deschise peste card, fonturi uniforme, cutie de cautare cu lupa SVG, fieldset fara chenar, tooltip pe butoane cu o glifa, camp drag and drop la preluarea inventarului (regulile sunt in `CLAUDE.md`).
+
 ## Ultimul lucru facut (08.10.2026, a doua parte)
 
 - Setari -> Backup este un tab principal cu sub-taburile „Backup si restaurare” (generare, notificare, stergere pachete vechi, tabel cu pachetele de pe server si NAS), „Backup NAS” si „Verificare ora”. Pagina de restaurare separata a disparut.
@@ -31,7 +37,7 @@ Actualizat: 08.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 
 ## Validari
 
-- Suita in memorie: 967 verificari trecute; suita MariaDB `blazorstoc_test`: 1574 trecute, 0 esecuri (08.10.2026, inainte de commit). Migrarile 1-35 aplicate pe `blazorstoc_test`; pe `BlazorStoc` migrarile 34-35 se aplica la repornirea aplicatiei.
+- Suita in memorie: 979 verificari trecute; suita MariaDB `blazorstoc_test`: 1588 trecute, 0 esecuri; UI pe componente: 229 (08.10.2026, inainte de commit). Migrarile 1-35 aplicate pe `blazorstoc_test`; pe `BlazorStoc` migrarile 34-35 se aplica la repornirea aplicatiei.
 - Neverificat in browser: tot ce e in `Teste utilizator/` marcat 07.10.2026 (utilizatorul nu a testat inca nimic).
 
 ## Preview

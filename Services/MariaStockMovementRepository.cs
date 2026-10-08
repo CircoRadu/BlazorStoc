@@ -49,16 +49,27 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             AND (@destination IS NULL OR (m.kind=0 AND m.destination=@destination))
             AND (@beneficiary IS NULL OR (m.kind=0 AND m.beneficiary_id=@beneficiary))
             AND (@vehicle IS NULL OR (m.kind=0 AND (m.vehicle_id=@vehicle OR m.source_vehicle_id=@vehicle)))
+            AND (@day IS NULL OR m.movement_date=@day)
+            AND (@text IS NULL OR m.description LIKE @text OR IFNULL(m.reference,'') LIKE @text
+                 OR EXISTS(SELECT 1 FROM supplier_invoices si2 LEFT JOIN suppliers su2 ON su2.id=si2.supplier_id WHERE si2.id=m.invoice_id AND (si2.`number` LIKE @text OR su2.name LIKE @text))
+                 OR EXISTS(SELECT 1 FROM suppliers fs2 WHERE fs2.id=m.free_supplier_id AND fs2.name LIKE @text)
+                 OR EXISTS(SELECT 1 FROM beneficiaries b2 WHERE b2.id=m.beneficiary_id AND b2.name LIKE @text)
+                 OR EXISTS(SELECT 1 FROM projects p2 WHERE p2.id=m.project_id AND p2.name LIKE @text)
+                 OR EXISTS(SELECT 1 FROM vehicles v2 WHERE v2.id IN (m.vehicle_id,m.source_vehicle_id) AND v2.plate_number LIKE @text))
             {overStockFilter}
             """;
         object destinationFilter = query.Destination is { } chosenDestination ? (int)chosenDestination : DBNull.Value;
         object beneficiaryFilter = query.BeneficiaryId is { } chosenBeneficiary ? chosenBeneficiary : DBNull.Value;
         object vehicleFilter = query.VehicleId is { } chosenVehicle ? chosenVehicle : DBNull.Value;
+        // The text filter: part of a description, reference, invoice number, supplier, beneficiary, project or plate (the characters of LIKE are taken literally).
+        object textFilter = string.IsNullOrWhiteSpace(query.Text) ? DBNull.Value
+            : "%" + query.Text.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+        object dayFilter = query.Date is { } chosenDay ? StockMovementRules.StorageDate(chosenDay) : DBNull.Value;
         int total;
         await using (var count = Command(connection, null,
             $"SELECT COUNT(*) FROM stock_movements m WHERE m.product_id=@product AND (@kind IS NULL OR m.kind=@kind) {sourceFilter}",
             ("@product", productId), ("@kind", kind), ("@source", source), ("@supplier", supplier),
-            ("@destination", destinationFilter), ("@beneficiary", beneficiaryFilter), ("@vehicle", vehicleFilter)))
+            ("@destination", destinationFilter), ("@beneficiary", beneficiaryFilter), ("@vehicle", vehicleFilter), ("@text", textFilter), ("@day", dayFilter)))
             total = Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
         bool anyModified;
         await using (var modified = Command(connection, null, """
@@ -78,7 +89,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             ORDER BY m.movement_date {direction}, m.id {direction}
             LIMIT @limit OFFSET @offset
             """, ("@product", productId), ("@kind", kind), ("@source", source), ("@supplier", supplier), ("@limit", limit), ("@offset", offset),
-            ("@destination", destinationFilter), ("@beneficiary", beneficiaryFilter), ("@vehicle", vehicleFilter)))
+            ("@destination", destinationFilter), ("@beneficiary", beneficiaryFilter), ("@vehicle", vehicleFilter), ("@text", textFilter), ("@day", dayFilter)))
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) items.Add(ReadMovement(reader));
         var inVehicles = (await VehicleQuantitiesAsync(connection, null, productId, cancellationToken).ConfigureAwait(false))

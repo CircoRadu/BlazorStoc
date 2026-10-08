@@ -24,7 +24,7 @@
                               SelectedIdChanged="SelectBeneficiaryAsync" Disabled="Disabled" />
             @if (AllowAdd)
             {
-                <button type="button" class="refresh add-related" id="@($"{Prefix}-add-beneficiary")" disabled="@Disabled"
+                <button type="button" class="refresh act-confirm add-related" id="@($"{Prefix}-add-beneficiary")" disabled="@Disabled"
                         @onclick="AddBeneficiaryRequested">+ Adaugă beneficiar</button>
             }
         </div>
@@ -37,7 +37,7 @@
                                   SelectedIdChanged="ProjectChanged" Disabled="Disabled" />
                 @if (AllowAdd)
                 {
-                    <button type="button" class="refresh add-related" id="@($"{Prefix}-add-project")" disabled="@Disabled"
+                    <button type="button" class="refresh act-confirm add-related" id="@($"{Prefix}-add-project")" disabled="@Disabled"
                             @onclick="AddProjectRequested">+ Adaugă proiect</button>
                 }
                 @if (Projects.Count == 0) { <small class="form-note">Beneficiarul ales nu are proiecte.</small> }

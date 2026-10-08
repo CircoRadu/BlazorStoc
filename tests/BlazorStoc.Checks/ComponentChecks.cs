@@ -108,8 +108,27 @@ public static class ComponentChecks
         check(panel.Markup.Contains("Stoc curent -3") && !resolution.IsResolved, "Negative stock panel: warns with the current stock and starts unresolved");
         panel.FindAll("button").First(button => button.TextContent.Contains("pe 0")).Click();
         check(resolution.IsResolved && resolution.RealQuantity == 0 && changes == 1, "Negative stock panel: \"set to zero\" resolves with the real quantity 0");
-        panel.Find("input").Change("4");
-        check(resolution.IsResolved && !resolution.Zero && resolution.RealQuantity == 4, "Negative stock panel: a typed real quantity replaces the zero choice");
+        panel.Find("input").Input("4");
+        check(resolution.IsResolved && !resolution.Zero && resolution.RealQuantity == 4 && !panel.Markup.Contains("validation-message"), "Negative stock panel: a typed real quantity replaces the zero choice and is accepted at once (on every keystroke)");
+        panel.Find("input").Input("-10");
+        check(!resolution.IsResolved && panel.Markup.Contains("validation-message") && panel.Find("input").GetAttribute("aria-invalid") == "true",
+            "Negative stock panel: a negative real quantity is flagged and does not resolve");
+        panel.Find("input").Input("0");
+        check(resolution.IsResolved && resolution.RealQuantity == 0 && !resolution.Zero && !panel.Markup.Contains("validation-message"), "Negative stock panel: a real quantity of 0 is valid");
+        panel.Find("input").Input("1.5");
+        check(!resolution.IsResolved && panel.Markup.Contains("validation-message"), "Negative stock panel: a quantity that is not a whole number is flagged");
+        panel.Find("input").Input("4");
+
+        IReadOnlyList<AnafFieldProposal>? chosenAnaf = null;
+        var anafDialog = context.Render<Components.Shared.AnafDifferencesDialog>(parameters => parameters
+            .Add(p => p.Items, new AnafFieldProposal[] { new("Adresă fiscală", "Str. Veche 1", "Str. Noua 2"), new("Cod poștal", "100", "200") })
+            .Add(p => p.Applied, (IReadOnlyList<AnafFieldProposal> chosen) => { chosenAnaf = chosen; }));
+        check(anafDialog.Markup.Contains("Str. Veche 1") && anafDialog.Markup.Contains("Str. Noua 2") && anafDialog.FindAll("input[role=switch]").Count == 2, "ANAF dialog: each different field shows the user's value, the ANAF value and a switch");
+        anafDialog.FindAll("button").First(button => button.TextContent.Contains("Aplică")).Click();
+        check(chosenAnaf is { Count: 0 }, "ANAF dialog: nothing is taken from ANAF unless the user switches it on (his own values are the default)");
+        anafDialog.FindAll("input[role=switch]")[1].Change(true);
+        anafDialog.FindAll("button").First(button => button.TextContent.Contains("Aplică")).Click();
+        check(chosenAnaf is { Count: 1 } && chosenAnaf[0].Label == "Cod poștal", "ANAF dialog: only the fields switched on are returned");
 
         var memorySuppliers = new MemorySupplierRepository();
         var picked = await memorySuppliers.CreateAsync(new SupplierInput { Name = "Furnizor Componenta SRL", Cui = SupplierChecks.ValidCui(1234567) });

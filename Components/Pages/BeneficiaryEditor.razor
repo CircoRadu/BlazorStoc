@@ -32,7 +32,7 @@
                         <label for="beneficiary-cui">CUI *</label>
                         <div class="beneficiary-cui-line">
                             <InputTextLive id="beneficiary-cui" @bind-Value="input.Cui" maxlength="12" autocomplete="off" />
-                            <button type="button" class="refresh" disabled="@(fetching || input.Cui.Trim().Length == 0)" @onclick="FetchFromAnafAsync">@(fetching ? "Se interoghează ANAF…" : "Preia date din ANAF")</button>
+                            <button type="button" class="refresh act-confirm" disabled="@(fetching || input.Cui.Trim().Length == 0)" @onclick="FetchFromAnafAsync">@(fetching ? "Se interoghează ANAF…" : "Preia date din ANAF")</button>
                         </div>
                         <small>2–10 cifre, opțional precedate de RO. CUI-ul identifică persoana juridică.</small>
                         <ValidationMessage For="() => input.Cui" />
@@ -63,6 +63,11 @@
 {
     <SaveConfirmationDialog Title="Salvezi modificările beneficiarului?" ObjectLabel="@Original.Name" Changes="pendingChanges"
                             Reason="@input.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
+
+@if (pendingAnaf is not null)
+{
+    <AnafDifferencesDialog Items="pendingAnaf" Applied="ApplyChosenAnaf" Cancelled="() => pendingAnaf = null" />
 }
 
 @code {
@@ -126,15 +131,13 @@
             var result = await Anaf.LookupCompanyAsync(input.Cui, lifetime.Token);
             if (result.Company is { } company)
             {
-                input.Name = Norm(company.Name);
-                if (company.Address.Length > 0) input.Address = Norm(company.Address);
-                if (company.RegistryNumber.Length > 0) input.RegistryNumber = Norm(company.RegistryNumber).ToUpperInvariant();
-                if (company.Phone.Length > 0) input.Phone = BeneficiaryRules.NormalizePhone(company.Phone);
-                if (company.PostalCode.Length > 0) input.PostalCode = BeneficiaryRules.CompactValue(company.PostalCode);
-                if (company.CaenCode.Length > 0) input.CaenCode = BeneficiaryRules.CompactValue(company.CaenCode);
+                var plan = AnafApplyRules.Plan(AnafApplyRules.Proposals(company, input.Name, input.Address, input.RegistryNumber, input.Phone, input.PostalCode, input.CaenCode), result.Updates);
+                foreach (var proposal in plan.Direct) ApplyAnafField(proposal);
+                pendingAnaf = plan.Ask.Count > 0 ? plan.Ask : null;
+                keptMine = plan.KeptMine;
                 anafSnapshot = company with { Cui = input.Cui };
                 anafMessageIsError = false;
-                anafMessage = "Datele au fost preluate din ANAF. Completează manual câmpurile obligatorii pe care ANAF nu le-a returnat (de exemplu telefonul).";
+                anafMessage = "Datele au fost preluate din ANAF. Completează manual câmpurile obligatorii pe care ANAF nu le-a returnat (de exemplu telefonul)." + KeptNote;
                 anafWarning = result.Warning;
             }
             else
@@ -152,6 +155,30 @@
             anafMessage = "Datele nu au putut fi preluate din ANAF. Le poți introduce manual.";
         }
         finally { fetching = false; }
+    }
+
+    // The fields ANAF changed in the form only after the user chose (policy "Cere confirmare"), and the fields whose own value was kept (policy "Păstrează valoarea mea").
+    private IReadOnlyList<AnafFieldProposal>? pendingAnaf;
+    private IReadOnlyList<string> keptMine = [];
+    private string KeptNote => keptMine.Count == 0 ? "" : $" S-au păstrat valorile tale pentru: {string.Join(", ", keptMine)}.";
+
+    private void ApplyAnafField(AnafFieldProposal proposal)
+    {
+        switch (proposal.Label)
+        {
+            case "Denumire": input.Name = proposal.Incoming; break;
+            case "Adresă fiscală": input.Address = proposal.Incoming; break;
+            case "Nr. Registrul Comerțului": input.RegistryNumber = proposal.Incoming; break;
+            case "Telefon": input.Phone = proposal.Incoming; break;
+            case "Cod poștal": input.PostalCode = proposal.Incoming; break;
+            case "Cod CAEN": input.CaenCode = proposal.Incoming; break;
+        }
+    }
+
+    private void ApplyChosenAnaf(IReadOnlyList<AnafFieldProposal> chosen)
+    {
+        foreach (var proposal in chosen) ApplyAnafField(proposal);
+        pendingAnaf = null;
     }
 
     private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());

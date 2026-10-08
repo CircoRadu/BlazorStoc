@@ -7,6 +7,8 @@
     const zoneSelector = "[data-pickup-dropzone]";
 
     function zoneOf(event) {
+        // A FileDropZone inside the page handles its own drop (file-drop.js): it is not handled twice.
+        if (event.target instanceof Element && event.target.closest("[data-file-drop]")) return null;
         return event.target instanceof Element ? event.target.closest(zoneSelector) : null;
     }
 

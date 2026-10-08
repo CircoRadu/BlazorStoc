@@ -24,8 +24,8 @@
         </div>
         <div class="editor-actions">
             <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează</button>
-            <button type="button" class="refresh" disabled="@busy" @onclick="TestAsync">Testează conexiunea</button>
-            <button type="button" class="refresh" disabled="@busy" @onclick="CopyNowAsync" title="Urcă pe NAS toate pachetele locale care lipsesc de acolo (de exemplu cele făcute când NAS-ul era oprit)">Copiază pe NAS pachetele lipsă</button>
+            <button type="button" class="refresh act-reload" disabled="@busy" @onclick="TestAsync">Testează conexiunea</button>
+            <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="CopyNowAsync" title="Urcă pe NAS toate pachetele locale care lipsesc de acolo (de exemplu cele făcute când NAS-ul era oprit)">Copiază pe NAS pachetele lipsă</button>
             @if (busy) { <span class="muted" role="status" data-operation-driver>@busyText</span> }
         </div>
         <p class="muted"><small>Orice backup făcut local (la preluarea de inventar, programat sau la cerere) este copiat automat pe NAS cât timp „Copiere pe NAS” este Activ. Programarea, ștergerea pachetelor vechi de pe server și lista pachetelor sunt în Setări → Backup.</small></p>

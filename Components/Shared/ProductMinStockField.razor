@@ -6,8 +6,8 @@
 <div class="min-stock-field">
     <label for="@($"min-stock-{ProductId}")">Stoc minim (buc.)</label>
     <input id="@($"min-stock-{ProductId}")" type="number" min="1" max="@StockMovementRules.MaxQuantity" placeholder="fără minim" @bind="input" @bind:event="oninput" disabled="@busy" />
-    <button type="button" class="refresh" disabled="@busy" @onclick="SaveAsync">Setează</button>
-    @if (minimum is not null) { <button type="button" class="danger" aria-label="Elimină stocul minim" disabled="@busy" @onclick="RemoveAsync">×</button> }
+    <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="SaveAsync">Setează</button>
+    @if (minimum is not null) { <button type="button" class="danger" aria-label="Elimină stocul minim" disabled="@busy" @onclick="RemoveAsync" title="Elimină stocul minim">×</button> }
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (minimum is { } min && Stock < min) { <p class="muted" role="status">⚠ Stoc sub minim: lipsesc <strong>@(min - Stock) buc.</strong> până la minimul de @min buc.</p> }

@@ -36,7 +36,7 @@ else
             }
             <p><span class="anaf-source @SupplierSources.CssClass(supplier.Source)"><span aria-hidden="true">@SupplierSources.Icon(supplier.Source)</span> @SupplierSources.Label(supplier.Source)</span>
                 @if (supplier.VerifiedUtc is not null) { <span class="muted"> · ultima citire din ANAF: @SupplierRules.DisplayTime(supplier.VerifiedUtc)</span> }</p></div>
-        <div class="heading-actions"><button class="refresh" disabled="@editing" @onclick="OpenEditor">Editează</button></div>
+        <div class="heading-actions"><button class="refresh act-edit" disabled="@editing" @onclick="OpenEditor">Editează</button></div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     @if (editing) { <SupplierEditor @key="editorKey" Original="supplier" Saved="SavedAsync" Closed="CloseEditor" /> }

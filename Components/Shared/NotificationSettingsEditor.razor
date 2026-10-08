@@ -18,16 +18,15 @@ else if (settings is not null)
     <section class="product-editor" aria-labelledby="purge-settings-title">
         <div class="catalog-heading"><h3 id="purge-settings-title">Ștergerea notificărilor rezolvate</h3></div>
         <fieldset disabled="@(saving || confirming is not null)">
-            <div class="editor-grid">
-                <label class="anaf-check anaf-wide"><input id="purge-enabled" type="checkbox" role="switch" checked="@enabled" @onchange="args => enabled = args.Value is true" />
-                    Șterge notificările rezolvate mai vechi de:</label>
-                <label for="purge-months">Perioada, în luni (@NotificationPurgeRules.MinMonths–@NotificationPurgeRules.MaxMonths)
+            <div class="editor-grid purge-grid">
+                <ToggleSwitch Class="anaf-wide" Id="purge-enabled" @bind-Value="enabled" OnText="Activ" OffText="Inactiv">Șterge notificările rezolvate mai vechi de:</ToggleSwitch>
+                <label for="purge-months" class="purge-months">Perioada, în luni (@NotificationPurgeRules.MinMonths–@NotificationPurgeRules.MaxMonths)
                     <input id="purge-months" type="number" min="@NotificationPurgeRules.MinMonths" max="@NotificationPurgeRules.MaxMonths" step="1" @bind="months" /></label>
             </div>
             <p class="form-note">Stare actuală: @CurrentState</p>
             <div class="editor-actions">
                 <button class="primary" type="button" disabled="@(!Changed)" @onclick="BeginSaveAsync">@(saving ? "Se salvează…" : "Salvează setările")</button>
-                <button class="refresh" type="button" disabled="@(!Changed)" @onclick="Reset">Renunță la modificări</button>
+                <button class="refresh act-close" type="button" disabled="@(!Changed)" @onclick="Reset">Renunță la modificări</button>
             </div>
         </fieldset>
     </section>

@@ -43,7 +43,7 @@
             <p class="muted">Ultimele corecții nerezolvate (citit din factură → furnizorul ales):</p>
             @if (aliasError is not null) { <div class="validation-message" role="alert">@aliasError</div> }
             <ul>
-                @foreach (var fix in Unresolved(summary)) { <li>@StockMovementRules.DisplayDate(DateOnly.FromDateTime(fix.Utc)) · factura @fix.InvoiceNumber · „@(fix.ReadName.Length > 0 ? fix.ReadName : "—")” (CUI @(fix.ReadCui.Length > 0 ? fix.ReadCui : "—")) → <strong>@(fix.ChosenName.Length > 0 ? fix.ChosenName : "—")</strong>@(fix.RecognizedName.Length > 0 ? $" (propus: {fix.RecognizedName})" : " (nimic propus)") <button type="button" class="refresh" disabled="@(aliasBusy || fix.ReadName.Trim().Length == 0)" @onclick="() => RememberAliasAsync(fix)">Ține minte ca denumire alternativă</button></li> }
+                @foreach (var fix in Unresolved(summary)) { <li>@StockMovementRules.DisplayDate(DateOnly.FromDateTime(fix.Utc)) · factura @fix.InvoiceNumber · „@(fix.ReadName.Length > 0 ? fix.ReadName : "—")” (CUI @(fix.ReadCui.Length > 0 ? fix.ReadCui : "—")) → <strong>@(fix.ChosenName.Length > 0 ? fix.ChosenName : "—")</strong>@(fix.RecognizedName.Length > 0 ? $" (propus: {fix.RecognizedName})" : " (nimic propus)") <button type="button" class="refresh act-confirm" disabled="@(aliasBusy || fix.ReadName.Trim().Length == 0)" @onclick="() => RememberAliasAsync(fix)">Ține minte ca denumire alternativă</button></li> }
             </ul>
         }
         </div>

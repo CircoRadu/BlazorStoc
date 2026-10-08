@@ -90,7 +90,7 @@ else if (vehicle is not null)
                         <td class="number">@target.Target</td>
                         <td class="number">@held</td>
                         <td class="number">@VehicleTargetRules.Missing(target.Target, held)</td>
-                        <td><button type="button" class="danger" aria-label="@($"Elimină nivelul țintă pentru {target.ProductName}")" disabled="@targetBusy" @onclick="() => RemoveTargetAsync(target)">×</button></td>
+                        <td><button type="button" class="danger" aria-label="@($"Elimină nivelul țintă pentru {target.ProductName}")" disabled="@targetBusy" @onclick="() => RemoveTargetAsync(target)" title="@($"Elimină nivelul țintă pentru {target.ProductName}")">×</button></td>
                     </tr>
                 }
                 </tbody></table></div>
@@ -100,7 +100,7 @@ else if (vehicle is not null)
                 <SearchableSelect Id="target-product" Label="Produs" Placeholder="Caută sau alege produsul…" EmptyText="Niciun produs găsit." Options="TargetProductOptions"
                                   SelectedId="newTargetProduct" SelectedIdChanged="id => newTargetProduct = id" />
                 <input type="number" aria-label="Nivel țintă (buc.)" min="1" max="@StockMovementRules.MaxQuantity" @bind="newTargetQuantity" @bind:event="oninput" />
-                <button type="button" class="refresh" disabled="@targetBusy" @onclick="SetTargetAsync">Setează nivelul</button>
+                <button type="button" class="refresh act-confirm" disabled="@targetBusy" @onclick="SetTargetAsync">Setează nivelul</button>
                 @if (targets.Any(target => VehicleTargetRules.Missing(target.Target, HeldOf(target.ProductId)) > 0)) { <a class="primary"
                    href="@($"/iesiri/multipla?vehicul={Id}")">Completează la nivel</a> }
             </div>

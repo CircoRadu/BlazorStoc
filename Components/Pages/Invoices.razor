@@ -100,7 +100,7 @@ else
                 </tbody></table></div>
             }
             <div class="editor-actions">
-                @if (CanAddManually) { <button type="button" class="refresh" @onclick="() => manualFor = shown">Adaugă produs manual</button> }
+                @if (CanAddManually) { <button type="button" class="refresh act-confirm" @onclick="() => manualFor = shown">Adaugă produs manual</button> }
                 <button type="button" class="primary" @onclick="CloseEntries">Închide</button>
             </div>
         </section>

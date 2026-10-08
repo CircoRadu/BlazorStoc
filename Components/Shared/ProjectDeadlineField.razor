@@ -7,8 +7,8 @@
 <div class="deadline-field">
     <label for="@($"project-deadline-{ProjectId}")">Termen proiect</label>
     <PickOnlyDate Id="@($"project-deadline-{ProjectId}")" @bind-Value="input" Min="@StockMovementRules.StorageDate(StockMovementRules.Today)" Disabled="busy" />
-    <button type="button" class="refresh" disabled="@busy" @onclick="SaveAsync">Setează termenul</button>
-    @if (deadline is not null) { <button type="button" class="danger" aria-label="Elimină termenul" disabled="@busy" @onclick="RemoveAsync">×</button> }
+    <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="SaveAsync">Setează termenul</button>
+    @if (deadline is not null) { <button type="button" class="danger" aria-label="Elimină termenul" disabled="@busy" @onclick="RemoveAsync" title="Elimină termenul">×</button> }
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 

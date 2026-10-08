@@ -46,7 +46,7 @@ else if (beneficiary is not null)
                 <p><span class="anaf-source @(beneficiary.AnafVerified ? "ok" : "warn")"><span aria-hidden="true">@(beneficiary.AnafVerified ? "✓" : "⚠")</span> @(beneficiary.AnafVerified ? "Date preluate din ANAF" : "Date introduse manual")</span></p>
             }</div>
         <div class="heading-actions">
-            @if (canManage) { <button class="refresh" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenEditBeneficiaryAsync">Editează</button> }
+            @if (canManage) { <button class="refresh act-edit" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenEditBeneficiaryAsync">Editează</button> }
             <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button>
         </div>
     </div>
@@ -71,27 +71,27 @@ else if (beneficiary is not null)
 
     <section class="catalog">
         <div class="catalog-heading"><h2>Puncte de lucru <span>@workPoints.Count</span></h2>
-            @if (canManage) { <button class="refresh" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
+            @if (canManage) { <button class="refresh act-confirm" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
         </div>
         @if (workPointError is not null) { <div class="error-banner" role="alert">@workPointError</div> }
         <div class="table-scroll"><table><thead><tr><th>NUME</th><th>ADRESĂ</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th><th>DESCRIERE</th><th>COORDONATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th>@if (canManage) { <th></th> }</tr></thead><tbody>
             @foreach (var workPoint in workPoints)
             {
-                <tr @key="workPoint.Id"><td><strong>@workPoint.Name</strong>@if (workPoint.IsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }</td><td>@workPoint.Address</td><td>@workPoint.Phone</td><td>@workPoint.ContactPerson</td>
+                <tr @key="workPoint.Id"><td><strong>@workPoint.Name</strong>@if (workPoint.IsPrimary) { <span class="anaf-source ok work-point-badge">Principal</span> }</td><td>@workPoint.Address</td><td>@workPoint.Phone</td><td>@workPoint.ContactPerson</td>
                     <td class="work-point-description" title="@workPoint.Description">@workPoint.Description</td>
                     <td>@(workPoint.HasCoordinates ? WorkPointCoordinates.Format(workPoint.Latitude, workPoint.Longitude) : "")</td>
                     <td class="number">@(photoCounts.TryGetValue(workPoint.Id, out var photoCount) ? photoCount.ToString() : "")</td>
                     <td>@{ var coverage = ActiveCoverage(workPoint.Id); }@if (coverage is { } covered) { <span>@covered.Contract.Label</span><text> </text><span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(covered.Point.NextDue, Today, thresholdDays))">@StockMovementRules.DisplayDate(covered.Point.NextDue)</span> } else if (InOffContract(workPoint.Id)) { <span class="contract-state off">Contract Off</span> }</td>
                     @if (canManage)
                     {
-                        <td>
+                        <td class="row-actions work-point-actions">
                             @if (workPoint.Id == 0)
                             {
                                 <small class="muted">Se creează la pornirea aplicației</small>
                             }
                             else
                             {
-                                <button class="refresh" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="() => OpenEditWorkPoint(workPoint)">Editează</button>
+                                <button class="refresh act-edit" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="() => OpenEditWorkPoint(workPoint)">Editează</button>
                                 @if (!workPoint.IsPrimary)
                                 {
                                     <button class="danger" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="() => DeleteWorkPointAsync(workPoint)">Șterge</button>

@@ -42,7 +42,7 @@
             }
             <div class="editor-actions">
                 <button type="button" class="primary" disabled="@Busy" @onclick="ContinueAsync">Continuă</button>
-                <button type="button" class="danger" disabled="@Busy" @onclick="CancelAsync">Anulează</button>
+                <button type="button" class="refresh act-close" disabled="@Busy" @onclick="CancelAsync">Anulează</button>
             </div>
         }
         else
@@ -52,14 +52,14 @@
             <label class="delete-confirmation-input" for="@ConfirmationId">
                 Confirmare
                 <input id="@ConfirmationId" autocomplete="off" spellcheck="false" disabled="@Busy"
-                       @bind="confirmation" @bind:event="oninput" />
+                       @bind="confirmation" @bind:event="oninput" @onkeydown="ConfirmKeyAsync" />
             </label>
             <p class="form-note">@ConfirmationNote</p>
             <div class="editor-actions">
-                <button type="button" class="danger" disabled="@(Busy || !CanConfirm)" @onclick="ConfirmAsync">
+                <button type="button" class="primary" disabled="@(Busy || !CanConfirm)" @onclick="ConfirmAsync">
                     @(Busy ? "Se șterge…" : "Confirmă ștergerea")
                 </button>
-                <button type="button" class="danger" disabled="@Busy" @onclick="CancelAsync">Anulează</button>
+                <button type="button" class="refresh act-close" disabled="@Busy" @onclick="CancelAsync">Anulează</button>
             </div>
         }
     </section>
@@ -117,6 +117,12 @@
     {
         choice = value;
         reasonError = null;
+    }
+
+    // Enter in the confirmation field confirms the deletion, but only when the word is written (the same condition as the button).
+    private async Task ConfirmKeyAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && CanConfirm && !Busy) await ConfirmAsync();
     }
 
     private async Task ConfirmAsync()

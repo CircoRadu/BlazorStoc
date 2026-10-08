@@ -11,7 +11,7 @@
 <h2>@(IsEditMode ? "Editare șablon" : "Generare șablon factură")</h2>
 @if (IsEditMode)
 {
-    <div class="heading-actions"><button type="button" class="refresh" disabled="@saving" title="Închide editarea șablonului și revino la lista de șabloane" @onclick="RequestCloseAsync">✕ Închide editarea</button></div>
+    <div class="heading-actions"><button type="button" class="refresh act-close" disabled="@saving" title="Închide editarea șablonului și revino la lista de șabloane" @onclick="RequestCloseAsync">✕ Închide editarea</button></div>
     <p class="muted">Editezi elementele șablonului (câmpuri, coloane, descrierea intrării în stoc, denumirea și furnizorul). Fișierul model se afișează fără să fie analizat; analiza pornește doar din butonul „Analizează fișierul”. Dacă părăsești pagina fără să salvezi, ești avertizat.</p>
 }
 @if (Embedded)
@@ -54,7 +54,7 @@ else
         <div class="heading-actions">
             @if (!analyzed)
             {
-                <button type="button" class="refresh" disabled="@(busy || saving)" title="Analizează fișierul (câmpuri, tabel, șabloane potrivite) și așază șablonul pe el" @onclick="AnalyzeFileAsync">@(busy ? "Se analizează…" : "Analizează fișierul")</button>
+                <button type="button" class="refresh act-reload" disabled="@(busy || saving)" title="Analizează fișierul (câmpuri, tabel, șabloane potrivite) și așază șablonul pe el" @onclick="AnalyzeFileAsync">@(busy ? "Se analizează…" : "Analizează fișierul")</button>
             }
             <button type="button" class="danger" disabled="@saving" @onclick="DiscardAsync">@(Embedded ? "Renunță la crearea șablonului" : "Renunță și elimină fișierul")</button>
         </div>
@@ -82,11 +82,11 @@ else
                         <span><strong>@suggestion.Template.Info.Name</strong> <span class="muted">· @SupplierLabel(suggestion.Template.Info)</span>
                             @if (suggestion.Match.SupplierMatch) { <span class="notification-state done">furnizor recunoscut</span> }
                             <span class="notification-state">potrivire @((int)Math.Round(suggestion.Match.Score * 100))%</span></span>
-                        <button type="button" class="refresh" disabled="@(active || saving)" @onclick="() => UseTemplate(suggestion.Template)">@(active ? "În editare" : "Folosește acest șablon")</button>
+                        <button type="button" class="refresh act-confirm" disabled="@(active || saving)" @onclick="() => UseTemplate(suggestion.Template)">@(active ? "În editare" : "Folosește acest șablon")</button>
                     </li>
                 }
             </ul>
-            @if (existing is not null) { <button type="button" class="refresh" disabled="@saving" @onclick="UseAutomaticProposal">Înapoi la propunerea automată</button> }
+            @if (existing is not null) { <button type="button" class="refresh act-nav" disabled="@saving" @onclick="UseAutomaticProposal">Înapoi la propunerea automată</button> }
         </section>
     }
 
@@ -103,18 +103,18 @@ else
                 </div>
             }
             <div class="invoice-draw-tools">
-                <button type="button" class="refresh" disabled="@(undoStack.Count == 0)" title="@(undoStack.Count > 0 ? "Anulează: " + undoStack[^1].Name + " (Ctrl+Z)" : "Nimic de anulat")" aria-label="Anulează ultima acțiune" @onclick="Undo">↶ Anulează</button>
-                <button type="button" class="refresh" disabled="@(redoStack.Count == 0)" title="@(redoStack.Count > 0 ? "Refă: " + redoStack[^1].Name + " (Ctrl+Y)" : "Nimic de refăcut")" aria-label="Refă acțiunea anulată" @onclick="Redo">↷ Refă</button>
-                <button type="button" class="refresh @(drawMode == "field" ? "active" : "")" aria-pressed="@(drawMode == "field" ? "true" : "false")" @onclick="@(() => ToggleDraw("field"))">▭ Adaugă câmp desenând pe pagină</button>
-                <button type="button" class="refresh @(drawMode == "column" ? "active" : "")" aria-pressed="@(drawMode == "column" ? "true" : "false")" @onclick="@(() => ToggleDraw("column"))">▯ Adaugă celulă de antet desenând pe pagină</button>
-                <button type="button" class="refresh @(drawMode == "zone" ? "active" : "")" aria-pressed="@(drawMode == "zone" ? "true" : "false")" @onclick="@(() => ToggleDraw("zone"))">▮ Desenează zona unei coloane</button>
+                <button type="button" class="refresh act-edit" disabled="@(undoStack.Count == 0)" title="@(undoStack.Count > 0 ? "Anulează: " + undoStack[^1].Name + " (Ctrl+Z)" : "Nimic de anulat")" aria-label="Anulează ultima acțiune" @onclick="Undo">↶ Anulează</button>
+                <button type="button" class="refresh act-edit" disabled="@(redoStack.Count == 0)" title="@(redoStack.Count > 0 ? "Refă: " + redoStack[^1].Name + " (Ctrl+Y)" : "Nimic de refăcut")" aria-label="Refă acțiunea anulată" @onclick="Redo">↷ Refă</button>
+                <button type="button" class="refresh act-confirm @(drawMode == "field" ? "active" : "")" aria-pressed="@(drawMode == "field" ? "true" : "false")" @onclick="@(() => ToggleDraw("field"))">▭ Adaugă câmp desenând pe pagină</button>
+                <button type="button" class="refresh act-confirm @(drawMode == "column" ? "active" : "")" aria-pressed="@(drawMode == "column" ? "true" : "false")" @onclick="@(() => ToggleDraw("column"))">▯ Adaugă celulă de antet desenând pe pagină</button>
+                <button type="button" class="refresh act-edit @(drawMode == "zone" ? "active" : "")" aria-pressed="@(drawMode == "zone" ? "true" : "false")" @onclick="@(() => ToggleDraw("zone"))">▮ Desenează zona unei coloane</button>
                 @if (drawMode.Length > 0) { <span class="muted">Trage cu mausul pe pagină@(drawMode == "column" ? " (celula din capul de tabel: lățimea ei devine lățimea coloanei)" : drawMode == "zone" ? " (sub celula coloanei: contează doar înălțimea, unde începe și unde se termină valorile)" : "").</span> }
                 @if (drawMode.Length == 0 && multiIds.Count == 0) { <span class="muted">Trage pe pagină, într-un loc liber, ca să selectezi mai multe elemente.</span> }
                 @if (multiIds.Count > 0)
                 {
                     <span class="invoice-multi-bar"><strong>@multiIds.Count elemente selectate</strong>
                         <button type="button" class="danger" @onclick="DeleteMulti">Șterge elementele selectate</button>
-                        <button type="button" class="refresh" @onclick="ClearMulti">Anulează selecția</button></span>
+                        <button type="button" class="refresh act-close" @onclick="ClearMulti">Anulează selecția</button></span>
                 }
             </div>
             <div class="invoice-page-wrap" style="aspect-ratio: @F(pageData.Width) / @F(pageData.Height)">
@@ -357,15 +357,15 @@ else
                 else if (registryLoaded)
                 {
                     <div class="invoice-warning" role="status" id="template-supplier-missing">⚠ Furnizorul nu este în baza de date@(supplierName.Trim().Length > 0 ? " (" + supplierName.Trim() + ")" : ""). Adaugă-l: șablonul se leagă de furnizor, iar numele lui este cel returnat de ANAF sau cel introdus manual.
-                        <button type="button" class="refresh" @onclick="OpenAddSupplier">+ Adaugă furnizorul</button>
-                        @if (similarSupplier is { } nearSupplier) { <span id="template-similar-supplier"> Sau probabil <strong>@nearSupplier.Name</strong>: <button type="button" class="refresh" @onclick="UseSimilarSupplier">Folosește acest furnizor</button></span> }</div>
+                        <button type="button" class="refresh act-confirm" @onclick="OpenAddSupplier">+ Adaugă furnizorul</button>
+                        @if (similarSupplier is { } nearSupplier) { <span id="template-similar-supplier"> Sau probabil <strong>@nearSupplier.Name</strong>: <button type="button" class="refresh act-confirm" @onclick="UseSimilarSupplier">Folosește acest furnizor</button></span> }</div>
                 }
                 @foreach (var problem in problems) { <div class="validation-message" role="alert">@problem</div> }
                 <div class="editor-actions">
                     @if (existing is not null)
                     {
                         <button type="button" class="primary" disabled="@saving" @onclick="() => SaveAsync(asNew: false)">@(saving ? "Se salvează…" : "Salvează")</button>
-                        <button type="button" class="refresh" disabled="@saving" @onclick="OpenSaveAsNew">Salvează ca șablon nou</button>
+                        <button type="button" class="refresh act-confirm" disabled="@saving" @onclick="OpenSaveAsNew">Salvează ca șablon nou</button>
                     }
                     else { <button type="button" class="primary" disabled="@saving" @onclick="() => SaveAsync(asNew: false)">@(saving ? "Se salvează…" : "Salvează șablonul")</button> }
                 </div>
@@ -396,7 +396,7 @@ else
                         <div class="invoice-warning full-width" role="alert">
                             <strong>Eticheta „@InvoiceTemplateDraft.EffectiveLabel(pf)” este deja folosită</strong> de @(same.Count == 1 ? "alt câmp" : $"alte {same.Count} câmpuri") (valoare: @string.Join(", ", same.Select(item => ShortValue(item.Value)))); @(same.Count == 1 ? "este evidențiat" : "sunt evidențiate") pe pagină cu roșu.
                             <div class="invoice-warning-actions">
-                                <button type="button" class="refresh" @onclick="() => UseFreeLabel(pf)">Folosește „@draft.FreeLabelFor(pf)”</button>
+                                <button type="button" class="refresh act-confirm" @onclick="() => UseFreeLabel(pf)">Folosește „@draft.FreeLabelFor(pf)”</button>
                                 <span class="muted">sau scrie o altă etichetă mai sus.</span>
                             </div>
                         </div>

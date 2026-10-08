@@ -11,7 +11,7 @@
 
 <PageTitle>Jurnal activitate · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal activitate</h1><p class="muted">Acțiunile operate în sistem, în ordine cronologică.</p></div>
-    <div class="heading-actions"><a class="refresh" href="@AuditCompleteState.Path">Jurnal complet (toate evenimentele) →</a></div></div>
+    <div class="heading-actions"><a class="refresh act-nav" href="@AuditCompleteState.Path">Jurnal complet (toate evenimentele) →</a></div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 <section class="metrics audit-metrics" aria-label="Rezumat activitate">
     <article><span>Evenimente</span><strong>@(summary is null ? "—" : summary.Total.ToString("N0"))</strong><small>În tot jurnalul</small><i>≡</i></article>

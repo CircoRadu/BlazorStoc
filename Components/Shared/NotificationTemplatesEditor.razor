@@ -16,7 +16,7 @@
     {
         var selected = name == activeCategory;
         <button type="button" role="tab" class="settings-subtab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" disabled="@editing"
-                @onclick="() => SelectCategory(name)">@name (@templates.Count(item => CategoryOf(item) == name))</button>
+                @onclick="() => SelectCategory(name)">@name <span class="count-badge">@templates.Count(item => CategoryOf(item) == name)</span></button>
     }
 </div>
 
@@ -55,7 +55,7 @@
                     <p><b>@ExpiryTemplateRules.RenderSample(input.Subject, selectedSource)</b></p>
                     <p class="notification-body">@ExpiryTemplateRules.RenderSample(input.Body, selectedSource)</p>
                 </div>
-                <div class="editor-actions"><button type="button" class="refresh" @onclick="FillExample">Completează un text-exemplu</button></div>
+                <div class="editor-actions"><button type="button" class="refresh act-confirm" @onclick="FillExample">Completează un text-exemplu</button></div>
             }
             <div class="editor-actions">
                 <button class="primary" type="button" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează șablonul")</button>

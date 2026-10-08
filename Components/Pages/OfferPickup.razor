@@ -15,7 +15,7 @@
 <PageBoundary>
 
 <PageTitle>Preluare ofertă · BlazorStoc</PageTitle>
-<div class="page-heading"><div><p class="eyebrow">OFERTE</p><h1>Preluare ofertă</h1><p class="muted">Un deviz-ofertă Excel (.xlsx) se citește cu un șablon, se leagă de beneficiar, proiect și componentă, iar liniile în bucăți se potrivesc cu produsele din catalog. Același număr de ofertă este o revizie a ofertei existente.</p></div><div class="heading-actions"><a class="refresh" href="/oferte/sabloane">Șabloane de oferte</a></div></div>
+<div class="page-heading"><div><p class="eyebrow">OFERTE</p><h1>Preluare ofertă</h1><p class="muted">Un deviz-ofertă Excel (.xlsx) se citește cu un șablon, se leagă de beneficiar, proiect și componentă, iar liniile în bucăți se potrivesc cu produsele din catalog. Același număr de ofertă este o revizie a ofertei existente.</p></div><div class="heading-actions"><a class="refresh act-nav" href="/oferte/sabloane">Șabloane de oferte</a></div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 
 <div class="settings-tabs" role="tablist" aria-label="Pașii preluării">
@@ -103,14 +103,14 @@ else if (step == 2)
             <span class="relation-check">Alt beneficiar</span>
             <SearchableSelect Id="offer-beneficiary-search" Label="Beneficiar" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
                               Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="id => { SelectBeneficiary(id); return Task.CompletedTask; }" />
-            <button type="button" class="refresh add-related" disabled="@busy" @onclick="() => addingBeneficiary = true">+ Beneficiar nou</button>
+            <button type="button" class="refresh act-confirm add-related" disabled="@busy" @onclick="() => addingBeneficiary = true">+ Beneficiar nou</button>
         </div>
         @if (beneficiaryId is not null && OfferRules.Key(beneficiaryText).Length > 0 && OfferRules.Key(beneficiaryText) != OfferRules.Key(ChosenBeneficiary?.Name))
         {
             <ToggleSwitch @bind-Value="rememberAlias" OnText="Reține denumirea din ofertă pentru oferte viitoare" OffText="Nu reține denumirea din ofertă" AriaLabel="Reține denumirea din ofertă ca denumire alternativă" />
         }
         <div class="editor-actions">
-            <button type="button" class="refresh" disabled="@busy" @onclick="() => step = 1">Înapoi</button>
+            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 1">Înapoi</button>
             <button type="button" class="primary" disabled="@(busy || beneficiaryId is null)" @onclick="ToProjectAsync">Pasul următor</button>
         </div>
     </section>
@@ -140,7 +140,7 @@ else if (step == 3)
         @if (systemTypeId is null) { <small class="form-note">Categoria „@category” nu corespunde niciunui tip de sistem din <a href="/nomenclator">Nomenclator</a> (nici ca denumire alternativă): alege manual sau lasă fără componentă.</small> }
         else if (ComponentNote() is { } note) { <small class="form-note">@note</small> }
         <div class="editor-actions">
-            <button type="button" class="refresh" disabled="@busy" @onclick="() => step = 2">Înapoi</button>
+            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 2">Înapoi</button>
             <button type="button" class="primary" disabled="@(busy || (!newProject && projectId is null) || (newProject && newProjectName.Trim().Length == 0))" @onclick="ToLinesAsync">Pasul următor</button>
         </div>
     </section>
@@ -181,7 +181,7 @@ else if (step == 4)
         }
         </tbody></table></div>
         <div class="editor-actions">
-            <button type="button" class="refresh" disabled="@busy" @onclick="() => step = 3">Înapoi</button>
+            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 3">Înapoi</button>
             <button type="button" class="primary" disabled="@busy" @onclick="ToSummaryAsync">Pasul următor</button>
         </div>
     </section>
@@ -205,7 +205,7 @@ else if (step == 5)
             </div>
         }
         <div class="editor-actions">
-            <button type="button" class="refresh" disabled="@busy" @onclick="() => step = 4">Înapoi</button>
+            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 4">Înapoi</button>
             <button type="button" class="primary" disabled="@busy" @onclick="ImportAsync">@(busy ? "Se preia…" : "Preia oferta")</button>
         </div>
     </section>

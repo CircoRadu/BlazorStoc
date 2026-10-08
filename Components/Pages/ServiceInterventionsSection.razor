@@ -18,7 +18,7 @@
                 <option value="M">Mentenanță</option>
                 <option value="C">La cerere</option>
             </select></label>
-            @if (CanManage) { <button class="refresh" disabled="@Locked" @onclick="OpenAdd">+ Înregistrează intervenție</button> }
+            @if (CanManage) { <button class="refresh act-confirm" disabled="@Locked" @onclick="OpenAdd">+ Înregistrează intervenție</button> }
         </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -52,7 +52,7 @@
                 @if (CanManage)
                 {
                     <td>
-                        <button class="refresh" disabled="@Locked" @onclick="() => OpenEdit(item)">Editează</button>
+                        <button class="refresh act-edit" disabled="@Locked" @onclick="() => OpenEdit(item)">Editează</button>
                         <button class="danger" disabled="@Locked" @onclick="() => OpenDelete(item)">Șterge</button>
                     </td>
                 }

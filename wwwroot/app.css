@@ -222,8 +222,10 @@
 .movement-kind { display:flex; gap:10px; flex-wrap:wrap; }
 .kind-button { display:inline-flex; align-items:center; gap:8px; padding:12px 20px; font-size:14px; font-weight:650; background:white; border:2px solid var(--line); border-radius:8px; color:var(--ink); }
 .kind-button svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
-.kind-in.selected { background:#dff5e3; border-color:#3aa356; color:#1f6f35; }
-.kind-out.selected { background:#fbe7e4; border-color:#c0473c; color:#8d302a; }
+.kind-in.selected { background:#2f9e4f; border-color:#237a3c; color:#fff; }
+.kind-in:not(.selected):hover { border-color:#3aa356; color:#1f6f35; }
+.kind-out.selected { background:#d6453a; border-color:#a8342b; color:#fff; }
+.kind-out:not(.selected):hover { border-color:#c0473c; color:#8d302a; }
 .movement-form-bottom { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; justify-content:space-between; }
 .movement-form-bottom label { flex:0 0 160px; }
 .relation-picker { display:grid; gap:10px; }
@@ -255,7 +257,13 @@
 .movement-summary { font-size:13px; margin:14px 0 0; }
 .movement-history-list { list-style:none; margin:0 0 12px; padding:0; display:grid; gap:12px; font-size:13px; }
 .movement-history-list li { border-left:3px solid var(--line); padding-left:12px; overflow-wrap:anywhere; }
-@media (max-width:900px) { .movement-layout { grid-template-columns:1fr; } .movement-date { flex:1 1 100%; } }
+/* The product card stays in the left column; every other card (stock where, reservations, the movement form) goes under each other in the wide column. */
+.movement-layout { row-gap:0; }
+.movement-layout > .movement-product { grid-column:1; grid-row:1 / span 8; margin-bottom:20px; }
+.movement-layout > :not(.movement-product) { grid-column:2; min-width:0; margin-bottom:20px; }
+.movement-layout > :not(.movement-product):last-child { margin-bottom:0; }
+.movement-form { overflow-x:clip; }
+@media (max-width:900px) { .movement-layout { grid-template-columns:1fr; } .movement-layout > .movement-product { grid-row:auto; } .movement-layout > :not(.movement-product) { grid-column:1; } .movement-date { flex:1 1 100%; } }
 .info-banner { background:#eef4f8; color:#2c5673; border:1px solid #c6d9e6; border-radius:8px; padding:15px 18px; margin-bottom:20px; }
 
 /* Save confirmation (Task 5): summary of fields about to change */
@@ -883,3 +891,122 @@ td.row-actions { white-space:nowrap; text-align:right; }
 .retention-list { max-height: 14rem; overflow-y: auto; margin: .5rem 0; padding-left: 1.2rem; }
 .retention-list li { margin-bottom: .25rem; }
 .retention-list small { display: block; color: var(--muted, #64748b); }
+.movement-form > .editor-actions { margin-bottom:16px; }
+.negative-stock-panel .validation-message { margin-top:8px; }
+
+/* Filters: a bare select must not squeeze the search box (the select's width:100% used to take the whole row). */
+.filters > select { width: auto; flex: 1 1 180px; min-width: 0; }
+.filters > .search-box { flex: 2 1 260px; min-width: 200px; }
+/* Anything placed straight inside a card (not in .catalog-body) keeps the card's side padding, like its heading and body. */
+.catalog > :not(.catalog-heading):not(.catalog-body):not(.filters):not(.settings-tabs):not(.settings-subtabs):not(.table-wrap):not(.table-scroll):not(table):not(.empty-state):not(style):not(script):not(dialog):not(.delete-overlay):not(.modal-backdrop) { margin-left: 24px; margin-right: 24px; }
+.catalog > .file-drop { max-width: min(560px, calc(100% - 48px)); width: auto; }
+.catalog > :last-child:not(.catalog-body):not(.table-wrap):not(table) { margin-bottom: 24px; }
+
+/* Buttons that were plain white are coloured by the kind of action (rule in CLAUDE.md): green = save / add / confirm, blue = refresh / check / test,
+   slate = navigation, amber = edit, red = close / cancel, violet = export. The solid green .primary and red .danger stay for the main / destructive action. */
+.refresh.act-confirm { background:#e0f3e7; border-color:#6fbf8b; color:#145a37; }
+.refresh.act-confirm:hover:not(:disabled) { background:#cdebd8; }
+.refresh.act-reload { background:#e3eefb; border-color:#7fa9dc; color:#1c4a82; }
+.refresh.act-reload:hover:not(:disabled) { background:#d0e2f6; }
+.refresh.act-nav { background:#e9edf4; border-color:#a3afc6; color:#31405c; }
+.refresh.act-nav:hover:not(:disabled) { background:#dbe1ec; }
+.refresh.act-edit { background:#fdeecb; border-color:#dfae45; color:#74500c; }
+.refresh.act-edit:hover:not(:disabled) { background:#fae3a9; }
+.refresh.act-close { background:#fbe3df; border-color:#dd9a92; color:#8a2d26; }
+.refresh.act-close:hover:not(:disabled) { background:#f6d0ca; }
+.refresh.act-export { background:#ede4fa; border-color:#b296de; color:#4a2a82; }
+.refresh.act-export:hover:not(:disabled) { background:#e0d2f5; }
+.refresh[class*="act-"]:disabled { opacity:.55; }
+/* The stock total of a product: a visible pill with its own padding. */
+.movement-stock { display:inline-block; padding:7px 14px; border-radius:7px; font-weight:600; }
+.movement-stock.positive { background:#cfeadb; color:#14573a; }
+.movement-stock.zero { background:#f7e2ad; color:#6f5008; }
+.movement-stock.negative { background:#f6c9c3; color:#8a1f18; }
+.movement-stock.negative strong { color:#8a1f18; }
+
+/* Movement history filters: a text field, chips for the active filters, column labels that open a panel of choices. */
+.movement-filters { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
+.movement-text-filter { flex:1 1 320px; font-size:13px; font-weight:600; }
+.movement-text-filter input { width:100%; margin-top:4px; }
+.movement-filter-chips { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:12px 0 0; }
+.filter-chip { display:inline-flex; align-items:center; gap:6px; background:#e3eefb; border:1px solid #7fa9dc; color:#1c4a82; border-radius:999px; padding:4px 6px 4px 12px; font-size:12px; font-weight:600; }
+.filter-chip-remove { border:0; background:transparent; color:inherit; font-size:15px; line-height:1; cursor:pointer; padding:0 6px; border-radius:50%; }
+.filter-chip-remove:hover { background:#c9dcf3; }
+.movement-column-panel { margin:12px 0 0; padding:12px 14px; border:1px solid #7fa9dc; background:#f3f8fe; border-radius:8px; display:grid; gap:8px; font-size:13px; }
+.movement-column-options { display:flex; flex-wrap:wrap; gap:8px; max-height:180px; overflow-y:auto; }
+.column-option { border:1px solid #c5d3e6; background:white; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:600; color:#31405c; cursor:pointer; }
+.column-option:hover { background:#e9f1fb; }
+.column-option.selected { background:#1c64b8; border-color:#14508f; color:white; }
+.col-filter-button { background:transparent; border:0; padding:0; font:inherit; letter-spacing:inherit; text-transform:inherit; color:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+.col-filter-button:hover, .col-filter-button.open { color:#1c64b8; }
+.col-filter-button.active { color:#1c64b8; text-decoration:underline; text-underline-offset:3px; }
+.col-filter-caret { font-size:11px; }
+
+/* Text must never touch the edge of its box: a collapsible card gets padding on its summary, small pills a little more room. */
+details.catalog > summary { padding: 16px 0; cursor: pointer; }
+.destination-label { padding: 4px 10px; }
+.alias-chip { padding: 4px 10px; }
+.stock-badge, .notification-state { padding-top: 5px; padding-bottom: 5px; }
+
+.audit-filter-link.filter-hint { margin-left: 4px; font-size: 11px; opacity: .55; text-decoration: none; }
+.audit-filter-link.filter-hint:hover, .audit-filter-link.filter-hint:focus-visible { opacity: 1; }
+.audit-filter-link.destination-label { border: 0; cursor: pointer; }
+.movement-filters { padding: 0 0 14px; }
+
+/* The count of a set (tabs, section titles) is a small badge, like the one of a card heading - never "(3)" in parentheses (rule in CLAUDE.md). */
+.count-badge { display:inline-block; font-size:11px; font-weight:700; line-height:1; padding:4px 7px; margin-left:6px; background:#eef3ef; color:#748a7e; border-radius:5px; vertical-align:middle; }
+.settings-tab.active .count-badge, .settings-subtab.active .count-badge { background:#d8efe7; color:var(--green); }
+h3 .count-badge, h2 .count-badge { font-size:11px; }
+/* A row that holds a name and a badge, or a button and a note: they never touch. */
+.work-point-badge { margin-left:10px; }
+td.work-point-actions { white-space:normal; }
+td.work-point-actions > * { margin-right:10px; }
+td.work-point-actions > small { display:inline-block; }
+
+/* "Ștergerea notificărilor rezolvate": the switch on its own row, the period under it, a short input. */
+.purge-grid { display:grid; grid-template-columns:1fr; gap:16px; max-width:460px; padding:4px 0 8px; }
+.purge-grid .purge-months input { max-width:160px; margin-top:6px; }
+
+/* Whatever follows a row of action buttons (a note, a heading, a card) starts a little lower: nothing sits against the buttons (rule in CLAUDE.md). */
+.editor-actions + :not(.editor-actions):not(.delete-overlay):not(script):not(style) { margin-top: 18px; }
+.editor-actions + h2, .editor-actions + h3 { margin-top: 28px; }
+.editor-actions + h2:not(.editor-actions):not(.delete-overlay):not(script):not(style), .editor-actions + h3:not(.editor-actions):not(.delete-overlay):not(script):not(style) { margin-top: 28px; }
+
+.anaf-usage { display:inline-block; font-size:11px; font-weight:700; padding:4px 8px; border-radius:5px; white-space:nowrap; }
+.anaf-usage.used { background:#e0f3e7; color:#145a37; }
+.anaf-usage.info { background:#eef1f4; color:#5c6b78; }
+
+/* One font for the forms: labels, fields, switches and the lists of choices are 14 px (switch state words 13 px, buttons 13 px). */
+.workspace input:not([type=checkbox]):not([type=radio]), .workspace select, .workspace textarea { font-size: 14px; }
+.row-toggle.labelled, .row-toggle-label { font-size: 14px; }
+.row-toggle-text { font-size: 13px; }
+.searchable-select-list li { font-size: 14px; }
+.workspace button, .workspace .refresh, .workspace .primary, .workspace .danger { font-size: 13px; }
+/* A list of choices (beneficiary, product ...) opens over the rest of the card instead of being cut by it. */
+.catalog:has(.searchable-select), .catalog.exit-operation { overflow: visible; }
+.exit-operation .table-scroll, .catalog:has(.searchable-select) .table-scroll { overflow: visible; }
+.searchable-select { position: relative; }
+.searchable-select-list { z-index: 80; }
+
+/* A fieldset used only to disable what it holds draws no frame (the default black border is never wanted). */
+fieldset:not([class]) { border: 0; padding: 0; margin: 0; min-width: 0; }
+/* The search box: a magnifier drawn the same everywhere, centred with the text, and a text that starts after a clear gap. */
+.search-box { display: flex; align-items: center; gap: 10px; padding: 0 14px; }
+.search-box > span { flex: 0 0 18px; width: 18px; height: 18px; font-size: 0; line-height: 0; color: #8c9b95; background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5 21 21'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5 21 21'/%3E%3C/svg%3E") center / contain no-repeat; }
+.search-box:focus-within > span { color: var(--green); }
+.search-box input { flex: 1 1 auto; min-width: 0; width: auto; padding: 11px 0; font-size: 14px; background: transparent; }
+
+/* The two switches of an options bar sit on one line, centred on each other (the generic card spacing must not push one of them down). */
+.catalog.inventory-options { align-items: center; }
+.catalog.inventory-options > * { margin: 0 !important; }
+.empty-state .file-drop { margin: 18px auto 0; text-align: left; }
+
+/* The sub-items of a category in the menu start below the category, with room between them. */
+.category-submenu { margin-top: 8px; gap: 5px; }
+
+/* Buttons side by side are always the same height (rule in CLAUDE.md): 40 px, 32 px inside table rows; a glyph inside a button never makes it taller. */
+.primary, .danger, .refresh, .secondary, .reload { box-sizing: border-box; height: 40px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1.15; padding-top: 0; padding-bottom: 0; white-space: nowrap; }
+.primary > *, .danger > *, .refresh > *, .secondary > * { line-height: 1; }
+td .primary, td .danger, td .refresh, td .secondary, .table-scroll .primary, .table-scroll .danger, .table-scroll .refresh { height: 32px; min-height: 32px; }

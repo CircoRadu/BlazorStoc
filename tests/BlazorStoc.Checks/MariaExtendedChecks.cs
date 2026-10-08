@@ -402,6 +402,15 @@ public static class MariaExtendedChecks
             var withInvoice = await movements.GetPageAsync(product.Id, new StockMovementQuery(StockMovementKind.Entry, PageSize: 50, Source: EntrySource.WithInvoice));
             var onlyFree = await movements.GetPageAsync(product.Id, new StockMovementQuery(StockMovementKind.Entry, PageSize: 50, Source: EntrySource.Free));
             var bySupplier = await movements.GetPageAsync(product.Id, new StockMovementQuery(StockMovementKind.Entry, PageSize: 50, SupplierId: a.Id));
+            var byText = await movements.GetPageAsync(product.Id, new StockMovementQuery(PageSize: 50, Text: bySupplier.Items.First().SupplierName));
+            var byWildcard = await movements.GetPageAsync(product.Id, new StockMovementQuery(PageSize: 50, Text: "%"));
+            var byNothing = await movements.GetPageAsync(product.Id, new StockMovementQuery(PageSize: 50, Text: "text-care-nu-exista-nicaieri"));
+            var dayOfEntry = bySupplier.Items.First().Date;
+            var byDay = await movements.GetPageAsync(product.Id, new StockMovementQuery(PageSize: 50, Date: dayOfEntry));
+            var byOtherDay = await movements.GetPageAsync(product.Id, new StockMovementQuery(PageSize: 50, Date: new DateOnly(2001, 1, 1)));
+            Check(byDay.TotalCount > 0 && byDay.Items.All(item => item.Date == dayOfEntry) && byOtherDay.TotalCount == 0, "Movement list: the date filter returns only the movements of that day");
+            Check(byText.TotalCount >= bySupplier.TotalCount && bySupplier.TotalCount > 0 && byWildcard.TotalCount == 0 && byNothing.TotalCount == 0 && (await movements.GetPageAsync(product.Id, new StockMovementQuery(PageSize: 50, Text: "  "))).TotalCount == (await movements.GetPageAsync(product.Id, new StockMovementQuery(PageSize: 50))).TotalCount,
+                "Movement list: the text filter finds the movements by supplier name, takes % literally, and a blank text filters nothing");
             Check(withInvoice.Items.Count == 1 && withInvoice.TotalCount == 1 && onlyFree.Items.Count == 1 && !onlyFree.Items[0].HasInvoice && bySupplier.Items.Count == 1
                   && withInvoice.Suppliers is { Count: 1 } && withInvoice.Suppliers[0].Id == a.Id, "The entry filters (with invoice / free / by supplier) and the supplier list work");
             var movementEdit = StockMovementInput.From(linked.Movement); movementEdit.Quantity = 4; movementEdit.Reason = "Ext corectie cantitate";

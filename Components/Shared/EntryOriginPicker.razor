@@ -9,7 +9,7 @@
         <button type="button" role="tab" class="settings-tab @(origin == Origin.Free ? "active" : "")" aria-selected="@(origin == Origin.Free)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Free)">Intrare liberă</button>
         <button type="button" role="tab" class="settings-tab @(origin == Origin.Existing ? "active" : "")" aria-selected="@(origin == Origin.Existing)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Existing)">Factură existentă</button>
         <button type="button" role="tab" class="settings-tab @(origin == Origin.New ? "active" : "")" aria-selected="@(origin == Origin.New)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.New)">Factură nouă (manual)</button>
-        <a class="refresh origin-pdf" href="/produse/preluare-factura">Preia din PDF</a>
+        <a class="refresh act-confirm origin-pdf" href="/produse/preluare-factura">Preia din PDF</a>
     </div>
     @if (origin == Origin.Free)
     {

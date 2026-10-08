@@ -18,7 +18,7 @@
             <div class="editor-grid">
                 <label for="contract-number">Număr / dată contract *<InputTextLive id="contract-number" @bind-Value="input.NumberText" maxlength="60" autocomplete="off" placeholder="26/23.09.2025" /><small>Se acceptă 26/23.09.2025, 26 / 23.09.2025 sau 26 din 23.09.2025; se afișează ca număr/dată.</small></label>
                 <label for="contract-cycle">Ciclicitate (luni) *<select id="contract-cycle" @bind="input.CycleMonths">@for (var months = ServiceContractRules.MinimumCycle; months <= ServiceContractRules.MaximumCycle; months++) { <option value="@months">@ServiceContractRules.CycleText(months)</option> }</select><small>Ciclicitatea globală a contractului; fiecare punct o poate înlocui cu una proprie.</small></label>
-                <label for="contract-valid-until">Valabil până la (opțional)<span class="valid-until-field"><PickOnlyDate Id="contract-valid-until" @bind-Value="input.ValidUntil" Min="@ValidUntilMin" Disabled="saving" /><button type="button" class="refresh" disabled="@(input.ValidUntil is null)" @onclick="ClearValidUntil">Fără termen</button></span><small>Data de expirare a contractului; fără ea contractul nu are termen. Nu oprește singură mentenanța.</small></label>
+                <label for="contract-valid-until">Valabil până la (opțional)<span class="valid-until-field"><PickOnlyDate Id="contract-valid-until" @bind-Value="input.ValidUntil" Min="@ValidUntilMin" Disabled="saving" /><button type="button" class="refresh act-nav" disabled="@(input.ValidUntil is null)" @onclick="ClearValidUntil">Fără termen</button></span><small>Data de expirare a contractului; fără ea contractul nu are termen. Nu oprește singură mentenanța.</small></label>
                 <label for="contract-notes" class="full-width">Observații<textarea id="contract-notes" rows="3" maxlength="@ServiceContractInput.NotesMaximumLength" @bind="input.Notes" @bind:event="oninput"></textarea></label>
             </div>
 
@@ -31,7 +31,7 @@
             {
                 <div class="contract-global-date">
                     <label for="contract-global-due">Data primei intervenții (pentru mai multe puncte deodată)<PickOnlyDate Id="contract-global-due" @bind-Value="globalDue" Disabled="saving" /></label>
-                    <button type="button" class="refresh" disabled="@(globalDue is null)" @onclick="ApplyGlobalDue">Aplică tuturor punctelor bifate</button>
+                    <button type="button" class="refresh act-confirm" disabled="@(globalDue is null)" @onclick="ApplyGlobalDue">Aplică tuturor punctelor bifate</button>
                 </div>
                 <p class="form-note">Data primei intervenții este scadența inițială (prima vizită planificată), nu data de la care se numără ciclul. Ciclicitatea individuală, dacă o alegi, înlocuiește ciclicitatea contractului pentru punctul respectiv.</p>
                 <div class="table-scroll"><table class="contract-points-table"><thead><tr><th></th><th>PUNCT DE LUCRU</th><th>STARE</th><th>PRIMA INTERVENȚIE / SCADENȚA CURENTĂ</th><th>CICLICITATE INDIVIDUALĂ</th></tr></thead><tbody>

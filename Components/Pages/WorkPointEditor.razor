@@ -26,7 +26,7 @@
                 }
                 <label for="work-point-contact">Persoană de contact<InputTextLive id="work-point-contact" @bind-Value="input.ContactPerson" maxlength="200" autocomplete="off" /><ValidationMessage For="() => input.ContactPerson" /></label>
                 <label for="work-point-description" class="full-width">Descriere<textarea id="work-point-description" rows="4" maxlength="@WorkPointInput.DescriptionMaximumLength" @bind="input.Description" @bind:event="oninput"></textarea><small>Text liber despre punctul de lucru (acces, echipamente, particularități). Cel mult @WorkPointInput.DescriptionMaximumLength de caractere.</small><ValidationMessage For="() => input.Description" /></label>
-                <label class="check-label full-width" for="work-point-use-coordinates"><input id="work-point-use-coordinates" type="checkbox" role="switch" @bind="input.UseCoordinates" /> Coordonate (opțional)</label>
+                <ToggleSwitch Class="full-width" Id="work-point-use-coordinates" @bind-Value="input.UseCoordinates" OnText="Activ" OffText="Inactiv">Coordonate (opțional)</ToggleSwitch>
                 @if (input.UseCoordinates)
                 {
                     <label for="work-point-coordinates" class="full-width">Latitudine, longitudine<InputTextLive id="work-point-coordinates" @bind-Value="input.CoordinatesText" maxlength="60" autocomplete="off" placeholder="45.7489, 21.2087" /><small>Poți lipi coordonatele copiate dintr-o hartă (de exemplu 45.7489, 21.2087). Latitudinea este între -90 și 90, longitudinea între -180 și 180. Cu comutatorul oprit, punctul rămâne fără coordonate.</small><ValidationMessage For="() => input.CoordinatesText" /></label>

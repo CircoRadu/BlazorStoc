@@ -18,7 +18,7 @@
                 </select></label>
             <button type="button" class="primary" disabled="@(busy || chosenType is null)" @onclick="AddAsync">Adaugă componenta</button>
             <ToggleSwitch @bind-Value="showArchived" OnText="Arată și arhivate" OffText="Doar active" AriaLabel="Arată componentele arhivate" />
-            <a class="refresh" href="@($"/proiecte/{ProjectId}/situatie")">Situația proiectului</a>
+            <a class="refresh act-nav" href="@($"/proiecte/{ProjectId}/situatie")">Situația proiectului</a>
         </div>
         @if (Visible.Count == 0)
         {
@@ -91,7 +91,7 @@
                     <InputTextArea id="component-archive-reason" @bind-Value="archiveReason" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@busy" /></label>
                 <div class="editor-actions">
                     <button type="button" class="danger" disabled="@busy" @onclick="ArchiveAsync">@(busy ? "Se salvează…" : pendingExits.Count > 0 ? "Lămurește și scoate componenta" : "Scoate componenta")</button>
-                    <button type="button" class="refresh" disabled="@busy" @onclick="() => archiving = null">Renunț</button>
+                    <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => archiving = null">Renunț</button>
                 </div>
             </section>
         </div>

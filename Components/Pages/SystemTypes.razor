@@ -35,8 +35,8 @@
             var position = index;
             <tr @key="type.Id" class="@(type.Active ? "" : "inactive-row")" id="@($"system-type-{type.Id}")">
                 <td>
-                    <button type="button" class="row-action" aria-label="@($"Mută {type.Name} mai sus")" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(type, -1)">▲</button>
-                    <button type="button" class="row-action" aria-label="@($"Mută {type.Name} mai jos")" disabled="@(busy || position == types.Count - 1)" @onclick="() => MoveAsync(type, 1)">▼</button>
+                    <button type="button" class="row-action" aria-label="@($"Mută {type.Name} mai sus")" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(type, -1)" title="@($"Mută {type.Name} mai sus")">▲</button>
+                    <button type="button" class="row-action" aria-label="@($"Mută {type.Name} mai jos")" disabled="@(busy || position == types.Count - 1)" @onclick="() => MoveAsync(type, 1)" title="@($"Mută {type.Name} mai jos")">▼</button>
                 </td>
                 <td>
                     @if (renamingId == type.Id)
@@ -44,7 +44,7 @@
                         <form @onsubmit="() => RenameAsync(type)" @onsubmit:preventDefault>
                             <input aria-label="@($"Denumirea nouă a tipului {type.Name}")" maxlength="@SystemTypeRules.NameMaximumLength" disabled="@busy" @bind="renameText" @bind:event="oninput" />
                             <button type="submit" class="primary" disabled="@busy">Salvează</button>
-                            <button type="button" class="refresh" disabled="@busy" @onclick="() => renamingId = null">Renunț</button>
+                            <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => renamingId = null">Renunț</button>
                         </form>
                     }
                     else
@@ -56,11 +56,12 @@
                 <td>
                     @foreach (var alias in type.Aliases)
                     {
-                        <span class="alias-chip">@alias <button type="button" class="alias-remove" aria-label="@($"Șterge denumirea alternativă {alias}")" disabled="@busy" @onclick="() => RemoveAliasAsync(type, alias)">×</button></span>
+                        <span class="alias-chip">@alias <button type="button" class="alias-remove" aria-label="@($"Șterge denumirea alternativă {alias}")" disabled="@busy" @onclick="() => RemoveAliasAsync(type, alias)" title="@($"Șterge denumirea alternativă {alias}")">×</button></span>
                     }
                     <form class="alias-add" @onsubmit="() => AddAliasAsync(type)" @onsubmit:preventDefault>
                         <input aria-label="@($"Denumire alternativă pentru {type.Name}")" placeholder="+ denumire alternativă" maxlength="@SystemTypeRules.NameMaximumLength" disabled="@busy"
                                value="@AliasText(type.Id)" @oninput="args => aliasTexts[type.Id] = args.Value?.ToString() ?? string.Empty" />
+                        <button type="submit" class="refresh act-confirm" aria-label="@($"Adaugă denumirea alternativă pentru {type.Name}")" disabled="@(busy || string.IsNullOrWhiteSpace(AliasText(type.Id)))">Adaugă</button>
                     </form>
                 </td>
                 <td><ToggleSwitch Compact Value="type.Active" ValueChanged="value => SetActiveAsync(type, value)" Disabled="busy" AriaLabel="@($"Activ: {type.Name}")" /></td>

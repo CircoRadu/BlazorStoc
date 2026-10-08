@@ -135,7 +135,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `backup_settings` WRITE;
 /*!40000 ALTER TABLE `backup_settings` DISABLE KEYS */;
-REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'11:10','2026-10-08',2,1,7,NULL,NULL,'administrator.demo','2026-10-08T09:18:43.695Z',1,'',NULL,0,127);
+REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'02:00','2026-10-08',2,1,7,NULL,NULL,'administrator.demo','2026-10-08T10:08:02.481Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
 /*!40000 ALTER TABLE `backup_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -147,7 +147,8 @@ REPLACE INTO `beneficiaries` (`id`, `name`, `normalized_name`, `cui`, `normalize
 (4,'ELECTRIC STANDARD PREST SRL','ELECTRIC STANDARD PREST SRL','RO9178894','9178894','PJ','JUD. HUNEDOARA, ORS. SIMERIA, STR. LIBERTATII, NR.39','0254261787','J1997000089209','335900','7112',1,0),
 (5,'Ion Paun','ION PAUN','','PF:ION PAUN','PF','Strada Pacii 5, Deva','0744123456','','','',0,0),
 (6,'TELESYSTEM SRL','TELESYSTEM SRL','RO22460883','22460883','PJ','JUD. BACAU, MUN. BACAU, CAL. MARASESTI, NR.110, SC.C, ET.1, AP.7','0334418118','J2007001650049','600073','8009',1,0),
-(7,'Maria Popescu','MARIA POPESCU','','PF:MARIA POPESCU','PF','Strada Florilor 3, Deva','0733111222','','','',0,0);
+(7,'Maria Popescu','MARIA POPESCU','','PF:MARIA POPESCU','PF','Strada Florilor 3, Deva','0733111222','','','',0,0),
+(8,'COMUNA VETEL','COMUNA VETEL','4374105','4374105','PJ','JUD. HUNEDOARA, SAT VETEL COM. VETEL, STR. MIHAI EMINESCU, NR.256','0254237733','','337525','',1,0);
 /*!40000 ALTER TABLE `beneficiaries` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -164,7 +165,8 @@ REPLACE INTO `beneficiary_work_points` (`id`, `beneficiary_id`, `name`, `address
 (4,4,'Punct de lucru principal','JUD. HUNEDOARA, ORS. SIMERIA, STR. LIBERTATII, NR.39','JUDETUL HUNEDOARA ORASUL SIMERIA STRADA LIBERTATII 39','0254261787','',0,'',1,NULL,NULL,4),
 (5,5,'Punct de lucru principal','Strada Pacii 5, Deva','STRADA PACII 5 DEVA','0744123456','',0,'',1,NULL,NULL,5),
 (6,6,'Punct de lucru principal','JUD. BACAU, MUN. BACAU, CAL. MARASESTI, NR.110, SC.C, ET.1, AP.7','JUDETUL BACAU MUNICIPIUL BACAU CAL MARASESTI 110 SCARA C ETAJ 1 APARTAMENT 7','0334418118','',0,'',1,NULL,NULL,6),
-(7,7,'Punct de lucru principal','Strada Florilor 3, Deva','STRADA FLORILOR 3 DEVA','0733111222','',0,'',1,NULL,NULL,7);
+(7,7,'Punct de lucru principal','Strada Florilor 3, Deva','STRADA FLORILOR 3 DEVA','0733111222','',0,'',1,NULL,NULL,7),
+(8,8,'Punct de lucru principal','JUD. HUNEDOARA, SAT VETEL COM. VETEL, STR. MIHAI EMINESCU, NR.256','JUDETUL HUNEDOARA SAT VETEL COMUNA VETEL STRADA MIHAI EMINESCU 256','0254237733','',0,'',1,NULL,NULL,8);
 /*!40000 ALTER TABLE `beneficiary_work_points` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -183,7 +185,7 @@ UNLOCK TABLES;
 LOCK TABLES `expiry_notifications` WRITE;
 /*!40000 ALTER TABLE `expiry_notifications` DISABLE KEYS */;
 REPLACE INTO `expiry_notifications` (`id`, `template_id`, `source_key`, `object_id`, `expiry_date`, `created_utc`, `acknowledged_by`, `acknowledged_utc`, `snooze_until`, `snooze_days`, `version`, `resolved_by`, `resolved_utc`, `resolved_reason`, `resolved_auto`, `object_label`, `snapshot_values`, `snapshot_subject`, `snapshot_body`, `snapshot_source`) VALUES (1,1,'vehicul.itp',1,'2026-10-15','2026-09-30T10:21:03.873Z','administrator.demo','2026-09-30T10:40:51.531Z',NULL,NULL,1,NULL,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL),
-(2,7,'stoc.iesiri-peste-stoc',8,'2026-10-08','2026-10-08T08:47:09.682Z',NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,'Stoc negativ la Disc diamantat 230 mm, ieșiri peste stoc din 24.09.2026','{\"produs\":\"Disc diamantat 230 mm\",\"data prima iesire\":\"24.09.2026\",\"numar iesiri\":\"1\",\"cauza\":\"necunoscut\\u0103\"}',NULL,NULL,NULL);
+(2,7,'stoc.iesiri-peste-stoc',8,'2026-10-08','2026-10-08T08:47:09.682Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-08T11:31:57.186Z','Stocul produsului nu mai este negativ (intrare operată sau stoc regularizat).',1,'Stoc negativ la Disc diamantat 230 mm, ieșiri peste stoc din 24.09.2026','{\"produs\":\"Disc diamantat 230 mm\",\"data prima iesire\":\"24.09.2026\",\"numar iesiri\":\"1\",\"cauza\":\"necunoscut\\u0103\"}','Ieșiri peste stoc nerezolvate – Disc diamantat 230 mm','Produsul Disc diamantat 230 mm are stoc negativ după 1 ieșiri peste stoc, prima din 24.09.2026 (cauza: necunoscută). Regularizarea era așteptată până la 08.10.2026 (zile rămase: 0; zile de depășire: 0).','Stoc · Ieșiri peste stoc nerezolvate');
 /*!40000 ALTER TABLE `expiry_notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -216,6 +218,7 @@ REPLACE INTO `notification_template_seeds` (`source_key`, `seeded_utc`) VALUES (
 ('mentenanta.scadenta','2026-10-08T08:47:08.955Z'),
 ('proiect.deficit-termen','2026-10-08T08:47:08.984Z'),
 ('sistem.backup-lipsa','2026-10-08T08:47:08.988Z'),
+('sistem.ceas-server-decalat','2026-10-08T10:05:36.723Z'),
 ('sistem.copie-nas-lipsa','2026-10-08T08:47:08.991Z'),
 ('stoc.iesiri-peste-stoc','2026-10-08T08:47:08.971Z'),
 ('stoc.rezervare-fara-miscare','2026-10-08T08:47:08.981Z'),
@@ -239,7 +242,8 @@ REPLACE INTO `notification_templates` (`id`, `source_key`, `subject`, `body`, `t
 (9,'stoc.rezervare-fara-miscare','Rezervare fără mișcare – <produs>','Proiectul <proiect> ține rezervate <cantitate rezervata> buc. din <produs> fără nicio mișcare de peste 30 de zile. Revizuirea era așteptată până la <data expirare> (zile de depășire: <zile depasire>).',1,1,0,'stoc.rezervare-fara-miscare'),
 (10,'proiect.deficit-termen','Deficit la proiectul <proiect>','Proiectul <proiect> are termen la <termen proiect> și încă <numar repere de achizitionat> repere de achiziționat (vezi lista de achiziție din situația proiectului). Zile rămase: <zile ramase>; zile de depășire: <zile depasire>.',14,1,0,'proiect.deficit-termen'),
 (11,'sistem.backup-lipsa','Backup lipsă – ultimul: <ultimul backup>','Nu s-a făcut niciun backup de peste <vechime maxima> zile. Ultimul backup: <ultimul backup>. Ultima eroare: <ultima eroare backup>. Verifică Setări → Backup NAS și programarea zilnică.',1,1,0,'sistem.backup-lipsa'),
-(12,'sistem.copie-nas-lipsa','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: <ultima copiere>. Cauza: <cauza copiere>. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.',1,1,0,'sistem.copie-nas-lipsa');
+(12,'sistem.copie-nas-lipsa','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: <ultima copiere>. Cauza: <cauza copiere>. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.',1,1,0,'sistem.copie-nas-lipsa'),
+(13,'sistem.ceas-server-decalat','Ceasul serverului este decalat','Ceasul serverului este <decalaj ceas> față de ora de pe internet (constatat: <constatat ceas>). Backup-urile iau ora de pe internet, iar ștergerea automată a pachetelor vechi este oprită până la corectare. Verifică data și ora serverului.',1,1,0,'sistem.ceas-server-decalat');
 /*!40000 ALTER TABLE `notification_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -250,6 +254,16 @@ UNLOCK TABLES;
 
 LOCK TABLES `offer_lines` WRITE;
 /*!40000 ALTER TABLE `offer_lines` DISABLE KEYS */;
+REPLACE INTO `offer_lines` (`id`, `offer_id`, `line_order`, `section`, `number`, `product_type`, `name`, `name_key`, `unit`, `quantity`, `in_stock`, `product_id`) VALUES (1,1,1,'Echipamente','1','CENTRALA CONTROL ACCES','Datele de comunicare sunt criptate pentru a imbunatati siguranta sistemului. Interfata RS485 si Wiegand (W26/W34), compatibilitate cu cititoare terta parte. \nControlerul suporta operatiuni offline. Dispune de un tamper pentru siguranta sporita. Posibilitate de alimentare back-up cu acumulator.','dateledecomunicaresuntcriptatepentruaimbunatatisigurantasistemuluiinterfatars485siwiegandw26w34compatibilitatecucititoaretertapartecontrolerulsuportaoperatiuniofflinedispunedeuntamperpentrus','Buc',1.000,1,NULL),
+(2,1,2,'Echipamente','2','CITITOARE CONTROL ACCES','Producator HIKVISION, Cartele suportate MIFARE 13.56MHz, Alimentare:12VDC ± 25%\nConsum max. 1.6W, Conectivitate Wiegand 26/34 protocol\nDistanta de citire max. 50mm, Timp citire max. 300 ms\nTemperatura de functionare:-20-65°C, IP65\nDimensiuni:87 × 87 × 13.3mm\nAlte caracteristici:Led si Beeper incorporate\nStandard Radiofrecventa:ISO 14443-A\nTastatura	12 butoane (0~9,*,#)','producatorhikvisioncartelesuportatemifare1356mhzalimentare12vdc25consummax16wconectivitatewiegand2634protocoldistantadecitiremax50mmtimpcitiremax300mstemperaturadefunctionare2065cip65dimensi','Buc',2.000,1,NULL),
+(3,1,3,'Echipamente','3','ELECTROMAGNETI','Electromagnet de 280 Kgf cu monitorizare, bobina din CUPRU 100%, montare aparenta.','electromagnetde280kgfcumonitorizarebobinadincupru100montareaparenta','Buc',2.000,1,NULL),
+(4,1,4,'Echipamente','4','ELECTROMAGNETI','Suport inoxidabil ZL pt. electromagnet\nSuport inoxidabil din duraluminiu pentru montarea electromagnetilor la usi cu deschidere in interior.\nElectromagnetul se monteaza deasupra usii, in interior, folosind suportul L. Contraplaca se monteaza pe usa, la nivelul electromagnetului, folosind suportul Z.','suportinoxidabilzlptelectromagnetsuportinoxidabildinduraluminiupentrumontareaelectromagnetilorlausicudeschidereininteriorelectromagnetulsemonteazadeasuprausiiininteriorfolosindsuportullcontr','Buc',2.000,1,NULL),
+(5,1,5,'Echipamente','5','BUTON','Buton de iesire din plastic folosit in instalatii de control acces. Include baza.','butondeiesiredinplasticfolositininstalatiidecontrolaccesincludebaza','Buc',2.000,1,NULL),
+(6,1,6,'Echipamente','6','BUTON','Buton de urgenta verde cu geam din sticla','butondeurgentaverdecugeamdinsticla','Buc',2.000,1,NULL),
+(7,1,7,'Echipamente','7','CABLURI','Cablu FTP cat5E, LSZH, 4x2x0,49mm, 100% cupru solid, ecran general cu folie AL, manta exterioara LSZH, culoare albastru, clasa de reactie la foc conform EN50575-2014 : Eca, diametru exterior 6,0mm, cutii unreel de 305m, CE, RoHS, cod EAN 5949022105520, FLUKE PASS','cabluftpcat5elszh4x2x049mm100cuprusolidecrangeneralcufoliealmantaexterioaralszhculoarealbastruclasadereactielafocconformen505752014ecadiametruexterior60mmcutiiunreelde305mcerohscodean5949022','Metru',150.000,0,NULL),
+(8,1,8,'Echipamente','8','CANAL CABLU','Canal Cablu cu Banda Adeziva 20x10mm','canalcablucubandaadeziva20x10mm','Buc',20.000,1,NULL),
+(9,1,9,'Echipamente','9','CANAL CABLU','Tag de proximitate MIFARE (13.56MHz)\nDimensiuni: 34x28x7 mm\nCuloare: gri sau albastru','tagdeproximitatemifare1356mhzdimensiuni34x28x7mmculoaregrisaualbastru','Buc',15.000,1,NULL),
+(10,1,10,'Echipamente','10','DIVERSE','Material marunt de instalare','materialmaruntdeinstalare','Buc',1.000,1,NULL);
 /*!40000 ALTER TABLE `offer_lines` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -261,6 +275,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `offers` WRITE;
 /*!40000 ALTER TABLE `offers` DISABLE KEYS */;
+REPLACE INTO `offers` (`id`, `number`, `number_key`, `revision`, `title`, `category`, `beneficiary_id`, `project_id`, `system_type_id`, `template_id`, `file_name`, `created_by`, `created_utc`) VALUES (1,'250700006','250700006',1,'Oferta sistem controla acces','CA',8,6,2,1,'RaportOferta CA.xlsx','administrator.demo','2026-10-08T11:43:16.042Z');
 /*!40000 ALTER TABLE `offers` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -289,7 +304,7 @@ REPLACE INTO `products` (`id`, `category_id`, `subcategory_id`, `name`, `normali
 (5,4,5,'Telemetru laser','TELEMETRU LASER','Domeniu 0,2–50 m · husa inclusa',0,0),
 (6,5,6,'Set chei combinate','SET CHEI COMBINATE','12 piese · dimensiuni 8–19 mm',7,0),
 (7,2,7,'Manusi de lucru','MANUSI DE LUCRU','Marimea 10 · acoperire nitril',52,0),
-(8,3,2,'Disc diamantat 230 mm','DISC DIAMANTAT 230 MM','Pentru beton si zidarie',-2,0),
+(8,3,2,'Disc diamantat 230 mm','DISC DIAMANTAT 230 MM','Pentru beton si zidarie',0,0),
 (9,4,8,'Nivela cu bula 60 cm','NIVELA CU BULA 60 CM','Corp aluminiu · trei fiole',5,0),
 (10,1,1,'Ciocan rotopercutor SDS Plus','CIOCAN ROTOPERCUTOR SDS PLUS','Putere 800 W · energie de impact 2,7 J',2,0),
 (12,5,6,'Diblu nylon 8 × 40 test 22','DIBLU NYLON 8 × 40 TEST 22','Pentru fixari in zidarie si polistiren si BCA',148,8),
@@ -304,7 +319,8 @@ UNLOCK TABLES;
 
 LOCK TABLES `project_components` WRITE;
 /*!40000 ALTER TABLE `project_components` DISABLE KEYS */;
-REPLACE INTO `project_components` (`id`, `project_id`, `system_type_id`, `state`, `archived_utc`, `archive_reason`, `version`, `created_utc`, `updated_utc`) VALUES (1,2,1,1,NULL,NULL,0,'2026-10-07T12:38:10.059Z','2026-10-07T12:38:10.059Z');
+REPLACE INTO `project_components` (`id`, `project_id`, `system_type_id`, `state`, `archived_utc`, `archive_reason`, `version`, `created_utc`, `updated_utc`) VALUES (1,2,1,1,NULL,NULL,0,'2026-10-07T12:38:10.059Z','2026-10-07T12:38:10.059Z'),
+(2,6,2,1,NULL,NULL,0,'2026-10-08T11:43:16.033Z','2026-10-08T11:43:16.033Z');
 /*!40000 ALTER TABLE `project_components` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -332,7 +348,8 @@ UNLOCK TABLES;
 LOCK TABLES `projects` WRITE;
 /*!40000 ALTER TABLE `projects` DISABLE KEYS */;
 REPLACE INTO `projects` (`id`, `beneficiary_id`, `name`, `normalized_name`, `observations`, `version`, `created_utc`, `updated_utc`) VALUES (2,2,'Instalare TVCI Barcea','INSTALARE TVCI BARCEA','',0,'2026-09-24T13:27:12.7227815Z','2026-09-24T13:27:12.7227815Z'),
-(5,7,'Renovare casa Deva','RENOVARE CASA DEVA','',0,'2026-09-29T11:53:32.418Z','2026-09-29T11:53:32.418Z');
+(5,7,'Renovare casa Deva','RENOVARE CASA DEVA','',0,'2026-09-29T11:53:32.418Z','2026-09-29T11:53:32.418Z'),
+(6,8,'Oferta sistem controla acces','OFERTA SISTEM CONTROLA ACCES','',0,'2026-10-08T11:43:16.015Z','2026-10-08T11:43:16.015Z');
 /*!40000 ALTER TABLE `projects` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -405,7 +422,8 @@ REPLACE INTO `stock_movements` (`id`, `product_id`, `beneficiary_id`, `quantity`
 (43,24,NULL,1,'2026-10-06T12:21:33.429Z',NULL,1,'2026-10-06','105.2 RON factura 111094321 din data 22.09.2026 SC TELESYSTEM SRL','administrator.demo',0,'2026-10-06T12:21:33.429Z',NULL,NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL),
 (44,20,NULL,5,'2026-10-06T12:23:17.747Z',NULL,1,'2026-10-06','168.2 RON factura 111094321 din data 22.09.2026 SC TELESYSTEM SRL','administrator.demo',0,'2026-10-06T12:23:17.747Z',NULL,NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL),
 (45,21,NULL,1,'2026-10-06T12:23:17.752Z',NULL,1,'2026-10-06','243.8 RON factura 111094321 din data 22.09.2026 SC TELESYSTEM SRL','administrator.demo',0,'2026-10-06T12:23:17.752Z',NULL,NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL),
-(46,22,NULL,7,'2026-10-06T12:23:17.758Z',NULL,1,'2026-10-06','335.6 RON factura 111094321 din data 22.09.2026 SC TELESYSTEM SRL','administrator.demo',0,'2026-10-06T12:23:17.758Z',NULL,NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL);
+(46,22,NULL,7,'2026-10-06T12:23:17.758Z',NULL,1,'2026-10-06','335.6 RON factura 111094321 din data 22.09.2026 SC TELESYSTEM SRL','administrator.demo',0,'2026-10-06T12:23:17.758Z',NULL,NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL),
+(47,8,NULL,2,'2026-10-08T11:26:30.544Z',NULL,1,'2026-10-08','Regularizare stoc negativ (-2): cantitate reala in depozit 0 · Regularizare din pagina produsului','administrator.demo',0,'2026-10-08T11:26:30.544Z',NULL,NULL,NULL,NULL,2,NULL,'Regularizare stoc negativ',NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL);
 /*!40000 ALTER TABLE `stock_movements` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -459,12 +477,22 @@ UNLOCK TABLES;
 
 LOCK TABLES `system_type_aliases` WRITE;
 /*!40000 ALTER TABLE `system_type_aliases` DISABLE KEYS */;
+REPLACE INTO `system_type_aliases` (`id`, `system_type_id`, `alias`, `alias_key`, `created_utc`) VALUES (2,1,'CCTV','cctv','2026-10-08T10:24:44.031Z'),
+(3,1,'Sistem video','sistemvideo','2026-10-08T10:24:51.089Z'),
+(4,2,'Control Acces','controlacces','2026-10-08T11:39:46.366Z'),
+(5,3,'Efractie','efractie','2026-10-08T11:40:01.306Z'),
+(6,3,'Sistem antiefractie','sistemantiefractie','2026-10-08T11:40:07.635Z'),
+(7,4,'PSI','psi','2026-10-08T11:40:21.223Z'),
+(8,4,'Incendiu','incendiu','2026-10-08T11:40:27.789Z');
 /*!40000 ALTER TABLE `system_type_aliases` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `system_types` WRITE;
 /*!40000 ALTER TABLE `system_types` DISABLE KEYS */;
-REPLACE INTO `system_types` (`id`, `name`, `name_key`, `active`, `sort_order`, `version`, `created_utc`, `updated_utc`) VALUES (1,'TVCI','tvci',1,1,2,'2026-10-07T12:37:25.959Z','2026-10-07T12:48:21.985Z');
+REPLACE INTO `system_types` (`id`, `name`, `name_key`, `active`, `sort_order`, `version`, `created_utc`, `updated_utc`) VALUES (1,'TVCI','tvci',1,1,6,'2026-10-07T12:37:25.959Z','2026-10-08T10:24:51.089Z'),
+(2,'CA','ca',1,2,1,'2026-10-08T11:39:39.606Z','2026-10-08T11:39:46.367Z'),
+(3,'EFR','efr',1,3,2,'2026-10-08T11:39:51.644Z','2026-10-08T11:40:07.636Z'),
+(4,'IDSAI','idsai',1,4,2,'2026-10-08T11:40:17.548Z','2026-10-08T11:40:27.789Z');
 /*!40000 ALTER TABLE `system_types` ENABLE KEYS */;
 UNLOCK TABLES;
 

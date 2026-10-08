@@ -16,8 +16,8 @@
 <PageTitle>Jurnal complet · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal complet</h1><p class="muted">Toate evenimentele din jurnal, căutate direct pe server, pe pagini. Se afișează implicit ultima lună; alege alt interval sau tot jurnalul.</p></div>
     <div class="heading-actions">
-        <a class="refresh" href="@AuditListState.Default.Url()">← Jurnal activitate (ultimele @AuditQueryRules.RecentWindow)</a>
-        <button type="button" class="refresh" disabled="@(loading || exporting)" @onclick="() => ReloadAsync(0)">↻ Actualizează</button>
+        <a class="refresh act-nav" href="@AuditListState.Default.Url()">← Jurnal activitate (ultimele @AuditQueryRules.RecentWindow)</a>
+        <button type="button" class="refresh act-reload" disabled="@(loading || exporting)" @onclick="() => ReloadAsync(0)">↻ Actualizează</button>
     </div>
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -27,9 +27,9 @@
     <AuditFilterBar Values="values" Changed="FiltersChangedAsync" Cleared="ClearAsync">
         <label class="period-field">De la <PickOnlyDate Id="audit-from" Value="fromDate" ValueChanged="FromChangedAsync" /></label>
         <label class="period-field">până la <PickOnlyDate Id="audit-to" Value="toDate" ValueChanged="ToChangedAsync" /></label>
-        <button type="button" class="refresh" @onclick="() => PresetAsync(1)">Ultima lună</button>
-        <button type="button" class="refresh" @onclick="() => PresetAsync(3)">Ultimele 3 luni</button>
-        <button type="button" class="refresh" @onclick="() => PresetAsync(0)">Tot jurnalul</button>
+        <button type="button" class="refresh act-nav" @onclick="() => PresetAsync(1)">Ultima lună</button>
+        <button type="button" class="refresh act-nav" @onclick="() => PresetAsync(3)">Ultimele 3 luni</button>
+        <button type="button" class="refresh act-nav" @onclick="() => PresetAsync(0)">Tot jurnalul</button>
         <button type="button" class="primary" disabled="@(loading || exporting || result is null || result.Total == 0)" @onclick="ExportAsync">@(exporting ? "Se exportă…" : "Exportă CSV")</button>
     </AuditFilterBar>
     @if (loading && result is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă jurnalul</h3></div> }

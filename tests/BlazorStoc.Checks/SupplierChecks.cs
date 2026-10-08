@@ -207,12 +207,64 @@ public static class SupplierChecks
         var garbage = AnafRules.Interpret(config, request, 200, 5, "<html>eroare</html>");
         check(!unknownNumber.Ok && unknownNumber.CuiNotFound && unknownObject.CuiNotFound && !otherUnknown.CuiNotFound && !garbage.CuiNotFound && unknownNumber.Errors.Single().Contains("nu este înregistrat în ANAF"),
             "ANAF: a CUI listed among those unknown to ANAF is \"not found\" (not an outage); another CUI or an unreadable answer is not");
+        // ANAF values against the form: filled when empty, equal changes nothing, otherwise the policy of the field decides.
+        var plansFor = new Dictionary<string, string> { ["Adresă fiscală"] = "confirm", ["Telefon"] = "empty", ["Cod CAEN"] = "overwrite", ["Nr. Registrul Comerțului"] = "confirm" };
+        var plan = AnafApplyRules.Plan(
+        [
+            new("Denumire", "", "X SRL"), new("Adresă fiscală", "Str. Veche 1", "Str. Noua 2"), new("Nr. Registrul Comerțului", "j40/1/2000", "J40/1/2000"),
+            new("Telefon", "0721000000", "021"), new("Cod poștal", "", ""), new("Cod CAEN", "1234", "4711")
+        ], plansFor);
+        check(plan.Direct.Select(item => item.Label).OrderBy(label => label).SequenceEqual(["Cod CAEN", "Denumire"]) && plan.Ask.Single().Label == "Adresă fiscală" && plan.KeptMine.Single() == "Telefon",
+            "ANAF apply rules: empty fields are filled, equal values change nothing, \"overwrite\" applies, \"keep mine\" is kept and noted, \"confirm\" asks");
+        check(AnafApplyRules.Plan([new("Telefon", "0721000000", "021")], null).Ask.Count == 1 && AnafApplyRules.Plan([new("Telefon", "0721000000", "")], plansFor).Direct.Count == 0
+              && AnafApplyRules.Plan([new("Denumire", "x srl", "X SRL")], plansFor).Direct.Count == 0 && AnafApplyRules.Plan([new("Denumire", "x srl", "X SRL")], plansFor).Ask.Count == 0,
+            "ANAF apply rules: without a configured policy the answer is to ask; a field ANAF did not send is left alone; the difference of case only is no difference");
+        // ANAF really answers HTTP 404 with its normal body for a CUI it does not know: that must read as "not registered", not as a wrong service address.
+        var anafFile = Path.Combine(Path.GetTempPath(), $"anaf-{Guid.NewGuid():N}.json");
+        try
+        {
+            var anafConfiguration = Microsoft.Extensions.Configuration.MemoryConfigurationBuilderExtensions.AddInMemoryCollection(new Microsoft.Extensions.Configuration.ConfigurationBuilder(), new Dictionary<string, string?> { ["Anaf:ConfigurationPath"] = anafFile }).Build();
+            var anafStore = new AnafStore(anafConfiguration);
+            anafStore.WriteAsync(new AnafState { Active = new AnafVersion { Id = 1, Config = new AnafConfig { Enabled = true } } }, default).GetAwaiter().GetResult();
+            var anafService = new AnafService(anafStore, new AnafStubFactory(404, """{"found":[],"notFound":[10000002]}"""), new TestAccessControl(true, "admin"), null!, Microsoft.Extensions.Logging.Abstractions.NullLogger<AnafService>.Instance);
+            var unknownCompany = anafService.LookupCompanyAsync("RO10000002").GetAwaiter().GetResult();
+            var brokenService = new AnafService(anafStore, new AnafStubFactory(404, "<html>Not found</html>"), new TestAccessControl(true, "admin"), null!, Microsoft.Extensions.Logging.Abstractions.NullLogger<AnafService>.Instance);
+            var wrongAddress = brokenService.LookupCompanyAsync("RO10000002").GetAwaiter().GetResult();
+            check(unknownCompany.Outcome == AnafLookupOutcome.NotFound && wrongAddress.Outcome == AnafLookupOutcome.Unavailable && wrongAddress.Error!.Contains("HTTP 404"),
+                "ANAF: HTTP 404 with the normal body for an unknown CUI is \"CUI not registered\"; a 404 without it is still a wrong address");
+            const string foundBody = """{"found":[{"date_generale":{"cui":14399840,"denumire":"DANTE INTERNATIONAL SA","adresa":"STR. GARA HERASTRAU NR.6","telefon":"021","nrRegCom":"J40/1/2000","codPostal":"","cod_CAEN":"4711"},"inregistrare_scop_Tva":{"scpTVA":true},"stare_inactiv":{"statusInactivi":false}}],"notFound":[]}""";
+            var foundService = new AnafService(anafStore, new AnafStubFactory(200, foundBody), new TestAccessControl(true, "admin"), null!, Microsoft.Extensions.Logging.Abstractions.NullLogger<AnafService>.Instance);
+            var foundCompany = foundService.LookupCompanyAsync("14399840").GetAwaiter().GetResult();
+            check(foundCompany.Company is { Name: "DANTE INTERNATIONAL SA", CaenCode: "4711" } && foundCompany.Updates is { } updates && updates["Telefon"] == "empty" && updates["Cod CAEN"] == "overwrite"
+                  && updates["Denumire"] == "confirm" && AnafRules.Usage("Telefon") == "Formular" && AnafRules.Usage("Inactiv fiscal") == "Avertisment" && AnafRules.Usage("RO e-Factura") == "Doar informativ" && AnafRules.Usage("CUI") == "Identificare",
+                "ANAF: a lookup returns the policy of every field (defaults: phone kept, CAEN and registry number overwritten, the rest confirmed) and the use of each mapped field");
+            var oldConfig = new AnafConfig();
+            oldConfig.Mappings.First(item => item.Label == "Telefon").Missing = "clear";
+            anafStore.WriteAsync(new AnafState { Active = new AnafVersion { Id = 1, Config = oldConfig }, Draft = oldConfig }, default).GetAwaiter().GetResult();
+            check(anafStore.ReadAsync(default).GetAwaiter().GetResult().Active!.Config.Mappings.First(item => item.Label == "Telefon").Missing == "keep",
+                "ANAF: the removed policy \"clear\" of an old configuration reads as \"keep\"");
+            var historyState = new AnafState { Draft = new AnafConfig() };
+            for (var id = 1; id <= 3; id++) historyState.History.Add(new AnafVersion { Id = id, Admin = "admin", At = DateTimeOffset.Now.AddDays(-4 + id), Config = new AnafConfig() });
+            historyState.Active = historyState.History[^1];
+            anafStore.WriteAsync(historyState, default).GetAwaiter().GetResult();
+            var versions = new AnafService(anafStore, new AnafStubFactory(200, "{}"), new TestAccessControl(true, "admin"), null!, Microsoft.Extensions.Logging.Abstractions.NullLogger<AnafService>.Instance);
+            var activatedOld = versions.ActivateVersionAsync(1).GetAwaiter().GetResult();
+            var afterDelete = versions.DeleteVersionAsync(2, "curatare").GetAwaiter().GetResult();
+            var deleteActive = Throws(() => versions.DeleteVersionAsync(afterDelete.Active!.Id, "nu").GetAwaiter().GetResult());
+            var noReason = Throws(() => versions.DeleteVersionAsync(1, " ").GetAwaiter().GetResult());
+            var again = Throws(() => versions.DeleteVersionAsync(2, "iar").GetAwaiter().GetResult());
+            var next = versions.ActivateVersionAsync(1).GetAwaiter().GetResult();
+            check(activatedOld.Active!.Id == 4 && activatedOld.Active.RestoredFrom == 1 && afterDelete.History.Select(item => item.Id).SequenceEqual([1, 3, 4]) && deleteActive && noReason && again
+                  && next.Active!.Id == 5 && next.History.Select(item => item.Id).Distinct().Count() == next.History.Count,
+                "ANAF versions: an older version can be activated again, an inactive one deleted (reason required), the active one never; version numbers are not reused");
+        }
+        finally { try { File.Delete(anafFile); } catch (IOException) { } }
     }
 
     private static bool Throws(Action action)
     {
         try { action(); return false; }
-        catch (Exception exception) when (exception is SupplierOperationException or SupplierInvoiceOperationException or StockMovementOperationException) { return true; }
+        catch (Exception exception) when (exception is SupplierOperationException or SupplierInvoiceOperationException or StockMovementOperationException or AnafException) { return true; }
     }
 
     private static BunitContext EditorContext(MemorySupplierRepository suppliers, ScriptedAnaf anaf)
@@ -713,5 +765,17 @@ internal sealed class ScriptedAnaf(Func<string, AnafCompanyResult> script) : IAn
     public Task SaveDraftAsync(AnafConfig config, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<AnafState> ActivateAsync(AnafConfig config, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<AnafState> RollbackAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<AnafState> ActivateVersionAsync(int versionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<AnafState> DeleteVersionAsync(int versionId, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public bool WasTestedSuccessfully(AnafConfig config) => false;
+}
+
+sealed class AnafStubFactory(int status, string body) : IHttpClientFactory
+{
+    public HttpClient CreateClient(string name) => new(new StubHandler(status, body));
+    private sealed class StubHandler(int status, string body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage((System.Net.HttpStatusCode)status) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") });
+    }
 }

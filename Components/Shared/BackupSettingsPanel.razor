@@ -76,7 +76,7 @@
             <p class="muted"><small>Înainte de a șterge pachete vechi și la fiecare backup, ceasul serverului se compară cu ora de pe internet; dacă două servere răspund, ele trebuie să fie de acord. Cu un ceas decalat cu peste 15 minute, backup-ul ia ora de pe internet, iar ștergerea automată așteaptă. Dacă ora nu poate fi verificată, backup-ul se face oricum, dar pachetul se marchează „ora neverificată”: nu se șterge automat, ci doar manual, de un administrator. Pentru o rețea fără internet, introdu un server NTP propriu la „Altul”.</small></p>
             <div class="editor-actions">
                 <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează</button>
-                <button type="button" class="refresh" disabled="@(busy || probing || !timeCheckEnabled)" @onclick="ProbeAsync">@(probing ? "Se verifică…" : "Verifică acum")</button>
+                <button type="button" class="refresh act-reload" disabled="@(busy || probing || !timeCheckEnabled)" @onclick="ProbeAsync">@(probing ? "Se verifică…" : "Verifică acum")</button>
             </div>
             @if (probe is not null)
             {

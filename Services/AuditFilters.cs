@@ -88,7 +88,8 @@ public static class AuditFilterOptions
         (AuditActions.AddSystemType, AuditActions.AddSystemType), (AuditActions.RenameSystemType, AuditActions.RenameSystemType),
         (AuditActions.ActivateSystemType, AuditActions.ActivateSystemType), (AuditActions.DeactivateSystemType, AuditActions.DeactivateSystemType),
         (AuditActions.MoveSystemType, AuditActions.MoveSystemType), (AuditActions.AddSystemTypeAlias, AuditActions.AddSystemTypeAlias),
-        (AuditActions.RemoveSystemTypeAlias, AuditActions.RemoveSystemTypeAlias)
+        (AuditActions.RemoveSystemTypeAlias, AuditActions.RemoveSystemTypeAlias),
+        (AuditActions.DeleteAnafVersion, AuditActions.DeleteAnafVersion), (AuditActions.ActivateAnafVersion, AuditActions.ActivateAnafVersion)
     ];
 }
 

@@ -39,9 +39,9 @@ else if (state is not null)
                 }
             </div>
             <div class="editor-actions">
-                <button class="refresh" type="button" disabled="@testing" @onclick="TestAsync">@(testing ? "Se testează…" : "Testează furnizorul")</button>
+                <button class="refresh act-reload" type="button" disabled="@testing" @onclick="TestAsync">@(testing ? "Se testează…" : "Testează furnizorul")</button>
                 <button class="primary" type="button" @onclick="BeginSave">Salvează setările</button>
-                <button class="refresh" type="button" disabled="@(!Changed)" @onclick="Discard">Renunță la modificări</button>
+                <button class="refresh act-close" type="button" disabled="@(!Changed)" @onclick="Discard">Renunță la modificări</button>
                 @if (state.EngineSaved) { <button class="danger" type="button" @onclick="BeginReset">Revino la valorile din configurația aplicației</button> }
             </div>
             @if (testMessage is not null)

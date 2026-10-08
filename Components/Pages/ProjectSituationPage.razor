@@ -27,9 +27,9 @@ else if (situation is not null)
         <div><p class="eyebrow">PROIECT · @situation.ProjectName</p><h1>Situația proiectului</h1>
             <p class="muted">Necesar din ultima revizie a fiecărei oferte, predat (net de retururi), stoc și deficit; prețurile nu sunt luate în calcul.</p></div>
         <div class="heading-actions">
-            <button type="button" class="refresh" @onclick="LoadAsync">Actualizează</button>
+            <button type="button" class="refresh act-reload" @onclick="LoadAsync">Actualizează</button>
             <a class="primary" href="@($"/api/proiecte/{Id}/situatie.pdf")" target="_blank">Export PDF</a>
-            <a class="refresh" href="@($"/api/proiecte/{Id}/situatie.csv")">Export CSV</a>
+            <a class="refresh act-export" href="@($"/api/proiecte/{Id}/situatie.csv")">Export CSV</a>
         </div>
     </div>
     <ProjectDeadlineField ProjectId="Id" />
@@ -43,7 +43,7 @@ else if (situation is not null)
     {
         <section class="catalog" aria-label="@component.Name">
             <div class="catalog-heading"><h2>@component.Name</h2><small>predat @ProjectSituationRules.Format(component.Delivered) din @ProjectSituationRules.Format(component.Needed) (bucăți)</small></div>
-            <div class="heading-actions section-actions"><button type="button" class="refresh" disabled="@busy" @onclick="() => ReserveComponentAsync(component)">Rezervă cât se poate pentru componentă</button></div>
+            <div class="heading-actions section-actions"><button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => ReserveComponentAsync(component)">Rezervă cât se poate pentru componentă</button></div>
             <div class="table-scroll"><table><thead><tr><th>SECȚIUNE</th><th>DENUMIRE</th><th class="number">NECESAR</th><th class="number">PREDAT</th><th class="number">DIN STOC</th><th class="number">DIN CARE REZERVAT</th><th class="number">INTRAT PT. OFERTĂ</th><th class="number">DEFICIT</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
             @foreach (var line in component.Lines)
             {
@@ -97,7 +97,7 @@ else if (situation is not null)
                             <input type="number" aria-label="Cantitatea scăzută" min="1" max="@reservation.Quantity" @bind="reduceQuantity" @bind:event="oninput" disabled="@busy" />
                             <input type="text" aria-label="Motivul scăderii" placeholder="Motiv scurt" maxlength="@ReservationRules.ReasonMaximumLength" @bind="reduceReason" @bind:event="oninput" disabled="@busy" />
                             <button type="button" class="danger" disabled="@busy" @onclick="() => ReduceAsync(reservation)">Scade</button>
-                            <button type="button" class="refresh" disabled="@busy" @onclick="() => reducing = null">Renunț</button>
+                            <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => reducing = null">Renunț</button>
                         }
                         else { <button type="button" class="row-action delete" disabled="@busy" @onclick="() => StartReduce(reservation)">Scade / eliberează</button> }
                     </td>

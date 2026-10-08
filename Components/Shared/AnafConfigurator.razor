@@ -41,7 +41,7 @@ else
                 <button type="button" class="danger" aria-label="Șterge antetul @header.Name" @onclick="() => { config.Headers.RemoveAt(index); Edited(); }">Șterge</button>
             </div>
         }
-        <button type="button" class="refresh" @onclick="() => { config.Headers.Add(new AnafHeader()); Edited(); }">+ Adaugă antet</button>
+        <button type="button" class="refresh act-confirm" @onclick="() => { config.Headers.Add(new AnafHeader()); Edited(); }">+ Adaugă antet</button>
     </fieldset>
 
     <fieldset class="anaf-section"><legend>2. Cerere</legend>
@@ -61,23 +61,25 @@ else
             <label>Lista negăsiților<input @bind="config.NotFound" @bind:after="Edited" /></label>
             <label>Identificarea CUI în fiecare element<input @bind="config.Identity" @bind:after="Edited" /></label>
         </div>
-        <div class="table-scroll"><table class="anaf-mappings"><thead><tr><th>DENUMIRE</th><th>CALE</th><th>TIP</th><th>OBLIGATORIU</th><th>LA LIPSĂ</th><th>LA ACTUALIZARE</th><th></th></tr></thead><tbody>
+        <div class="table-scroll"><table class="anaf-mappings"><thead><tr><th>DENUMIRE</th><th>FOLOSIT ÎN</th><th>CALE</th><th>TIP</th><th>OBLIGATORIU</th><th>CÂND ANAF NU TRIMITE CÂMPUL</th><th>CÂND ANAF DĂ ALTĂ VALOARE</th><th></th></tr></thead><tbody>
         @for (var i = 0; i < config.Mappings.Count; i++)
         {
             var mapping = config.Mappings[i];
             var index = i;
             <tr>
-                <td><input aria-label="Denumire câmp" @bind="mapping.Label" @bind:after="Edited" /></td>
+                @{ var usage = AnafRules.Usage(mapping.Label); var informative = usage == "Doar informativ"; }
+                <td><input aria-label="Denumire câmp" @bind="mapping.Label" @bind:after="Edited" readonly="@(!informative)" title="@(informative ? null : "Câmp folosit de aplicație: denumirea nu se schimbă")" /></td>
+                <td><span class="anaf-usage @(informative ? "info" : "used")" title="@(usage == "Identificare" ? "CUI-ul este cheia căutării: se trimite la ANAF și se verifică în răspuns că ANAF a returnat aceeași firmă; formularul îl are deja, deci nu se copiază din nou." : null)">@usage</span></td>
                 <td><input aria-label="Cale câmp" @bind="mapping.Path" @bind:after="Edited" /></td>
                 <td><select aria-label="Tip" @bind="mapping.Type" @bind:after="Edited"><option value="text">Text</option><option value="boolean">Da/Nu</option></select></td>
                 <td><ToggleSwitch Compact AriaLabel="Obligatoriu" @bind-Value="mapping.Required" @bind-Value:after="Edited" /></td>
-                <td><select aria-label="Politică la lipsă" @bind="mapping.Missing" @bind:after="Edited"><option value="keep">Păstrează</option><option value="clear">Golește</option><option value="error">Raportează eroare</option></select></td>
-                <td><select aria-label="Politică la actualizare" @bind="mapping.Update" @bind:after="Edited"><option value="empty">Doar dacă e gol</option><option value="overwrite">Suprascrie</option><option value="confirm">Cere confirmare</option></select></td>
+                <td><select aria-label="Politică la lipsă" @bind="mapping.Missing" @bind:after="Edited"><option value="keep">Păstrează valoarea din formular</option><option value="error">Oprește preluarea (eroare)</option></select></td>
+                <td><select aria-label="Politică la actualizare" @bind="mapping.Update" @bind:after="Edited" disabled="@(usage != "Formular")"><option value="confirm">Cere confirmare</option><option value="empty">Păstrează valoarea mea</option><option value="overwrite">Ia valoarea din ANAF</option></select></td>
                 <td><button type="button" class="danger" aria-label="Șterge maparea @mapping.Label" @onclick="() => { config.Mappings.RemoveAt(index); Edited(); }">Șterge</button></td>
             </tr>
         }
         </tbody></table></div>
-        <button type="button" class="refresh" @onclick="() => { config.Mappings.Add(new AnafMapping()); Edited(); }">+ Adaugă câmp</button>
+        <button type="button" class="refresh act-confirm" @onclick="() => { config.Mappings.Add(new AnafMapping()); Edited(); }">+ Adaugă câmp</button>
     </fieldset>
 
     <fieldset class="anaf-section"><legend>4. Testare</legend>
@@ -85,7 +87,7 @@ else
             <label for="anaf-cui">CUI de test (de exemplu RO9178894 sau 28996610)</label>
             <div class="settings-form-row">
                 <input id="anaf-cui" @bind="cui" @bind:event="oninput" maxlength="14" autocomplete="off" />
-                <button type="button" class="refresh" disabled="@busy" @onclick="PreviewAsync">Previzualizează cererea</button>
+                <button type="button" class="refresh act-reload" disabled="@busy" @onclick="PreviewAsync">Previzualizează cererea</button>
                 <button type="submit" class="primary" disabled="@(busy || cui.Trim().Length == 0)">@(busy ? "Se interoghează…" : "Testează")</button>
             </div>
         </form>
@@ -113,27 +115,41 @@ else
 
     <fieldset class="anaf-section"><legend>5. Versiuni</legend>
         <div class="editor-actions">
-            <button type="button" class="refresh" disabled="@busy" @onclick="SaveDraftAsync">Salvează ciorna</button>
+            <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="SaveDraftAsync">Salvează ciorna</button>
             <button type="button" class="primary" disabled="@(busy || !tested)" title="@(tested ? "" : "Testează cu succes configurația înainte de activare")" @onclick="ActivateAsync">Activează configurația testată</button>
             <button type="button" class="danger" disabled="@(busy || (state?.History.Count ?? 0) < 2)" @onclick="RollbackAsync">Revino la activarea precedentă</button>
         </div>
         @if (state is { History.Count: > 0 })
         {
-            <div class="table-scroll"><table class="settings-result"><thead><tr><th>VERSIUNE</th><th>DATA</th><th>ADMINISTRATOR</th><th>ORIGINE</th><th></th></tr></thead><tbody>
+            <div class="table-scroll"><table class="settings-result"><thead><tr><th>VERSIUNE</th><th>DATA</th><th>ADMINISTRATOR</th><th>CREATĂ PRIN</th><th>ACTIVĂ</th><th></th></tr></thead><tbody>
             @foreach (var version in state.History.AsEnumerable().Reverse())
             {
                 <tr>
                     <td>#@version.Id @(state.Active?.Id == version.Id ? "(activă)" : "")</td>
                     <td>@version.At.ToString("dd.MM.yyyy HH:mm")</td>
                     <td>@version.Admin</td>
-                    <td>@(version.RestoredFrom is { } from ? $"revenire la #{from}" : "activare")</td>
-                    <td><button type="button" class="refresh" @onclick="() => LoadVersion(version)">Încarcă în editor</button></td>
+                    <td>@(version.RestoredFrom is { } from ? $"Revenire la versiunea #{from}" : "Activarea unei configurații testate")</td>
+                    <td><ToggleSwitch Value="@(state.Active?.Id == version.Id)" ValueChanged="@((bool on) => ActivateVersionAsync(version, on))" Disabled="@(busy || state.Active?.Id == version.Id)"
+                                      OnText="Activă" OffText="Inactivă" AriaLabel="@($"Versiunea #{version.Id} activă")"
+                                      Title="@(state.Active?.Id == version.Id ? "Este versiunea activă; activează altă versiune pentru a o schimba" : $"Activează versiunea #{version.Id}")" /></td>
+                    <td class="row-actions">
+                        <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => LoadVersion(version)">Încarcă în editor</button>
+                        <button type="button" class="row-icon delete" disabled="@(busy || state.Active?.Id == version.Id)" aria-label="@($"Șterge versiunea #{version.Id}")"
+                                title="@(state.Active?.Id == version.Id ? "Versiunea activă nu se poate șterge" : $"Șterge versiunea #{version.Id}")" @onclick="() => deletingVersion = version"></button>
+                    </td>
                 </tr>
             }
             </tbody></table></div>
         }
         else { <p class="muted">Nicio versiune activată încă.</p> }
     </fieldset>
+}
+
+@if (deletingVersion is not null)
+{
+    <DeleteConfirmationDialog @key="deletingVersion.Id" Title="Ștergi versiunea configurației ANAF?" Subject="Versiunea" ObjectLabel="@($"#{deletingVersion.Id} · {deletingVersion.At:dd.MM.yyyy HH:mm} · {deletingVersion.Admin}")"
+                              Description="Versiunea dispare din istoric și nu mai poate fi reactivată. Versiunea activă și configurația din editor nu se schimbă."
+                              ConfirmationNote="Ștergerea nu poate fi anulată și va fi înregistrată în jurnal." Error="@deleteError" Confirmed="DeleteVersionAsync" Cancelled="() => deletingVersion = null" />
 }
 
 @code {
@@ -214,6 +230,34 @@ else
         tested = Anaf.WasTestedSuccessfully(config);
         Say($"S-a revenit la configurația versiunii precedente (activă acum: #{state.Active!.Id}).");
     });
+
+    private AnafVersion? deletingVersion;
+    private string? deleteError;
+
+    // The switch of an older version activates it (the active one stays on and cannot be switched off: another version is activated instead).
+    private Task ActivateVersionAsync(AnafVersion version, bool on) => !on ? Task.CompletedTask : Run(async () =>
+    {
+        state = await Anaf.ActivateVersionAsync(version.Id, lifetime.Token);
+        config = state.Draft;
+        test = null;
+        preview = null;
+        tested = Anaf.WasTestedSuccessfully(config);
+        Say($"Versiunea #{version.Id} este activă din nou (înregistrată ca versiunea #{state.Active!.Id}).");
+    });
+
+    private async Task DeleteVersionAsync(string reason)
+    {
+        if (deletingVersion is null) return;
+        deleteError = null;
+        try
+        {
+            state = await Anaf.DeleteVersionAsync(deletingVersion.Id, reason, lifetime.Token);
+            Say($"Versiunea #{deletingVersion.Id} a fost ștearsă.");
+            deletingVersion = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is AnafException or AccessDeniedException) { deleteError = ex.Message; }
+    }
 
     private void LoadVersion(AnafVersion version)
     {

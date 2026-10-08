@@ -111,7 +111,7 @@ public sealed class StockMovementInput
 public enum EntrySource { All, WithInvoice, Free }
 public sealed record StockMovementQuery(StockMovementKind? Kind = null, bool Descending = false, int Page = 1, int PageSize = 10,
     EntrySource Source = EntrySource.All, int? SupplierId = null, bool OverStockOnly = false,
-    ExitDestination? Destination = null, int? BeneficiaryId = null, int? VehicleId = null);
+    ExitDestination? Destination = null, int? BeneficiaryId = null, int? VehicleId = null, string? Text = null, DateOnly? Date = null);
 public sealed record MovementSupplier(int Id, string Name);
 
 // What the user chose for a product whose stock is negative: stock set to zero, or the real quantity found in the warehouse.

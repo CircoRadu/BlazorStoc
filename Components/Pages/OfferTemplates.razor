@@ -85,7 +85,7 @@
             {
                 var current = key;
                 if (definition.HeaderFields.Any(field => field.Key == current)) continue;
-                <button type="button" class="refresh" disabled="@busy" @onclick="() => definition.HeaderFields.Add(new OfferHeaderField { Key = current, Position = current == OfferHeaderField.TitleKey ? OfferHeaderField.Below : OfferHeaderField.Right })">+ @OfferRules.FieldLabel(current)</button>
+                <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => definition.HeaderFields.Add(new OfferHeaderField { Key = current, Position = current == OfferHeaderField.TitleKey ? OfferHeaderField.Below : OfferHeaderField.Right })">+ @OfferRules.FieldLabel(current)</button>
             }
         </div>
 
@@ -102,8 +102,8 @@
         }
         </tbody></table></div>
         <div class="editor-actions">
-            <button type="button" class="refresh" disabled="@busy" @onclick="() => definition.Sections.Add(new OfferSectionRule { Name = string.Empty, Import = true })">+ Secțiune</button>
-            @if (workbook is not null) { <button type="button" class="refresh" disabled="@busy" @onclick="AddDetectedSections">Preia secțiunile din fișier</button> }
+            <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => definition.Sections.Add(new OfferSectionRule { Name = string.Empty, Import = true })">+ Secțiune</button>
+            @if (workbook is not null) { <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="AddDetectedSections">Preia secțiunile din fișier</button> }
         </div>
 
         <label class="full-width" for="offer-template-ignore">Rânduri ignorate (începutul unei celule, separate prin virgulă)
@@ -123,7 +123,7 @@
             </div>
         }
         <div class="editor-actions">
-            @if (workbook is not null) { <button type="button" class="refresh" disabled="@busy" @onclick="Verify">Verifică pe fișier</button> }
+            @if (workbook is not null) { <button type="button" class="refresh act-reload" disabled="@busy" @onclick="Verify">Verifică pe fișier</button> }
             <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">@(busy ? "Se salvează…" : "Salvează șablonul")</button>
         </div>
         </div>
@@ -166,7 +166,7 @@ else
             <p>Șablonul se șterge definitiv; ofertele deja preluate nu se schimbă. Se înregistrează în jurnal.</p>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@busy" @onclick="DeleteAsync">@(busy ? "Se șterge…" : "Șterge șablonul")</button>
-                <button type="button" class="refresh" disabled="@busy" @onclick="() => deleting = null">Renunț</button>
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => deleting = null">Renunț</button>
             </div>
         </section>
     </div>

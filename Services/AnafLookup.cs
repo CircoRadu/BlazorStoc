@@ -80,7 +80,9 @@ public sealed record AnafCompany(string Cui, string Name, string Address, string
 // configuration cannot read): the data may be typed by hand and is marked as such.
 public enum AnafLookupOutcome { Found, NotFound, InvalidCui, Unavailable }
 
-public sealed record AnafCompanyResult(AnafCompany? Company, string? Error, string? Warning, AnafLookupOutcome Outcome = AnafLookupOutcome.Found);
+// Updates: the policy "when ANAF gives another value than the form holds" of each mapped field (label -> confirm / empty / overwrite).
+public sealed record AnafCompanyResult(AnafCompany? Company, string? Error, string? Warning, AnafLookupOutcome Outcome = AnafLookupOutcome.Found,
+    IReadOnlyDictionary<string, string>? Updates = null);
 public sealed record AnafMappedValue(string Label, string Path, string Type, string? Value);
 // CuiNotFound: ANAF answered normally and listed the requested CUI among those it does not know.
 public sealed record AnafTestResult(bool Ok, int? StatusCode, long DurationMs, AnafRequest? Request, string Raw,
@@ -106,15 +108,21 @@ public static partial class AnafRules
     public static List<AnafMapping> DefaultMappings() =>
     [
         Map("CUI", "date_generale.cui", TypeText, true), Map("Denumire", "date_generale.denumire", TypeText, true),
-        Map("Adresă fiscală", "date_generale.adresa", TypeText), Map("Nr. Registrul Comerțului", "date_generale.nrRegCom", TypeText),
-        Map("Telefon", "date_generale.telefon", TypeText), Map("Cod poștal", "date_generale.codPostal", TypeText),
-        Map("Cod CAEN", "date_generale.cod_CAEN", TypeText), Map("Plătitor TVA", "inregistrare_scop_Tva.scpTVA", TypeBoolean),
+        Map("Adresă fiscală", "date_generale.adresa", TypeText), Map("Nr. Registrul Comerțului", "date_generale.nrRegCom", TypeText, update: "overwrite"),
+        Map("Telefon", "date_generale.telefon", TypeText, update: "empty"), Map("Cod poștal", "date_generale.codPostal", TypeText),
+        Map("Cod CAEN", "date_generale.cod_CAEN", TypeText, update: "overwrite"), Map("Plătitor TVA", "inregistrare_scop_Tva.scpTVA", TypeBoolean),
         Map("TVA la încasare", "inregistrare_RTVAI.statusTvaIncasare", TypeBoolean), Map("Inactiv fiscal", "stare_inactiv.statusInactivi", TypeBoolean),
         Map("RO e-Factura", "date_generale.statusRO_e_Factura", TypeBoolean)
     ];
 
-    private static AnafMapping Map(string label, string path, string type, bool required = false) =>
-        new() { Label = label, Path = "$." + path, Type = type, Required = required };
+    private static AnafMapping Map(string label, string path, string type, bool required = false, string update = "confirm") =>
+        new() { Label = label, Path = "$." + path, Type = type, Required = required, Update = update };
+
+    /// <summary>What a mapped field is used for: the value fills a form, raises a warning, or is only shown when the configuration is tested.</summary>
+    public static string Usage(string? label) =>
+        AnafApplyRules.FormLabels.Contains(label ?? "", StringComparer.OrdinalIgnoreCase) ? "Formular"
+        : string.Equals(label, "Inactiv fiscal", StringComparison.OrdinalIgnoreCase) ? "Avertisment"
+        : string.Equals(label, "CUI", StringComparison.OrdinalIgnoreCase) ? "Identificare" : "Doar informativ";
 
     // What the user (and the administrator testing the configuration) reads when ANAF answers with an error status.
     public static string HttpErrorMessage(int status) => status switch
@@ -275,6 +283,10 @@ public interface IAnafService
     Task SaveDraftAsync(AnafConfig config, CancellationToken cancellationToken = default);
     Task<AnafState> ActivateAsync(AnafConfig config, CancellationToken cancellationToken = default);
     Task<AnafState> RollbackAsync(CancellationToken cancellationToken = default);
+    /// <summary>Makes an older version the active one again (a new version is appended as a copy of it; it was tested when it was first activated).</summary>
+    Task<AnafState> ActivateVersionAsync(int versionId, CancellationToken cancellationToken = default);
+    /// <summary>Deletes a version of the history; the active version cannot be deleted. The reason is mandatory and the journal names the version.</summary>
+    Task<AnafState> DeleteVersionAsync(int versionId, string reason, CancellationToken cancellationToken = default);
     bool WasTestedSuccessfully(AnafConfig config);
 }
 
@@ -292,7 +304,11 @@ public sealed class AnafStore(IConfiguration configuration)
     {
         if (!File.Exists(path)) return new AnafState();
         await using var stream = File.OpenRead(path);
-        return await JsonSerializer.DeserializeAsync<AnafState>(stream, Options, cancellationToken) ?? new AnafState();
+        var state = await JsonSerializer.DeserializeAsync<AnafState>(stream, Options, cancellationToken) ?? new AnafState();
+        // The policy "Golește" (a missing field empties the form field) was removed: older files read as "Păstrează".
+        foreach (var config in new[] { state.Draft, state.Active?.Config }.Concat(state.History.Select(version => version.Config)))
+            foreach (var mapping in config?.Mappings ?? []) if (mapping.Missing == "clear") mapping.Missing = "keep";
+        return state;
     }
 
     public async Task WriteAsync(AnafState state, CancellationToken cancellationToken)
@@ -370,7 +386,9 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
         var company = new AnafCompany(result.Request!.Cui, Value("Denumire"), Value("Adresă fiscală"), Value("Nr. Registrul Comerțului"),
             Value("Telefon"), Value("Cod poștal"), Value("Cod CAEN"));
         var warning = Value("Inactiv fiscal") == "Da" ? "Atenție: ANAF raportează firma ca inactivă fiscal." : null;
-        return new(company, null, warning, AnafLookupOutcome.Found);
+        var updates = config.Mappings.Where(m => m.Label.Length > 0).GroupBy(m => m.Label, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().Update, StringComparer.OrdinalIgnoreCase);
+        return new(company, null, warning, AnafLookupOutcome.Found, updates);
     }
 
     private async Task<AnafTestResult> SendAsync(AnafConfig config, AnafRequest request, CancellationToken cancellationToken)
@@ -412,7 +430,11 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
                 }
                 var raw = Encoding.UTF8.GetString(buffer.ToArray()).TrimStart('﻿');
                 if (!response.IsSuccessStatusCode)
+                {
+                    // ANAF answers HTTP 404 WITH its normal body ({"found":[],"notFound":[cui]}) when the CUI does not exist: that is "CUI not registered", not a wrong address.
+                    if (status == 404 && AnafRules.Interpret(config, request, status, watch.ElapsedMilliseconds, raw) is { CuiNotFound: true } unknown) return unknown;
                     return new(false, status, watch.ElapsedMilliseconds, request, raw, [], [AnafRules.HttpErrorMessage(status)], DateTimeOffset.Now);
+                }
                 return AnafRules.Interpret(config, request, status, watch.ElapsedMilliseconds, raw);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -462,7 +484,38 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
         }, "Revenire la versiunea precedentă", cancellationToken);
     }
 
-    private async Task<AnafState> AppendVersionAsync(Func<AnafState, (AnafConfig Config, int? RestoredFrom)> select, string action, CancellationToken cancellationToken)
+    public async Task<AnafState> ActivateVersionAsync(int versionId, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAdministratorAsync(cancellationToken);
+        return await AppendVersionAsync(state =>
+        {
+            var version = state.History.FirstOrDefault(item => item.Id == versionId) ?? throw new AnafException("Versiunea nu mai există. Actualizează lista.");
+            if (state.Active?.Id == versionId) throw new AnafException("Versiunea este deja activă.");
+            return (version.Config.Clone(), version.Id);
+        }, $"Activare versiune #{versionId}", cancellationToken, AuditActions.ActivateAnafVersion);
+    }
+
+    public async Task<AnafState> DeleteVersionAsync(int versionId, string reason, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAdministratorAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(reason)) throw new AnafException("Motivul ștergerii este obligatoriu.");
+        await store.FileGate.WaitAsync(cancellationToken);
+        try
+        {
+            var state = await store.ReadAsync(cancellationToken);
+            var version = state.History.FirstOrDefault(item => item.Id == versionId) ?? throw new AnafException("Versiunea nu mai există. Actualizează lista.");
+            if (state.Active?.Id == versionId) throw new AnafException("Versiunea activă nu se poate șterge. Activează mai întâi o altă versiune.");
+            state.History.Remove(version);
+            await store.WriteAsync(state, cancellationToken);
+            await AuditRecorder.RecordEditAsync(auditTrail, access, "IntegrareANAF", versionId.ToString(CultureInfo.InvariantCulture), "Configurație ANAF",
+                [new AuditChange("Versiune", $"#{versionId} ({version.At:dd.MM.yyyy HH:mm}, {version.Admin})", "ștearsă"), new AuditChange("Versiune activă", $"#{state.Active?.Id}", $"#{state.Active?.Id}")],
+                reason.Trim(), cancellationToken, AuditActions.DeleteAnafVersion);
+            return state;
+        }
+        finally { store.FileGate.Release(); }
+    }
+
+    private async Task<AnafState> AppendVersionAsync(Func<AnafState, (AnafConfig Config, int? RestoredFrom)> select, string action, CancellationToken cancellationToken, string? journalAction = null)
     {
         var admin = await access.GetUsernameAsync(cancellationToken) ?? "Administrator";
         await store.FileGate.WaitAsync(cancellationToken);
@@ -470,14 +523,14 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
         {
             var state = await store.ReadAsync(cancellationToken);
             var (config, restoredFrom) = select(state);
-            var version = new AnafVersion { Id = state.History.Count + 1, At = DateTimeOffset.Now, Admin = admin, Config = config, RestoredFrom = restoredFrom };
+            var version = new AnafVersion { Id = state.History.Count == 0 ? 1 : state.History.Max(item => item.Id) + 1, At = DateTimeOffset.Now, Admin = admin, Config = config, RestoredFrom = restoredFrom };
             state.History.Add(version);
             state.Active = version;
             state.Draft = config.Clone();
             await store.WriteAsync(state, cancellationToken);
             await AuditRecorder.RecordEditAsync(auditTrail, access, "IntegrareANAF", version.Id.ToString(CultureInfo.InvariantCulture), "Configurație ANAF",
                 [new AuditChange("Versiune activă", (state.History.Count > 1 ? state.History[^2].Id.ToString(CultureInfo.InvariantCulture) : "—"), version.Id.ToString(CultureInfo.InvariantCulture))],
-                action, cancellationToken);
+                action, cancellationToken, journalAction);
             return state;
         }
         finally { store.FileGate.Release(); }

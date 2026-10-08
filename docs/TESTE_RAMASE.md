@@ -738,3 +738,7 @@ Notificari backup: vechime configurabila, model needitabil, numai cu backup NAS 
 Backup: stergere la salvare, verificare ora pe internet, setari NTP (08.10.2026): De verificat in browser: sectiunea Verificare ora, fereastra de confirmare la stergere, ceas mutat, internet taiat; migrarea 34 pe baza BlazorStoc se aplica la repornirea aplicatiei
 
 Setari Backup: categorie principala cu sub-taburi si zilele saptamanii (08.10.2026): De verificat in browser: sub-taburile Backup, zilele saptamanii; migrarile 34 si 35 pe baza BlazorStoc se aplica la repornirea aplicatiei
+
+Pagina produsului: taburi, filtre, aspect; ANAF 404; butoane colorate; padding (08.10.2026): De verificat de utilizator: paginile cu formulare in browser (padding), culorile butoanelor, filtrele din tabelul de miscari pe date reale
+
+ANAF: reguli pe camp, dialog de diferente, versiuni cu slider si stergere; filtre ca in jurnal; liste de alegere; cautare (08.10.2026): De verificat de utilizator: dialogul ANAF pe date reale, versiunile ANAF, aspectul listelor si al cautarii; migrarile 34-35 pe baza BlazorStoc

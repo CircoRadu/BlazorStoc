@@ -11,14 +11,14 @@
 <PageTitle>Notificări · BlazorStoc</PageTitle>
 <div class="page-heading">
     <div><p class="eyebrow">AVERTIZĂRI</p><h1>Notificări</h1><p class="muted">Expirări apropiate sau depășite, după șabloanele definite de administrator. O notificare rămâne în listă până este rezolvată. O notificare preluată nu mai avertizează; dacă o amâni, avertizează din nou la sfârșitul perioadei.</p></div>
-    <div class="heading-actions"><button class="refresh" type="button" disabled="@loading" @onclick="() => LoadAsync(true)">↻ Actualizează</button></div>
+    <div class="heading-actions"><button class="refresh act-reload" type="button" disabled="@loading" @onclick="() => LoadAsync(true)">↻ Actualizează</button></div>
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 
 <div class="settings-tabs" role="tablist" aria-label="Liste de notificări">
-    <button type="button" role="tab" id="tab-active" class="settings-tab @(showResolved ? "" : "active")" aria-selected="@(showResolved ? "false" : "true")" aria-controls="panel-notifications" @onclick="() => showResolved = false">Active (@views.Count)</button>
-    <button type="button" role="tab" id="tab-resolved" class="settings-tab @(showResolved ? "active" : "")" aria-selected="@(showResolved ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => showResolved = true">Rezolvate (@resolved.Count)</button>
+    <button type="button" role="tab" id="tab-active" class="settings-tab @(showResolved ? "" : "active")" aria-selected="@(showResolved ? "false" : "true")" aria-controls="panel-notifications" @onclick="() => showResolved = false">Active <span class="count-badge">@views.Count</span></button>
+    <button type="button" role="tab" id="tab-resolved" class="settings-tab @(showResolved ? "active" : "")" aria-selected="@(showResolved ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => showResolved = true">Rezolvate <span class="count-badge">@resolved.Count</span></button>
 </div>
 
 <div id="panel-notifications" role="tabpanel" aria-labelledby="@(showResolved ? "tab-resolved" : "tab-active")">
@@ -85,7 +85,7 @@ else if (loaded)
                     @if (selected.MaxSnoozeDays >= 1)
                     {
                         <label for="snooze-days">Amintește-mi peste (zile, cel mult @selected.MaxSnoozeDays)<input id="snooze-days" type="number" min="1" max="@selected.MaxSnoozeDays" step="1" @bind="snoozeDays" disabled="@busy" /></label>
-                        <button type="button" class="refresh" disabled="@busy" @onclick="SnoozeAsync">Amână</button>
+                        <button type="button" class="refresh act-edit" disabled="@busy" @onclick="SnoozeAsync">Amână</button>
                     }
                     else { <small class="muted">Amânarea nu mai este posibilă: expirarea este prea aproape (limita este numărul de zile rămase minus 2).</small> }
                 </div>
@@ -96,7 +96,7 @@ else if (loaded)
                     <p>Marchezi notificarea ca rezolvată? Trece în lista „Rezolvate” și nu mai avertizează.</p>
                     <div class="editor-actions">
                         <button type="button" class="primary" disabled="@busy" @onclick="ResolveAsync">@(busy ? "Se salvează…" : "Da, rezolvată")</button>
-                        <button type="button" class="refresh" disabled="@busy" @onclick="() => confirmingResolve = false">Renunț</button>
+                        <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => confirmingResolve = false">Renunț</button>
                     </div>
                 </div>
             }
@@ -104,8 +104,8 @@ else if (loaded)
             {
                 <div class="editor-actions">
                     @if (selected.IsAlert) { <button type="button" class="primary" disabled="@busy" @onclick="AcknowledgeAsync">@(busy ? "Se salvează…" : "Preiau notificarea")</button> }
-                    <button type="button" class="refresh" disabled="@busy" @onclick="() => confirmingResolve = true">Marchează ca rezolvată</button>
-                    @if (selected.Url is { Length: > 0 } url) { <a class="refresh" href="@url">Deschide obiectul</a> }
+                    <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => confirmingResolve = true">Marchează ca rezolvată</button>
+                    @if (selected.Url is { Length: > 0 } url) { <a class="refresh act-nav" href="@url">Deschide obiectul</a> }
                     <button type="button" class="danger" disabled="@busy" @onclick="Close">Închide</button>
                 </div>
             }

@@ -197,3 +197,9 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 - **Task:** Setari backup unificate (tab Backup cu sub-taburi), notificari pe categorii, iconite pe randuri, verificare ora pe internet
 - **Rezumat:** migrarile 32-35 (sabloane implicite, setari backup, verificare ora, zilele saptamanii); `BackupSettings`, `BackupCatalog`, `TrustedClock`, `BackupRetentionService`, sursa de notificare `ClockSkewSource`; panourile `BackupSettingsPanel`, `BackupPackagesTable`, `BackupNasSettings`; pagina `DatabaseRestore` scoasa; clasele `row-icon` in `app.css`. Detalii pe fisiere: `IMPLEMENTED.md`.
 - **Teste:** vezi randul „Validari” din `docs/PROJECT_STATE.md`; neverificat in browser (`docs/TESTE_RAMASE.md`).
+
+## 2026-10-08T18:00:00.0000000Z - claude
+
+- **Task:** ANAF (reguli pe camp, versiuni), pagina produsului (taburi, filtre ca in Jurnal), uniformizarea interfetei
+- **Rezumat:** `Services/AnafApply.cs`, `AnafDifferencesDialog`, `ActivateVersionAsync`/`DeleteVersionAsync` in `AnafService`, filtrul `Text`/`Date` in `StockMovementQuery`, `TrustedClock`-ul ramas neschimbat; CSS: butoane `act-*`, inaltime fixa, `count-badge`, liste de alegere peste card, `fieldset` fara chenar, cautare cu SVG; regulile noi sunt in `CLAUDE.md`.
+- **Teste:** suita in memorie 979, MariaDB 1588, componente 229; verificat in browserul din aplicatie (taburi, filtre, clickuri reale in liste, inaltimea butoanelor pe 30 de pagini).

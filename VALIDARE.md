@@ -6,6 +6,11 @@
 
 > Intrarile mai vechi sunt in `docs/arhiva/VALIDARE_pana_la_30.09.2026.md` (verificari istorice).
 
+## ANAF, pagina produsului si uniformizarea interfetei (08.10.2026)
+
+- Verificat automat: build Release; suita completa (979 in memorie, 1588 MariaDB, 229 componente); decizia regulilor ANAF pe camp, versiunile configuratiei, filtrul pe text si pe zi al miscarilor, validarea cantitatii reale, dialogul de diferente; in browserul din aplicatie: selectii cu click real in liste, taburile Intrare/Iesire, filtrele din tabel, inaltimea butoanelor vecine pe toate paginile si subsectiunile din Setari.
+- Neverificat: dialogul de diferente ANAF pe date reale ANAF, ferestrele de dialog deschise (padding, butoane), culorile pe un ecran ingust; vezi `Teste utilizator/` si `docs/TESTE_RAMASE.md`.
+
 ## Backup unificat, verificare ora, iconite (08.10.2026)
 
 - Verificat automat: build Release; suita completa (vezi `docs/PROJECT_STATE.md`); verificari tintite pentru regulile de stergere (ultimele 4, ora neverificata exclusa), decizia de ceas (decalat, bun, fara internet, servere in dezacord), validarea serverelor NTP, zilele saptamanii si notificarea de ceas.

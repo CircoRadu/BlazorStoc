@@ -21,7 +21,7 @@
     <div class="heading-actions">
         @if (lastPdfBytes is not null)
         {
-            <button type="button" class="refresh" @onclick="ReopenPdfViewerAsync">Redeschide formularul PDF</button>
+            <button type="button" class="refresh act-nav" @onclick="ReopenPdfViewerAsync">Redeschide formularul PDF</button>
         }
         <label class="primary file-upload-label" for="pickup-file-input">@(scanning ? "Se proceseaza…" : "Preia inventar")</label>
         <InputFile id="pickup-file-input" class="sr-only" OnChange="FileSelectedAsync" accept=".pdf" disabled="@scanning" />
@@ -44,7 +44,8 @@ else if (scanning)
 }
 else if (loadError is null && review is null)
 {
-    <div class="empty-state"><h3>Niciun formular încărcat</h3><p>Apasă „Preia inventar” sau trage fișierul PDF cu formularul de service scanat aici.</p></div>
+    <div class="empty-state"><h3>Niciun formular încărcat</h3><p>Trage fișierul PDF cu formularul de service scanat în câmpul de mai jos, sau alege-l din calculator.</p>
+        <FileDropZone Id="pickup-drop-input" Accept=".pdf" Text="Alege formularul PDF" OnChange="FileSelectedAsync" Disabled="@(loading || scanning)" /></div>
 }
 else if (review is not null)
 {

@@ -325,3 +325,21 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Backup-ul programat se poate face doar in anumite zile ale saptamanii (migrarea 35, schedule_days, masca Luni=1..Duminica=64); notificarea Backup lipsa asteapta cel putin intervalul maxim dintre doua backup-uri programate.
 - Fiecare sub-tab salveaza doar campurile lui (restul se iau din valorile salvate).
 - Verificari: build Release, grup nas 25 PASS, sectiunea maria 21 PASS, componente 217 PASS
+
+## Finalizat la 08.10.2026 14:01 - Pagina produsului: taburi, filtre, aspect; ANAF 404; butoane colorate; padding
+
+- Pagina de miscari: Intrare/Iesire sunt taburi (verde/rosu/alb), trecerea goleste formularul; filtrele radio inlocuite cu camp de text (StockMovementQuery.Text, cautare in descriere, referinta, factura, furnizor, beneficiar, proiect, vehicul) si etichete de coloana care deschid panouri de alegeri, cu etichete pentru filtrele active.
+- Aspect: cardurile paginii in doua coloane (produs stanga, restul dreapta) fara spatiu in plus; total stoc cu padding si culori vizibile; padding implicit pentru orice element pus direct intr-un .catalog; filtre cu select simplu nu mai strivesc cautarea; summary de card pliabil cu padding.
+- Butoane: clasele act-confirm/reload/nav/edit/close/export pentru toate butoanele refresh albe (84 de butoane), regula in CLAUDE.md.
+- Cantitate reala la stoc negativ: validare la fiecare tasta (negativ/zecimal refuzat), butonul Regularizeaza se activeaza imediat.
+- ANAF: HTTP 404 cu corpul notFound inseamna CUI inexistent, nu adresa gresita (AnafService.SendAsync).
+- SystemTypes: buton Adauga langa denumirea alternativa.
+- Verificari: build Release, suita 971 in memorie, componente 221, sectiunile Maria Suppliers si Stock movements trecute; verificat in browserul din aplicatie: taburi, filtre, spatii.
+
+## Finalizat la 08.10.2026 14:46 - ANAF: reguli pe camp, dialog de diferente, versiuni cu slider si stergere; filtre ca in jurnal; liste de alegere; cautare
+
+- ANAF: politici pe camp aplicate in formulare (AnafApplyRules, dialog AnafDifferencesDialog), coloana Folosit in, politica Goleste eliminata, implicite pe camp; HTTP 404 cu corp notFound = CUI inexistent.
+- Versiuni configuratie ANAF: coloana Creata prin, slider Activa (ActivateVersionAsync), stergere cu motiv (DeleteVersionAsync), actiuni de jurnal noi; id-urile versiunilor nu se refolosesc.
+- Pagina produsului: filtre ca in Jurnal activitate (camp de cautare, liste, etichete Filtre active, valori filtrabile in tabel, stare in adresa, filtru pe zi).
+- Liste de alegere (beneficiar, produs, furnizor) se deschid peste card (overflow vizibil); fonturi uniformizate (campuri 14 px); fieldset fara chenar; cutie de cautare cu lupa SVG centrata; insigne count-badge; spatiu dupa randuri de butoane; sliderul pentru stergerea notificarilor rezolvate; tooltip pe butoane cu o glifa.
+- Verificari: build Release, suita 979 in memorie, componente 229, jurnal 151; verificat in browserul din aplicatie: selectii cu click real, spatii, chenar.

@@ -148,6 +148,18 @@ Neverificat încă: legarea de bonul de consum / storno (Task următor).
 5. Data in viitor este refuzata.
 6. Anulare/parasire cu modificari nesalvate: avertizarea apare deasupra dialogului si "Paraseste" inchide ambele.
 
+### 08.10.2026 - Pagina produsului: taburi Intrare/Iesire, filtre in tabel, aspect
+
+**Ce s-a schimbat:** (1) „Intrare” si „Iesire” sunt taburi (selectat: verde pentru Intrare, rosu pentru Iesire, neselectat: alb); la trecerea de la unul la altul formularul se goleste. (2) Filtrele cu butoane radio au disparut: camp de filtrare editabil (descriere, referinta, numar factura, furnizor, beneficiar, proiect, numar vehicul) si etichetele coloanelor INTRARE/IESIRE, FURNIZOR / FACTURA, BENEFICIAR/PROIECT, VEHICUL deschid un panou cu alegeri; filtrele active apar ca etichete cu × si „Reseteaza filtrele”. (3) Cardurile paginii stau in doua coloane (produsul la stanga, restul in coloana lata), fara spatiu mare pana la tabel; totalul de stoc are fundal vizibil si padding; butoanele albe sunt colorate dupa tipul actiunii. (4) Cantitatea reala la stoc negativ: valoarea negativa sau cu zecimale e refuzata pe loc, iar „Regularizeaza” se activeaza imediat ce cantitatea este valida.
+
+| Nr | Pas | Rezultat asteptat | Confirmat |
+|---|---|---|---|
+| 1 | Deschide un produs | Cardul „Unde sunt bucatile”, „Inregistreaza o miscare” si tabelul sunt in coloana din dreapta, produsul in stanga; spatiu de ~20 px intre carduri | |
+| 2 | Scrie o descriere la Intrare, apasa tabul Iesire, apoi inapoi Intrare | Formularul este gol de fiecare data; tabul Intrare e verde, Iesire e rosu cand e ales, alb cand nu | |
+| 3 | In tabel scrie in „Filtreaza” (ex. numele unui furnizor, un numar de factura, o placuta) | Dupa o scurta pauza tabelul se restrange; apare eticheta „Text: ...” cu × | |
+| 4 | Apasa eticheta coloanei INTRARE/IESIRE, alege „Intrari”; apoi FURNIZOR / FACTURA si alege un furnizor | Panou cu alegeri sub filtre; filtrele active apar ca etichete; „Reseteaza filtrele” le scoate pe toate | |
+| 5 | Produs cu stoc negativ: la „Cantitate reala in depozit” scrie -10, apoi 0, apoi 5 | -10: mesaj de eroare si „Regularizeaza” inactiv; 0 si 5: butonul devine activ imediat, fara a iesi din camp | |
+
 ## Ecran ingust
 
 - Formularul de iesire (Referinta, panoul de iesire repetata, nota de depasire) pe latime de telefon: fara depasiri orizontale.

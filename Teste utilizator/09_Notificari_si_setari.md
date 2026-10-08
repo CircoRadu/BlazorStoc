@@ -4,7 +4,7 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
-### 08.10.2026 - Iconite pe randurile tabelelor si numar in paranteze pe taburi
+### 08.10.2026 - Iconite pe randurile tabelelor si numar ca insigna pe taburi
 
 **Ce s-a adaugat:** regula „Iconite pe randurile tabelelor" (CLAUDE.md): editarea si stergerea/scoaterea de pe un rand sunt butoane doar cu iconita (creion verde, cos de gunoi rosu), peste tot (sabloane notificari, hartă, facturi, oferte, furnizori, beneficiari, vehicule, utilizatori, miscari, tipuri de sisteme, componente proiect, pachete backup). Taburile de categorii din sabloanele de notificari arata numarul in paranteze, ex. „Stoc (4)".
 
@@ -12,7 +12,7 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 | Nr | Pas | Rezultat asteptat | Confirmat |
 |---|---|---|---|
-| 1 | Setari -> Notificari -> Sabloane notificari | Taburile arata „Autovehicule (3)", „Stoc (4)" etc. | |
+| 1 | Setari -> Notificari -> Sabloane notificari | Taburile arata numarul de sabloane ca insigna mica langa nume („Autovehicule 3", „Stoc 4”), la fel ca numarul din titlul unui card; la fel pe taburile Notificari (Active/Rezolvate) si Mentenanta (Scadente/Registru) | |
 | 2 | Un tabel cu randuri: Furnizori, Beneficiari, Utilizatori, Vehicule, Facturi, Sabloane oferte | La fiecare rand: creion si cos, nu cuvinte sau ✎/× | |
 | 3 | Trece mouse-ul peste o iconita | Apare „Editeaza <obiect>" / „Sterge <obiect>" | |
 | 4 | Un rand cu stergere interzisa (furnizor folosit, factura cu miscari) | Cosul este estompat, motivul apare la trecerea mouse-ului | |

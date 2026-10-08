@@ -24,13 +24,13 @@ else if (error is not null)
 }
 else if (user is null)
 {
-    <div class="empty-state"><span class="empty-icon">♙</span><h3>Utilizatorul nu mai există</h3><p>Contul a fost șters (mutat în arhivă) sau linkul nu este valid.</p><a class="refresh" href="/utilizatori">Înapoi la utilizatori</a></div>
+    <div class="empty-state"><span class="empty-icon">♙</span><h3>Utilizatorul nu mai există</h3><p>Contul a fost șters (mutat în arhivă) sau linkul nu este valid.</p><a class="refresh act-nav" href="/utilizatori">Înapoi la utilizatori</a></div>
 }
 else
 {
     <div class="page-heading">
         <div><p class="eyebrow">UTILIZATOR</p><h1>@user.Username</h1><p class="muted">@user.DisplayName</p></div>
-        <div class="heading-actions"><button class="refresh" disabled="@editing" @onclick="OpenEditorAsync">Editează</button></div>
+        <div class="heading-actions"><button class="refresh act-edit" disabled="@editing" @onclick="OpenEditorAsync">Editează</button></div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />

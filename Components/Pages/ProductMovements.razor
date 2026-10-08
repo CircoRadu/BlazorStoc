@@ -32,7 +32,7 @@ else if (error is not null && product is null)
 }
 else if (product is null)
 {
-    <div class="empty-state"><span class="empty-icon">▦</span><h3>Produsul nu mai există</h3><p>Produsul a fost șters sau linkul nu este valid.@(restoreMessage is null ? "" : " " + restoreMessage)</p><a class="refresh" href="/produse">Înapoi la catalog</a></div>
+    <div class="empty-state"><span class="empty-icon">▦</span><h3>Produsul nu mai există</h3><p>Produsul a fost șters sau linkul nu este valid.@(restoreMessage is null ? "" : " " + restoreMessage)</p><a class="refresh act-nav" href="/produse">Înapoi la catalog</a></div>
 }
 else
 {
@@ -65,7 +65,7 @@ else
                 @if (canManage)
                 {
                     <div class="movement-product-actions">
-                        @if (holder is null) { <a class="refresh" href="@ReturnNavigation.EditUrl(product.Id, CurrentPath)">Editează</a> }
+                        @if (holder is null) { <a class="refresh act-edit" href="@ReturnNavigation.EditUrl(product.Id, CurrentPath)">Editează</a> }
                         else { <button type="button" class="row-icon edit" disabled title="@ProductLockRules.HeldMessage(holder)" aria-label="Editează mișcarea"></button> }
                         <a class="danger movement-link-danger" href="@ReturnNavigation.DeleteUrl(product.Id, CurrentPath)">Șterge produs</a>
                     </div>
@@ -91,10 +91,10 @@ else
                         <div class="movement-form-top">
                             <label class="movement-date" for="movement-date">Data mișcării *
                                 <PickOnlyDate Id="movement-date" @bind-Value="form.Date" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
-                            <div class="movement-kind" role="group" aria-label="Tipul mișcării">
-                                <button type="button" class="kind-button kind-in @(form.Kind == StockMovementKind.Entry ? "selected" : "")" aria-pressed="@(form.Kind == StockMovementKind.Entry)" @onclick="() => SetKindAsync(StockMovementKind.Entry)">
+                            <div class="movement-kind" role="tablist" aria-label="Tipul mișcării">
+                                <button type="button" class="kind-button kind-in @(form.Kind == StockMovementKind.Entry ? "selected" : "")" role="tab" aria-selected="@(form.Kind == StockMovementKind.Entry)" @onclick="() => SetKindAsync(StockMovementKind.Entry)">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v13m0 0-5-5m5 5 5-5M5 20h14" /></svg> Intrare</button>
-                                <button type="button" class="kind-button kind-out @(form.Kind == StockMovementKind.Exit ? "selected" : "")" aria-pressed="@(form.Kind == StockMovementKind.Exit)" @onclick="() => SetKindAsync(StockMovementKind.Exit)">
+                                <button type="button" class="kind-button kind-out @(form.Kind == StockMovementKind.Exit ? "selected" : "")" role="tab" aria-selected="@(form.Kind == StockMovementKind.Exit)" @onclick="() => SetKindAsync(StockMovementKind.Exit)">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V7m0 0-5 5m5-5 5 5M5 4h14" /></svg> Ieșire</button>
                             </div>
                         </div>
@@ -176,7 +176,7 @@ else
                                     <InputTextArea id="duplicate-reason" @bind-Value="duplicateReason" rows="2" maxlength="@ChangeReasonRules.MaximumLength" /></label>
                                 <div class="editor-actions">
                                     <button type="button" class="primary" @onclick="ConfirmDuplicateAsync">Adaugă totuși</button>
-                                    <button type="button" class="refresh" @onclick="ModifyExistingAsync">Modifică intrarea existentă</button>
+                                    <button type="button" class="refresh act-edit" @onclick="ModifyExistingAsync">Modifică intrarea existentă</button>
                                     <button type="button" class="danger" @onclick="CancelWarning">Renunț</button>
                                 </div>
                             </div>
@@ -194,64 +194,63 @@ else
             <span class="movement-stock @StockClass" role="status">Total produse în stoc: <strong>@stock</strong>
                 @if (StockMovementRules.StockSplit(stock, inVehicles) is { } breakdown) { <small class="movement-breakdown">· @breakdown</small> }</span>
         </div>
-        <div class="movement-filters">
-            <fieldset class="movement-radios">
-                <legend class="sr-only">Filtrează mișcările</legend>
-                <label><input type="radio" name="movement-filter" checked="@(filter is null)" @onchange="() => SetFilterAsync(null)" /> Intrări/Ieșiri</label>
-                <label class="in"><input type="radio" name="movement-filter" checked="@(filter == StockMovementKind.Entry)" @onchange="() => SetFilterAsync(StockMovementKind.Entry)" /> Intrări</label>
-                <label class="out"><input type="radio" name="movement-filter" checked="@(filter == StockMovementKind.Exit)" @onchange="() => SetFilterAsync(StockMovementKind.Exit)" /> Ieșiri</label>
-            </fieldset>
-            @if (filter == StockMovementKind.Exit)
-            {
-                <fieldset class="movement-radios">
-                    <legend class="sr-only">Ieșiri peste stoc</legend>
-                    <label><input type="radio" name="movement-over" checked="@(!overStockOnly)" @onchange="() => SetOverStockAsync(false)" /> Toate ieșirile</label>
-                    <label><input type="radio" name="movement-over" checked="@overStockOnly" @onchange="() => SetOverStockAsync(true)" /> Peste stoc</label>
-                </fieldset>
-                <label class="movement-page-size">Destinație
-                    <select @onchange="DestinationFilterChangedAsync">
-                        <option value="">Toate</option>
-                        @foreach (var kind in FilterDestinations) { <option value="@((int)kind)" selected="@(destinationFilter == kind)">@StockMovementRules.DestinationLabel(kind)</option> }
-                    </select></label>
-                @if (pageData.ExitBeneficiaries is { Count: > 0 } exitBeneficiaries)
-                {
-                    <label class="movement-page-size">Beneficiar
-                        <select @onchange="BeneficiaryFilterChangedAsync">
-                            <option value="">Toți</option>
-                            @foreach (var b in exitBeneficiaries) { <option value="@b.Id" selected="@(beneficiaryFilter == b.Id)">@b.Name</option> }
-                        </select></label>
-                }
-                @if (pageData.ExitVehicles is { Count: > 0 } exitVehicles)
-                {
-                    <label class="movement-page-size">Vehicul
-                        <select @onchange="VehicleFilterChangedAsync">
-                            <option value="">Toate</option>
-                            @foreach (var v in exitVehicles) { <option value="@v.Id" selected="@(vehicleFilter == v.Id)">@v.Name</option> }
-                        </select></label>
-                }
-            }
-            @if (filter == StockMovementKind.Entry)
-            {
-                <fieldset class="movement-radios">
-                    <legend class="sr-only">Proveniența intrărilor</legend>
-                    <label><input type="radio" name="movement-source" checked="@(source == EntrySource.All)" @onchange="() => SetSourceAsync(EntrySource.All)" /> Toate</label>
-                    <label><input type="radio" name="movement-source" checked="@(source == EntrySource.WithInvoice)" @onchange="() => SetSourceAsync(EntrySource.WithInvoice)" /> Cu factură</label>
-                    <label><input type="radio" name="movement-source" checked="@(source == EntrySource.Free)" @onchange="() => SetSourceAsync(EntrySource.Free)" /> Libere</label>
-                </fieldset>
-                @if (pageData.Suppliers is { Count: > 0 } suppliers)
-                {
-                    <label class="movement-page-size">Furnizor
-                        <select @onchange="SupplierFilterChangedAsync">
-                            <option value="">Toți</option>
-                            @foreach (var s in suppliers) { <option value="@s.Id" selected="@(supplierFilter == s.Id)">@s.Name</option> }
-                        </select></label>
-                }
-            }
-            <label class="movement-page-size">Rânduri pe pagină
-                <select @onchange="PageSizeChangedAsync">
-                    @foreach (var option in PageSizes) { <option value="@option" selected="@(option == pageSize)">@(option == 0 ? "Toate" : option.ToString())</option> }
+        <div class="filters audit-filters movement-filters">
+            <label class="search-box"><span>⌕</span><input id="movement-text-filter" aria-label="Caută în mișcări" autocomplete="off" maxlength="80"
+                       placeholder="Descriere, factură, furnizor, beneficiar, proiect, vehicul…" @bind="textFilter" @bind:event="oninput" @bind:after="TextChangedAsync" /></label>
+            <label><span class="sr-only">Tip mișcare</span>
+                <select id="movement-kind-filter" @onchange="KindChosenAsync">
+                    <option value="" selected="@(filter is null && !overStockOnly)">Toate mișcările</option>
+                    <option value="in" selected="@(filter == StockMovementKind.Entry)">Intrări</option>
+                    <option value="out" selected="@(filter == StockMovementKind.Exit && !overStockOnly)">Ieșiri</option>
+                    <option value="over" selected="@overStockOnly">Ieșiri peste stoc</option>
                 </select></label>
+            <label><span class="sr-only">Proveniența intrărilor</span>
+                <select id="movement-source-filter" @onchange="SourceChosenAsync">
+                    <option value="" selected="@(source == EntrySource.All)">Toate proveniențele</option>
+                    <option value="invoice" selected="@(source == EntrySource.WithInvoice)">Cu factură</option>
+                    <option value="free" selected="@(source == EntrySource.Free)">Intrări libere</option>
+                </select></label>
+            @if (pageData.Suppliers is { Count: > 0 } filterSuppliers)
+            {
+                <label><span class="sr-only">Furnizor</span>
+                    <select id="movement-supplier-filter" @onchange="SupplierFilterChangedAsync">
+                        <option value="">Toți furnizorii</option>
+                        @foreach (var item in filterSuppliers) { <option value="@item.Id" selected="@(supplierFilter == item.Id)">@item.Name</option> }
+                    </select></label>
+            }
+            <label><span class="sr-only">Destinația ieșirilor</span>
+                <select id="movement-destination-filter" @onchange="DestinationFilterChangedAsync">
+                    <option value="">Toate destinațiile</option>
+                    @foreach (var kind in FilterDestinations) { <option value="@((int)kind)" selected="@(destinationFilter == kind)">@StockMovementRules.DestinationLabel(kind)</option> }
+                </select></label>
+            @if (pageData.ExitBeneficiaries is { Count: > 0 } filterBeneficiaries)
+            {
+                <label><span class="sr-only">Beneficiar</span>
+                    <select id="movement-beneficiary-filter" @onchange="BeneficiaryFilterChangedAsync">
+                        <option value="">Toți beneficiarii</option>
+                        @foreach (var item in filterBeneficiaries) { <option value="@item.Id" selected="@(beneficiaryFilter == item.Id)">@item.Name</option> }
+                    </select></label>
+            }
+            @if (pageData.ExitVehicles is { Count: > 0 } filterVehicles)
+            {
+                <label><span class="sr-only">Vehicul</span>
+                    <select id="movement-vehicle-filter" @onchange="VehicleFilterChangedAsync">
+                        <option value="">Toate vehiculele</option>
+                        @foreach (var item in filterVehicles) { <option value="@item.Id" selected="@(vehicleFilter == item.Id)">@item.Name</option> }
+                    </select></label>
+            }
         </div>
+        @if (ActiveFilters.Count > 0)
+        {
+            <div class="audit-active-filters" role="status">
+                <span>Filtre active:</span>
+                @foreach (var chip in ActiveFilters)
+                {
+                    <strong class="audit-filter-chip">@chip.Text <button type="button" aria-label="@($"Elimină filtrul {chip.Text}")" title="@($"Elimină filtrul {chip.Text}")" @onclick="chip.Remove">×</button></strong>
+                }
+                <button type="button" class="audit-clear-filters danger" @onclick="ClearFiltersAsync">Șterge filtrele</button>
+            </div>
+        }
 
         @if (loading)
         {
@@ -274,32 +273,32 @@ else
                         @foreach (var m in pageData.Items)
                         {
                             <tr @key="m.Id" class="@(m.Modified ? "modified" : "") @(m.IsVoided ? "voided" : "")" @oncontextmenu="() => OpenHistoryAsync(m)" @oncontextmenu:preventDefault="@m.Modified">
-                                <td>@StockMovementRules.DisplayDate(m.Date)</td>
-                                <td><span class="kind-label @(m.Kind == StockMovementKind.Entry ? "in" : "out")">@StockMovementRules.KindLabel(m.Kind)@(m.Modified ? "[*]" : "")</span></td>
+                                <td><button type="button" class="audit-filter-link" title="Filtrează după această dată" @onclick="() => FilterByDateAsync(m.Date)">@StockMovementRules.DisplayDate(m.Date)</button></td>
+                                <td><button type="button" class="audit-filter-link kind-label @(m.Kind == StockMovementKind.Entry ? "in" : "out")" title="Filtrează după acest tip de mișcare" @onclick="() => FilterByKindAsync(m.Kind)">@StockMovementRules.KindLabel(m.Kind)@(m.Modified ? "[*]" : "")</button></td>
                                 <td class="number">@m.Quantity</td>
                                 <td class="movement-text">@m.Description@if (m.IsVoided) { <span class="stock-badge negative" title="@($"Stornat de {m.VoidedBy}: {m.VoidReason}")"> stornat</span> }@if (m.ReturnOfMovementId is { } returnOf) { <small class="movement-project"> · retur al ieșirii #@returnOf</small> }@if (m.Kind == StockMovementKind.Exit && m.Reference is not null) { <small class="movement-project"> · ref. @m.Reference</small> }@if (pageData.OverStockIds?.Contains(m.Id) == true) { <span class="stock-badge negative" title="Ieșirea a depășit stocul din depozit (sau din mașină) la data ei"> peste stoc</span>@if (m.OverStockCause is { } overCause) { <small class="movement-project"> · @StockMovementRules.CauseLabel(overCause)</small> } }</td>
                                 <td>
                                     @if (m.InvoiceNumber is not null)
                                     {
                                         <span>@m.InvoiceNumber</span>
-                                        @if (m.SupplierId is { } supplierId && m.SupplierName is not null) { <span class="movement-project"> · <a class="category-table-link" href="@SupplierNavigation.SupplierUrl(supplierId)">@m.SupplierName</a></span> }
+                                        @if (m.SupplierId is { } supplierId && m.SupplierName is not null) { <span class="movement-project"> · <a class="category-table-link" href="@SupplierNavigation.SupplierUrl(supplierId)">@m.SupplierName</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest furnizor" aria-label="Filtrează după acest furnizor" @onclick="() => FilterBySupplierAsync(supplierId)">⌕</button></span> }
                                     }
                                     else if (m.Kind == StockMovementKind.Entry) { <span class="destination-label">Intrare liberă</span> }
                                 </td>
                                 <td>
                                     @if (m.BeneficiaryName is not null)
                                     {
-                                        <a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a>
+                                        <a class="category-table-link" href="@($"/beneficiari/{m.BeneficiaryId}")">@m.BeneficiaryName</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest beneficiar" aria-label="Filtrează după acest beneficiar" @onclick="() => FilterByBeneficiaryAsync(m.BeneficiaryId!.Value)">⌕</button>
                                         @if (m.ProjectName is not null) { <span class="movement-project"> · <a class="category-table-link" href="@($"/proiecte/{m.ProjectId}")">@m.ProjectName</a></span> }
                                     }
                                     else if (m.Destination is ExitDestination.GenericSale or ExitDestination.StockCorrection or ExitDestination.WarehouseReturn)
                                     {
-                                        <span class="destination-label">@StockMovementRules.DestinationLabel(m.Destination.Value)</span>
+                                        <button type="button" class="audit-filter-link destination-label" title="Filtrează după această destinație" @onclick="() => FilterByDestinationAsync(m.Destination!.Value)">@StockMovementRules.DestinationLabel(m.Destination.Value)</button>
                                     }
                                 </td>
                                 <td>
-                                    @if (m.VehiclePlate is not null) { <span class="movement-project">în <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.VehicleId!.Value)">@m.VehiclePlate</a></span> }
-                                    @if (m.SourceVehiclePlate is not null) { <span class="movement-project">din <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.SourceVehicleId!.Value)">@m.SourceVehiclePlate</a></span> }
+                                    @if (m.VehiclePlate is not null) { <span class="movement-project">în <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.VehicleId!.Value)">@m.VehiclePlate</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest vehicul" aria-label="Filtrează după acest vehicul" @onclick="() => FilterByVehicleAsync(m.VehicleId!.Value)">⌕</button></span> }
+                                    @if (m.SourceVehiclePlate is not null) { <span class="movement-project">din <a class="category-table-link" href="@VehicleNavigation.PageUrl(m.SourceVehicleId!.Value)">@m.SourceVehiclePlate</a> <button type="button" class="audit-filter-link filter-hint" title="Filtrează după acest vehicul" aria-label="Filtrează după acest vehicul" @onclick="() => FilterByVehicleAsync(m.SourceVehicleId!.Value)">⌕</button></span> }
                                 </td>
                                 @if (canManage)
                                 {
@@ -340,7 +339,7 @@ else
 @if (imagePreview && product is not null)
 {
     <div class="image-lightbox" role="dialog" aria-modal="true" aria-label="Imagine mărită pentru @product.Name" @onclick="() => imagePreview = false" @onkeydown="ImageKeyAsync">
-        <button type="button" class="image-lightbox-close" aria-label="Închide imaginea" @onclick="() => imagePreview = false">×</button>
+        <button type="button" class="image-lightbox-close" aria-label="Închide imaginea" @onclick="() => imagePreview = false" title="Închide imaginea">×</button>
         <figure @onclick:stopPropagation="true"><img src="@ImageUrl" alt="Imagine mărită pentru @product.Name" /><figcaption>@product.Name</figcaption></figure>
     </div>
 }
@@ -447,7 +446,7 @@ else
                 <InputTextArea id="void-reason" @bind-Value="voidReason" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@voidBusy" /></label>
             <div class="editor-actions">
                 <button type="button" class="danger" disabled="@voidBusy" @onclick="VoidAsync">@(voidBusy ? "Se stornează…" : "Stornează operația")</button>
-                <button type="button" class="refresh" disabled="@voidBusy" @onclick="CancelVoid">Renunț</button>
+                <button type="button" class="refresh act-close" disabled="@voidBusy" @onclick="CancelVoid">Renunț</button>
             </div>
         </section>
     </div>
@@ -483,7 +482,7 @@ else
     // Set by the add-beneficiary / add-project pages when they send the user back to a half-filled exit form.
     [SupplyParameterFromQuery(Name = "restaurare")] public string? RestoreFlag { get; set; }
     private string? restoreMessage;
-    private bool restoreHandled;
+    private bool restoreHandled, stateApplied;
     private static readonly int[] PageSizes = [10, 20, 50, 0];
     private Product? product;
     private StockMovementPage pageData = new([], 0, 0, false);
@@ -684,7 +683,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        if (product is not null && product.Id != Id) { product = null; filter = null; source = EntrySource.All; supplierFilter = null; destinationFilter = null; beneficiaryFilter = vehicleFilter = null; overStockOnly = false; pageNumber = 1; form = NewForm(); useProject = false; addSuggestion = null; }
+        if (product is not null && product.Id != Id) { stateApplied = false; dateFilter = null; textFilter = ""; product = null; filter = null; source = EntrySource.All; supplierFilter = null; destinationFilter = null; beneficiaryFilter = vehicleFilter = null; overStockOnly = false; pageNumber = 1; form = NewForm(); useProject = false; addSuggestion = null; }
         if (product is null) await LoadAsync();
     }
 
@@ -697,6 +696,7 @@ else
             var accessTask = Access.CanManageProductsAsync(lifetime.Token);
             await Task.WhenAll(productTask, accessTask);
             product = await productTask; canManage = await accessTask;
+            if (!stateApplied) { ApplyStateFromAddress(); stateApplied = true; }
             isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
             if (product is not null) { await LoadPageAsync(); await RefreshHolderAsync(); }
             await RestoreExitFormAsync();
@@ -778,7 +778,7 @@ else
     }
 
     private StockMovementQuery CurrentQuery() => new(filter, descending, pageNumber, pageSize, source, supplierFilter, overStockOnly,
-        destinationFilter, beneficiaryFilter, vehicleFilter);
+        destinationFilter, beneficiaryFilter, vehicleFilter, textFilter, dateFilter);
 
     private async Task LoadPageAsync()
     {
@@ -786,6 +786,7 @@ else
         try
         {
             pageData = await Movements.GetPageAsync(Id, CurrentQuery(), lifetime.Token);
+            SyncState();
             stock = pageData.Stock; inVehicles = pageData.InVehicles;
             if (canManage) { vehicleStocks = await Movements.GetVehicleStocksAsync(Id, lifetime.Token); returnables = await Movements.GetReturnableExitsAsync(Id, lifetime.Token); }
             var pages = TotalPages;
@@ -806,8 +807,11 @@ else
         catch (Exception ex) { Logger.LogError("Beneficiary list loading failed ({ErrorType}).", ex.GetType().Name); formError = "Lista beneficiarilor nu a putut fi încărcată."; }
     }
 
+    // Entry and exit are two tabs: passing from one to the other starts a clean form (nothing typed for one is carried into the other).
     private async Task SetKindAsync(StockMovementKind kind)
     {
+        if (form.Kind == kind) return;
+        form = NewForm(); useProject = false; addSuggestion = null; addTracker?.Rebase();
         form.Kind = kind; formError = null;
         if (kind == StockMovementKind.Entry)
         {
@@ -937,26 +941,29 @@ else
         await LoadPageAsync();
     }
 
-    private async Task SetFilterAsync(StockMovementKind? kind)
+    private async Task SetFilterAsync(StockMovementKind? kind, bool load = true)
     {
         filter = kind; pageNumber = 1;
         if (kind != StockMovementKind.Entry) { source = EntrySource.All; supplierFilter = null; }
         if (kind != StockMovementKind.Exit) { overStockOnly = false; destinationFilter = null; beneficiaryFilter = vehicleFilter = null; }
-        await LoadPageAsync();
+        if (load) await LoadPageAsync();
     }
     private async Task DestinationFilterChangedAsync(ChangeEventArgs e)
     {
         destinationFilter = int.TryParse(e.Value?.ToString(), out var id) && Enum.IsDefined((ExitDestination)id) ? (ExitDestination)id : null;
+        if (destinationFilter is not null) filter = StockMovementKind.Exit;
         pageNumber = 1; await LoadPageAsync();
     }
     private async Task BeneficiaryFilterChangedAsync(ChangeEventArgs e)
     {
         beneficiaryFilter = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        if (beneficiaryFilter is not null) filter = StockMovementKind.Exit;
         pageNumber = 1; await LoadPageAsync();
     }
     private async Task VehicleFilterChangedAsync(ChangeEventArgs e)
     {
         vehicleFilter = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        if (vehicleFilter is not null) filter = StockMovementKind.Exit;
         pageNumber = 1; await LoadPageAsync();
     }
     private async Task SetOverStockAsync(bool value) { overStockOnly = value; pageNumber = 1; await LoadPageAsync(); }
@@ -999,9 +1006,126 @@ else
     private async Task SupplierFilterChangedAsync(ChangeEventArgs e)
     {
         supplierFilter = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
-        if (supplierFilter is not null && source == EntrySource.Free) source = EntrySource.WithInvoice;
+        if (supplierFilter is not null) { filter = StockMovementKind.Entry; if (source != EntrySource.WithInvoice) source = EntrySource.WithInvoice; }
         pageNumber = 1; await LoadPageAsync();
     }
+    // The filters of the movement list: a text field, and the column labels (kind, invoice / supplier, beneficiary, vehicle) that open a panel of choices.
+    private string textFilter = "";
+    private CancellationTokenSource? textDebounce;
+
+    private async Task TextChangedAsync()
+    {
+        textDebounce?.Cancel(); textDebounce?.Dispose();
+        var debounce = textDebounce = new CancellationTokenSource();
+        try { await Task.Delay(350, debounce.Token); }
+        catch (TaskCanceledException) { return; }
+        pageNumber = 1; await LoadPageAsync();
+    }
+
+    private sealed record FilterChip(string Text, EventCallback Remove);
+
+    private IReadOnlyList<FilterChip> ActiveFilters
+    {
+        get
+        {
+            var chips = new List<FilterChip>();
+            FilterChip Chip(string text, Func<Task> remove) => new(text, EventCallback.Factory.Create(this, async () => { pageNumber = 1; await remove(); }));
+            if (!string.IsNullOrWhiteSpace(textFilter)) chips.Add(Chip($"Text: {textFilter.Trim()}", () => { textFilter = ""; return LoadPageAsync(); }));
+            if (dateFilter is { } day) chips.Add(Chip($"data: {StockMovementRules.DisplayDate(day)}", () => { dateFilter = null; return LoadPageAsync(); }));
+            if (filter is not null) chips.Add(Chip(filter == StockMovementKind.Entry ? "Intrări" : "Ieșiri", () => SetFilterAsync(null)));
+            if (overStockOnly) chips.Add(Chip("Peste stoc", () => { overStockOnly = false; return LoadPageAsync(); }));
+            if (source != EntrySource.All) chips.Add(Chip(source == EntrySource.Free ? "Intrări libere" : "Cu factură", () => { source = EntrySource.All; supplierFilter = null; return LoadPageAsync(); }));
+            if (supplierFilter is { } supplierId) chips.Add(Chip($"Furnizor: {pageData.Suppliers?.FirstOrDefault(item => item.Id == supplierId)?.Name ?? supplierId.ToString()}", () => { supplierFilter = null; return LoadPageAsync(); }));
+            if (destinationFilter is { } destination) chips.Add(Chip($"Destinație: {StockMovementRules.DestinationLabel(destination)}", () => { destinationFilter = null; return LoadPageAsync(); }));
+            if (beneficiaryFilter is { } beneficiaryId) chips.Add(Chip($"Beneficiar: {pageData.ExitBeneficiaries?.FirstOrDefault(item => item.Id == beneficiaryId)?.Name ?? beneficiaryId.ToString()}", () => { beneficiaryFilter = null; return LoadPageAsync(); }));
+            if (vehicleFilter is { } vehicleId) chips.Add(Chip($"Vehicul: {pageData.ExitVehicles?.FirstOrDefault(item => item.Id == vehicleId)?.Name ?? vehicleId.ToString()}", () => { vehicleFilter = null; return LoadPageAsync(); }));
+            return chips;
+        }
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        textFilter = ""; filter = null; source = EntrySource.All; supplierFilter = null; overStockOnly = false; destinationFilter = null; beneficiaryFilter = vehicleFilter = null;
+        dateFilter = null; pageNumber = 1; await LoadPageAsync();
+    }
+
+    // Filters as in the activity journal: a search box and selects, the active filters as chips with "Șterge filtrele", the values of the table as filters
+    // (date, type, supplier, beneficiary, destination, vehicle), and the state in the address (so Back restores it).
+    private DateOnly? dateFilter;
+    private string? appliedAddress;
+
+    private async Task KindChosenAsync(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+        pageNumber = 1;
+        if (value == "over") { await SetFilterAsync(StockMovementKind.Exit, load: false); overStockOnly = true; await LoadPageAsync(); }
+        else await SetFilterAsync(value == "in" ? StockMovementKind.Entry : value == "out" ? StockMovementKind.Exit : null);
+    }
+
+    private async Task SourceChosenAsync(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? "";
+        source = value == "invoice" ? EntrySource.WithInvoice : value == "free" ? EntrySource.Free : EntrySource.All;
+        if (source != EntrySource.WithInvoice) supplierFilter = null;
+        if (source != EntrySource.All) filter = StockMovementKind.Entry;
+        pageNumber = 1; await LoadPageAsync();
+    }
+
+    private async Task FilterByDateAsync(DateOnly date) { dateFilter = date; pageNumber = 1; await LoadPageAsync(); }
+    private async Task FilterByKindAsync(StockMovementKind kind) => await SetFilterAsync(kind);
+    private async Task FilterBySupplierAsync(int id) { filter = StockMovementKind.Entry; source = EntrySource.WithInvoice; supplierFilter = id; pageNumber = 1; await LoadPageAsync(); }
+    private async Task FilterByBeneficiaryAsync(int id) { filter = StockMovementKind.Exit; beneficiaryFilter = id; pageNumber = 1; await LoadPageAsync(); }
+    private async Task FilterByDestinationAsync(ExitDestination destination) { filter = StockMovementKind.Exit; destinationFilter = destination; pageNumber = 1; await LoadPageAsync(); }
+    private async Task FilterByVehicleAsync(int id) { filter = StockMovementKind.Exit; vehicleFilter = id; pageNumber = 1; await LoadPageAsync(); }
+
+    [SupplyParameterFromQuery(Name = "q")] public string? QueryText { get; set; }
+    [SupplyParameterFromQuery(Name = "tip")] public string? KindParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "sursa")] public string? SourceParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "furnizor")] public int? SupplierParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "destinatie")] public int? DestinationParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "beneficiar")] public int? BeneficiaryParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "vehicul")] public int? VehicleParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "data")] public string? DateParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "peste-stoc")] public string? OverStockParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "pe-pagina")] public int? PageSizeParameter { get; set; }
+    [SupplyParameterFromQuery(Name = "pagina")] public int? PageParameter { get; set; }
+
+    // Read from the address once, when the page is opened for a product (later the page itself is the source of the state).
+    private void ApplyStateFromAddress()
+    {
+        textFilter = (QueryText ?? "").Trim();
+        filter = KindParameter == "intrari" ? StockMovementKind.Entry : KindParameter == "iesiri" ? StockMovementKind.Exit : null;
+        source = SourceParameter == "factura" ? EntrySource.WithInvoice : SourceParameter == "libere" ? EntrySource.Free : EntrySource.All;
+        supplierFilter = SupplierParameter; beneficiaryFilter = BeneficiaryParameter; vehicleFilter = VehicleParameter;
+        destinationFilter = DestinationParameter is { } destination && Enum.IsDefined((ExitDestination)destination) ? (ExitDestination)destination : null;
+        dateFilter = DateOnly.TryParseExact(DateParameter, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var day) ? day : null;
+        overStockOnly = OverStockParameter == "1";
+        if (supplierFilter is not null) { filter = StockMovementKind.Entry; if (source == EntrySource.All) source = EntrySource.WithInvoice; }
+        if (source != EntrySource.All) filter = StockMovementKind.Entry;
+        if (destinationFilter is not null || beneficiaryFilter is not null || vehicleFilter is not null || overStockOnly) filter = StockMovementKind.Exit;
+        pageSize = PageSizeParameter is { } size && PageSizes.Contains(size) ? size : 10;
+        pageNumber = Math.Max(1, PageParameter ?? 1);
+    }
+
+    private void SyncState()
+    {
+        var values = new Dictionary<string, object?>
+        {
+            ["q"] = string.IsNullOrWhiteSpace(textFilter) ? null : textFilter.Trim(),
+            ["tip"] = filter == StockMovementKind.Entry ? "intrari" : filter == StockMovementKind.Exit ? "iesiri" : null,
+            ["sursa"] = source == EntrySource.WithInvoice ? "factura" : source == EntrySource.Free ? "libere" : null,
+            ["furnizor"] = supplierFilter, ["destinatie"] = destinationFilter is { } destination ? (int)destination : null,
+            ["beneficiar"] = beneficiaryFilter, ["vehicul"] = vehicleFilter,
+            ["data"] = dateFilter is { } day ? StockMovementRules.StorageDate(day) : null,
+            ["peste-stoc"] = overStockOnly ? "1" : null,
+            ["pe-pagina"] = pageSize == 10 ? null : pageSize, ["pagina"] = pageNumber <= 1 ? null : pageNumber
+        };
+        var address = Navigation.GetUriWithQueryParameters(values);
+        if (address == Navigation.Uri || address == appliedAddress) return;
+        appliedAddress = address;
+        Navigation.NavigateTo(address, replace: true);
+    }
+
     private async Task ToggleSortAsync() { descending = !descending; pageNumber = 1; await LoadPageAsync(); }
     private async Task PreviousPageAsync() { if (pageNumber > 1) { pageNumber--; await LoadPageAsync(); } }
     private async Task NextPageAsync() { if (pageNumber < TotalPages) { pageNumber++; await LoadPageAsync(); } }

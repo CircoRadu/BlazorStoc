@@ -25,7 +25,7 @@
                         <InputTextLive id="supplier-cui" @bind-Value="input.Cui" maxlength="20" autocomplete="off" disabled="@(saving || Locked)" />
                         @if (!input.IsExternal)
                         {
-                            <button type="button" class="refresh" disabled="@(fetching || saving || input.Cui.Trim().Length == 0)" @onclick="FetchFromAnafAsync">@(fetching ? "Se interoghează ANAF…" : Original is null ? "Preia date din ANAF" : "Preia din nou din ANAF")</button>
+                            <button type="button" class="refresh act-confirm" disabled="@(fetching || saving || input.Cui.Trim().Length == 0)" @onclick="FetchFromAnafAsync">@(fetching ? "Se interoghează ANAF…" : Original is null ? "Preia date din ANAF" : "Preia din nou din ANAF")</button>
                         }
                     </div>
                     <small>@(input.IsExternal ? $"Începe cu {input.Country} (de exemplu {input.Country}123456789); prefixul se adaugă singur dacă lipsește." : "2–10 cifre, opțional precedate de RO. CUI-ul identifică furnizorul: nu poate exista de două ori.")</small>
@@ -76,7 +76,7 @@
                         <label for="supplier-alias-input">Denumire alternativă nouă<input id="supplier-alias-input" maxlength="@SupplierRules.MaxAliasLength" value="@aliasText" @oninput="args => aliasText = args.Value?.ToString() ?? string.Empty" autocomplete="off" /></label>
                     </div>
                     @if (aliasError.Length > 0) { <div class="validation-message" role="alert">@aliasError</div> }
-                    <button type="button" class="refresh" disabled="@(saving || aliasBusy || aliasText.Trim().Length == 0)" @onclick="AddAliasAsync">+ Adaugă denumirea</button>
+                    <button type="button" class="refresh act-confirm" disabled="@(saving || aliasBusy || aliasText.Trim().Length == 0)" @onclick="AddAliasAsync">+ Adaugă denumirea</button>
                 </div>
             }
             <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează furnizorul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
@@ -87,6 +87,11 @@
 {
     <SaveConfirmationDialog Title="Salvezi modificările furnizorului?" ObjectLabel="@Original.Name" Changes="pendingChanges"
                             Reason="@input.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
+
+@if (pendingAnaf is not null)
+{
+    <AnafDifferencesDialog Items="pendingAnaf" Applied="ApplyChosenAnaf" Cancelled="() => pendingAnaf = null" />
 }
 
 @code {
@@ -172,7 +177,7 @@
             anafMessageKind = "warn";
             anafMessage = "CUI-ul citit din factură nu pare corect: " + problem + " Corectează-l după factură.";
         }
-        else await FetchFromAnafAsync();
+        else { replaceNameOnce = true; await FetchFromAnafAsync(); replaceNameOnce = false; }
         StateHasChanged();
     }
 
@@ -216,17 +221,15 @@
             outcome = result.Outcome;
             if (result.Company is { } company)
             {
-                input.Name = Norm(company.Name);
-                if (company.Address.Length > 0) input.Address = Norm(company.Address);
-                if (company.RegistryNumber.Length > 0) input.RegistryNumber = Norm(company.RegistryNumber).ToUpperInvariant();
-                if (company.Phone.Length > 0) input.Phone = BeneficiaryRules.NormalizePhone(company.Phone);
-                if (company.PostalCode.Length > 0) input.PostalCode = BeneficiaryRules.CompactValue(company.PostalCode);
-                if (company.CaenCode.Length > 0) input.CaenCode = BeneficiaryRules.CompactValue(company.CaenCode);
+                var plan = AnafApplyRules.Plan(AnafApplyRules.Proposals(company, input.Name, input.Address, input.RegistryNumber, input.Phone, input.PostalCode, input.CaenCode), SupplierUpdates(result.Updates));
+                foreach (var proposal in plan.Direct) ApplyAnafField(proposal);
+                pendingAnaf = plan.Ask.Count > 0 ? plan.Ask : null;
+                keptMine = plan.KeptMine;
                 anafSnapshot = company with { Cui = requested };
                 failure = null;
                 fetchedFromAnaf = true;
                 anafMessageKind = "ok";
-                anafMessage = "Datele au fost preluate din ANAF. Completează manual ce nu a returnat ANAF (de exemplu telefonul), dacă ai nevoie.";
+                anafMessage = "Datele au fost preluate din ANAF. Completează manual ce nu a returnat ANAF (de exemplu telefonul), dacă ai nevoie." + KeptNote;
                 anafWarning = result.Warning;
             }
             else
@@ -272,6 +275,41 @@
     private Supplier Preview() => new(Original?.Id ?? 0, input.Name, SupplierRules.NormalizeCui(input.Country, input.Cui), input.Country, Original?.Version ?? 0,
         input.Address, input.Phone, input.RegistryNumber, input.PostalCode, input.CaenCode, CurrentSource, Original?.VerifiedUtc);
 
+    // The fields ANAF changed in the form only after the user chose (policy "Cere confirmare"), and the fields whose own value was kept (policy "Păstrează valoarea mea").
+    private IReadOnlyList<AnafFieldProposal>? pendingAnaf;
+    private IReadOnlyList<string> keptMine = [];
+    private string KeptNote => keptMine.Count == 0 ? "" : $" S-au păstrat valorile tale pentru: {string.Join(", ", keptMine)}.";
+
+    private void ApplyAnafField(AnafFieldProposal proposal)
+    {
+        switch (proposal.Label)
+        {
+            case "Denumire": input.Name = proposal.Incoming; break;
+            case "Adresă fiscală": input.Address = proposal.Incoming; break;
+            case "Nr. Registrul Comerțului": input.RegistryNumber = proposal.Incoming; break;
+            case "Telefon": input.Phone = proposal.Incoming; break;
+            case "Cod poștal": input.PostalCode = proposal.Incoming; break;
+            case "Cod CAEN": input.CaenCode = proposal.Incoming; break;
+        }
+    }
+
+    private void ApplyChosenAnaf(IReadOnlyList<AnafFieldProposal> chosen)
+    {
+        foreach (var proposal in chosen) ApplyAnafField(proposal);
+        pendingAnaf = null;
+    }
+
+    // Two moments take the official name of ANAF without asking: a supplier opened from an invoice (it holds the name READ from the PDF, which may be misread;
+    // the read name is offered as an alias) and the check before the first save. Every other field follows its policy.
+    private bool replaceNameOnce;
+
+    private IReadOnlyDictionary<string, string>? SupplierUpdates(IReadOnlyDictionary<string, string>? updates)
+    {
+        if (Original is not null || !replaceNameOnce) return updates;
+        var copy = new Dictionary<string, string>(updates ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase) { ["Denumire"] = AnafApplyRules.Overwrite };
+        return copy;
+    }
+
     private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
 
     private async Task SaveAsync()
@@ -285,7 +323,11 @@
         if (Original is null && !input.IsExternal && !HasSnapshot && ActiveFailure is null)
         {
             error = null;
-            if (await FetchAsync() == AnafLookupOutcome.Found)
+            // The check before the first save exists to take the official data: the typed name is replaced by the one of ANAF (the other fields follow their policy).
+            replaceNameOnce = true;
+            var outcome = await FetchAsync();
+            replaceNameOnce = false;
+            if (outcome == AnafLookupOutcome.Found)
             {
                 anafMessage = "Datele au fost preluate din ANAF și completate în formular. Verifică-le și apasă din nou „Salvează furnizorul”.";
                 return;

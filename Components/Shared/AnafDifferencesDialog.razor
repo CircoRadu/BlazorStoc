@@ -1,0 +1,45 @@
+@using BlazorStoc.Services
+@* ANAF returned values that differ from what the form already holds (and the policy of the field is "Cere confirmare"): for each field the user chooses
+   the value from ANAF or keeps his own. The default is to keep his own; nothing is saved here, the chosen values only go into the form. *@
+<div class="delete-overlay" @onkeydown="KeyDownAsync">
+    <section class="delete-dialog save-confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="anaf-differences-title">
+        <h2 id="anaf-differences-title">Date diferite în ANAF</h2>
+        <p>ANAF are alte valori decât cele din formular. Pentru fiecare câmp alege valoarea din ANAF sau păstrează-o pe a ta.</p>
+        <div class="table-scroll">
+            <table class="save-summary">
+                <caption class="sr-only">Câmpuri cu valori diferite</caption>
+                <thead><tr><th scope="col">Câmp</th><th scope="col">Valoarea ta</th><th scope="col">Valoarea din ANAF</th><th scope="col">Alegere</th></tr></thead>
+                <tbody>
+                    @for (var index = 0; index < Items.Count; index++)
+                    {
+                        var row = index;
+                        <tr>
+                            <th scope="row">@Items[row].Label</th>
+                            <td>@Items[row].Current</td>
+                            <td><strong>@Items[row].Incoming</strong></td>
+                            <td><ToggleSwitch Value="useAnaf[row]" ValueChanged="@((bool on) => useAnaf[row] = on)" OnText="Din ANAF" OffText="A mea" AriaLabel="@($"Valoarea din ANAF pentru {Items[row].Label}")" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="primary" @onclick="ApplyAsync">Aplică alegerea</button>
+            <button type="button" class="refresh act-close" @onclick="() => Cancelled.InvokeAsync()">Renunță</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AnafFieldProposal> Items { get; set; } = [];
+    /// <summary>The proposals the user chose to take from ANAF (possibly none).</summary>
+    [Parameter] public EventCallback<IReadOnlyList<AnafFieldProposal>> Applied { get; set; }
+    [Parameter] public EventCallback Cancelled { get; set; }
+    private bool[] useAnaf = [];
+
+    protected override void OnParametersSet() { if (useAnaf.Length != Items.Count) useAnaf = new bool[Items.Count]; }
+
+    private Task ApplyAsync() => Applied.InvokeAsync([.. Items.Where((_, index) => useAnaf[index])]);
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? Cancelled.InvokeAsync() : Task.CompletedTask;
+}
