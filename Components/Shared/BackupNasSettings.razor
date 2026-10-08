@@ -1,0 +1,116 @@
+@using BlazorStoc.Services
+@inject INasBackupSettingsRepository Settings
+@inject INasBackupCopier Copier
+@inject IBackupAlertReader Alerts
+@inject ILogger<BackupNasSettings> Logger
+@implements IDisposable
+@* Setari -> Backup NAS: only the connection to the network share (path, account, password kept encrypted), the copy of the packages and the last result.
+   The daily backup, the age for the notification, the old-package clean-up and the table of packages are in Setari -> Backup. *@
+
+<section class="catalog nas-backup">
+    <div class="catalog-heading"><h2>Backup pe NAS</h2><small>Fiecare backup făcut local se copiază apoi pe NAS. Pachetele de pe NAS nu se șterg niciodată din aplicație. Parola se păstrează criptat și nu se mai afișează.</small></div>
+
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
+        <div class="anaf-grid">
+            <ToggleSwitch Class="anaf-check" @bind-Value="copyEnabled" OnText="Activ" OffText="Inactiv">Copiere pe NAS</ToggleSwitch>
+            <label class="anaf-wide">Cale partajare (de forma \\server\partajare sau \\server\partajare\folder)<input id="nas-path" @bind="path" maxlength="500" autocomplete="off" placeholder="\\192.168.100.50\BackupStocDepozit" /></label>
+            <label>Cont<input id="nas-user" @bind="userName" maxlength="100" autocomplete="off" /></label>
+            <label>Parolă<input id="nas-password" type="password" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(hasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează</button>
+            <button type="button" class="refresh" disabled="@busy" @onclick="TestAsync">Testează conexiunea</button>
+            <button type="button" class="refresh" disabled="@busy" @onclick="CopyNowAsync" title="Urcă pe NAS toate pachetele locale care lipsesc de acolo (de exemplu cele făcute când NAS-ul era oprit)">Copiază pe NAS pachetele lipsă</button>
+            @if (busy) { <span class="muted" role="status" data-operation-driver>@busyText</span> }
+        </div>
+        <p class="muted"><small>Orice backup făcut local (la preluarea de inventar, programat sau la cerere) este copiat automat pe NAS cât timp „Copiere pe NAS” este Activ. Programarea, ștergerea pachetelor vechi de pe server și lista pachetelor sunt în Setări → Backup.</small></p>
+        <p class="muted" role="status" style="margin-top:12px">
+            @if (current.LastAttemptUtc is { } at) { <text>Ultima operație pe NAS: <strong>@at.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</strong> — @(current.LastOk == true ? "reușită" : "eșuată"). @current.LastMessage</text> }
+            else { <text>Nicio copiere pe NAS încă.</text> }
+        </p>
+        @if (alertState is not null)
+        {
+            var model = NasCopyMissingSource.Preview(alertState);
+            <h3>Model notificare „Copie pe NAS lipsă”</h3>
+            <div class="notification-model" role="note" aria-label="Model de notificare, needitabil">
+                <strong>@model.Subject</strong>
+                <p>@model.Body</p>
+                <small class="muted">Model needitabil: textul propriu-zis se editează în Setări → Notificări → Sistem. Notificarea apare numai cât „Copiere pe NAS” este Activ, când ultima copiere a eșuat sau este mai veche de @alertState.MaxAgeDays @(alertState.MaxAgeDays == 1 ? "zi" : "zile"). Aici este afișat cu valorile de acum.</small>
+            </div>
+        }
+    }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, busy, noticeOk, hasPassword, copyEnabled;
+    private BackupAlertState? alertState;
+    private string? error, notice, busyText;
+    private string path = "", userName = "", password = "";
+    private NasBackupSettings current = NasBackupSettings.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { Apply(await Settings.GetAsync(lifetime.Token)); await LoadAlertAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("NAS backup settings loading failed ({ErrorType}).", ex.GetType().Name); error = "Setările nu au putut fi încărcate. Verifică conexiunea la baza de date."; }
+        finally { loading = false; }
+    }
+
+    private async Task LoadAlertAsync()
+    {
+        try { alertState = await Alerts.GetAsync(lifetime.Token); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { alertState = null; }
+    }
+
+    private void Apply(NasBackupSettings settings)
+    {
+        current = settings; path = settings.Path; userName = settings.UserName; hasPassword = settings.HasPassword;
+        copyEnabled = settings.CopyEnabled; password = "";
+    }
+
+    private NasBackupInput Input => new(path, userName, string.IsNullOrEmpty(password) ? null : password, copyEnabled);
+
+    private async Task RunAsync(string working, Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; busyText = working; error = null; notice = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is NasBackupException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("NAS backup action failed ({ErrorType}).", ex.GetType().Name); error = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    private Task SaveAsync() => RunAsync("Se salvează…", async () =>
+    {
+        if (copyEnabled && !hasPassword && string.IsNullOrEmpty(password)) throw new NasBackupException("Introdu parola contului (nu este salvată nici una).");
+        await Settings.SaveAsync(Input, lifetime.Token);
+        Apply(await Settings.GetAsync(lifetime.Token));
+        await LoadAlertAsync();
+        noticeOk = true; notice = "Configurarea a fost salvată." + (copyEnabled ? "" : " Atenție: „Copiere pe NAS” este Inactiv, deci pachetele nu se copiază pe NAS.");
+    });
+
+    private Task TestAsync() => RunAsync("Se testează conexiunea…", async () =>
+    {
+        var result = await Copier.TestAsync(Input, lifetime.Token);
+        noticeOk = result.Ok; notice = result.Message;
+    });
+
+    private Task CopyNowAsync() => RunAsync("Se copiază pachetele…", async () =>
+    {
+        var result = await Copier.CopyMissingAsync(lifetime.Token);
+        noticeOk = result.Ok; notice = result.Message;
+        Apply(await Settings.GetAsync(lifetime.Token));
+        await LoadAlertAsync();
+    });
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

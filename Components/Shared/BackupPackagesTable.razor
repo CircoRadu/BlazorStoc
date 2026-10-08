@@ -1,0 +1,275 @@
+@using BlazorStoc.Services
+@using System.Globalization
+@inject IDatabaseBackupService BackupService
+@inject IDatabaseRestoreService RestoreService
+@inject INasBackupSettingsRepository NasSettings
+@inject INasBackupCopier Copier
+@inject IAccessControl Access
+@inject ILogger<BackupPackagesTable> Logger
+@implements IDisposable
+@* Setari -> Backup: the backup packages available on the server and on the NAS (matched by name), the backup made on request, and the restore.
+   The server list appears at once; the NAS is read afterwards (it may be slow or off) and a failure is only a note above the table. *@
+
+<section class="metrics" aria-label="Rezumat pachete">
+    <article><span>Total pachete</span><strong>@(loaded ? rows.Count.ToString() : "—")</strong><small>Pe server și pe NAS</small><i>▤</i></article>
+    <article><span>Spațiu ocupat pe server</span><strong>@(loaded ? FormatSize(rows.Where(row => row.OnLocal).Sum(row => row.SizeBytes)) : "—")</strong><small>Numai pachetele locale</small><i>◆</i></article>
+    <article><span>Preluare inventar</span><strong>@(loaded ? rows.Count(row => row.Kind == BackupKind.InventoryPickup).ToString() : "—")</strong><small>Pot fi șterse de pe server</small><i>◇</i></article>
+    <article><span>Programate și la cerere</span><strong>@(loaded ? rows.Count(row => row.Kind is BackupKind.Scheduled or BackupKind.Manual).ToString() : "—")</strong><small>Nu pot fi șterse din aplicație</small><i class="amber">⚿</i></article>
+    <article><span>Pre-restaurare</span><strong>@(loaded ? rows.Count(row => row.Kind == BackupKind.PreRestore).ToString() : "—")</strong><small>Nu pot fi șterse din aplicație</small><i class="amber">⚿</i></article>
+    @if (nasEnabled)
+    {
+        <article><span>Pe NAS</span><strong>@(nasRead ? rows.Count(row => row.OnNas).ToString() : "—")</strong><small>@(nasRead ? $"Doar pe NAS: {rows.Count(row => row.NasOnly)}" : "Se citește partajarea")</small><i>⇄</i></article>
+    }
+</section>
+
+<section class="catalog">
+    <div class="catalog-heading">
+        <h2>Backupuri disponibile <span>@rows.Count</span></h2>
+        <div class="editor-actions">
+            <button type="button" class="refresh" disabled="@Busy" @onclick="BackupNowAsync" title="Face un backup nou pe server; dacă „Copiere pe NAS” este Activ, îl copiază și pe NAS">Fă backup acum</button>
+            @if (nasEnabled) { <button type="button" class="refresh" disabled="@(Busy || nasLoading)" @onclick="LoadNasAsync">Reîmprospătează NAS</button> }
+            <button class="primary" disabled="@(selected is null || Busy)" @onclick="OpenRestorePopup">Restaurează baza de date</button>
+        </div>
+    </div>
+    <div class="catalog-body">
+        @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
+        @if (notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
+        @if (nasNote is not null) { <div class="error-banner" role="status">NAS: @nasNote Se afișează numai pachetele de pe server.</div> }
+        @if (nasLoading) { <p class="muted" role="status"><small>Se citește partajarea de pe NAS…</small></p> }
+        @if (Busy) { <p class="muted" role="status" data-operation-driver>@busyText</p> }
+    </div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă pachetele</h3></div> }
+    else if (rows.Count == 0) { <div class="empty-state"><h3>Niciun pachet de siguranță</h3><p>Un pachet apare aici după prima preluare de inventar, un backup programat sau la cerere.</p></div> }
+    else
+    {
+        <div class="table-scroll">
+            <table>
+                <thead><tr>
+                    <th><span class="sr-only">Selectează</span></th>
+                    <th>TIP</th><th>DENUMIRE</th><th>DATA</th><th>OPERATOR</th><th>DIMENSIUNE</th>
+                    @if (nasEnabled) { <th>LOCAȚIE</th> }
+                    <th><span class="sr-only">Acțiuni</span></th>
+                </tr></thead>
+                <tbody>
+                    @foreach (var row in rows)
+                    {
+                        <tr @key="row.FileName">
+                            <td><input type="radio" name="backup-selection" aria-label="@($"Selectează {row.FileName}")" checked="@(selectedName == row.FileName)" @onchange="() => selectedName = row.FileName" /></td>
+                            <td><span class="role-badge @(row.Kind == BackupKind.InventoryPickup ? "limited" : "admin")">
+                                @(row.Kind switch { BackupKind.InventoryPickup => "Preluare inventar", BackupKind.Scheduled => "Programat", BackupKind.Manual => "La cerere", _ => "Pre-restaurare" })</span></td>
+                            <td>@row.FileName</td>
+                            <td>@row.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)
+                                @if (row.TimeSource == TrustedClock.SourceUnverified)
+                                {
+                                    <small class="muted" title="Ora serverului nu a putut fi verificată pe internet la crearea pachetului: nu se șterge automat, doar manual de un administrator."><br />ora neverificată</small>
+                                }
+                                else if (row.TimeSource == TrustedClock.SourceInternet)
+                                {
+                                    <small class="muted" title="Ceasul serverului era decalat: data pachetului vine de pe internet."><br />ora de pe internet</small>
+                                }</td>
+                            <td>@(row.OperatorName.Length == 0 ? "—" : row.OperatorRole.Length == 0 ? row.OperatorName : $"{row.OperatorName} ({row.OperatorRole})")</td>
+                            <td>@FormatSize(row.SizeBytes)</td>
+                            @if (nasEnabled)
+                            {
+                                <td>@LocationText(row)</td>
+                            }
+                            <td class="row-actions">
+                                @if (nasEnabled && nasRead && row.OnLocal && !row.OnNas)
+                                {
+                                    <button type="button" class="refresh" disabled="@Busy" @onclick="() => CopyToNasAsync(row)">Copiază pe NAS</button>
+                                }
+                                @if (row.CanDelete)
+                                {
+                                    <button class="row-icon delete" aria-label="@($"Șterge {row.FileName}")" disabled="@(deleting is not null || Busy)" @onclick="() => RequestDelete(row)" title="@($"Șterge {row.FileName}")"></button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.FileName" Title="Ștergi pachetul de siguranță de pe server?" Subject="Pachetul" ObjectLabel="@deleting.FileName"
+                              Description="Pachetul nu va mai putea fi folosit de pe server. Dacă există o copie pe NAS, ea rămâne acolo."
+                              ConfirmationNote="Fișierul va fi șters definitiv de pe server (nu poate fi recuperat decât de pe NAS, dacă a fost copiat) și operația va fi înregistrată în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDelete" />
+}
+
+@if (showRestorePopup && selected is not null)
+{
+    <RestoreConfirmationDialog @key="selected.FileName" PackageLabel="@selected.FileName" Busy="@restoring" Error="@restoreError"
+                               ProgressMessage="@restoreProgressMessage" Confirmed="ConfirmRestoreAsync" Cancelled="CancelRestoreAsync" />
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<BackupPackage> local = [];
+    private IReadOnlyList<NasShareFile>? share;
+    private IReadOnlyList<BackupCatalogRow> rows = [];
+    private BackupCatalogRow? deleting;
+    private string? selectedName, error, notice, nasNote, deleteError, restoreError, restoreProgressMessage, busyText;
+    private bool loading = true, loaded, nasEnabled, nasRead, nasLoading, noticeOk, deleteBusy, showRestorePopup, restoring, working;
+    private bool Busy => working || restoring;
+    private BackupCatalogRow? selected => rows.FirstOrDefault(row => row.FileName == selectedName);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        if (nasEnabled) await LoadNasAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            if (!await Access.IsAdministratorAsync(lifetime.Token)) { error = "Nu ai drepturi de administrator."; return; }
+            nasEnabled = (await NasSettings.GetAsync(lifetime.Token)).CopyEnabled;
+            local = await BackupService.ListPackagesAsync(lifetime.Token);
+            Rebuild();
+            loaded = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Backup package listing failed ({ErrorType}).", exception.GetType().Name);
+            error = "Pachetele de siguranță nu au putut fi încărcate. Verifică conexiunea la baza de date.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task LoadNasAsync()
+    {
+        nasLoading = true; nasNote = null; StateHasChanged();
+        try
+        {
+            var listing = await Copier.ListShareAsync(lifetime.Token);
+            nasRead = listing.Ok; share = listing.Ok ? listing.Files : null; nasNote = listing.Ok ? null : listing.Message;
+            Rebuild();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("NAS listing failed ({ErrorType}).", exception.GetType().Name);
+            nasRead = false; share = null; nasNote = "Partajarea de pe NAS nu a putut fi citită.";
+            Rebuild();
+        }
+        finally { nasLoading = false; }
+    }
+
+    private void Rebuild()
+    {
+        rows = BackupCatalog.Merge(local, share);
+        if (selectedName is not null && rows.All(row => row.FileName != selectedName)) selectedName = null;
+    }
+
+    private string LocationText(BackupCatalogRow row) =>
+        !nasRead ? (row.OnLocal ? "Server" : "—")
+        : row.OnLocal && row.OnNas ? (row.NasSizeDiffers ? "Server + NAS (mărime diferită)" : "Server + NAS")
+        : row.OnLocal ? "Doar pe server" : "Doar pe NAS";
+
+    private async Task RunAsync(string text, Func<Task> action)
+    {
+        if (Busy) return;
+        working = true; busyText = text; notice = null; error = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is NasBackupException or AccessDeniedException) { noticeOk = false; notice = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Backup action failed ({ErrorType}).", exception.GetType().Name);
+            noticeOk = false; notice = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației.";
+        }
+        finally { working = false; busyText = null; }
+    }
+
+    private Task BackupNowAsync() => RunAsync("Se face backup-ul…", async () =>
+    {
+        var result = await BackupService.CreateBackupAsync(BackupKind.Manual, null, lifetime.Token);
+        noticeOk = result.Success;
+        if (!result.Success) { notice = result.ErrorMessage; return; }
+        notice = nasEnabled ? $"Backup făcut: {result.PackageFileName}. Copierea pe NAS s-a încercat automat." : $"Backup făcut: {result.PackageFileName}.";
+        await LoadAsync();
+        if (nasEnabled) await LoadNasAsync();
+    });
+
+    private Task CopyToNasAsync(BackupCatalogRow row) => RunAsync("Se copiază pe NAS…", async () =>
+    {
+        var result = await Copier.CopyAfterBackupAsync(row.FileName, lifetime.Token);
+        noticeOk = result.Ok; notice = result.Message;
+        await LoadNasAsync();
+    });
+
+    private void RequestDelete(BackupCatalogRow row) { deleting = row; deleteError = null; notice = null; }
+    private void CancelDelete() { deleting = null; deleteError = null; }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleteBusy || deleting is null) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            var result = await BackupService.DeletePackageAsync(deleting.FileName, reason, lifetime.Token);
+            if (!result.Success) { deleteError = result.ErrorMessage; return; }
+            noticeOk = true; notice = "Pachetul a fost șters de pe server.";
+            deleting = null;
+            await LoadAsync();
+            if (nasEnabled && nasRead) Rebuild();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Backup package deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Pachetul nu a putut fi șters. Actualizează lista și reîncearcă.";
+        }
+        finally { deleteBusy = false; }
+    }
+
+    private void OpenRestorePopup() { if (selectedName is null) return; restoreError = null; notice = null; showRestorePopup = true; }
+    private void CancelRestoreAsync() { if (!restoring) { showRestorePopup = false; restoreError = null; } }
+
+    // A package that is only on the NAS is first brought to the server (checked by checksum) and then restored like any other; it stays on the server afterwards.
+    private async Task ConfirmRestoreAsync()
+    {
+        if (restoring || selected is not { } package) return;
+        restoring = true; restoreError = null;
+        try
+        {
+            if (package.NasOnly)
+            {
+                restoreProgressMessage = "Se aduce pachetul de pe NAS…"; StateHasChanged();
+                var fetched = await Copier.FetchAsync(package.FileName, lifetime.Token);
+                if (!fetched.Ok) { restoreError = fetched.Message; return; }
+            }
+            var progress = new Progress<RestoreProgress>(step => { restoreProgressMessage = step.Message; StateHasChanged(); });
+            var result = await RestoreService.RestoreAsync(package.FileName, progress, lifetime.Token);
+            if (!result.Success) { restoreError = result.ErrorMessage ?? RestoreRules.GenericFailedMessage; return; }
+            showRestorePopup = false; selectedName = null;
+            noticeOk = true; notice = RestoreRules.SuccessMessage;
+            await LoadAsync();
+            if (nasEnabled) await LoadNasAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Database restore failed ({ErrorType}).", exception.GetType().Name);
+            restoreError = RestoreRules.GenericFailedMessage;
+        }
+        finally { restoring = false; restoreProgressMessage = null; }
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        double size = bytes;
+        var unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.Length - 1) { size /= 1024; unitIndex++; }
+        return $"{size.ToString(unitIndex == 0 ? "0" : "0.0", CultureInfo.InvariantCulture)} {units[unitIndex]}";
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

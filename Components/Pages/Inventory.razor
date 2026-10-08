@@ -11,6 +11,7 @@
 @inject IJSRuntime JS
 @inject ILogger<Inventory> Logger
 @implements IAsyncDisposable
+<PageBoundary>
 
 <PageTitle>Inventar · BlazorStoc</PageTitle>
 <div class="page-heading">
@@ -104,6 +105,8 @@ else if (loadError is null)
         </section>
     </div>
 }
+
+</PageBoundary>
 
 @code {
     private IReadOnlyList<ProductGroup> groups = Array.Empty<ProductGroup>();

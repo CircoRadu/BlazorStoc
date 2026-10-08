@@ -5,6 +5,7 @@
 @inject UnsavedChanges Guard
 @inject IInvoiceTemplateService InvoiceTemplates
 @inject IAccessControl Access
+<PageBoundary>
 
 <PageTitle>Setări · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -59,6 +60,24 @@
             }
         </div>
     }
+    else if (isAdmin && activeTab == BackupTab)
+    {
+        <div role="tabpanel" id="panel-@BackupTab" aria-labelledby="tab-@BackupTab" class="settings-body">
+            @SubtabBar(BackupSubtabs, "Secțiuni backup")
+            @if (backupSubtab == NasTab)
+            {
+                <div role="tabpanel" id="subpanel-@NasTab" aria-labelledby="subtab-@NasTab"><BackupNasSettings /></div>
+            }
+            else if (backupSubtab == BackupTimeSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@BackupTimeSubtab" aria-labelledby="subtab-@BackupTimeSubtab"><BackupSettingsPanel Section="@BackupSettingsPanel.TimeSection" /></div>
+            }
+            else
+            {
+                <div role="tabpanel" id="subpanel-@BackupMainSubtab" aria-labelledby="subtab-@BackupMainSubtab"><BackupSettingsPanel Section="@BackupSettingsPanel.BackupSection" /></div>
+            }
+        </div>
+    }
     else if (isAdmin && activeTab == MapTab)
     {
         <div role="tabpanel" id="panel-@MapTab" aria-labelledby="tab-@MapTab" class="settings-body">
@@ -75,12 +94,21 @@
     }
 </section>
 
+</PageBoundary>
+
 @code {
     private const string AnafTab = "anaf";
     private const string NotificationsTab = SettingsNavigation.NotificationsTab;
     private const string MapTab = SettingsNavigation.MapTab;
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi")];
+    private const string BackupTab = "backup";
+    // Backup is one tab with three sub-tabs: backup and restore, the NAS copy, the check of the server clock.
+    private const string BackupMainSubtab = "backup-main";
+    private const string NasTab = "backup-nas";
+    private const string BackupTimeSubtab = "backup-time";
+    private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
+    private string backupSubtab = BackupMainSubtab;
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup")];
     private string activeTab = AnafTab;
 
     // The administrator has every tab; a user without that role only reaches the invoice templates (creating and changing them).
@@ -150,7 +178,7 @@
     }
 
     private string CurrentSubtab((string Id, string Title)[] subtabs) =>
-        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : notificationSubtab;
+        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : notificationSubtab;
 
     // Deep links (for example from the Journal) open the named tab, sub-tab and object; later clicks on the tabs win.
     [SupplyParameterFromQuery(Name = SettingsNavigation.TabParameter)] public string? TabQuery { get; set; }
@@ -169,6 +197,9 @@
         if (link == appliedLink) return;
         appliedLink = link;
         if (VisibleTabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
+        // The old address of the NAS tab keeps working.
+        if (isAdmin && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
+        if (BackupSubtabs.Any(tab => tab.Id == SubtabQuery)) { backupSubtab = SubtabQuery!; if (isAdmin && TabQuery is null or BackupTab) activeTab = BackupTab; }
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
         if (InvoiceSubtabs.Any(tab => tab.Id == SubtabQuery)) invoiceSubtab = SubtabQuery!;
@@ -237,6 +268,7 @@
     private void SelectSubtab((string Id, string Title)[] subtabs, string id)
     {
         if (subtabs == MapSubtabs) mapSubtab = id;
+        else if (subtabs == BackupSubtabs) backupSubtab = id;
         else if (subtabs == InvoiceSubtabs) { if (id != InvoiceEditSubtab && editTemplate is not null) AfterEditingClosed(() => invoiceSubtab = id); else invoiceSubtab = id; }
         else notificationSubtab = id;
     }

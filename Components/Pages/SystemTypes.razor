@@ -5,6 +5,7 @@
 @inject ISystemTypeRepository Repository
 @inject ILogger<SystemTypes> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Nomenclator · Tipuri de sisteme · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">NOMENCLATOR</p><h1>Tipuri de sisteme</h1><p class="muted">Sistemele din care sunt făcute proiectele (antiefracție, TVCI, control acces, incendiu, rețelistică…). Un tip nu se șterge: se dezactivează și nu mai apare la alegeri noi. Denumirile alternative (de exemplu „CCTV” pentru „TVCI”) ajută la recunoașterea lor în oferte.</p></div></div>
@@ -49,7 +50,7 @@
                     else
                     {
                         <strong>@type.Name</strong>
-                        <button type="button" class="row-action edit" aria-label="@($"Redenumește {type.Name}")" disabled="@busy" @onclick="() => StartRename(type)">Redenumește</button>
+                        <button type="button" class="row-icon edit" aria-label="@($"Redenumește {type.Name}")" disabled="@busy" @onclick="() => StartRename(type)" title="@($"Redenumește {type.Name}")"></button>
                     }
                 </td>
                 <td>
@@ -68,6 +69,8 @@
         </tbody></table></div>
     }
 </section>
+
+</PageBoundary>
 
 @code {
     private readonly CancellationTokenSource lifetime = new();

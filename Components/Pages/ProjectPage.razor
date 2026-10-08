@@ -11,6 +11,7 @@
 @inject ListNavigationContext ListContext
 @inject ILogger<Project> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>@(project?.Name ?? "Proiect") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -84,6 +85,8 @@ else if (project is not null)
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteProjectAsync"
                               Cancelled="() => { deleting = false; deleteError = null; }" />
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

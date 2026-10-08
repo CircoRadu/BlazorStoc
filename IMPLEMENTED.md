@@ -220,3 +220,108 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 07.10.2026 15:17 - Rezervari si legarea de oferta la preluarea facturii
 
 - Selectorul "Pentru oferta" (EntryComponentChoice, refactorizat cu ComponentId/ComponentIdChanged) in pasul 3 al preluarii facturii (InvoicePickup, camp ComponentId pe rand, trimis ca ProjectComponentId la intrare) si in InvoiceManualEntryDialog; dupa finalizarea preluarii, propunerile de rezervare (ReserveSuggestions) pentru fiecare produs preluat. Produsele noi din factura nu au selectorul (nu pot fi in oferta).,Verificari: -Mode maria -Section "Offer import" (13 trecute, o verificare noua: intrare legata de componenta, componenta scoasa refuzata, aparitia in situatie ca Intrat pt. oferta, propuneri nevide); neverificat in browser.
+
+## Finalizat la 08.10.2026 08:45 - Completari stoc: iesire rapida, Unde sunt bucatile, completare vehicul la nivel, stoc minim, export consum, notificari de stoc
+
+- Iesire rapida: butonul de pe fiecare rand din lista de produse deschide formularul de iesire multipla intr-un dialog (ExitOperation cu parametrii Embedded, InitialProductId, OnClosed; dialogul in Home.razor).
+- Unde sunt bucatile: cardul ProductWhere pe pagina produsului (depozit, fiecare masina, predat pe beneficiar/proiect = iesiri minus retururi); IProductPlacementReader / MariaProductPlacementReader.
+- Completare vehicul la nivel: tabelul vehicle_target_levels (migrarea 28), IVehicleTargetRepository / MariaVehicleTargetRepository, sectiunea Nivel tinta pe VehicleEquipmentPage; Completeaza la nivel deschide iesirea multipla cu masina si liniile lipsa (parametrul ?vehicul=); jurnal Setare/Eliminare nivel tinta vehicul.
+- Stoc minim: tabelul product_min_stock (migrarea 29), ProductMinStockField pe cardul produsului, notificarea Stoc sub minim (MinStockSource; expira la data ultimei miscari sau a setarii minimului, prag implicit 0 zile; stocul comparat este cel total); jurnal Setare/Eliminare stoc minim.
+- Notificari noi: Rezervare fara miscare (StaleReservationSource, 30 de zile fara modificare) si Deficit la un proiect cu termen apropiat (ProjectDeficitSource: termen setat pe pagina situatiei proiectului, tabelul project_deadlines, deficit = lista de achizitie nevida; prag implicit 14 zile); jurnal Setare/Eliminare termen proiect. Sabloanele se creeaza ca la celelalte surse (Setari -> Notificari).
+- Export consum: pagina /consum (meniul Produse), filtre beneficiar, proiect, perioada, tabel si CSV la /api/consum.csv (MariaConsumptionReader, ConsumptionExportRules.ToCsv).
+- Verificari: build Release; -Mode components 185 trecute; -Mode maria 1518 trecute (sectiuni noi: Vehicle target levels, Stock alerts; verificare noua in Reservations); migrarile 28 si 29 aplicate pe BlazorStoc, tabelele create direct pe blazorstoc_test.
+
+## Finalizat la 08.10.2026 08:57 - Aliniere estetica in formulare si liste derulante fara contur gros
+
+- wwwroot/app.css: comutatoarele din .editor-grid/.anaf-grid stau pe linia casetelor (min-height 39px, align-self end); randurile .filters au casetele pe aceeasi linie (align-items flex-end, ex. filtrele din Facturi); select:focus fara contur gros, doar bordura verde subtire.
+- Reguli noi in CLAUDE.md (elemente alaturate in formulare; liste derulante fara contur gros).
+- Verificari: parcurgere automata cu script in browser a formularelor si filtrelor din 11 pagini (editoare deschise), fara nealiniere ramasa; ANAF/Notificari/Utilizator confirmate vizual de utilizator.
+
+## Finalizat la 08.10.2026 09:02 - Campuri de editare active fara contur gros
+
+- wwwroot/app.css (reguli comune la sfarsit): input/select/textarea la focus fara outline, cu bordura verde 1px si umbra 1px; .search-box si campul interior evidentiate pe container (:focus-within); .clipboard-zone/.file-drop/.mark-field la fel; butoane si linkuri cu inel de 2px la :focus-visible; forced-colors pastreaza conturul sistemului.
+- Regula in CLAUDE.md (inlocuieste regula doar pentru select).
+- Verificat in browser pe Jurnal: campul de cautare nu mai are inel exterior (computed style); celelalte pagini de verificat vizual.
+
+## Finalizat la 08.10.2026 09:04 - Pagina principala: intrari Mentenanta si Notificari cu semnalizare
+
+- Dashboard.razor: carduri Mentenanta (/mentenanta) si Notificari (/notificari) in ordinea din meniu; cardul Notificari are data-notification-nav si triunghi ⚠, rosu cand IExpiryNotificationService.AlertCountAsync > 0 (aceeasi sursa ca meniul).
+- wwwroot/notification-watch.js: apply() actualizeaza toate elementele data-notification-nav (meniu + card) la sondajul din 60 s; app.css: stil rosu pentru cardul .nav-alert.
+- Decizie: Mentenanta nu semnaleaza separat (notificarile de mentenanta sunt deja in Notificari).
+- Verificari: Release publicat; in browser, cu raspuns simulat count=3, meniul si cardul devin rosii fara reincarcare; fara alerte nu apare semnul.
+
+## Finalizat la 08.10.2026 09:05 - Sabloane de facturi: scanari slabe si linii desenate (inchis, deja implementat)
+
+- Verificat in cod la 08.10.2026: taskul era depasit de motorul geometric din 05.10.2026.
+- 5.1 contrast: InvoicePdfReader (calea OCR) intinde contrastul cand InkContrast < FaintInkContrast (varianta "contrast stretched" si "stretched, without ruled lines", aleasa doar daca citeste mai bine); test cu scanare palida reala in Program.cs (~linia 1716).
+- 5.2 linii desenate: InvoicePdfReader.DrawnRules (PdfPig, curse vectoriale si dreptunghiuri subtiri) si FindFaintLines (scanari) alimenteaza grila tabelului (InvoiceGridDetector, GridChecks.cs).
+- Nu s-a scris cod nou; scanarea reala palida suplimentara ramane la N28 din docs/TESTE_RAMASE.md.
+
+## Finalizat la 08.10.2026 09:09 - Robustete la erori: jurnal in fisier, /health, ErrorBoundary, sarcini fara asteptare
+
+- Services/Robustness.cs: RollingFileLoggerProvider (logs/blazorstoc-yyyyMMdd.log, avertismente si erori cu stack trace, retentie 14 zile configurabila), handlere AppDomain.UnhandledException si TaskScheduler.UnobservedTaskException, Task.FireAndForget(logger, descriere); AddFileLogging in Program.cs; logs/ in .gitignore.
+- Program.cs: /health anonim (SELECT 1; 200 sau 503 fara detalii), /health/live ramane.
+- MainLayout.razor: ErrorBoundary in jurul @Body cu buton Reincarca pagina, refacut la schimbarea paginii. FireAndForget aplicat in paginile cu sondaje periodice, Home (bataia de inima), layout si UnsavedChangesHost; nu exista async void in cod.
+- Supervizor: doar reteta (Task Scheduler/NSSM, systemd) in docs/SUPERVIZOR_SI_JURNAL.md; nu s-a instalat niciunul (locul instalarii neclarificat).
+- Verificari: tests RobustnessChecks (4 PASS), /health 200 in preview, pagina Produse se afiseaza normal.
+
+## Finalizat la 08.10.2026 09:24 - Robustete la erori: completari dupa verificarea in browser (08.10.2026)
+
+- Verificat: cu MariaDB oprita /health da 503 si /health/live 200; aplicatia pornea gresit cu baza oprita (cadea in MariaArchiveSchema.InitializeAsync) - corectat in Program.cs (MySqlException la pornire se logheaza, aplicatia porneste; lipsa tabelelor ramane fatala); la repornirea bazei /health revine 200 fara repornirea aplicatiei.
+- Verificat: ErrorBoundary-ul din layout NU vedea erorile paginilor (layout static, fiecare pagina este insula interactiva proprie); inlocuit cu Components/Shared/PageBoundary.razor, pus in jurul continutului celor 40 de pagini. O eroare intr-o componenta copil a paginii arata "Eroare in aceasta pagina" fara sa inchida circuitul (verificat); o eroare in codul paginii insesi (handler/randare proprie) inchide in continuare circuitul (limitare Blazor Server, bannerul "Conexiunea intrerupta" ramane).
+- Verificat: jurnalul in fisier nu scria (ClearProviders din Program.cs il sterge) - AddFileLogging mutat dupa; acum scrie avertismentele/erorile (confirmat cu baza oprita).
+- Verificat: supervizor simulat (script de repornire) - proces omorat, repornit in ~5 s, /health 200. Blocarea de produs luata, server omorat: blocarea expira singura la 90 s si produsul se poate edita din nou.
+- Teste: RobustnessChecks 7 PASS (jurnal, retentie, FireAndForget, fiecare pagina are PageBoundary, fara "_ =" la sondajele periodice); suita componente 189 PASS.
+- Tinta de instalare: container (docs/SUPERVIZOR_SI_JURNAL.md, restart policy + healthcheck).
+
+## Finalizat la 08.10.2026 10:15 - Backup pe NAS: configurare in Setari, copiere dupa backup, backup programat
+
+- Services/NasBackup.cs: MariaNasBackupStore (setari, parola criptata cu Data Protection), NasBackupCopier (test conexiune, copiere sub nume temporar, verificare marime si SHA256, redenumire; nimic nu se sterge pe NAS), NetworkShareConnection (WNetAddConnection2 pe Windows), NasCopyingBackupService (decorator: copiaza dupa orice backup reusit, nu si pre-restaurare), SystemAccess, BackupScheduler (backup zilnic la ora aleasa, retry la 15 min).
+- Migrarea 30 backup_nas_settings (si in MariaArchiveSchema.MigratedTables); BackupKind.Scheduled si Manual (pagina Restaurare); actiuni de jurnal Modificare configurare backup NAS / Testare conexiune NAS / Copiere backup pe NAS.
+- UI: Components/Shared/BackupNasSettings.razor, tab Backup NAS in Setari (administrator). CSS: .catalog-body (margine interioara in carduri), regula in CLAUDE.md; corectat si in Suppliers (recunoasterea furnizorului), OfferTemplates (editor) si ConsumptionExportPage.
+- Verificari: NasBackupChecks 7 PASS (reguli de cale, copiere fisier, decorator), sectiune Maria 8 PASS (parola criptata in DB, doar administrator, jurnal fara parola). Testul pe NAS-ul real cu EspStoc nu s-a facut (parola nu se introduce de agent).
+
+## Finalizat la 08.10.2026 11:01 - Backup NAS: corectii dupa testul pe NAS-ul real (08.10.2026)
+
+- Confirmat de utilizator: Fa backup acum face pachetul si il copiaza pe NAS (EspStoc, \\192.168.100.50\BackupStocDepozit); backup-ul programat a urcat si pachetele vechi lipsa.
+- Corectat: conectarea la share cu LogonUser NEW_CREDENTIALS + impersonare (nu mai da eroarea 1219); tools/start-preview.ps1 trimite caile mariadb-dump/mariadb (fara ele orice backup esua); Fa backup acum copiaza numai pachetul nou (butonul Copiaza pachetele lipsa urca restul); mesajul unui backup esuat spune cauza reala (BackupRules.FailureMessage); pagina Setari ramane pe loc cat ruleaza backup-ul (data-operation-driver in maintenance-watch.js) - inainte era mutata pe pagina de asteptare si operatia se anula.
+- De verificat la instalarea pe server: Database:MariaDumpExecutablePath si MariaClientExecutablePath setate la calea reala; backup programat zilnic pe ceas real; cazurile de eroare (parola gresita, NAS oprit).
+
+## Finalizat la 08.10.2026 11:15 - Notificari pentru backup lipsa si copie pe NAS lipsa
+
+- Services/BackupAlerts.cs: sursele de expirare BackupMissingSource (Sistem / Backup lipsa: expira la data ultimului pachet + 2 zile; fara backup, ceasul porneste de la prima utilizare) si NasCopyMissingSource (Sistem / Copie pe NAS lipsa: numai cand copierea este activa; ultima incercare esuata = restanta de la data ei, reusita = + 2 zile), MariaBackupAlertReader (ultimul .zip din directorul de backup, setarile NAS), BackupAlertRules; chei in ExpirySourceKeys, inregistrare in Program.cs.
+- Se inchid singure la un backup nou / o copiere reusita (motorul inchide notificarea cand data se muta). Pragul implicit 0 zile; administratorul creeaza cate un sablon pentru fiecare in Setari -> Notificari, ca la celelalte surse.
+- Verificari: 3 teste de reguli si surse (NasBackupChecks), 1 pe baza de test; suita componente 203 PASS.
+
+## Finalizat la 08.10.2026 11:23 - Notificari backup: vechime configurabila, model needitabil, numai cu backup NAS activ
+
+- Migrarea 31 (backup_nas_settings: max_age_days, last_error_utc, last_error). Setari -> Backup NAS: camp „Notificare backup lipsa dupa (zile)” 1-30, jurnalizat (Vechime maxima backup), plus modelul needitabil al notificarii (subiect, text, data ultimului backup, data si cauza ultimei erori).
+- Sursele Backup lipsa si Copie pe NAS lipsa dau instante numai cand Copiere pe NAS este Activ. Decoratorul NasCopyingBackupService retine cauza si ora oricarui backup esuat (INasBackupCopier.RecordBackupFailureAsync); marcajele noi <ultima eroare backup>, <vechime maxima>, <cauza copiere>.
+- Verificari: teste de reguli/sursa/model (NasBackupChecks) si pe baza de test (setare, limite 1-30, cauza pastrata) trec; pagina Setari nu a fost vazuta in browser dupa modificare.
+
+## Finalizat la 08.10.2026 11:49 - Notificari: tab pe categorie si sabloane de pornire
+
+- Sabloane notificari: tab pentru fiecare categorie; migrarea 32 (notification_template_seeds); DefaultNotificationTemplates creeaza o data, la pornire, un sablon activ din textul implicit al fiecarui eveniment fara sablon; drepturi noi pe tabela pentru utilizatorul aplicatiei la instalare
+
+## Finalizat la 08.10.2026 12:08 - Backup unificat in Setari: pagina Backup, tabel server+NAS, pastrare, NAS redus
+
+- Setari -> Backup: programare, vechime notificare, stergere automata locala (ultimele 4 pachete pastrate, cu NAS numai pachete copiate), tabel server+NAS cu restaurare inclusiv din NAS; migrarea 33 (backup_settings); pagina Restaurare scoasa; copierea pe NAS la preluarea de inventar in fundal; Backup lipsa nu mai depinde de NAS; nimic nu se sterge pe NAS din aplicatie
+
+## Finalizat la 08.10.2026 12:11 - Iconite pe randurile tabelelor (regula + aplicare) si numar in paranteze pe taburile de sabloane
+
+- Clasa comuna row-icon edit/delete (SVG din CSS) pentru editare/stergere/scoatere pe randurile tabelelor, in 15 fisiere (28 butoane); regula in CLAUDE.md; taburile de categorii arata Categorie (n)
+
+## Finalizat la 08.10.2026 12:52 - Backup: stergere la salvare, verificare ora pe internet, setari NTP
+
+- Stergerea automata a pachetelor vechi ruleaza si pe loc la salvarea unui prag nou, dupa confirmarea listei (BackupSettingsPanel, BackupRetentionService); se aplica tuturor tipurilor de pachete, inclusiv prerestaurare.
+- Ceasul serverului se compara cu ora de pe internet (TrustedClock: NTP, doua servere trebuie sa fie de acord, apoi antet Date HTTPS). Stergerea asteapta cand ceasul difera cu peste 5 min sau ora nu se poate verifica.
+- Backup: ceas decalat peste 15 min = data pachetului de pe internet (manifest TimeSource Internet); ora imposibil de verificat = pachet Unverified, exclus din stergerea automata si din ultimele 4, sters doar manual de administrator. Backup-ul zilnic urmeaza ora de pe internet (verificare la 10 min).
+- Setari -> Backup: sectiunea Verificare ora (3 servere NTP precompletate, lista de 6, server propriu, Verifica acum); migrarea 34 (ntp_check_enabled, ntp_servers, clock_issue_utc, clock_skew_minutes); sablon nou Ceas server decalat (Sistem).
+- Verificari: build Release, grup nas 24 PASS, sectiunea maria backup 19 PASS, componente 216 PASS
+
+## Finalizat la 08.10.2026 12:59 - Setari Backup: categorie principala cu sub-taburi si zilele saptamanii
+
+- Setari -> Backup este un tab principal cu sub-taburile Backup si restaurare, Backup NAS, Verificare ora (BackupSettingsPanel cu Section; legatura veche tab=backup-nas ramane valabila; notificarile trimit la sub-tabul potrivit).
+- Backup-ul programat se poate face doar in anumite zile ale saptamanii (migrarea 35, schedule_days, masca Luni=1..Duminica=64); notificarea Backup lipsa asteapta cel putin intervalul maxim dintre doua backup-uri programate.
+- Fiecare sub-tab salveaza doar campurile lui (restul se iau din valorile salvate).
+- Verificari: build Release, grup nas 25 PASS, sectiunea maria 21 PASS, componente 217 PASS

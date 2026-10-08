@@ -7,6 +7,7 @@
 @inject IAccessControl Access
 @inject ILogger<Invoices> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Facturi · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Facturi</h1><p class="muted">Facturile furnizorilor din care s-au preluat intrări în stoc. Apasă pe numărul unei facturi ca să vezi produsele preluate din ea.</p></div></div>
@@ -73,8 +74,8 @@ else
                 <td><div class="row-buttons">
                     @if (isAdmin)
                     {
-                        <button class="row-action edit" aria-label="Editează factura @invoice.Number" title="Editează" disabled="@(saving || deleting is not null)" @onclick="() => OpenEditor(invoice)">✎</button>
-                        <button class="row-action delete" aria-label="Șterge factura @invoice.Number" title="@(invoice.MovementCount > 0 ? SupplierInvoiceRules.DeleteBlockedMessage(invoice.MovementCount) : "Șterge")" disabled="@(invoice.MovementCount > 0 || saving)" @onclick="() => RequestDelete(invoice)">×</button>
+                        <button class="row-icon edit" aria-label="Editează factura @invoice.Number" title="Editează" disabled="@(saving || deleting is not null)" @onclick="() => OpenEditor(invoice)"></button>
+                        <button class="row-icon delete" aria-label="Șterge factura @invoice.Number" title="@(invoice.MovementCount > 0 ? SupplierInvoiceRules.DeleteBlockedMessage(invoice.MovementCount) : "Șterge")" disabled="@(invoice.MovementCount > 0 || saving)" @onclick="() => RequestDelete(invoice)"></button>
                     }</div></td>
             </tr>
         }
@@ -118,6 +119,8 @@ else
                               Description="Se șterg doar facturile din care nu s-a preluat nicio intrare în stoc."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDelete" />
 }
+
+</PageBoundary>
 
 @code {
     private readonly CancellationTokenSource lifetime = new();

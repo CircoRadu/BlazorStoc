@@ -192,3 +192,8 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 - **Rezumat:** migrarile 19-27 (cauza iesirii, operatia de iesire, storno/retur, nomenclator, componente, sabloane de oferte, oferte, iesiri legate de componente, rezervari); pagini `/iesiri/multipla`, `/nomenclator`, `/oferte/*`, `/proiecte/{id}/situatie`; actiuni noi de jurnal; tabelele migrarilor 22-27 adaugate in lista de backup/restore; directorul `Teste utilizator/` cu „Ce s-a adaugat" / „Ce face acum".
 - **Teste:** suita in memorie 935 trecute; suita MariaDB 1505 trecute, 0 esecuri; neverificat in browser (vezi `docs/TESTE_RAMASE.md`).
 
+## 2026-10-08T15:00:00.0000000Z - claude
+
+- **Task:** Setari backup unificate (tab Backup cu sub-taburi), notificari pe categorii, iconite pe randuri, verificare ora pe internet
+- **Rezumat:** migrarile 32-35 (sabloane implicite, setari backup, verificare ora, zilele saptamanii); `BackupSettings`, `BackupCatalog`, `TrustedClock`, `BackupRetentionService`, sursa de notificare `ClockSkewSource`; panourile `BackupSettingsPanel`, `BackupPackagesTable`, `BackupNasSettings`; pagina `DatabaseRestore` scoasa; clasele `row-icon` in `app.css`. Detalii pe fisiere: `IMPLEMENTED.md`.
+- **Teste:** vezi randul „Validari” din `docs/PROJECT_STATE.md`; neverificat in browser (`docs/TESTE_RAMASE.md`).

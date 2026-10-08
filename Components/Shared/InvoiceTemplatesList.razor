@@ -37,8 +37,8 @@
                 <td><small>@Stamp(info.UpdatedUtc)<br />@info.UpdatedBy</small></td>
                 <td class="row-actions">
                     <button type="button" class="invoice-icon-btn" title="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-label="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleDetails(info.Id)">👁</button>
-                    <button type="button" class="invoice-icon-btn" disabled="@saving" title="Editează șablonul (elementele, denumirea și furnizorul)" aria-label="Editează șablonul" @onclick="() => OnEditWithFile.InvokeAsync(template)">✎</button>
-                    @if (isAdmin) { <button type="button" class="invoice-icon-btn danger" disabled="@saving" title="Șterge șablonul" aria-label="Șterge șablonul" @onclick="() => deleting = info">🗑</button> }
+                    <button type="button" class="row-icon edit" disabled="@saving" title="Editează șablonul (elementele, denumirea și furnizorul)" aria-label="Editează șablonul" @onclick="() => OnEditWithFile.InvokeAsync(template)"></button>
+                    @if (isAdmin) { <button type="button" class="row-icon delete" disabled="@saving" title="Șterge șablonul" aria-label="Șterge șablonul" @onclick="() => deleting = info"></button> }
                 </td>
             </tr>
             @if (open)

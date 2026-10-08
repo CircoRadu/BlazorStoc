@@ -1,0 +1,61 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@inject ILogger<ProductMinStockField> Logger
+@implements IDisposable
+@* The minimum stock of a product: below it a notification "Stoc sub minim" is raised (Setari -> Notificari). Set or removed here; each change is journaled. *@
+<div class="min-stock-field">
+    <label for="@($"min-stock-{ProductId}")">Stoc minim (buc.)</label>
+    <input id="@($"min-stock-{ProductId}")" type="number" min="1" max="@StockMovementRules.MaxQuantity" placeholder="fără minim" @bind="input" @bind:event="oninput" disabled="@busy" />
+    <button type="button" class="refresh" disabled="@busy" @onclick="SaveAsync">Setează</button>
+    @if (minimum is not null) { <button type="button" class="danger" aria-label="Elimină stocul minim" disabled="@busy" @onclick="RemoveAsync">×</button> }
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (minimum is { } min && Stock < min) { <p class="muted" role="status">⚠ Stoc sub minim: lipsesc <strong>@(min - Stock) buc.</strong> până la minimul de @min buc.</p> }
+
+@code {
+    [Parameter, EditorRequired] public int ProductId { get; set; }
+    [Parameter] public int Stock { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private int? minimum, input;
+    private bool busy;
+    private string? error;
+    private int loadedFor = -1;
+
+    private IProductMinStockRepository? Repository => Services.GetService<IProductMinStockRepository>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == ProductId) return;
+        loadedFor = ProductId;
+        try { minimum = Repository is { } repository ? await repository.GetAsync(ProductId, lifetime.Token) : null; input = minimum; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception) { minimum = null; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || Repository is not { } repository) return;
+        error = null;
+        if (input is not > 0) { error = StockAlertRules.MinimumMessage; return; }
+        busy = true;
+        try { await repository.SetAsync(ProductId, input.Value, lifetime.Token); minimum = input; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockAlertException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Minimum stock saving failed ({ErrorType}).", ex.GetType().Name); error = "Stocul minim nu a putut fi salvat. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (busy || Repository is not { } repository) return;
+        error = null; busy = true;
+        try { await repository.RemoveAsync(ProductId, lifetime.Token); minimum = null; input = null; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockAlertException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Minimum stock removal failed ({ErrorType}).", ex.GetType().Name); error = "Stocul minim nu a putut fi eliminat. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -706,3 +706,35 @@ Beneficiari - cheia CUI fara prefix RO (06.10.2026): in browser, creeaza un bene
 - **Ce s-a adaugat:** Selectorul „Pentru oferta" in pasul 3 al preluarii facturii si in dialogul „Adauga produs la factura"; propuneri de rezervare dupa finalizarea preluarii.
 - **Ce face acum:** O intrare din factura poate fi legata de componenta ofertei pe care o aproviziona (propunere automata cand produsul e intr-o singura componenta) si apare in Situatie ca „Intrat pt. oferta"; dupa preluare vezi cine poate rezerva din stocul liber.
 - **De verificat:** In browser: selectorul si propunerile (Teste utilizator/03).
+
+Completari stoc: iesire rapida, Unde sunt bucatile, completare vehicul la nivel, stoc minim, export consum, notificari de stoc (08.10.2026): Task completari stoc: totul de verificat in browser (vezi Teste utilizator 01, 06, 07, 09); neverificat: sabloanele de notificare pentru cele trei surse noi, crearea unui sablon si aparitia notificarilor in pagina Notificari.
+
+#### Aliniere comutatoare in grilele de formular (08.10.2026)
+- **Ce s-a adaugat:** regula CSS comuna `.editor-grid > .row-toggle, .anaf-grid > .row-toggle` (aliniere pe linia casetelor, inaltime 39 px).
+- **Ce face acum:** comutatorul de langa un camp (Setari > ANAF „Integrare activata", Setari > Notificari „Sablon activ") sta pe linia casetei campului, nu la inaltimea etichetei.
+- **De verificat:** in browser, la latime mare, medie si pe telefon: ANAF, sabloane de notificari, editorul de utilizator; restul formularelor din audit (butoane/note langa campuri) nu au fost parcurse.
+
+Campuri de editare active fara contur gros (08.10.2026): Focus fara contur gros: de verificat vizual cautarea (liste, harta, produse), PickOnlyDate, SearchableSelect, zona de lipire/incarcare, dialoguri, la latime mare si pe telefon.
+
+Pagina principala: intrari Mentenanta si Notificari cu semnalizare (08.10.2026): Pagina principala: de verificat cu notificari reale care avertizeaza, ca utilizator limitat si pe ecran ingust.
+
+#### Robustete la erori: jurnal in fisier, /health, ErrorBoundary (08.10.2026)
+- **Ce s-a adaugat:** jurnal rulant in `logs/` cu retentie, handlere pentru exceptii necaptate, ajutorul `FireAndForget`, `ErrorBoundary` in layout, `/health` cu verificarea bazei; reteta de supervizor in `docs/SUPERVIZOR_SI_JURNAL.md`.
+- **Ce face acum:** o eroare intr-o pagina nu mai inchide circuitul; erorile ajung in `logs/blazorstoc-*.log`; `/health` da 200/503.
+- **De verificat:** (1) pornirea cu MariaDB oprita: `/health` = 503, aplicatia porneste; (2) o eroare fortata intr-o pagina arata bannerul si butonul „Reincarca pagina"; (3) cadere simulata a procesului si repornirea de catre supervizorul ales (nu este instalat niciunul); (4) eliberarea blocarilor de operatie/produs cand circuitul cade (bataia de inima).
+
+Robustete la erori: jurnal in fisier, /health, ErrorBoundary, sarcini fara asteptare (08.10.2026): Robustete: baza oprita (/health 503), eroare fortata in pagina, cadere cu repornire de supervizor, eliberarea blocarilor la caderea circuitului (vezi TESTE_RAMASE).
+
+Robustete la erori: completari dupa verificarea in browser (08.10.2026) (08.10.2026): Robustete: de verificat la instalarea in container (restart policy, healthcheck, volum logs); erorile din codul paginii insesi inchid circuitul (acceptat).
+
+Backup pe NAS: configurare in Setari, copiere dupa backup, backup programat (08.10.2026): Backup NAS: de testat pe NAS-ul real (Teste utilizator/09), inclusiv backup programat si cazurile de eroare; fara notificare la backup lipsa.
+
+Backup NAS: corectii dupa testul pe NAS-ul real (08.10.2026) (08.10.2026): Backup NAS: backup programat pe ceas real si cazurile de eroare pe NAS (Teste utilizator/09 pasii 4-5).
+
+Notificari pentru backup lipsa si copie pe NAS lipsa (08.10.2026): Notificari backup: de creat sabloanele in Setari -> Notificari si de verificat aparitia/inchiderea (de exemplu oprind backup-ul programat 3 zile sau cu un NAS oprit).
+
+Notificari backup: vechime configurabila, model needitabil, numai cu backup NAS activ (08.10.2026): Backup NAS: de verificat vizual modelul de notificare si campul de zile; de creat sabloanele in Setari -> Notificari.
+
+Backup: stergere la salvare, verificare ora pe internet, setari NTP (08.10.2026): De verificat in browser: sectiunea Verificare ora, fereastra de confirmare la stergere, ceas mutat, internet taiat; migrarea 34 pe baza BlazorStoc se aplica la repornirea aplicatiei
+
+Setari Backup: categorie principala cu sub-taburi si zilele saptamanii (08.10.2026): De verificat in browser: sub-taburile Backup, zilele saptamanii; migrarile 34 si 35 pe baza BlazorStoc se aplica la repornirea aplicatiei

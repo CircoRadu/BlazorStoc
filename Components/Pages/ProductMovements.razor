@@ -16,6 +16,7 @@
 @inject IProductLockRepository Locks
 @inject ILogger<ProductMovements> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>@(product is null ? "Intrări/ieșiri" : $"Intrări/ieșiri · {product.Name}") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -65,7 +66,7 @@ else
                 {
                     <div class="movement-product-actions">
                         @if (holder is null) { <a class="refresh" href="@ReturnNavigation.EditUrl(product.Id, CurrentPath)">Editează</a> }
-                        else { <button type="button" class="refresh" disabled title="@ProductLockRules.HeldMessage(holder)">Editează</button> }
+                        else { <button type="button" class="row-icon edit" disabled title="@ProductLockRules.HeldMessage(holder)" aria-label="Editează mișcarea"></button> }
                         <a class="danger movement-link-danger" href="@ReturnNavigation.DeleteUrl(product.Id, CurrentPath)">Șterge produs</a>
                     </div>
                 }
@@ -73,6 +74,7 @@ else
         </section>
 
         <ProductReservationsInfo ProductId="Id" Stock="stock" Version="reservationVersion" />
+        @if (canManage) { <ProductWhere ProductId="Id" Stock="stock" Version="reservationVersion" /> }
         @if (canManage)
         {
             <ReserveSuggestions ProductId="Id" Trigger="suggestionTrigger" Reserved="() => { reservationVersion++; }" />
@@ -304,8 +306,8 @@ else
                                     <td class="movement-actions">
                                         @if (!m.IsVoided)
                                         {
-                                            <button class="row-action edit" aria-label="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenEditAsync(m)">Editează</button>
-                                            <button class="row-action delete" aria-label="Șterge mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => RequestDelete(m)">Șterge</button>
+                                            <button class="row-icon edit" aria-label="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenEditAsync(m)" title="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)"></button>
+                                            <button class="row-icon delete" aria-label="Șterge mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => RequestDelete(m)" title="Șterge mișcarea din @StockMovementRules.DisplayDate(m.Date)"></button>
                                         }
                                         @if (m.Kind == StockMovementKind.Exit && m.OperationId is { } operationId)
                                         {
@@ -473,6 +475,8 @@ else
         </section>
     </div>
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }
@@ -1070,7 +1074,7 @@ else
     }
 
     private void CloseEdit() { if (!editSaving) { editing = null; pendingEditChanges = null; } }
-    private void EditKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape" && pendingEditChanges is null) _ = RequestCloseEditAsync(); }
+    private void EditKeyAsync(KeyboardEventArgs args) { if (args.Key == "Escape" && pendingEditChanges is null) RequestCloseEditAsync().FireAndForget(Logger, "close edit"); }
 
     // Task 1: leaving the add form or the edit dialog with modified values asks for confirmation first.
     private UnsavedChangesTracker? addTracker, editTracker;

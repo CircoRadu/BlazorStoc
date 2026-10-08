@@ -127,6 +127,18 @@ LOCK TABLES `archive_work_points` WRITE;
 /*!40000 ALTER TABLE `archive_work_points` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `backup_nas_settings` WRITE;
+/*!40000 ALTER TABLE `backup_nas_settings` DISABLE KEYS */;
+REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8F-Vh-JEyYtDr8SrPmy8eV65LZ0otZD2aWSjDcjNroDfpKJiX4dWyXPqqwPv8WcehPj4rqCoQYgV_Z1Ux-i3uhMs_KkT7zg4hw1Nwj8Ef8-J_xhSiZYc0InnyicPZC23ig',1,1,'11:10','2026-10-08','2026-10-08T09:17:31.918Z',1,'Pachetul nou a fost copiat pe NAS: Copie siguranta la cerere 08.10.2026 12-17-31 Administrator administrator demo.zip.','administrator.demo','2026-10-08T08:09:03.475Z',2,NULL,NULL);
+/*!40000 ALTER TABLE `backup_nas_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `backup_settings` WRITE;
+/*!40000 ALTER TABLE `backup_settings` DISABLE KEYS */;
+REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'11:10','2026-10-08',2,1,7,NULL,NULL,'administrator.demo','2026-10-08T09:18:43.695Z',1,'',NULL,0,127);
+/*!40000 ALTER TABLE `backup_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `beneficiaries` WRITE;
 /*!40000 ALTER TABLE `beneficiaries` DISABLE KEYS */;
 REPLACE INTO `beneficiaries` (`id`, `name`, `normalized_name`, `cui`, `normalized_cui`, `kind`, `address`, `phone`, `registry_number`, `postal_code`, `caen_code`, `anaf_verified`, `version`) VALUES (1,'Construct Demo SRL','CONSTRUCT DEMO SRL','RO10000001','10000001','PJ','Strada Demo 1, Bucuresti','0721000001','','','',0,1),
@@ -170,7 +182,8 @@ UNLOCK TABLES;
 
 LOCK TABLES `expiry_notifications` WRITE;
 /*!40000 ALTER TABLE `expiry_notifications` DISABLE KEYS */;
-REPLACE INTO `expiry_notifications` (`id`, `template_id`, `source_key`, `object_id`, `expiry_date`, `created_utc`, `acknowledged_by`, `acknowledged_utc`, `snooze_until`, `snooze_days`, `version`, `resolved_by`, `resolved_utc`, `resolved_reason`, `resolved_auto`, `object_label`, `snapshot_values`, `snapshot_subject`, `snapshot_body`, `snapshot_source`) VALUES (1,1,'vehicul.itp',1,'2026-10-15','2026-09-30T10:21:03.873Z','administrator.demo','2026-09-30T10:40:51.531Z',NULL,NULL,1,NULL,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL);
+REPLACE INTO `expiry_notifications` (`id`, `template_id`, `source_key`, `object_id`, `expiry_date`, `created_utc`, `acknowledged_by`, `acknowledged_utc`, `snooze_until`, `snooze_days`, `version`, `resolved_by`, `resolved_utc`, `resolved_reason`, `resolved_auto`, `object_label`, `snapshot_values`, `snapshot_subject`, `snapshot_body`, `snapshot_source`) VALUES (1,1,'vehicul.itp',1,'2026-10-15','2026-09-30T10:21:03.873Z','administrator.demo','2026-09-30T10:40:51.531Z',NULL,NULL,1,NULL,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL),
+(2,7,'stoc.iesiri-peste-stoc',8,'2026-10-08','2026-10-08T08:47:09.682Z',NULL,NULL,NULL,NULL,0,NULL,NULL,NULL,0,'Stoc negativ la Disc diamantat 230 mm, ieșiri peste stoc din 24.09.2026','{\"produs\":\"Disc diamantat 230 mm\",\"data prima iesire\":\"24.09.2026\",\"numar iesiri\":\"1\",\"cauza\":\"necunoscut\\u0103\"}',NULL,NULL,NULL);
 /*!40000 ALTER TABLE `expiry_notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -196,11 +209,37 @@ LOCK TABLES `notification_settings` WRITE;
 /*!40000 ALTER TABLE `notification_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `notification_template_seeds` WRITE;
+/*!40000 ALTER TABLE `notification_template_seeds` DISABLE KEYS */;
+REPLACE INTO `notification_template_seeds` (`source_key`, `seeded_utc`) VALUES ('contract.expirare','2026-10-08T08:47:08.958Z'),
+('intrare.factura-asteptata','2026-10-08T08:47:08.965Z'),
+('mentenanta.scadenta','2026-10-08T08:47:08.955Z'),
+('proiect.deficit-termen','2026-10-08T08:47:08.984Z'),
+('sistem.backup-lipsa','2026-10-08T08:47:08.988Z'),
+('sistem.copie-nas-lipsa','2026-10-08T08:47:08.991Z'),
+('stoc.iesiri-peste-stoc','2026-10-08T08:47:08.971Z'),
+('stoc.rezervare-fara-miscare','2026-10-08T08:47:08.981Z'),
+('stoc.sub-minim','2026-10-08T08:47:08.975Z'),
+('vehicul.asigurare','2026-10-08T08:47:08.929Z'),
+('vehicul.itp','2026-10-08T08:47:08.906Z'),
+('vehicul.rovinieta','2026-10-08T08:47:08.930Z');
+/*!40000 ALTER TABLE `notification_template_seeds` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `notification_templates` WRITE;
 /*!40000 ALTER TABLE `notification_templates` DISABLE KEYS */;
 REPLACE INTO `notification_templates` (`id`, `source_key`, `subject`, `body`, `threshold_days`, `is_active`, `version`, `active_source_key`) VALUES (1,'vehicul.itp','Expirare <eveniment> – <numar autovehicul> la data de <data expirare>','Atenție: <eveniment> pentru autovehiculul <numar autovehicul> (<descriere autovehicul>) expiră la data de <data expirare>, peste <zile ramase> zile. Vă rugăm să luați măsurile necesare înainte de această dată.',15,1,1,'vehicul.itp'),
 (2,'vehicul.asigurare','Expirare <eveniment> – <numar autovehicul> la data <data expirare>','Atenție: <eveniment> pentru autovehiculul <numar autovehicul> (<descriere autovehicul>) expiră la data de <data expirare>, peste <zile ramase> zile. Vă rugăm să luați măsurile necesare înainte de această dată.',30,1,0,'vehicul.asigurare'),
-(3,'vehicul.rovinieta','Expirare <eveniment> – <numar autovehicul> la data <data expirare>','Atenție: <eveniment> pentru autovehiculul <numar autovehicul> (<descriere autovehicul>) expiră la data de <data expirare>, peste <zile ramase> zile. Vă rugăm să luați măsurile necesare înainte de această dată.',30,1,0,'vehicul.rovinieta');
+(3,'vehicul.rovinieta','Expirare <eveniment> – <numar autovehicul> la data <data expirare>','Atenție: <eveniment> pentru autovehiculul <numar autovehicul> (<descriere autovehicul>) expiră la data de <data expirare>, peste <zile ramase> zile. Vă rugăm să luați măsurile necesare înainte de această dată.',30,1,0,'vehicul.rovinieta'),
+(4,'mentenanta.scadenta','Scadență mentenanță – <beneficiar>, <punct de lucru>','Intervenția de mentenanță la punctul de lucru <punct de lucru> (<adresa punct de lucru>) al beneficiarului <beneficiar>, contract <numar contract>, este programată pentru <data expirare> (zile rămase: <zile ramase>; zile de depășire: <zile depasire>). Ultima intervenție de mentenanță: <data ultima interventie>.',30,1,0,'mentenanta.scadenta'),
+(5,'contract.expirare','Expirare contract – <beneficiar>','Contractul de mentenanță <numar contract> al beneficiarului <beneficiar> expiră la data de <data expirare> (zile rămase: <zile ramase>; zile de depășire: <zile depasire>).',30,1,0,'contract.expirare'),
+(6,'intrare.factura-asteptata','Factură așteptată – <furnizor>','De la furnizorul <furnizor> s-au primit produse la data de <data receptie> (<numar produse> produse) fără factură. Factura era așteptată până la <data expirare> (zile rămase: <zile ramase>; zile de depășire: <zile depasire>).',7,1,0,'intrare.factura-asteptata'),
+(7,'stoc.iesiri-peste-stoc','Ieșiri peste stoc nerezolvate – <produs>','Produsul <produs> are stoc negativ după <numar iesiri> ieșiri peste stoc, prima din <data prima iesire> (cauza: <cauza>). Regularizarea era așteptată până la <data expirare> (zile rămase: <zile ramase>; zile de depășire: <zile depasire>).',7,1,0,'stoc.iesiri-peste-stoc'),
+(8,'stoc.sub-minim','Stoc sub minim – <produs>','Produsul <produs> are stocul <stoc> buc., sub minimul de <stoc minim> buc. (lipsesc <lipsa pana la minim> buc. până la minim).',1,1,0,'stoc.sub-minim'),
+(9,'stoc.rezervare-fara-miscare','Rezervare fără mișcare – <produs>','Proiectul <proiect> ține rezervate <cantitate rezervata> buc. din <produs> fără nicio mișcare de peste 30 de zile. Revizuirea era așteptată până la <data expirare> (zile de depășire: <zile depasire>).',1,1,0,'stoc.rezervare-fara-miscare'),
+(10,'proiect.deficit-termen','Deficit la proiectul <proiect>','Proiectul <proiect> are termen la <termen proiect> și încă <numar repere de achizitionat> repere de achiziționat (vezi lista de achiziție din situația proiectului). Zile rămase: <zile ramase>; zile de depășire: <zile depasire>.',14,1,0,'proiect.deficit-termen'),
+(11,'sistem.backup-lipsa','Backup lipsă – ultimul: <ultimul backup>','Nu s-a făcut niciun backup de peste <vechime maxima> zile. Ultimul backup: <ultimul backup>. Ultima eroare: <ultima eroare backup>. Verifică Setări → Backup NAS și programarea zilnică.',1,1,0,'sistem.backup-lipsa'),
+(12,'sistem.copie-nas-lipsa','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: <ultima copiere>. Cauza: <cauza copiere>. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.',1,1,0,'sistem.copie-nas-lipsa');
 /*!40000 ALTER TABLE `notification_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -216,6 +255,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `offer_templates` WRITE;
 /*!40000 ALTER TABLE `offer_templates` DISABLE KEYS */;
+REPLACE INTO `offer_templates` (`id`, `name`, `name_key`, `active`, `definition`, `version`, `created_by`, `created_utc`, `updated_by`, `updated_utc`) VALUES (1,'produse','produse',1,'{\"Sheet\":\"Sheet\",\"NumberColumn\":\"A\",\"TypeColumn\":\"B\",\"NameColumn\":\"D\",\"UnitColumn\":\"F\",\"QuantityColumn\":\"G\",\"ColumnLabels\":{\"number\":\"Nr.\",\"type\":\"Tip produs\",\"name\":\"Denumire\",\"unit\":\"Unitate m\\u0103sur\\u0103\",\"quantity\":\"Cantitate\"},\"HeaderFields\":[{\"Key\":\"number\",\"Label\":\"Oferta Nr\",\"Position\":\"right\"},{\"Key\":\"title\",\"Label\":\"Oferta Nr\",\"Position\":\"below\"},{\"Key\":\"category\",\"Label\":\"Categoria\",\"Position\":\"right\"},{\"Key\":\"beneficiary\",\"Label\":\"Beneficiar\",\"Position\":\"right\"}],\"Sections\":[{\"Name\":\"Echipamente\",\"Import\":true},{\"Name\":\"Manoper\\u0103\",\"Import\":false}],\"IgnoreRows\":[\"Total\",\"F\\u0103r\\u0103 TVA\"]}',0,'administrator.demo','2026-10-07T12:41:07.250Z','administrator.demo','2026-10-07T12:41:07.250Z');
 /*!40000 ALTER TABLE `offer_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -231,7 +271,13 @@ UNLOCK TABLES;
 
 LOCK TABLES `product_locks` WRITE;
 /*!40000 ALTER TABLE `product_locks` DISABLE KEYS */;
+REPLACE INTO `product_locks` (`product_id`, `owner_username`, `session_id`, `acquired_utc`, `renewed_utc`, `expires_utc`) VALUES (4,'administrator.demo','fc4a1105-1c8f-49d8-b296-bd8b71fb13d4','2026-10-08T06:16:24.082Z','2026-10-08T06:16:24.082Z','2026-10-08T06:17:54.082Z');
 /*!40000 ALTER TABLE `product_locks` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `product_min_stock` WRITE;
+/*!40000 ALTER TABLE `product_min_stock` DISABLE KEYS */;
+/*!40000 ALTER TABLE `product_min_stock` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `products` WRITE;
@@ -258,7 +304,13 @@ UNLOCK TABLES;
 
 LOCK TABLES `project_components` WRITE;
 /*!40000 ALTER TABLE `project_components` DISABLE KEYS */;
+REPLACE INTO `project_components` (`id`, `project_id`, `system_type_id`, `state`, `archived_utc`, `archive_reason`, `version`, `created_utc`, `updated_utc`) VALUES (1,2,1,1,NULL,NULL,0,'2026-10-07T12:38:10.059Z','2026-10-07T12:38:10.059Z');
 /*!40000 ALTER TABLE `project_components` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `project_deadlines` WRITE;
+/*!40000 ALTER TABLE `project_deadlines` DISABLE KEYS */;
+/*!40000 ALTER TABLE `project_deadlines` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `project_observation_files` WRITE;
@@ -412,7 +464,13 @@ UNLOCK TABLES;
 
 LOCK TABLES `system_types` WRITE;
 /*!40000 ALTER TABLE `system_types` DISABLE KEYS */;
+REPLACE INTO `system_types` (`id`, `name`, `name_key`, `active`, `sort_order`, `version`, `created_utc`, `updated_utc`) VALUES (1,'TVCI','tvci',1,1,2,'2026-10-07T12:37:25.959Z','2026-10-07T12:48:21.985Z');
 /*!40000 ALTER TABLE `system_types` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `vehicle_target_levels` WRITE;
+/*!40000 ALTER TABLE `vehicle_target_levels` DISABLE KEYS */;
+/*!40000 ALTER TABLE `vehicle_target_levels` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `vehicles` WRITE;

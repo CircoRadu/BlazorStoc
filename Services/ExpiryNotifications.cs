@@ -77,6 +77,12 @@ public static class ExpirySourceKeys
     public const string ContractExpiry = "contract.expirare";
     public const string AwaitedInvoice = "intrare.factura-asteptata";
     public const string OverStock = "stoc.iesiri-peste-stoc";
+    public const string MinStock = "stoc.sub-minim";
+    public const string StaleReservation = "stoc.rezervare-fara-miscare";
+    public const string ProjectDeficit = "proiect.deficit-termen";
+    public const string BackupMissing = "sistem.backup-lipsa";
+    public const string NasCopyMissing = "sistem.copie-nas-lipsa";
+    public const string ClockSkew = "sistem.ceas-server-decalat";
 }
 
 public sealed record NotificationTemplate(int Id, string SourceKey, string Subject, string Body, int ThresholdDays, bool Active, long Version);

@@ -8,6 +8,7 @@
 @inject ChangeOrigin Origin
 @inject ILogger<VehiclePage> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>@(vehicle?.PlateNumber ?? "Vehicul") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -47,7 +48,7 @@ else if (vehicle is not null)
                 <tr><td>Descriere</td><td><strong>@vehicle.Description</strong></td><td></td></tr>
                 @foreach (var (field, date) in Expiries(vehicle))
                 {
-                    <tr><td>@field.Label</td><td><strong>@VehicleRules.DisplayExpiry(date)</strong> <button class="row-action edit" aria-label="Modifică @field.Label.ToLowerInvariant()" disabled="@(editing || editingExpiry is not null)" @onclick="() => editingExpiry = field">✎</button></td><td>@ExpiryBadge(date)</td></tr>
+                    <tr><td>@field.Label</td><td><strong>@VehicleRules.DisplayExpiry(date)</strong> <button class="row-icon edit" aria-label="Modifică @field.Label.ToLowerInvariant()" disabled="@(editing || editingExpiry is not null)" @onclick="() => editingExpiry = field" title="Modifică @field.Label.ToLowerInvariant()"></button></td><td>@ExpiryBadge(date)</td></tr>
                 }
             </tbody></table></div>
         </div>
@@ -67,6 +68,8 @@ else if (vehicle is not null)
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteVehicleAsync"
                               Cancelled="CancelDelete" />
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

@@ -1,6 +1,7 @@
 @page "/intretinere"
 @attribute [Authorize]
 @using BlazorStoc.Services
+<PageBoundary>
 
 <PageTitle>Întreținere · BlazorStoc</PageTitle>
 <div class="page-heading">
@@ -13,6 +14,8 @@
     <p>De obicei durează câteva secunde.</p>
     <a class="refresh" href="@ReturnTarget">Reîncearcă acum</a>
 </div>
+
+</PageBoundary>
 
 @code {
     [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }

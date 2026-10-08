@@ -2,6 +2,8 @@
 @layout Layout.PopoutLayout
 @attribute [Authorize]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+<PageBoundary>
 
 @* The categories page without the menu, to open in front of another page (the product form of the invoice pickup). *@
 <ProductGroups />
+</PageBoundary>

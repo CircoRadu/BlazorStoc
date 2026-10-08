@@ -6,6 +6,7 @@
 @inject IAccessControl Access
 @inject ILogger<OfferTemplates> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Șabloane de oferte · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">OFERTE · <a href="/oferte/preluare">Preluare ofertă</a></p><h1>Șabloane de oferte</h1><p class="muted">Un șablon spune unde sunt datele într-un deviz-ofertă Excel (.xlsx): antetul ofertei se citește după etichete, tabelul după etichetele coloanelor, iar secțiunile (Echipamente, Manoperă, Cheltuieli) se importă sau nu. Prețurile și TVA nu se citesc; unitatea de măsură servește doar ca să se deosebească produsele pe bucăți (cele din stoc) de metraje și ore.</p></div></div>
@@ -16,6 +17,7 @@
 {
     <section class="catalog offer-template-editor" aria-label="Editor de șablon">
         <div class="catalog-heading"><h2>@(original is null ? "Șablon nou" : $"Modifică șablonul {original.Name}")</h2><button type="button" class="danger" disabled="@busy" @onclick="CloseEditor">Închide</button></div>
+        <div class="catalog-body">
         <FileDropZone Id="offer-sample" Accept=".xlsx" Disabled="busy" OnChange="SampleChosenAsync" Text="Trage aici un fișier de probă .xlsx sau alege-l (nu se păstrează)" />
         @if (workbook is not null && workbook.Sheets.Count > 1)
         {
@@ -74,7 +76,7 @@
                     <option value="@OfferHeaderField.Right" selected="@(item.Position != OfferHeaderField.Below)">La dreapta etichetei</option>
                     <option value="@OfferHeaderField.Below" selected="@(item.Position == OfferHeaderField.Below)">Sub etichetă</option>
                 </select></td>
-                <td><button type="button" class="row-action delete" disabled="@busy" @onclick="() => definition.HeaderFields.Remove(item)">Scoate</button></td>
+                <td><button type="button" class="row-icon delete" disabled="@busy" @onclick="() => definition.HeaderFields.Remove(item)" aria-label="Scoate câmpul din șablon" title="Scoate câmpul din șablon"></button></td>
             </tr>
         }
         </tbody></table></div>
@@ -95,7 +97,7 @@
             <tr>
                 <td><input aria-label="Denumirea secțiunii" disabled="@busy" @bind="rule.Name" @bind:event="onchange" /></td>
                 <td><ToggleSwitch @bind-Value="rule.Import" OnText="Da" OffText="Nu" AriaLabel="@($"Se importă secțiunea {rule.Name}")" Disabled="busy" /></td>
-                <td><button type="button" class="row-action delete" disabled="@busy" @onclick="() => definition.Sections.Remove(rule)">Scoate</button></td>
+                <td><button type="button" class="row-icon delete" disabled="@busy" @onclick="() => definition.Sections.Remove(rule)" aria-label="Scoate regula din șablon" title="Scoate regula din șablon"></button></td>
             </tr>
         }
         </tbody></table></div>
@@ -124,6 +126,7 @@
             @if (workbook is not null) { <button type="button" class="refresh" disabled="@busy" @onclick="Verify">Verifică pe fișier</button> }
             <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">@(busy ? "Se salvează…" : "Salvează șablonul")</button>
         </div>
+        </div>
     </section>
 }
 else
@@ -144,8 +147,8 @@ else
                     <td class="muted">@(string.Join(", ", template.Definition.Sections.Where(section => section.Import).Select(section => section.Name)) is { Length: > 0 } imported ? imported : "—")</td>
                     <td><ToggleSwitch Compact Value="template.Active" ValueChanged="value => SetActiveAsync(template, value)" Disabled="busy" AriaLabel="@($"Activ: {template.Name}")" /></td>
                     <td>
-                        <button type="button" class="row-action edit" disabled="@busy" @onclick="() => StartEdit(template)">Modifică</button>
-                        @if (isAdministrator) { <button type="button" class="row-action delete" disabled="@busy" @onclick="() => deleting = template">Șterge</button> }
+                        <button type="button" class="row-icon edit" disabled="@busy" @onclick="() => StartEdit(template)" aria-label="@($"Modifică șablonul {template.Name}")" title="@($"Modifică șablonul {template.Name}")"></button>
+                        @if (isAdministrator) { <button type="button" class="row-icon delete" disabled="@busy" @onclick="() => deleting = template" aria-label="@($"Șterge șablonul {template.Name}")" title="@($"Șterge șablonul {template.Name}")"></button> }
                     </td>
                 </tr>
             }
@@ -168,6 +171,8 @@ else
         </section>
     </div>
 }
+
+</PageBoundary>
 
 @code {
     private const long MaxSampleBytes = 8L * 1024 * 1024;

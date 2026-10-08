@@ -17,6 +17,7 @@
 @inject InvoiceLabSettings Lab
 @inject ILogger<InvoicePickup> Logger
 @implements IAsyncDisposable
+<PageBoundary>
 
 <PageTitle>Preluare factură · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -495,6 +496,8 @@ else
         <button type="button" class="primary" disabled="@((step == 1 && !CanLeaveStep1) || (step == 2 && !CanLeaveStep2))" @onclick="NextStep">Pasul următor →</button>
     }
 </div>
+
+</PageBoundary>
 
 @code {
     private static readonly string[] StepTitles = ["Citirea facturii", "Potrivirea produselor", "Confirmare"];

@@ -4,6 +4,28 @@ Fluxul: Administrare -> Vehicule -> pagina vehiculului (taburi: date, expirari I
 
 ## Modificari de testat
 
+### 08.10.2026 - Nivel tinta pe vehicul si „Completeaza la nivel"
+
+**Ce s-a adaugat:** pe pagina „Materiale si echipamente" a unei masini, sectiunea „Nivel tinta": pentru fiecare produs se seteaza cate bucati ar trebui sa aiba masina, plus butonul „Completeaza la nivel" (migrarea 28, tabelul `vehicle_target_levels`).
+
+**Ce face acum:** tabelul arata nivelul tinta, cate bucati are masina si cate lipsesc. „Completeaza la nivel" deschide „Iesire multipla" cu destinatia masina si cate o linie pentru fiecare produs care lipseste (cantitatea lipsa), descrierea „Completare la nivel"; tu verifici si salvezi (aceleasi reguli ca la orice iesire: peste stoc, rezervari, bon PDF). Nivelul nu schimba stocul singur.
+
+1. Deschide o masina, tabul „Materiale si echipamente": in „Nivel tinta" alege un produs, scrie nivelul si apasa „Setează nivelul"; apare in tabel.
+2. Schimba nivelul aceluiasi produs: valoarea se inlocuieste (nu apare un al doilea rand).
+3. Daca masina are mai putine bucati decat nivelul, coloana „Lipseste" arata diferenta si apare „Completeaza la nivel".
+4. Apasa „Completeaza la nivel": se deschide iesirea multipla cu masina si liniile pregatite; salveaza-o, apoi revino pe pagina masinii: „Lipseste" este 0 si butonul dispare.
+5. Elimina un nivel cu ×. In Jurnal apar „Setare nivel tinta vehicul" si „Eliminare nivel tinta vehicul", cu valoarea veche si noua.
+
+**Detalii:**
+
+- Setare: se alege produsul si nivelul dorit; la acelasi produs valoarea se inlocuieste.
+- Tabel: arata nivelul tinta, cate bucati are masina si cate lipsesc, cu × pentru eliminare.
+- Completare: „Completeaza la nivel" apare doar cand lipseste ceva si deschide „Iesire multipla" cu masina si cate o linie pentru fiecare produs lipsa; utilizatorul verifica si salveaza (aceleasi reguli ca la orice iesire), iar stocul nu se schimba inainte de salvare.
+- Jurnal: „Setare nivel tinta vehicul" si „Eliminare nivel tinta vehicul", cu valoarea veche si noua.
+- Schema: migrarea 28 (`vehicle_target_levels`), aplicata pe `BlazorStoc`; pe `blazorstoc_test` tabela a fost creata direct (contul migrator nu are drepturi acolo).
+- Cod: `Services/VehicleTargets.cs`, `Services/MariaVehicleTargetRepository.cs`, `Components/Pages/VehicleEquipmentPage.razor`, `ExitOperation.razor` (parametrul `?vehicul=`); test in `MariaExtendedChecks` („Vehicle target levels").
+- Jurnalul si tabelul sunt incluse in arhivare (`MariaArchiveSchema.MigratedTables`).
+
 ### 07.10.2026 - Operatii si reimprospatare
 
 **Ce s-a adaugat:** transferurile si restituirile de pe pagina vehiculului fac parte acum dintr-o operatie (id comun, vizibil in jurnal), pot fi stornate cu motiv din pagina produsului (refuzat daca masina ar ramane negativa) si au bon; pagina vehiculului se reimprospateaza fara licarire. Pasii: 02_Intrari_si_iesiri_produs.md.

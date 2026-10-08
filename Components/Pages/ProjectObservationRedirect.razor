@@ -5,6 +5,7 @@
 @inject IProjectRepository Repository
 @inject NavigationManager Navigation
 @inject ILogger<ProjectObservationRedirect> Logger
+<PageBoundary>
 
 <PageTitle>Observație · BlazorStoc</PageTitle>
 <a class="nav-back" href="/beneficiari"><span>←</span> Beneficiari</a>
@@ -20,6 +21,8 @@ else
 {
     <div class="empty-state" role="status"><div class="spinner"></div><h3>Se deschide pagina observației</h3></div>
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

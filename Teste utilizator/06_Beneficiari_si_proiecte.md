@@ -4,6 +4,23 @@ Fluxul: Administrare -> Beneficiari (PF sau PJ cu preluare ANAF) -> pagina benef
 
 ## Modificari de testat
 
+### 08.10.2026 - Termen pe proiect
+
+**Ce s-a adaugat:** pe pagina „Situatia proiectului" campul „Termen proiect" cu butonul „Setează termenul" (migrarea 29, tabelul `project_deadlines`).
+
+**Ce face acum:** termenul nu poate fi in trecut; se inlocuieste daca il schimbi; cu × se elimina. Cu un sablon de notificare activ pentru „Deficit la un proiect cu termen apropiat" (vezi 09), un proiect cu termen si cu lista de achizitie nevida primeste notificare cand termenul se apropie.
+
+1. Deschide situatia unui proiect cu oferta, alege o data din viitor si apasa „Setează termenul".
+2. Incearca o data din trecut: mesajul „Termenul nu poate fi înainte de data de azi.".
+3. Schimba data, apoi elimina termenul cu ×. In Jurnal: „Setare termen proiect" / „Eliminare termen proiect", cu valoarea veche si noua.
+
+**Detalii:**
+
+- Termen: se seteaza pe pagina „Situatia proiectului", nu poate fi in trecut; fara el nu exista notificarea de deficit.
+- Jurnal: „Setare termen proiect" si „Eliminare termen proiect"; tabela `project_deadlines` este inclusa in arhivare.
+- Deficitul este lista de achizitie a situatiei proiectului (ce nu este acoperit de stoc).
+- Cod: `Components/Shared/ProjectDeadlineField.razor`, `Services/MariaStockAlerts.cs`.
+
 ### 07.10.2026 - Rezervari pe proiect
 
 **Ce s-a adaugat:** (1) **Rezervari**: pagina Situatia proiectului are coloana "Din care rezervat", butoanele "Rezerva cat se poate" (pe linie si pe componenta), formularul de rezervare manuala (produs, componenta, cantitate) si lista "Rezervarile proiectului" cu "Scade / elibereaza" (cantitate + motiv scurt). Rezervarea **nu schimba stocul**; scade **stocul liber** (stoc - rezervari, niciodata sub zero; la stoc negativ nu e nimic liber). (2) **La iesire nu se blocheaza nimic**: iesirea pentru proiect consuma intai rezervarea proiectului; restul se compara cu stocul liber, iar daca ar lua bucati rezervate de alte proiecte apare un avertisment cu proiectele care tin rezervari si alegerea: continua fara sa ating rezervarile, sau scade rezervarea unui proiect (cantitate + motiv), sau renunti; la Iesire multipla, avertismentele apar in rezumatul de dinainte de salvare, pe fiecare linie. (3) Pe pagina produsului apare "Rezervat: X buc. (proiecte) · stoc liber". (4) Dupa o **intrare** pe produs apar propunerile "Rezerva N buc. pentru proiectul X" (proiecte al caror necesar e acoperit de stocul liber, dar nerezervat), iar intrarea poate fi legata de o oferta (selectorul "Pentru oferta", cu propunere automata cand produsul e intr-o singura componenta); in Situatie apare coloana "Intrat pt. oferta". (5) La scoaterea unei componente, rezervarile ei se elibereaza automat.

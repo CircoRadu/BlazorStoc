@@ -9,6 +9,7 @@
 @inject NavigationManager Navigation
 @inject ILogger<Vehicles> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Vehicule · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -31,7 +32,7 @@
         <div class="table-scroll"><table><thead><tr><th>NUMĂR DE ÎNMATRICULARE</th><th>DESCRIERE</th><th class="number">MIȘCĂRI</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var vehicle in Filtered)
         {
-            <tr @key="vehicle.Id"><td><a class="category-table-link" href="@VehicleNavigation.PageUrl(vehicle.Id)" aria-label="Deschide vehiculul @vehicle.PlateNumber"><span class="role-badge limited">@vehicle.PlateNumber</span></a></td><td class="movement-text"><strong>@vehicle.Description</strong></td><td class="number">@if (movementCounts.GetValueOrDefault(vehicle.Id) is > 0 and var used) { <a class="category-table-link" href="@VehicleNavigation.PageUrl(vehicle.Id)">@used</a> } else { <text>0</text> }</td><td><div class="row-buttons"><button class="row-action edit" aria-label="Editează vehiculul @vehicle.PlateNumber" @onclick="() => OpenEditorAsync(vehicle)">✎</button><button class="row-action delete" aria-label="Șterge vehiculul @vehicle.PlateNumber" @onclick="() => RequestDeleteAsync(vehicle)">×</button></div></td></tr>
+            <tr @key="vehicle.Id"><td><a class="category-table-link" href="@VehicleNavigation.PageUrl(vehicle.Id)" aria-label="Deschide vehiculul @vehicle.PlateNumber"><span class="role-badge limited">@vehicle.PlateNumber</span></a></td><td class="movement-text"><strong>@vehicle.Description</strong></td><td class="number">@if (movementCounts.GetValueOrDefault(vehicle.Id) is > 0 and var used) { <a class="category-table-link" href="@VehicleNavigation.PageUrl(vehicle.Id)">@used</a> } else { <text>0</text> }</td><td><div class="row-buttons"><button class="row-icon edit" aria-label="Editează vehiculul @vehicle.PlateNumber" @onclick="() => OpenEditorAsync(vehicle)" title="Editează vehiculul @vehicle.PlateNumber"></button><button class="row-icon delete" aria-label="Șterge vehiculul @vehicle.PlateNumber" @onclick="() => RequestDeleteAsync(vehicle)" title="Șterge vehiculul @vehicle.PlateNumber"></button></div></td></tr>
         }
         </tbody></table></div>
     }
@@ -45,6 +46,8 @@
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteVehicleAsync"
                               Cancelled="CancelDeleteAsync" />
 }
+
+</PageBoundary>
 
 @code {
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
@@ -63,7 +66,7 @@
     {
         if (!await Access.CanManageProductsAsync(lifetime.Token)) { denied = true; error = "Nu ai dreptul să administrezi vehiculele."; return; }
         await LoadAsync(true);
-        _ = SynchronizePeriodicallyAsync();
+        SynchronizePeriodicallyAsync().FireAndForget(Logger, "periodic synchronization");
     }
 
     protected override async Task OnParametersSetAsync()

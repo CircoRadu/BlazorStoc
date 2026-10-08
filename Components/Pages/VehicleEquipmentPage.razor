@@ -4,10 +4,14 @@
 @using BlazorStoc.Services
 @inject IVehicleRepository Vehicles
 @inject IStockMovementRepository Movements
+@inject IProductRepository ProductsRepository
+@inject IVehicleTargetRepository Targets
+@inject IAccessControl Access
 @inject IChangeFeed ChangeFeed
 @inject ChangeOrigin Origin
 @inject ILogger<VehicleEquipmentPage> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Materiale și echipamente @(vehicle?.PlateNumber is { } plate ? $"· {plate}" : "") · BlazorStoc</PageTitle>
 
@@ -69,6 +73,39 @@ else if (vehicle is not null)
         }
         </div>
     </section>
+    @if (canManage)
+    {
+        <section class="catalog settings-panel vehicle-targets">
+            <h2>Nivel țintă</h2>
+            <p class="muted">Câte bucăți ar trebui să aibă mașina din fiecare produs. „Completează la nivel” pregătește o ieșire multiplă din depozit pentru ce lipsește; o verifici și o salvezi tu.</p>
+            @if (targetError is not null) { <div class="error-banner" role="alert">@targetError</div> }
+            @if (targets.Count > 0)
+            {
+                <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">NIVEL ȚINTĂ</th><th class="number">ÎN MAȘINĂ</th><th class="number">LIPSEȘTE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                @foreach (var target in targets)
+                {
+                    var held = items.FirstOrDefault(item => item.ProductId == target.ProductId)?.Quantity ?? 0;
+                    <tr @key="target.ProductId">
+                        <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(target.ProductId)">@target.ProductName</a></td>
+                        <td class="number">@target.Target</td>
+                        <td class="number">@held</td>
+                        <td class="number">@VehicleTargetRules.Missing(target.Target, held)</td>
+                        <td><button type="button" class="danger" aria-label="@($"Elimină nivelul țintă pentru {target.ProductName}")" disabled="@targetBusy" @onclick="() => RemoveTargetAsync(target)">×</button></td>
+                    </tr>
+                }
+                </tbody></table></div>
+            }
+            else { <p class="muted">Nu există niveluri țintă pentru această mașină.</p> }
+            <div class="editor-actions">
+                <SearchableSelect Id="target-product" Label="Produs" Placeholder="Caută sau alege produsul…" EmptyText="Niciun produs găsit." Options="TargetProductOptions"
+                                  SelectedId="newTargetProduct" SelectedIdChanged="id => newTargetProduct = id" />
+                <input type="number" aria-label="Nivel țintă (buc.)" min="1" max="@StockMovementRules.MaxQuantity" @bind="newTargetQuantity" @bind:event="oninput" />
+                <button type="button" class="refresh" disabled="@targetBusy" @onclick="SetTargetAsync">Setează nivelul</button>
+                @if (targets.Any(target => VehicleTargetRules.Missing(target.Target, HeldOf(target.ProductId)) > 0)) { <a class="primary"
+                   href="@($"/iesiri/multipla?vehicul={Id}")">Completează la nivel</a> }
+            </div>
+        </section>
+    }
 }
 
 @if (dialog is { } current)
@@ -79,6 +116,8 @@ else if (vehicle is not null)
                            ShowTarget="@(current.Kind is TransferKind.Move or TransferKind.MoveAll)" Targets="otherVehicles"
                            Busy="@busy" Error="@dialogError" Confirmed="ConfirmAsync" Cancelled="Close" />
 }
+
+</PageBoundary>
 
 @code {
     private enum TransferKind { Return, Move, ReturnAll, MoveAll }
@@ -126,11 +165,61 @@ else if (vehicle is not null)
         finally { loading = false; }
     }
 
+    private IReadOnlyList<VehicleTarget> targets = [];
+    private IReadOnlyList<Product> allProducts = [];
+    private bool canManage, targetBusy;
+    private string? targetError;
+    private int? newTargetProduct, newTargetQuantity;
+
+    private int HeldOf(int productId) => items.FirstOrDefault(item => item.ProductId == productId)?.Quantity ?? 0;
+    private IReadOnlyList<SelectOption> TargetProductOptions =>
+        allProducts.Where(product => targets.All(target => target.ProductId != product.Id))
+            .Select(product => new SelectOption(product.Id, product.Name, $"{product.Category} {product.Subcategory}")).ToArray();
+
+    private async Task LoadTargetsAsync()
+    {
+        canManage = await Access.CanManageProductsAsync(lifetime.Token);
+        if (!canManage) return;
+        targets = await Targets.GetForVehicleAsync(Id, lifetime.Token);
+        allProducts = (await ProductsRepository.GetProductsAsync(lifetime.Token)).OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+    }
+
+    private async Task SetTargetAsync()
+    {
+        if (targetBusy) return;
+        targetError = null;
+        if (newTargetProduct is not { } productId) { targetError = "Alege produsul."; return; }
+        if (newTargetQuantity is not { } quantity) { targetError = VehicleTargetRules.QuantityMessage; return; }
+        targetBusy = true;
+        try
+        {
+            await Targets.SetAsync(Id, productId, quantity, lifetime.Token);
+            newTargetProduct = null; newTargetQuantity = null;
+            await LoadTargetsAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is VehicleTargetException or AccessDeniedException) { targetError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Vehicle target saving failed ({ErrorType}).", exception.GetType().Name); targetError = "Nivelul nu a putut fi salvat. Reîncearcă."; }
+        finally { targetBusy = false; }
+    }
+
+    private async Task RemoveTargetAsync(VehicleTarget target)
+    {
+        if (targetBusy) return;
+        targetBusy = true; targetError = null;
+        try { await Targets.RemoveAsync(Id, target.ProductId, lifetime.Token); await LoadTargetsAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is VehicleTargetException or AccessDeniedException) { targetError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Vehicle target removal failed ({ErrorType}).", exception.GetType().Name); targetError = "Nivelul nu a putut fi eliminat. Reîncearcă."; }
+        finally { targetBusy = false; }
+    }
+
     private async Task LoadItemsAsync()
     {
         var all = await Vehicles.GetVehiclesAsync(lifetime.Token);
         otherVehicles = all.Where(item => item.Id != Id).ToList();
         items = await Movements.GetVehicleEquipmentAsync(Id, lifetime.Token);
+        await LoadTargetsAsync();
     }
 
     private async Task RefreshAsync()

@@ -6,6 +6,7 @@
 @inject ILogger<Notifications> Logger
 @inject IJSRuntime JS
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Notificări · BlazorStoc</PageTitle>
 <div class="page-heading">
@@ -126,6 +127,8 @@ else if (loaded)
     </div>
 }
 
+</PageBoundary>
+
 @code {
     private IReadOnlyList<NotificationView> views = Array.Empty<NotificationView>();
     private IReadOnlyList<ResolvedNotificationView> resolved = Array.Empty<ResolvedNotificationView>();
@@ -142,7 +145,7 @@ else if (loaded)
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync(true);
-        _ = RefreshPeriodicallyAsync();
+        RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");
     }
 
     private RenderFragment NotificationTable(IReadOnlyList<NotificationView> items, bool overdue) => @<div class="table-scroll"><table class="notification-table"><thead><tr><th>STARE</th><th>TITLU</th><th>OBIECT</th><th>@(overdue ? "SCADENȚĂ" : "EXPIRĂ LA")</th><th class="number">@(overdue ? "DEPĂȘIT CU (ZILE)" : "ZILE RĂMASE")</th></tr></thead><tbody>

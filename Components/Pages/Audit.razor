@@ -7,6 +7,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
+<PageBoundary>
 
 <PageTitle>Jurnal activitate · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal activitate</h1><p class="muted">Acțiunile operate în sistem, în ordine cronologică.</p></div>
@@ -33,6 +34,8 @@
         <AuditPager PageSize="pageSize" Page="currentPage" Total="result.Total" PageChanged="GoToPageAsync" PageSizeChanged="PageSizeChangedAsync" />
     }
 </section>
+
+</PageBoundary>
 
 @code {
     [SupplyParameterFromQuery(Name = "q")] public string? QueryText { get; set; }
@@ -89,7 +92,7 @@
     {
         ApplyStateFromAddress();
         await LoadAsync(true);
-        _ = SynchronizePeriodicallyAsync();
+        SynchronizePeriodicallyAsync().FireAndForget(Logger, "periodic synchronization");
     }
 
     // Typing waits a moment (a new keystroke cancels the wait), so the server is asked once per pause, not once per letter.

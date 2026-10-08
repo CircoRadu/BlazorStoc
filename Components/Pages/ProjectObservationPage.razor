@@ -10,6 +10,7 @@
 @inject ChangeOrigin Origin
 @inject ILogger<ProjectObservation> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>@(observation?.Name ?? "Observație") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -65,7 +66,7 @@ else if (observation is not null && project is not null)
                     <td><a href="@($"/media/project-files/{file.Id}")" target="_blank" rel="noopener">@file.OriginalName</a></td>
                     <td class="muted">@file.ContentType</td>
                     <td class="muted">@FormatSize(file.SizeBytes)</td>
-                    <td><button class="row-action delete" aria-label="Elimină @file.OriginalName" @onclick="() => RequestRemoveFileAsync(file)">×</button></td>
+                    <td><button class="row-icon delete" aria-label="Elimină @file.OriginalName" @onclick="() => RequestRemoveFileAsync(file)" title="Elimină @file.OriginalName"></button></td>
                 </tr>
             }
             </tbody></table></div>
@@ -85,6 +86,8 @@ else if (observation is not null && project is not null)
                               Busy="@removeFileBusy" Error="@removeFileError" Confirmed="RemoveFileAsync"
                               Cancelled="() => { removingFile = null; removeFileError = null; }" />
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int ProjectId { get; set; }

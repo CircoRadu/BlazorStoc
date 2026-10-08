@@ -5,6 +5,7 @@
 @using BlazorStoc.Services
 @inject IAccessControl Access
 @inject IInvoiceAnalysisStore Store
+<PageBoundary>
 
 <PageTitle>Factura preluată · BlazorStoc</PageTitle>
 
@@ -38,6 +39,8 @@ else
         }
     </div>
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public Guid SessionId { get; set; }

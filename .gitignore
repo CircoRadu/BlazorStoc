@@ -22,3 +22,4 @@ data/audit-events.jsonl*
 data/manual-backups/
 data/database-backups/
 local-secrets/tmp-setup.sql
+logs/

@@ -42,7 +42,9 @@ var checkGroups = new Dictionary<string, Func<Task>>(StringComparer.OrdinalIgnor
         await SupplierChecks.PickupAsync(Check);
     },
     ["groups"] = async () => await ProductGroupsChecks.RunAsync(Check),
-    ["reasons"] = () => { ReasonSummaryChecks.Run(Check); return Task.CompletedTask; }
+    ["reasons"] = () => { ReasonSummaryChecks.Run(Check); return Task.CompletedTask; },
+    ["nas"] = () => NasBackupChecks.RunAsync(Check),
+    ["robustness"] = () => RobustnessChecks.RunAsync(Check)
 };
 var selectedGroups = (Environment.GetEnvironmentVariable("CHECKS_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 if (Environment.GetEnvironmentVariable("INVOICE_CHECKS_ONLY") == "1") selectedGroups.Add("invoices");
@@ -2405,6 +2407,8 @@ await SupplierChecks.ComponentsAsync(Check);
 await SupplierChecks.PickupAsync(Check);
 await ProductGroupsChecks.RunAsync(Check);
 ReasonSummaryChecks.Run(Check);
+await RobustnessChecks.RunAsync(Check);
+await NasBackupChecks.RunAsync(Check);
 BlazorStoc.Checks.OfferChecks.Run(Check);
 BlazorStoc.Checks.OfferChecks.RunSituation(Check);
 await InvoiceChecks.RunAsync(Check);

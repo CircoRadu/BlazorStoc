@@ -1,0 +1,130 @@
+@page "/consum"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IConsumptionReader Reader
+@inject IBeneficiaryRepository Beneficiaries
+@inject IProjectRepository ProjectsRepository
+@inject IAccessControl Access
+@inject ILogger<ConsumptionExportPage> Logger
+@implements IDisposable
+<PageBoundary>
+@* Consumption export: what was handed over (exits to beneficiaries minus returns) per product, for a project, a beneficiary and/or a period; shown here and downloaded as CSV. *@
+
+<PageTitle>Export consum · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">STOC</p><h1>Export consum</h1><p class="muted">Ce s-a predat beneficiarilor (ieșiri minus retururi), pe proiect, beneficiar și perioadă.</p></div><div class="heading-actions"><a class="refresh" href="/produse">← Produse</a></div></div>
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+}
+else if (!canManage)
+{
+    <div class="empty-state"><h3>Acces restricționat</h3><p>Exportul de consum este disponibil utilizatorilor care gestionează produsele.</p></div>
+}
+else
+{
+    <section class="catalog consumption-filters">
+        <div class="catalog-body pad-top">
+        <div class="editor-grid">
+            <SearchableSelect Id="consum-beneficiary" Label="Beneficiar" Placeholder="Toți beneficiarii" EmptyText="Niciun beneficiar găsit."
+                              Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="BeneficiaryChangedAsync" />
+            <SearchableSelect Id="consum-project" Label="Proiect" Placeholder="Toate proiectele" EmptyText="Niciun proiect găsit."
+                              Options="ProjectOptions" SelectedId="projectId" SelectedIdChanged="id => projectId = id" Disabled="beneficiaryId is null" />
+            <label for="consum-from">De la <PickOnlyDate Id="consum-from" @bind-Value="from" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
+            <label for="consum-to">Până la <PickOnlyDate Id="consum-to" @bind-Value="to" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@busy" @onclick="ShowAsync">@(busy ? "Se încarcă…" : "Arată consumul")</button>
+            <a class="refresh" href="@CsvUrl">Descarcă CSV</a>
+        </div>
+        </div>
+    </section>
+
+    @if (rows is not null)
+    {
+        @if (rows.Count == 0)
+        {
+            <div class="empty-state"><span class="empty-icon">▦</span><h3>Nu există consum pentru filtrele alese</h3></div>
+        }
+        else
+        {
+            <section class="catalog">
+                <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>PROIECT</th><th>PRODUS</th><th class="number">IEȘIT</th><th class="number">RETURNAT</th><th class="number">CONSUM NET</th></tr></thead><tbody>
+                @foreach (var row in rows)
+                {
+                    <tr><td>@row.BeneficiaryName</td><td>@(row.ProjectName ?? "—")</td><td>@row.ProductName</td><td class="number">@row.Exited</td><td class="number">@row.Returned</td><td class="number"><strong>@row.Net</strong></td></tr>
+                }
+                </tbody></table></div>
+                <div class="table-footer"><span>@rows.Count @(rows.Count == 1 ? "rând" : "rânduri") · consum net @rows.Sum(row => row.Net) buc.</span></div>
+            </section>
+        }
+    }
+}
+
+</PageBoundary>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, canManage, busy;
+    private string? error;
+    private IReadOnlyList<Beneficiary> beneficiaries = [];
+    private IReadOnlyList<Project> projects = [];
+    private int? beneficiaryId, projectId;
+    private DateOnly? from, to;
+    private IReadOnlyList<ConsumptionRow>? rows;
+
+    private IReadOnlyList<SelectOption> BeneficiaryOptions => beneficiaries.Select(item => new SelectOption(item.Id, item.Name)).ToArray();
+    private IReadOnlyList<SelectOption> ProjectOptions => projects.Select(item => new SelectOption(item.Id, item.Name)).ToArray();
+
+    private string CsvUrl
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (beneficiaryId is { } b) parts.Add($"beneficiar={b}");
+            if (projectId is { } p) parts.Add($"proiect={p}");
+            if (from is { } f) parts.Add($"de={StockMovementRules.StorageDate(f)}");
+            if (to is { } t) parts.Add($"pana={StockMovementRules.StorageDate(t)}");
+            return "/api/consum.csv" + (parts.Count > 0 ? "?" + string.Join("&", parts) : "");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canManage = await Access.CanManageProductsAsync(lifetime.Token);
+            if (canManage) beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogError("Consumption page loading failed ({ErrorType}).", ex.GetType().Name); error = "Pagina nu a putut fi încărcată. Verifică serverul și conexiunea la baza de date."; }
+        finally { loading = false; }
+    }
+
+    private async Task BeneficiaryChangedAsync(int? id)
+    {
+        beneficiaryId = id; projectId = null; projects = [];
+        if (id is not { } value) return;
+        try { projects = await ProjectsRepository.GetForBeneficiaryAsync(value, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogError("Project list loading failed ({ErrorType}).", ex.GetType().Name); }
+    }
+
+    private async Task ShowAsync()
+    {
+        if (busy) return;
+        error = null;
+        if (from is { } start && to is { } end && start > end) { error = "Data de început nu poate fi după data de sfârșit."; return; }
+        busy = true;
+        try { rows = await Reader.GetAsync(new ConsumptionQuery(beneficiaryId, projectId, from, to), lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Consumption loading failed ({ErrorType}).", ex.GetType().Name); error = "Consumul nu a putut fi încărcat. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

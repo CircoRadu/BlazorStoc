@@ -6,6 +6,11 @@
 
 > Intrarile mai vechi sunt in `docs/arhiva/VALIDARE_pana_la_30.09.2026.md` (verificari istorice).
 
+## Backup unificat, verificare ora, iconite (08.10.2026)
+
+- Verificat automat: build Release; suita completa (vezi `docs/PROJECT_STATE.md`); verificari tintite pentru regulile de stergere (ultimele 4, ora neverificata exclusa), decizia de ceas (decalat, bun, fara internet, servere in dezacord), validarea serverelor NTP, zilele saptamanii si notificarea de ceas.
+- Neverificat: ecranele din Setari -> Backup si Notificari in browser, comunicarea reala cu serverele NTP, stergerea reala de fisiere, restaurarea dintr-un pachet doar pe NAS; vezi `Teste utilizator/09_Notificari_si_setari.md` si `docs/TESTE_RAMASE.md`.
+
 ## Setari notificari: curatarea rezolvatelor (30.09.2026)
 
 - `tests/BlazorStoc.Checks`: 636 PASS (601 inainte), 3 rulari consecutive fara esec, cu integrare MariaDB pe `blazorstoc_test` (`RUN_MARIA_INTEGRATION_CHECKS=1`); sectiunea noua "Notification settings: clean-up of old resolved notifications" acopera valorile implicite, accesul doar pentru administrator, validarea perioadei, ce se sterge si ce se pastreaza, activarea cu stergere imediata, scurtarea perioadei, oprirea, rularea zilnica o data pe zi (ceas simulat) si jurnalul.

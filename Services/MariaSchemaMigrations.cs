@@ -875,6 +875,161 @@ public static class MariaSchemaMigrations
             ("project_reservations", "id"), ("project_reservations", "project_id"), ("project_reservations", "project_component_id"), ("project_reservations", "component_key"),
             ("project_reservations", "product_id"), ("project_reservations", "quantity"), ("project_reservations", "version"), ("project_reservations", "created_by"),
             ("project_reservations", "created_utc"), ("project_reservations", "updated_utc")
+        ]),
+        // Nivel tinta pe vehicul: how many pieces of a product a vehicle should hold; used to fill the vehicle with one exit operation.
+        new(28, "Nivel tinta pe vehicul: completare la nivel",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `vehicle_target_levels` (
+              `vehicle_id` BIGINT NOT NULL,
+              `product_id` BIGINT NOT NULL,
+              `target_quantity` INT NOT NULL,
+              `updated_by` VARCHAR(100) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`vehicle_id`, `product_id`),
+              KEY `ix_vehicle_target_levels_product` (`product_id`),
+              CONSTRAINT `fk_vehicle_target_levels_vehicle` FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
+              CONSTRAINT `fk_vehicle_target_levels_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("vehicle_target_levels", "vehicle_id"), ("vehicle_target_levels", "product_id"), ("vehicle_target_levels", "target_quantity"),
+            ("vehicle_target_levels", "updated_by"), ("vehicle_target_levels", "updated_utc")
+        ]),
+        // Stoc minim pe produs si termen pe proiect: the data of the notifications "Stoc sub minim" and "Deficit la un proiect cu termen apropiat".
+        new(29, "Stoc minim pe produs si termen pe proiect",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `product_min_stock` (
+              `product_id` BIGINT NOT NULL,
+              `min_quantity` INT NOT NULL,
+              `set_date` VARCHAR(10) NOT NULL,
+              `updated_by` VARCHAR(100) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`product_id`),
+              CONSTRAINT `fk_product_min_stock_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS `project_deadlines` (
+              `project_id` BIGINT NOT NULL,
+              `deadline` VARCHAR(10) NOT NULL,
+              `updated_by` VARCHAR(100) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`project_id`),
+              CONSTRAINT `fk_project_deadlines_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("product_min_stock", "product_id"), ("product_min_stock", "min_quantity"), ("product_min_stock", "set_date"), ("product_min_stock", "updated_by"),
+            ("product_min_stock", "updated_utc"), ("project_deadlines", "project_id"), ("project_deadlines", "deadline"), ("project_deadlines", "updated_by"),
+            ("project_deadlines", "updated_utc")
+        ])
+        ,
+        // Backup pe NAS: one settings row (path, account, password kept encrypted, copy and schedule switches, last result).
+        new(30, "Configurare backup NAS",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `backup_nas_settings` (
+              `id` TINYINT NOT NULL,
+              `unc_path` VARCHAR(500) NOT NULL,
+              `username` VARCHAR(100) NOT NULL,
+              `password_protected` TEXT NULL,
+              `copy_enabled` TINYINT(1) NOT NULL DEFAULT 0,
+              `schedule_enabled` TINYINT(1) NOT NULL DEFAULT 0,
+              `schedule_time` VARCHAR(5) NOT NULL DEFAULT '02:00',
+              `last_scheduled_date` VARCHAR(10) NULL,
+              `last_attempt_utc` VARCHAR(40) NULL,
+              `last_ok` TINYINT(1) NULL,
+              `last_message` VARCHAR(500) NULL,
+              `updated_by` VARCHAR(100) NOT NULL,
+              `updated_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("backup_nas_settings", "id"), ("backup_nas_settings", "unc_path"), ("backup_nas_settings", "username"), ("backup_nas_settings", "password_protected"),
+            ("backup_nas_settings", "copy_enabled"), ("backup_nas_settings", "schedule_enabled"), ("backup_nas_settings", "schedule_time"),
+            ("backup_nas_settings", "last_scheduled_date"), ("backup_nas_settings", "last_attempt_utc"), ("backup_nas_settings", "last_ok"),
+            ("backup_nas_settings", "last_message"), ("backup_nas_settings", "updated_by"), ("backup_nas_settings", "updated_utc")
+        ])
+        ,
+        // Backup NAS: how old a backup may get before the notification, and the last failed backup (cause and time) for the notification text.
+        new(31, "Backup NAS: varsta maxima si ultima eroare",
+        [
+            """
+            ALTER TABLE `backup_nas_settings`
+                ADD COLUMN IF NOT EXISTS `max_age_days` INT NOT NULL DEFAULT 2,
+                ADD COLUMN IF NOT EXISTS `last_error_utc` VARCHAR(40) NULL,
+                ADD COLUMN IF NOT EXISTS `last_error` VARCHAR(500) NULL
+            """
+        ],
+        [
+            ("backup_nas_settings", "max_age_days"), ("backup_nas_settings", "last_error_utc"), ("backup_nas_settings", "last_error")
+        ]),
+        // The events that already got their starting template: a template the administrator deletes is not made again.
+        new(32, "Sabloane de notificare implicite: evidenta evenimentelor tratate",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `notification_template_seeds` (
+              `source_key` VARCHAR(60) NOT NULL,
+              `seeded_utc` VARCHAR(40) NOT NULL,
+              PRIMARY KEY (`source_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
+        ],
+        [
+            ("notification_template_seeds", "source_key"), ("notification_template_seeds", "seeded_utc")
+        ]),
+        // The backup settings (schedule, age for the notification, retention) leave the NAS table: they concern the local backup, with or without a NAS.
+        new(33, "Setari backup: programare, vechime, pastrare",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `backup_settings` (
+              `id` INT NOT NULL,
+              `schedule_enabled` TINYINT(1) NOT NULL DEFAULT 0,
+              `schedule_time` VARCHAR(5) NOT NULL DEFAULT '02:00',
+              `last_scheduled_date` VARCHAR(10) NULL,
+              `max_age_days` INT NOT NULL DEFAULT 2,
+              `retention_enabled` TINYINT(1) NOT NULL DEFAULT 0,
+              `retention_days` INT NOT NULL DEFAULT 30,
+              `last_error_utc` VARCHAR(40) NULL,
+              `last_error` VARCHAR(500) NULL,
+              `updated_by` VARCHAR(100) NOT NULL DEFAULT '',
+              `updated_utc` VARCHAR(40) NOT NULL DEFAULT '',
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """
+        ],
+        [
+            ("backup_settings", "id"), ("backup_settings", "schedule_enabled"), ("backup_settings", "schedule_time"), ("backup_settings", "last_scheduled_date"),
+            ("backup_settings", "max_age_days"), ("backup_settings", "retention_enabled"), ("backup_settings", "retention_days"), ("backup_settings", "last_error_utc"),
+            ("backup_settings", "last_error"), ("backup_settings", "updated_by"), ("backup_settings", "updated_utc")
+        ]),
+        // The check of the server clock against the internet time: the NTP servers (Settings -> Backup) and the last clock problem found (notification).
+        new(34, "Setari backup: verificare ora pe internet",
+        [
+            """
+            ALTER TABLE `backup_settings`
+                ADD COLUMN IF NOT EXISTS `ntp_check_enabled` TINYINT(1) NOT NULL DEFAULT 1,
+                ADD COLUMN IF NOT EXISTS `ntp_servers` VARCHAR(400) NOT NULL DEFAULT '',
+                ADD COLUMN IF NOT EXISTS `clock_issue_utc` VARCHAR(40) NULL,
+                ADD COLUMN IF NOT EXISTS `clock_skew_minutes` INT NOT NULL DEFAULT 0
+            """
+        ],
+        [
+            ("backup_settings", "ntp_check_enabled"), ("backup_settings", "ntp_servers"), ("backup_settings", "clock_issue_utc"), ("backup_settings", "clock_skew_minutes")
+        ]),
+        // The days of the week of the scheduled backup (mask: Monday = 1 ... Sunday = 64; 127 = every day, as before).
+        new(35, "Setari backup: zilele saptamanii",
+        [
+            "ALTER TABLE `backup_settings` ADD COLUMN IF NOT EXISTS `schedule_days` INT NOT NULL DEFAULT 127"
+        ],
+        [
+            ("backup_settings", "schedule_days")
         ])
     ];
 }

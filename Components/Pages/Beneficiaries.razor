@@ -8,6 +8,7 @@
 @inject NavigationManager Navigation
 @inject ILogger<Beneficiaries> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Beneficiari · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -33,7 +34,7 @@
         <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TIP / CUI</th><th>ADRESĂ</th><th>TELEFON</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var beneficiary in Filtered)
         {
-            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Identifier</span></td><td>@(beneficiary.Address.Length == 0 ? "—" : beneficiary.Address)</td><td>@(beneficiary.Phone.Length == 0 ? "—" : beneficiary.Phone)</td><td><div class="row-buttons"><button class="row-action edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)">✎</button><button class="row-action delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)">×</button></div></td></tr>
+            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Identifier</span></td><td>@(beneficiary.Address.Length == 0 ? "—" : beneficiary.Address)</td><td>@(beneficiary.Phone.Length == 0 ? "—" : beneficiary.Phone)</td><td><div class="row-buttons"><button class="row-icon edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)" title="Editează @beneficiary.Name"></button><button class="row-icon delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)" title="Șterge @beneficiary.Name"></button></div></td></tr>
         }
         </tbody></table></div>
     }
@@ -47,6 +48,8 @@
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteBeneficiaryAsync"
                               Cancelled="CancelDeleteAsync" />
 }
+
+</PageBoundary>
 
 @code {
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
@@ -67,7 +70,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync(true);
-        _ = SynchronizePeriodicallyAsync();
+        SynchronizePeriodicallyAsync().FireAndForget(Logger, "periodic synchronization");
     }
 
     protected override async Task OnParametersSetAsync()

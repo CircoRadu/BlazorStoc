@@ -9,6 +9,7 @@
 @inject ILogger<Suppliers> Logger
 @inject IServiceProvider Services
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Furnizori · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -28,6 +29,7 @@
 {
     <details class="catalog" id="supplier-recognition-summary">
         <summary><strong>Recunoașterea furnizorului la preluarea facturilor</strong> <span class="muted">· @summary.Total recunoașteri, @summary.Corrected corectate de utilizator</span></summary>
+        <div class="catalog-body">
         <p><a href="/api/furnizori/recunoastere.csv" download>Exportă jurnalul (CSV)</a></p>
         @if (summary.ByMethod.Any(Suspect)) { <p class="invoice-warning" role="status">⚠ O metodă cu încredere „mare” depășește 5% corecții: pragurile recunoașterii merită revăzute.</p> }
         <div class="table-wrap"><table>
@@ -44,6 +46,7 @@
                 @foreach (var fix in Unresolved(summary)) { <li>@StockMovementRules.DisplayDate(DateOnly.FromDateTime(fix.Utc)) · factura @fix.InvoiceNumber · „@(fix.ReadName.Length > 0 ? fix.ReadName : "—")” (CUI @(fix.ReadCui.Length > 0 ? fix.ReadCui : "—")) → <strong>@(fix.ChosenName.Length > 0 ? fix.ChosenName : "—")</strong>@(fix.RecognizedName.Length > 0 ? $" (propus: {fix.RecognizedName})" : " (nimic propus)") <button type="button" class="refresh" disabled="@(aliasBusy || fix.ReadName.Trim().Length == 0)" @onclick="() => RememberAliasAsync(fix)">Ține minte ca denumire alternativă</button></li> }
             </ul>
         }
+        </div>
     </details>
 }
 
@@ -68,8 +71,8 @@
                 <td>@(supplier.Phone.Length == 0 ? "—" : supplier.Phone)</td>
                 <td>@(supplier.InvoiceCount == 0 ? "—" : $"{supplier.InvoiceCount} ({supplier.MovementCount} {(supplier.MovementCount == 1 ? "intrare" : "intrări")})")</td>
                 <td><div class="row-buttons">
-                    <button class="row-action edit" aria-label="Editează @supplier.Name" title="Editează" disabled="@(editing || deleting is not null)" @onclick="() => OpenEditorAsync(supplier)">✎</button>
-                    <button class="row-action delete" aria-label="Șterge @supplier.Name" title="@DeleteHint(supplier)" disabled="@(!canDelete || supplier.InUse)" @onclick="() => RequestDeleteAsync(supplier)">×</button>
+                    <button class="row-icon edit" aria-label="Editează @supplier.Name" title="Editează" disabled="@(editing || deleting is not null)" @onclick="() => OpenEditorAsync(supplier)"></button>
+                    <button class="row-icon delete" aria-label="Șterge @supplier.Name" title="@DeleteHint(supplier)" disabled="@(!canDelete || supplier.InUse)" @onclick="() => RequestDeleteAsync(supplier)"></button>
                 </div></td>
             </tr>
         }
@@ -85,6 +88,8 @@
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteSupplierAsync"
                               Cancelled="CancelDeleteAsync" />
 }
+
+</PageBoundary>
 
 @code {
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
@@ -148,7 +153,7 @@
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         await LoadAsync(true);
         await LoadRecognitionAsync();
-        _ = SynchronizePeriodicallyAsync();
+        SynchronizePeriodicallyAsync().FireAndForget(Logger, "periodic synchronization");
     }
 
     protected override async Task OnParametersSetAsync()

@@ -1,0 +1,48 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@* The card "Unde sunt bucatile": the pieces of a product in the warehouse, in each vehicle and handed over to beneficiaries / projects. *@
+<section class="movement-card product-where" aria-labelledby="product-where-title">
+    <h2 id="product-where-title">Unde sunt bucățile</h2>
+    @if (failed) { <p class="muted">Datele nu au putut fi încărcate.</p> }
+    else
+    {
+        <dl class="movement-facts">
+            <dt>Depozit</dt><dd><strong>@StockMovementRules.WarehouseStock(Stock, vehicles.Sum(item => item.Quantity)) buc.</strong></dd>
+            @foreach (var vehicle in vehicles)
+            {
+                <dt>Mașina @vehicle.PlateNumber</dt><dd>@vehicle.Quantity buc.</dd>
+            }
+            @foreach (var delivery in deliveries)
+            {
+                <dt>@delivery.BeneficiaryName@(delivery.ProjectName is null ? "" : $" · {delivery.ProjectName}")</dt><dd>@delivery.Net buc. predate</dd>
+            }
+        </dl>
+        @if (vehicles.Count == 0 && deliveries.Count == 0) { <p class="muted">Toate bucățile sunt în depozit.</p> }
+        <ProductMinStockField ProductId="ProductId" Stock="Stock" />
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public int ProductId { get; set; }
+    [Parameter] public int Stock { get; set; }
+    // Changes when the page changed the stock: the lists are read again.
+    [Parameter] public int Version { get; set; }
+
+    private IReadOnlyList<VehicleStock> vehicles = [];
+    private IReadOnlyList<ProductDelivery> deliveries = [];
+    private bool failed;
+    private (int, int, int) loadedFor = (-1, -1, -1);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == (ProductId, Version, Stock)) return;
+        loadedFor = (ProductId, Version, Stock);
+        try
+        {
+            vehicles = Services.GetService<IStockMovementRepository>() is { } movements ? await movements.GetVehicleStocksAsync(ProductId) : [];
+            deliveries = Services.GetService<IProductPlacementReader>() is { } reader ? await reader.GetDeliveriesAsync(ProductId) : [];
+            failed = false;
+        }
+        catch (Exception) { failed = true; }
+    }
+}

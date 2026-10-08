@@ -14,7 +14,11 @@ public enum BackupKind
 {
     InventoryPickup,
     // Not produced yet (Task 3); the label already matches the TODO's naming model for when restore is built.
-    PreRestore
+    PreRestore,
+    // Made by the application at the time chosen in Settings (Backup NAS).
+    Scheduled,
+    // Made on request from Settings (Backup NAS).
+    Manual
 }
 
 public enum BackupStage { Locking, CheckingSpace, Exporting, Verifying, Saving, Done, Failed }
@@ -28,7 +32,7 @@ public sealed record BackupResult(bool Success, string? PackagePath, string? Pac
 }
 
 public sealed record BackupManifest(DateTime CreatedAtUtc, string OperatorName, string OperatorRole, string Kind,
-    int TableCount, IReadOnlyDictionary<string, int> RowCounts, string SchemaVersion, string ContentSha256, string CanonicalHash);
+    int TableCount, IReadOnlyDictionary<string, int> RowCounts, string SchemaVersion, string ContentSha256, string CanonicalHash, string? TimeSource = null);
 
 public static class BackupRules
 {
@@ -37,10 +41,24 @@ public static class BackupRules
     public const string VerificationFailedMessage = "Copia de siguranta nu a putut fi verificata; nu a fost salvata.";
     public const string GenericFailedMessage = "Copia de siguranta a esuat. Preluarea inventarului nu a fost confirmata.";
 
+    /// <summary>The message for a failed backup, with the real cause when it can be said without detail (never a path, an account or a password).</summary>
+    public static string FailureMessage(Exception exception) => exception switch
+    {
+        InvalidOperationException when exception.Message.StartsWith("Utilitarul mariadb-dump", StringComparison.Ordinal) =>
+            DumpFailedMessage + " Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).",
+        InvalidOperationException when exception.Message.StartsWith("mariadb-dump a esuat (cod ", StringComparison.Ordinal) =>
+            DumpFailedMessage + " Cauza: mariadb-dump a esuat (" + System.Text.RegularExpressions.Regex.Match(exception.Message, @"cod -?\d+").Value + "); detaliile sunt in jurnalul aplicatiei.",
+        InvalidOperationException => DumpFailedMessage,
+        UnauthorizedAccessException or IOException => GenericFailedMessage + " Cauza: scrierea in folderul de backup a esuat (drepturi sau spatiu).",
+        _ => GenericFailedMessage
+    };
+
     public static string KindLabel(BackupKind kind) => kind switch
     {
         BackupKind.InventoryPickup => "Copie siguranta preluare inventar",
         BackupKind.PreRestore => "Copie siguranta baza de date inainte restaurare baza de date folosind backup preluare inventar",
+        BackupKind.Scheduled => "Copie siguranta programata",
+        BackupKind.Manual => "Copie siguranta la cerere",
         _ => "Copie siguranta"
     };
 
@@ -123,11 +141,14 @@ public static class BackupDiskSpace
 
 // Subtask 3.1 (Task 3): one row of the restore page's package table.
 public sealed record BackupPackage(string FileName, BackupKind Kind, long SizeBytes, DateTime CreatedAtUtc,
-    string OperatorName, string OperatorRole, int TableCount)
+    string OperatorName, string OperatorRole, int TableCount, string TimeSource = TrustedClock.SourceVerified)
 {
+    /// <summary>Made while the time could not be checked on the internet: the date may be wrong, so the automatic removal leaves it alone.</summary>
+    public bool TimeUnverified => TimeSource == TrustedClock.SourceUnverified;
     // Subtask 3.2: only an "InventoryPickup" package may ever be deleted - enforced here (used by the page to hide
     // the button) and again, independently, inside DeletePackageAsync (never trust the UI alone for this refusal).
-    public bool CanDelete => Kind == BackupKind.InventoryPickup;
+    // The one exception: a package with an unverified time can be deleted by an administrator (the automatic removal never touches it).
+    public bool CanDelete => Kind == BackupKind.InventoryPickup || TimeUnverified;
 }
 
 public sealed record BackupDeleteResult(bool Success, string? ErrorMessage)
@@ -168,7 +189,7 @@ internal static class BackupPackageStore
             if (manifest is null) continue;
             var kind = Enum.TryParse<BackupKind>(manifest.Kind, out var parsedKind) ? parsedKind : BackupKind.InventoryPickup;
             packages.Add(new BackupPackage(fileName, kind, new FileInfo(path).Length, manifest.CreatedAtUtc,
-                manifest.OperatorName, manifest.OperatorRole, manifest.TableCount));
+                manifest.OperatorName, manifest.OperatorRole, manifest.TableCount, manifest.TimeSource ?? TrustedClock.SourceVerified));
         }
         return packages.OrderByDescending(package => package.CreatedAtUtc).ToList();
     }
@@ -185,7 +206,11 @@ internal static class BackupPackageStore
         var manifest = await TryReadManifestAsync(path, token).ConfigureAwait(false);
         var kind = manifest is not null && Enum.TryParse<BackupKind>(manifest.Kind, out var parsedKind) ? parsedKind : BackupKind.InventoryPickup;
         if (kind != BackupKind.InventoryPickup)
-            return BackupDeleteResult.Failed("Pachetele generate automat inainte de o restaurare nu pot fi sterse.");
+        {
+            if (manifest?.TimeSource != TrustedClock.SourceUnverified)
+                return BackupDeleteResult.Failed("Pachetele generate automat inainte de o restaurare nu pot fi sterse (cu exceptia celor cu ora neverificata).");
+            await access.EnsureAdministratorAsync(token).ConfigureAwait(false);
+        }
 
         // The dialog (DeleteConfirmationDialog, subtask 3.2) already resolved the default/custom choice into a
         // single reason string before calling here; this only guards against a caller that skips the dialog.
@@ -243,7 +268,7 @@ file static class BackupManifestIo
 // --single-transaction still gives a consistent MVCC snapshot, and this is the same accepted residual risk TODO.md's
 // Task 3 risk list already documents for that scenario.
 public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAccessControl access,
-    IOperationLockService locks, IAuditTrail? auditTrail, ILogger<MariaDatabaseBackupService> logger) : IDatabaseBackupService
+    IOperationLockService locks, IAuditTrail? auditTrail, ILogger<MariaDatabaseBackupService> logger, Func<CancellationToken, Task<ClockCheck>>? clockCheck = null) : IDatabaseBackupService
 {
     private readonly string backupDirectory = MariaAssetPaths.DatabaseBackups(configuration);
 
@@ -302,8 +327,14 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
 
             var dumpHash = await BackupManifestIo.HashFileAsync(tempSql, cancellationToken).ConfigureAwait(false);
             var rowCounts = after.Tables.ToDictionary(table => table.Table, table => table.RowCount);
-            var manifest = new BackupManifest(DateTime.UtcNow, operatorName, operatorRole, kind.ToString(),
-                after.Tables.Count, rowCounts, $"{after.Tables.Count} tabele (MariaDB 11.4.13)", dumpHash, after.OverallHash);
+            // The date of the package comes from the server clock when it matches the internet time; when it is off the internet time is used, and when the time cannot be
+            // checked the package is marked so (the automatic removal never touches it). The check is short, so a backup never waits long for the network.
+            var clock = await (clockCheck?.Invoke(cancellationToken) ?? BackupTimeCheck.RunAsync(configuration, cancellationToken, forBackup: true, overall: TimeSpan.FromSeconds(6))).ConfigureAwait(false);
+            var stamp = TrustedClock.Stamp(DateTime.UtcNow, clock);
+            try { await new MariaBackupSettingsStore(configuration).RecordClockAsync(clock, cancellationToken).ConfigureAwait(false); }
+            catch (Exception exception) when (exception is not OperationCanceledException) { logger.LogWarning("The clock check could not be recorded ({ErrorType}).", exception.GetType().Name); }
+            var manifest = new BackupManifest(stamp.Utc, operatorName, operatorRole, kind.ToString(),
+                after.Tables.Count, rowCounts, $"{after.Tables.Count} tabele (MariaDB 11.4.13)", dumpHash, after.OverallHash, stamp.Source);
 
             progress?.Report(new(BackupStage.Saving, BackupRules.StageMessage(BackupStage.Saving)));
             var tempManifest = tempSql + ".manifest.json";
@@ -315,7 +346,7 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
             }
             File.Delete(tempManifest);
 
-            var fileName = BackupNaming.BuildFileName(kind, DateTime.Now, operatorRole, operatorName);
+            var fileName = BackupNaming.BuildFileName(kind, stamp.Utc.ToLocalTime(), operatorRole, operatorName);
             var finalPath = BackupNaming.ResolveUniquePath(backupDirectory, fileName);
             fileName = Path.GetFileName(finalPath);
             File.Move(tempZip, finalPath);
@@ -323,7 +354,12 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
             await File.WriteAllTextAsync(finalPath + ".sha256", archiveHash, cancellationToken).ConfigureAwait(false);
 
             await AuditRecorder.RecordGenerateAsync(auditTrail, access, AuditEntities.DatabaseBackup, fileName,
-                $"Pachet: {fileName}; tabele: {after.Tables.Count}; hash canonic: {after.OverallHash[..12]}", cancellationToken).ConfigureAwait(false);
+                $"Pachet: {fileName}; tabele: {after.Tables.Count}; hash canonic: {after.OverallHash[..12]}" + stamp.Source switch
+                {
+                    TrustedClock.SourceInternet => $"; ora luată de pe internet (ceasul serverului era decalat cu {Math.Round(clock.Skew!.Value.TotalMinutes)} min)",
+                    TrustedClock.SourceUnverified => "; ora neverificată (internetul nu a putut fi consultat)",
+                    _ => ""
+                }, cancellationToken).ConfigureAwait(false);
 
             progress?.Report(new(BackupStage.Done, BackupRules.StageMessage(BackupStage.Done)));
             return BackupResult.Ok(finalPath, fileName);
@@ -332,7 +368,7 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
         {
             logger.LogError(exception, "Database backup failed ({ErrorType}).", exception.GetType().Name);
             progress?.Report(new(BackupStage.Failed, BackupRules.StageMessage(BackupStage.Failed)));
-            return BackupResult.Failed(exception is InvalidOperationException ? BackupRules.DumpFailedMessage : BackupRules.GenericFailedMessage);
+            return BackupResult.Failed(BackupRules.FailureMessage(exception));
         }
         finally
         {

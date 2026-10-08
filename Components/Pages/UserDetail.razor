@@ -8,6 +8,7 @@
 @inject IChangeFeed ChangeFeed
 @inject ChangeOrigin Origin
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>@(user?.Username ?? "Utilizator") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -46,6 +47,8 @@ else
         <p class="muted">Parola nu este afișată și nu poate fi recuperată.</p>
     </section>
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

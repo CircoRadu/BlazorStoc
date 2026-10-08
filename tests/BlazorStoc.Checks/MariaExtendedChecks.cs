@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Hosting;
+﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using MySqlConnector;
 using BlazorStoc.Services;
@@ -47,6 +47,10 @@ public static class MariaExtendedChecks
             await Section("Exit flow: journal by destination, reference, filters, repeated exit, use above the vehicle quantity", () => ExitFlowAsync(configuration, admin, audit, probe));
             await Section("Offer import: project, component, lines, revision, remembered ties", () => OfferImportAsync(configuration, admin, audit, probe));
             await Section("Reservations: free stock, consumption by exit, warning and lowering, release with the component", () => ReservationsAsync(configuration, admin, audit, probe));
+            await Section("Vehicle target levels: set, change, missing pieces, remove, journal", () => VehicleTargetsAsync(configuration, admin, audit, probe));
+            await Section("Stock alerts: minimum stock, stale reservation, project deadline, consumption export", () => StockAlertsAsync(configuration, admin, audit, probe));
+            await Section("NAS backup settings: encrypted password, administrators only, journal", () => NasBackupSettingsAsync(configuration, admin, audit, probe));
+            await Section("Default notification templates: made once per event, existing and deleted ones left alone, journal", () => DefaultTemplatesAsync(configuration, admin, audit, probe));
             await Section("Offer templates: save, refuse, change, journal", () => OfferTemplatesAsync(configuration, admin, audit, probe));
             await Section("Project components: add, state, archive, reactivate", () => ProjectComponentsAsync(configuration, admin, audit, probe));
             await Section("System types: uniqueness, alternative names, deactivation, journal", () => SystemTypesAsync(configuration, admin, audit, probe));
@@ -61,6 +65,116 @@ public static class MariaExtendedChecks
         }
         if (failures > 0) throw new Exception($"{failures} extended MariaDB section(s) failed.");
         Console.WriteLine("=== Extended MariaDB checks: all sections passed. ===");
+    }
+
+    // ---- Backup NAS settings --------------------------------------------------------------------------------------------------
+
+    private static async Task NasBackupSettingsAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var protection = Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("BlazorStoc.Checks");
+        var store = new MariaNasBackupStore(configuration, protection, admin, audit);
+        var backupStore = new MariaBackupSettingsStore(configuration, admin, audit);
+        const string secret = "S3cret-Nas-Pass-9";
+        await using (var cleanup = new MySqlCommand("DELETE FROM backup_nas_settings WHERE id=1; DELETE FROM backup_settings WHERE id=1", probe)) await cleanup.ExecuteNonQueryAsync();
+        try
+        {
+            Check((await store.GetAsync()).HasPassword == false && (await store.GetAsync()).Path == "", "NAS backup settings: nothing is configured at first");
+            var alertState = await new MariaBackupAlertReader(configuration).GetAsync();
+            Check(!alertState.NasCopyEnabled && alertState.MaxAgeDays == BackupAlertRules.BackupMaxAgeDays && alertState.FirstUseUtc <= DateTime.UtcNow.AddSeconds(1),
+                "Backup notifications: the reader works on the real database (NAS copy off, default age while nothing is configured)");
+            await store.SaveAsync(new(@"\\nas\share\folder\", "espstoc", secret, true));
+            var saved = await store.GetAsync();
+            await using var raw = new MySqlCommand("SELECT password_protected FROM backup_nas_settings WHERE id=1", probe);
+            var stored = (string?)await raw.ExecuteScalarAsync();
+            Check(saved.Path == @"\\nas\share\folder" && saved.UserName == "espstoc" && saved.HasPassword && saved.CopyEnabled && stored is { Length: > 20 } && !stored.Contains(secret),
+                "NAS backup settings: path, account and the copy switch are saved, the password only encrypted");
+            var credentials = await new MariaNasBackupStore(configuration, protection).CredentialsAsync(default);
+            Check(credentials is not null && credentials.Password == secret && credentials.UserName == "espstoc", "NAS backup settings: the stored password decrypts for the copy");
+            await store.SaveAsync(new(@"\\nas\share", "espstoc", null, false));
+            var kept = await new MariaNasBackupStore(configuration, protection).CredentialsAsync(default);
+            Check(kept?.Password == secret && !(await store.GetAsync()).CopyEnabled, "NAS backup settings: an empty password on save keeps the stored one");
+            var denied = await Rejects<AccessDeniedException>(() => new MariaNasBackupStore(configuration, protection, new TestAccessControl(false, "limited")).GetAsync(), "A limited user cannot read the settings");
+            var invalid = await Rejects<NasBackupException>(() => store.SaveAsync(new(@"C:\x", "u", null, true)), "A local path is refused");
+            var wrongKeys = await new MariaNasBackupStore(configuration, Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("Other.Keys")).ReadAsync(default);
+            Check(denied is not null && invalid is not null && !wrongKeys.Settings.HasPassword, "NAS backup settings: only administrators, a local path is refused, a password that cannot be decrypted asks to be typed again");
+            var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.Action == AuditActions.SetNasBackup).ToList();
+            Check(events.Count >= 2 && events.All(item => !item.Details.Contains(secret)) && events.Any(item => item.Details.Contains("Parola NAS: — → schimbată")),
+                "NAS backup settings: every change is journaled, the password only as changed, never its value");
+
+            // The backup settings (Settings -> Backup): schedule, age for the notification, retention of old packages.
+            async Task<string?> ScheduledDate() { await using var query = new MySqlCommand("SELECT last_scheduled_date FROM backup_settings WHERE id=1", probe); return await query.ExecuteScalarAsync() as string; }
+            Check(!(await backupStore.GetAsync()).ScheduleEnabled && (await backupStore.GetAsync()).MaxAgeDays == 2 && !(await backupStore.GetAsync()).RetentionEnabled, "Backup settings: defaults while nothing is saved (no schedule, 2 days, no clean-up)");
+            await backupStore.SaveAsync(new(true, "00:00", 2, false, 30));
+            var pastTime = await ScheduledDate();
+            await backupStore.SaveAsync(new(true, "23:59", 2, false, 30));
+            var futureTime = await ScheduledDate();
+            Check(pastTime == DateTime.Now.ToString("yyyy-MM-dd") && futureTime is null,
+                "Backup settings: a new schedule time already past waits for tomorrow, a time still ahead runs today (the earlier run of the day does not block it)");
+            await backupStore.SaveAsync(new(true, "23:59", 7, true, 14));
+            var withAge = await backupStore.GetAsync();
+            var badAge = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 0, false, 30)), "An age below one day is refused");
+            var tooOld = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 31, false, 30)), "An age above thirty days is refused");
+            var badRetention = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 2, true, 3)), "A retention below seven days is refused");
+            await new MariaBackupSettingsStore(configuration).RecordBackupErrorAsync("cauza de proba", default);
+            var withError = await new MariaBackupAlertReader(configuration).GetAsync();
+            Check(withAge.MaxAgeDays == 7 && withAge.RetentionEnabled && withAge.RetentionDays == 14 && badAge is not null && tooOld is not null && badRetention is not null
+                  && withError.MaxAgeDays == 7 && withError.LastError == "cauza de proba" && withError.LastErrorUtc is not null,
+                "Backup settings: age (1-30 days) and retention (7+ days) are configurable, the last backup failure is kept for the notification text");
+            await backupStore.SaveAsync(new(true, "23:59", 7, true, 14, true, "time.google.com, ntp.firma.local"));
+            var withNtp = await backupStore.GetAsync();
+            var badNtp = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 7, true, 14, true, "https://pool.ntp.org")), "A web address is refused as an NTP server");
+            var system = new MariaBackupSettingsStore(configuration);
+            await system.RecordClockAsync(new ClockCheck(false, DateTime.UtcNow, TimeSpan.FromDays(30), "decalat"), default);
+            var clockIssue = await new MariaBackupAlertReader(configuration).GetAsync();
+            await system.RecordClockAsync(new ClockCheck(false, null, null, "fara internet"), default);
+            var stillIssue = await new MariaBackupAlertReader(configuration).GetAsync();
+            await system.RecordClockAsync(new ClockCheck(true, DateTime.UtcNow, TimeSpan.Zero, ""), default);
+            var clearedIssue = await new MariaBackupAlertReader(configuration).GetAsync();
+            Check(withNtp.TimeCheckEnabled && withNtp.NtpServers == "time.google.com, ntp.firma.local" && badNtp is not null
+                  && clockIssue.ClockIssueUtc is not null && clockIssue.ClockSkewMinutes == 43200 && stillIssue.ClockIssueUtc is not null && clearedIssue.ClockIssueUtc is null,
+                "Backup settings: NTP servers are saved and validated; a wrong clock is recorded, an unverifiable check leaves it as it was, a right clock clears it");
+            await backupStore.SaveAsync(new(true, "23:59", 2, false, 30, true, "", 1 | 8));
+            var withDays = await backupStore.GetAsync();
+            var effectiveAge = (await new MariaBackupAlertReader(configuration).GetAsync()).MaxAgeDays;
+            var noDays = await Rejects<NasBackupException>(() => backupStore.SaveAsync(new(true, "23:59", 2, false, 30, true, "", 0)), "A scheduled backup with no day is refused");
+            Check(withDays.ScheduleDays == 9 && effectiveAge == 5 && noDays is not null, "Backup settings: the weekdays are kept (Monday and Thursday), and the missing-backup age follows the longest stretch (4 days + 1)");
+            await backupStore.SaveAsync(new(true, "23:59", 7, true, 14));
+            var deniedBackup = await Rejects<AccessDeniedException>(() => new MariaBackupSettingsStore(configuration, new TestAccessControl(false, "limited")).GetAsync(), "A limited user cannot read the backup settings");
+            var backupEvents = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.Action == AuditActions.SetBackupSettings).ToList();
+            Check(deniedBackup is not null && backupEvents.Count >= 3 && backupEvents.Any(item => item.Details.Contains("Ștergere pachete vechi")) && backupEvents.Any(item => item.Details.Contains("Vechime maximă backup")),
+                "Backup settings: administrators only, every change is journaled with its own action");
+        }
+        finally { await using var cleanup = new MySqlCommand("DELETE FROM backup_nas_settings WHERE id=1; DELETE FROM backup_settings WHERE id=1", probe); await cleanup.ExecuteNonQueryAsync(); }
+    }
+
+    private static async Task DefaultTemplatesAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var repository = new MariaExpiryNotificationRepository(configuration);
+        var reader = new MariaBackupAlertReader(configuration);
+        IExpirySource[] sources = [new BackupMissingSource(reader, "sistem.proba-a"), new NasCopyMissingSource(reader, "sistem.proba-b")];
+        async Task Clean()
+        {
+            foreach (var template in (await repository.GetTemplatesAsync()).Where(item => item.SourceKey.StartsWith("sistem.proba-", StringComparison.Ordinal))) await repository.DeleteTemplateAsync(template);
+            await using var seeds = new MySqlCommand("DELETE FROM notification_template_seeds WHERE source_key LIKE 'sistem.proba-%'", probe); await seeds.ExecuteNonQueryAsync();
+        }
+        await Clean();
+        try
+        {
+            var first = await DefaultNotificationTemplates.SeedAsync(configuration, repository, sources, audit, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            var made = (await repository.GetTemplatesAsync()).Where(item => item.SourceKey.StartsWith("sistem.proba-", StringComparison.Ordinal)).ToList();
+            Check(first == 2 && made.Count == 2 && made.All(item => item.Active && item.ThresholdDays >= 1 && item.Subject.Length > 0 && item.Body.Length > 0),
+                "Default templates: every event without a template gets an active one from its own default text");
+            var again = await DefaultNotificationTemplates.SeedAsync(configuration, repository, sources, audit, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            await repository.DeleteTemplateAsync(made[0]);
+            var afterDelete = await DefaultNotificationTemplates.SeedAsync(configuration, repository, sources, audit, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            Check(again == 0 && afterDelete == 0 && (await repository.GetTemplatesAsync()).Count(item => item.SourceKey.StartsWith("sistem.proba-", StringComparison.Ordinal)) == 1,
+                "Default templates: made only once, a template the administrator deleted is not made again");
+            var events = (await audit.GetEventsAsync()).Count(item => item.TimestampUtc >= started && item.Action == AuditActions.CreateNotificationTemplate);
+            Check(events >= 2, "Default templates: each one is journaled as a template creation");
+        }
+        finally { await Clean(); }
     }
 
     // ---- Invoice templates (Settings -> Facturi) ---------------------------------------------------------------------------------
@@ -1293,6 +1407,9 @@ public static class MariaExtendedChecks
             Check(noReason is not null && afterOwn.Sum(item => item.Quantity) == 1 && (await reservations.GetForProjectAsync(second.Id)).Sum(item => item.Quantity) == 5 && await Stock() == 7
                   && await Journaled(AuditActions.ReservationConsumed) && await Journaled(AuditActions.ReduceReservation),
                 "An exit for the project consumes its own reservation first, without a warning, and it is journaled");
+            var placement = await new MariaProductPlacementReader(configuration, admin).GetDeliveriesAsync(product.Id);
+            Check(placement.Count == 1 && placement[0].Net == 3 && placement[0].ProjectId == first.Id && placement[0].BeneficiaryId == beneficiary.Id,
+                "The card of the pieces lists what was handed over to the beneficiary and project (exits minus returns)");
 
             // 3. An exit by someone with no reservation that would take reserved pieces is warned (nothing is blocked): continue untouched, or lower a reservation with a reason.
             var warning = await Rejects<ReservationWarningException>(() => movements.CreateAsync(product.Id, Exit(3, null)), "An exit taking reserved pieces is warned");
@@ -1326,6 +1443,125 @@ public static class MariaExtendedChecks
             await projects.DeleteAsync((await projects.GetAsync(second.Id))!, "Ext curatare");
             await beneficiaries.DeleteAsync((await beneficiaries.GetBeneficiariesAsync()).First(item => item.Id == beneficiary.Id), "Ext curatare");
             await ExecuteAsync(probe, "DELETE FROM system_types WHERE id=@id", ("@id", type.Id));
+            await products.DeleteAsync((await products.GetProductAsync(product.Id))!, "Ext curatare");
+            await ExecuteAsync(probe, "DELETE FROM subcategories WHERE name=@n", ("@n", subcategory));
+            await ExecuteAsync(probe, "DELETE FROM categories WHERE name=@n", ("@n", category));
+        }
+    }
+
+    private static async Task VehicleTargetsAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var suffix = Suffix();
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var category = $"Ext Tinta Cat {suffix}";
+        var subcategory = $"Ext Tinta Sub {suffix}";
+        var products = new MariaProductRepository(configuration, admin, audit);
+        var vehicles = new MariaVehicleRepository(configuration, admin, audit);
+        var targets = new MariaVehicleTargetRepository(configuration, admin, audit);
+        await products.CreateCategoryAsync(category);
+        await products.CreateSubcategoryAsync(category, subcategory);
+        var product = await products.CreateAsync(new ProductInput { Name = $"Ext Tinta Produs {suffix}", Category = category, Subcategory = subcategory });
+        var car = await vehicles.CreateAsync(new VehicleInput { PlateNumber = "TS-95-" + Letters(), Description = "Ext tinta", ItpExpiry = Expiry, InsuranceExpiry = Expiry, RovinietaExpiry = Expiry });
+        try
+        {
+            async Task<bool> Journaled(string action) => (await audit.GetEventsAsync()).Any(item => item.TimestampUtc >= started && item.Action == action);
+            await targets.SetAsync(car.Id, product.Id, 5);
+            await targets.SetAsync(car.Id, product.Id, 8);
+            var listed = await targets.GetForVehicleAsync(car.Id);
+            var invalid = await Rejects<VehicleTargetException>(() => targets.SetAsync(car.Id, product.Id, 0), "A target below one is refused");
+            Check(listed.Count == 1 && listed[0].Target == 8 && listed[0].ProductId == product.Id && invalid is not null && await Journaled(AuditActions.SetVehicleTarget),
+                "A vehicle target level is set once per product, changed in place, validated and journaled");
+            Check(VehicleTargetRules.Missing(8, 3) == 5 && VehicleTargetRules.Missing(8, 8) == 0 && VehicleTargetRules.Missing(8, 12) == 0 && VehicleTargetRules.Missing(8, -2) == 8,
+                "The missing pieces are the target minus what the vehicle holds, never negative");
+            await targets.RemoveAsync(car.Id, product.Id);
+            Check((await targets.GetForVehicleAsync(car.Id)).Count == 0 && await Journaled(AuditActions.RemoveVehicleTarget), "Removing a target level is journaled");
+        }
+        finally
+        {
+            await vehicles.DeleteAsync((await vehicles.GetVehiclesAsync()).First(item => item.Id == car.Id), "Ext curatare");
+            await products.DeleteAsync((await products.GetProductAsync(product.Id))!, "Ext curatare");
+            await ExecuteAsync(probe, "DELETE FROM subcategories WHERE name=@n", ("@n", subcategory));
+            await ExecuteAsync(probe, "DELETE FROM categories WHERE name=@n", ("@n", category));
+        }
+    }
+
+    private static async Task StockAlertsAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var suffix = Suffix();
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var category = $"Ext Alerta Cat {suffix}";
+        var subcategory = $"Ext Alerta Sub {suffix}";
+        var products = new MariaProductRepository(configuration, admin, audit);
+        var movements = new MariaStockMovementRepository(configuration, admin, audit);
+        var reservations = new MariaReservationRepository(configuration, admin, audit);
+        var minimums = new MariaProductMinStockRepository(configuration, admin, audit);
+        var deadlines = new MariaProjectDeadlineRepository(configuration, admin, audit);
+        var alerts = new MariaStockAlertReader(configuration);
+        var beneficiaries = new MariaBeneficiaryRepository(configuration, admin, audit);
+        var projects = new MariaProjectRepository(configuration, new TestWebHostEnvironment(Path.GetTempPath()), admin, audit);
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        await products.CreateCategoryAsync(category);
+        await products.CreateSubcategoryAsync(category, subcategory);
+        var product = await products.CreateAsync(new ProductInput { Name = $"Ext Alerta Produs {suffix}", Category = category, Subcategory = subcategory });
+        var beneficiary = await beneficiaries.CreateAsync(Legal($"Ext Alerta Client {suffix} SRL", "RO" + Random.Shared.Next(60000000, 69999999)));
+        var project = await projects.CreateAsync(new ProjectInput { BeneficiaryId = beneficiary.Id, Name = $"Ext Alerta Proiect {suffix}" });
+        try
+        {
+            async Task<bool> Journaled(string action) => (await audit.GetEventsAsync()).Any(item => item.TimestampUtc >= started && item.Action == action);
+            await movements.CreateAsync(product.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today.AddDays(-2), Quantity = 10, Description = "Ext alerta stoc" });
+
+            // 1. Minimum stock: set/change/validate/journal; below the minimum the product is an instance of the notification, at or above it is not; removing closes it.
+            await minimums.SetAsync(product.Id, 4);
+            var invalid = await Rejects<StockAlertException>(() => minimums.SetAsync(product.Id, 0), "A minimum below one is refused");
+            var noneBelow = (await alerts.GetBelowMinimumAsync()).All(item => item.ProductId != product.Id);
+            await movements.CreateAsync(product.Id, new StockMovementInput
+            {
+                Kind = StockMovementKind.Exit, Date = today, Quantity = 8, Description = "Ext alerta iesire", Destination = ExitDestination.Beneficiary,
+                BeneficiaryId = beneficiary.Id, ProjectId = project.Id, Reference = "Aviz alerta"
+            });
+            var source = new MinStockSource(alerts);
+            var below = (await source.GetInstancesAsync()).SingleOrDefault(item => item.ObjectId == product.Id);
+            Check(await minimums.GetAsync(product.Id) == 4 && invalid is not null && noneBelow && below is not null && below.Expiry == today && below.Values[MinStockSource.MissingName] == "2"
+                  && await Journaled(AuditActions.SetMinStock), "A product below its minimum stock is a notification instance (with what is missing) and the setting is journaled");
+            await minimums.RemoveAsync(product.Id);
+            Check(await minimums.GetAsync(product.Id) is null && (await source.GetInstancesAsync()).All(item => item.ObjectId != product.Id) && await Journaled(AuditActions.RemoveMinStock),
+                "Removing the minimum stock closes the notification and is journaled");
+
+            // 2. A reservation unchanged for more than the stale period is an instance of its notification; a recent one is not.
+            var reservation = await reservations.ReserveAsync(project.Id, null, product.Id, 1, capToFree: true);
+            var staleSource = new StaleReservationSource(alerts);
+            var fresh = (await staleSource.GetInstancesAsync()).All(item => item.ObjectId != reservation.Id);
+            await ExecuteAsync(probe, "UPDATE project_reservations SET updated_utc=@old WHERE id=@id", ("@old", MariaTimeText.Format(DateTime.UtcNow.AddDays(-40))), ("@id", reservation.Id));
+            var stale = (await staleSource.GetInstancesAsync()).SingleOrDefault(item => item.ObjectId == reservation.Id);
+            Check(fresh && stale is not null && stale.Expiry < today && stale.Values[StaleReservationSource.ProjectName] == project.Name,
+                "A reservation unchanged for more than 30 days is a notification instance, a recent one is not");
+
+            // 3. Project deadline: not in the past, one per project, replaced in place, removed, journaled.
+            var past = await Rejects<StockAlertException>(() => deadlines.SetAsync(project.Id, today.AddDays(-1)), "A deadline in the past is refused");
+            await deadlines.SetAsync(project.Id, today.AddDays(10));
+            await deadlines.SetAsync(project.Id, today.AddDays(12));
+            var listed = (await alerts.GetProjectDeadlinesAsync()).Where(item => item.ProjectId == project.Id).ToList();
+            Check(past is not null && listed.Count == 1 && listed[0].Deadline == today.AddDays(12) && await deadlines.GetAsync(project.Id) == today.AddDays(12) && await Journaled(AuditActions.SetProjectDeadline),
+                "A project deadline is set once per project, replaced in place, refused in the past and journaled");
+            await deadlines.RemoveAsync(project.Id);
+            Check(await deadlines.GetAsync(project.Id) is null && await Journaled(AuditActions.RemoveProjectDeadline), "Removing the project deadline is journaled");
+
+            // 4. Consumption export: per product, beneficiary and project; the filters of project and period apply; the CSV has the rows.
+            var consumption = new MariaConsumptionReader(configuration, admin);
+            var all = await consumption.GetAsync(new ConsumptionQuery(beneficiary.Id, project.Id, null, null));
+            var later = await consumption.GetAsync(new ConsumptionQuery(beneficiary.Id, project.Id, today.AddDays(1), null));
+            var csv = ConsumptionExportRules.ToCsv(new ConsumptionQuery(beneficiary.Id, project.Id, null, null), all);
+            Check(all.Count == 1 && all[0].Exited == 8 && all[0].Net == 8 && all[0].ProjectName == project.Name && later.Count == 0
+                  && csv.Contains("Produs;Beneficiar;Proiect;Iesit;Returnat;Consum net") && csv.Contains($"{all[0].ProductName};{beneficiary.Name};{project.Name};8;0;8"),
+                "The consumption export lists what was handed over per product and project, honours the period and writes the CSV");
+        }
+        finally
+        {
+            await ExecuteAsync(probe, "DELETE FROM stock_movements WHERE product_id=@id", ("@id", product.Id));
+            await ExecuteAsync(probe, "UPDATE products SET quantity=0 WHERE id=@id", ("@id", product.Id));
+            await ExecuteAsync(probe, "DELETE FROM project_reservations WHERE product_id=@id", ("@id", product.Id));
+            await projects.DeleteAsync((await projects.GetAsync(project.Id))!, "Ext curatare");
+            await beneficiaries.DeleteAsync((await beneficiaries.GetBeneficiariesAsync()).First(item => item.Id == beneficiary.Id), "Ext curatare");
             await products.DeleteAsync((await products.GetProductAsync(product.Id))!, "Ext curatare");
             await ExecuteAsync(probe, "DELETE FROM subcategories WHERE name=@n", ("@n", subcategory));
             await ExecuteAsync(probe, "DELETE FROM categories WHERE name=@n", ("@n", category));

@@ -13,6 +13,7 @@
 @inject UnsavedChanges Guard
 @inject IProductLockRepository Locks
 @implements IAsyncDisposable
+<PageBoundary>
 
 <PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -43,7 +44,7 @@ else
 <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după cod produs sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label></div>
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
-else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td><button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)">↗</button></td></tr> }</tbody></table></div> }
+else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td>@if (canManage) { <button class="row-action" title="Ieșire rapidă" aria-label="@($"Ieșire rapidă {p.Name}")" @onclick="() => quickExit = p">⇥</button> }<button class="row-action" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)">↗</button></td></tr> }</tbody></table></div> }
 <footer class="table-footer"><span>@Filtered.Count @(Filtered.Count == 1 ? "rezultat" : "rezultate")</span><div class="pagination"><button disabled="@(page <= 1)" @onclick="() => page--" aria-label="Pagina anterioară">‹</button><span>Pagina @(page) din @Pages</span><button disabled="@(page >= Pages)" @onclick="() => page++" aria-label="Pagina următoare">›</button></div></footer></section>
 <p class="workspace-note"><span class="status-dot"></span> Date din BlazorStoc <span>·</span> Catalog și gestiune produse</p>
 }
@@ -56,6 +57,15 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     </div>
 }
 
+@if (quickExit is not null)
+{
+    <div class="invoice-modal-backdrop" role="dialog" aria-modal="true" aria-label="Ieșire rapidă @quickExit.Name">
+        <div class="invoice-modal quick-exit-modal">
+            <ExitOperation @key="quickExit.Id" Embedded="true" InitialProductId="quickExit.Id" OnClosed="CloseQuickExitAsync" />
+        </div>
+    </div>
+}
+
 @if (deleting is not null)
 {
     <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi produsul?" Subject="Produsul"
@@ -64,8 +74,12 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteProductAsync"
                               Cancelled="CancelDeleteAsync" />
 }
+</PageBoundary>
+
 @code {
     [SupplyParameterFromQuery(Name = "tab")] public string? TabName { get; set; }
+    private Product? quickExit;
+    private async Task CloseQuickExitAsync() { quickExit = null; await LoadAsync(); }
     private bool regularizeTab;
     private int toRegularize;
     private async Task CountToRegularizeAsync()
@@ -229,7 +243,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         StopHeartbeat();
         lockedProductId = productId; lockLost = false;
         var source = heartbeat = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
-        _ = HeartbeatAsync(productId, source.Token);
+        HeartbeatAsync(productId, source.Token).FireAndForget(Logger, "product lock heartbeat");
     }
 
     private async Task HeartbeatAsync(int productId, CancellationToken token)

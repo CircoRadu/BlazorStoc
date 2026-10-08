@@ -1,0 +1,16 @@
+@inject NavigationManager Navigation
+@* The error boundary of a page. The layout is rendered on the server once per navigation and every page is an interactive island of its own,
+   so a boundary in the layout cannot see the exceptions of a page: each page wraps its content in this one. An exception of a component of the page
+   (rendering, lifecycle or an event handler) shows this message instead of closing the whole circuit; the framework writes the exception to the log. *@
+<ErrorBoundary>
+    <ChildContent>@ChildContent</ChildContent>
+    <ErrorContent>
+        <div class="error-banner" role="alert"><strong>Eroare în această pagină.</strong> <button type="button" class="refresh" @onclick="Reload">Reîncarcă pagina</button></div>
+    </ErrorContent>
+</ErrorBoundary>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private void Reload() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+}

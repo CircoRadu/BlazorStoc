@@ -5,6 +5,7 @@
 @inject IStockMovementRepository Movements
 @inject NavigationManager Navigation
 @inject ILogger<StockMovementRedirect> Logger
+<PageBoundary>
 
 <PageTitle>Mișcare de stoc · BlazorStoc</PageTitle>
 <a class="nav-back" href="/produse"><span>←</span> Produse și stocuri</a>
@@ -20,6 +21,8 @@ else
 {
     <div class="empty-state" role="status"><div class="spinner"></div><h3>Se deschide pagina produsului</h3></div>
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

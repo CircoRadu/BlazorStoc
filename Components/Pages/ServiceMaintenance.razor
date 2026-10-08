@@ -8,6 +8,7 @@
 @inject TimeProvider Clock
 @inject ILogger<ServiceMaintenance> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Mentenanță · BlazorStoc</PageTitle>
 <div class="page-heading">
@@ -128,6 +129,8 @@ else
     </section>
 }
 </div>
+
+</PageBoundary>
 
 @code {
     private const int PageSize = 25;

@@ -24,12 +24,12 @@
     private void OnGuardChanged()
     {
         if (disposed) return;
-        _ = InvokeAsync(() =>
+        InvokeAsync(() =>
         {
             if (disposed) return;
             confirmExternal = Guard.HasUnsavedChanges;
             StateHasChanged();
-        });
+        }).FireAndForget(Logger, "leave guard refresh");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

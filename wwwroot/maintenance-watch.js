@@ -1,11 +1,11 @@
 // Live notification of a backup/restore for every open page (no SignalR client library is shipped, so the page asks
 // a tiny endpoint every few seconds). While an operation runs, a page that is not the one driving it is moved to the
 // waiting page, and the waiting page brings the user back as soon as the operation ends. The pages that DRIVE an
-// operation (preluare inventar, restaurare) stay where they are.
+// operation (preluare inventar; backup si restaurare din Setari, marcate cu data-operation-driver) stay where they are.
 (function () {
     "use strict";
     const waitingPath = "/intretinere";
-    const drivingPaths = ["/inventar/preluare", "/inventar/restaurare"];
+    const drivingPaths = ["/inventar/preluare"];
     const visibleInterval = 2500;
     const hiddenInterval = 10000;
     const banner = "maintenance-banner";
@@ -14,7 +14,8 @@
     // the location is read on every use, never once at load.
     const currentPath = () => location.pathname.toLowerCase();
     const onWaitingPage = () => currentPath().startsWith(waitingPath);
-    const drivesOperation = () => drivingPaths.some(p => currentPath().startsWith(p));
+    // A page can also mark itself as the driver of the running operation (Settings -> Backup NAS while "Fă backup acum" runs): data-operation-driver.
+    const drivesOperation = () => drivingPaths.some(p => currentPath().startsWith(p)) || document.querySelector("[data-operation-driver]") !== null;
 
     function returnTarget() {
         const wait = document.getElementById("maintenance-wait");
@@ -25,7 +26,7 @@
     function showBanner(visible) {
         let element = document.getElementById(banner);
         if (!visible) { if (element && element.dataset.live === "1") element.remove(); return; }
-        if (element || onWaitingPage() || currentPath().startsWith("/inventar/restaurare")) return;
+        if (element || onWaitingPage() || currentPath().startsWith("/setari")) return;
         const workspace = document.querySelector("main.workspace");
         if (!workspace) return;
         element = document.createElement("div");

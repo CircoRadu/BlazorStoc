@@ -8,12 +8,14 @@
     const hiddenInterval = 180000;
 
     function apply(count) {
-        const nav = document.querySelector("[data-notification-nav]");
-        if (!nav) return;
+        const navs = document.querySelectorAll("[data-notification-nav]");
+        if (navs.length === 0) return;
         const warn = count > 0;
-        nav.classList.toggle("nav-alert", warn);
-        const triangle = nav.querySelector("[data-notification-triangle]");
-        if (triangle) triangle.hidden = !warn;
+        navs.forEach(nav => {
+            nav.classList.toggle("nav-alert", warn);
+            const triangle = nav.querySelector("[data-notification-triangle]");
+            if (triangle) triangle.hidden = !warn;
+        });
     }
 
     async function poll() {

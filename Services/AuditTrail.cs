@@ -159,6 +159,18 @@ public static class AuditActions
     public const string ChangeProjectComponentState = "Modificare stare componentă proiect";
     public const string ArchiveProjectComponent = "Arhivare componentă proiect";
     public const string ReactivateProjectComponent = "Reactivare componentă proiect";
+    public const string SetVehicleTarget = "Setare nivel țintă vehicul";
+    public const string RemoveVehicleTarget = "Eliminare nivel țintă vehicul";
+    public const string SetMinStock = "Setare stoc minim";
+    public const string RemoveMinStock = "Eliminare stoc minim";
+    public const string SetNasBackup = "Modificare configurare backup NAS";
+    public const string SetBackupSettings = "Modificare setări backup";
+    public const string RetentionDelete = "Ștergere automată pachet backup vechi";
+    public const string FetchBackupFromNas = "Aducere pachet backup de pe NAS";
+    public const string TestNasBackup = "Testare conexiune NAS";
+    public const string CopyBackupToNas = "Copiere backup pe NAS";
+    public const string SetProjectDeadline = "Setare termen proiect";
+    public const string RemoveProjectDeadline = "Eliminare termen proiect";
     public const string ReserveStock = "Rezervare stoc";
     public const string ReduceReservation = "Scădere rezervare";
     public const string ReleaseReservation = "Eliberare rezervare";
@@ -198,7 +210,7 @@ public static class AuditActions
             or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
-            or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
+            or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
             or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias;
 
     public static string Normalize(string? action) =>

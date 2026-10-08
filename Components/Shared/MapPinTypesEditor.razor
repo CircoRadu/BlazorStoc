@@ -66,8 +66,8 @@ else
                 <td>@(type.IsFill ? "Umplere" : "Insignă") · <small>@DescribeRule(type)</small></td>
                 <td class="number">@type.Order</td>
                 <td><span class="notification-state @(type.Active ? "done" : "")">@(type.Active ? "Activ" : "Inactiv")</span></td>
-                <td class="row-actions"><button type="button" class="refresh" disabled="@(editing || saving)" @onclick="() => OpenEditor(type)">Editează</button>
-                    @if (!type.BuiltIn) { <button type="button" class="danger" disabled="@(editing || saving)" @onclick="() => deleting = type">Șterge</button> }</td>
+                <td class="row-actions"><button type="button" class="row-icon edit" disabled="@(editing || saving)" @onclick="() => OpenEditor(type)" aria-label="@($"Editează tipul {type.Name}")" title="@($"Editează tipul {type.Name}")"></button>
+                    @if (!type.BuiltIn) { <button type="button" class="row-icon delete" disabled="@(editing || saving)" @onclick="() => deleting = type" aria-label="@($"Șterge tipul {type.Name}")" title="@($"Șterge tipul {type.Name}")"></button> }</td>
             </tr>
         }
         </tbody></table></div>

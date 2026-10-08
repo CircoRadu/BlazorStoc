@@ -19,6 +19,7 @@
 @inject ListNavigationContext ListContext
 @inject ILogger<BeneficiaryDetail> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>@(beneficiary?.Name ?? "Beneficiar") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -146,6 +147,8 @@ else if (beneficiary is not null)
         }
     </section>
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

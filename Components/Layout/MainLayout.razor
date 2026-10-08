@@ -6,6 +6,7 @@
 @inject IOperationLockService OperationLock
 @inject IExpiryNotificationService Notifications
 @inject NavigationManager Navigation
+@inject ILogger<MainLayout> Logger
 
 <div class="app-shell">
     <aside class="sidebar">
@@ -51,6 +52,7 @@
                     <a class="@(productsMenuSection && !onInvoicePickupPage ? "active" : "")" href="/produse">Stoc</a>
                     <NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink>
                     <NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink>
+                    <NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink>
                 </ChildContent>
             </CollapsibleSection>
             <CollapsibleSection Id="inventory-menu"
@@ -63,7 +65,6 @@
                 <ChildContent>
                     <NavLink href="/inventar" Match="NavLinkMatch.All">Generare situație inventar</NavLink>
                     <NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix">Preluare inventar</NavLink>
-                    <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/inventar/restaurare" Match="NavLinkMatch.Prefix">Restaurează stoc</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection>
             <CollapsibleSection Id="administration-menu"
@@ -153,7 +154,10 @@
         catch (Exception) { alertCount = 0; }
     }
 
-    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args) => _ = RefreshNavigationAsync();
+    private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        RefreshNavigationAsync().FireAndForget(Logger, "layout navigation refresh");
+    }
 
     private async Task RefreshNavigationAsync()
     {
@@ -184,12 +188,12 @@
             uri.AbsolutePath.StartsWith("/vehicule", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase);
         if (administrationSection) administrationExpanded = true;
-        productsMenuSection = uri.AbsolutePath.StartsWith("/produse", StringComparison.OrdinalIgnoreCase);
+        productsMenuSection = uri.AbsolutePath.StartsWith("/produse", StringComparison.OrdinalIgnoreCase) || uri.AbsolutePath.StartsWith("/consum", StringComparison.OrdinalIgnoreCase);
         if (productsMenuSection) productsExpanded = true;
         onInvoicePickupPage = uri.AbsolutePath.StartsWith("/produse/preluare-factura", StringComparison.OrdinalIgnoreCase);
         inventorySection = uri.AbsolutePath.StartsWith("/inventar", StringComparison.OrdinalIgnoreCase);
         if (inventorySection) inventoryExpanded = true;
-        onRestorePage = uri.AbsolutePath.StartsWith("/inventar/restaurare", StringComparison.OrdinalIgnoreCase);
+        onRestorePage = uri.AbsolutePath.StartsWith("/setari", StringComparison.OrdinalIgnoreCase);
         onWaitingPage = uri.AbsolutePath.StartsWith(MaintenanceSupport.WaitingPath, StringComparison.OrdinalIgnoreCase);
         var query = QueryHelpers.ParseQuery(uri.Query);
         selectedCategory = productSection && query.TryGetValue("categorie", out var categoryValue) ? categoryValue.ToString() : "";

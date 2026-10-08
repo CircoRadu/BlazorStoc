@@ -6,6 +6,7 @@
 @inject IStockMovementRepository Movements
 @inject ILogger<ProjectEquipment> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Echipamente @(project?.Name is { } name ? $"· {name}" : "") · BlazorStoc</PageTitle>
 
@@ -51,6 +52,8 @@ else if (project is not null)
         }
     </section>
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

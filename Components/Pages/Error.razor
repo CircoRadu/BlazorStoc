@@ -1,5 +1,6 @@
 ﻿@page "/Error"
 @using System.Diagnostics
+<PageBoundary>
 
 <PageTitle>Eroare · BlazorStoc</PageTitle>
 
@@ -13,6 +14,8 @@
         <strong>Cod de diagnostic:</strong> <code>@RequestId</code>
     </p>
 }
+
+</PageBoundary>
 
 @code{
     [CascadingParameter]

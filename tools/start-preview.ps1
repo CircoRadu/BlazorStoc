@@ -60,6 +60,13 @@ if (-not $NoPublish -or -not (Test-Path (Join-Path $build 'BlazorStoc.dll'))) {
 $env:Database__PrivateConfigPath = $config
 $env:ASPNETCORE_URLS = "http://127.0.0.1:$Port"
 $env:ASPNETCORE_WEBROOT = Join-Path $build 'wwwroot'
+# The backup and restore tools (mariadb-dump, mariadb) of the same MariaDB distribution the preview runs on; without these paths the application looks for them under
+# %LocalAppData%\BlazorStoc-MariaDB and a backup fails with "mariadb-dump nu a fost gasit".
+$toolsBin = if ($MariaBinDir) { $MariaBinDir } else { Get-ChildItem -Path $MariaRoot -Directory -Filter 'mariadb-*' -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName 'bin' } }
+if ($toolsBin -and (Test-Path (Join-Path $toolsBin 'mariadb-dump.exe'))) {
+    $env:Database__MariaDumpExecutablePath = Join-Path $toolsBin 'mariadb-dump.exe'
+    $env:Database__MariaClientExecutablePath = Join-Path $toolsBin 'mariadb.exe'
+}
 try {
     Start-Process dotnet -ArgumentList "`"$(Join-Path $build 'BlazorStoc.dll')`"" -WorkingDirectory $repo -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $repo "preview-$Port.stdout.log") -RedirectStandardError (Join-Path $repo "preview-$Port.stderr.log")

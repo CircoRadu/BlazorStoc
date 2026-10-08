@@ -1,4 +1,4 @@
-# Inventar (/inventar, /inventar/preluare, /inventar/restaurare)
+# Inventar (/inventar, /inventar/preluare; restaurarea a trecut in Setari -> Backup)
 
 Fluxul: Generare situatie inventar (PDF cu categoriile alese) -> tiparesti, completezi de mana -> Preluare inventar (scanare/PDF) -> verifici cifrele citite -> se genereaza miscari de corectie. "Restaureaza stoc" (administrator) readuce stocul la o stare anterioara.
 

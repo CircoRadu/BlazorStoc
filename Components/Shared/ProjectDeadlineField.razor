@@ -1,0 +1,60 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@inject ILogger<ProjectDeadlineField> Logger
+@implements IDisposable
+@* The deadline of a project: when it is near and the project still has things to buy, a notification "Deficit la un proiect cu termen apropiat" is raised
+   (Setari -> Notificari). Set or removed here; each change is journaled. *@
+<div class="deadline-field">
+    <label for="@($"project-deadline-{ProjectId}")">Termen proiect</label>
+    <PickOnlyDate Id="@($"project-deadline-{ProjectId}")" @bind-Value="input" Min="@StockMovementRules.StorageDate(StockMovementRules.Today)" Disabled="busy" />
+    <button type="button" class="refresh" disabled="@busy" @onclick="SaveAsync">Setează termenul</button>
+    @if (deadline is not null) { <button type="button" class="danger" aria-label="Elimină termenul" disabled="@busy" @onclick="RemoveAsync">×</button> }
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+
+@code {
+    [Parameter, EditorRequired] public int ProjectId { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private DateOnly? deadline, input;
+    private bool busy;
+    private string? error;
+    private int loadedFor = -1;
+
+    private IProjectDeadlineRepository? Repository => Services.GetService<IProjectDeadlineRepository>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedFor == ProjectId) return;
+        loadedFor = ProjectId;
+        try { deadline = Repository is { } repository ? await repository.GetAsync(ProjectId, lifetime.Token) : null; input = deadline; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception) { deadline = null; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy || Repository is not { } repository) return;
+        error = null;
+        if (input is not { } date) { error = "Alege data termenului."; return; }
+        busy = true;
+        try { await repository.SetAsync(ProjectId, date, lifetime.Token); deadline = date; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockAlertException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Project deadline saving failed ({ErrorType}).", ex.GetType().Name); error = "Termenul nu a putut fi salvat. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (busy || Repository is not { } repository) return;
+        error = null; busy = true;
+        try { await repository.RemoveAsync(ProjectId, lifetime.Token); deadline = null; input = null; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is StockAlertException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Project deadline removal failed ({ErrorType}).", ex.GetType().Name); error = "Termenul nu a putut fi eliminat. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

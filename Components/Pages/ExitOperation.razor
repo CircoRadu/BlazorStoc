@@ -6,15 +6,24 @@
 @inject IBeneficiaryRepository Beneficiaries
 @inject IProjectRepository ProjectsRepository
 @inject IVehicleRepository VehiclesRepository
+@inject IVehicleTargetRepository VehicleTargets
 @inject IAccessControl Access
 @inject ILogger<ExitOperation> Logger
 @implements IDisposable
+<PageBoundary>
 @* The exit operation (the exit basket): one destination, one date and one reference for several products, each with its quantity and source
    (warehouse or a vehicle). Saved all or nothing; every line follows the rules of a single exit (over the stock allowed and marked, a repeated
    exit needs a reason). The warnings of all lines are gathered in a summary shown before saving. *@
 
+@if (Embedded)
+{
+    <div class="page-heading"><div><h2>Ieșire din stoc</h2><p class="muted">Se salvează o operație (toate liniile sau niciuna), ca în „Ieșire multiplă”.</p></div><div class="heading-actions"><button type="button" class="refresh" disabled="@busy" @onclick="() => OnClosed.InvokeAsync()">Închide</button></div></div>
+}
+else
+{
 <PageTitle>Ieșire multiplă · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">STOC</p><h1>Ieșire multiplă</h1><p class="muted">Mai multe produse către aceeași destinație, într-o singură operație (se salvează toate sau niciuna).</p></div><div class="heading-actions"><a class="refresh" href="/produse">← Produse</a></div></div>
+}
 
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (success is not null)
@@ -132,7 +141,16 @@ else
     </section>
 }
 
+</PageBoundary>
+
 @code {
+    /// <summary>Used as dialog content (quick exit from the product list): no page heading, optional starting product, close callback.</summary>
+    // From the vehicle page ("Completeaza la nivel"): the exit to this vehicle is prepared with the pieces missing from its target levels.
+    [SupplyParameterFromQuery(Name = "vehicul")] public int? FillVehicleId { get; set; }
+    [Parameter] public bool Embedded { get; set; }
+    [Parameter] public int? InitialProductId { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
     private sealed class Line
     {
         public int Key { get; init; }
@@ -172,10 +190,29 @@ else
         {
             canManage = await Access.CanManageProductsAsync(lifetime.Token);
             if (canManage) await LoadAsync();
+            if (canManage && InitialProductId is { } initial) await ProductChangedAsync(lines[0], initial);
+            if (canManage && !Embedded && FillVehicleId is { } fillVehicle) await FillVehicleAsync(fillVehicle);
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Logger.LogError("Exit operation page loading failed ({ErrorType}).", ex.GetType().Name); error = "Pagina nu a putut fi încărcată. Verifică serverul și conexiunea la baza de date."; }
         finally { loading = false; }
+    }
+
+    private async Task FillVehicleAsync(int vehicleId)
+    {
+        if (vehicles.All(vehicle => vehicle.Id != vehicleId)) { error = "Vehiculul pentru completare nu mai există."; return; }
+        var held = (await Movements.GetVehicleEquipmentAsync(vehicleId, lifetime.Token)).ToDictionary(item => item.ProductId, item => item.Quantity);
+        var missing = (await VehicleTargets.GetForVehicleAsync(vehicleId, lifetime.Token))
+            .Select(target => (target.ProductId, Quantity: VehicleTargetRules.Missing(target.Target, held.GetValueOrDefault(target.ProductId)))).Where(item => item.Quantity > 0).ToList();
+        if (missing.Count == 0) { error = "Mașina are deja toate produsele la nivelul țintă."; return; }
+        common.Destination = ExitDestination.Vehicle; common.VehicleId = vehicleId; common.Description = "Completare la nivel";
+        lines = [];
+        foreach (var (productId, quantity) in missing)
+        {
+            var line = new Line { Key = nextKey++, Quantity = quantity };
+            lines.Add(line);
+            await ProductChangedAsync(line, productId);
+        }
     }
 
     private async Task LoadAsync()

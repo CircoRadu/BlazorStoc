@@ -11,6 +11,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
+<PageBoundary>
 
 <PageTitle>Jurnal complet · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal complet</h1><p class="muted">Toate evenimentele din jurnal, căutate direct pe server, pe pagini. Se afișează implicit ultima lună; alege alt interval sau tot jurnalul.</p></div>
@@ -40,6 +41,8 @@
         @if (result.Total > AuditQueryRules.MaxRows) { <p class="form-note">Exportul cuprinde cel mult @AuditQueryRules.MaxRows.ToString("N0") de evenimente (cele mai recente dintre cele găsite); restrânge intervalul pentru a le exporta pe toate.</p> }
     }
 </section>
+
+</PageBoundary>
 
 @code {
     [SupplyParameterFromQuery(Name = "q")] public string? QueryText { get; set; }

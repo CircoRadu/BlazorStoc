@@ -1,0 +1,288 @@
+@using BlazorStoc.Services
+@inject IBackupSettingsRepository Settings
+@inject IBackupRetentionService Retention
+@inject IBackupAlertReader Alerts
+@inject ILogger<BackupSettingsPanel> Logger
+@implements IDisposable
+@* Setari -> Backup: when backups are made (inventory pickup: always; daily: optional), when a missing backup is notified, which old packages the server
+   removes by itself, and below the table of available backups (server and NAS) with the restore. The NAS connection is in Setari -> Backup NAS. *@
+
+<section class="catalog backup-settings">
+    @if (Section == TimeSection)
+    {
+        <div class="catalog-heading"><h2>Verificare oră</h2><small>Ceasul serverului este comparat cu ora de pe internet înainte de backup și de ștergerea pachetelor vechi.</small></div>
+    }
+    else
+    {
+        <div class="catalog-heading"><h2>Backup și restaurare</h2><small>Backup-urile se fac pe server; dacă „Copiere pe NAS” este Activ (Setări → Backup → Backup NAS), fiecare pachet nou este copiat și pe NAS.</small></div>
+    }
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+        @if (Section != TimeSection)
+        {
+            <h3>Generare backup</h3>
+            <div class="anaf-grid">
+                <ToggleSwitch Class="anaf-check" Value="true" Disabled="true" OnText="Activ (obligatoriu)" OffText="Inactiv">Backup la preluarea de inventar</ToggleSwitch>
+                <ToggleSwitch Class="anaf-check" @bind-Value="scheduleEnabled" OnText="Activ" OffText="Inactiv">Backup programat automat</ToggleSwitch>
+                <label>Ora (HH:mm)<input id="backup-time" type="time" @bind="scheduleTime" /></label>
+            </div>
+            <div class="anaf-grid weekday-toggles" role="group" aria-label="Zilele în care se face backup-ul programat">
+                @for (var index = 0; index < weekdays.Length; index++)
+                {
+                    var day = index;
+                    <ToggleSwitch Class="anaf-check" Value="weekdays[day]" ValueChanged="@((bool on) => weekdays[day] = on)" Disabled="@(!scheduleEnabled)" OnText="Activ" OffText="Inactiv">@BackupScheduleDays.Names[day]</ToggleSwitch>
+                }
+            </div>
+            <p class="muted"><small>Backup-ul programat se face numai în zilele pornite, la ora aleasă. Pentru backup-uri mai rare lasă pornite doar câteva zile; notificarea „Backup lipsă” așteaptă atunci cel puțin intervalul dintre două backup-uri@(scheduleEnabled && weekdays.Any(on => on) ? $" (acum: {BackupAlertRules.EffectiveMaxAge(maxAgeDays, true, Enumerable.Range(0, 7).Where(day => weekdays[day]).Sum(day => 1 << day))} zile)" : ""). Preluarea inventarului nu se confirmă fără un backup verificat: de aceea acesta nu poate fi oprit.</small></p>
+            <h3>Notificare backup lipsă</h3>
+            <div class="anaf-grid">
+                <label>Notificare după (zile fără backup)<input id="backup-max-age" type="number" min="1" max="30" @bind="maxAgeDays" /></label>
+            </div>
+            <h3>Ștergere pachete vechi de pe server</h3>
+            <div class="anaf-grid">
+                <ToggleSwitch Class="anaf-check" @bind-Value="retentionEnabled" OnText="Activ" OffText="Inactiv">Ștergere automată</ToggleSwitch>
+                <label>Se șterg pachetele mai vechi de (zile)<input id="backup-retention-days" type="number" min="@BackupSettingsRules.MinRetentionDays" max="@BackupSettingsRules.MaxRetentionDays" @bind="retentionDays" /></label>
+            </div>
+            <p class="muted"><small>Se aplică tuturor tipurilor de pachete (preluare inventar, programat, la cerere și copiile de siguranță dinaintea restaurărilor). Ultimele @BackupSettingsRules.KeepNewest pachete se păstrează oricând. La salvarea unui prag nou ștergerea rulează imediat, după confirmarea listei. Cu „Copiere pe NAS” Activ, un pachet se șterge de pe server numai dacă are o copie pe NAS; pe NAS nu se șterge nimic din aplicație (pachetele de acolo se șterg manual).</small></p>
+        }
+        @if (Section == TimeSection)
+        {
+            <h3>Verificare oră pe internet</h3>
+            <div class="anaf-grid">
+                <ToggleSwitch Class="anaf-check" @bind-Value="timeCheckEnabled" OnText="Activ" OffText="Inactiv">Compară ceasul serverului cu ora de pe internet</ToggleSwitch>
+                @for (var index = 0; index < ntpServers.Length; index++)
+                {
+                    var slot = index;
+                    <label>Server NTP @(slot + 1)@(slot == 0 ? "" : " (opțional)")
+                        <select id="@($"ntp-server-{slot + 1}")" disabled="@(!timeCheckEnabled)" @onchange="e => ChooseServer(slot, e.Value?.ToString() ?? string.Empty)">
+                            @if (slot > 0) { <option value="" selected="@(!ntpCustom[slot] && ntpServers[slot].Length == 0)">— nefolosit —</option> }
+                            @foreach (var host in BackupTimeRules.Suggested)
+                            {
+                                <option value="@host" selected="@(!ntpCustom[slot] && ntpServers[slot] == host)">@host</option>
+                            }
+                            <option value="@OtherChoice" selected="@ntpCustom[slot]">Altul (server propriu)…</option>
+                        </select>
+                        @if (ntpCustom[slot])
+                        {
+                            <input id="@($"ntp-custom-{slot + 1}")" type="text" maxlength="253" autocomplete="off" spellcheck="false" placeholder="ntp.firma.local" disabled="@(!timeCheckEnabled)" @bind="ntpServers[slot]" />
+                        }
+                    </label>
+                }
+            </div>
+            <p class="muted"><small>Înainte de a șterge pachete vechi și la fiecare backup, ceasul serverului se compară cu ora de pe internet; dacă două servere răspund, ele trebuie să fie de acord. Cu un ceas decalat cu peste 15 minute, backup-ul ia ora de pe internet, iar ștergerea automată așteaptă. Dacă ora nu poate fi verificată, backup-ul se face oricum, dar pachetul se marchează „ora neverificată”: nu se șterge automat, ci doar manual, de un administrator. Pentru o rețea fără internet, introdu un server NTP propriu la „Altul”.</small></p>
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează</button>
+                <button type="button" class="refresh" disabled="@(busy || probing || !timeCheckEnabled)" @onclick="ProbeAsync">@(probing ? "Se verifică…" : "Verifică acum")</button>
+            </div>
+            @if (probe is not null)
+            {
+                <ul class="retention-list" role="status" aria-label="Rezultatul verificării orei">
+                    @foreach (var entry in probe)
+                    {
+                        <li><strong>@entry.Host</strong>
+                            @if (entry.Utc is { } answered) { <small>răspunde: @answered.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") · ceasul serverului: @SkewText(entry.ServerUtcAtReply - answered)</small> }
+                            else { <small>nu răspunde (verifică firewall-ul: UDP 123)</small> }
+                        </li>
+                    }
+                </ul>
+            }
+        }
+        else
+        {
+            <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează</button></div>
+        }
+        @if (alertState is not null)
+        {
+            var model = BackupMissingSource.Preview(alertState);
+            <h3>Model notificare „Backup lipsă”</h3>
+            <div class="notification-model" role="note" aria-label="Model de notificare, needitabil">
+                <strong>@model.Subject</strong>
+                <p>@model.Body</p>
+                <dl>
+                    <dt>Ultimul backup</dt><dd>@BackupAlertRules.Describe(alertState.LastBackupUtc)</dd>
+                    <dt>Ultima eroare de backup</dt><dd>@BackupAlertRules.ErrorText(alertState)</dd>
+                </dl>
+                <small class="muted">Model needitabil: textul propriu-zis se editează în Setări → Notificări → Sistem. Notificarea apare după @alertState.MaxAgeDays @(alertState.MaxAgeDays == 1 ? "zi" : "zile") fără backup sau după un backup eșuat; problemele de copiere pe NAS au notificarea lor. Aici este afișat cu valorile de acum.</small>
+            </div>
+        }
+    }
+    </div>
+</section>
+
+@if (Section != TimeSection)
+{
+    <BackupPackagesTable @key="tableVersion" />
+}
+
+@if (pendingRemoval is not null)
+{
+    <div class="delete-overlay">
+        <section class="delete-dialog delete-confirmation-dialog" role="dialog" aria-modal="true" aria-labelledby="retention-confirm-title">
+            <h2 id="retention-confirm-title">Ștergi @pendingRemoval.Count @(pendingRemoval.Count == 1 ? "pachet vechi" : "pachete vechi") de pe server?</h2>
+            <p>Cu pragul de @retentionDays zile, salvarea șterge acum pachetele de mai jos (toate tipurile, inclusiv copiile de siguranță dinaintea restaurărilor). Ultimele @BackupSettingsRules.KeepNewest pachete se păstrează oricum.</p>
+            <ul class="retention-list">
+                @foreach (var package in pendingRemoval)
+                {
+                    <li><strong>@package.FileName</strong> <small>@package.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @BackupRules.KindLabel(package.Kind)</small></li>
+                }
+            </ul>
+            <p class="form-note">@(nasCopyNote)</p>
+            <div class="editor-actions">
+                <button type="button" class="danger" disabled="@busy" @onclick="ConfirmRemovalAsync">@(busy ? "Se salvează…" : "Salvează și șterge")</button>
+                <button type="button" disabled="@busy" @onclick="CancelRemoval">Renunță (nu se salvează)</button>
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    /// <summary>"backup" (generation, notification, clean-up, table of packages and restore) or "time" (the check of the server clock): two sub-tabs of Settings -> Backup.</summary>
+    [Parameter] public string Section { get; set; } = BackupSection;
+    public const string BackupSection = "backup", TimeSection = "time";
+    private const string OtherChoice = "__other";
+    private bool loading = true, busy, scheduleEnabled, retentionEnabled, timeCheckEnabled = true, probing;
+    private readonly string[] ntpServers = [.. TrustedClock.DefaultServers];
+    private readonly bool[] ntpCustom = new bool[3];
+    private readonly bool[] weekdays = [.. Enumerable.Repeat(true, 7)];
+    private IReadOnlyList<TimeProbeEntry>? probe;
+    private int maxAgeDays = BackupAlertRules.BackupMaxAgeDays, retentionDays = BackupSettingsRules.DefaultRetentionDays;
+    private TimeOnly scheduleTime = new(2, 0);
+    private BackupAlertState? alertState;
+    private string? error, notice;
+    private BackupSettings? saved;
+    private IReadOnlyList<BackupPackage>? pendingRemoval;
+    private string nasCopyNote = "Fișierele se șterg definitiv de pe server și operațiile se înregistrează în jurnal. Pe NAS nu se șterge nimic.";
+    private int tableVersion;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { Apply(await Settings.GetAsync(lifetime.Token)); await LoadAlertAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Backup settings loading failed ({ErrorType}).", exception.GetType().Name); error = "Setările nu au putut fi încărcate. Verifică conexiunea la baza de date."; }
+        finally { loading = false; }
+    }
+
+    private async Task LoadAlertAsync()
+    {
+        try { alertState = await Alerts.GetAsync(lifetime.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { alertState = null; }
+    }
+
+    private void Apply(BackupSettings settings)
+    {
+        saved = settings;
+        timeCheckEnabled = settings.TimeCheckEnabled;
+        var servers = BackupTimeRules.Servers(settings.NtpServers);
+        for (var slot = 0; slot < ntpServers.Length; slot++)
+        {
+            ntpServers[slot] = slot < servers.Count ? servers[slot] : "";
+            ntpCustom[slot] = ntpServers[slot].Length > 0 && !BackupTimeRules.Suggested.Contains(ntpServers[slot], StringComparer.OrdinalIgnoreCase);
+        }
+        for (var day = 0; day < weekdays.Length; day++) weekdays[day] = (settings.ScheduleDays & (1 << day)) != 0;
+        scheduleEnabled = settings.ScheduleEnabled; maxAgeDays = settings.MaxAgeDays; retentionEnabled = settings.RetentionEnabled; retentionDays = settings.RetentionDays;
+        scheduleTime = NasBackupRules.TryParseTime(settings.ScheduleTime, out var time) ? time : new TimeOnly(2, 0);
+    }
+
+    // A changed (or newly switched on) retention runs right away: if that removes old packages, the user confirms the list first.
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try
+        {
+            var input = await BuildInputAsync();
+            if (BackupSettingsRules.Validate(input) is { } invalid) { error = invalid; return; }
+            var retentionChanged = Section != TimeSection && retentionEnabled && (saved is null || !saved.RetentionEnabled || saved.RetentionDays != retentionDays);
+            if (retentionChanged)
+            {
+                var preview = await Retention.PreviewAsync(retentionDays, lifetime.Token);
+                if (preview.Packages.Count > 0) { pendingRemoval = preview.Packages; return; }
+                if (preview.Note is not null) notice = preview.Note;
+            }
+            await PersistAsync(input, runRetention: retentionChanged);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is NasBackupException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Backup settings saving failed ({ErrorType}).", exception.GetType().Name); error = "Setările nu au putut fi salvate. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private async Task ConfirmRemovalAsync()
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try
+        {
+            await PersistAsync(await BuildInputAsync(), runRetention: true);
+            pendingRemoval = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is NasBackupException or AccessDeniedException) { pendingRemoval = null; error = exception.Message; }
+        catch (Exception exception) { pendingRemoval = null; Logger.LogError("Backup settings saving failed ({ErrorType}).", exception.GetType().Name); error = "Setările nu au putut fi salvate. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private void CancelRemoval() { if (!busy) pendingRemoval = null; }
+
+    // The two sections save only their own fields: the others are taken from what is stored now, so a stale page never overwrites them.
+    private async Task<BackupSettingsInput> BuildInputAsync()
+    {
+        var stored = await Settings.GetAsync(lifetime.Token);
+        var own = CurrentInput();
+        return Section == TimeSection
+            ? new(stored.ScheduleEnabled, stored.ScheduleTime, stored.MaxAgeDays, stored.RetentionEnabled, stored.RetentionDays, own.TimeCheckEnabled, own.NtpServers, stored.ScheduleDays)
+            : own with { TimeCheckEnabled = stored.TimeCheckEnabled, NtpServers = stored.NtpServers };
+    }
+
+    private BackupSettingsInput CurrentInput() =>
+        new(scheduleEnabled, scheduleTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture), maxAgeDays, retentionEnabled, retentionDays,
+            timeCheckEnabled, string.Join(", ", ntpServers.Select(host => host.Trim()).Where(host => host.Length > 0)),
+            Enumerable.Range(0, weekdays.Length).Where(day => weekdays[day]).Sum(day => 1 << day));
+
+    private void ChooseServer(int slot, string choice)
+    {
+        ntpCustom[slot] = choice == OtherChoice;
+        ntpServers[slot] = choice == OtherChoice ? "" : choice;
+        probe = null;
+    }
+
+    private static string SkewText(TimeSpan skew) =>
+        skew.Duration() < TimeSpan.FromSeconds(2) ? "la fel" : skew.Duration() < TimeSpan.FromMinutes(2)
+            ? $"{Math.Round(skew.Duration().TotalSeconds)} s {(skew > TimeSpan.Zero ? "înainte" : "în urmă")}" : ClockSkewSource.Describe((int)Math.Round(skew.TotalMinutes));
+
+    private async Task ProbeAsync()
+    {
+        if (probing) return;
+        probing = true; error = null; probe = null;
+        try
+        {
+            var servers = BackupTimeRules.Parse(string.Join(", ", ntpServers));
+            if (BackupTimeRules.Validate(string.Join(", ", ntpServers)) is { } invalid) { error = invalid; return; }
+            probe = await Settings.ProbeTimeAsync(servers, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is NasBackupException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Time check failed ({ErrorType}).", exception.GetType().Name); error = "Verificarea orei nu a putut fi făcută. Reîncearcă."; }
+        finally { probing = false; }
+    }
+
+    private async Task PersistAsync(BackupSettingsInput input, bool runRetention)
+    {
+        await Settings.SaveAsync(input, lifetime.Token);
+        Apply(await Settings.GetAsync(lifetime.Token));
+        await LoadAlertAsync();
+        var run = runRetention ? await Retention.RunAsync(lifetime.Token) : new RetentionResult(0, null);
+        var removed = run.Removed;
+        if (run.Blocked is not null) notice = run.Blocked;
+        if (removed > 0) tableVersion++;
+        notice = (notice is null ? "" : notice + " ") + "Setările de backup au fost salvate." + (removed > 0 ? $" S-au șters {removed} {(removed == 1 ? "pachet vechi" : "pachete vechi")} de pe server." : "");
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

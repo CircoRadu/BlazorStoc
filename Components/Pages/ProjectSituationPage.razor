@@ -8,6 +8,7 @@
 @inject IProductRepository ProductRepository
 @inject ILogger<ProjectSituationPage> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Situația proiectului @(situation?.ProjectName is { } name ? $"· {name}" : "") · BlazorStoc</PageTitle>
 
@@ -31,6 +32,7 @@ else if (situation is not null)
             <a class="refresh" href="@($"/api/proiecte/{Id}/situatie.csv")">Export CSV</a>
         </div>
     </div>
+    <ProjectDeadlineField ProjectId="Id" />
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     @if (actionError is not null) { <div class="error-banner" role="alert">@actionError</div> }
     @if (situation.IsEmpty)
@@ -133,6 +135,8 @@ else if (situation is not null)
         </section>
     }
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

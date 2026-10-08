@@ -12,6 +12,7 @@
 @inject IAccessControl Access
 @inject ILogger<OfferPickup> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>Preluare ofertă · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">OFERTE</p><h1>Preluare ofertă</h1><p class="muted">Un deviz-ofertă Excel (.xlsx) se citește cu un șablon, se leagă de beneficiar, proiect și componentă, iar liniile în bucăți se potrivesc cu produsele din catalog. Același număr de ofertă este o revizie a ofertei existente.</p></div><div class="heading-actions"><a class="refresh" href="/oferte/sabloane">Șabloane de oferte</a></div></div>
@@ -218,6 +219,8 @@ else if (step == 5)
 {
     <div class="delete-overlay"><div class="delete-dialog"><ProductEditor InitialName="@NewProductName" InitialDescription="@NewProductDescription" Groups="groups" Saved="ProductAddedAsync" Closed="() => { newProductFor = null; return Task.CompletedTask; }" /></div></div>
 }
+
+</PageBoundary>
 
 @code {
     private sealed class PickLine

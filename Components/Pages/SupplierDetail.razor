@@ -7,6 +7,7 @@
 @inject UnsavedChanges Guard
 @inject ILogger<SupplierDetail> Logger
 @implements IDisposable
+<PageBoundary>
 
 <PageTitle>@(supplier?.Name ?? "Furnizor") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
@@ -54,6 +55,8 @@ else
         }
     </section>
 }
+
+</PageBoundary>
 
 @code {
     [Parameter] public int Id { get; set; }

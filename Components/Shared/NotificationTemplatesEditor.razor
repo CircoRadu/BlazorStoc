@@ -5,11 +5,20 @@
 @implements IDisposable
 
 <h2>Șabloane notificări</h2>
-<p class="muted">Definește pentru ce expirări se creează notificări, cu câte zile înainte și cu ce text. În subiect și în text poți folosi marcaje de forma <code>&lt;numar autovehicul&gt;</code>, înlocuite automat cu valorile obiectului. Categoriile și evenimentele disponibile vin din registrul de expirări al aplicației; un eveniment nou (de exemplu analiza de risc a unui obiectiv) apare aici de îndată ce este înregistrat. Pentru fiecare eveniment poate fi activ un singur șablon; notificarea creată rămâne în listă până este rezolvată, chiar și după data expirării.</p>
+<p class="muted">Definește pentru ce expirări se creează notificări, cu câte zile înainte și cu ce text. În subiect și în text poți folosi marcaje de forma <code>&lt;numar autovehicul&gt;</code>, înlocuite automat cu valorile obiectului. Fiecare categorie are tabul ei; evenimentele vin din registrul de expirări al aplicației, iar un eveniment nou apare aici de îndată ce este înregistrat și primește un șablon de pornire. Pentru fiecare eveniment poate fi activ un singur șablon; notificarea creată rămâne în listă până este rezolvată, chiar și după data expirării.</p>
 
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 @if (FocusTemplateId is { } wanted && !loading && templates.All(item => item.Id != wanted)) { <div class="error-banner" role="status">Șablonul #@wanted nu mai există (a fost șters).</div> }
+
+<div class="settings-subtabs" role="tablist" aria-label="Categorii de notificări">
+    @foreach (var name in Categories)
+    {
+        var selected = name == activeCategory;
+        <button type="button" role="tab" class="settings-subtab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" disabled="@editing"
+                @onclick="() => SelectCategory(name)">@name (@templates.Count(item => CategoryOf(item) == name))</button>
+    }
+</div>
 
 @if (editing)
 {
@@ -18,7 +27,7 @@
         <fieldset disabled="@saving">
             <div class="editor-grid">
                 <label for="template-category">Categorie *
-                    <select id="template-category" value="@category" @onchange="CategoryChanged">
+                    <select id="template-category" value="@category" @onchange="CategoryChanged" disabled="@(original is not null || category == activeCategory)">
                         <option value="">Alege categoria…</option>
                         @foreach (var name in Categories) { <option value="@name">@name</option> }
                     </select></label>
@@ -61,23 +70,23 @@ else
 }
 
 <section class="catalog">
-    <div class="catalog-heading"><h3>Șabloane definite <span>@templates.Count</span></h3></div>
+    <div class="catalog-heading"><h3>Șabloane „@activeCategory” <span>@Shown.Count</span></h3></div>
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă șabloanele</h3></div> }
-    else if (templates.Count == 0) { <div class="empty-state"><span class="empty-icon">✉</span><h3>Nu există șabloane</h3><p>Adaugă un șablon pentru a începe să primești notificări de expirare.</p></div> }
+    else if (Shown.Count == 0) { <div class="empty-state"><span class="empty-icon">✉</span><h3>Nu există șabloane în categoria „@activeCategory”</h3><p>Adaugă un șablon pentru a începe să primești notificările acestei categorii.</p></div> }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>CATEGORIE · EVENIMENT</th><th>SUBIECT</th><th class="number">ZILE ÎNAINTE</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
-        @foreach (var template in templates)
+        <div class="table-scroll"><table><thead><tr><th>EVENIMENT</th><th>SUBIECT</th><th class="number">ZILE ÎNAINTE</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var template in Shown)
         {
             var source = Service.Sources.FirstOrDefault(item => item.Key == template.SourceKey);
             var focused = template.Id == FocusTemplateId;
             <tr @key="template.Id" id="template-@template.Id" class="@(focused ? "row-focus" : null)">
-                <td>@(source is null ? template.SourceKey : $"{source.Category} · {source.EventName}")</td>
+                <td>@(source is null ? template.SourceKey : source.EventName)</td>
                 <td>@template.Subject</td>
                 <td class="number">@template.ThresholdDays</td>
                 <td><span class="notification-state @(template.Active ? "done" : "")">@(template.Active ? "Activ" : "Inactiv")</span></td>
-                <td class="row-actions"><button type="button" class="refresh" disabled="@(editing || saving)" @onclick="() => OpenEditor(template)">Editează</button>
-                    <button type="button" class="danger" disabled="@(editing || saving)" @onclick="() => BeginDeleteAsync(template)">Șterge</button></td>
+                <td class="row-actions"><button type="button" class="row-icon edit" disabled="@(editing || saving)" @onclick="() => OpenEditor(template)" aria-label="@($"Editează șablonul {template.Subject}")" title="@($"Editează șablonul {template.Subject}")"></button>
+                    <button type="button" class="row-icon delete" disabled="@(editing || saving)" @onclick="() => BeginDeleteAsync(template)" aria-label="@($"Șterge șablonul {template.Subject}")" title="@($"Șterge șablonul {template.Subject}")"></button></td>
             </tr>
         }
         </tbody></table></div>
@@ -106,11 +115,22 @@ else
     // Set by a link from the Journal: that template's row is highlighted and scrolled into view once the list is loaded.
     [Parameter] public int? FocusTemplateId { get; set; }
 
+    private string activeCategory = "";
+    private IReadOnlyList<NotificationTemplate> Shown => [.. templates.Where(item => CategoryOf(item) == activeCategory)];
+    private string CategoryOf(NotificationTemplate template) => Service.Sources.FirstOrDefault(source => source.Key == template.SourceKey)?.Category ?? "";
+    private void SelectCategory(string name) { activeCategory = name; notice = null; error = null; }
+
     private IEnumerable<string> Categories => Service.Sources.Select(source => source.Category).Distinct().Order(StringComparer.CurrentCultureIgnoreCase);
     private IEnumerable<IExpirySource> SourcesOfCategory => Service.Sources.Where(source => source.Category == category);
     private IExpirySource? SelectedSource => Service.Sources.FirstOrDefault(source => source.Key == input.SourceKey);
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        activeCategory = Categories.FirstOrDefault() ?? "";
+        await LoadAsync();
+        // A link from the Journal opens the category of the template it names.
+        if (FocusTemplateId is { } id && templates.FirstOrDefault(item => item.Id == id) is { } focus && CategoryOf(focus) is { Length: > 0 } focusCategory) activeCategory = focusCategory;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -140,7 +160,8 @@ else
     {
         original = template; notice = null; error = null;
         input = template is null ? new NotificationTemplateInput() : NotificationTemplateInput.From(template);
-        category = Service.Sources.FirstOrDefault(source => source.Key == input.SourceKey)?.Category ?? "";
+        category = Service.Sources.FirstOrDefault(source => source.Key == input.SourceKey)?.Category ?? activeCategory;
+        if (template is null) { var only = SourcesOfCategory.ToArray(); if (only.Length == 1) input.SourceKey = only[0].Key; }
         subjectActive = false;
         editing = true;
     }

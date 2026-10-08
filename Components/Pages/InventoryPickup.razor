@@ -12,6 +12,7 @@
 @inject IJSRuntime JS
 @inject ILogger<InventoryPickup> Logger
 @implements IAsyncDisposable
+<PageBoundary>
 
 <PageTitle>Preluare inventar · BlazorStoc</PageTitle>
 <div class="page-heading">
@@ -180,6 +181,8 @@ else if (review is not null)
         </section>
     </div>
 }
+
+</PageBoundary>
 
 @code {
     private bool loading = true, scanning, sending;
