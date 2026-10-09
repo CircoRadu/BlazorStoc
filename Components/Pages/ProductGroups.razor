@@ -43,6 +43,20 @@ else if (editingSubcategory is not null)
                             Reason="@reason" Confirmed="ConfirmGroupSaveAsync" Cancelled="CancelGroupConfirmation" />
 }
 
+@if (deletingCategory is not null)
+{
+    <DeleteConfirmationDialog @key="@($"cat:{deletingCategory}")" Title="Ștergi categoria goală?" Subject="Categoria" ObjectLabel="@deletingCategory"
+                              Description="Se pot șterge doar categoriile fără subcategorii și fără produse."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteCategoryAsync" Cancelled="CancelDelete" />
+}
+@if (deletingGroup is not null)
+{
+    <DeleteConfirmationDialog @key="@($"sub:{deletingGroup.Category}:{deletingGroup.Subcategory}")" Title="Ștergi subcategoria goală?" Subject="Subcategoria"
+                              ObjectLabel="@($"{deletingGroup.Category} / {deletingGroup.Subcategory}")"
+                              Description="Se pot șterge doar subcategoriile fără produse."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteSubcategoryAsync" Cancelled="CancelDelete" />
+}
+
 @if (loading)
 {
     <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă structura catalogului</h3></div>
@@ -64,8 +78,9 @@ else
                     <span class="category-disclosure-text"><span class="category-title">@category</span><small>@SubcategoryCountLabel(category)</small><small>@ProductCount(category) produse asociate</small></span>
                 </Header>
                 <Actions>
-                    <button class="primary" disabled="@(saving || IsEditing)" @onclick="() => CreateSubcategory(category)">+ Adaugă subcategorie</button>
-                    <button class="soft-success" disabled="@(saving || IsEditing)" @onclick="() => EditCategory(category)">Editează categoria</button>
+                    <button class="row-icon add" disabled="@(saving || IsEditing)" aria-label="@($"Adaugă subcategorie în {category}")" title="@($"Adaugă subcategorie în {category}")" @onclick="() => CreateSubcategory(category)"></button>
+                    <button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează categoria {category}")" title="@($"Editează categoria {category}")" @onclick="() => EditCategory(category)"></button>
+                    <button class="row-icon delete" disabled="@(saving || IsEditing || !CategoryIsEmpty(category))" aria-label="@($"Șterge categoria {category}")" title="@(DeleteCategoryTitle(category))" @onclick="() => RequestDeleteCategory(category)"></button>
                 </Actions>
                 <ChildContent>
                     @if (Subcategories(category).Count == 0)
@@ -77,7 +92,12 @@ else
                         <div class="table-scroll"><table><thead><tr><th>SUBCATEGORIE</th><th>PRODUSE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
                         @foreach (var group in Subcategories(category))
                         {
-                            <tr @key="@($"{group.Category}:{group.Subcategory}")"><td><strong>@group.Subcategory</strong></td><td>@ProductCount(group) produse</td><td><button class="soft-success" disabled="@(saving || IsEditing)" @onclick="() => EditSubcategory(group)">Editează / Mută</button></td></tr>
+                            <tr @key="@($"{group.Category}:{group.Subcategory}")"><td><strong>@group.Subcategory</strong></td><td>@ProductCount(group) produse</td><td class="row-actions"><button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează sau mută subcategoria {group.Subcategory}")" title="@($"Editează sau mută subcategoria {group.Subcategory}")" @onclick="() => EditSubcategory(group)"></button>
+                                @if (ProductCount(group) == 0)
+                                {
+                                    <button class="row-icon delete" disabled="@(saving || IsEditing)" aria-label="@($"Șterge subcategoria goală {group.Subcategory}")" title="@($"Șterge subcategoria goală {group.Subcategory}")" @onclick="() => RequestDeleteSubcategory(group)"></button>
+                                }
+                            </td></tr>
                         }
                         </tbody></table></div>
                     }
@@ -123,15 +143,17 @@ else
         <UnsavedChangesTracker @ref="groupTracker" Adding="@(creatingCategory || creatingSubcategory)" Snapshot="CurrentSnapshot" Discard="DiscardEditAsync" />
         <div class="catalog-heading"><h2 id="subcategory-editor-title">@(creatingSubcategory ? $"Adaugă subcategorie în „{targetCategory}”" : $"Editează subcategoria „{editingSubcategory!.Subcategory}”")</h2></div>
         <div class="editor-grid">
-            <label for="subcategory-name">Denumire subcategorie *<input id="subcategory-name" maxlength="100" @bind="subcategoryName" disabled="@saving" /></label>
-            <fieldset class="category-choice" aria-labelledby="subcategory-category-legend">
-                <legend id="subcategory-category-legend">Categorie *</legend>
-                @foreach (var category in Categories)
-                {
-                    var option = category;
-                    <label class="category-option"><input type="radio" name="subcategory-category" checked="@string.Equals(targetCategory, option, StringComparison.Ordinal)" disabled="@(saving || creatingSubcategory)" @onchange="() => targetCategory = option" /> <span>@option</span></label>
-                }
-            </fieldset>
+            <label for="subcategory-name">Denumire subcategorie *<input id="subcategory-name" maxlength="100" @bind="subcategoryName" disabled="@saving" autocomplete="off" /></label>
+            @* A new subcategory belongs to the category whose form this is (it is in the title); the category is chosen (picked or typed) only to move a subcategory that exists. *@
+            @if (!creatingSubcategory)
+            {
+                <label>Categorie *
+                    <SearchableSelect Id="subcategory-category" Label="Categoria subcategoriei" Placeholder="Caută sau alege categoria" EmptyText="Nicio categorie găsită."
+                                      Options="@(Categories.Select((name, index) => new SelectOption(index, name)).ToArray())"
+                                      SelectedId="@(Categories.FindIndex(name => string.Equals(name, targetCategory, StringComparison.Ordinal)) is var chosenIndex and >= 0 ? chosenIndex : null)"
+                                      SelectedIdChanged="@(id => { if (id is { } picked && picked < Categories.Count) targetCategory = Categories[picked]; })" Disabled="@saving" />
+                </label>
+            }
             @if (!creatingSubcategory) { <ChangeReasonField Id="subcategory-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Disabled="@saving" /> }
         </div>
         <div class="editor-actions"><button class="primary" disabled="@saving" @onclick="RequestSaveSubcategoryAsync">@(creatingSubcategory ? "Adaugă subcategoria" : "Salvează subcategoria")</button><button class="danger" disabled="@saving" @onclick="RequestCancelEditAsync">Anulează</button></div>
@@ -189,6 +211,51 @@ else
         showNewSubcategory = true;
     }
     private bool showNewSubcategory;
+
+    private bool CategoryIsEmpty(string category) => Subcategories(category).Count == 0 && ProductCount(category) == 0;
+
+    private string DeleteCategoryTitle(string category) => CategoryIsEmpty(category)
+        ? $"Șterge categoria goală {category}"
+        : "Categoria nu se poate șterge: are subcategorii sau produse. Se șterg doar categoriile goale (fără subcategorii și fără produse); șterge mai întâi subcategoriile goale sau mută produsele.";
+
+    // ---- deleting an empty category or subcategory ----
+    private string? deletingCategory, deleteError;
+    private ProductGroup? deletingGroup;
+    private bool deleteBusy;
+
+    private void RequestDeleteCategory(string category) { CancelEdit(); deletingGroup = null; deletingCategory = category; deleteError = null; notice = null; }
+    private void RequestDeleteSubcategory(ProductGroup group) { CancelEdit(); deletingCategory = null; deletingGroup = group; deleteError = null; notice = null; }
+    private Task CancelDelete() { deletingCategory = null; deletingGroup = null; deleteError = null; return Task.CompletedTask; }
+
+    private Task DeleteCategoryAsync(string deleteReason) => RunDeleteAsync(async () =>
+    {
+        await Repository.DeleteCategoryAsync(deletingCategory!, deleteReason, lifetime.Token);
+        return $"Categoria „{deletingCategory}” a fost ștearsă.";
+    });
+
+    private Task DeleteSubcategoryAsync(string deleteReason) => RunDeleteAsync(async () =>
+    {
+        await Repository.DeleteSubcategoryAsync(deletingGroup!, deleteReason, lifetime.Token);
+        return $"Subcategoria „{deletingGroup!.Subcategory}” a fost ștearsă.";
+    });
+
+    private async Task RunDeleteAsync(Func<Task<string>> delete)
+    {
+        if (deleteBusy) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            var message = await delete();
+            deletingCategory = null; deletingGroup = null;
+            await LoadAsync();
+            notice = message;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProductOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Category deletion failed ({ErrorType}).", exception.GetType().Name); deleteError = "Ștergerea nu a reușit. Actualizează lista și reîncearcă."; }
+        finally { deleteBusy = false; }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

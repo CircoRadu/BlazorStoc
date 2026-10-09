@@ -329,7 +329,14 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
     {
         await access.EnsureAdministratorAsync(cancellationToken);
         await store.FileGate.WaitAsync(cancellationToken);
-        try { return await store.ReadAsync(cancellationToken); }
+        try
+        {
+            var state = await store.ReadAsync(cancellationToken);
+            // Only a configuration that passed the test could be activated, so the saved versions count as tested again after a restart (the set is in memory).
+            lock (store.Tested)
+                foreach (var version in state.History.Append(state.Active).OfType<AnafVersion>()) store.Tested.Add(AnafRules.Fingerprint(version.Config));
+            return state;
+        }
         finally { store.FileGate.Release(); }
     }
 

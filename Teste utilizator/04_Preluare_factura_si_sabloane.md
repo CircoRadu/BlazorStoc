@@ -4,6 +4,21 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 
 ## Modificari de testat
 
+### 09.10.2026 - Facturi XML (e-Factura UBL)
+
+**Ce s-a adaugat:** Preluarea unei facturi din fisier XML (de exemplu e-Factura UBL), fara OCR, pe baza unui sablon XML (cai de elemente) definit in Setari -> Facturi -> Sabloane salvate.
+
+**Ce face acum:** In Preluare factura poti alege un fisier .xml; se citesc numarul, data, furnizorul (CUI), liniile (cod, denumire, cantitate, UM, pret). Sablonul furnizorului se alege singur dupa CUI-ul din fisier; fara sablon se folosesc caile UBL standard, cu un avertisment. Restul asistentului (potrivire produse, confirmari, intrari legate de factura, jurnal, duplicat) este ca la PDF.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Facturi -> Sabloane salvate -> „Sablon XML nou"; alege furnizorul, „Completeaza cu caile UBL standard", incarca un XML de proba | Se vad numarul, data, furnizorul si primele 10 linii citite; denumirea si furnizorul sunt obligatorii | |
+| 2 | Salveaza; sablonul apare in lista cu sursa „Fisier XML"; deschide detaliile | Caile salvate; creionul deschide aceeasi fereastra (nu editorul PDF) | |
+| 3 | Produse -> Preluare factura -> alege o factura .xml a furnizorului | „Sablon XML detectat: ...", tabelul cu liniile, fara imaginea paginii | |
+| 4 | Aceeasi factura XML fara sablon al furnizorului | Mesaj ca s-au folosit caile UBL standard; liniile se citesc | |
+| 5 | Un fisier XML invalid sau fara linii | Mesaj clar in romana; nimic preluat | |
+| 6 | Continua pana la pasul 3 si salveaza; apoi repeta cu aceeasi factura | Intrarile apar legate de factura; a doua oara avertisment de duplicat | |
+
 ### 06.10.2026 - Verificarea in pasul 2, furnizor, sabloane
 
 **Ce s-a adaugat:** Verificarea furnizorului si a sablonului in pasul 2 al preluarii facturii (avertizare cu furnizorul citit).
@@ -51,6 +66,21 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 | 2 | Parasire cu modificari nesalvate | Avertizare | |
 | 3 | Comutatoare On/Off pentru coloane si campuri; coloane gasite = initial folosite | Corect | |
 | 4 | Facturile reale furnizate de tine (scanari, alte furnizori) | Tabelul si totalurile citite corect; la nepotriviri spune ce | |
+
+### 09.10.2026 - Sablon XML cu legare vizuala, unitati, ZIP, descriere intrare, perechi cod furnizor
+
+**Ce s-a adaugat:** Editorul de sablon XML imparte pagina in sectiuni ca editorul PDF (Legaturi cu fisierul XML, Previzualizare, Sablon descriere intrare in stoc, Salvare); elementele sablonului se leaga vizual de valorile din fisierul de proba; unitatile UN/ECE (XPP etc.) se arata in romaneste; fisierul poate fi si ZIP e-Factura; potrivirea produsului cauta si codul din denumire si retine perechea cod furnizor - produs.
+
+**Ce face acum:** Pe un XML de proba apeseaza „Alege" la un element si apoi valoarea din arborele fisierului; la „Schimba" nu se trece la elementul urmator, iar o valoare deja legata de alt element e refuzata. Numele sablonului porneste ca „<furnizor> - xml <data>" (la PDF „... - pdf <data>"). Descrierea intrarii in stoc are etichete colorate cu spatii puse automat inainte si dupa ele (nu in operatii). La preluarea unui XML nu mai exista confirmari de verificat; cantitatea „10.000000" se arata „10". Un PDF exportat din e-Factura arata mesajul despre XML/ZIP; potrivirea slaba a sablonului (sub 30%) propune un sablon nou, iar „Nr. inregistrare" al vanzatorului din acel PDF este CUI.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Facturi -> Generare sablon: incarca un XML | Sectiunile Legaturi/Previzualizare/Descriere/Salvare; butonul „+ Adauga furnizorul" doar daca furnizorul nu e ales, iar fereastra arata formularul | |
+| 2 | Alege un element, apoi o valoare din arbore; apoi „Schimba" pe un element legat | Dupa „Schimba" nu se trece la urmatorul; o valoare legata de alt element da avertisment | |
+| 3 | Descriere: apasa etichete si operatii | Spatiu inainte si dupa fiecare, fara spatii in operatii; previzualizarea fara spatii la capete; cursorul dupa eticheta | |
+| 4 | Preluare factura cu un XML (si un ZIP e-Factura) | Fara comutatoare de verificare la numar/CUI/data; cantitatile fara zerouri; descrierea dupa sablon | |
+| 5 | Preluare PDF e-Factura (de ex. telesystem) | Mesajul despre XML/ZIP; „Nr. inregistrare" apare ca CUI; la potrivire sub 30% avertizare cu „Creeaza sablon" | |
+| 6 | Produs nou dintr-un XML: cod GS in denumire; la urmatoarea factura acelasi cod furnizor | Numele propus e codul din denumire; a doua oara produsul e legat din factura anterioara | |
 
 ## Fluxul de baza
 

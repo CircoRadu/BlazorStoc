@@ -42,6 +42,8 @@ public static class MariaExtendedChecks
             await Section("Notification settings: clean-up of old resolved notifications", () => NotificationSettingsAsync(configuration, admin, audit, probe));
             await Section("Invoice templates: create, versions, unique names, concurrency, delete, journal", () => InvoiceTemplatesAsync(configuration, admin, audit, probe));
             await Section("Suppliers and invoices: unique tax id, sources, edits, invoices, entries tied to invoices, delete rules, journal, archive", () => SuppliersAsync(configuration, admin, audit, probe));
+            await Section("Supplier product codes: link, change, journal, removal with the product", () => SupplierProductCodesAsync(configuration, admin, audit, probe));
+            await Section("Categories: unique names together, deleting empty ones", () => CategoryNamesAndDeletionAsync(configuration, admin, audit));
             await Section("Supplier recognition: template link, aliases, recognition log, CSV export", () => SupplierRecognitionAsync(configuration, admin, audit, probe));
             await Section("Usage scenarios: invoice flows, exits to beneficiary and vehicles, over-stock exits, regularization, concurrency", () => UsageScenariosAsync(configuration, admin, audit, probe));
             await Section("Exit flow: journal by destination, reference, filters, repeated exit, use above the vehicle quantity", () => ExitFlowAsync(configuration, admin, audit, probe));
@@ -291,6 +293,75 @@ public static class MariaExtendedChecks
                 if (supplier is not null && await suppliers.GetAsync(supplier.Id) is { } leftover) await suppliers.DeleteAsync(leftover, "Curatare test");
             }
             catch (Exception exception) when (exception is not OperationCanceledException) { Console.WriteLine("Cleanup of the recognition checks failed: " + exception.GetType().Name); }
+        }
+    }
+
+    private static async Task CategoryNamesAndDeletionAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit)
+    {
+        var suffix = Suffix();
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var products = new MariaProductRepository(configuration, admin, audit);
+        var category = $"Ext Nume Cat {suffix}";
+        var subcategory = $"Ext Nume Sub {suffix}";
+        async Task<bool> Rejected(Func<Task> action) { try { await action(); return false; } catch (ProductOperationException) { return true; } }
+        await products.CreateCategoryAsync(category);
+        await products.CreateSubcategoryAsync(category, subcategory);
+        Check(await Rejected(() => products.CreateSubcategoryAsync(category, category.ToUpperInvariant())) && await Rejected(() => products.CreateCategoryAsync(subcategory)),
+            "A subcategory cannot be named like a category and a category not like a subcategory (case aside)");
+        var other = $"Ext Nume Alta {suffix}";
+        await products.CreateCategoryAsync(other);
+        Check(await Rejected(() => products.RenameCategoryAsync(other, subcategory, "test")) && await Rejected(() => products.UpdateSubcategoryAsync(new ProductGroup(category, subcategory), other, category, "test")),
+            "Renaming a category to the name of a subcategory, and a subcategory to the name of a category, is refused");
+        var product = await products.CreateAsync(new ProductInput { Name = $"NM-{suffix}", Category = category, Subcategory = subcategory });
+        Check(await Rejected(() => products.DeleteCategoryAsync(category, "test")) && await Rejected(() => products.DeleteSubcategoryAsync(new ProductGroup(category, subcategory), "test")),
+            "A category with a subcategory and a subcategory with a product cannot be deleted");
+        await products.DeleteAsync((await products.GetProductAsync(product.Id))!, "Ext curatare");
+        await products.DeleteSubcategoryAsync(new ProductGroup(category, subcategory), "Ext curatare");
+        Check(await Rejected(() => products.DeleteSubcategoryAsync(new ProductGroup(category, subcategory), "test")), "A subcategory that is already deleted says that it no longer exists");
+        await products.DeleteCategoryAsync(category, "Ext curatare");
+        await products.DeleteCategoryAsync(other, "Ext curatare");
+        var groups = await products.GetGroupsAsync();
+        var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && (item.Action == AuditActions.DeleteSubcategory || item.Action == AuditActions.DeleteCategory)).ToList();
+        Check(groups.All(group => group.Category != category && group.Category != other) && events.Count(item => item.Action == AuditActions.DeleteCategory) == 2 && events.Count(item => item.Action == AuditActions.DeleteSubcategory) == 1,
+            "The empty subcategory and the empty categories are deleted and journaled as their own operations");
+    }
+
+    private static async Task SupplierProductCodesAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var suffix = Suffix();
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var products = new MariaProductRepository(configuration, admin, audit);
+        var suppliers = new MariaSupplierRepository(configuration, admin, audit);
+        var codes = new MariaSupplierProductCodes(configuration, admin, audit);
+        var category = $"Ext Coduri Cat {suffix}";
+        var subcategory = $"Ext Coduri Sub {suffix}";
+        await products.CreateCategoryAsync(category);
+        await products.CreateSubcategoryAsync(category, subcategory);
+        var first = await products.CreateAsync(new ProductInput { Name = $"CF-{suffix}-1", Category = category, Subcategory = subcategory });
+        var second = await products.CreateAsync(new ProductInput { Name = $"CF-{suffix}-2", Category = category, Subcategory = subcategory });
+        var supplier = await suppliers.CreateAsync(new SupplierInput { Name = $"Furnizor Coduri {suffix} SRL", Cui = SupplierChecks.ValidCui(Random.Shared.Next(1_000_000, 9_999_999)) });
+        try
+        {
+            var code = $"INT-{suffix}";
+            Check(await codes.LinkAsync(supplier.Id, code, first.Id) && (await codes.GetAsync(supplier.Id)).GetValueOrDefault(SupplierProductCodeRules.Key(code)) == first.Id,
+                "A supplier code is linked to a product and read back by its key (case, dash and spaces do not matter)");
+            Check(!await codes.LinkAsync(supplier.Id, $"int {suffix}", first.Id), "Linking the same code to the same product again writes nothing");
+            Check(await codes.LinkAsync(supplier.Id, code, second.Id) && (await codes.GetAsync(supplier.Id)).Single().Value == second.Id &&
+                  await ScalarLongAsync(probe, "SELECT COUNT(*) FROM supplier_product_codes WHERE supplier_id=@id", ("@id", supplier.Id)) == 1,
+                "Linking the code to another product changes the link: still one row for the supplier and code");
+            var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.EntityType == AuditEntities.Supplier && item.EntityId == supplier.Id.ToString()).ToList();
+            Check(events.Any(item => item.Action == AuditActions.LinkSupplierProductCode) && events.FirstOrDefault(item => item.Action == AuditActions.ChangeSupplierProductCode) is { } change &&
+                  change.Details.Contains(first.Name, StringComparison.Ordinal) && change.Details.Contains(second.Name, StringComparison.Ordinal),
+                "The link and the change of the link are journaled as their own operations, the change with the product before and after");
+            Check(!await codes.LinkAsync(supplier.Id, "A", first.Id), "A code of one character is not worth a link");
+            await products.DeleteAsync((await products.GetProductAsync(second.Id))!, "Ext curatare");
+            Check((await codes.GetAsync(supplier.Id)).Count == 0, "The link goes with the product when the product is deleted");
+        }
+        finally
+        {
+            foreach (var id in new[] { first.Id, second.Id })
+                if (await products.GetProductAsync(id) is { } leftover) await products.DeleteAsync(leftover, "Ext curatare");
+            if (await suppliers.GetAsync(supplier.Id) is { } supplierLeft) await suppliers.DeleteAsync(supplierLeft, "Curatare test");
         }
     }
 

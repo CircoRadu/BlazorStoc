@@ -34,6 +34,16 @@ public static class InvoiceTemplateRules
 {
     public const int MaxNameLength = 120;
     public const int MaxSupplierNameLength = 200;
+
+    // The name a new template starts with: "<supplier> - xml 09.10.2026" (pdf for a PDF invoice); the user can change it.
+    public static string SuggestedName(string supplierName, bool xml, DateTime date)
+    {
+        var suffix = (xml ? "xml " : "pdf ") + date.ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture);
+        var supplier = (supplierName ?? "").Trim();
+        if (supplier.Length + 3 + suffix.Length > MaxNameLength) supplier = supplier[..Math.Max(0, MaxNameLength - 3 - suffix.Length)].TrimEnd();
+        return supplier.Length == 0 ? suffix : supplier + " - " + suffix;
+    }
+
     public const string NameRequiredMessage = "Denumirea șablonului este obligatorie.";
     public const string NameTooLongMessage = "Denumirea șablonului poate avea cel mult 120 de caractere.";
     public const string SupplierTooLongMessage = "Denumirea furnizorului poate avea cel mult 200 de caractere.";
@@ -85,8 +95,9 @@ public static class InvoiceTemplateRules
         return changed ? definition with { Fields = fields, ProductDescription = description } : null;
     }
 
-    public static string Describe(InvoiceTemplateDefinition definition) =>
-        $"sursă: {(definition.SourceKind == InvoiceSources.Ocr ? "OCR" : "text")}; câmpuri folosite: {definition.UsedFieldCount}; coloane folosite: {definition.UsedColumnCount}" + ((definition.ProductDescription ?? "").Length > 0 ? $"; descriere intrare în stoc a produsului: {definition.ProductDescription}" : "");
+    public static string Describe(InvoiceTemplateDefinition definition) => definition.Xml is { } xml
+        ? $"sursă: XML; linii: {xml.Lines}; număr: {xml.Number}; dată: {xml.Date}; furnizor: {xml.SupplierCui}; cantitate: {xml.Quantity}; denumire: {xml.Name}; cod: {xml.Code}"
+        :         $"sursă: {(definition.SourceKind == InvoiceSources.Ocr ? "OCR" : "text")}; câmpuri folosite: {definition.UsedFieldCount}; coloane folosite: {definition.UsedColumnCount}" + ((definition.ProductDescription ?? "").Length > 0 ? $"; descriere intrare în stoc a produsului: {definition.ProductDescription}" : "");
 }
 
 public interface IInvoiceTemplateStore

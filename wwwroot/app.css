@@ -197,6 +197,8 @@
     text-align:center;
 }
 .administration-parent { margin-top:0; }
+/* A menu title that opens a sub-menu is as tall as a plain menu item (48 px), not 56 px. */
+.sidebar .nav-item.administration-parent { height:48px; }
 
 /* Pagina de intrări/ieșiri a produsului. */
 .movement-layout { display:grid; grid-template-columns:minmax(260px,340px) 1fr; gap:20px; margin-bottom:20px; align-items:start; }
@@ -787,7 +789,7 @@ tr.selectable-row:hover { background: #f4f9f7; }
 tr.selectable-row.selected { background: #eaf5f1; }
 tr.selectable-row input, tr.selectable-row a { cursor: auto; }
 /* Avertizarea de modificari nesalvate sta peste orice alta fereastra (dialogul de editare al unei miscari, fereastra de creare a sablonului): fara asta se desena sub ele. */
-.delete-overlay.unsaved-overlay { z-index: 70; }
+.delete-overlay.unsaved-overlay { z-index: 3000; }   /* above the windows over a page (.invoice-modal-backdrop 1000, .front 2000): the confirmation of closing must be seen */
 
 .pickup-invoice-head { margin:0 0 16px; padding:12px 14px; border:1px solid #d9e2de; border-radius:8px; }
 .verify-field { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
@@ -882,6 +884,8 @@ button:focus-visible, a:focus-visible, .collapsible-header:focus-visible, .logou
 .row-icon::before { content:""; position:absolute; inset:0; margin:auto; width:16px; height:16px; background:currentColor; -webkit-mask:var(--row-icon-shape) center/contain no-repeat; mask:var(--row-icon-shape) center/contain no-repeat; }
 .row-icon.edit { color:var(--green); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E"); }
 .row-icon.delete { color:#a63a32; border-color:#e1b4b0; --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4h8v2'/%3E%3Cpath d='M19 6l-1 14H6L5 6'/%3E%3Cpath d='M10 11v6M14 11v6'/%3E%3C/svg%3E"); }
+.row-icon.add { color:var(--green); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E"); }
+.row-icon.add:hover:not(:disabled) { background:#eaf4f0; border-color:#9fc9bd; }
 .row-icon.edit:hover:not(:disabled) { background:#eaf4f0; border-color:#9fc9bd; }
 .row-icon.delete:hover:not(:disabled) { background:#fbefed; border-color:#d49791; }
 .row-icon:disabled { opacity:.4; cursor:not-allowed; }
@@ -1004,9 +1008,55 @@ fieldset:not([class]) { border: 0; padding: 0; margin: 0; min-width: 0; }
 .empty-state .file-drop { margin: 18px auto 0; text-align: left; }
 
 /* The sub-items of a category in the menu start below the category, with room between them. */
-.category-submenu { margin-top: 8px; gap: 5px; }
+/* Same spacing for every sub-menu of the main menu (Produse, Inventar, Administrare). */
+.category-submenu, .administration-submenu { margin-top: 8px; gap: 5px; }
 
 /* Buttons side by side are always the same height (rule in CLAUDE.md): 40 px, 32 px inside table rows; a glyph inside a button never makes it taller. */
 .primary, .danger, .refresh, .secondary, .reload { box-sizing: border-box; height: 40px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1.15; padding-top: 0; padding-bottom: 0; white-space: nowrap; }
 .primary > *, .danger > *, .refresh > *, .secondary > * { line-height: 1; }
 td .primary, td .danger, td .refresh, td .secondary, .table-scroll .primary, .table-scroll .danger, .table-scroll .refresh { height: 32px; min-height: 32px; }
+.invoice-xml-fields select { display:block; width:100%; height:40px; margin-top:8px; }
+.invoice-xml-fields > .editor-actions { margin:0; align-self:center; }
+.invoice-xml-fields > label.full-width { grid-column:1 / -1; }
+.invoice-xml-fields > .editor-actions + label { margin-top:0 !important; }
+
+/* An action put under a field never touches it: room between the field and the button (rule in CLAUDE.md). */
+.editor-grid label > select + button, .editor-grid label > input + button, .editor-grid label > select + .refresh, .editor-grid label > input + .refresh { margin-top:10px; }
+.invoice-xml-fields > .invoice-warning { grid-column:1 / -1; margin:0; }
+
+/* Visual linking of an XML example with the elements of the template (the template elements on the left, the tree of the file on the right) */
+.xml-linker { display:grid; grid-template-columns:minmax(280px, 380px) minmax(0, 1fr); gap:24px; margin:24px 0 8px; align-items:start; }
+.xml-targets h3 { margin-bottom:8px; }
+.xml-target { border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-top:10px; background:#fff; }
+.xml-target.active { border-color:var(--green); background:#f1f8f5; box-shadow:0 0 0 1px var(--green); }
+.xml-target-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.xml-target-actions { display:flex; gap:8px; }
+.xml-target-actions .refresh { height:32px; padding:0 12px; }
+.xml-target-value { margin-top:10px; font-size:13px; overflow-wrap:anywhere; }
+.xml-target .small { margin-top:8px; }
+.xml-tree-box { min-width:0; }
+.xml-tree-search { display:block; font-size:12px; margin-bottom:10px; }
+.xml-tree-search input { display:block; width:100%; margin-top:8px; }
+.xml-tree { border:1px solid var(--line); border-radius:8px; background:#fff; max-height:640px; overflow:auto; padding:8px 6px; }
+.xml-node { display:flex; align-items:flex-start; gap:4px; min-height:30px; }
+.xml-toggle, .xml-toggle-space { flex:0 0 22px; width:22px; height:28px; padding:0; border:0; background:none; color:#5b6f6b; font-size:13px; }
+.xml-node-main { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; text-align:left; border:0; background:none; padding:5px 8px; border-radius:6px; color:var(--ink); font-size:12px; min-width:0; }
+.xml-node-main:disabled { opacity:1; cursor:default; }
+.xml-node-main.pick { cursor:pointer; background:#f3f7f5; outline:1px dashed #9fcfc2; }
+.xml-node-main.pick:hover { background:#e2f1ec; }
+.xml-name { color:#5b6f6b; }
+.xml-value { font-weight:650; overflow-wrap:anywhere; }
+.xml-badge { background:#e2f1ec; color:#176d5e; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:650; }
+.xml-node.linked .xml-node-main { background:#eaf6f1; }
+.xml-advanced { margin-top:20px; }
+.xml-advanced > summary { cursor:pointer; font-weight:650; margin-bottom:12px; }
+@media (max-width: 900px) { .xml-linker { grid-template-columns:1fr; } }
+
+/* A button that does not do its action yet but can be pressed to be told why (aria-disabled): it looks like a disabled one. */
+button.blocked { opacity: .45; cursor: default; }
+
+/* The text of a marked field has exactly the size of its coloured backdrop (the general 14px of the workspace fields moved the cursor away from the end of the text). */
+.workspace .mark-field input, .workspace .mark-field textarea { font-size: 13px; line-height: 1.5; }
+
+/* In a column of fields the date label must not keep the 190px basis it has in a row: it would leave a gap of that height. */
+.verify-field .movement-date { flex: 0 0 auto; }

@@ -115,6 +115,17 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 | 1 | La iesire spre beneficiar alege beneficiarul si proiectul din combobox | Merge; referinta (aviz) se vede in tabelul de miscari | |
 | 2 | Pagina proiectului / echipamente | Iesirile apar la proiect | |
 
+### 09.10.2026 - Beneficiar: telefon scurt din ANAF
+
+**Ce s-a adaugat:** Un telefon complet care se termina cu partea locala returnata de ANAF nu mai face datele „manuale"; insigna din formular spune ce difera de ANAF.
+
+**Ce face acum:** La „Preia date din ANAF", numarul tau (+40254260681) fata de cel din ANAF (260681) nu mai e o diferenta; la salvare datele raman „Date preluate din ANAF".
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Editeaza beneficiarul „SPITALUL GENERAL CAI FERATE SIMERIA", „Preia date din ANAF", salveaza | Fara intrebare pentru telefon; insigna „Date preluate din ANAF" | |
+| 2 | Schimba o adresa si observa insigna | „Date introduse manual: difera de ANAF adresa" | |
+
 ## Fluxul de baza
 
 1. Beneficiar PJ cu preluare ANAF -> salvare.

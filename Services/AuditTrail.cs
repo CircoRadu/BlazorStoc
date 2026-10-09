@@ -132,6 +132,10 @@ public static class AuditActions
     public const string MoveSupplierInvoice = "Mutare factură la alt furnizor";
     public const string AddSupplierAlias = "Adăugare denumire alternativă furnizor";
     public const string RemoveSupplierAlias = "Ștergere denumire alternativă furnizor";
+    public const string LinkSupplierProductCode = "Legare cod furnizor de produs";
+    public const string DeleteCategory = "Ștergere categorie goală";
+    public const string DeleteSubcategory = "Ștergere subcategorie goală";
+    public const string ChangeSupplierProductCode = "Schimbare legătură cod furnizor";
     // Stock entries and invoices: a free entry (no invoice), its tie to an invoice and the entry the user confirmed against a warning.
     public const string RecordFreeEntry = "Intrare liberă înregistrată";
     public const string AttachEntryToInvoice = "Atașare intrare la factură";
@@ -207,7 +211,7 @@ public static class AuditActions
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
-            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias
+            or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias or LinkSupplierProductCode or ChangeSupplierProductCode
             or RecordFreeEntry or AttachEntryToInvoice or DetachEntryFromInvoice or DuplicateEntryOnInvoice or RegularizeNegativeStock or ExitOverStock
             or ExitToBeneficiary or ExitToVehicle or GenericSale or StockCorrection or DuplicateExit or VoidExitOperation or ReturnFromBeneficiary
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias

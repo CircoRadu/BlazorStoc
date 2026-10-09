@@ -141,6 +141,15 @@ public static class BeneficiaryRules
     public static string CompactValue(string? value) => string.Concat(TextNormalization.ForObjectNameOrCode(value).Where(c => !char.IsWhiteSpace(c)));
 
     /// <summary>Keeps digits and a leading +: "0744 123.456" and "0744-123-456" both become "0744123456".</summary>
+    // ANAF often returns only the local part of a phone number ("260681" for "+40254260681", without the country and the area code): a full number that ends
+    // with what ANAF returned is the same number, not a different value typed by hand.
+    public static bool PhoneCoveredBy(string? anafPhone, string? ownPhone)
+    {
+        var anaf = new string((anafPhone ?? "").Where(char.IsDigit).ToArray());
+        var own = new string((ownPhone ?? "").Where(char.IsDigit).ToArray());
+        return anaf.Length >= 5 && own.EndsWith(anaf, StringComparison.Ordinal);
+    }
+
     public static string NormalizePhone(string? value)
     {
         var text = CompactValue(value);

@@ -12,12 +12,24 @@ public static class InvoiceAnalyzer
         if (table is null) warnings.Add("Nu s-a găsit tabelul cu liniile facturii; poți adăuga coloanele manual.");
         else if (table.ByStructure) warnings.Add("Antetul tabelului nu a fost recunoscut după etichete (alt limbaj sau alt format): tabelul a fost găsit după numerotarea liniilor. Verifică sensul fiecărei coloane.");
         else if (table.Rows.Count == 0) warnings.Add("Antetul tabelului a fost găsit, dar nu s-au putut citi rânduri sub el.");
-        var fields = AssignLeadingTaxCode(PromoteTableTotal(InvoiceFieldFinder.Find(document, consumed, hint), table, hint));
+        var fields = AssignLeadingTaxCode(RegistryAsTaxCode(PromoteTableTotal(InvoiceFieldFinder.Find(document, consumed, hint), table, hint), document));
         foreach (var page in document.Pages.Where(page => page.Words.Count < InvoiceAnalysisRules.MinTextWords))
             warnings.Add($"Pagina {page.Number} conține foarte puțin text citibil.");
         if (document.Pages.Any(page => page.Source == InvoiceSources.Ocr))
             warnings.Add("Cel puțin o pagină a fost citită prin recunoașterea imaginii (OCR): verifică atent valorile.");
         return new InvoiceAnalysis(document.Pages, fields, table, warnings);
+    }
+
+    // In the PDF printed from e-Factura the "Nr. inregistrare" of the seller is the CUI/CIF (the CompanyID of the party), not the number of the trade registry.
+    // It becomes the tax code of the supplier; the "Identificatorul TVA" (the same code with the VAT prefix) stays as a field without a role of its own, so that a
+    // template does not read two fields with the same role.
+    private static List<InvoiceHeaderField> RegistryAsTaxCode(List<InvoiceHeaderField> fields, InvoiceDocument document)
+    {
+        if (!InvoiceEFacturaPdf.IsExport(document.AllWords.Select(word => word.Text))) return fields;
+        var registry = fields.FirstOrDefault(field => field.Meaning == InvoiceFieldMeanings.SupplierRegistry && InvoiceValues.NormalizeCui(field.Value).Length > 0);
+        if (registry is null) return fields;
+        return fields.Select(field => field == registry ? field with { Meaning = InvoiceFieldMeanings.SupplierCui }
+            : field.Meaning == InvoiceFieldMeanings.SupplierCui ? field with { Meaning = "" } : field).ToList();
     }
 
     // An invoice whose supplier has no heading (the letterhead at the top, no "Furnizor"/"Vanzator", or a heading OCR could not read) leaves

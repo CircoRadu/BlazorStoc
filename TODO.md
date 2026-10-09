@@ -18,14 +18,7 @@ Planul de mai jos vine din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` (deciziile c
 
 Planul din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` este implementat integral (vezi `IMPLEMENTED.md`); verificarile ramase sunt in `docs/TESTE_RAMASE.md`.
 
-## Task 1 - Sablon de import factura de tip XML
-
-Cerut de utilizator la 07.10.2026. Facturile de furnizor se pot prelua si dintr-un fisier **XML** (de exemplu factura electronica UBL / e-Factura), nu doar din PDF/OCR: fisierul se citeste direct, fara OCR, pe baza unui **sablon XML** care spune ce element/atribut contine numarul facturii, data, furnizorul (CUI), liniile (cod/denumire, cantitate, unitate) si totalurile.
-
-- Sablonul XML se defineste in Setari -> Facturi (cai de elemente, ex. XPath simplificat), se salveaza ca restul sabloanelor si se potriveste furnizorului; pentru UBL standard exista un sablon propus implicit.
-- Preluarea foloseste acelasi asistent ca PDF-ul (recunoastere furnizor, potrivire produse, intrari legate de factura, jurnal exact, avertismente de duplicat).
-- Fisiere de test generate in teste (fara facturi reale); XML invalid sau cu alt format primeste mesaj clar.
-- **Teste:** UBL valid citit complet, XML cu linii lipsa, XML invalid, furnizor necunoscut, factura deja preluata.
+Nu mai sunt taskuri active.
 
 ## Observații pentru etapa de implementare
 

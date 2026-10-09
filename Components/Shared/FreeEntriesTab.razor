@@ -16,11 +16,8 @@
                 @foreach (var item in Enum.GetValues<FreeEntryType>()) { <option value="@((int)item)" selected="@(type == item)">@StockMovementRules.FreeTypeLabel(item)</option> }
                 <option value="0" selected="@unspecified">Înregistrate fără motiv (vechi)</option>
             </select></label>
-        <label>Furnizor
-            <select @onchange="SupplierChanged">
-                <option value="" selected="@(supplierId is null)">Toți</option>
-                @foreach (var supplier in Suppliers) { <option value="@supplier.Id" selected="@(supplierId == supplier.Id)">@supplier.Name</option> }
-            </select></label>
+        <SearchableSelect Id="free-entries-supplier" Label="Furnizor" Placeholder="Toți furnizorii" EmptyText="Niciun furnizor găsit."
+                          Options="@(Suppliers.Select(supplier => new SelectOption(supplier.Id, supplier.Name)).ToArray())" SelectedId="supplierId" SelectedIdChanged="SupplierChanged" />
         <label>Vechime
             <select @onchange="AgeChanged">
                 <option value="" selected="@(olderThan is null)">Oricât</option>
@@ -108,7 +105,7 @@
         type = int.TryParse(text, out var value) && Enum.IsDefined(typeof(FreeEntryType), value) ? (FreeEntryType)value : null;
         await LoadAsync();
     }
-    private async Task SupplierChanged(ChangeEventArgs args) { supplierId = int.TryParse(args.Value?.ToString(), out var id) ? id : null; await LoadAsync(); }
+    private async Task SupplierChanged(int? id) { supplierId = id; await LoadAsync(); }
     private async Task AgeChanged(ChangeEventArgs args) { olderThan = int.TryParse(args.Value?.ToString(), out var days) ? days : null; await LoadAsync(); }
 
     private void Toggle(int id, bool value) { if (value) selected.Add(id); else selected.Remove(id); }

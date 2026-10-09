@@ -212,11 +212,8 @@ else
                 </select></label>
             @if (pageData.Suppliers is { Count: > 0 } filterSuppliers)
             {
-                <label><span class="sr-only">Furnizor</span>
-                    <select id="movement-supplier-filter" @onchange="SupplierFilterChangedAsync">
-                        <option value="">Toți furnizorii</option>
-                        @foreach (var item in filterSuppliers) { <option value="@item.Id" selected="@(supplierFilter == item.Id)">@item.Name</option> }
-                    </select></label>
+                <SearchableSelect Id="movement-supplier-filter" Label="Furnizor" Placeholder="Toți furnizorii" EmptyText="Niciun furnizor găsit."
+                                  Options="@(filterSuppliers.Select(item => new SelectOption(item.Id, item.Name)).ToArray())" SelectedId="supplierFilter" SelectedIdChanged="SupplierFilterChangedAsync" />
             }
             <label><span class="sr-only">Destinația ieșirilor</span>
                 <select id="movement-destination-filter" @onchange="DestinationFilterChangedAsync">
@@ -225,11 +222,8 @@ else
                 </select></label>
             @if (pageData.ExitBeneficiaries is { Count: > 0 } filterBeneficiaries)
             {
-                <label><span class="sr-only">Beneficiar</span>
-                    <select id="movement-beneficiary-filter" @onchange="BeneficiaryFilterChangedAsync">
-                        <option value="">Toți beneficiarii</option>
-                        @foreach (var item in filterBeneficiaries) { <option value="@item.Id" selected="@(beneficiaryFilter == item.Id)">@item.Name</option> }
-                    </select></label>
+                <SearchableSelect Id="movement-beneficiary-filter" Label="Beneficiar" Placeholder="Toți beneficiarii" EmptyText="Niciun beneficiar găsit."
+                                  Options="@(filterBeneficiaries.Select(item => new SelectOption(item.Id, item.Name)).ToArray())" SelectedId="beneficiaryFilter" SelectedIdChanged="BeneficiaryFilterChangedAsync" />
             }
             @if (pageData.ExitVehicles is { Count: > 0 } filterVehicles)
             {
@@ -954,9 +948,9 @@ else
         if (destinationFilter is not null) filter = StockMovementKind.Exit;
         pageNumber = 1; await LoadPageAsync();
     }
-    private async Task BeneficiaryFilterChangedAsync(ChangeEventArgs e)
+    private async Task BeneficiaryFilterChangedAsync(int? id)
     {
-        beneficiaryFilter = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        beneficiaryFilter = id;
         if (beneficiaryFilter is not null) filter = StockMovementKind.Exit;
         pageNumber = 1; await LoadPageAsync();
     }
@@ -1003,9 +997,9 @@ else
         if (value == EntrySource.Free) supplierFilter = null;
         await LoadPageAsync();
     }
-    private async Task SupplierFilterChangedAsync(ChangeEventArgs e)
+    private async Task SupplierFilterChangedAsync(int? id)
     {
-        supplierFilter = int.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        supplierFilter = id;
         if (supplierFilter is not null) { filter = StockMovementKind.Entry; if (source != EntrySource.WithInvoice) source = EntrySource.WithInvoice; }
         pageNumber = 1; await LoadPageAsync();
     }

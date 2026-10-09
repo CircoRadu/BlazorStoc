@@ -116,7 +116,7 @@ else
     <fieldset class="anaf-section"><legend>5. Versiuni</legend>
         <div class="editor-actions">
             <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="SaveDraftAsync">Salvează ciorna</button>
-            <button type="button" class="primary" disabled="@(busy || !tested)" title="@(tested ? "" : "Testează cu succes configurația înainte de activare")" @onclick="ActivateAsync">Activează configurația testată</button>
+            <button type="button" class="primary" disabled="@(busy || !tested)" title="@(tested ? "Salvează configurația ca versiune nouă și o activează" : "Testează cu succes configurația înainte de salvare și activare")" @onclick="ActivateAsync">Salvează și activează configurația testată</button>
             <button type="button" class="danger" disabled="@(busy || (state?.History.Count ?? 0) < 2)" @onclick="RollbackAsync">Revino la activarea precedentă</button>
         </div>
         @if (state is { History.Count: > 0 })
@@ -218,7 +218,7 @@ else
     private Task ActivateAsync() => Run(async () =>
     {
         state = await Anaf.ActivateAsync(config!, lifetime.Token);
-        Say($"Configurația a fost activată ca versiunea #{state.Active!.Id}.");
+        Say($"Configurația a fost salvată și activată ca versiunea #{state.Active!.Id}.");
     });
 
     private Task RollbackAsync() => Run(async () =>

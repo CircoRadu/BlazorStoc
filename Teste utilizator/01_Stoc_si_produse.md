@@ -105,6 +105,20 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 |---|---|---|---|
 | 1 | Formularul de produs si lista | Nu exista unitate de masura; cantitatile sunt in "buc." | |
 
+### 09.10.2026 - Categorii si subcategorii: nume unice, stergere, iconite
+
+**Ce s-a adaugat:** Numele categoriilor si subcategoriilor sunt unice impreuna; se pot sterge categorii si subcategorii goale; antetul categoriei are iconite; categoria unei subcategorii se alege (cu cautare) doar la mutare; listele de alegere (furnizor, beneficiar) se aleg cu clic si se pot filtra scriind.
+
+**Ce face acum:** Pagina Categorii: la fiecare categorie iconitele plus (adauga subcategorie), creion, cos (inactiv cu explicatie in tooltip daca nu e goala); la subcategorie creion si cos (doar daca nu are produse). La adaugarea unei subcategorii nu mai exista alegerea categoriei. Jurnalul are actiunile „Stergere categorie goala" si „Stergere subcategorie goala".
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Adauga o subcategorie cu numele unei categorii (si invers) | Mesaj ca numele e deja folosit | |
+| 2 | Sterge o subcategorie goala, apoi categoria goala (motiv + cuvant de confirmare) | Dispar; jurnalul le consemneaza cu actiuni proprii | |
+| 3 | Treci cu mouse-ul pe cosul unei categorii cu subcategorii | Cos inactiv, tooltip cu explicatia | |
+| 4 | Editeaza o subcategorie: campul Categorie | Camp cu alegere si scriere pentru filtrare | |
+| 5 | Export consum si filtrele Furnizor/Beneficiar din Miscari: alege cu clic | Alegerea se pastreaza (si in Brave) | |
+
 ## Fluxul de baza
 
 1. Adauga produs (nume, cod, categorie/subcategorie) -> apare in lista.

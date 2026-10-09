@@ -1,0 +1,25 @@
+@using BlazorStoc.Services
+
+@* Invoice pickup, XML invoice: which XML template reads the file (the one of the supplier, else the standard UBL paths) and the choice of another. *@
+<div class="invoice-suggestions" role="status">
+    <strong>@Info</strong>
+    @if (Templates.Count > 0)
+    {
+        <label class="muted">Alt șablon XML:
+            <select @onchange="OnChoose" aria-label="Alege șablonul XML de citire">
+                <option value="0" selected="@(ChosenId is null)">Șablon UBL standard (necreat)</option>
+                @foreach (var template in Templates)
+                {
+                    <option value="@template.Info.Id" selected="@(ChosenId == template.Info.Id)">@template.Info.Name · @InvoiceTemplateText.SupplierLabel(template.Info)</option>
+                }
+            </select>
+        </label>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Info { get; set; }
+    [Parameter] public IReadOnlyList<InvoiceTemplateRecord> Templates { get; set; } = [];
+    [Parameter] public int? ChosenId { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnChoose { get; set; }
+}

@@ -1,0 +1,46 @@
+@using BlazorStoc.Services
+
+@* Invoice pickup, step 2: the catalog product of one row: the exact one (and where it came from), the new product prepared for it, or the closest ones to choose from. *@
+@if (Match.Exact is { } exact)
+{
+    <div class="pickup-exact"><span class="stock-badge in-stock"><span>●</span> @ExactText(Match.Via)</span> <strong>@exact.Name</strong> <small class="muted">@exact.Description · stoc @exact.Quantity buc.</small></div>
+}
+else if (Staged is { } staged)
+{
+    <div class="pickup-exact"><span class="stock-badge low"><span>●</span> Produs nou pregătit</span> <strong>@staged.Input.Name</strong>
+        <small class="muted">@staged.Input.Category / @staged.Input.Subcategory · nu e în catalog încă, se adaugă la finalizare</small>
+        <button type="button" class="refresh act-edit" @onclick="OnOpenNew">Modifică</button>
+        <button type="button" class="danger" @onclick="OnDiscardStaged">Renunță</button></div>
+}
+else
+{
+    <fieldset class="pickup-alternatives">
+        <legend class="muted">@(Match.Note.Length > 0 ? Match.Note : Match.Alternatives.Count == 0 ? "Niciun produs apropiat de codul „" + Match.Code + "”" : "Fără potrivire exactă pentru „" + Match.Code + "”. Alege cel mult un produs:")</legend>
+        @foreach (var candidate in Match.Alternatives)
+        {
+            var productId = candidate.Product.Id;
+            <label class="pickup-alternative"><input type="radio" name="@("pick-" + Index)" checked="@(ProductId == productId)" @onchange="() => OnPick.InvokeAsync(productId)" />
+                <span><strong>@candidate.Product.Name</strong> <small class="muted">@candidate.Product.Description · stoc @candidate.Product.Quantity buc. · @((int)Math.Round(candidate.Score * 100))% asemănare</small></span></label>
+        }
+        <label class="pickup-alternative"><input type="radio" name="@("pick-" + Index)" checked="@(ProductId is null)" @onchange="() => OnNone.InvokeAsync()" /> <span>Niciunul dintre ele</span></label>
+        <button type="button" class="refresh act-confirm" @onclick="OnOpenNew">+ Pregătește un produs nou</button>
+    </fieldset>
+}
+
+@code {
+    [Parameter, EditorRequired] public InvoiceProductMatch Match { get; set; } = default!;
+    [Parameter] public StagedProduct? Staged { get; set; }
+    [Parameter] public int? ProductId { get; set; }
+    [Parameter] public int Index { get; set; }
+    [Parameter] public EventCallback<int> OnPick { get; set; }
+    [Parameter] public EventCallback OnNone { get; set; }
+    [Parameter] public EventCallback OnOpenNew { get; set; }
+    [Parameter] public EventCallback OnDiscardStaged { get; set; }
+
+    private static string ExactText(string via) => via switch
+    {
+        InvoiceProductMatcher.ViaSupplierCode => "Legat din factura anterioară a furnizorului",
+        InvoiceProductMatcher.ViaName => "Cod găsit în denumire",
+        _ => "Potrivire exactă"
+    };
+}

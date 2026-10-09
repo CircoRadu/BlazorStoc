@@ -15,6 +15,13 @@ public sealed partial class MariaProductRepository
                 ("@key", TextNormalization.UniquenessKey(name))))
                 if (await duplicate.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string existing)
                     throw new ProductOperationException($"Categoria «{existing}» există deja.");
+            await using (var asSubcategory = Command(connection, transaction, """
+                SELECT s.name,c.name FROM subcategories s INNER JOIN categories c ON c.id=s.category_id
+                WHERE s.normalized_name=@key LIMIT 1
+                """, ("@key", TextNormalization.UniquenessKey(name))))
+            await using (var asReader = await asSubcategory.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                if (await asReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    throw new ProductOperationException(ProductGroupManagementRules.NameTakenBySubcategory(asReader.GetString(0), asReader.GetString(1)));
             await using var insert = Command(connection, transaction,
                 "INSERT INTO categories(name,normalized_name) VALUES(@name,@key)",
                 ("@name", name), ("@key", TextNormalization.UniquenessKey(name)));
@@ -52,6 +59,11 @@ public sealed partial class MariaProductRepository
             await using (var reader = await duplicate.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                     throw new ProductOperationException($"Subcategoria «{reader.GetString(0)}» există deja în categoria «{reader.GetString(1)}».");
+            await using (var asCategory = Command(connection, transaction,
+                "SELECT name FROM categories WHERE normalized_name=@key LIMIT 1",
+                ("@key", TextNormalization.UniquenessKey(name))))
+                if (await asCategory.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string categoryNamed)
+                    throw new ProductOperationException(ProductGroupManagementRules.NameTakenByCategory(categoryNamed));
             await using var insert = Command(connection, transaction,
                 "INSERT INTO subcategories(category_id,name,normalized_name) VALUES(@category,@name,@key)",
                 ("@category", categoryId), ("@name", name), ("@key", TextNormalization.UniquenessKey(name)));
@@ -63,6 +75,68 @@ public sealed partial class MariaProductRepository
             AuditDetails.Identification(("Denumire", result.Group.Subcategory), ("Categorie", result.Group.Category)),
             cancellationToken).ConfigureAwait(false);
         return result.Group;
+    }
+
+    public async Task DeleteCategoryAsync(string category, string reason, CancellationToken cancellationToken = default)
+    {
+        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        var motif = ProductGroupManagementRules.Reason(reason);
+        var deleted = await WriteAsync(async (connection, transaction) =>
+        {
+            int id;
+            string stored;
+            await using (var find = Command(connection, transaction,
+                "SELECT id,name FROM categories WHERE normalized_name=@key FOR UPDATE",
+                ("@key", TextNormalization.UniquenessKey(category))))
+            await using (var reader = await find.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    throw new ProductOperationException("Categoria nu mai există. Actualizează lista.");
+                id = checked((int)reader.GetInt64(0));
+                stored = reader.GetString(1);
+            }
+            await using (var used = Command(connection, transaction, """
+                SELECT (SELECT COUNT(*) FROM subcategories WHERE category_id=@id)+(SELECT COUNT(*) FROM products WHERE category_id=@id)
+                """, ("@id", id)))
+                if (Convert.ToInt64(await used.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) > 0)
+                    throw new ProductOperationException(ProductGroupManagementRules.CategoryNotEmptyMessage);
+            await using (var delete = Command(connection, transaction, "DELETE FROM categories WHERE id=@id", ("@id", id)))
+                await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            return stored;
+        }, cancellationToken).ConfigureAwait(false);
+        await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Category, AuditActions.DeleteCategory,
+            string.Empty, deleted, AuditDetails.Identification(("Denumire", deleted)), motif, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task DeleteSubcategoryAsync(ProductGroup group, string reason, CancellationToken cancellationToken = default)
+    {
+        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        var motif = ProductGroupManagementRules.Reason(reason);
+        var deleted = await WriteAsync(async (connection, transaction) =>
+        {
+            int id;
+            string name, categoryName;
+            await using (var find = Command(connection, transaction, """
+                SELECT s.id,s.name,c.name FROM subcategories s INNER JOIN categories c ON c.id=s.category_id
+                WHERE s.normalized_name=@subcategory AND c.normalized_name=@category FOR UPDATE
+                """, ("@subcategory", TextNormalization.UniquenessKey(group.Subcategory)), ("@category", TextNormalization.UniquenessKey(group.Category))))
+            await using (var reader = await find.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    throw new ProductOperationException("Subcategoria nu mai există. Actualizează lista.");
+                id = checked((int)reader.GetInt64(0));
+                name = reader.GetString(1);
+                categoryName = reader.GetString(2);
+            }
+            await using (var used = Command(connection, transaction, "SELECT COUNT(*) FROM products WHERE subcategory_id=@id", ("@id", id)))
+                if (Convert.ToInt64(await used.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) > 0)
+                    throw new ProductOperationException(ProductGroupManagementRules.SubcategoryNotEmptyMessage);
+            await using (var delete = Command(connection, transaction, "DELETE FROM subcategories WHERE id=@id", ("@id", id)))
+                await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            return new ProductGroup(categoryName, name);
+        }, cancellationToken).ConfigureAwait(false);
+        await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Subcategory, AuditActions.DeleteSubcategory,
+            string.Empty, $"{deleted.Category} / {deleted.Subcategory}", AuditDetails.Identification(("Denumire", deleted.Subcategory), ("Categorie", deleted.Category)), motif, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task RenameCategoryAsync(string originalCategory, string newCategory, string reason,
@@ -90,6 +164,13 @@ public sealed partial class MariaProductRepository
                 ("@key", TextNormalization.UniquenessKey(name)), ("@id", id)))
                 if (await duplicate.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string existing)
                     throw new ProductOperationException($"Categoria «{existing}» există deja.");
+            await using (var asSubcategory = Command(connection, transaction, """
+                SELECT s.name,c.name FROM subcategories s INNER JOIN categories c ON c.id=s.category_id
+                WHERE s.normalized_name=@key LIMIT 1
+                """, ("@key", TextNormalization.UniquenessKey(name))))
+            await using (var asReader = await asSubcategory.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                if (await asReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                    throw new ProductOperationException(ProductGroupManagementRules.NameTakenBySubcategory(asReader.GetString(0), asReader.GetString(1)));
             await using (var update = Command(connection, transaction,
                 "UPDATE categories SET name=@name,normalized_name=@key WHERE id=@id",
                 ("@name", name), ("@key", TextNormalization.UniquenessKey(name)), ("@id", id)))
@@ -143,6 +224,11 @@ public sealed partial class MariaProductRepository
                 ("@key", TextNormalization.UniquenessKey(name)), ("@id", id)))
                 if (await duplicate.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string existing)
                     throw new ProductOperationException($"Subcategoria «{existing}» există deja.");
+            await using (var asCategory = Command(connection, transaction,
+                "SELECT name FROM categories WHERE normalized_name=@key LIMIT 1",
+                ("@key", TextNormalization.UniquenessKey(name))))
+                if (await asCategory.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string categoryNamed)
+                    throw new ProductOperationException(ProductGroupManagementRules.NameTakenByCategory(categoryNamed));
             await using (var update = Command(connection, transaction, """
                 UPDATE subcategories SET category_id=@category,name=@name,normalized_name=@key WHERE id=@id
                 """, ("@category", categoryId), ("@name", name),

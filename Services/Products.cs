@@ -14,6 +14,9 @@ public interface IProductRepository
     Task RenameCategoryAsync(string originalCategory, string newCategory, string reason, CancellationToken cancellationToken = default);
     Task<ProductGroup> UpdateSubcategoryAsync(ProductGroup original, string newSubcategory, string targetCategory,
         string reason, CancellationToken cancellationToken = default);
+    // Only an empty category (no subcategory, no product) and an empty subcategory (no product) can be deleted.
+    Task DeleteCategoryAsync(string category, string reason, CancellationToken cancellationToken = default);
+    Task DeleteSubcategoryAsync(ProductGroup group, string reason, CancellationToken cancellationToken = default);
     Task<Product> CreateAsync(ProductInput input, CancellationToken cancellationToken = default);
     Task<Product> UpdateAsync(Product original, ProductInput input, CancellationToken cancellationToken = default);
     Task DeleteAsync(Product original, string reason, CancellationToken cancellationToken = default);

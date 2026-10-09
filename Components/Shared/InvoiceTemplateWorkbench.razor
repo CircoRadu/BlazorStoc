@@ -8,6 +8,8 @@
 @inject ILogger<InvoiceTemplateWorkbench> Logger
 @implements IAsyncDisposable
 
+@if (xmlSample is null)
+{
 <h2>@(IsEditMode ? "Editare șablon" : "Generare șablon factură")</h2>
 @if (IsEditMode)
 {
@@ -22,11 +24,16 @@ else if (!IsEditMode)
 {
 <p class="muted">Încarcă o factură PDF (din program de facturare, din e-Factura sau scanată). Aplicația citește tabelul cu liniile facturii și câmpurile din antet și le arată pe pagină ca un șablon interactiv: alegi ce se folosește la importul facturii și ce înseamnă fiecare element. Fișierul se păstrează în memorie cât timp lucrezi aici; când salvezi șablonul, factura se salvează împreună cu el (model), ca să o ai din nou la editarea șablonului. Șablonul se leagă de furnizor: denumirea și CUI/CIF-ul vânzătorului sunt obligatorii.</p>
 }
+}
 
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 
-@if (session is null || draft is null)
+@if (xmlSample is not null)
+{
+    <InvoiceXmlTemplateEditor @key="xmlSampleKey" Sample="xmlSample" SampleName="@xmlSampleName" Saved="XmlTemplateSavedAsync" Closed="CloseXmlSample" />
+}
+else if (session is null || draft is null)
 {
     @if (Embedded)
     {
@@ -39,9 +46,9 @@ else if (!IsEditMode)
         {
             <div class="demo-banner" role="status"><span aria-hidden="true">✎</span><div>Șablonul <strong>@EditTemplateName</strong> nu are o factură model salvată: încarcă o factură PDF a aceluiași furnizor. Elementele șablonului rămân la pozițiile salvate (fișierul nu este analizat decât dacă apeși „Analizează fișierul”), iar modificările se salvează în șablon (fișierul devine modelul).</div></div>
         }
-        <FileDropZone Id="invoice-file" Accept=".pdf,application/pdf" Text="Alege factura PDF" OnChange="OnFileAsync" Disabled="busy" />
+        <FileDropZone Id="invoice-file" Accept=".pdf,application/pdf,.xml,text/xml,application/xml,.zip,application/zip,application/x-zip-compressed" Text="Alege factura PDF, XML sau ZIP" OnChange="OnFileAsync" Disabled="busy" />
         @if (busy) { <div class="invoice-busy" role="status"><div class="spinner"></div><p class="muted">@(IsEditMode ? "Se deschide fișierul pentru șablon… (o pagină scanată poate dura câteva secunde)" : "Se analizează fișierul… (o pagină scanată poate dura câteva secunde)")</p></div> }
-        <p class="form-note">Sunt acceptate fișiere PDF de cel mult 20 MB și 30 de pagini. Facturile e-Factura în format XML vor fi acceptate la importul propriu-zis.</p>
+        <p class="form-note">Sunt acceptate fișiere PDF de cel mult 20 MB și 30 de pagini. O factură XML (e-Factura UBL) sau arhiva ZIP descărcată din e-Factura (se caută în ea factura, nu semnătura) deschide editorul șablonului XML, cu fișierul ca probă.</p>
     </section>
 }
 }
@@ -306,7 +313,7 @@ else
 
             <details class="invoice-section">
                 <summary>Șablon descriere intrare în stoc a produsului</summary>
-                <p class="form-note">Scrie textul cu care se descrie intrarea în stoc a unui produs preluat din factură. Apasă o etichetă ca să o adaugi la poziția cursorului din text (apare colorată, ca <code>&lt;etichetă&gt;</code> și se înlocuiește cu valoarea ei). Sunt disponibile etichetele active în șablon; Etichetele din rândul „Coloane folosite din tabel” sunt valorile coloanelor tabelului (au culoarea coloanei de pe pagină) și se citesc rând cu rând la importul efectiv al facturii; Operațiile aritmetice ADUNARE{}, SCADERE{}, ÎNMULȚIRE{} (scrisă INMULTIRE{}) și IMPARTIRE{} calculează cu valorile etichetelor dintre acolade (simbolul operației se pune singur între etichete; împărțirea primește exact două). Un șablon nou pornește cu un text propus, pe care îl poți modifica.</p>
+                <p class="form-note">Scrie textul cu care se descrie intrarea în stoc a unui produs preluat din factură. Apasă o etichetă ca să o adaugi la poziția cursorului din text (apare colorată, ca <code>&lt;etichetă&gt;</code> și se înlocuiește cu valoarea ei). Sunt disponibile etichetele active în șablon; Etichetele din rândul „Coloane folosite din tabel” sunt valorile coloanelor tabelului (au culoarea coloanei de pe pagină) și se citesc rând cu rând la importul efectiv al facturii; Operațiile aritmetice ADUNARE{}, SCADERE{}, ÎNMULȚIRE{} (scrisă INMULTIRE{}) și IMPARTIRE{} calculează cu valorile etichetelor dintre acolade (simbolul operației se pune singur între etichete; împărțirea primește exact două). La apăsarea unei etichete sau operații se pun spații înainte și după ea (nu înăuntrul unei operații); spațiile de la începutul și sfârșitul descrierii se șterg în previzualizare și la salvare. Un șablon nou pornește cu un text propus, pe care îl poți modifica.</p>
                 <label class="invoice-description-field" for="invoice-product-description">Descriere intrare în stoc a produsului
                     <MarkedTextField @ref="descriptionField" Id="invoice-product-description" Multiline="true" Rows="3" MaxLength="@InvoiceProductDescription.MaxLength" Value="@draft.ProductDescription"
                                      ValueChanged="SetProductDescription" Known="IsKnownDescriptionMark" Operations="true" ColorOf="MarkColor" OperationColor="@OperationColor" /></label>
@@ -369,6 +376,10 @@ else
                     }
                     else { <button type="button" class="primary" disabled="@saving" @onclick="() => SaveAsync(asNew: false)">@(saving ? "Se salvează…" : "Salvează șablonul")</button> }
                 </div>
+                @* The same messages under the buttons: on a scrolled page the ones at the top are out of sight and the user would not know why the saving does not work. *@
+                @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+                @foreach (var problem in problems) { <div class="validation-message" role="alert">@problem</div> }
+                @if (RegistrySupplier is null && registryLoaded) { <div class="invoice-warning" role="status">⚠ Furnizorul nu este în baza de date@(supplierName.Trim().Length > 0 ? " (" + supplierName.Trim() + ")" : ""): adaugă-l sau alege-l din listă, șablonul se leagă de furnizor.</div> }
             </details>
         </div>
     </div>
@@ -681,11 +692,39 @@ else
         catch (Exception exception) when (exception is AccessDeniedException or InvoiceTemplateOperationException) { error = exception.Message; }
     }
 
+    private Task CloseXmlSample() { xmlSample = null; return Task.CompletedTask; }
+    private byte[]? xmlSample;
+    private string xmlSampleName = "";
+    private int xmlSampleKey;
+
+    private async Task OpenXmlSampleAsync(IBrowserFile file)
+    {
+        if (file.Size > InvoiceXmlRules.MaxFileSizeBytes) { error = InvoiceXmlRules.TooLargeMessage; return; }
+        try
+        {
+            using var memory = new MemoryStream();
+            await using (var stream = file.OpenReadStream(InvoiceXmlRules.MaxFileSizeBytes, lifetime.Token)) await stream.CopyToAsync(memory, lifetime.Token);
+            (xmlSample, xmlSampleName) = InvoiceXmlReader.Unpack(memory.ToArray(), file.Name); xmlSampleKey++;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (InvoiceAnalysisException exception) { error = exception.Message; }
+        catch (IOException) { error = "Fișierul XML nu a putut fi citit."; }
+    }
+
+    private async Task XmlTemplateSavedAsync(InvoiceTemplateRecord saved)
+    {
+        xmlSample = null;
+        notice = $"Șablonul XML „{saved.Info.Name}” a fost salvat.";
+        await Saved.InvokeAsync();
+        await SavedRecord.InvokeAsync(saved);
+    }
+
     private async Task OnFileAsync(InputFileChangeEventArgs args)
     {
         if (busy) return;
         error = notice = null;
         var file = args.File;
+        if ((file.Name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) || file.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) && !IsEditMode) { await OpenXmlSampleAsync(file); return; }
         if (!file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && !string.Equals(file.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase))
         {
             error = InvoiceAnalysisRules.NotAPdfMessage;
@@ -788,6 +827,17 @@ else
         Refresh();
     }
 
+    // A new template is named "<supplier> - pdf <date>" as long as the user has not written another name (the supplier's name alone, as older versions proposed, counts as not written).
+    private string lastSuggestedName = "";
+
+    private void SuggestTemplateName(string previousSupplierName)
+    {
+        if (existing is not null) return;
+        var next = InvoiceTemplateRules.SuggestedName(supplierName, false, DateTime.Today);
+        if (templateName.Trim().Length == 0 || templateName == lastSuggestedName || (previousSupplierName.Length > 0 && InvoiceTemplateRules.SameName(templateName, previousSupplierName))) templateName = next;
+        lastSuggestedName = next;
+    }
+
     private void AdoptRegistrySupplier()
     {
         similarSupplier = null;
@@ -798,7 +848,7 @@ else
         if (found is null) return;
         supplierName = found.Name;
         supplierCui = found.Cui;
-        if (templateName.Trim().Length == 0 || InvoiceTemplateRules.SameName(templateName, draft?.SupplierName ?? "")) templateName = found.Name;
+        SuggestTemplateName(draft?.SupplierName ?? "");
     }
 
     private void OpenAddSupplier() { addSupplierKey++; addingSupplier = true; }
@@ -822,9 +872,10 @@ else
     {
         existing = null;
         draft = InvoiceTemplateDraft.FromAnalysis(session!.Analysis);
-        templateName = draft.SupplierName.Length > 0 ? draft.SupplierName : "";
+        templateName = lastSuggestedName = "";
         supplierName = draft.SupplierName;
         supplierCui = draft.SupplierCui;
+        SuggestTemplateName("");
         AdoptRegistrySupplier();
         ResetSelection(); ResetHistory();
         Refresh();
@@ -1100,7 +1151,7 @@ else
     private async Task InsertOperation(string name)
     {
         var operation = name + "{}";
-        if (descriptionField is not null && await descriptionField.InsertAsync(operation, 1)) return;
+        if (descriptionField is not null && await descriptionField.InsertAsync(operation, 1, true)) return;
         var text = draft!.ProductDescription;
         SetProductDescription(text + (text.Length > 0 && !char.IsWhiteSpace(text[^1]) ? " " : "") + operation);
     }

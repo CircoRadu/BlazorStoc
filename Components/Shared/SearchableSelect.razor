@@ -11,7 +11,7 @@
         @if (SelectedId is not null && !Disabled)
         {
             <button type="button" class="searchable-select-clear" aria-label="Șterge selecția (@Label)" tabindex="-1"
-                    @onmousedown:preventDefault @onclick="ClearAsync" title="Șterge selecția (@Label)">×</button>
+                    @onmousedown="ClearAsync" @onmousedown:preventDefault title="Șterge selecția (@Label)">×</button>
         }
     </div>
     @if (open)
@@ -27,7 +27,7 @@
                 var option = matches[index];
                 var position = index;
                 <li id="@OptionId(position)" role="option" aria-selected="@(option.Id == SelectedId ? "true" : "false")"
-                    class="@(position == active ? "active" : "")" @onmousedown:preventDefault @onclick="() => SelectAsync(option)">@option.Text</li>
+                    class="@(position == active ? "active" : "")" @onmousedown="() => SelectAsync(option)" @onmousedown:preventDefault>@option.Text</li>
             }
         </ul>
     }

@@ -72,18 +72,27 @@
             let [start, stop] = selections.get(element) ?? [end, end];
             start = Math.min(start, end);
             stop = Math.min(Math.max(stop, start), end);
-            // A label put inside an arithmetic operation, after another label, gets the symbol of the operation before it (" + ", " - ", " * ", " / ").
+            // Description fields (join): a label or an operation gets a space before and after it (none where a space already is); inside an
+            // arithmetic operation there are no spaces, a label after another label gets the symbol of the operation. The ends of the description
+            // are trimmed where it is shown (preview) and saved.
+            let lead = "", trail = "";
             if (join) {
-                const open = /(ADUNARE|SCADERE|INMULTIRE|IMPARTIRE)\{([^{}]*)$/.exec(element.value.slice(0, start));
-                if (open && />\s*$/.test(open[2])) {
-                    const symbol = { ADUNARE: "+", SCADERE: "-", INMULTIRE: "*", IMPARTIRE: "/" }[open[1]];
-                    text = (/\s$/.test(open[2]) ? "" : " ") + symbol + " " + text;
+                const before = element.value.slice(0, start);
+                const after = element.value.slice(stop);
+                const open = /(ADUNARE|SCADERE|INMULTIRE|IMPARTIRE)\{([^{}]*)$/.exec(before);
+                if (open) {
+                    if (/^<[^<>\r\n]{1,80}>$/.test(text) && />\s*$/.test(open[2])) text = { ADUNARE: "+", SCADERE: "-", INMULTIRE: "*", IMPARTIRE: "/" }[open[1]] + text;
+                } else {
+                    if (!/\s$/.test(before)) lead = " ";
+                    if (!/^\s/.test(after)) trail = " ";
                 }
             }
-            if (element.maxLength > 0 && end - (stop - start) + text.length > element.maxLength) return false;
+            const inserted = lead + text + trail;
+            if (element.maxLength > 0 && end - (stop - start) + inserted.length > element.maxLength) return false;
             element.focus();
-            element.setRangeText(text, start, stop, "end");
-            const caret = start + text.length - Math.min(Math.max(caretBack, 0), text.length);
+            element.setRangeText(inserted, start, stop, "end");
+            // The cursor goes after the label and its space (where the typing goes on), or inside the braces of an operation.
+            const caret = caretBack > 0 ? start + lead.length + text.length - Math.min(caretBack, text.length) : start + inserted.length;
             const value = element.value;
             remember(element);
             // Blazor reads the new value from the input event.

@@ -343,3 +343,24 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Pagina produsului: filtre ca in Jurnal activitate (camp de cautare, liste, etichete Filtre active, valori filtrabile in tabel, stare in adresa, filtru pe zi).
 - Liste de alegere (beneficiar, produs, furnizor) se deschid peste card (overflow vizibil); fonturi uniformizate (campuri 14 px); fieldset fara chenar; cutie de cautare cu lupa SVG centrata; insigne count-badge; spatiu dupa randuri de butoane; sliderul pentru stergerea notificarilor rezolvate; tooltip pe butoane cu o glifa.
 - Verificari: build Release, suita 979 in memorie, componente 229, jurnal 151; verificat in browserul din aplicatie: selectii cu click real, spatii, chenar.
+
+## Finalizat la 09.10.2026 08:07 - Sablon de import factura de tip XML
+
+- InvoiceXmlMapping/InvoiceXmlReader/InvoiceXmlRules (Services/Invoices/InvoiceXml.cs): cai de elemente (nume locale, @atribut, //Nume, alternative cu |), UBL standard implicit, UM UN/ECE -> buc, data dd.mm.yyyy; DTD interzis, limita 5 MB.
+- Sablonul XML se salveaza ca restul sabloanelor (invoice_templates, source_kind xml, campul Xml din definitie; fara migrare), cu jurnalul existent; exclus din propunerile pentru PDF.
+- Setari -> Facturi -> Sabloane salvate: buton Sablon XML nou, fereastra InvoiceXmlTemplateEditor (cai, UBL standard, proba pe fisier); creionul unui sablon XML deschide aceeasi fereastra.
+- Preluare factura accepta .xml: IInvoiceAnalysisService.OpenXmlAsync, sablonul furnizorului ales dupa CUI, altfel UBL standard cu avertisment; restul asistentului neschimbat (fara pagina/liniile de demarcare).
+- Verificari: build Release, 19 verificari noi (InvoiceXmlChecks: UBL complet, linii lipsa, XML invalid/DTD/prea mare, mapare proprie, JSON, wizard cu si fara sablon). Neverificat in browser; netestat: duplicat de factura XML (logica existenta din asistent).
+
+## Finalizat la 09.10.2026 13:36 - Sabloane XML si preluare facturi XML/PDF, categorii, liste de alegere
+
+- Sablon XML: editor pe sectiuni ca cel PDF (Legaturi, Previzualizare, Descriere intrare, Salvare), legare vizuala a elementelor cu arborele fisierului (InvoiceXmlLinker, InvoiceXmlTree), antet de fisier, zona de proba ascunsa dupa incarcare; schimbarea unei valori legate nu trece la urmatorul element si refuza o valoare legata de alt element; nume propus "<furnizor> - xml/pdf <data>" (si la PDF); butonul Adauga furnizorul doar daca furnizorul nu e ales (popup-ul era gol: lipsea using-ul SupplierEditor).
+- Unitati UN/ECE Rec 20 (Services/Invoices/InvoiceUnitCodes.cs, 2162 coduri, echivalente scurte: buc, set, kg...); fisier ZIP e-Factura; numere XML afisate fara zerouri inutile (10.000000 -> 10, preturi cu minimum 2 zecimale).
+- Descriere intrare in stoc la XML (InvoiceXmlDescription): etichete = elementele legate, aceleasi operatii ca la PDF; spatii automate inainte/dupa etichete si operatii (nu in operatii), trim la capete in previzualizare si salvare (mark-field.js); fontul campurilor cu etichete egalat cu fundalul (cursorul nu mai pleca de la text).
+- Potrivirea produsului: cod din denumire, perechi cod furnizor - produs (tabela supplier_product_codes, migrarea 36, jurnal propriu, backup), nume propus la produs nou; refactorizarea preluarii in componente (PickupXmlTemplateBar, PickupPdfTemplateBar, PickupProductCell, InvoicePickup.*.cs).
+- Preluare factura: mesajele de eroare/motivele apar si sub butoane si doar dupa o incercare (butoane blocked, fara erori la pagina proaspata); la XML nu mai exista confirmari Verificat; reparat spatiul gol si insignele duble din Datele facturii, decupaje fara randuri vecine.
+- PDF: trepte de potrivire a sablonului (sub 30% propune sablon nou, 30-60% avertizeaza), recunoasterea PDF-ului exportat din e-Factura (InvoiceEFacturaPdf) cu mesaj despre XML/ZIP, Nr. inregistrare = CUI in acel PDF.
+- Categorii: nume unice impreuna (categorii + subcategorii), stergerea categoriilor/subcategoriilor goale cu motiv (DeleteCategoryAsync/DeleteSubcategoryAsync, actiuni de jurnal Stergere categorie/subcategorie goala), iconite pe antetul categoriei si pe randuri, categoria subcategoriei aleasa cu SearchableSelect doar la mutare.
+- Liste de alegere: SearchableSelect alege la mousedown (clicul real nu mergea in Brave); filtre Furnizor/Beneficiar la Miscari, Furnizor la Intrari libere si Furnizor din editorul XML convertite in liste cu cautare.
+- ANAF: butonul Salveaza si activeaza configuratia testata; beneficiar: telefonul complet care se termina cu partea locala din ANAF nu mai face datele manuale, insigna listeaza campurile diferite.
+- Verificari: build Release, suita completa 1038 trecute, sectiunea Maria Categories (5) si Supplier product codes (6) trecute; verificat in browser: popup furnizor, alegere din liste, ANAF beneficiar; restul neverificat in browser.

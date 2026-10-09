@@ -1,0 +1,387 @@
+@using BlazorStoc.Services
+@using BlazorStoc.Components.Pages
+@using Microsoft.AspNetCore.Components.Forms
+@inject ISupplierRepository Suppliers
+@inject IInvoiceTemplateService Service
+@inject ILogger<InvoiceXmlTemplateEditor> Logger
+@implements IDisposable
+
+<section class="invoice-xml-editor" aria-label="@(Existing is null ? "Șablon XML nou" : "Editare șablon XML")">
+        @if (Existing is null && triedFile is not null)
+        {
+            <section class="invoice-head" aria-label="Fișierul citit">
+                <div><strong>@triedFile</strong> <span class="muted">· factură XML</span></div>
+                <button type="button" class="danger" disabled="@saving" @onclick="() => Closed.InvokeAsync()">Renunță și elimină fișierul</button>
+            </section>
+        }
+        <h2>@(Existing is null ? "Șablon XML nou" : "Editare șablon XML · " + Existing.Info.Name)</h2>
+        <p class="muted">Leagi vizual elementele șablonului de valorile din fișierul de probă: apeși „Alege” la un element, apoi apeși în arbore valoarea lui. Citirea de mai jos se actualizează la fiecare legătură.</p>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        <div class="invoice-panel">
+            <details class="invoice-section" open>
+                <summary>Legături cu fișierul XML <span>@LinkedCount legate din @InvoiceXmlTree.Targets.Count</span></summary>
+                <div class="editor-actions xml-row-left"><button type="button" class="refresh act-reload" @onclick="UseUbl">Completează cu căile UBL standard</button></div>
+                @if (sampleXml is not null)
+                {
+                    <InvoiceXmlLinker Document="sampleXml" Mapping="mapping.ToMapping()" MappingChanged="OnLinked" />
+                }
+        <details class="xml-advanced" open="@(sampleXml is null)">
+                <summary>Căi XML (avansat)</summary>
+                <p class="muted">Calea spune unde se află fiecare valoare în fișierul XML: nume de elemente separate prin „/” (prefixul, ca în cbc:ID, se ignoră), „@@atribut” la sfârșit pentru un atribut,
+                    „//Nume” pentru un element la orice adâncime și „a | b” ca să se ia prima cale care are valoare. Căile liniei sunt față de elementul unei linii.</p>
+            <div class="editor-grid invoice-xml-fields">
+                <label>Numărul facturii *<input @bind="mapping.Number" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Data facturii *<input @bind="mapping.Date" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Denumirea furnizorului<input @bind="mapping.SupplierName" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>CUI-ul furnizorului<input @bind="mapping.SupplierCui" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Moneda<input @bind="mapping.Currency" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Totalul facturii<input @bind="mapping.Total" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label class="full-width">Elementul unei linii de factură *<input @bind="mapping.Lines" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Codul intern al furnizorului<input @bind="mapping.Code" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Denumirea produsului<input @bind="mapping.Name" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Cantitatea *<input @bind="mapping.Quantity" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Unitatea de măsură<input @bind="mapping.Unit" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Prețul unitar<input @bind="mapping.UnitPrice" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+                <label>Valoarea liniei<input @bind="mapping.Value" @bind:event="oninput" @bind:after="Reread" autocomplete="off" /></label>
+            </div>
+            </details>
+            </details>
+
+            <details class="invoice-section">
+                <summary>Previzualizare: ce se citește cu acest șablon</summary>
+        @if (Existing is not null || triedFile is null)
+            {
+                <h5>Încearcă pe un fișier XML</h5>
+                <FileDropZone Accept=".xml,text/xml,application/xml,.zip,application/zip,application/x-zip-compressed" Text="Alege un fișier XML sau ZIP de probă" OnChange="TryFileAsync" Disabled="@saving" />
+            }
+            @if (tryError is not null) { <div class="error-banner" role="alert">@tryError</div> }
+            @if (tried is { } extraction)
+            {
+                <p class="muted">Citit din <strong>@triedFile</strong>:
+                    @string.Join(" · ", extraction.Fields.Where(field => field.Found).Select(field => field.Name + ": " + field.Value))</p>
+                @foreach (var warning in extraction.Warnings) { <div class="invoice-warning" role="status">⚠ @warning</div> }
+                @if (extraction.Rows.Count > 0)
+                {
+                    <div class="table-scroll"><table>
+                        <thead><tr><th>#</th>@foreach (var column in extraction.Columns) { <th>@column.Label</th> }</tr></thead>
+                        <tbody>@foreach (var row in extraction.Rows.Take(10))
+                        {
+                            <tr><td>@row.Number</td>@foreach (var column in extraction.Columns) { <td>@row.Cells.GetValueOrDefault(column.Id, "")</td> }</tr>
+                        }</tbody></table></div>
+                    @if (extraction.Rows.Count > 10) { <small class="muted">Primele 10 linii din @extraction.Rows.Count.</small> }
+                }
+            }
+            </details>
+
+            <details class="invoice-section">
+                <summary>Șablon descriere intrare în stoc a produsului</summary>
+                <p class="form-note">Scrie textul cu care se descrie intrarea în stoc a unui produs preluat din factură. Apasă o etichetă ca să o adaugi la poziția cursorului din text (apare colorată, ca <code>&lt;etichetă&gt;</code> și se înlocuiește cu valoarea ei). Sunt disponibile elementele legate în șablon; Operațiile aritmetice ADUNARE{}, SCADERE{}, ÎNMULȚIRE{} (scrisă INMULTIRE{}) și IMPARTIRE{} calculează cu valorile etichetelor dintre acolade (simbolul operației se pune singur între etichete; împărțirea primește exact două). La apăsarea unei etichete sau operații se pun spații înainte și după ea (nu înăuntrul unei operații); spațiile de la începutul și sfârșitul descrierii se șterg în previzualizare și la salvare. Un șablon nou pornește cu un text propus, pe care îl poți modifica.</p>
+                <label class="invoice-description-field" for="invoice-product-description">Descriere intrare în stoc a produsului
+                    <MarkedTextField @ref="descriptionField" Id="invoice-product-description" Multiline="true" Rows="3" MaxLength="@InvoiceProductDescription.MaxLength" Value="@productDescription"
+                                     ValueChanged="SetDescription" Known="IsKnownMark" Operations="true" OperationColor="@OperationColor" /></label>
+                <div class="placeholder-list" aria-label="Valori din antetul facturii">
+                    <span class="muted small">Valori din antetul facturii:</span>
+                    @foreach (var label in InvoiceXmlDescription.HeaderOf(mapping.ToMapping()))
+                    {
+                        <button type="button" class="placeholder-chip" @onclick="() => AppendLabel(label)">&lt;@label&gt;</button>
+                    }
+                </div>
+                <div class="placeholder-list" aria-label="Valori din linia facturii">
+                    <span class="muted small">Valori din linia facturii (se citesc rând cu rând la preluare):</span>
+                    @foreach (var label in InvoiceXmlDescription.LinesOf(mapping.ToMapping()))
+                    {
+                        <button type="button" class="placeholder-chip column-chip" @onclick="() => AppendLabel(label)">&lt;@label&gt;</button>
+                    }
+                </div>
+                <div class="placeholder-list" aria-label="Operații aritmetice">
+                    <span class="muted small">Operații aritmetice:</span>
+                    @foreach (var operation in InvoiceProductDescription.Operations)
+                    {
+                        var operationName = operation.Name;
+                        <button type="button" class="placeholder-chip operation-chip" style="color: @OperationColor; border-color: @OperationColor" title="@(operation.Title): apasă, apoi adaugă între acolade etichetele operației; simbolul „@(operation.Symbol)” se pune singur între ele" @onclick="() => InsertOperation(operationName)">@(operationName)&#123;&#125;</button>
+                    }
+                </div>
+                @if (productDescription.Trim().Length > 0)
+                {
+                    <div class="notification-preview" aria-live="polite">
+                        <strong>Previzualizare descriere intrare în stoc a produsului</strong>
+                        <p class="notification-body">@InvoiceXmlDescription.RenderSample(productDescription, tried)</p>
+                    </div>
+                }
+            </details>
+
+            <details class="invoice-section">
+                <summary>Salvare</summary>
+                <div class="editor-grid invoice-xml-fields">
+                    <label>Denumirea șablonului *<input maxlength="@InvoiceTemplateRules.MaxNameLength" @bind="name" @bind:event="oninput" autocomplete="off" /></label>
+                    <label>Furnizor *
+                        <SearchableSelect Id="template-supplier" Label="Furnizorul șablonului" Placeholder="Caută sau alege furnizorul" EmptyText="Niciun furnizor găsit."
+                                          Options="@(suppliers.Select(supplier => new SelectOption(supplier.Id, supplier.Name + " · " + supplier.Identifier, supplier.Cui)).ToArray())"
+                                          SelectedId="@(int.TryParse(supplierId, out var chosenSupplier) ? chosenSupplier : null)" SelectedIdChanged="SupplierChosen" />
+                    </label>
+                    @if (supplierId.Length == 0) { <div class="editor-actions xml-row-right"><button type="button" class="refresh act-confirm" disabled="@saving" @onclick="OpenAddSupplier">+ Adaugă furnizorul</button></div> }
+                    @if (supplierId.Length == 0)
+                    {
+                        <div class="invoice-warning full-width" role="status" id="template-supplier-missing">⚠ Alege furnizorul din listă@(sampleSupplierName.Trim().Length > 0 ? " (în fișier: " + sampleSupplierName.Trim() + ")" : ""). Dacă nu este în baza de date, adaugă-l cu „+ Adaugă furnizorul”: șablonul se leagă de furnizor.</div>
+                    }
+                </div>
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-close" disabled="@saving" @onclick="() => Closed.InvokeAsync()">Renunță</button>
+                    <button type="button" class="primary" disabled="@saving" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează șablonul")</button>
+                </div>
+                @* The same messages under the button: on a scrolled page the ones at the top are out of sight and the user would not know why the saving does not work. *@
+                @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            </details>
+        </div>
+
+        @if (addingSupplier)
+        {
+            <div class="invoice-modal-backdrop">
+                <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă furnizor">
+                    <SupplierEditor @key="addSupplierKey" InitialCui="@sampleCui" InitialName="@sampleSupplierName" Saved="SupplierAddedAsync" Closed="CloseAddSupplier" />
+                </div>
+            </div>
+        }
+
+</section>
+
+@code {
+    [Parameter] public InvoiceTemplateRecord? Existing { get; set; }
+    [Parameter] public EventCallback<InvoiceTemplateRecord> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    // A sample file chosen before the window opened: it is tried at once and its supplier is proposed.
+    [Parameter] public byte[]? Sample { get; set; }
+    [Parameter] public string SampleName { get; set; } = "";
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<Supplier> suppliers = [];
+    private MappingModel mapping = MappingModel.From(InvoiceXmlMapping.Ubl);
+    private string name = "", supplierId = "";
+    // The description of the stock entry; while the user has not written it, it follows the elements that are linked.
+    private string productDescription = "", lastSuggestedName = "";
+    private bool descriptionEdited;
+    private IReadOnlyList<string> knownLabels = [];
+    private MarkedTextField? descriptionField;
+    private string? error, tryError, triedFile;
+    private InvoiceExtraction? tried;
+    private System.Xml.Linq.XDocument? sampleXml;
+    // The XML file read as the example (taken out of a ZIP when it came in one): it is kept with the template as its model.
+    private byte[]? sampleBytes;
+    private bool saving, addingSupplier;
+    private int addSupplierKey;
+    // What the sample file says about its supplier: it prefills the new supplier.
+    private string sampleCui = "", sampleSupplierName = "";
+
+    // The mapping as editable text fields (a record cannot be bound).
+    private sealed class MappingModel
+    {
+        public string Number { get; set; } = "";
+        public string Date { get; set; } = "";
+        public string SupplierName { get; set; } = "";
+        public string SupplierCui { get; set; } = "";
+        public string Currency { get; set; } = "";
+        public string Total { get; set; } = "";
+        public string Lines { get; set; } = "";
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Quantity { get; set; } = "";
+        public string Unit { get; set; } = "";
+        public string UnitPrice { get; set; } = "";
+        public string Value { get; set; } = "";
+
+        public static MappingModel From(InvoiceXmlMapping item) => new()
+        {
+            Number = item.Number, Date = item.Date, SupplierName = item.SupplierName, SupplierCui = item.SupplierCui, Currency = item.Currency, Total = item.Total,
+            Lines = item.Lines, Code = item.Code, Name = item.Name, Quantity = item.Quantity, Unit = item.Unit, UnitPrice = item.UnitPrice, Value = item.Value
+        };
+
+        public InvoiceXmlMapping ToMapping() => InvoiceXmlRules.Clean(new InvoiceXmlMapping(Number, Date, SupplierName, SupplierCui, Currency, Total, Lines, Code, Name, Quantity, Unit, UnitPrice, Value));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var initial = Existing?.Definition.Xml ?? InvoiceXmlMapping.Ubl;
+        productDescription = Existing?.Definition.ProductDescription ?? "";
+        descriptionEdited = productDescription.Length > 0;
+        if (!descriptionEdited) productDescription = InvoiceXmlDescription.Default(initial);
+        knownLabels = InvoiceXmlDescription.Labels(initial);
+        try { suppliers = [.. (await Suppliers.GetSuppliersAsync(lifetime.Token)).Where(item => !item.IsExternal)]; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Supplier list loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Registrul de furnizori nu a putut fi citit.";
+        }
+        if (Existing is { } existing)
+        {
+            name = existing.Info.Name;
+            mapping = MappingModel.From(existing.Definition.Xml ?? InvoiceXmlMapping.Ubl);
+            supplierId = existing.Info.SupplierId?.ToString() ?? suppliers.FirstOrDefault(item => SupplierRules.CuiDigits(item.Cui) == SupplierRules.CuiDigits(existing.Info.SupplierCui))?.Id.ToString() ?? "";
+            try
+            {
+                if (await Service.GetModelAsync(existing.Info.Id, lifetime.Token) is { } model)
+                {
+                    sampleBytes = model.Content;
+                    sampleXml = InvoiceXmlReader.Parse(model.Content);
+                    triedFile = model.FileName;
+                    tried = InvoiceXmlReader.Read(sampleXml, mapping.ToMapping());
+                }
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+            catch (Exception exception) when (exception is InvoiceAnalysisException or InvoiceTemplateOperationException)
+            {
+                sampleBytes = null; sampleXml = null; triedFile = null; tried = null;
+            }
+        }
+        if (Sample is not null && Existing is null)
+        {
+            try
+            {
+                var xml = InvoiceXmlReader.Parse(Sample);
+                sampleXml = xml; sampleBytes = Sample;
+                var (supplierText, cui) = InvoiceXmlReader.Supplier(xml);
+                (sampleCui, sampleSupplierName) = (cui, supplierText);
+                if (cui.Length > 0) supplierId = suppliers.FirstOrDefault(item => SupplierRules.CuiDigits(item.Cui) == SupplierRules.CuiDigits(cui))?.Id.ToString() ?? "";
+                tried = InvoiceXmlReader.Read(xml, mapping.ToMapping());
+                triedFile = SampleName;
+            }
+            catch (InvoiceAnalysisException exception) { tryError = exception.Message; }
+        }
+        SyncName();
+    }
+
+    // A new template is named "<supplier> - xml <date>" as long as the user has not written another name.
+    private void SyncName()
+    {
+        if (Existing is not null) return;
+        var chosen = suppliers.FirstOrDefault(item => item.Id.ToString() == supplierId)?.Name ?? sampleSupplierName;
+        var next = InvoiceTemplateRules.SuggestedName(chosen, true, DateTime.Today);
+        if (name.Trim().Length == 0 || name == lastSuggestedName) name = next;
+        lastSuggestedName = next;
+    }
+
+    private void SupplierChosen(int? id) { supplierId = id?.ToString() ?? string.Empty; SyncName(); }
+
+    // ---- the description of the stock entry ----
+
+    private string OperationColor => "hsl(272 70% 38%)";
+
+    private void SetDescription(string text) { productDescription = text; descriptionEdited = true; }
+
+    private bool IsKnownMark(string mark) => InvoiceXmlDescription.Labels(mapping.ToMapping()).Any(label => InvoiceValues.Normalize(label) == InvoiceValues.Normalize(mark));
+
+    private int LinkedCount => InvoiceXmlTree.Targets.Count(target => InvoiceXmlRules.Alternatives(InvoiceXmlTree.PathOf(mapping.ToMapping(), target.Id)).Any());
+
+    // The label goes where the cursor is in the description; at its end when that is not possible.
+    private async Task AppendLabel(string label)
+    {
+        var mark = "<" + label + ">";
+        if (descriptionField is not null && await descriptionField.InsertAsync(mark, 0, true)) return;
+        SetDescription(productDescription + (productDescription.Length > 0 && !char.IsWhiteSpace(productDescription[^1]) ? " " : "") + mark);
+    }
+
+    private async Task InsertOperation(string operationName)
+    {
+        var operation = operationName + "{}";
+        if (descriptionField is not null && await descriptionField.InsertAsync(operation, 1, true)) return;
+        SetDescription(productDescription + (productDescription.Length > 0 && !char.IsWhiteSpace(productDescription[^1]) ? " " : "") + operation);
+    }
+
+    // After a link changed: the marks of a label that is no longer linked leave the description; an untouched description follows the links.
+    private void SyncDescription()
+    {
+        var current = InvoiceXmlDescription.Labels(mapping.ToMapping());
+        foreach (var gone in knownLabels.Where(label => !current.Contains(label))) productDescription = InvoiceProductDescription.RemoveMark(productDescription, gone);
+        if (!descriptionEdited) productDescription = InvoiceXmlDescription.Default(mapping.ToMapping());
+        knownLabels = current;
+    }
+
+    private void OpenAddSupplier() { addSupplierKey++; addingSupplier = true; }
+    private Task CloseAddSupplier() { addingSupplier = false; return Task.CompletedTask; }
+
+    // The new supplier is chosen at once, as the template belongs to it.
+    private async Task SupplierAddedAsync(Supplier saved)
+    {
+        addingSupplier = false;
+        try { suppliers = [.. (await Suppliers.GetSuppliersAsync(lifetime.Token)).Where(item => !item.IsExternal)]; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception exception) { Logger.LogError("Supplier list loading failed ({ErrorType}).", exception.GetType().Name); }
+        supplierId = saved.Id.ToString();
+        SyncName();
+    }
+
+    // A link made in the picture of the file: the paths of the template change and the file is read again.
+    private void OnLinked(InvoiceXmlMapping changed) { mapping = MappingModel.From(changed); Reread(); }
+
+    private void UseUbl() { mapping = MappingModel.From(InvoiceXmlMapping.Ubl); Reread(); }
+
+    // The reading shown below follows every change of a path: the sample file is read again with the paths as typed.
+    private void Reread()
+    {
+        SyncDescription();
+        if (sampleXml is null) return;
+        tryError = null;
+        if (InvoiceXmlRules.Validate(mapping.ToMapping()) is { } invalid) { tried = null; tryError = invalid; return; }
+        try { tried = InvoiceXmlReader.Read(sampleXml, mapping.ToMapping()); }
+        catch (InvoiceAnalysisException exception) { tried = null; tryError = exception.Message; }
+    }
+
+    private async Task TryFileAsync(InputFileChangeEventArgs e)
+    {
+        tryError = null; tried = null; sampleXml = null; sampleBytes = null;
+        try
+        {
+            if (e.File.Size > InvoiceXmlRules.MaxFileSizeBytes) { tryError = InvoiceXmlRules.TooLargeMessage; return; }
+            if (InvoiceXmlRules.Validate(mapping.ToMapping()) is { } invalid) { tryError = invalid; return; }
+            using var memory = new MemoryStream();
+            await using (var stream = e.File.OpenReadStream(InvoiceXmlRules.MaxFileSizeBytes, lifetime.Token)) await stream.CopyToAsync(memory, lifetime.Token);
+            var (xmlBytes, xmlName) = InvoiceXmlReader.Unpack(memory.ToArray(), e.File.Name);
+            sampleXml = InvoiceXmlReader.Parse(xmlBytes); sampleBytes = xmlBytes;
+            (sampleSupplierName, sampleCui) = InvoiceXmlReader.Supplier(sampleXml);
+            tried = InvoiceXmlReader.Read(sampleXml, mapping.ToMapping());
+            triedFile = xmlName;
+            SyncName();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (InvoiceAnalysisException exception) { tryError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Trying an XML template failed ({ErrorType}).", exception.GetType().Name);
+            tryError = "Fișierul XML nu a putut fi citit.";
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        error = null;
+        var clean = mapping.ToMapping();
+        if (InvoiceXmlRules.Validate(clean) is { } invalid) { error = invalid; return; }
+        if (InvoiceXmlDescription.Problems(productDescription, clean) is { Count: > 0 } descriptionProblems) { error = string.Join(" ", descriptionProblems); return; }
+        var supplier = suppliers.FirstOrDefault(item => item.Id.ToString() == supplierId);
+        if (supplier is null) { error = InvoiceTemplateRules.SupplierRequiredMessage; return; }
+        saving = true;
+        try
+        {
+            var definition = new InvoiceTemplateDefinition(InvoiceTemplateDefinition.CurrentSchema, InvoiceTemplateDefinition.XmlSourceKind, 0, 0, [], [], null, productDescription.Trim(), clean);
+            var input = new InvoiceTemplateInput { Name = name, SupplierName = supplier.Name, SupplierCui = supplier.Cui, SupplierId = supplier.Id, Definition = definition };
+            // Only the XML file is kept as the example (never the ZIP and never the signature).
+            if (sampleBytes is { Length: > 0 }) { input.ModelContent = sampleBytes; input.ModelFileName = triedFile ?? "model.xml"; }
+            var saved = Existing is null
+                ? await Service.CreateAsync(input, lifetime.Token)
+                : await Service.SaveAsync(Existing.Info, input, lifetime.Token);
+            await Saved.InvokeAsync(saved);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (InvoiceTemplateOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("XML invoice template saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Șablonul nu a putut fi salvat. Reîncearcă.";
+        }
+        finally { saving = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

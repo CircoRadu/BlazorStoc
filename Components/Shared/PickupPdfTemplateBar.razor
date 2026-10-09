@@ -1,0 +1,73 @@
+@using BlazorStoc.Services
+
+@* Invoice pickup, PDF invoice: the template that reads the file and the choice of another, or the warning that the supplier has none (with the way to make one). *@
+@if (EFactura)
+{
+    <div class="invoice-warning" role="status" id="efactura-pdf-notice">ℹ @InvoiceEFacturaPdf.Notice</div>
+}
+@if (Chosen is null && !LabEnabled)
+{
+    <div class="invoice-warning no-template-warning" role="alert">
+        <p><strong>⚠ Nu există niciun șablon definit pentru furnizorul acestei facturi@(SupplierText.Length > 0 ? " (" + SupplierText + ")" : "").</strong> Factura este citită automat: verifică rândurile și coloanele.</p>
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@Creating" @onclick="OnCreate">Creează șablon pentru acest furnizor</button>
+            @if (PdfTemplates.Count > 0)
+            {
+                <label class="muted">sau folosește un șablon existent:
+                    <select @onchange="OnChooseAny" aria-label="Folosește un șablon existent">
+                        <option value="" selected>— alege —</option>
+                        @foreach (var template in PdfTemplates)
+                        {
+                            <option value="@template.Info.Id">@template.Info.Name · @InvoiceTemplateText.SupplierLabel(template.Info)</option>
+                        }
+                    </select>
+                </label>
+            }
+        </div>
+    </div>
+}
+else if (Info is not null)
+{
+    <div class="invoice-suggestions" role="status">
+        <strong>@Info</strong>
+        @if (Suggestions.Count > 1)
+        {
+            <label class="muted">Alt șablon:
+                <select @onchange="OnChoose" aria-label="Alege șablonul de citire">
+                    @foreach (var suggestion in Suggestions)
+                    {
+                        <option value="@suggestion.Template.Info.Id" selected="@(Chosen?.Info.Id == suggestion.Template.Info.Id)">@suggestion.Template.Info.Name · @InvoiceTemplateText.SupplierLabel(suggestion.Template.Info)</option>
+                    }
+                </select>
+            </label>
+        }
+    </div>
+    @if (Chosen is not null && Score is { } score && score < InvoiceTemplateSuggestions.GoodLayoutScore)
+    {
+        <div class="invoice-warning" role="status" id="weak-template-warning">
+            @if (score < InvoiceTemplateSuggestions.WeakLayoutScore)
+            {
+                <span>⚠ Șablonul se potrivește slab cu această factură (@((int)Math.Round(score * 100))%): fișierul pare a avea alt aspect decât cel pe care s-a făcut șablonul. Verifică rândurile sau creează un șablon nou.</span>
+                <div class="editor-actions"><button type="button" class="primary" disabled="@Creating" @onclick="OnCreate">Creează șablon pentru acest furnizor</button></div>
+            }
+            else { <span>⚠ Potrivire parțială a șablonului (@((int)Math.Round(score * 100))%): verifică rândurile citite.</span> }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public InvoiceTemplateRecord? Chosen { get; set; }
+    [Parameter] public bool LabEnabled { get; set; }
+    [Parameter] public string SupplierText { get; set; } = "";
+    [Parameter] public string? Info { get; set; }
+    [Parameter] public bool Creating { get; set; }
+    // How well the layout of the chosen template fits the file (0..1), and whether the PDF is the printed form of an e-Factura.
+    [Parameter] public double? Score { get; set; }
+    [Parameter] public bool EFactura { get; set; }
+    // The active templates of PDF invoices (the ones of XML invoices have their own bar).
+    [Parameter] public IReadOnlyList<InvoiceTemplateRecord> PdfTemplates { get; set; } = [];
+    [Parameter] public IReadOnlyList<InvoiceTemplateSuggestion> Suggestions { get; set; } = [];
+    [Parameter] public EventCallback OnCreate { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnChooseAny { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> OnChoose { get; set; }
+}

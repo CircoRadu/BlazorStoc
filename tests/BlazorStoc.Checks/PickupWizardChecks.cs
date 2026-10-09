@@ -53,7 +53,7 @@ public static class PickupWizardChecks
         var cut = context.Render<InvoicePickup>();
         cut.WaitForAssertion(() => cut.Find("input[type=file]"), TimeSpan.FromSeconds(10));
         cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(invoice.Pdf, "factura-test.pdf", null, "application/pdf"));
-        cut.WaitForAssertion(() => { if (!cut.FindAll("button").Any(button => button.TextContent.Contains("Pasul următor") && !button.HasAttribute("disabled"))) throw new Exception("pending"); }, TimeSpan.FromSeconds(60));
+        cut.WaitForAssertion(() => { if (!cut.FindAll("button").Any(button => button.TextContent.Contains("Pasul următor") && !button.HasAttribute("aria-disabled"))) throw new Exception("pending"); }, TimeSpan.FromSeconds(60));
         var rowsRead = cut.FindAll("tbody tr").Count;
         check(rowsRead == invoice.Rows.Count, $"Pickup wizard: step 1 reads the rows of the generated invoice ({rowsRead} of {invoice.Rows.Count})");
 

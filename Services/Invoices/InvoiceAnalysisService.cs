@@ -15,6 +15,11 @@ public sealed class InvoiceAnalysisSession
     public required InvoiceAnalysis Analysis { get; set; }
     // The uploaded PDF itself, kept in memory so that it can be saved with the template as its model.
     public byte[]? SourcePdf { get; init; }
+    // An XML invoice is read directly, without pages or pictures: the parsed file stays here while the pickup works on it (Document has one empty page).
+    public System.Xml.Linq.XDocument? Xml { get; init; }
+    public bool IsXml => Xml is not null;
+    public string SupplierNameFromXml { get; init; } = "";
+    public string SupplierCuiFromXml { get; init; } = "";
     public DateTime LastUsedUtc { get; set; } = DateTime.UtcNow;
 }
 
@@ -86,6 +91,8 @@ public interface IInvoiceAnalysisService
     InvoiceAnalysisSession Analyze(Guid id);
     InvoiceAnalysisSession? Get(Guid id);
     void Discard(Guid id);
+    // Opens an XML invoice (parsed and checked); it has no pages, so the session is not kept in the store of analyses.
+    Task<InvoiceAnalysisSession> OpenXmlAsync(byte[] content, string fileName, CancellationToken cancellationToken = default);
 }
 
 // Reads an uploaded PDF, proposes a template for it and keeps the session for its owner (the signed-in user).
@@ -113,6 +120,21 @@ public sealed class InvoiceAnalysisService(IInvoicePdfReader reader, IInvoiceAna
         return store.Add(owner, fileName, read, new InvoiceAnalysis(read.Document.Pages, [], null, []));
     }
 
+    public async Task<InvoiceAnalysisSession> OpenXmlAsync(byte[] content, string fileName, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
+        var xml = InvoiceXmlReader.Parse(content);
+        var pages = new List<InvoicePageData> { new(1, 595, 842, InvoiceSources.Text, []) };
+        var (name, cui) = InvoiceXmlReader.Supplier(xml);
+        var fields = new List<InvoiceHeaderField>();
+        return new InvoiceAnalysisSession
+        {
+            Id = Guid.NewGuid(), Owner = owner, FileName = fileName, Document = new InvoiceDocument(pages), Previews = [], Xml = xml,
+            Analysis = new InvoiceAnalysis(pages, fields, null, []), LastUsedUtc = DateTime.UtcNow, SupplierNameFromXml = name, SupplierCuiFromXml = cui
+        };
+    }
+
     public InvoiceAnalysisSession Analyze(Guid id)
     {
         var session = Get(id) ?? throw new InvoiceAnalysisException("Sesiunea de analiză a expirat: încarcă din nou fișierul.");
@@ -135,13 +157,16 @@ public sealed record InvoiceTemplateSuggestion(InvoiceTemplateRecord Template, I
 public static class InvoiceTemplateSuggestions
 {
     public const double MinLayoutScore = 0.5;
+    // How well the layout of a template fits a file: below Weak it is probably another layout (a new template is proposed), below Good the rows need a look.
+    public const double WeakLayoutScore = 0.3;
+    public const double GoodLayoutScore = 0.6;
 
     // The suggestions with the active templates of the supplier recognised for the file first (the best layout among them first), added even when
     // their layout is below the threshold; the other suggestions follow.
     public static IReadOnlyList<InvoiceTemplateSuggestion> PreferSupplier(IReadOnlyList<InvoiceTemplateSuggestion> ranked, IEnumerable<InvoiceTemplateRecord> templates,
         InvoiceDocument document, Supplier supplier)
     {
-        bool Of(InvoiceTemplateRecord template) => template.Info.Active && (template.Info.SupplierId == supplier.Id
+        bool Of(InvoiceTemplateRecord template) => template.Info.Active && !template.Definition.IsXml && (template.Info.SupplierId == supplier.Id
             || (template.Info.SupplierId is null && SupplierRules.CuiDigits(template.Info.SupplierCui) == SupplierRules.CuiDigits(supplier.Cui) && !supplier.IsExternal));
         var own = templates.Where(Of)
             .Select(template => ranked.FirstOrDefault(item => item.Template.Info.Id == template.Info.Id)
@@ -151,7 +176,7 @@ public static class InvoiceTemplateSuggestions
     }
 
     public static IReadOnlyList<InvoiceTemplateSuggestion> Rank(IEnumerable<InvoiceTemplateRecord> templates, InvoiceDocument document) =>
-        templates.Where(template => template.Info.Active).Select(template => new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, document, template.Info.SupplierName)))
+        templates.Where(template => template.Info.Active && !template.Definition.IsXml).Select(template => new InvoiceTemplateSuggestion(template, InvoiceTemplateEngine.Match(template.Definition, template.Info.SupplierCui, document, template.Info.SupplierName)))
             .Where(item => item.Match.SupplierMatch || item.Match.Score >= MinLayoutScore)
             .OrderByDescending(item => item.Match.SupplierMatch).ThenByDescending(item => item.Match.Score).ThenBy(item => item.Template.Info.Name).ToList();
 }

@@ -163,7 +163,23 @@ public static partial class InvoiceValues
         text = text.Trim().TrimEnd(',', ';', '.', ' ');
         var match = CuiShape().Match(text);
         if (!match.Success) match = CuiShape().Match(RepairOcrDigits(text));
+        // The field often runs on into the rest of the line ("RO2460883, sediu social:"): the part before the first comma or semicolon is the code.
+        if (!match.Success && text.IndexOfAny([',', ';']) is > 0 and var cut)
+        {
+            var head = text[..cut].Trim();
+            match = CuiShape().Match(head);
+            if (!match.Success) match = CuiShape().Match(RepairOcrDigits(head));
+        }
         return match.Success ? match.Groups[1].Value.TrimStart('0') is { Length: >= 2 } digits ? digits : "" : "";
+    }
+
+    // The tax id as it is read from a file: letters that OCR takes for digits are turned back (Z is 2: no tax id has a letter but the RO prefix) and what runs on
+    // after the code is cut off ("ROZ2460883, sediu social:" -> "RO2460883"). Text that is not a tax id is returned as it is.
+    public static string CleanCui(string? text)
+    {
+        var digits = NormalizeCui(text);
+        if (digits.Length == 0) return text ?? "";
+        return (text!.TrimStart().StartsWith("RO", StringComparison.OrdinalIgnoreCase) ? "RO" : "") + digits;
     }
 
     // A tax code read by OCR may carry a letter where a digit is ("RO2Z2460883"): in a code that is otherwise digits, the look-alike letters
@@ -173,7 +189,11 @@ public static partial class InvoiceValues
         var prefix = text.StartsWith("RO", StringComparison.OrdinalIgnoreCase) ? 2 : 0;
         var body = text[prefix..].Trim();
         if (body.Length is < 6 or > 12 || body.Count(char.IsAsciiDigit) * 10 < body.Length * 7) return text;
-        var repaired = body.Select(letter => letter switch { 'Z' or 'z' => '2', 'O' or 'o' => '0', 'I' or 'l' or '|' => '1', 'S' => '5', 'B' => '8', _ => letter });
+        // Z is 2; i, I, l and | are 1; o and O are 0 after the RO prefix or anywhere but the first position (a leading O may be the start of "RO" itself).
+        var repaired = body.Select((letter, index) => letter switch
+        {
+            'Z' or 'z' => '2', 'O' or 'o' => prefix > 0 || index > 0 ? '0' : letter, 'I' or 'i' or 'l' or '|' => '1', 'S' => '5', 'B' => '8', _ => letter
+        });
         return text[..prefix] + new string(repaired.ToArray());
     }
 

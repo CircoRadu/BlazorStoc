@@ -9,6 +9,14 @@ Actualizat: 08.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (09.10.2026)
+
+- Facturi XML (UBL / e-Factura): `Services/Invoices/InvoiceXml.cs` (mapare de cai, cititor, reguli), sablon salvat in `invoice_templates` cu `source_kind` xml (campul `Xml` din definitie, fara migrare), fereastra `InvoiceXmlTemplateEditor` in Setari -> Facturi -> Sabloane salvate, ramura XML in `InvoicePickup` (`OpenXmlAsync`, sablon dupa CUI, altfel UBL standard). Teste: `InvoiceXmlChecks` (19). Neverificat in browser (`Teste utilizator/04`).
+
+- Sabloane XML (editor pe sectiuni, legare vizuala `InvoiceXmlLinker`/`InvoiceXmlTree`, descriere intrare `InvoiceXmlDescription`, unitati `InvoiceUnitCodes`, ZIP e-Factura), perechi cod furnizor - produs (`SupplierProductCodes`, migrarea 36), potrivire sablon PDF pe trepte 30/60% si recunoasterea PDF-ului e-Factura (`InvoiceEFacturaPdf`), preluarea refactorizata in componente `Pickup*` si `InvoicePickup.*.cs`.
+- Categorii: nume unice impreuna, stergere de categorii/subcategorii goale (`DeleteCategoryAsync`/`DeleteSubcategoryAsync`), iconite; `SearchableSelect` alege la mousedown; telefonul scurt din ANAF (`BeneficiaryRules.PhoneCoveredBy`).
+- Suita completa 1038 trecute. De verificat in browser: vezi `docs/TESTE_RAMASE.md` si `Teste utilizator/` 01, 04, 06.
+
 ## Ultimul lucru facut (08.10.2026, a treia parte)
 
 - ANAF: reguli pe camp aplicate in formulare (`AnafApplyRules`, dialogul „Date diferite in ANAF”), coloana „Folosit in”, versiunile configuratiei cu slider de activare si stergere (jurnal exact), HTTP 404 cu corp `notFound` = CUI inexistent (nu adresa gresita).
@@ -49,7 +57,7 @@ Actualizat: 08.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Propunere de studiu, neimplementata: selectarea liniilor ofertei la pasul 4 si stergerea unei oferte din proiect (`docs/PROPUNERE_OFERTE_SELECTIE_STERGERE.md`); asteapta deciziile din sectiunea 5.
 
 - Verificari ramase: `docs/TESTE_RAMASE.md` (cazurile N45, N47 si cele de pe pagina Facturi); drepturile contului migrator pe baza de teste.
-- Taskuri active: `TODO.md` (primul: fisierul facturii pe server; ultimul: sablon de import factura XML).
+- Taskuri active: niciunul in `TODO.md`.
 
 ## Urmatorul pas
 

@@ -19,11 +19,15 @@ void Check(bool condition, string message)
 }
 // CHECKS_ONLY=<group>[,<group>...] runs only the named groups of the checks that live in their own files (a fast loop while working on one
 // area); the checks written below in this file (products, beneficiaries, vehicles, journal...) run only in the full run.
-// Groups: suppliers, pickup, groups, reasons, components, invoices, or "ui" (every group except invoices). Older switches stay as aliases:
+// Groups: suppliers, pickup, groups, reasons, components, invoices, pdf and xml (the two halves of invoices; xml is fast), or "ui" (every group except invoices). Older switches stay as aliases:
 // INVOICE_CHECKS_ONLY=1 = invoices, COMPONENT_CHECKS_ONLY=1 = ui. An unknown group name fails the run.
 var checkGroups = new Dictionary<string, Func<Task>>(StringComparer.OrdinalIgnoreCase)
 {
-    ["invoices"] = async () => await InvoiceChecks.RunAsync(Check),
+    // The invoice checks are split by the kind of file: "pdf" (text and scanned PDF: OCR, templates, fields; minutes) and "xml" (XML and the ZIP of
+    // e-Factura: reader, templates, wizard; seconds). "invoices" runs both. Run only the one that the change touches (the full run before a commit has all).
+    ["invoices"] = async () => { await InvoiceXmlChecks.RunAsync(Check); await InvoiceChecks.RunAsync(Check); },
+    ["pdf"] = async () => await InvoiceChecks.RunAsync(Check),
+    ["xml"] = async () => await InvoiceXmlChecks.RunAsync(Check),
     ["offers"] = () => { BlazorStoc.Checks.OfferChecks.Run(Check); BlazorStoc.Checks.OfferChecks.RunSituation(Check); return Task.CompletedTask; },
     // Only the extended MariaDB sections (with MARIA_ONLY, one section): needs RUN_MARIA_INTEGRATION_CHECKS=1 and MARIA_TEST_CONFIG_PATH.
     ["maria"] = async () => await BlazorStoc.Checks.MariaExtendedChecks.RunAsync(new Microsoft.Extensions.Configuration.ConfigurationBuilder()
@@ -52,7 +56,7 @@ if (Environment.GetEnvironmentVariable("COMPONENT_CHECKS_ONLY") == "1") selected
 if (selectedGroups.Count > 0)
 {
     var names = selectedGroups.SelectMany(name => name.Equals("ui", StringComparison.OrdinalIgnoreCase)
-        ? checkGroups.Keys.Where(key => !key.Equals("invoices", StringComparison.OrdinalIgnoreCase) && !key.Equals("maria", StringComparison.OrdinalIgnoreCase)) : [name]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        ? checkGroups.Keys.Where(key => !key.Equals("invoices", StringComparison.OrdinalIgnoreCase) && !key.Equals("pdf", StringComparison.OrdinalIgnoreCase) && !key.Equals("maria", StringComparison.OrdinalIgnoreCase)) : [name]).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     var unknown = names.Where(name => !checkGroups.ContainsKey(name)).ToList();
     if (unknown.Count > 0) throw new ArgumentException($"CHECKS_ONLY: unknown group(s) {string.Join(", ", unknown)}; known: {string.Join(", ", checkGroups.Keys)}, ui.");
     foreach (var name in names) await checkGroups[name]();
@@ -2411,6 +2415,7 @@ await RobustnessChecks.RunAsync(Check);
 await NasBackupChecks.RunAsync(Check);
 BlazorStoc.Checks.OfferChecks.Run(Check);
 BlazorStoc.Checks.OfferChecks.RunSituation(Check);
+await InvoiceXmlChecks.RunAsync(Check);
 await InvoiceChecks.RunAsync(Check);
 
 // Subtask 2.11: opt-in real integration checks against the isolated blazorstoc_test MariaDB database. Skipped
@@ -2498,6 +2503,8 @@ sealed class FakeInventoryProductRepository(IReadOnlyList<Product> products, IRe
     public Task<ProductGroup> CreateSubcategoryAsync(string category, string subcategory, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task RenameCategoryAsync(string originalCategory, string newCategory, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<ProductGroup> UpdateSubcategoryAsync(ProductGroup original, string newSubcategory, string targetCategory, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task DeleteCategoryAsync(string category, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task DeleteSubcategoryAsync(ProductGroup group, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<Product> CreateAsync(ProductInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<Product> UpdateAsync(Product original, ProductInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task DeleteAsync(Product original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();

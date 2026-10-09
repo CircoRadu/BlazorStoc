@@ -50,6 +50,7 @@ public static class AnafApplyRules
             if (proposal.Incoming.Length == 0) continue;
             var current = Normalize(proposal.Label, proposal.Current);
             if (string.Equals(current, proposal.Incoming, StringComparison.Ordinal)) continue;
+            if (proposal.Label == "Telefon" && BeneficiaryRules.PhoneCoveredBy(proposal.Incoming, current)) continue;
             var policy = policies is not null && policies.TryGetValue(proposal.Label, out var chosen) ? chosen : Confirm;
             // A difference of case only is not worth a question: it is applied when the policy takes the value of ANAF, otherwise ignored.
             if (current.Length > 0 && string.Equals(current, proposal.Incoming, StringComparison.OrdinalIgnoreCase)) { if (policy == Overwrite) direct.Add(proposal); continue; }

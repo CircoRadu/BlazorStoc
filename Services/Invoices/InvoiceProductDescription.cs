@@ -189,7 +189,7 @@ public static partial class InvoiceProductDescription
 
     // The text with every operation and every mark replaced by its value (value returns null for a label it does not know: the mark is left as written).
     public static string Render(string template, Func<string, string?> value) =>
-        Mark().Replace(Operation().Replace(template ?? "", match => Calculate(match.Groups[1].Value, match.Groups[2].Value, value) ?? match.Value), match => value(match.Groups[1].Value.Trim()) ?? match.Value);
+        Mark().Replace(Operation().Replace(template ?? "", match => Calculate(match.Groups[1].Value, match.Groups[2].Value, value) ?? match.Value), match => value(match.Groups[1].Value.Trim()) ?? match.Value).Trim();
 
     // The marks of the text that are not labels of the template.
     public static IReadOnlyList<string> UnknownMarks(string template, IEnumerable<string> labels)

@@ -63,6 +63,8 @@ public static class AuditFilterOptions
         (AuditActions.EditSupplierInvoiceNumber, AuditActions.EditSupplierInvoiceNumber), (AuditActions.EditSupplierInvoiceDate, AuditActions.EditSupplierInvoiceDate),
         (AuditActions.MoveSupplierInvoice, AuditActions.MoveSupplierInvoice),
         (AuditActions.AddSupplierAlias, AuditActions.AddSupplierAlias), (AuditActions.RemoveSupplierAlias, AuditActions.RemoveSupplierAlias),
+        (AuditActions.DeleteCategory, AuditActions.DeleteCategory), (AuditActions.DeleteSubcategory, AuditActions.DeleteSubcategory),
+        (AuditActions.LinkSupplierProductCode, AuditActions.LinkSupplierProductCode), (AuditActions.ChangeSupplierProductCode, AuditActions.ChangeSupplierProductCode),
         (AuditActions.RecordFreeEntry, AuditActions.RecordFreeEntry), (AuditActions.AttachEntryToInvoice, AuditActions.AttachEntryToInvoice),
         (AuditActions.DetachEntryFromInvoice, AuditActions.DetachEntryFromInvoice), (AuditActions.DuplicateEntryOnInvoice, AuditActions.DuplicateEntryOnInvoice),
         (AuditActions.RegularizeNegativeStock, AuditActions.RegularizeNegativeStock), (AuditActions.ExitOverStock, AuditActions.ExitOverStock),

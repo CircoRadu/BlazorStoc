@@ -8,6 +8,12 @@
 @inject ILogger<InvoiceTemplatesList> Logger
 @implements IDisposable
 
+@if (xmlEditing)
+{
+    <InvoiceXmlTemplateEditor @key="xmlEditorKey" Existing="xmlTarget" Saved="XmlSavedAsync" Closed="CloseXmlEditor" />
+}
+else
+{
 <h2>Șabloane de facturi salvate</h2>
 <p class="muted">Fiecare furnizor poate avea mai multe șabloane (de exemplu pentru un PDF din program și pentru unul scanat). La analiza unei facturi, aplicația propune șabloanele care se potrivesc, după CUI-ul furnizorului și după aspectul facturii. Un șablon se editează cu iconița ✎ (elementele lui, denumirea și furnizorul); fiecare salvare înlocuiește șablonul.</p>
 
@@ -16,12 +22,12 @@
 @if (FocusTemplateId is { } wanted && !loading && templates.All(item => item.Info.Id != wanted)) { <div class="error-banner" role="status">Șablonul #@wanted nu mai există (a fost șters).</div> }
 
 <section class="catalog">
-    <div class="catalog-heading"><h3>Șabloane <span>@templates.Count</span></h3><button type="button" class="refresh act-reload" disabled="@loading" @onclick="LoadAsync">Actualizează</button></div>
+    <div class="catalog-heading"><h3>Șabloane <span>@templates.Count</span></h3><div class="editor-actions"><button type="button" class="refresh act-reload" disabled="@loading" @onclick="LoadAsync">Actualizează</button></div></div>
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă șabloanele</h3></div> }
-    else if (templates.Count == 0) { <div class="empty-state"><div class="empty-icon" aria-hidden="true">▤</div><h3>Nu există șabloane salvate</h3><p>Încarcă o factură în pagina „Generare șablon factură” și salvează șablonul creat.</p></div> }
+    else if (templates.Count == 0) { <div class="empty-state"><div class="empty-icon" aria-hidden="true">▤</div><h3>Nu există șabloane salvate</h3><p>Încarcă o factură (PDF sau XML) în pagina „Generare șablon factură” și salvează șablonul creat.</p></div> }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>ACTIV</th><th>ȘABLON</th><th>FURNIZOR</th><th>CUI</th><th>SURSĂ</th><th>CONȚINUT</th><th>ACTUALIZAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th>ACTIV</th><th>ȘABLON</th><th>FURNIZOR</th><th>CUI</th><th>FORMAT</th><th>CONȚINUT</th><th>ACTUALIZAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var template in templates)
         {
             var info = template.Info;
@@ -32,12 +38,12 @@
                 <td><strong>@info.Name</strong></td>
                 <td>@(info.SupplierName.Length > 0 ? info.SupplierName : "—")@if (info.SupplierId is null) { <br /><span class="notification-state">nelegat de un furnizor</span> <button type="button" class="refresh act-confirm" disabled="@saving" @onclick="() => LinkAsync(info)">Leagă de furnizor</button> }</td>
                 <td>@(info.SupplierCui.Length > 0 ? info.SupplierCui : "—")</td>
-                <td>@(info.SourceKind == InvoiceSources.Ocr ? "Scanat (OCR)" : "PDF cu text")</td>
-                <td><small>@template.Definition.UsedFieldCount câmpuri · @template.Definition.UsedColumnCount coloane</small></td>
+                <td><strong>@(template.Definition.IsXml ? "XML" : "PDF")</strong>@if (!template.Definition.IsXml) { <br /><small>@(info.SourceKind == InvoiceSources.Ocr ? "scanat (OCR)" : "cu text")</small> }</td>
+                <td><small>@(template.Definition.IsXml ? "căi XML: " + template.Definition.Xml!.Lines : $"{template.Definition.UsedFieldCount} câmpuri · {template.Definition.UsedColumnCount} coloane")</small></td>
                 <td><small>@Stamp(info.UpdatedUtc)<br />@info.UpdatedBy</small></td>
                 <td class="row-actions">
                     <button type="button" class="invoice-icon-btn" title="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-label="@(open ? "Ascunde detaliile șablonului" : "Arată detaliile șablonului")" aria-expanded="@(open ? "true" : "false")" @onclick="() => ToggleDetails(info.Id)">👁</button>
-                    <button type="button" class="row-icon edit" disabled="@saving" title="Editează șablonul (elementele, denumirea și furnizorul)" aria-label="Editează șablonul" @onclick="() => OnEditWithFile.InvokeAsync(template)"></button>
+                    <button type="button" class="row-icon edit" disabled="@saving" title="Editează șablonul (elementele, denumirea și furnizorul)" aria-label="Editează șablonul" @onclick="() => EditAsync(template)"></button>
                     @if (isAdmin) { <button type="button" class="row-icon delete" disabled="@saving" title="Șterge șablonul" aria-label="Șterge șablonul" @onclick="() => deleting = info"></button> }
                 </td>
             </tr>
@@ -45,6 +51,17 @@
             {
                 <tr class="invoice-details-row"><td colspan="8">
                     <div class="invoice-details">
+                        @if (template.Definition.Xml is { } xml)
+                        {
+                            <div><strong>Căi XML</strong>
+                                <ul>
+                                    <li>Număr: @xml.Number</li><li>Dată: @xml.Date</li><li>Furnizor: @(xml.SupplierName.Length > 0 ? xml.SupplierName : "—")</li><li>CUI: @(xml.SupplierCui.Length > 0 ? xml.SupplierCui : "—")</li>
+                                    <li>Linii: @xml.Lines</li><li>Cod: @(xml.Code.Length > 0 ? xml.Code : "—")</li><li>Denumire: @(xml.Name.Length > 0 ? xml.Name : "—")</li><li>Cantitate: @xml.Quantity</li>
+                                    <li>UM: @(xml.Unit.Length > 0 ? xml.Unit : "—")</li><li>Preț unitar: @(xml.UnitPrice.Length > 0 ? xml.UnitPrice : "—")</li><li>Valoare: @(xml.Value.Length > 0 ? xml.Value : "—")</li>
+                                </ul></div>
+                        }
+                        else
+                        {
                         <div><strong>Câmpuri folosite</strong>
                             <ul>@foreach (var field in template.Definition.Fields.Where(field => field.Use)) { <li>@(field.Name.Length > 0 ? field.Name : "(fără denumire)")</li> }
                                 @if (template.Definition.UsedFieldCount == 0) { <li class="muted">niciunul</li> }</ul></div>
@@ -53,6 +70,7 @@
                                 { <li>@(column.Label.Length > 0 ? column.Label : "(fără denumire)")</li> }
                                 @if (template.Definition.UsedColumnCount == 0) { <li class="muted">niciuna</li> }</ul>
                             @if (template.Definition.Table?.NameCodeSeparator is { Length: > 0 } separator) { <small class="muted">Codul produsului se ia din denumire, înaintea separatorului „@separator”.</small> }</div>
+                        }
                     </div>
                 </td></tr>
             }
@@ -60,6 +78,7 @@
         </tbody></table></div>
     }
 </section>
+}
 
 @if (deleting is not null)
 {
@@ -162,6 +181,28 @@
         catch (InvoiceTemplateOperationException exception) { error = exception.Message; }
         catch (AccessDeniedException exception) { error = exception.Message; }
         finally { saving = false; }
+        await LoadAsync();
+    }
+
+    // ---- XML templates have their own window (the paths of the values); the others are edited on their model in the template workbench ----
+
+    private bool xmlEditing;
+    private int xmlEditorKey;
+    private InvoiceTemplateRecord? xmlTarget;
+
+    private Task EditAsync(InvoiceTemplateRecord template)
+    {
+        if (template.Definition.IsXml) { OpenXmlEditor(template); return Task.CompletedTask; }
+        return OnEditWithFile.InvokeAsync(template);
+    }
+
+    private void OpenXmlEditor(InvoiceTemplateRecord? template) { xmlTarget = template; xmlEditorKey++; xmlEditing = true; error = notice = null; }
+    private Task CloseXmlEditor() { xmlEditing = false; return Task.CompletedTask; }
+
+    private async Task XmlSavedAsync(InvoiceTemplateRecord saved)
+    {
+        xmlEditing = false;
+        notice = $"Șablonul XML „{saved.Info.Name}” a fost salvat.";
         await LoadAsync();
     }
 

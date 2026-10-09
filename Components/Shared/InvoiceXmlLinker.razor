@@ -1,0 +1,155 @@
+@using System.Xml.Linq
+@using BlazorStoc.Services
+
+<div class="xml-linker">
+    <div class="xml-targets" role="list" aria-label="Elementele șablonului">
+        <h3>Elementele șablonului</h3>
+        <p class="muted small">Apasă „Alege” la un element, apoi apasă în fișierul de probă (în dreapta) valoarea care îi corespunde. Valoarea citită apare imediat sub nume.</p>
+        @foreach (var target in InvoiceXmlTree.Targets)
+        {
+            var node = linked.GetValueOrDefault(target.Id);
+            var isActive = activeId == target.Id;
+            <div class="xml-target @(isActive ? "active" : "")" role="listitem">
+                <div class="xml-target-head">
+                    <strong>@target.Label@(target.Required ? " *" : "")</strong>
+                    <div class="xml-target-actions">
+                        <button type="button" class="refresh act-reload" aria-pressed="@(isActive ? "true" : "false")" @onclick="() => Activate(target.Id)">@(isActive ? "Alege în fișier…" : node is null ? "Alege" : "Schimbă")</button>
+                        @if (node is not null && !target.Required)
+                        {
+                            <button type="button" class="refresh act-close" title="Scoate legătura pentru „@target.Label”" @onclick="() => ClearAsync(target.Id)">Scoate</button>
+                        }
+                    </div>
+                </div>
+                <div class="xml-target-value">@if (node is null) { <span class="muted">nelegat</span> } else { <span>@ValueOf(target, node)</span> }</div>
+                @if (target.Help.Length > 0) { <div class="muted small">@target.Help</div> }
+            </div>
+        }
+    </div>
+
+    <div class="xml-tree-box">
+        <label class="xml-tree-search">Caută în fișier
+            <input type="search" @bind="filter" @bind:event="oninput" placeholder="o valoare sau un nume de element" autocomplete="off" />
+        </label>
+        @if (hint is not null) { <div class="invoice-warning" role="status">⚠ @hint</div> }
+        <div class="xml-tree" role="tree" aria-label="Fișierul XML de probă">
+            @foreach (var (node, depth) in Visible())
+            {
+                var labels = labelsOf.GetValueOrDefault(node.Source);
+                var pick = CanPick(node);
+                <div class="xml-node @(labels is not null ? "linked" : "")" style="padding-left:@(depth * 18)px" role="treeitem">
+                    @if (node.Children.Count > 0)
+                    {
+                        <button type="button" class="xml-toggle" aria-label="@(collapsed.Contains(node.Path) ? "Extinde" : "Restrânge") @node.Name" aria-expanded="@(collapsed.Contains(node.Path) ? "false" : "true")" @onclick="() => Toggle(node.Path)">@(collapsed.Contains(node.Path) ? "▸" : "▾")</button>
+                    }
+                    else { <span class="xml-toggle-space"></span> }
+                    <button type="button" class="xml-node-main @(pick ? "pick" : "")" disabled="@(!pick)" @onclick="() => PickAsync(node)">
+                        <span class="xml-name">@node.Name</span>
+                        @if (node.Value.Length > 0) { <span class="xml-value">@Short(node.Value)</span> }
+                        @if (node.SimilarSiblings > 0) { <span class="muted small">+ încă @node.SimilarSiblings la fel</span> }
+                        @if (labels is not null) { <span class="xml-badge">→ @string.Join(", ", labels)</span> }
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public XDocument Document { get; set; } = default!;
+    [Parameter, EditorRequired] public InvoiceXmlMapping Mapping { get; set; } = default!;
+    [Parameter] public EventCallback<InvoiceXmlMapping> MappingChanged { get; set; }
+
+    private string? activeId, hint;
+    private string filter = "";
+    private readonly HashSet<string> collapsed = [];
+    private InvoiceXmlTreeNode? tree;
+    private IReadOnlyDictionary<string, XObject> linked = new Dictionary<string, XObject>();
+    private Dictionary<XObject, List<string>> labelsOf = [];
+
+    protected override void OnParametersSet()
+    {
+        tree = InvoiceXmlTree.Build(Document, Mapping);
+        linked = InvoiceXmlTree.Linked(Document, Mapping);
+        labelsOf = [];
+        foreach (var target in InvoiceXmlTree.Targets)
+            if (linked.TryGetValue(target.Id, out var node))
+            {
+                if (!labelsOf.TryGetValue(node, out var list)) labelsOf[node] = list = [];
+                list.Add(target.Label);
+            }
+    }
+
+    private static string ValueOf(InvoiceXmlTarget target, XObject node)
+    {
+        var text = node switch { XAttribute attribute => attribute.Value, XElement element => element.HasElements ? "elementul „" + element.Name.LocalName + "”" : element.Value, _ => "" };
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+        return target.Id == "unit" ? InvoiceUnitCodes.Display(text) : Short(text);
+    }
+
+    private static string Short(string value) => value.Length > 90 ? value[..90] + "…" : value;
+
+    private void Activate(string id) { activeId = activeId == id ? null : id; hint = null; }
+
+    private void Toggle(string path) { if (!collapsed.Remove(path)) collapsed.Add(path); }
+
+    // The rows shown: the tree flattened with its depth; a search keeps the nodes that match and the ones above them.
+    private IEnumerable<(InvoiceXmlTreeNode Node, int Depth)> Visible()
+    {
+        if (tree is null) yield break;
+        var text = filter.Trim();
+        var stack = new Stack<(InvoiceXmlTreeNode Node, int Depth)>();
+        stack.Push((tree, 0));
+        while (stack.Count > 0)
+        {
+            var (node, depth) = stack.Pop();
+            if (text.Length == 0 || Matches(node, text)) yield return (node, depth);
+            if (node.Children.Count == 0 || (text.Length == 0 && collapsed.Contains(node.Path))) continue;
+            foreach (var child in node.Children.Reverse()) stack.Push((child, depth + 1));
+        }
+    }
+
+    private static bool Matches(InvoiceXmlTreeNode node, string text) =>
+        node.Name.Contains(text, StringComparison.OrdinalIgnoreCase) || node.Value.Contains(text, StringComparison.OrdinalIgnoreCase)
+        || node.Children.Any(child => Matches(child, text));
+
+    private bool CanPick(InvoiceXmlTreeNode node)
+    {
+        if (activeId is null) return false;
+        var target = InvoiceXmlTree.Targets.First(item => item.Id == activeId);
+        if (target.IsContainer) return !node.IsAttribute && node.Children.Any(child => !child.IsAttribute) && node.Path.Length > 0;
+        return node.Children.All(child => child.IsAttribute) && node.Value.Length > 0;
+    }
+
+    private async Task PickAsync(InvoiceXmlTreeNode node)
+    {
+        if (activeId is null) return;
+        var target = InvoiceXmlTree.Targets.First(item => item.Id == activeId);
+        var path = target.IsLine && !target.IsContainer ? node.LinePath : node.Path;
+        if (path is null)
+        {
+            hint = $"„{target.Label}” se citește din interiorul unei linii de factură: alege o valoare din prima linie (elementul „{LineName()}”).";
+            return;
+        }
+        hint = null;
+        // Changing a value that was already linked: the new one must not belong to another element, and the choice ends here.
+        var changing = linked.ContainsKey(target.Id);
+        if (changing && labelsOf.TryGetValue(node.Source, out var others) && others.Any(label => label != target.Label))
+        {
+            hint = $"Valoarea aleasă este deja legată de „{string.Join("”, „", others.Where(label => label != target.Label))}”. Alege altă valoare pentru „{target.Label}”.";
+            return;
+        }
+        await MappingChanged.InvokeAsync(InvoiceXmlTree.With(Mapping, target.Id, InvoiceXmlTree.Link(InvoiceXmlTree.PathOf(Mapping, target.Id), path)));
+        if (changing) { activeId = null; return; }
+        // The next element of the template waits for its value.
+        var index = InvoiceXmlTree.Targets.ToList().FindIndex(item => item.Id == target.Id);
+        activeId = index + 1 < InvoiceXmlTree.Targets.Count ? InvoiceXmlTree.Targets[index + 1].Id : null;
+    }
+
+    private async Task ClearAsync(string id)
+    {
+        hint = null;
+        await MappingChanged.InvokeAsync(InvoiceXmlTree.With(Mapping, id, ""));
+    }
+
+    private string LineName() => linked.TryGetValue("lines", out var line) && line is XElement element ? element.Name.LocalName : "linie";
+}

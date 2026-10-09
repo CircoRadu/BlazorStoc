@@ -39,7 +39,8 @@
                     </div>
                     <div class="anaf-source-cell" role="status" aria-live="polite">
                         @if (FromAnaf) { <span class="anaf-source ok"><span aria-hidden="true">✓</span> Date preluate din ANAF</span> }
-                        else { <span class="anaf-source warn"><span aria-hidden="true">⚠</span> Date introduse manual</span> }
+                        else if (DifferingFields is { Count: > 0 } differing) { <span class="anaf-source warn"><span aria-hidden="true">⚠</span> Date introduse manual: diferă de ANAF @string.Join(", ", differing)</span> }
+                        else { <span class="anaf-source warn"><span aria-hidden="true">⚠</span> Date introduse manual (nepreluate din ANAF)</span> }
                     </div>
                     @if (anafMessage is not null) { <div class="anaf-message @(anafMessageIsError ? "error" : "ok") beneficiary-anaf-message" role="@(anafMessageIsError ? "alert" : "status")">@anafMessage</div> }
                     @if (anafWarning is not null) { <div class="anaf-message warn beneficiary-anaf-message" role="status">@anafWarning</div> }
@@ -113,9 +114,30 @@
     private bool FromAnaf => !input.IsIndividual && anafSnapshot is { } snapshot &&
         Digits(input.Cui) == Digits(snapshot.Cui) &&
         Same(snapshot.Name, input.Name) && Same(snapshot.Address, input.Address) &&
-        Same(snapshot.RegistryNumber, input.RegistryNumber) && Same(BeneficiaryRules.NormalizePhone(snapshot.Phone), BeneficiaryRules.NormalizePhone(input.Phone)) &&
+        Same(snapshot.RegistryNumber, input.RegistryNumber) && SamePhone(snapshot.Phone, input.Phone) &&
         Same(BeneficiaryRules.CompactValue(snapshot.PostalCode), BeneficiaryRules.CompactValue(input.PostalCode)) &&
         Same(BeneficiaryRules.CompactValue(snapshot.CaenCode), BeneficiaryRules.CompactValue(input.CaenCode));
+
+    // What the form holds that is not what ANAF returned (the fields that make the data "manual"); empty when ANAF was not asked.
+    private IReadOnlyList<string>? DifferingFields
+    {
+        get
+        {
+            if (input.IsIndividual || anafSnapshot is not { } snapshot) return null;
+            var result = new List<string>();
+            if (Digits(input.Cui) != Digits(snapshot.Cui)) result.Add("CUI");
+            if (!Same(snapshot.Name, input.Name)) result.Add("denumire");
+            if (!Same(snapshot.Address, input.Address)) result.Add("adresă");
+            if (!Same(snapshot.RegistryNumber, input.RegistryNumber)) result.Add("nr. Registrul Comerțului");
+            if (!SamePhone(snapshot.Phone, input.Phone)) result.Add("telefon");
+            if (!Same(BeneficiaryRules.CompactValue(snapshot.PostalCode), BeneficiaryRules.CompactValue(input.PostalCode))) result.Add("cod poștal");
+            if (!Same(BeneficiaryRules.CompactValue(snapshot.CaenCode), BeneficiaryRules.CompactValue(input.CaenCode))) result.Add("cod CAEN");
+            return result;
+        }
+    }
+
+    private static bool SamePhone(string snapshotPhone, string current) =>
+        Same(BeneficiaryRules.NormalizePhone(snapshotPhone), BeneficiaryRules.NormalizePhone(current)) || BeneficiaryRules.PhoneCoveredBy(snapshotPhone, current);
 
     // Values ANAF did not supply (empty) may be typed by hand without turning the data into "manual".
     private static bool Same(string snapshotValue, string current) =>

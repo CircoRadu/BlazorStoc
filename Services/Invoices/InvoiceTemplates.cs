@@ -41,8 +41,10 @@ public sealed record InvoiceTemplateTable(int HeaderPage, double HeaderTop, doub
     string NameCodeSeparator, IReadOnlyList<InvoiceTemplateColumn> Columns, double BodyBottom = 0);
 
 public sealed record InvoiceTemplateDefinition(int Schema, string SourceKind, double PageWidth, double PageHeight,
-    IReadOnlyList<InvoiceTemplateAnchor> Anchors, IReadOnlyList<InvoiceTemplateField> Fields, InvoiceTemplateTable? Table, string ProductDescription = "")
+    IReadOnlyList<InvoiceTemplateAnchor> Anchors, IReadOnlyList<InvoiceTemplateField> Fields, InvoiceTemplateTable? Table, string ProductDescription = "", InvoiceXmlMapping? Xml = null)
 {
+    public const string XmlSourceKind = "xml";
+    [JsonIgnore] public bool IsXml => Xml is not null;
     public const int CurrentSchema = 1;
     public int UsedFieldCount => Fields.Count(field => field.Use);
     public int UsedColumnCount => Table?.Columns.Count(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore) ?? 0;
@@ -484,6 +486,7 @@ public static class InvoiceTemplateEngine
     public static FieldRead ReadField(InvoiceTemplateField field, InvoiceDocument document, InvoiceAlignment alignment)
     {
         var read = ReadFieldText(field, document, alignment);
+        if (field.Meaning == InvoiceFieldMeanings.SupplierCui) return read with { Value = InvoiceValues.CleanCui(read.Value) };
         return field.Kind == "number" ? read with { Value = InvoiceValues.WithoutCurrency(read.Value) } : read;
     }
 

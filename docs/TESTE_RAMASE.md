@@ -742,3 +742,7 @@ Setari Backup: categorie principala cu sub-taburi si zilele saptamanii (08.10.20
 Pagina produsului: taburi, filtre, aspect; ANAF 404; butoane colorate; padding (08.10.2026): De verificat de utilizator: paginile cu formulare in browser (padding), culorile butoanelor, filtrele din tabelul de miscari pe date reale
 
 ANAF: reguli pe camp, dialog de diferente, versiuni cu slider si stergere; filtre ca in jurnal; liste de alegere; cautare (08.10.2026): De verificat de utilizator: dialogul ANAF pe date reale, versiunile ANAF, aspectul listelor si al cautarii; migrarile 34-35 pe baza BlazorStoc
+
+Sablon de import factura de tip XML (09.10.2026): Facturi XML: de verificat in browser pasii din Teste utilizator/04 (09.10.2026)
+
+Sabloane XML si preluare facturi XML/PDF, categorii, liste de alegere (09.10.2026): Verificare in browser a editorului XML, descrierii cu spatii automate, avertizarilor de potrivire PDF, ZIP e-Factura, stergerii de categorii (Teste utilizator 01, 04, 06)

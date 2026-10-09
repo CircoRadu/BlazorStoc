@@ -219,6 +219,8 @@ public static class SupplierChecks
         check(AnafApplyRules.Plan([new("Telefon", "0721000000", "021")], null).Ask.Count == 1 && AnafApplyRules.Plan([new("Telefon", "0721000000", "")], plansFor).Direct.Count == 0
               && AnafApplyRules.Plan([new("Denumire", "x srl", "X SRL")], plansFor).Direct.Count == 0 && AnafApplyRules.Plan([new("Denumire", "x srl", "X SRL")], plansFor).Ask.Count == 0,
             "ANAF apply rules: without a configured policy the answer is to ask; a field ANAF did not send is left alone; the difference of case only is no difference");
+        check(AnafApplyRules.Plan([new("Telefon", "+40254260681", "260681")], null) is { Ask.Count: 0, Direct.Count: 0 } && AnafApplyRules.Plan([new("Telefon", "0721000000", "260681")], null).Ask.Count == 1 && BeneficiaryRules.PhoneCoveredBy("260681", "+40254260681") && !BeneficiaryRules.PhoneCoveredBy("021", "0721000021"),
+            "ANAF apply rules: a full phone number that ends with the local part ANAF returns is the same number (nothing to ask, still verified); a different number is asked");
         // ANAF really answers HTTP 404 with its normal body for a CUI it does not know: that must read as "not registered", not as a wrong service address.
         var anafFile = Path.Combine(Path.GetTempPath(), $"anaf-{Guid.NewGuid():N}.json");
         try
@@ -446,7 +448,7 @@ public static class SupplierChecks
     {
         var cut = await ToStepTwoAsync(context, pdf, fileName);
         SupplierTestServices.ConfirmHeader(cut);
-        cut.WaitForAssertion(() => { if (cut.FindAll("button").Any(button => button.TextContent.Contains("Pasul următor") && button.HasAttribute("disabled"))) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+        cut.WaitForAssertion(() => { if (cut.FindAll("button").Any(button => button.TextContent.Contains("Pasul următor") && button.HasAttribute("aria-disabled"))) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         cut.FindAll("button").First(button => button.TextContent.Contains("Pasul următor")).Click();
         cut.WaitForAssertion(() => cut.Find(".pickup-entry"), TimeSpan.FromSeconds(10));
         await Task.CompletedTask;
@@ -460,7 +462,7 @@ public static class SupplierChecks
         cut.WaitForAssertion(() => cut.Find("input[type=file]"), TimeSpan.FromSeconds(10));
         cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(pdf, fileName, null, "application/pdf"));
         void Click(string text) => cut.FindAll("button").First(button => button.TextContent.Contains(text)).Click();
-        cut.WaitForAssertion(() => { if (!cut.FindAll("button").Any(button => button.TextContent.Contains("Pasul următor") && !button.HasAttribute("disabled"))) throw new Exception("pending"); }, TimeSpan.FromSeconds(60));
+        cut.WaitForAssertion(() => { if (!cut.FindAll("button").Any(button => button.TextContent.Contains("Pasul următor") && !button.HasAttribute("aria-disabled"))) throw new Exception("pending"); }, TimeSpan.FromSeconds(60));
         Click("Pasul următor");
         cut.WaitForAssertion(() => { if (cut.FindAll("table.pickup-match").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         // A product is prepared for the first row without a match in the catalog (a pickup repeated after the products were created finds them all).
@@ -511,12 +513,12 @@ public static class SupplierChecks
         using (var context = PickupContext(access, store, products, movements, suppliers, invoices))
         {
             var cut = await ToStepTwoAsync(context, invoice.Pdf, "factura-furnizor.pdf");
-            bool NextDisabled() => cut.FindAll("button").First(button => button.TextContent.Contains("Pasul următor")).HasAttribute("disabled");
+            bool NextDisabled() => cut.FindAll("button").First(button => button.TextContent.Contains("Pasul următor")).HasAttribute("aria-disabled");
             IReadOnlyList<AngleSharp.Dom.IElement> Switches() => cut.FindAll(".pickup-invoice-head input[role=switch]");
             check(cut.Find("#pickup-supplier-cui").GetAttribute("value") == "12345678" && cut.Find("#pickup-invoice-number").GetAttribute("value") == "FT 1" && cut.Find("#pickup-invoice-date").GetAttribute("value") == "05.10.2026" &&
                   cut.Find("#pickup-supplier-name").TextContent.Contains("Furnizor Test SRL"),
                 "Pickup (step 2): the number, the supplier's CUI and the date of issue are read from the invoice into editable fields, and the supplier of the CUI is shown");
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.warn").Count == 2 && cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 1 && Switches()[1].GetAttribute("aria-checked") == "true" && Switches().Count == 3 &&
+            check(Switches().Count == 3 && Switches()[0].GetAttribute("aria-checked") != "true" && Switches()[1].GetAttribute("aria-checked") == "true" && Switches()[2].GetAttribute("aria-checked") != "true" &&
                   NextDisabled() && cut.Markup.Contains("confirmă numărul facturii, CUI-ul furnizorului și data"),
                 "Pickup (step 2): the CUI of a supplier found in the register starts verified; the number and the date start as \"neverificat\" and the next step is closed until they are confirmed");
             check(cut.FindAll(".pickup-invoice-head img.pickup-region").Count == 2 && cut.FindAll(".pickup-invoice-head img.pickup-region").All(image => (image.GetAttribute("src") ?? "").StartsWith("data:image/png;base64,")),
@@ -524,17 +526,17 @@ public static class SupplierChecks
 
             // Each field is confirmed on its own.
             Switches()[0].Change(true);
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 2 && NextDisabled(), "Pickup (step 2): confirming the number alone does not open the next step");
+            check(cut.FindAll(".pickup-invoice-head input[role=switch][aria-checked=true]").Count == 2 && NextDisabled(), "Pickup (step 2): confirming the number alone does not open the next step");
             
             Switches()[2].Change(true);
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 3 && !NextDisabled(), "Pickup (step 2): with the number and the date confirmed (the CUI is verified by the register) the next step opens");
+            check(cut.FindAll(".pickup-invoice-head input[role=switch][aria-checked=true]").Count == 3 && !NextDisabled(), "Pickup (step 2): with the number and the date confirmed (the CUI is verified by the register) the next step opens");
 
             // Editing a field puts that field (only) back to \"neverificat\" and closes the step again.
             cut.Find("#pickup-invoice-number").Input("FT 1 ");
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 2 && Switches()[0].GetAttribute("aria-checked") == "false" && NextDisabled(), "Pickup (step 2): editing the number makes it \"neverificat\" again (the other two stay confirmed)");
+            check(cut.FindAll(".pickup-invoice-head input[role=switch][aria-checked=true]").Count == 2 && Switches()[0].GetAttribute("aria-checked") == "false" && NextDisabled(), "Pickup (step 2): editing the number makes it \"neverificat\" again (the other two stay confirmed)");
             Switches()[0].Change(true);
             cut.Find("#pickup-supplier-cui").Input("RO 12345678");
-            check(cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 3 && Switches()[1].GetAttribute("aria-checked") == "true" && cut.Find("#pickup-supplier-name").TextContent.Contains("Furnizor Test SRL") && !NextDisabled(),
+            check(cut.FindAll(".pickup-invoice-head input[role=switch][aria-checked=true]").Count == 3 && Switches()[1].GetAttribute("aria-checked") == "true" && cut.Find("#pickup-supplier-name").TextContent.Contains("Furnizor Test SRL") && !NextDisabled(),
                 "Pickup (step 2): a CUI typed that is in the register is verified at once; the supplier is found by the digits");
             Switches()[1].Change(true);
             cut.Find("#pickup-supplier-cui").Input("99999999");
@@ -582,11 +584,11 @@ public static class SupplierChecks
             cut.FindAll("button").First(button => button.TextContent.Contains("Da, este factura FT 1")).Click();
             cut.WaitForAssertion(() => { if (!cut.Markup.Contains("a mai fost preluată")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
             check(cut.Find("#pickup-invoice-number").GetAttribute("value") == "FT 1", "Pickup: choosing the look-alike invoice puts its number in place and continues on it");
-            check(cut.Markup.Contains("Produs preluat · ") && cut.FindAll(".pickup-invoice-head .anaf-source.ok").Count == 1, "Pickup: an invoice taken before is recognized in step 2 and what was taken is listed; the number put in place is to be confirmed again");
+            check(cut.Markup.Contains("Produs preluat · ") && cut.FindAll(".pickup-invoice-head input[role=switch][aria-checked=true]").Count == 1, "Pickup: an invoice taken before is recognized in step 2 and what was taken is listed; the number put in place is to be confirmed again");
             SupplierTestServices.ConfirmHeader(cut);
             cut.FindAll("button").First(button => button.TextContent.Contains("Pasul următor")).Click();
             cut.WaitForAssertion(() => cut.Find(".pickup-entry"), TimeSpan.FromSeconds(10));
-            check(cut.Markup.Contains("s-au preluat deja") && cut.FindAll("button").First(button => button.TextContent.Contains("Finalizează preluarea")).HasAttribute("disabled"),
+            check(cut.Markup.Contains("s-au preluat deja") && cut.FindAll("button").First(button => button.TextContent.Contains("Finalizează preluarea")).HasAttribute("aria-disabled"),
                 "Pickup: the products already taken from the invoice are marked and, all skipped, there is nothing to finalize");
             cut.Find(".invoice-warning input[role=switch]").Change(true);
             cut.FindAll("button").First(button => button.TextContent.Contains("Finalizează preluarea")).Click();
