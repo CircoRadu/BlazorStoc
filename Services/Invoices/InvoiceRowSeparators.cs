@@ -132,7 +132,7 @@ public static partial class InvoiceTableReader
                 rows.Add(new InvoiceTableRow(page.Number, number, values, [], bands[index].Top, bands[index].Bottom));
             }
         }
-        return Validate(rows, columns, hint);
+        return InvoiceAmbiguity.Mark(Validate(rows, columns, hint), document);
     }
 }
 

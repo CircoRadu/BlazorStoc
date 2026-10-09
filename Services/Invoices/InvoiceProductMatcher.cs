@@ -5,7 +5,9 @@ public sealed record ProductCandidate(Product Product, double Score);
 
 // What the catalog says about one row of an invoice: the product with exactly the same code, else the closest ones.
 // Via says where an exact product came from (see InvoiceProductMatcher.Via*); Note is a warning for the user when the sources do not agree.
-public sealed record InvoiceProductMatch(string Code, Product? Exact, IReadOnlyList<ProductCandidate> Alternatives, string Via = "", string Note = "");
+// Variants: the code of the row is the model of products with required parameters (BaseModel) and these are its variants, VariantProposal the one proposed.
+public sealed record InvoiceProductMatch(string Code, Product? Exact, IReadOnlyList<ProductCandidate> Alternatives, string Via = "", string Note = "",
+    IReadOnlyList<Product>? Variants = null, string BaseModel = "", int? VariantProposal = null);
 
 // Invoice pickup, step 2: finds the products of the catalog that a row of the invoice stands for. A product is known by its code (Product.Name,
 // "cod produs"); the code of a row is its code cell, or the start of its name ("DS-UPS1000 - Sursa neintreruptibila ..." is DS-UPS1000).

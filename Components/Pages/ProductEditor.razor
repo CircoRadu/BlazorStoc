@@ -1,6 +1,7 @@
 @using BlazorStoc.Services
 @inject IProductRepository Repository
 @inject IStockMovementRepository Movements
+@inject IProductParameterRepository ParameterRepository
 @inject IProductImageStore ImageStore
 @inject ILogger<ProductEditor> Logger
 @inject IJSRuntime JS
@@ -15,12 +16,34 @@
         <ValidationSummary />
         <fieldset disabled="@saving">
             <div class="editor-grid">
-                <label class="full-width" for="product-code">@ProductCode.Label *<InputText id="product-code" @bind-Value="input.Name" @oninput="args => input.Name = args.Value?.ToString() ?? string.Empty" maxlength="100" autocomplete="off" aria-describedby="product-code-note" /><small id="product-code-note" class="form-note">Introdu codul stabilit de producător. Codul trebuie să fie unic în catalog.</small><ValidationMessage For="() => input.Name" /></label>
+                <label class="full-width" for="product-code">@(HasParameters ? "Model" : ProductCode.Label) *<input id="product-code" value="@CodeText" @oninput="args => CodeText = args.Value?.ToString() ?? string.Empty" maxlength="100" autocomplete="off" aria-describedby="product-code-note" />@if (HasParameters) { <small id="product-code-note" class="form-note">Introdu modelul stabilit de producător, fără variantă (aceasta se alege mai jos). Codul produsului se compune din model și valorile alese.</small> } else { <small id="product-code-note" class="form-note">Introdu codul stabilit de producător. Codul trebuie să fie unic în catalog.</small> }<ValidationMessage For="() => input.Name" /></label>
+                @if (InvoiceAmbiguity.Found(CodeText) is { Length: > 0 } codeDoubt) { <p class="uncertain-note full-width" id="product-code-doubt" role="status"><span class="uncertain-badge">⚠ caractere nesigure: @codeDoubt</span> Codul conține caractere care se confundă ușor cu litere sau cifre (o liniuță verticală în loc de I, l sau 1 etc.). Verifică-l: căutarea imaginii folosește exact acest cod.</p> }
                 <label for="product-category">Categorie *<InputSelect id="product-category" @bind-Value="input.Category" @bind-Value:after="CategoryChangedAsync">@foreach (var category in Categories) { <option value="@category">@category</option> }</InputSelect><ValidationMessage For="() => input.Category" /></label>
-                <label for="product-subcategory">Subcategorie *<InputSelect id="product-subcategory" @bind-Value="input.Subcategory">@foreach (var subcategory in Subcategories) { <option value="@subcategory">@subcategory</option> }</InputSelect><ValidationMessage For="() => input.Subcategory" /></label>
+                <label for="product-subcategory">Subcategorie *<InputSelect id="product-subcategory" @bind-Value="input.Subcategory" @bind-Value:after="GroupChanged">@foreach (var subcategory in Subcategories) { <option value="@subcategory">@subcategory</option> }</InputSelect><ValidationMessage For="() => input.Subcategory" /></label>
                 <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>@if (Original is null) { <text> sau <button type="button" class="refresh act-confirm" @onclick="OpenCategories">Adaugă categorie / subcategorie</button> (se deschide într-o fereastră separată)</text> }.</p>
                 @if (!HasSelectableGroup) { <p class="validation-message full-width" role="alert">Nu există nicio combinație categorie–subcategorie disponibilă. Creează mai întâi o subcategorie în pagina dedicată.</p> }
+                @if (HasParameters)
+                {
+                    @foreach (var parameter in CurrentParameters)
+                    {
+                        <div class="parameter-field" @key="parameter.Id">
+                            <label for="@($"product-parameter-{parameter.Id}")">@parameter.Name@(parameter.Unit.Length > 0 ? $" ({parameter.Unit})" : "") *
+                                <select id="@($"product-parameter-{parameter.Id}")" @onchange="args => ChooseValue(parameter, args.Value?.ToString())">
+                                    <option value="" selected="@(!chosen.ContainsKey(parameter.Id))">— alege valoarea —</option>
+                                    @foreach (var value in parameter.Values) { <option value="@value.Id" selected="@(chosen.TryGetValue(parameter.Id, out var chosenId) && chosenId == value.Id)">@value.Value</option> }
+                                </select>
+                            </label>
+                            <div class="parameter-add">
+                                <input aria-label="@($"Valoare nouă pentru {parameter.Name}")" maxlength="@ProductParameterRules.ValueMaximumLength" placeholder="@(parameter.Kind == ParameterKind.Number ? "Valoare nouă (număr)" : "Valoare nouă")"
+                                       value="@NewParameterValue(parameter.Id)" @oninput="args => newParameterValues[parameter.Id] = args.Value?.ToString() ?? string.Empty" autocomplete="off" />
+                                <button type="button" class="refresh act-confirm" @onclick="() => AddParameterValueAsync(parameter)">Adaugă valoarea</button>
+                            </div>
+                        </div>
+                    }
+                    <p class="form-note full-width" id="product-composed-code">Codul produsului rezultat: <strong>@ComposedPreview</strong>@if (!ParametersComplete) { <text> (incomplet: alege câte o valoare pentru fiecare parametru)</text> }</p>
+                }
                 <label class="full-width" for="product-description">Descriere<InputTextArea id="product-description" @bind-Value="input.Description" @oninput="args => input.Description = args.Value?.ToString() ?? string.Empty" maxlength="1000" rows="3" /><ValidationMessage For="() => input.Description" /></label>
+                @if (InvoiceAmbiguity.Found(input.Description) is { Length: > 0 } descriptionDoubt) { <p class="uncertain-note full-width" id="product-description-doubt" role="status"><span class="uncertain-badge">⚠ caractere nesigure: @descriptionDoubt</span> Descrierea conține caractere care se confundă ușor cu litere sau cifre. Verifică-o.</p> }
                 <div class="product-image-editor full-width">
                     <div class="image-preview-card">
                         <img src="@ImagePreviewUrl" alt="Previzualizare imagine pentru produs" />
@@ -83,11 +106,13 @@
     // A new product can start with a code and a description (the invoice pickup offers the product of an invoice row).
     [Parameter] public string InitialName { get; set; } = "";
     [Parameter] public string InitialDescription { get; set; } = "";
+    // The values already chosen for a product prepared earlier (invoice pickup), kept when it is edited again.
+    [Parameter] public IReadOnlyList<ProductParameterChoice> InitialChoices { get; set; } = [];
     [Parameter] public IReadOnlyList<ProductGroup> Groups { get; set; } = Array.Empty<ProductGroup>();
     [Parameter] public EventCallback<Product> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
     private UnsavedChangesTracker? tracker;
-    private string CurrentSnapshot() => FormSnapshot.Of(input, imageFileName);
+    private string CurrentSnapshot() => FormSnapshot.Of(input, imageFileName, string.Join(",", chosen.OrderBy(item => item.Key).Select(item => $"{item.Key}:{item.Value}")));
     // "Părăsește editarea": the leave warning closes the form without saving (Task 1).
     private Task DiscardAsync() => Closed.InvokeAsync();
     private ProductInput input = new();
@@ -104,6 +129,7 @@
     [
         new(ProductCode.Label, Original.Name, input.Name), new("Categorie", Original.Category, input.Category),
         new("Subcategorie", Original.Subcategory, input.Subcategory), new("Descriere", Original.Description, input.Description),
+        new("Parametri", ChoiceSummary(originalChoices), ChoiceSummary(CurrentChoices)),
         new("Imagine", "neschimbată", selectedImage is null ? "neschimbată" : $"înlocuită cu {imageFileName}")
     ]);
     private ProductImageData? selectedImage;
@@ -129,7 +155,9 @@
         try
         {
             refreshedGroups = await Repository.GetGroupsAsync(lifetime.Token);
+            await LoadParametersAsync();
             NormalizeGroupSelection();
+            GroupChanged();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { Logger.LogWarning("Category list reloading failed ({ErrorType}).", exception.GetType().Name); }
@@ -148,6 +176,89 @@
 
     private int inVehicles;
 
+    // Required parameters of the chosen subcategory: the code becomes "<model> - <value> - ..." and every parameter needs a value.
+    private IReadOnlyList<SubcategoryParameter> allParameters = [];
+    private readonly Dictionary<int, int> chosen = [];
+    private readonly Dictionary<int, string> newParameterValues = [];
+    private IReadOnlyList<ProductParameterChoice> originalChoices = [];
+    private IReadOnlyList<SubcategoryParameter> CurrentParameters => allParameters
+        .Where(parameter => string.Equals(parameter.Category, input.Category, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(parameter.Subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
+    private bool HasParameters => CurrentParameters.Count > 0;
+    private bool ParametersComplete => CurrentParameters.All(parameter => chosen.ContainsKey(parameter.Id));
+    private IReadOnlyList<ProductParameterChoice> CurrentChoices => CurrentParameters.Where(parameter => chosen.ContainsKey(parameter.Id))
+        .Select(parameter => new ProductParameterChoice(parameter.Id, chosen[parameter.Id])).ToList();
+    private string NewParameterValue(int parameterId) => newParameterValues.TryGetValue(parameterId, out var text) ? text : "";
+    private string CodeText
+    {
+        get => HasParameters ? input.BaseModel : input.Name;
+        set { if (HasParameters) input.BaseModel = value; else input.Name = value; SyncName(); }
+    }
+    private string ComposedPreview
+    {
+        get
+        {
+            var model = TextNormalization.ForObjectNameOrCode(input.BaseModel);
+            var displays = CurrentParameters.Where(parameter => chosen.ContainsKey(parameter.Id))
+                .Select(parameter => parameter.Values.FirstOrDefault(value => value.Id == chosen[parameter.Id]) is { } value ? parameter.Display(value.Value) : "…");
+            return model.Length == 0 ? "—" : ProductParameterRules.ComposeName(model, displays);
+        }
+    }
+    private string ChoiceSummary(IEnumerable<ProductParameterChoice> choices) => ProductParameterRules.Summary(allParameters
+        .SelectMany(parameter => choices.Where(choice => choice.ParameterId == parameter.Id)
+            .Select(choice => (parameter.Name, Display: parameter.Values.FirstOrDefault(value => value.Id == choice.ValueId) is { } value ? parameter.Display(value.Value) : "")))
+        .Where(item => item.Display.Length > 0));
+
+    // The code the form checks and shows follows the model and the values; the repository composes the final one.
+    private void SyncName()
+    {
+        if (!HasParameters) return;
+        var model = TextNormalization.ForObjectNameOrCode(input.BaseModel);
+        input.Name = model.Length == 0 ? "" : ComposedPreview;
+        input.Parameters = CurrentChoices.ToList();
+    }
+
+    private void ChooseValue(SubcategoryParameter parameter, string? text)
+    {
+        if (int.TryParse(text, out var id) && parameter.Values.Any(value => value.Id == id)) chosen[parameter.Id] = id;
+        else chosen.Remove(parameter.Id);
+        SyncName();
+    }
+
+    // The subcategory changed: values of other subcategories are dropped, and the typed code becomes the model of a subcategory with parameters.
+    private void GroupChanged()
+    {
+        var wasParametric = input.BaseModel.Length > 0;
+        foreach (var id in chosen.Keys.Where(id => CurrentParameters.All(parameter => parameter.Id != id)).ToList()) chosen.Remove(id);
+        if (HasParameters && input.BaseModel.Length == 0) input.BaseModel = input.Name;
+        else if (!HasParameters && wasParametric && string.IsNullOrWhiteSpace(input.Name)) input.Name = input.BaseModel;
+        SyncName();
+    }
+
+    private async Task LoadParametersAsync()
+    {
+        try { allParameters = await ParameterRepository.GetParametersAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Parameter list loading failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private async Task AddParameterValueAsync(SubcategoryParameter parameter)
+    {
+        error = null;
+        try
+        {
+            var added = await ParameterRepository.AddValueAsync(parameter.Id, NewParameterValue(parameter.Id), lifetime.Token);
+            newParameterValues.Remove(parameter.Id);
+            await LoadParametersAsync();
+            chosen[parameter.Id] = added.Id;
+            SyncName();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProductOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Parameter value adding failed ({ErrorType}).", exception.GetType().Name); error = "Valoarea nu a putut fi adăugată."; }
+    }
+
     // The list given by the page can be older than the catalog (a category created in the popup of another form of the same page):
     // the categories are read again when the form opens, before the chosen category is checked against them.
     protected override async Task OnInitializedAsync()
@@ -158,7 +269,25 @@
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { Logger.LogWarning("Category list reloading failed ({ErrorType}).", exception.GetType().Name); }
+        await LoadParametersAsync();
         NormalizeGroupSelection();
+        if (Original is not null)
+        {
+            try
+            {
+                var state = await ParameterRepository.GetProductStateAsync(Original.Id, lifetime.Token);
+                originalChoices = state.Choices;
+                foreach (var choice in state.Choices) chosen[choice.ParameterId] = choice.ValueId;
+                input.BaseModel = state.BaseModel.Length > 0 ? state.BaseModel : Original.Name;
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+            catch (Exception exception) { Logger.LogWarning("Product parameters loading failed ({ErrorType}).", exception.GetType().Name); input.BaseModel = Original.Name; }
+        }
+        if (HasParameters && input.BaseModel.Length == 0) input.BaseModel = input.Name;
+        if (Original is null)
+            foreach (var choice in InitialChoices)
+                if (CurrentParameters.Any(parameter => parameter.Id == choice.ParameterId && parameter.Values.Any(value => value.Id == choice.ValueId))) chosen[choice.ParameterId] = choice.ValueId;
+        SyncName();
         if (Original is null) return;
         try { inVehicles = (await Movements.GetVehicleStocksAsync(Original.Id, lifetime.Token)).Sum(stock => stock.Quantity); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -197,6 +326,7 @@
     private Task CategoryChangedAsync()
     {
         input.Subcategory = Subcategories.FirstOrDefault() ?? "";
+        GroupChanged();
         return Task.CompletedTask;
     }
     private void NormalizeGroupSelection()
@@ -210,6 +340,12 @@
     private async Task SaveAsync()
     {
         if (saving) return;
+        if (HasParameters && !ParametersComplete)
+        {
+            error = ProductParameterRules.RequiredMessage(input.Subcategory, CurrentParameters.Select(parameter => parameter.Name));
+            return;
+        }
+        SyncName();
         if (Original is not null) input.Reason = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
         reasonError = Original is null ? null : ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason);
         if (reasonError is not null) return;
@@ -223,6 +359,7 @@
                 pendingChanges = SaveSummary.Changed(
                     new(ProductCode.Label, Original.Name, value.Name), new("Categorie", Original.Category, value.Category),
                     new("Subcategorie", Original.Subcategory, value.Subcategory), new("Descriere", Original.Description, value.Description),
+                    new("Parametri", ChoiceSummary(originalChoices), ChoiceSummary(CurrentChoices)),
                     new("Imagine", "neschimbată", selectedImage is null ? "neschimbată" : $"înlocuită cu {imageFileName}"));
             }
             catch (ProductOperationException exception) { error = exception.Message; }

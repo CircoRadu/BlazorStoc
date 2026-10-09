@@ -722,7 +722,7 @@ public static partial class InvoiceTableReader
         // The columns become as wide as the text that was found under them (a name runs past its heading), so that the same columns
         // read the next invoice of the supplier.
         refined = WidenColumns(refined, rowCells);
-        var checkedRows = Validate(rows, refined, hint);
+        var checkedRows = InvoiceAmbiguity.Mark(Validate(rows, refined, hint), document);
         var score = GeometricScore(checkedRows, usedIndex);
         return new InvoiceTableRead(refined, checkedRows, split, usedIndex, score - 0.15 * misalignment, consumed);
     }
@@ -951,19 +951,29 @@ public static partial class InvoiceTableReader
                 flags.Add("Denumire lipsă");
             if (quantity is not null && price is not null && value is not null)
             {
-                var difference = Math.Abs(quantity.Value * price.Value - value.Value);
-                // A charge per unit in another column (an environmental tax "Taxa verde") is part of the value: quantity x (price + charge), or price x quantity + charge.
-                // The column of such a charge has no meaning in the dictionary (or was taken for another): any column left over may hold it.
-                foreach (var other in columns.Where(column => column.Meaning is InvoiceColumnMeanings.VatRate or InvoiceColumnMeanings.Ignore or InvoiceColumnMeanings.Other))
-                    if (row.Cells.TryGetValue(other.Id, out var chargeText) && InvoiceValues.ParseNumber(chargeText, hint) is { } charge && charge != 0)
-                        difference = Math.Min(difference, Math.Min(Math.Abs(quantity.Value * (price.Value + charge) - value.Value), Math.Abs(quantity.Value * price.Value + charge - value.Value)));
-                if (difference > Math.Max(0.05m, Math.Abs(value.Value) * 0.001m)) flags.Add(ArithmeticFlag);
+                // Numbers misread from a scan can be huge: a product beyond the range of a decimal is simply a row that does not add up.
+                if (!AddsUp(quantity.Value, price.Value, value.Value, columns, row, hint)) flags.Add(ArithmeticFlag);
             }
             else if (ColumnOf(columns, InvoiceColumnMeanings.Quantity) >= 0 && quantity is null && value is not null)
                 flags.Add(UnreadQuantityFlag);
             result.Add(row with { Flags = flags });
         }
         return result;
+    }
+
+    private static bool AddsUp(decimal quantity, decimal price, decimal value, IReadOnlyList<InvoiceColumn> columns, InvoiceTableRow row, char? hint)
+    {
+        try
+        {
+            var difference = Math.Abs(quantity * price - value);
+            // A charge per unit in another column (an environmental tax "Taxa verde") is part of the value: quantity x (price + charge), or price x quantity + charge.
+            // The column of such a charge has no meaning in the dictionary (or was taken for another): any column left over may hold it.
+            foreach (var other in columns.Where(column => column.Meaning is InvoiceColumnMeanings.VatRate or InvoiceColumnMeanings.Ignore or InvoiceColumnMeanings.Other))
+                if (row.Cells.TryGetValue(other.Id, out var chargeText) && InvoiceValues.ParseNumber(chargeText, hint) is { } charge && charge != 0)
+                    difference = Math.Min(difference, Math.Min(Math.Abs(quantity * (price + charge) - value), Math.Abs(quantity * price + charge - value)));
+            return difference <= Math.Max(0.05m, Math.Abs(value) * 0.001m);
+        }
+        catch (OverflowException) { return false; }
     }
 
     // The score of a reading by its geometry alone: one point for each row that was found, and a half for rows told apart by a running number

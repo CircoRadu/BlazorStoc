@@ -19,8 +19,12 @@ else
         <textarea id="@($"{Id}-auto")" class="reason-auto" readonly rows="@AutoRows" aria-label="Motivarea generată automat" placeholder="Nicio modificare făcută încă."
                   value="@AutoText"></textarea>
         <label class="reason-option"><input type="radio" name="@($"{Id}-mode")" checked="@(!UseAuto)" disabled="@Disabled" @onchange="() => SetModeAsync(false)" /> <span>Scrisă de mine</span></label>
-        <textarea id="@Id" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@(Disabled || UseAuto)" aria-label="Motivarea scrisă de utilizator"
-                  value="@Value" @oninput="ValueInputAsync" aria-required="@(UseAuto ? "false" : "true")"></textarea>
+        @* The written field stays hidden until its option is selected. *@
+        @if (!UseAuto)
+        {
+            <textarea id="@Id" rows="3" maxlength="@ChangeReasonRules.MaximumLength" disabled="@Disabled" aria-label="Motivarea scrisă de utilizator"
+                      value="@Value" @oninput="ValueInputAsync" aria-required="true"></textarea>
+        }
         <small id="@DescriptionId">Motivul ales este păstrat în jurnalul de activitate.</small>
         @if (Error is not null) { <span class="validation-message" role="alert">@Error</span> }
     </fieldset>

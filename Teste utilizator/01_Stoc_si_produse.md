@@ -4,6 +4,25 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 
 ## Modificari de testat
 
+### 09.10.2026 - Parametri obligatori pe subcategorie (etapa 1)
+
+**Ce s-a adaugat:** pe pagina Categorii si subcategorii, butonul „Parametri" pe fiecare subcategorie (migrarea 37: tabelele `subcategory_parameters`, `parameter_values`, `product_parameter_values` si coloana `products.base_model`); in formularul de produs, model + o valoare pentru fiecare parametru; marcajul „Parametri obligatorii necompletati · blocat" in lista de produse.
+
+**Ce face acum:** pentru o subcategorie cu parametri (de exemplu „Lentila", numar, unitate mm), un produs se salveaza ca „<model> - <valoare> - <valoare>" (ordinea parametrilor) si nu poate fi salvat fara model si fara valoarea fiecarui parametru. Produsele care existau deja in subcategorie raman blocate (nicio intrare/iesire/rezervare pe ele) pana li se aleg valorile prin editare. Orice utilizator adauga parametri si valori noi si sterge valorile nefolosite; doar administratorul editeaza parametri si valori. O valoare folosita se modifica numai de administrator, cu previzualizare a produselor redenumite; daca un cod nou ar exista deja, modificarea se refuza.
+
+1. Deschide „Categorii", la o subcategorie apasa „Parametri": panoul se deschide sub formulare. La o subcategorie nou creata panoul se deschide singur.
+2. Adauga parametrul „Lentila", tip „Numar", unitate „mm". Adauga valorile „2,8" si „4": apar ca „2.8 mm" si „4 mm". Scrie „2.80": se refuza (exista deja).
+3. In „Produse" cauta un produs deja existent in subcategorie: are marcajul „Parametri obligatorii necompletati · blocat". Incearca o intrare sau o iesire pe el: se refuza si mesajul numeste parametrii lipsa.
+4. Editeaza produsul: campul „Model" contine vechiul cod; alege valoarea lentilei: sub formular se vede „Codul produsului rezultat: <model> - 2.8 mm". Salveaza (motivarea automata arata si „Parametri"). Marcajul dispare, intrarea/iesirea merg.
+5. Adauga un produs nou in aceeasi subcategorie: cere model si valoarea; fara valoare apare „Subcategoria ... cere modelul si valoarea fiecarui parametru". Aceeasi combinatie model + valoare a doua oara: „Codul produsului ... exista deja".
+6. In formularul de produs, la lentila scrie o valoare noua („6") si apasa „Adauga valoarea": apare in lista si este aleasa.
+7. Pe panou, cu iconita cos de la o valoare folosita de produse: este inactiva, cu explicatia „Folosita de N produse". La o valoare nefolosita: stergere cu motivare.
+8. Ca administrator, creionul de la o valoare folosita: scrie „2.9" si „Verifica modificarea": tabelul arata codurile vechi si noi; „Continua", motivare, „Aplica modificarea": produsele sunt redenumite cu stocul pastrat. Daca exista deja un produs cu unul dintre codurile noi, modificarea e refuzata si nu se schimba nimic.
+9. Ca utilizator fara drept de administrator: panoul nu arata iconitele de editare a parametrilor si valorilor.
+10. In Jurnal: „Adaugare parametru obligatoriu subcategorie", „Adaugare valoare parametru", „Stergere valoare parametru", „Modificare valoare parametru" si, pentru fiecare produs, „Redenumire produs (valoare parametru)".
+
+**Detalii:** preluarea de pe factura (alegerea variantei) este in `04_Preluare_factura_si_sabloane.md`.
+
 ### 08.10.2026 - Stoc minim pe produs si export consum
 
 **Ce s-a adaugat:** pe cardul „Unde sunt bucatile" al produsului, campul „Stoc minim (buc.)" (migrarea 29, tabelul `product_min_stock`); pagina „Export consum" (`/consum`, meniul Produse > Export consum).

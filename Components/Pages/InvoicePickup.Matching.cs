@@ -14,6 +14,13 @@ public partial class InvoicePickup
         var nameColumn = reading!.Extraction.Columns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Name)?.Id;
         var name = nameColumn is null ? "" : item.Cells.GetValueOrDefault(nameColumn, "");
         item.Match = InvoiceProductMatcher.Match(InvoiceProductMatcher.CodeOf(item.Cells.GetValueOrDefault("code"), name), name, catalog, supplierCodes, item.Cells.GetValueOrDefault("code"));
+        // The code of the row is the model of products with required parameters: the user chooses the variant (the proposal is shown chosen).
+        item.Match = InvoiceVariants.Apply(item.Match, name, catalog, baseModels);
+        if (item.Match.Variants is { } variants)
+        {
+            item.ProductId = variants.Any(variant => variant.Id == item.ProductId) ? item.ProductId : item.Match.VariantProposal;
+            return;   // a product prepared for the row stays: the user may be preparing a new variant
+        }
         // An exact match is the product; else the choice made among the alternatives stays only while that product is still offered.
         item.ProductId = item.Match.Exact?.Id ?? (item.Match.Alternatives.Any(candidate => candidate.Product.Id == item.ProductId) ? item.ProductId : null);
         if (item.Match.Exact is not null) item.Staged = null;   // the code exists in the catalog now: no new product is needed
@@ -38,6 +45,30 @@ public partial class InvoicePickup
         var nameColumn = reading?.Extraction.Columns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Name)?.Id;
         return InvoiceProductMatcher.CodeInText(nameColumn is null ? "" : item.Cells.GetValueOrDefault(nameColumn, "")) ?? item.Match.Code;
     }
+
+    // The models of the products with required parameters and the products still missing a value (blocked for stock entries).
+    private IReadOnlyDictionary<int, string> baseModels = new Dictionary<int, string>();
+    private IReadOnlySet<int> incompleteProducts = new HashSet<int>();
+
+    private async Task LoadVariantsAsync()
+    {
+        baseModels = new Dictionary<int, string>();
+        incompleteProducts = new HashSet<int>();
+        if (Services.GetService<IProductParameterRepository>() is not { } parameters) return;
+        try
+        {
+            baseModels = await parameters.GetBaseModelsAsync(lifetime.Token);
+            incompleteProducts = await parameters.GetIncompleteProductIdsAsync(lifetime.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("Reading the variants of the products failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    // The category and subcategory of the variants of the model of a row: a new variant is prepared in the same subcategory.
+    private Product? VariantSample(PickRow item) => item.Match.Variants?.FirstOrDefault();
+
+    private string NewProductInitialName(PickRow item) =>
+        item.Staged is { } staged ? (staged.Input.BaseModel.Length > 0 ? staged.Input.BaseModel : staged.Input.Name)
+        : item.Match.BaseModel.Length > 0 ? item.Match.BaseModel : NewProductName(item);
 
     // The links of the supplier's codes to the products, used by the matching of the rows; none when the supplier is not known yet.
     private IReadOnlyDictionary<string, int> supplierCodes = new Dictionary<string, int>();

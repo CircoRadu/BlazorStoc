@@ -746,3 +746,5 @@ ANAF: reguli pe camp, dialog de diferente, versiuni cu slider si stergere; filtr
 Sablon de import factura de tip XML (09.10.2026): Facturi XML: de verificat in browser pasii din Teste utilizator/04 (09.10.2026)
 
 Sabloane XML si preluare facturi XML/PDF, categorii, liste de alegere (09.10.2026): Verificare in browser a editorului XML, descrierii cu spatii automate, avertizarilor de potrivire PDF, ZIP e-Factura, stergerii de categorii (Teste utilizator 01, 04, 06)
+
+Parametri obligatori pe subcategorie, variante la preluarea facturii si caractere nesigure (09.10.2026): Parametri obligatori, variante la preluare si caractere nesigure: de verificat in browser (Teste utilizator 01 si 04)

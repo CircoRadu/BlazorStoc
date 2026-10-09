@@ -1060,3 +1060,21 @@ button.blocked { opacity: .45; cursor: default; }
 
 /* In a column of fields the date label must not keep the 190px basis it has in a row: it would leave a gap of that height. */
 .verify-field .movement-date { flex: 0 0 auto; }
+
+/* Required parameters of a subcategory (panel on the categories page, fields of the product form) */
+.subcategory-parameters > .form-note { margin: 0 0 16px; }
+.parameter-card { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px 18px; margin-bottom: 18px; }
+.parameter-card-heading { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.parameter-card-heading .heading-actions { margin-left: auto; gap: 8px; }
+.parameter-card .parameter-edit { margin-bottom: 18px; }
+.parameter-card .table-scroll { margin-bottom: 14px; }
+.parameter-add { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.parameter-add input { flex: 1 1 220px; min-width: 0; margin-top: 0 !important; }
+.editor-grid .parameter-field { display: block; }
+.editor-grid .parameter-field select { display: block; width: 100%; margin-top: 8px; }
+.parameter-add-title { margin: 26px 0 14px; }
+.parameter-value-dialog { width: 640px; max-width: calc(100vw - 32px); }
+.parameter-value-dialog .error-banner, .parameter-value-dialog .table-scroll { margin-top: 12px; }
+.incomplete-badge { color:#a63a32; }
+
+.uncertain-note { grid-column:1 / -1; margin:0; font-size:12px; color:#60766c; line-height:1.7; }

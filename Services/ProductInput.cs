@@ -18,12 +18,19 @@ public sealed class ProductInput
     public string Subcategory { get; set; } = "";
     [StringLength(ChangeReasonRules.MaximumLength, ErrorMessage = ChangeReasonRules.TooLongMessage)]
     public string Reason { get; set; } = "";
+    // Subcategories with required parameters: the code is "<BaseModel> - <value> - ..." composed by the repository from the model and the
+    // chosen values (Name then only carries the preview); for a subcategory without parameters both stay empty.
+    public string BaseModel { get; set; } = "";
+    public List<ProductParameterChoice> Parameters { get; set; } = [];
 
     public ProductInput Validated(Product? original = null)
     {
+        var baseModel = TextNormalization.ForObjectNameOrCode(BaseModel);
         var normalized = new ProductInput
         {
-            Name = TextNormalization.ForObjectNameOrCode(Name),
+            Name = TextNormalization.ForObjectNameOrCode(Name.Trim().Length == 0 && baseModel.Length > 0 ? baseModel : Name),
+            BaseModel = baseModel,
+            Parameters = [.. Parameters],
             Description = TextNormalization.ForStorage(Description),
             Category = TextNormalization.ForObjectNameOrCode(Category),
             Subcategory = TextNormalization.ForObjectNameOrCode(Subcategory),

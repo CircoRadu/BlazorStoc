@@ -1057,6 +1057,55 @@ public static class MariaSchemaMigrations
             ("supplier_product_codes", "id"), ("supplier_product_codes", "supplier_id"), ("supplier_product_codes", "code_key"), ("supplier_product_codes", "code"),
             ("supplier_product_codes", "product_id"), ("supplier_product_codes", "created_by"), ("supplier_product_codes", "created_utc"),
             ("supplier_product_codes", "updated_by"), ("supplier_product_codes", "updated_utc")
+        ]),
+        new(37, "Produse: parametri obligatori pe subcategorie (model + valori), valorile alese pe produs",
+        [
+            """
+            CREATE TABLE IF NOT EXISTS `subcategory_parameters` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `subcategory_id` BIGINT NOT NULL,
+              `name` VARCHAR(100) NOT NULL,
+              `normalized_name` VARCHAR(512) NOT NULL,
+              `unit` VARCHAR(40) NOT NULL DEFAULT '',
+              `kind` TINYINT NOT NULL,
+              `position` INT NOT NULL DEFAULT 0,
+              `version` BIGINT NOT NULL DEFAULT 0,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `uq_subcategory_parameters_name` (`subcategory_id`, `normalized_name`),
+              CONSTRAINT `fk_subcategory_parameters_subcategory` FOREIGN KEY (`subcategory_id`) REFERENCES `subcategories` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS `parameter_values` (
+              `id` BIGINT NOT NULL AUTO_INCREMENT,
+              `parameter_id` BIGINT NOT NULL,
+              `value` VARCHAR(120) NOT NULL,
+              `normalized_value` VARCHAR(512) NOT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `uq_parameter_values_value` (`parameter_id`, `normalized_value`),
+              CONSTRAINT `fk_parameter_values_parameter` FOREIGN KEY (`parameter_id`) REFERENCES `subcategory_parameters` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """,
+            "ALTER TABLE `products` ADD COLUMN IF NOT EXISTS `base_model` VARCHAR(200) NULL",
+            """
+            CREATE TABLE IF NOT EXISTS `product_parameter_values` (
+              `product_id` BIGINT NOT NULL,
+              `parameter_id` BIGINT NOT NULL,
+              `value_id` BIGINT NOT NULL,
+              PRIMARY KEY (`product_id`, `parameter_id`),
+              KEY `ix_product_parameter_values_value` (`value_id`),
+              CONSTRAINT `fk_product_parameter_values_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
+              CONSTRAINT `fk_product_parameter_values_parameter` FOREIGN KEY (`parameter_id`) REFERENCES `subcategory_parameters` (`id`) ON DELETE CASCADE ON UPDATE NO ACTION,
+              CONSTRAINT `fk_product_parameter_values_value` FOREIGN KEY (`value_id`) REFERENCES `parameter_values` (`id`) ON DELETE RESTRICT ON UPDATE NO ACTION
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_nopad_bin
+            """
+        ],
+        [
+            ("subcategory_parameters", "id"), ("subcategory_parameters", "subcategory_id"), ("subcategory_parameters", "name"), ("subcategory_parameters", "normalized_name"),
+            ("subcategory_parameters", "unit"), ("subcategory_parameters", "kind"), ("subcategory_parameters", "position"), ("subcategory_parameters", "version"),
+            ("parameter_values", "id"), ("parameter_values", "parameter_id"), ("parameter_values", "value"), ("parameter_values", "normalized_value"),
+            ("products", "base_model"),
+            ("product_parameter_values", "product_id"), ("product_parameter_values", "parameter_id"), ("product_parameter_values", "value_id")
         ])
     ];
 }

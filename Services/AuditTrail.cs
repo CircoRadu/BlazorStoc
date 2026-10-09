@@ -135,6 +135,14 @@ public static class AuditActions
     public const string LinkSupplierProductCode = "Legare cod furnizor de produs";
     public const string DeleteCategory = "Ștergere categorie goală";
     public const string DeleteSubcategory = "Ștergere subcategorie goală";
+    // Required parameters of a subcategory (model + values in the product code): each kind of change has its own action.
+    public const string AddSubcategoryParameter = "Adăugare parametru obligatoriu subcategorie";
+    public const string EditSubcategoryParameter = "Modificare parametru obligatoriu subcategorie";
+    public const string DeleteSubcategoryParameter = "Ștergere parametru obligatoriu subcategorie";
+    public const string AddParameterValue = "Adăugare valoare parametru";
+    public const string DeleteParameterValue = "Ștergere valoare parametru";
+    public const string EditParameterValue = "Modificare valoare parametru";
+    public const string RenameProductByParameter = "Redenumire produs (valoare parametru)";
     public const string ChangeSupplierProductCode = "Schimbare legătură cod furnizor";
     // Stock entries and invoices: a free entry (no invoice), its tie to an invoice and the entry the user confirmed against a warning.
     public const string RecordFreeEntry = "Intrare liberă înregistrată";

@@ -4,6 +4,18 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 
 ## Modificari de testat
 
+### 09.10.2026 - Preluare factura: alegerea variantei (parametri obligatori, etapa 2)
+
+**Ce s-a adaugat:** in pasul 2 al preluarii (PDF, OCR, XML), un rand al carui cod este modelul unor produse cu parametri obligatori (de exemplu „DS-2CD1043" pentru „DS-2CD1043 - 2.8 mm" si „DS-2CD1043 - 4 mm") arata variantele ca optiuni.
+
+**Ce face acum:** varianta se alege din lista; se propune (si apare deja bifata) cea scrisa in denumirea randului (de exemplu „4mm"), altfel cea legata de factura anterioara a furnizorului; daca nu se poate deduce nimic, nu e bifata nicio varianta. Se poate alege „Niciuna dintre variante" (randul nu se preia) sau „+ Varianta noua a modelului": se deschide formularul de produs cu modelul si subcategoria completate, unde alegi valorile; produsul se adauga in catalog la finalizare. Un produs ales sau gasit dupa cod care are parametri necompletati arata avertismentul „Parametri obligatorii necompletati" cu legatura „Editeaza produsul" (fereastra noua); intrarea pe el este refuzata la finalizare, iar celelalte randuri se salveaza.
+
+1. Ai in catalog produsele „<model> - 2.8 mm" si „<model> - 4 mm" (vezi 01). Preia o factura cu un rand cu codul <model> si „4 mm" in denumire: la rand apar cele doua variante, cea de 4 mm bifata.
+2. Schimba varianta; treci la pasul 3 si finalizeaza: intrarea se face pe varianta aleasa. A doua factura a aceluiasi furnizor cu acelasi cod propune varianta legata, dar o denumire care spune alta varianta o inlocuieste in propunere.
+3. Pe un rand fara varianta in denumire nu e bifata nicio varianta: alege una sau „Niciuna".
+4. Apasa „+ Varianta noua": formularul are modelul si subcategoria; fara valoarea fiecarui parametru nu se poate pregati. Dupa „Pregateste produsul", randul arata „Produs nou pregatit" cu codul compus; la finalizare produsul apare in catalog cu valorile si intrarea se inregistreaza.
+5. Alege un produs vechi (fara valori) al subcategoriei: apare avertismentul si, la finalizare, mesajul de refuz sub rand.
+
 ### 09.10.2026 - Facturi XML (e-Factura UBL)
 
 **Ce s-a adaugat:** Preluarea unei facturi din fisier XML (de exemplu e-Factura UBL), fara OCR, pe baza unui sablon XML (cai de elemente) definit in Setari -> Facturi -> Sabloane salvate.

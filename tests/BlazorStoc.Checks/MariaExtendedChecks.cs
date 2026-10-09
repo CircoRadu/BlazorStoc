@@ -59,6 +59,7 @@ public static class MariaExtendedChecks
             await Section("Storno, return, net consumption, consumption note", () => StornoReturnNoteAsync(configuration, admin, audit, probe));
             await Section("Exit operation: grouping, all or nothing, preview, repeated line", () => ExitOperationAsync(configuration, admin, audit, probe));
             await Section("To regularize: cause, list, notification, regularization", () => ToRegularizeAsync(configuration, admin, audit, probe));
+            await Section("Required parameters: definition, values, product code, blocked until complete, value change, journal", () => ProductParametersAsync(configuration, admin, audit, probe));
             await Section("Free entries and invoice linking: reasons, awaited invoice, repeated product, overrun, attach/detach, notification", () => FreeEntriesAsync(configuration, admin, audit, probe));
         }
         finally
@@ -324,6 +325,120 @@ public static class MariaExtendedChecks
         var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && (item.Action == AuditActions.DeleteSubcategory || item.Action == AuditActions.DeleteCategory)).ToList();
         Check(groups.All(group => group.Category != category && group.Category != other) && events.Count(item => item.Action == AuditActions.DeleteCategory) == 2 && events.Count(item => item.Action == AuditActions.DeleteSubcategory) == 1,
             "The empty subcategory and the empty categories are deleted and journaled as their own operations");
+    }
+
+    private static async Task ProductParametersAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var suffix = Suffix();
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var user = new TestAccessControl(false, "utilizator.parametri");
+        var products = new MariaProductRepository(configuration, admin, audit);
+        var parameters = new MariaProductParameterRepository(configuration, admin, audit);
+        var userParameters = new MariaProductParameterRepository(configuration, user, audit);
+        var movements = new MariaStockMovementRepository(configuration, admin, audit);
+        var category = $"Ext Param Cat {suffix}";
+        var subcategory = $"Ext Param Sub {suffix}";
+        await products.CreateCategoryAsync(category);
+        await products.CreateSubcategoryAsync(category, subcategory);
+        var group = new ProductGroup(category, subcategory);
+        var oldProduct = await products.CreateAsync(new ProductInput { Name = $"VECHI-{suffix}", Category = category, Subcategory = subcategory });
+
+        // Definition: a user adds parameters; the name is unique in the subcategory; the unit exists only for a number.
+        var lens = await userParameters.AddParameterAsync(group, "Lentila", "mm", ParameterKind.Number);
+        var color = await userParameters.AddParameterAsync(group, "Culoare", "mm", ParameterKind.Text);
+        Check(lens.Position == 1 && color.Position == 2 && color.Unit == "" && lens.Unit == "mm", "A parameter is added by a user, in order; a text parameter has no unit");
+        await Rejects<ProductOperationException>(() => userParameters.AddParameterAsync(group, "lentilă", "", ParameterKind.Number), "The same parameter name twice in a subcategory is refused (case aside)");
+        await Rejects<AccessDeniedException>(() => userParameters.UpdateParameterAsync(lens, "Lentila", "mm", "test"), "A user who is not an administrator cannot edit a parameter");
+
+        // Values: numbers are written one way, a duplicate is refused, a text is not a number.
+        var v28 = await userParameters.AddValueAsync(lens.Id, "2,8");
+        var v4 = await userParameters.AddValueAsync(lens.Id, " 4.0 ");
+        Check(v28.Value == "2.8" && v4.Value == "4", "A number is stored in one form (2,8 → 2.8; 4.0 → 4)");
+        await Rejects<ProductOperationException>(() => userParameters.AddValueAsync(lens.Id, "2.80"), "The same number written differently is a duplicate");
+        await Rejects<ProductOperationException>(() => userParameters.AddValueAsync(lens.Id, "patru"), "A text is refused for a number parameter");
+        var white = await userParameters.AddValueAsync(color.Id, "alb");
+        var black = await userParameters.AddValueAsync(color.Id, "negru");
+        await Rejects<ProductOperationException>(() => userParameters.AddValueAsync(color.Id, "ALB"), "A text value twice (case aside) is refused");
+
+        // The product that was there before the parameters is blocked until it is completed.
+        var incomplete = await parameters.GetIncompleteProductIdsAsync();
+        Check(incomplete.Contains(oldProduct.Id), "A product that misses the new parameters is marked incomplete");
+        var blocked = await Rejects<StockMovementOperationException>(() => movements.CreateAsync(oldProduct.Id,
+            new StockMovementInput { Kind = StockMovementKind.Entry, Date = today, Quantity = 1, Description = "Ext param blocat" }), "A stock entry on a product with missing parameters is refused");
+        Check(blocked!.Message.Contains("Lentila", StringComparison.Ordinal) && blocked.Message.Contains("Culoare", StringComparison.Ordinal), "The refusal names the missing parameters");
+
+        // A new product: model + a value for each parameter; the code is composed in the order of the parameters.
+        var model = $"CAM-{suffix}";
+        ProductInput Input(string? baseModel, params (SubcategoryParameter Parameter, int ValueId)[] choices) => new()
+        {
+            Name = baseModel ?? "", BaseModel = baseModel ?? "", Category = category, Subcategory = subcategory,
+            Parameters = choices.Select(choice => new ProductParameterChoice(choice.Parameter.Id, choice.ValueId)).ToList()
+        };
+        await Rejects<ProductOperationException>(() => products.CreateAsync(Input(null, (lens, v28.Id), (color, white.Id))), "A product of the subcategory without a model is refused");
+        await Rejects<ProductOperationException>(() => products.CreateAsync(Input(model, (lens, v28.Id))), "A product that misses one parameter is refused");
+        await Rejects<ProductOperationException>(() => products.CreateAsync(Input(model, (lens, v28.Id), (color, 2_000_000_000))), "A value that does not exist is refused");
+        var first = await products.CreateAsync(Input(model, (lens, v28.Id), (color, white.Id)));
+        Check(first.Name == $"{model} - 2.8 mm - alb", "The code is \"<model> - <value> - <value>\" in the order of the parameters");
+        var state = await parameters.GetProductStateAsync(first.Id);
+        Check(state.BaseModel == model && state.Choices.Count == 2 && state.Choices.Any(item => item.ValueId == white.Id), "The model and the chosen values are kept with the product");
+        var baseModels = await parameters.GetBaseModelsAsync();
+        Check(baseModels.GetValueOrDefault(first.Id) == model && !baseModels.ContainsKey(oldProduct.Id), "The model of each product with parameters is available for grouping the variants (a product without values has none)");
+        await Rejects<ProductOperationException>(() => products.CreateAsync(Input(model, (lens, v28.Id), (color, white.Id))), "The same model with the same values is the same code: refused");
+        var second = await products.CreateAsync(Input(model, (lens, v4.Id), (color, white.Id)));
+        Check(second.Name == $"{model} - 4 mm - alb", "Another value of the lens is another variant of the same model");
+        await movements.CreateAsync(first.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today, Quantity = 5, Description = "Ext param intrare" });
+        Check((await products.GetProductAsync(first.Id))!.Quantity == 5, "A complete product takes stock entries");
+
+        // Completing the old product removes the block.
+        var completed = await products.UpdateAsync(oldProduct, new ProductInput
+        {
+            Name = oldProduct.Name, BaseModel = oldProduct.Name, Category = category, Subcategory = subcategory,
+            Parameters = [new(lens.Id, v28.Id), new(color.Id, black.Id)], Reason = "Ext completare parametri"
+        });
+        Check(completed.Name == $"{oldProduct.Name} - 2.8 mm - negru" && !(await parameters.GetIncompleteProductIdsAsync()).Contains(oldProduct.Id), "Choosing the values completes the product and lifts the block");
+        await movements.CreateAsync(oldProduct.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today, Quantity = 1, Description = "Ext param dupa completare" });
+
+        // Deleting values: only the unused ones, by a user.
+        var spare = await userParameters.AddValueAsync(lens.Id, "6");
+        await Rejects<ProductOperationException>(() => userParameters.DeleteValueAsync(v28.Id, "test"), "A value attached to products cannot be deleted");
+        await userParameters.DeleteValueAsync(spare.Id, "Ext valoare nefolosita");
+        Check((await parameters.GetParametersAsync()).Single(item => item.Id == lens.Id).Values.All(item => item.Id != spare.Id), "An unused value is deleted by a user");
+        var counts = (await parameters.GetParametersAsync()).Single(item => item.Id == lens.Id).Values.Single(item => item.Id == v28.Id).ProductCount;
+        Check(counts == 2, "The list of values shows how many products use each value");
+
+        // Changing a used value: administrators only; a collision with another product blocks everything; otherwise the products follow the value.
+        await Rejects<AccessDeniedException>(() => new MariaProductParameterRepository(configuration, user, audit).ChangeValueAsync(v28.Id, "3", "test"), "A user who is not an administrator cannot change a value");
+        await Rejects<ProductOperationException>(() => parameters.PreviewValueChangeAsync(v28.Id, "4"), "Changing a value into one that is already in the list is refused");
+        var otherSubcategory = $"Ext Param Alta {suffix}";
+        await products.CreateSubcategoryAsync(category, otherSubcategory);
+        var squatter = await products.CreateAsync(new ProductInput { Name = $"{model} - 2.9 mm - alb", Category = category, Subcategory = otherSubcategory });
+        var conflictPreview = await parameters.PreviewValueChangeAsync(v28.Id, "2.9");
+        Check(conflictPreview.Affected.Count == 2 && conflictPreview.Conflicts.Count == 1 && !conflictPreview.CanApply, "The preview lists the products that follow the value and the code another product already has");
+        var beforeNames = (await products.GetProductsAsync()).Where(item => item.Category == category).ToDictionary(item => item.Id, item => item.Name);
+        await Rejects<ProductOperationException>(() => parameters.ChangeValueAsync(v28.Id, "2.9", "Ext conflict"), "A change that would give two products the same code is refused");
+        var afterNames = (await products.GetProductsAsync()).Where(item => item.Category == category).ToDictionary(item => item.Id, item => item.Name);
+        Check(beforeNames.Count == afterNames.Count && beforeNames.All(item => afterNames[item.Key] == item.Value), "A refused change leaves every product as it was");
+        await products.DeleteAsync((await products.GetProductAsync(squatter.Id))!, "Ext curatare");
+
+        var changed = await parameters.ChangeValueAsync(v28.Id, "2.9", "Ext corectie valoare");
+        Check(changed.Affected.Count == 2 && changed.Affected.All(item => item.NewName.Contains(" - 2.9 mm - ", StringComparison.Ordinal)), "The products that use the value are renamed with it");
+        var renamed = await products.GetProductAsync(first.Id);
+        Check(renamed!.Name == $"{model} - 2.9 mm - alb" && renamed.Version > first.Version && renamed.Quantity == 5, "A renamed product keeps its stock and gets a new version");
+        Check((await parameters.GetParametersAsync()).Single(item => item.Id == lens.Id).Values.Any(item => item.Id == v28.Id && item.Value == "2.9"), "The value itself is changed once for all");
+
+        // A parameter cannot be deleted while the subcategory has products; the journal names each operation.
+        await Rejects<ProductOperationException>(() => parameters.DeleteParameterAsync(lens, "Ext sters"), "A parameter of a subcategory with products cannot be deleted");
+        var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started).ToList();
+        Check(events.Count(item => item.Action == AuditActions.AddSubcategoryParameter) == 2 && events.Count(item => item.Action == AuditActions.AddParameterValue) >= 4
+              && events.Any(item => item.Action == AuditActions.DeleteParameterValue && item.Motif == "Ext valoare nefolosita")
+              && events.Any(item => item.Action == AuditActions.EditParameterValue && item.Details.Contains("2.8 mm → 2.9 mm", StringComparison.Ordinal) && item.Motif == "Ext corectie valoare")
+              && events.Count(item => item.Action == AuditActions.RenameProductByParameter) == 2,
+            "The journal names each operation: parameter and value added, value deleted, value changed and every product renamed");
+        var createEvent = events.FirstOrDefault(item => item.EntityType == AuditEntities.Product && item.Action == AuditActions.Create && item.Target == first.Name);
+        Check(createEvent is not null && createEvent.Details.Contains("Parametri: Lentila: 2.8 mm; Culoare: alb", StringComparison.Ordinal), "The creation of a product records its parameters");
+        var editEvent = events.FirstOrDefault(item => item.EntityType == AuditEntities.Product && item.Action == AuditActions.Edit && item.Target == completed.Name);
+        Check(editEvent is not null && editEvent.Details.Contains("Parametri:  → Lentila: 2.8 mm; Culoare: negru", StringComparison.Ordinal), "A product completed with its values records the parameters before and after");
     }
 
     private static async Task SupplierProductCodesAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)

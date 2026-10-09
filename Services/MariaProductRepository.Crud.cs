@@ -25,22 +25,24 @@ public sealed partial class MariaProductRepository
     {
         await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
-        (Product Product, GroupResolution Group) result;
+        (Product Product, GroupResolution Group, string Parameters) result;
         try
         {
             result = await WriteAsync(async (connection, transaction) =>
             {
-                await EnsureUniqueProductNameAsync(connection, transaction, value.Name, null, cancellationToken).ConfigureAwait(false);
                 var group = await ResolveGroupAsync(connection, transaction, value.Category, value.Subcategory, cancellationToken).ConfigureAwait(false);
+                var parameters = await ResolveParametersAsync(connection, transaction, group.SubcategoryId, group.Subcategory, value, cancellationToken).ConfigureAwait(false);
+                await EnsureUniqueProductNameAsync(connection, transaction, parameters.Name, null, cancellationToken).ConfigureAwait(false);
                 await using var insert = Command(connection, transaction, """
                     INSERT INTO products(category_id,subcategory_id,name,normalized_name,description,quantity,version)
                     VALUES(@category,@subcategory,@name,@normalized,@description,@quantity,0)
                     """, ("@category", group.CategoryId), ("@subcategory", group.SubcategoryId),
-                    ("@name", value.Name), ("@normalized", TextNormalization.UniquenessKey(value.Name)),
+                    ("@name", parameters.Name), ("@normalized", TextNormalization.UniquenessKey(parameters.Name)),
                     ("@description", value.Description), ("@quantity", 0));
                 await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                var product = new Product(checked((int)insert.LastInsertedId), group.Category, group.Subcategory, value.Name, value.Description, 0);
-                return (Product: product, Group: group);
+                var product = new Product(checked((int)insert.LastInsertedId), group.Category, group.Subcategory, parameters.Name, value.Description, 0);
+                if (parameters.BaseModel is not null) await StoreParametersAsync(connection, transaction, product.Id, parameters, cancellationToken).ConfigureAwait(false);
+                return (Product: product, Group: group, Parameters: parameters.Summary);
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (MySqlException exception) when (IsDuplicateKey(exception))
@@ -49,8 +51,9 @@ public sealed partial class MariaProductRepository
         }
         var product = result.Product;
         await RecordCreatedGroupsAsync(result.Group, cancellationToken).ConfigureAwait(false);
+        var identification = ProductCode.AuditIdentification(product) + (result.Parameters.Length == 0 ? "" : $"; Parametri: {result.Parameters}");
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Product, product.Id.ToString(),
-            ProductCode.AuditTarget(product), ProductCode.AuditIdentification(product), cancellationToken).ConfigureAwait(false);
+            ProductCode.AuditTarget(product), identification, cancellationToken).ConfigureAwait(false);
         return product;
     }
 
@@ -58,27 +61,30 @@ public sealed partial class MariaProductRepository
     {
         await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         var value = input.Validated(original);
-        (Product Product, GroupResolution Group) result;
+        (Product Product, GroupResolution Group, string Parameters) result;
         try
         {
             result = await WriteAsync(async (connection, transaction) =>
             {
                 var current = await GetLocked(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
                 ProductRules.CheckCurrent(current, original);
-                await EnsureUniqueProductNameAsync(connection, transaction, value.Name, original.Id, cancellationToken).ConfigureAwait(false);
                 var group = await ResolveGroupAsync(connection, transaction, value.Category, value.Subcategory, cancellationToken).ConfigureAwait(false);
+                var parameters = await ResolveParametersAsync(connection, transaction, group.SubcategoryId, group.Subcategory, value, cancellationToken).ConfigureAwait(false);
+                await EnsureUniqueProductNameAsync(connection, transaction, parameters.Name, original.Id, cancellationToken).ConfigureAwait(false);
+                var oldParameters = await ParameterSummaryAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
                 var version = checked(original.Version + 1);
                 await using var command = Command(connection, transaction, """
                     UPDATE products SET category_id=@category,subcategory_id=@subcategory,name=@name,
                         normalized_name=@normalized,description=@description,version=@version
                     WHERE id=@id AND version=@oldVersion
-                    """, ("@category", group.CategoryId), ("@subcategory", group.SubcategoryId), ("@name", value.Name),
-                    ("@normalized", TextNormalization.UniquenessKey(value.Name)), ("@description", value.Description),
+                    """, ("@category", group.CategoryId), ("@subcategory", group.SubcategoryId), ("@name", parameters.Name),
+                    ("@normalized", TextNormalization.UniquenessKey(parameters.Name)), ("@description", value.Description),
                     ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version));
                 if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                     throw new ProductOperationException("Produsul s-a schimbat între timp. Actualizează catalogul.");
-                var product = new Product(original.Id, group.Category, group.Subcategory, value.Name, value.Description, current!.Quantity, version);
-                return (Product: product, Group: group);
+                await StoreParametersAsync(connection, transaction, original.Id, parameters, cancellationToken).ConfigureAwait(false);
+                var product = new Product(original.Id, group.Category, group.Subcategory, parameters.Name, value.Description, current!.Quantity, version);
+                return (Product: product, Group: group, Parameters: oldParameters + "\u001f" + parameters.Summary);
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (MySqlException exception) when (IsDuplicateKey(exception))
@@ -87,8 +93,10 @@ public sealed partial class MariaProductRepository
         }
         var product = result.Product;
         await RecordCreatedGroupsAsync(result.Group, cancellationToken).ConfigureAwait(false);
+        var summaries = result.Parameters.Split('\u001f');
         await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.Product, product.Id.ToString(),
-            ProductCode.AuditTarget(product), ProductCode.AuditChanges(original, product), value.Reason, cancellationToken).ConfigureAwait(false);
+            ProductCode.AuditTarget(product), [.. ProductCode.AuditChanges(original, product), new("Parametri", summaries[0], summaries[1])],
+            value.Reason, cancellationToken).ConfigureAwait(false);
         return product;
     }
 

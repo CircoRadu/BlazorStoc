@@ -299,6 +299,13 @@ REPLACE INTO `offers` (`id`, `number`, `number_key`, `revision`, `title`, `categ
 /*!40000 ALTER TABLE `offers` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `parameter_values` WRITE;
+/*!40000 ALTER TABLE `parameter_values` DISABLE KEYS */;
+REPLACE INTO `parameter_values` (`id`, `parameter_id`, `value`, `normalized_value`) VALUES (1,1,'2.8 mm','2.8 MM'),
+(2,1,'4 mm','4 MM');
+/*!40000 ALTER TABLE `parameter_values` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `product_images` WRITE;
 /*!40000 ALTER TABLE `product_images` DISABLE KEYS */;
 /*!40000 ALTER TABLE `product_images` ENABLE KEYS */;
@@ -306,7 +313,6 @@ UNLOCK TABLES;
 
 LOCK TABLES `product_locks` WRITE;
 /*!40000 ALTER TABLE `product_locks` DISABLE KEYS */;
-REPLACE INTO `product_locks` (`product_id`, `owner_username`, `session_id`, `acquired_utc`, `renewed_utc`, `expires_utc`) VALUES (4,'administrator.demo','fc4a1105-1c8f-49d8-b296-bd8b71fb13d4','2026-10-08T06:16:24.082Z','2026-10-08T06:16:24.082Z','2026-10-08T06:17:54.082Z');
 /*!40000 ALTER TABLE `product_locks` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -315,25 +321,30 @@ LOCK TABLES `product_min_stock` WRITE;
 /*!40000 ALTER TABLE `product_min_stock` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `product_parameter_values` WRITE;
+/*!40000 ALTER TABLE `product_parameter_values` DISABLE KEYS */;
+/*!40000 ALTER TABLE `product_parameter_values` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `products` WRITE;
 /*!40000 ALTER TABLE `products` DISABLE KEYS */;
-REPLACE INTO `products` (`id`, `category_id`, `subcategory_id`, `name`, `normalized_name`, `description`, `quantity`, `version`) VALUES (1,1,1,'Masina de gaurit cu acumulator','MASINA DE GAURIT CU ACUMULATOR','18 V · mandrina de 13 mm · set cu doua acumulatoare',10,0),
-(2,1,2,'Polizor unghiular','POLIZOR UNGHIULAR','Disc 125 mm · putere 900 W',9,0),
-(3,2,3,'Casca de protectie alba XXL','CASCA DE PROTECTIE ALBA XXL','Reglaj cu rotita · utilizare pe santier',34,1),
-(4,3,4,'Surub autoforant 4,8 × 25 test','SURUB AUTOFORANT 4,8 × 25 TEST','Cutie pentru montaj profile metalice',150,4),
-(5,4,5,'Telemetru laser','TELEMETRU LASER','Domeniu 0,2–50 m · husa inclusa',0,0),
-(6,5,6,'Set chei combinate','SET CHEI COMBINATE','12 piese · dimensiuni 8–19 mm',7,0),
-(7,2,7,'Manusi de lucru','MANUSI DE LUCRU','Marimea 10 · acoperire nitril',52,0),
-(8,3,2,'Disc diamantat 230 mm','DISC DIAMANTAT 230 MM','Pentru beton si zidarie',0,0),
-(9,4,8,'Nivela cu bula 60 cm','NIVELA CU BULA 60 CM','Corp aluminiu · trei fiole',5,0),
-(10,1,1,'Ciocan rotopercutor SDS Plus','CIOCAN ROTOPERCUTOR SDS PLUS','Putere 800 W · energie de impact 2,7 J',2,0),
-(12,5,6,'Diblu nylon 8 × 40 test 22','DIBLU NYLON 8 × 40 TEST 22','Pentru fixari in zidarie si polistiren si BCA',148,8),
-(20,7,15,'DS-3E0109P-E-M','DS-3E0109P-E-M','Switch 8 porturi PoE, 1 port uplink- HIKVISION',10,1),
-(21,6,13,'DS-2CD1343G2-LIU-2.8mm','DS-2CD1343G2-LIU-2.8MM','Camera IP, 4MP, lentila 2.8mm, IR 30m, WL 30m, Mic - HIKVISION',2,1),
-(22,6,13,'DS-2CD1B43G2-LIU-2.8mm','DS-2CD1B43G2-LIU-2.8MM','Camera IP 4MP, lentila 2.8mm, IR 60m, WL 60m, Mic. - HIKVISION',14,1),
-(23,7,15,'DS-3E1318P-EI-M','DS-3E1318P-EI-M','Switch 16 porturi PoE 100Mbps, 1 port Gigabit combo, 1 Gigabit RJ45, SMART Management',2,2),
-(24,7,15,'DS-3E0105P-E-M','DS-3E0105P-E-M','DS-3E0105P-E-M Switch 4 porturi PoE, 1 port uplink- HIKVISION',2,1),
-(25,6,12,'DS-7116HQHI-K1','DS-7116HQHI-K1','',1,1);
+REPLACE INTO `products` (`id`, `category_id`, `subcategory_id`, `name`, `normalized_name`, `description`, `quantity`, `version`, `base_model`) VALUES (1,1,1,'Masina de gaurit cu acumulator','MASINA DE GAURIT CU ACUMULATOR','18 V · mandrina de 13 mm · set cu doua acumulatoare',10,0,NULL),
+(2,1,2,'Polizor unghiular','POLIZOR UNGHIULAR','Disc 125 mm · putere 900 W',9,0,NULL),
+(3,2,3,'Casca de protectie alba XXL','CASCA DE PROTECTIE ALBA XXL','Reglaj cu rotita · utilizare pe santier',34,1,NULL),
+(4,3,4,'Surub autoforant 4,8 × 25 test','SURUB AUTOFORANT 4,8 × 25 TEST','Cutie pentru montaj profile metalice',150,4,NULL),
+(5,4,5,'Telemetru laser','TELEMETRU LASER','Domeniu 0,2–50 m · husa inclusa',0,0,NULL),
+(6,5,6,'Set chei combinate','SET CHEI COMBINATE','12 piese · dimensiuni 8–19 mm',7,0,NULL),
+(7,2,7,'Manusi de lucru','MANUSI DE LUCRU','Marimea 10 · acoperire nitril',52,0,NULL),
+(8,3,2,'Disc diamantat 230 mm','DISC DIAMANTAT 230 MM','Pentru beton si zidarie',0,0,NULL),
+(9,4,8,'Nivela cu bula 60 cm','NIVELA CU BULA 60 CM','Corp aluminiu · trei fiole',5,0,NULL),
+(10,1,1,'Ciocan rotopercutor SDS Plus','CIOCAN ROTOPERCUTOR SDS PLUS','Putere 800 W · energie de impact 2,7 J',2,0,NULL),
+(12,5,6,'Diblu nylon 8 × 40 test 22','DIBLU NYLON 8 × 40 TEST 22','Pentru fixari in zidarie si polistiren si BCA',148,8,NULL),
+(20,7,15,'DS-3E0109P-E-M','DS-3E0109P-E-M','Switch 8 porturi PoE, 1 port uplink- HIKVISION',10,1,NULL),
+(21,6,13,'DS-2CD1343G2-LIU-2.8mm','DS-2CD1343G2-LIU-2.8MM','Camera IP, 4MP, lentila 2.8mm, IR 30m, WL 30m, Mic - HIKVISION',2,1,NULL),
+(22,6,13,'DS-2CD1B43G2-LIU-2.8mm','DS-2CD1B43G2-LIU-2.8MM','Camera IP 4MP, lentila 2.8mm, IR 60m, WL 60m, Mic. - HIKVISION',14,1,NULL),
+(23,7,15,'DS-3E1318P-EI-M','DS-3E1318P-EI-M','Switch 16 porturi PoE 100Mbps, 1 port Gigabit combo, 1 Gigabit RJ45, SMART Management',2,2,NULL),
+(24,7,15,'DS-3E0105P-E-M','DS-3E0105P-E-M','DS-3E0105P-E-M Switch 4 porturi PoE, 1 port uplink- HIKVISION',2,1,NULL),
+(25,6,12,'DS-7116HQHI-K1','DS-7116HQHI-K1','',1,1,NULL);
 /*!40000 ALTER TABLE `products` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -467,6 +478,12 @@ REPLACE INTO `subcategories` (`id`, `category_id`, `name`, `normalized_name`) VA
 (14,6,'Camere analogice','CAMERE ANALOGICE'),
 (15,7,'Switch','SWITCH');
 /*!40000 ALTER TABLE `subcategories` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `subcategory_parameters` WRITE;
+/*!40000 ALTER TABLE `subcategory_parameters` DISABLE KEYS */;
+REPLACE INTO `subcategory_parameters` (`id`, `subcategory_id`, `name`, `normalized_name`, `unit`, `kind`, `position`, `version`) VALUES (1,13,'Lentila','LENTILA','',2,1,0);
+/*!40000 ALTER TABLE `subcategory_parameters` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `supplier_aliases` WRITE;

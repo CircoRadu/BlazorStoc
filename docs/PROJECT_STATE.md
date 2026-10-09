@@ -9,6 +9,12 @@ Actualizat: 08.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (09.10.2026, parametri obligatori)
+
+- Parametri obligatori pe subcategorie (migrarea 37, `Services/ProductParameters.cs`, `MariaProductParameterRepository`, panoul `SubcategoryParametersPanel` pe /categorii): produsul se salveaza "<model> - <valoare> - ...", produsele vechi ale subcategoriei sunt blocate la miscari pana li se aleg valorile; valorile noi le adauga orice utilizator, editarea unei valori folosite doar administratorul (previzualizare, redenumire atomica, refuz la conflict).
+- Preluare factura: variantele unui model se aleg in pasul 2 (`InvoiceVariants`, `PickupProductCell`); caractere nesigure din OCR marcate (`InvoiceAmbiguity`) in tabel si in formularul de produs; corectat crash-ul la numere uriase din scan (`InvoiceTableReader.AddsUp`). Camp "Scrisa de mine" ascuns pana la selectare.
+- Suita MariaDB 1703 trecute, grupuri componente/pickup/xml/pdf trecute. De verificat in browser: `Teste utilizator/` 01 si 04.
+
 ## Ultimul lucru facut (09.10.2026)
 
 - Facturi XML (UBL / e-Factura): `Services/Invoices/InvoiceXml.cs` (mapare de cai, cititor, reguli), sablon salvat in `invoice_templates` cu `source_kind` xml (campul `Xml` din definitie, fara migrare), fereastra `InvoiceXmlTemplateEditor` in Setari -> Facturi -> Sabloane salvate, ramura XML in `InvoicePickup` (`OpenXmlAsync`, sablon dupa CUI, altfel UBL standard). Teste: `InvoiceXmlChecks` (19). Neverificat in browser (`Teste utilizator/04`).

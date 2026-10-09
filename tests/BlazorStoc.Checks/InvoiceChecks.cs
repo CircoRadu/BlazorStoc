@@ -20,6 +20,28 @@ public static class InvoiceChecks
         SeparatorsOnRules(check);
         ProductMatching(check);
         Vocabulary(check);
+        {
+            // Characters that OCR makes out of a stroke or a stain mark the row for checking; a page with real text and the usual punctuation do not.
+            check(InvoiceAmbiguity.Found("DS-2CD2T43G2-2L| 2.8MM") == "|" && InvoiceAmbiguity.Found("[1]_x§") == "[]_§" && InvoiceAmbiguity.Found("Camera 4,8 x 25 (IP) - 2.8 mm / 12V + 5% \"A\" #1 & co.") == "",
+                "Invoice ambiguity: the strokes and stains OCR reads as text are found, the usual punctuation of a line is not");
+            var ocrPage = new InvoicePageData(1, 595, 841, InvoiceSources.Ocr, []);
+            var textPage = new InvoicePageData(2, 595, 841, InvoiceSources.Text, []);
+            var bad = new Dictionary<string, string> { ["n"] = "Camera| 2.8MM" };
+            var good = new Dictionary<string, string> { ["n"] = "Camera 2.8MM" };
+            var marked = InvoiceAmbiguity.Mark([new(1, 1, bad, []), new(1, 2, good, []), new(2, 3, bad, [])], new InvoiceDocument([ocrPage, textPage]));
+            check(marked[0].Flags.Count == 1 && marked[0].Flags[0].StartsWith(InvoiceAmbiguity.FlagPrefix) && marked[1].Flags.Count == 0 && marked[2].Flags.Count == 0,
+                "Invoice ambiguity: a row read by OCR with an ambiguous character is flagged for checking, a clean row and a row of a text page are not");
+        }
+        {
+            // Numbers misread from a scan can be far beyond the range of a decimal: the row is flagged, the reading does not fail.
+            var columns = new List<InvoiceColumn>
+            {
+                new("q", "Cantitate", InvoiceColumnMeanings.Quantity, 0, 10), new("p", "Pret", InvoiceColumnMeanings.UnitPrice, 11, 20), new("v", "Valoare", InvoiceColumnMeanings.Value, 21, 30)
+            };
+            var huge = new InvoiceTableRow(1, 1, new Dictionary<string, string> { ["q"] = "79228162514264337593543950335", ["p"] = "79228162514264337593543950335", ["v"] = "10" }, []);
+            var checkedRows = InvoiceTableReader.Validate([huge], columns, '.');
+            check(checkedRows.Count == 1 && checkedRows[0].Flags.Contains(InvoiceTableReader.ArithmeticFlag), "Invoice analysis: a quantity and a price too big to multiply flag the row instead of failing the reading");
+        }
         var reader = new InvoicePdfReader(new TestTessdata());
 
         async Task<(InvoiceDocument Document, InvoiceAnalysis Analysis)> Analyze(byte[] pdf)

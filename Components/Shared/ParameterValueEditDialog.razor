@@ -1,0 +1,119 @@
+@using BlazorStoc.Services
+@inject IProductParameterRepository Parameters
+@inject ILogger<ParameterValueEditDialog> Logger
+@implements IDisposable
+
+@* Administrators only. Step 1: the new value and what it does to the products that use the old one (nothing is written); step 2: the reason and the confirmation. *@
+<div class="delete-overlay">
+    <section class="delete-dialog parameter-value-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+        <h2 id="@TitleId">Modifici valoarea parametrului?</h2>
+        <p class="delete-object"><strong>@Parameter.Name: @Parameter.Display(Value.Value)</strong></p>
+        @if (!confirming)
+        {
+            <p>@(Value.ProductCount == 0
+                ? "Valoarea nu este folosită de niciun produs."
+                : $"Valoarea este folosită de {Value.ProductCount} produse: codurile lor se schimbă odată cu ea.")</p>
+            <label class="full-width" for="@InputId">Valoare nouă *
+                <input id="@InputId" maxlength="@ProductParameterRules.ValueMaximumLength" value="@newValue" @oninput="args => { newValue = args.Value?.ToString() ?? string.Empty; change = null; error = null; }" disabled="@busy" autocomplete="off" />
+            </label>
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            @if (change is not null) { @Preview }
+            <div class="editor-actions">
+                @if (change is { CanApply: true }) { <button type="button" class="primary" disabled="@busy" @onclick="() => confirming = true">Continuă</button> }
+                else { <button type="button" class="refresh act-reload" disabled="@busy" @onclick="CheckAsync">Verifică modificarea</button> }
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => Closed.InvokeAsync()">Anulează</button>
+            </div>
+        }
+        else
+        {
+            <p>Valoarea „@Parameter.Display(change!.OldValue)” devine „@Parameter.Display(change.NewValue)”@(change.Affected.Count == 0 ? "." : $", iar {change.Affected.Count} produse sunt redenumite.")</p>
+            <ChangeReasonField Id="@ReasonId" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="@busy" CssClass="delete-custom-reason" />
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@busy" @onclick="ApplyAsync">@(busy ? "Se salvează…" : "Aplică modificarea")</button>
+                <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => confirming = false">Înapoi</button>
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => Closed.InvokeAsync()">Anulează</button>
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SubcategoryParameter Parameter { get; set; } = null!;
+    [Parameter, EditorRequired] public ParameterListValue Value { get; set; } = null!;
+    [Parameter, EditorRequired] public EventCallback Closed { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> Changed { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private string TitleId => $"value-title-{instanceId}";
+    private string InputId => $"value-input-{instanceId}";
+    private string ReasonId => $"value-reason-{instanceId}";
+    private string newValue = "", customReason = "", reasonChosen = "";
+    private string? error, reasonError;
+    private bool busy, confirming, reasonAuto = true;
+    private ParameterValueChange? change;
+    private string AutoSummary => change is null ? "" : ChangeReasonSummary.Build(
+        [new($"Valoare «{Parameter.Name}»", Parameter.Display(change.OldValue), Parameter.Display(change.NewValue))])
+        + (change.Affected.Count > 0 ? $"\n{change.Affected.Count} produse redenumite" : "");
+
+    protected override void OnInitialized() => newValue = Value.Value;
+
+    private RenderFragment Preview => @<div>
+        @if (change!.Conflicts.Count > 0)
+        {
+            <div class="error-banner" role="alert">@ProductParameterRules.ConflictMessage(change.Conflicts)</div>
+        }
+        else if (string.Equals(change.OldValue, change.NewValue, StringComparison.Ordinal))
+        {
+            <p class="form-note">Valoarea scrisă este aceeași cu cea actuală.</p>
+        }
+        else if (change.Affected.Count > 0)
+        {
+            <p class="form-note">Produsele care își schimbă codul:</p>
+            <div class="table-scroll"><table class="save-summary">
+                <thead><tr><th scope="col">Cod actual</th><th scope="col">Cod nou</th><th scope="col">Stoc</th></tr></thead>
+                <tbody>@foreach (var product in change.Affected) { <tr @key="product.ProductId"><td>@product.OldName</td><td><strong>@product.NewName</strong></td><td>@product.Quantity buc.</td></tr> }</tbody>
+            </table></div>
+        }
+        else
+        {
+            <p class="form-note">Niciun produs nu folosește valoarea: se schimbă doar valoarea din listă.</p>
+        }
+    </div>;
+
+    private async Task CheckAsync()
+    {
+        if (busy) return;
+        busy = true; error = null; change = null;
+        try { change = await Parameters.PreviewValueChangeAsync(Value.Id, newValue, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProductOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Parameter value preview failed ({ErrorType}).", exception.GetType().Name); error = "Verificarea nu a reușit. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (busy || change is null) return;
+        reasonError = ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason);
+        if (reasonError is not null) return;
+        reasonChosen = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
+        busy = true; error = null;
+        try
+        {
+            var applied = await Parameters.ChangeValueAsync(Value.Id, newValue, reasonChosen, lifetime.Token);
+            await Changed.InvokeAsync(applied.Affected.Count == 0
+                ? "Valoarea a fost modificată."
+                : $"Valoarea a fost modificată; {applied.Affected.Count} produse au fost redenumite.");
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ProductOperationException exception) { error = exception.Message; confirming = false; change = null; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Parameter value change failed ({ErrorType}).", exception.GetType().Name); error = "Modificarea nu a putut fi confirmată. Verifică lista înainte să reîncerci."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

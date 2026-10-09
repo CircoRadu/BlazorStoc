@@ -3,7 +3,8 @@
 @* Invoice pickup, step 2: the catalog product of one row: the exact one (and where it came from), the new product prepared for it, or the closest ones to choose from. *@
 @if (Match.Exact is { } exact)
 {
-    <div class="pickup-exact"><span class="stock-badge in-stock"><span>●</span> @ExactText(Match.Via)</span> <strong>@exact.Name</strong> <small class="muted">@exact.Description · stoc @exact.Quantity buc.</small></div>
+    <div class="pickup-exact"><span class="stock-badge in-stock"><span>●</span> @ExactText(Match.Via)</span> <strong>@exact.Name</strong> <small class="muted">@exact.Description · stoc @exact.Quantity buc.</small>
+        @if (Incomplete.Contains(exact.Id)) { <small class="lock-badge incomplete-badge">⚠ Parametri obligatorii necompletați: intrarea va fi refuzată. <a href="@($"/produse?edit={exact.Id}")" target="_blank" rel="noopener">Editează produsul</a> (într-o fereastră nouă), apoi reia pasul.</small> }</div>
 }
 else if (Staged is { } staged)
 {
@@ -11,6 +12,20 @@ else if (Staged is { } staged)
         <small class="muted">@staged.Input.Category / @staged.Input.Subcategory · nu e în catalog încă, se adaugă la finalizare</small>
         <button type="button" class="refresh act-edit" @onclick="OnOpenNew">Modifică</button>
         <button type="button" class="danger" @onclick="OnDiscardStaged">Renunță</button></div>
+}
+else if (Match.Variants is { } variants)
+{
+    <fieldset class="pickup-alternatives pickup-variants">
+        <legend class="muted">@(Match.Note.Length > 0 ? Match.Note + " " : "")Modelul „@Match.BaseModel” are variante în catalog. Alege varianta de preluat:</legend>
+        @foreach (var variant in variants)
+        {
+            <label class="pickup-alternative"><input type="radio" name="@("pick-" + Index)" checked="@(ProductId == variant.Id)" @onchange="() => OnPick.InvokeAsync(variant.Id)" />
+                <span><strong>@variant.Name</strong> <small class="muted">@variant.Description · stoc @variant.Quantity buc.</small>
+                    @if (Incomplete.Contains(variant.Id)) { <small class="lock-badge incomplete-badge">⚠ Parametri necompletați: <a href="@($"/produse?edit={variant.Id}")" target="_blank" rel="noopener">editează produsul</a></small> }</span></label>
+        }
+        <label class="pickup-alternative"><input type="radio" name="@("pick-" + Index)" checked="@(ProductId is null)" @onchange="() => OnNone.InvokeAsync()" /> <span>Niciuna dintre variante (rândul nu se preia)</span></label>
+        <button type="button" class="refresh act-confirm" @onclick="OnOpenNew">+ Variantă nouă a modelului „@Match.BaseModel”</button>
+    </fieldset>
 }
 else
 {
@@ -31,6 +46,8 @@ else
     [Parameter, EditorRequired] public InvoiceProductMatch Match { get; set; } = default!;
     [Parameter] public StagedProduct? Staged { get; set; }
     [Parameter] public int? ProductId { get; set; }
+    // Products with required parameters that miss a value: they cannot take a stock entry until they are completed.
+    [Parameter] public IReadOnlySet<int> Incomplete { get; set; } = new HashSet<int>();
     [Parameter] public int Index { get; set; }
     [Parameter] public EventCallback<int> OnPick { get; set; }
     [Parameter] public EventCallback OnNone { get; set; }

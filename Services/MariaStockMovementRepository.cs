@@ -982,8 +982,8 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             {
                 var current = await GetMovementAsync(connection, transaction, original.Id, true, token).ConfigureAwait(false);
                 StockMovementRules.CheckCurrent(current, original);
-                await LockProductAsync(connection, transaction, current!.ProductId, token).ConfigureAwait(false);
-                var snapshot = await VehicleSnapshotAsync(connection, transaction, current.ProductId, token).ConfigureAwait(false);
+                await LockProductAsync(connection, transaction, current!.ProductId, token, requireComplete: false).ConfigureAwait(false);
+                var snapshot =await VehicleSnapshotAsync(connection, transaction, current.ProductId, token).ConfigureAwait(false);
                 await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token).ConfigureAwait(false);
                 await using (var deleteHistory = Command(connection, transaction,
                     "DELETE FROM stock_movement_history WHERE movement_id=@id", ("@id", original.Id)))
@@ -1172,11 +1172,28 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     // Locks the product row for the rest of the transaction: every stock/vehicle-quantity check and the final
     // UPDATE products SET quantity=... below run under this lock, so two concurrent movements on the same product
     // serialize instead of racing (the MariaDB equivalent of SQLite's single-writer Serializable transaction).
-    private static async Task<string> LockProductAsync(MySqlConnection connection, MySqlTransaction transaction, int productId, CancellationToken token)
+    private static async Task<string> LockProductAsync(MySqlConnection connection, MySqlTransaction transaction, int productId, CancellationToken token,
+        bool requireComplete = true)
     {
         await using var command = Command(connection, transaction, "SELECT name FROM products WHERE id=@id FOR UPDATE", ("@id", productId));
-        return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string
-               ?? throw new StockMovementOperationException(ProductMissingMessage);
+        var name = await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string
+                   ?? throw new StockMovementOperationException(ProductMissingMessage);
+        if (requireComplete) await EnsureParametersCompleteAsync(connection, transaction, productId, name, token).ConfigureAwait(false);
+        return name;
+    }
+
+    // A product of a subcategory with required parameters that misses a value is blocked until it is completed (migration 37).
+    private static async Task EnsureParametersCompleteAsync(MySqlConnection connection, MySqlTransaction transaction, int productId, string name, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, """
+            SELECT sp.name FROM products p INNER JOIN subcategory_parameters sp ON sp.subcategory_id=p.subcategory_id
+            WHERE p.id=@id AND NOT EXISTS(SELECT 1 FROM product_parameter_values pv WHERE pv.product_id=p.id AND pv.parameter_id=sp.id)
+            ORDER BY sp.position,sp.id
+            """, ("@id", productId));
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        var missing = new List<string>();
+        while (await reader.ReadAsync(token).ConfigureAwait(false)) missing.Add(reader.GetString(0));
+        if (missing.Count > 0) throw new StockMovementOperationException(ProductParameterRules.MissingMessage(name, missing));
     }
 
     // Atomic increment under the product row lock: concurrent movements cannot overwrite each other's stock change.

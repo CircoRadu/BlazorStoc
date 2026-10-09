@@ -50,8 +50,8 @@ public static class ReasonSummaryChecks
             var cut = context.Render<T>(setup);
             string Text() => cut.Find($"#{reasonId}-auto").GetAttribute("value") ?? "";
             var radios = cut.FindAll($"input[type=radio][name='{reasonId}-mode']");
-            check(radios.Count == 2 && radios[0].HasAttribute("checked") && !radios[1].HasAttribute("checked") && Text() == "" && cut.Find($"#{reasonId}").HasAttribute("disabled"),
-                $"{name}: the reason is chosen with radio buttons, the generated one first and empty until something is changed");
+            check(radios.Count == 2 && radios[0].HasAttribute("checked") && !radios[1].HasAttribute("checked") && Text() == "" && cut.FindAll($"#{reasonId}").Count == 0,
+                $"{name}: the reason is chosen with radio buttons, the generated one first and empty until something is changed, the written field hidden");
             firstChange(cut);
             check(Text().Split('\n') is [var one] && one.StartsWith(firstLabel + ": ") && one.Contains(" → "), $"{name}: the generated reason shows the first change on a line");
             secondChange(cut);
@@ -59,7 +59,7 @@ public static class ReasonSummaryChecks
             firstBack(cut);
             check(Text().Split('\n') is [var left] && left.StartsWith(secondLabel + ": "), $"{name}: a change put back to its original value leaves the generated reason");
             cut.FindAll($"input[type=radio][name='{reasonId}-mode']")[1].Change(true);
-            check(!cut.Find($"#{reasonId}").HasAttribute("disabled"), $"{name}: choosing the written reason enables its field");
+            check(cut.FindAll($"#{reasonId}").Count == 1 && !cut.Find($"#{reasonId}").HasAttribute("disabled"), $"{name}: choosing the written reason shows and enables its field");
         }
 
         var beneficiary = new Beneficiary(1, "Beneficiar Test SRL", "RO12345678", 1, BeneficiaryKinds.Legal, "Strada Test 1", "0721000111", "J40/1/2020", "010101", "4321");

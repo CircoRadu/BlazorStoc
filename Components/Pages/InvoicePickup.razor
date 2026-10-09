@@ -361,11 +361,12 @@ else if (step == 2)
                                             <textarea class="pickup-cell pickup-name" rows="@NameRows(cellText)" aria-label="@column.Title, rândul @(index + 1)" value="@cellText" @onchange="args => EditCell(at, id, args.Value?.ToString() ?? string.Empty)"></textarea>
                                         }
                                         else {<input class="pickup-cell @(notNumber ? "invalid" : "")" data-numeric="@(IsNumeric(column) ? "" : null)" inputmode="@(IsNumeric(column) ? "decimal" : null)" aria-label="@column.Title, rândul @(index + 1)" aria-invalid="@(notNumber ? "true" : null)" title="@(notNumber ? "Valoarea nu este citită ca număr: corecteaz-o după factură." : null)" value="@item.Cells.GetValueOrDefault(id, "")" @onchange="args => EditCell(at, id, args.Value?.ToString() ?? string.Empty)" />}
+                                        @if (OcrDoubt(cellText) is { Length: > 0 } doubt) { <span class="uncertain-badge" title="@(InvoiceAmbiguity.Flag(doubt))">⚠ caractere nesigure din OCR: @doubt</span> }
                                         @if (rowHasBadNumber && id == warningColumnId) { <p class="pickup-row-warning" role="alert"><span class="pickup-warning-icon" aria-hidden="true">!</span> Atenție: unele valori din acest rând nu sunt numere (câmpurile cu fundal roșu). Corectați-le.</p>
                                             @if (RowPicture(item, [.. ShownColumns.Where(column => NotANumber(column, item.Cells.GetValueOrDefault(column.Id, "")))]) is { } rowPicture) { <img class="pickup-region pickup-row-picture" src="@rowPicture" alt="Rândul din factură, cu valorile necitite ca număr încadrate" /> } }</td>
                                 }
                                 <td class="pickup-product">
-                                    <PickupProductCell Match="item.Match" Staged="item.Staged" ProductId="item.ProductId" Index="index"
+                                    <PickupProductCell Match="item.Match" Staged="item.Staged" ProductId="item.ProductId" Index="index" Incomplete="incompleteProducts"
                                         OnPick="productId => { item.ProductId = productId; item.Staged = null; }" OnNone="() => item.ProductId = null"
                                         OnOpenNew="() => OpenNewProduct(at)" OnDiscardStaged="() => item.Staged = null" />
                                 </td>
@@ -380,8 +381,9 @@ else if (step == 2)
     {
         <div class="invoice-modal-backdrop">
             <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă produs">
-                <ProductEditor @key="newProductKey" Staging="true" InitialName="@(adding.Staged?.Input.Name ?? NewProductName(adding))" InitialDescription="@(adding.Staged?.Input.Description ?? NewProductDescription(adding))"
-                               InitialCategory="@(adding.Staged?.Input.Category ?? "")" InitialSubcategory="@(adding.Staged?.Input.Subcategory ?? "")" InitialImage="adding.Staged?.Image"
+                <ProductEditor @key="newProductKey" Staging="true" InitialName="@NewProductInitialName(adding)" InitialDescription="@(adding.Staged?.Input.Description ?? NewProductDescription(adding))"
+                               InitialCategory="@(adding.Staged?.Input.Category ?? VariantSample(adding)?.Category ?? "")" InitialSubcategory="@(adding.Staged?.Input.Subcategory ?? VariantSample(adding)?.Subcategory ?? "")"
+                               InitialChoices="@(adding.Staged?.Input.Parameters ?? [])" InitialImage="adding.Staged?.Image"
                                Groups="groups" Staged="NewProductStagedAsync" Closed="CloseNewProduct" />
             </div>
         </div>
@@ -1037,6 +1039,7 @@ else
                 return kept;
             })];
             await LoadSupplierCodesAsync();
+            await LoadVariantsAsync();
             foreach (var item in pick) Rematch(item);   // also against the catalog as it is now
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -1123,6 +1126,9 @@ else
     };
 
     // Quantities and amounts must be numbers (missing is not acceptable for the first three); discounts and VAT may be empty.
+    // The characters of a cell that text recognition makes out of a stroke or a stain (see InvoiceAmbiguity): the cell is to be checked against the invoice.
+    private string OcrDoubt(string text) => session is { IsXml: false } && session.Document.Pages.Any(page => page.Source == InvoiceSources.Ocr) ? InvoiceAmbiguity.Found(text) : "";
+
     private bool NotANumber(ShownColumn column, string text)
     {
         switch (column.Meaning)

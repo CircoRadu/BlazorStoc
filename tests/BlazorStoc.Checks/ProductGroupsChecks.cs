@@ -17,6 +17,7 @@ public static class ProductGroupsChecks
         context.Services.AddLogging();
         context.Services.AddSingleton<IAccessControl>(access);
         context.Services.AddSingleton<IProductRepository>(repository);
+        context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
         context.Services.AddScoped<UnsavedChanges>();
 
         // The names of categories and subcategories are unique all together (a subcategory is not named like a category, nor the other way round).
@@ -113,5 +114,29 @@ public static class ProductGroupsChecks
         var categoryName = page.Find("#category-name").GetAttribute("value") ?? "";
         page.Find("#category-name").Change(categoryName + " noua");
         check(Auto("category-reason") == $"Categorie: {categoryName} → {categoryName} noua", "Categories page: the generated reason of a category rename");
+
+        // Required parameters of a subcategory: a panel opened from the row, parameters and their values added by the user.
+        var parametersPage = context.Render<ProductGroups>();
+        parametersPage.WaitForAssertion(() => parametersPage.Find(".category-management-list"), TimeSpan.FromSeconds(5));
+        var firstSubcategory = parametersPage.FindAll("tbody button").First(button => (button.GetAttribute("aria-label") ?? "").StartsWith("Parametri obligatori"));
+        check(firstSubcategory.TextContent.Contains("Parametri") && parametersPage.FindAll(".subcategory-parameters").Count == 0, "Categories page: each subcategory has a button for its required parameters and the panel is closed");
+        firstSubcategory.Click();
+        parametersPage.WaitForAssertion(() => parametersPage.Find(".subcategory-parameters"), TimeSpan.FromSeconds(5));
+        parametersPage.Find("#new-parameter-name").Input("Lentila");
+        parametersPage.FindAll("input[type=radio][name='new-parameter-kind']")[1].Change(true);
+        parametersPage.Find("#new-parameter-unit").Input("mm");
+        parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă parametrul")).Click();
+        parametersPage.WaitForAssertion(() => parametersPage.Find(".parameter-card"), TimeSpan.FromSeconds(5));
+        check(parametersPage.Find(".parameter-card-heading").TextContent.Contains("Lentila") && parametersPage.Find(".parameter-card-heading").TextContent.Contains("Număr"), "Categories page: a number parameter with its unit is added to the subcategory");
+        parametersPage.Find(".parameter-add input").Input("2,8");
+        parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă valoarea")).Click();
+        parametersPage.WaitForAssertion(() => parametersPage.Find(".parameter-card tbody tr"), TimeSpan.FromSeconds(5));
+        check(parametersPage.Find(".parameter-card tbody tr").TextContent.Contains("2.8 mm"), "Categories page: a value is added to the parameter and shown with its unit, in one form (2,8 → 2.8)");
+        parametersPage.Find(".parameter-add input").Input("2.80");
+        parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă valoarea")).Click();
+        parametersPage.WaitForAssertion(() => parametersPage.Find(".subcategory-parameters .error-banner"), TimeSpan.FromSeconds(5));
+        check(parametersPage.Find(".subcategory-parameters .error-banner").TextContent.Contains("există deja"), "Categories page: the same value written another way is refused");
+        check(parametersPage.FindAll(".parameter-card button.row-icon.edit").Count == 2 && parametersPage.FindAll(".parameter-card button.row-icon.delete").Count == 2,
+            "Categories page: an administrator sees the icons to edit and delete the parameter and its values");
     }
 }

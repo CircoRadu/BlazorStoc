@@ -490,6 +490,7 @@ public static class SupplierChecks
         context.Services.AddScoped<IInvoiceAnalysisService>(_ => new InvoiceAnalysisService(new InvoicePdfReader(new TestTessdata()), store, access));
         context.Services.AddSingleton<IInvoiceTemplateService>(new NoTemplates());
         context.Services.AddSingleton<IProductRepository>(products);
+        context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
         context.Services.AddSingleton(movements);
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         context.Services.AddScoped<UnsavedChanges>();

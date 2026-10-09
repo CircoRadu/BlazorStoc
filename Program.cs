@@ -136,6 +136,7 @@ builder.Services.AddScoped<IUserAuthenticator>(services => (IUserAuthenticator)s
 builder.Services.AddScoped<IProductRepository>(services => new MariaProductRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>(),
         services.GetRequiredService<IProductImageStore>()));
+builder.Services.AddScoped<IProductParameterRepository>(services => new MariaProductParameterRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
 builder.Services.AddScoped<IStockMovementRepository>(services => new MariaStockMovementRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddScoped<IWorkPointRepository>(services => new MariaWorkPointRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));

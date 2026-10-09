@@ -209,6 +209,7 @@ public static class InvoiceXmlChecks
             context.Services.AddScoped<IInvoiceAnalysisService>(_ => new InvoiceAnalysisService(new InvoicePdfReader(new TestTessdata()), store, access));
             context.Services.AddSingleton<IInvoiceTemplateService>(new FixedTemplates(templates));
             context.Services.AddSingleton<IProductRepository>(repository);
+            context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
             context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
             context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
             context.Services.AddSupplierFakes();
