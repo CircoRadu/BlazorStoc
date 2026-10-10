@@ -1,0 +1,171 @@
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using BlazorStoc.Services
+@inject IRiskAnalysisRepository Repository
+@inject IWorkPointRepository WorkPointStore
+@inject IBeneficiaryRepository BeneficiaryStore
+@inject TimeProvider Clock
+@inject ILogger<RiskAnalysisEditor> Logger
+@implements IDisposable
+
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="risk-analysis-editor-title">
+    <div class="catalog-heading"><h2 id="risk-analysis-editor-title">@(Original is null ? "Adaugă analiză de risc" : $"Editează analiza de risc {Original.Analysis.Number}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (errors.Count > 0)
+    {
+        <div class="error-banner" role="alert"><ul class="validation-errors">@foreach (var message in errors) { <li>@message</li> }</ul></div>
+    }
+    <EditForm Model="input" OnSubmit="SubmitAsync" FormName="risk-analysis-editor">
+        <fieldset disabled="@(saving || loading)">
+            <div class="editor-grid">
+                @if (BeneficiaryId == 0 && Original is null)
+                {
+                    <SearchableSelect Id="risk-beneficiary" Label="Beneficiar *" Placeholder="Caută sau alege beneficiarul…" EmptyText="Niciun beneficiar găsit."
+                                      Options="BeneficiaryOptions" SelectedId="beneficiaryId" SelectedIdChanged="BeneficiaryChangedAsync" Disabled="saving" />
+                }
+                @if (Original is null)
+                {
+                    <label for="risk-work-point">Punct de lucru *
+                        <select id="risk-work-point" value="@input.WorkPointId" @onchange="WorkPointChanged" disabled="@(workPoints.Count == 0)">
+                            <option value="0">@(beneficiaryId is null ? "Alege mai întâi beneficiarul" : workPoints.Count == 0 ? "Beneficiarul nu are puncte de lucru" : "Alege punctul de lucru")</option>
+                            @foreach (var point in workPoints) { <option value="@point.Id">@point.Name@(point.IsPrimary ? " (principal)" : "") · @point.Address</option> }
+                        </select></label>
+                }
+                else
+                {
+                    <div class="form-note">Punct de lucru: <strong>@Original.WorkPointName</strong> · @Original.WorkPointAddress</div>
+                }
+                <label for="risk-number">Număr de înregistrare *<InputTextLive id="risk-number" @bind-Value="input.Number" maxlength="@RiskAnalysisRules.NumberMaximumLength" autocomplete="off" /><small>Rămâne același la reviziile analizei (folosește «Reînnoiește»); o analiză nouă are un număr nou.</small></label>
+                <label for="risk-author">Întocmită de *<InputTextLive id="risk-author" @bind-Value="input.Author" maxlength="@RiskAnalysisRules.AuthorMaximumLength" autocomplete="off" placeholder="Numele persoanei abilitate" /><small>Persoana abilitată să întocmească analize de risc la securitate.</small></label>
+                <label for="risk-initial-date">Data înregistrării *<PickOnlyDate Id="risk-initial-date" @bind-Value="input.InitialDate" Max="@TodayText" Disabled="@(saving || InitialLocked)" /><small>@(InitialLocked ? "Nu se mai poate modifica după ce analiza a fost reînnoită." : "Ultima reînnoire a unei analize noi este chiar data înregistrării.")</small></label>
+                <label for="risk-validity">Valabilitate (luni) *<input id="risk-validity" type="number" min="@RiskAnalysisRules.MinimumValidityMonths" max="@RiskAnalysisRules.MaximumValidityMonths" @bind="input.ValidityMonths" /><small>Conform legii, 36 de luni; valoarea se poate modifica oricând. Expiră: <strong>@ExpiryPreview</strong>.</small></label>
+                <label for="risk-notes" class="full-width">Observații<textarea id="risk-notes" rows="3" maxlength="@RiskAnalysisInput.NotesMaximumLength" @bind="input.Notes" @bind:event="oninput"></textarea></label>
+            </div>
+            @if (Original is null && ActiveOnPoint is { } active)
+            {
+                <div class="form-note">Punctul de lucru are deja analiza activă <strong>nr. @active.Analysis.Number</strong> (expiră @StockMovementRules.DisplayDate(active.Analysis.ExpiryDate)). Un punct poate avea o singură analiză activă.</div>
+                <ToggleSwitch @bind-Value="deactivateExisting" AriaLabel="Dezactivează analiza veche la salvare">Dezactivează analiza veche (nr. @active.Analysis.Number) la salvare</ToggleSwitch>
+            }
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : Original is null ? "Adaugă analiza" : "Salvează analiza")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    // 0 = the beneficiary is chosen in the form (the page of all analyses); otherwise the analysis is for this beneficiary.
+    [Parameter] public int BeneficiaryId { get; set; }
+    [Parameter] public RiskAnalysisView? Original { get; set; }
+    // The work point selected when the form opens (the "fara analiza" shortcut of the section); 0 = none.
+    [Parameter] public int PresetWorkPointId { get; set; }
+    [Parameter] public EventCallback<RiskAnalysisView> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private UnsavedChangesTracker? tracker;
+    private RiskAnalysisInput input = new();
+    private IReadOnlyList<SelectOption> BeneficiaryOptions = Array.Empty<SelectOption>();
+    private IReadOnlyList<WorkPoint> workPoints = Array.Empty<WorkPoint>();
+    private IReadOnlyList<RiskAnalysisView> existing = Array.Empty<RiskAnalysisView>();
+    private int? beneficiaryId;
+    private bool deactivateExisting = true, saving, loading;
+    private string? error;
+    private List<string> errors = [];
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    private string TodayText => Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private bool InitialLocked => Original is { Renewals.Count: > 0 };
+    private RiskAnalysisView? ActiveOnPoint => existing.FirstOrDefault(item => item.Analysis.IsActive && item.Analysis.WorkPointId == input.WorkPointId);
+
+    private string ExpiryPreview => input.InitialDate is { } initial && input.ValidityMonths is >= RiskAnalysisRules.MinimumValidityMonths and <= RiskAnalysisRules.MaximumValidityMonths
+        ? StockMovementRules.DisplayDate(RiskAnalysisRules.ExpiryDate(Original is { Renewals.Count: > 0 } ? Original.Analysis.LastRenewalDate : initial, input.ValidityMonths))
+        : "—";
+
+    private string CurrentSnapshot() => FormSnapshot.Of(input, $"{beneficiaryId}|{deactivateExisting}");
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    protected override async Task OnInitializedAsync()
+    {
+        input = Original is null ? new() { InitialDate = Today, WorkPointId = PresetWorkPointId } : RiskAnalysisInput.From(Original.Analysis);
+        if (Original is not null) return;
+        loading = true;
+        try
+        {
+            if (BeneficiaryId == 0)
+                BeneficiaryOptions = (await BeneficiaryStore.GetBeneficiariesAsync(lifetime.Token)).Select(item => new SelectOption(item.Id, item.Name)).ToArray();
+            else await LoadBeneficiaryAsync(BeneficiaryId);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analysis editor loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Datele beneficiarului nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task LoadBeneficiaryAsync(int id)
+    {
+        beneficiaryId = id;
+        workPoints = (await WorkPointStore.GetAsync(id, lifetime.Token)).Where(point => point.Id > 0).ToArray();
+        existing = await Repository.GetForBeneficiaryAsync(id, lifetime.Token);
+        if (!workPoints.Any(point => point.Id == input.WorkPointId)) input.WorkPointId = workPoints.Count == 1 ? workPoints[0].Id : 0;
+    }
+
+    private async Task BeneficiaryChangedAsync(int? id)
+    {
+        beneficiaryId = id;
+        input.WorkPointId = 0;
+        workPoints = Array.Empty<WorkPoint>();
+        existing = Array.Empty<RiskAnalysisView>();
+        if (id is not { } value) return;
+        loading = true;
+        try { await LoadBeneficiaryAsync(value); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analysis editor loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Punctele de lucru ale beneficiarului nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    private void WorkPointChanged(ChangeEventArgs args) =>
+        input.WorkPointId = int.TryParse(args.Value?.ToString(), CultureInfo.InvariantCulture, out var id) ? id : 0;
+
+    private async Task SubmitAsync()
+    {
+        if (saving) return;
+        error = null;
+        errors = [];
+        var results = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
+        {
+            errors = results.Select(result => result.ErrorMessage ?? string.Empty).Where(message => message.Length > 0).Distinct().ToList();
+            return;
+        }
+        var owner = Original?.Analysis.BeneficiaryId ?? beneficiaryId;
+        if (owner is not { } ownerId) { errors = ["Alege beneficiarul."]; return; }
+        saving = true;
+        RiskAnalysisView? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(ownerId, input, deactivateExisting && ActiveOnPoint is not null, lifetime.Token)
+                : await Repository.UpdateAsync(Original.Analysis, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (RiskAnalysisOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analysis saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Analiza de risc nu a putut fi salvată. Datele formularului au fost păstrate; actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

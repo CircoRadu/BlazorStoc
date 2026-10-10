@@ -57,7 +57,7 @@ else if (situation is not null)
                     <td class="number">@(line.InStock && line.Received > 0 ? ProjectSituationRules.Format(line.Received) : "—")</td>
                     <td class="number">@(line.InStock ? ProjectSituationRules.Format(line.Deficit) : "—")</td>
                     <td>@ProjectSituationRules.StateLabel(line.State)</td>
-                    <td>@if (CanReserve(line)) { <button type="button" class="row-action edit" disabled="@busy" @onclick="() => ReserveLineAsync(component, line)">Rezervă cât se poate</button> }</td>
+                    <td>@if (CanReserve(line)) { <button type="button" class="row-icon reserve" disabled="@busy" aria-label="@($"Rezervă cât se poate din {ProjectSituationRules.FirstLine(line.Name)}")" title="Rezervă cât se poate" @onclick="() => ReserveLineAsync(component, line)"></button> }</td>
                 </tr>
             }
             </tbody></table></div>
@@ -96,10 +96,10 @@ else if (situation is not null)
                         {
                             <input type="number" aria-label="Cantitatea scăzută" min="1" max="@reservation.Quantity" @bind="reduceQuantity" @bind:event="oninput" disabled="@busy" />
                             <input type="text" aria-label="Motivul scăderii" placeholder="Motiv scurt" maxlength="@ReservationRules.ReasonMaximumLength" @bind="reduceReason" @bind:event="oninput" disabled="@busy" />
-                            <button type="button" class="danger" disabled="@busy" @onclick="() => ReduceAsync(reservation)">Scade</button>
-                            <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => reducing = null">Renunț</button>
+                            <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Scade rezervarea pentru {reservation.ProductName}")" title="Scade rezervarea" @onclick="() => ReduceAsync(reservation)"></button>
+                            <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la scădere" title="Renunță" @onclick="() => reducing = null"></button>
                         }
-                        else { <button type="button" class="row-action delete" disabled="@busy" @onclick="() => StartReduce(reservation)">Scade / eliberează</button> }
+                        else { <button type="button" class="row-icon reduce" disabled="@busy" aria-label="@($"Scade sau eliberează rezervarea pentru {reservation.ProductName}")" title="Scade / eliberează rezervarea" @onclick="() => StartReduce(reservation)"></button> }
                     </td>
                 </tr>
             }

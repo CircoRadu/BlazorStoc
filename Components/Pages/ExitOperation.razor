@@ -88,7 +88,7 @@ else
                         </select>
                     </td>
                     <td><input type="text" aria-label="@($"Descriere, linia {index + 1}")" @bind="line.Description" maxlength="@StockMovementRules.MaxDescriptionLength" /></td>
-                    <td><button type="button" class="danger" aria-label="@($"Scoate linia {index + 1}")" disabled="@(lines.Count == 1)" @onclick="() => RemoveLine(position)" title="@($"Scoate linia {index + 1}")">×</button></td>
+                    <td><button type="button" class="row-icon delete" aria-label="@($"Scoate linia {index + 1}")" disabled="@(lines.Count == 1)" @onclick="() => RemoveLine(position)" title="@($"Scoate linia {index + 1}")"></button></td>
                 </tr>
             }
             </tbody></table></div>

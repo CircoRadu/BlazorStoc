@@ -75,7 +75,7 @@ else
                 <td><ToggleSwitch Compact AriaLabel="Obligatoriu" @bind-Value="mapping.Required" @bind-Value:after="Edited" /></td>
                 <td><select aria-label="Politică la lipsă" @bind="mapping.Missing" @bind:after="Edited"><option value="keep">Păstrează valoarea din formular</option><option value="error">Oprește preluarea (eroare)</option></select></td>
                 <td><select aria-label="Politică la actualizare" @bind="mapping.Update" @bind:after="Edited" disabled="@(usage != "Formular")"><option value="confirm">Cere confirmare</option><option value="empty">Păstrează valoarea mea</option><option value="overwrite">Ia valoarea din ANAF</option></select></td>
-                <td><button type="button" class="danger" aria-label="Șterge maparea @mapping.Label" @onclick="() => { config.Mappings.RemoveAt(index); Edited(); }">Șterge</button></td>
+                <td><button type="button" class="row-icon delete" aria-label="Șterge maparea @mapping.Label" title="Șterge maparea @mapping.Label" @onclick="() => { config.Mappings.RemoveAt(index); Edited(); }"></button></td>
             </tr>
         }
         </tbody></table></div>
@@ -133,7 +133,7 @@ else
                                       OnText="Activă" OffText="Inactivă" AriaLabel="@($"Versiunea #{version.Id} activă")"
                                       Title="@(state.Active?.Id == version.Id ? "Este versiunea activă; activează altă versiune pentru a o schimba" : $"Activează versiunea #{version.Id}")" /></td>
                     <td class="row-actions">
-                        <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => LoadVersion(version)">Încarcă în editor</button>
+                        <button type="button" class="row-icon load" disabled="@busy" aria-label="@($"Încarcă versiunea #{version.Id} în editor")" title="@($"Încarcă versiunea #{version.Id} în editor")" @onclick="() => LoadVersion(version)"></button>
                         <button type="button" class="row-icon delete" disabled="@(busy || state.Active?.Id == version.Id)" aria-label="@($"Șterge versiunea #{version.Id}")"
                                 title="@(state.Active?.Id == version.Id ? "Versiunea activă nu se poate șterge" : $"Șterge versiunea #{version.Id}")" @onclick="() => deletingVersion = version"></button>
                     </td>

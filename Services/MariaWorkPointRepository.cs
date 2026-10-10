@@ -103,6 +103,8 @@ public sealed class MariaWorkPointRepository(
             // A work point covered by a contract (On or Off) cannot be deleted: it must be taken out of the contract first.
             if (await MariaServiceContractRepository.CoverageLabelAsync(connection, null, original.Id, cancellationToken).ConfigureAwait(false) is { } coveredBy)
                 throw ServiceContractRules.WorkPointCovered(coveredBy);
+            if (await MariaRiskAnalysisRepository.NumberForWorkPointAsync(connection, null, original.Id, cancellationToken).ConfigureAwait(false) is { } analysisNumber)
+                throw RiskAnalysisRules.WorkPointHasAnalysis(analysisNumber);
             if (await MariaServiceInterventionRepository.CountAsync(connection, null, "work_point_id", original.Id, cancellationToken).ConfigureAwait(false) is var interventions and > 0)
                 throw ServiceInterventionRules.WorkPointHasInterventions(interventions);
         }
@@ -118,6 +120,8 @@ public sealed class MariaWorkPointRepository(
                     WorkPointRules.CheckCurrent(await GetLockedAsync(connection, transaction, original.Id, token).ConfigureAwait(false), original);
                     if (await MariaServiceContractRepository.CoverageLabelAsync(connection, transaction, original.Id, token).ConfigureAwait(false) is { } coveredNow)
                         throw ServiceContractRules.WorkPointCovered(coveredNow);
+                    if (await MariaRiskAnalysisRepository.NumberForWorkPointAsync(connection, transaction, original.Id, token).ConfigureAwait(false) is { } analysisNow)
+                        throw RiskAnalysisRules.WorkPointHasAnalysis(analysisNow);
                     if (await MariaServiceInterventionRepository.CountAsync(connection, transaction, "work_point_id", original.Id, token).ConfigureAwait(false) is var interventionsNow and > 0)
                         throw ServiceInterventionRules.WorkPointHasInterventions(interventionsNow);
                     var current = await ServicePhotoArchive.ReadAsync(connection, transaction, "work_point_id=@id", token, ("@id", original.Id)).ConfigureAwait(false);

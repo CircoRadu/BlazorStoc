@@ -1,0 +1,224 @@
+@using BlazorStoc.Services
+@inject IRiskAnalysisRepository Repository
+@inject TimeProvider Clock
+@inject ILogger<RiskAnalysesSection> Logger
+@implements IDisposable
+
+@if (adding || editing is not null)
+{
+    <RiskAnalysisEditor @key="editorKey" BeneficiaryId="BeneficiaryId" Original="editing" PresetWorkPointId="presetWorkPointId" Saved="SavedAsync" Closed="CloseEditorAsync" />
+}
+
+@if (renewing is not null)
+{
+    <RiskAnalysisRenewalForm @key="renewalKey" Analysis="renewing" Saved="RenewedAsync" Closed="CloseRenewalAsync" />
+}
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Analize de risc <span>@Visible.Count</span></h2>
+        <div class="heading-actions">
+            @if (OffCount > 0) { <ToggleSwitch @bind-Value="showOff">Arată și analizele Off (@OffCount)</ToggleSwitch> }
+            @if (CanManage) { <button class="refresh act-confirm" disabled="@Locked" @onclick="() => OpenAdd(0)">+ Adaugă analiză de risc</button> }
+        </div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (WithoutAnalysis.Count > 0)
+    {
+        <div class="catalog-body">
+            <div class="form-note">@(WithoutAnalysis.Count == 1 ? "Un punct de lucru nu are" : $"{WithoutAnalysis.Count} puncte de lucru nu au") analiză de risc activă:
+                @foreach (var point in WithoutAnalysis)
+                {
+                    <text> </text>@if (CanManage) { <button type="button" class="link-button" disabled="@Locked" title="@($"Adaugă analiză de risc pentru {point.Name}")" @onclick="() => OpenAdd(point.Id)">@point.Name</button> } else { <strong>@point.Name</strong> }
+                }
+            </div>
+        </div>
+    }
+    @if (Visible.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>@(Views.Count == 0 ? "Nu există analize de risc" : "Nicio analiză de risc activă")</h3>
+            <p>@(Views.Count == 0 ? "Adaugă o analiză de risc pentru un punct de lucru ca să urmărești expirarea ei." : "Activează „Arată și analizele Off” ca să le vezi.")</p></div>
+    }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>NR. ÎNREGISTRARE</th>@if (ShowBeneficiary) { <th>BENEFICIAR</th> }<th>PUNCT DE LUCRU</th><th>ÎNTOCMITĂ DE</th><th>ÎNREGISTRATĂ</th><th>ULTIMA REÎNNOIRE</th><th>VALABILITATE</th><th>EXPIRĂ</th><th>STARE</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+        @foreach (var view in Visible)
+        {
+            var analysis = view.Analysis;
+            var state = RiskAnalysisRules.State(analysis, Today, ThresholdDays);
+            <tr @key="analysis.Id" class="@(analysis.IsActive ? null : "contract-row-off")">
+                <td><strong>@analysis.Number</strong>@if (analysis.Notes.Length > 0) { <br /><small class="muted" title="@analysis.Notes">@Shorten(analysis.Notes)</small> }</td>
+                @if (ShowBeneficiary) { <td><a class="category-table-link" href="@($"/beneficiari/{analysis.BeneficiaryId}")">@view.BeneficiaryName</a></td> }
+                <td><strong>@view.WorkPointName</strong>@if (view.WorkPointIsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }<br /><small class="muted">@view.WorkPointAddress</small></td>
+                <td>@analysis.Author</td>
+                <td>@StockMovementRules.DisplayDate(analysis.InitialDate)</td>
+                <td>@StockMovementRules.DisplayDate(analysis.LastRenewalDate)<br /><button type="button" class="link-button" aria-expanded="@expanded.Contains(analysis.Id)" @onclick="() => Toggle(analysis.Id)">Istoric (@view.Renewals.Count) @(expanded.Contains(analysis.Id) ? "▴" : "▾")</button></td>
+                <td>@RiskAnalysisRules.ValidityText(analysis.ValidityMonths)</td>
+                <td>@StockMovementRules.DisplayDate(analysis.ExpiryDate)@if (analysis.IsActive) { <br /><small class="muted">@RiskAnalysisRules.ExpiryText(analysis, Today)</small> }</td>
+                <td><span class="@RiskAnalysisRules.StateCssClass(state)">@RiskAnalysisRules.StateLabel(state)</span></td>
+                @if (CanManage)
+                {
+                    <td class="row-actions">
+                        <ToggleSwitch Compact Value="@analysis.IsActive" ValueChanged="@(value => SetActiveAsync(analysis, value))" Disabled="Locked" AriaLabel="@($"Analiza {analysis.Number} activă (On/Off)")" />
+                        @if (analysis.IsActive) { <button class="row-icon renew" disabled="@Locked" aria-label="@($"Reînnoiește analiza {analysis.Number}")" title="@($"Reînnoiește analiza {analysis.Number}")" @onclick="() => OpenRenew(view)"></button> }
+                        <button class="row-icon edit" disabled="@Locked" aria-label="@($"Editează analiza de risc {analysis.Number}")" title="@($"Editează analiza de risc {analysis.Number}")" @onclick="() => OpenEdit(view)"></button>
+                        <button class="row-icon delete" disabled="@Locked" aria-label="@($"Șterge analiza de risc {analysis.Number}")" title="@($"Șterge analiza de risc {analysis.Number}")" @onclick="() => OpenDelete(view)"></button>
+                    </td>
+                }
+            </tr>
+            @if (expanded.Contains(analysis.Id))
+            {
+                <tr class="contract-points-row" @key="@($"history-{analysis.Id}")"><td colspan="@ColumnCount">
+                    <table class="contract-points-table"><thead><tr><th>EVENIMENT</th><th>DATA</th><th>ÎNREGISTRAT DE</th><th>OBSERVAȚII</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+                    @for (var index = 0; index < view.Renewals.Count; index++)
+                    {
+                        var renewal = view.Renewals[index];
+                        <tr @key="renewal.Id"><td>Reînnoire</td><td>@StockMovementRules.DisplayDate(renewal.RenewalDate) <small class="muted">(înlocuiește @StockMovementRules.DisplayDate(renewal.PreviousRenewalDate))</small></td>
+                            <td>@renewal.RecordedBy <small class="muted">@StockMovementRules.DisplayDate(DateOnly.FromDateTime(renewal.RecordedUtc.ToLocalTime()))</small></td><td>@renewal.Notes</td>
+                            @if (CanManage) { <td>@if (index == 0) { <button class="row-icon undo" disabled="@Locked" aria-label="@($"Anulează reînnoirea din {StockMovementRules.DisplayDate(renewal.RenewalDate)}")" title="@($"Anulează reînnoirea din {StockMovementRules.DisplayDate(renewal.RenewalDate)}")" @onclick="() => UndoAsync(analysis)"></button> }</td> }
+                        </tr>
+                    }
+                    <tr><td>Înregistrare inițială</td><td>@StockMovementRules.DisplayDate(analysis.InitialDate)</td><td>@analysis.Author <small class="muted">(întocmită de)</small></td><td></td>@if (CanManage) { <td></td> }</tr>
+                    </tbody></table>
+                </td></tr>
+            }
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Analysis.Id" Title="Ștergi analiza de risc?" Subject="Analiza de risc"
+                              ObjectLabel="@($"nr. {deleting.Analysis.Number} · {deleting.BeneficiaryName} · {deleting.WorkPointName}")"
+                              Description="Analiza se arhivează împreună cu istoricul reînnoirilor. Dacă vrei doar să o oprești (de exemplu la înlocuire), folosește comutatorul On/Off."
+                              Busy="@busy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDeleteAsync" />
+}
+
+@code {
+    // 0 = the analyses of several beneficiaries (the page of all analyses): the beneficiary column is shown and the form chooses it.
+    [Parameter] public int BeneficiaryId { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<RiskAnalysisView> Views { get; set; } = Array.Empty<RiskAnalysisView>();
+    // The work points of the beneficiary (fixed beneficiary only): the ones without an active analysis are listed above the table.
+    [Parameter] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
+    [Parameter] public bool CanManage { get; set; }
+    // The days before the expiry within which the state is "Expira curand" (from the active notification template).
+    [Parameter] public int ThresholdDays { get; set; } = RiskAnalysisRules.DefaultThresholdDays;
+    // The parent reloads the analyses after a change.
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private bool adding, busy, showOff;
+    private int presetWorkPointId;
+    private RiskAnalysisView? editing, renewing, deleting;
+    private Guid editorKey, renewalKey;
+    private string? notice, error, deleteError;
+    private readonly HashSet<int> expanded = [];
+    private readonly CancellationTokenSource lifetime = new();
+
+    private bool ShowBeneficiary => BeneficiaryId == 0;
+    private int ColumnCount => 9 + (ShowBeneficiary ? 1 : 0) + (CanManage ? 1 : 0);
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    private int OffCount => Views.Count(item => !item.Analysis.IsActive);
+    private IReadOnlyList<RiskAnalysisView> Visible => Views.Where(item => item.Analysis.IsActive || showOff).ToList();
+    private bool Locked => busy || adding || editing is not null || renewing is not null;
+    private IReadOnlyList<WorkPoint> WithoutAnalysis => BeneficiaryId == 0 ? Array.Empty<WorkPoint>()
+        : WorkPoints.Where(point => point.Id > 0 && !Views.Any(item => item.Analysis.IsActive && item.Analysis.WorkPointId == point.Id)).ToList();
+
+    private static string Shorten(string text) => text.Length <= 60 ? text : text[..60] + "…";
+
+    private void Toggle(int analysisId) { if (!expanded.Remove(analysisId)) expanded.Add(analysisId); }
+
+    private void OpenAdd(int workPointId) { adding = true; editing = renewing = null; presetWorkPointId = workPointId; editorKey = Guid.NewGuid(); notice = error = null; }
+    private void OpenEdit(RiskAnalysisView view) { adding = false; renewing = null; editing = view; editorKey = Guid.NewGuid(); notice = error = null; }
+    private Task CloseEditorAsync() { adding = false; editing = null; return Task.CompletedTask; }
+    private void OpenRenew(RiskAnalysisView view) { adding = false; editing = null; renewing = view; renewalKey = Guid.NewGuid(); notice = error = null; }
+    private Task CloseRenewalAsync() { renewing = null; return Task.CompletedTask; }
+
+    private async Task SavedAsync(RiskAnalysisView saved)
+    {
+        notice = adding ? $"Analiza de risc {saved.Analysis.Number} a fost adăugată." : $"Analiza de risc {saved.Analysis.Number} a fost actualizată.";
+        adding = false;
+        editing = null;
+        await Changed.InvokeAsync();
+    }
+
+    private async Task RenewedAsync(RiskAnalysisView saved)
+    {
+        notice = $"Analiza de risc {saved.Analysis.Number} a fost reînnoită; expiră la {StockMovementRules.DisplayDate(saved.Analysis.ExpiryDate)}.";
+        renewing = null;
+        await Changed.InvokeAsync();
+    }
+
+    private async Task SetActiveAsync(RiskAnalysis analysis, bool active)
+    {
+        if (busy) return;
+        busy = true;
+        notice = error = null;
+        try
+        {
+            if (active) await Repository.ActivateAsync(analysis, lifetime.Token); else await Repository.DeactivateAsync(analysis, lifetime.Token);
+            notice = active ? $"Analiza de risc {analysis.Number} este activă (On)." : $"Analiza de risc {analysis.Number} a fost oprită (Off); nu mai produce notificări.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (RiskAnalysisOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analysis activation change failed ({ErrorType}).", exception.GetType().Name);
+            error = "Starea analizei nu a putut fi schimbată.";
+        }
+        finally { busy = false; }
+        await Changed.InvokeAsync();
+    }
+
+    private async Task UndoAsync(RiskAnalysis analysis)
+    {
+        if (busy) return;
+        busy = true;
+        notice = error = null;
+        try
+        {
+            var saved = await Repository.UndoLastRenewalAsync(analysis, lifetime.Token);
+            notice = $"Ultima reînnoire a analizei {saved.Analysis.Number} a fost anulată; ultima reînnoire este acum {StockMovementRules.DisplayDate(saved.Analysis.LastRenewalDate)}.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (RiskAnalysisOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analysis renewal undo failed ({ErrorType}).", exception.GetType().Name);
+            error = "Reînnoirea nu a putut fi anulată.";
+        }
+        finally { busy = false; }
+        await Changed.InvokeAsync();
+    }
+
+    private void OpenDelete(RiskAnalysisView view) { deleting = view; deleteError = null; notice = error = null; }
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (busy || deleting is not { } view) return;
+        busy = true;
+        deleteError = null;
+        var done = false;
+        try
+        {
+            await Repository.DeleteAsync(view.Analysis, reason, lifetime.Token);
+            notice = $"Analiza de risc {view.Analysis.Number} a fost ștearsă (arhivată).";
+            done = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (RiskAnalysisOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analysis deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Analiza de risc nu a putut fi ștearsă.";
+        }
+        finally { busy = false; }
+        if (done) { deleting = null; expanded.Remove(view.Analysis.Id); await Changed.InvokeAsync(); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

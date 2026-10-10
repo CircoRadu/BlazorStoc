@@ -75,6 +75,7 @@ public static class ExpirySourceKeys
     public const string VehicleRovinieta = "vehicul.rovinieta";
     public const string MaintenanceDue = "mentenanta.scadenta";
     public const string ContractExpiry = "contract.expirare";
+    public const string RiskAnalysisExpiry = "analiza-risc.expirare";
     public const string AwaitedInvoice = "intrare.factura-asteptata";
     public const string OverStock = "stoc.iesiri-peste-stoc";
     public const string MinStock = "stoc.sub-minim";

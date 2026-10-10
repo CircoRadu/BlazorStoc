@@ -9,6 +9,11 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (10.10.2026, analize de risc)
+
+- Analize de risc pe punct de lucru: migrarea 39, `Services/RiskAnalyses.cs`, `MariaRiskAnalysisRepository`, sursa de notificari `analiza-risc.expirare` (`RiskAnalysisNotificationSources`, prag 60 zile), pagina `/analize-risc`, sectiunea de pe fisa beneficiarului (`RiskAnalysesSection`, `RiskAnalysisEditor`, `RiskAnalysisRenewalForm`). Propunere si decizii: `docs/PROPUNERE_ANALIZE_RISC.md`.
+- Verificat: MariaDB sectiunea „Risk analyses” 45 trecute (migrarea 39 aplicata manual pe `blazorstoc_test`; pe baza BlazorStoc se aplica la pornirea aplicatiei), grupurile structure+ui 337 trecute. Suita completa nerulata. De verificat in browser: `Teste utilizator/15_Analize_de_risc.md` (UI nevazut inca; previzualizarea nu a fost republicata).
+
 ## Ultimul lucru facut (10.10.2026, refactorizare fara schimbari de functionalitate)
 
 - Acces la baza de date comun in `Services/MariaDb.cs` (conexiune, comanda, tranzactie de scriere Serializable cu retry la deadlock); toate repository-urile si serviciile Maria* il folosesc. `Program.cs` are ~230 de randuri: inregistrarile DI pe module in `Startup/ServiceRegistration.cs`, fisierele private de conturi in `Startup/PrivateConfiguration.cs`.

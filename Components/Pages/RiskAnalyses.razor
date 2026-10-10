@@ -1,0 +1,91 @@
+@page "/analize-risc"
+@attribute [Authorize]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IRiskAnalysisRepository Repository
+@inject IExpiryNotificationService NotificationService
+@inject IAccessControl Access
+@inject TimeProvider Clock
+@inject ILogger<RiskAnalyses> Logger
+@implements IDisposable
+<PageBoundary>
+
+<PageTitle>Analize de risc · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">SERVICE</p><h1>Analize de risc</h1><p class="muted">Analizele de risc la securitate ale punctelor de lucru, cu data ultimei reînnoiri și expirarea. Un punct de lucru are o singură analiză activă; notificarea de expirare pornește din data ultimei reînnoiri.</p></div>
+    <div class="heading-actions"><button class="refresh act-reload" type="button" disabled="@loading" @onclick="ReloadAsync">↻ Actualizează</button></div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+
+@if (loading && !loaded)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă analizele de risc</h3></div>
+}
+else
+{
+    <section class="catalog filter-card">
+        <div class="filters">
+            <label class="search-box"><span>⌕</span><input aria-label="Caută în analizele de risc" placeholder="Beneficiar, punct de lucru, număr sau persoană…" @bind="text" @bind:event="oninput" /></label>
+            <select aria-label="Filtrează după stare" @bind="stateFilter">
+                <option value="">Toate stările</option>
+                <option value="Expired">Expirate</option>
+                <option value="ExpiresSoon">Expiră curând</option>
+                <option value="Valid">Valabile</option>
+            </select>
+        </div>
+    </section>
+    <RiskAnalysesSection BeneficiaryId="0" Views="Filtered" CanManage="canManage" ThresholdDays="thresholdDays" Changed="ReloadAsync" />
+}
+
+</PageBoundary>
+
+@code {
+    private IReadOnlyList<RiskAnalysisView> all = Array.Empty<RiskAnalysisView>();
+    private bool loading, loaded, canManage;
+    private string? error;
+    private string text = "", stateFilter = "";
+    private int thresholdDays = RiskAnalysisRules.DefaultThresholdDays;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    // Off analyses always pass the state filter: the section hides them behind its own switch.
+    private IReadOnlyList<RiskAnalysisView> Filtered
+    {
+        get
+        {
+            var trimmed = text.Trim();
+            return all.Where(view =>
+                (trimmed.Length == 0 || view.BeneficiaryName.Contains(trimmed, StringComparison.OrdinalIgnoreCase) ||
+                    view.WorkPointName.Contains(trimmed, StringComparison.OrdinalIgnoreCase) || view.Analysis.Number.Contains(trimmed, StringComparison.OrdinalIgnoreCase) ||
+                    view.Analysis.Author.Contains(trimmed, StringComparison.OrdinalIgnoreCase)) &&
+                (stateFilter.Length == 0 || !view.Analysis.IsActive ||
+                    RiskAnalysisRules.State(view.Analysis, Today, thresholdDays).ToString() == stateFilter)).ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            canManage = await Access.CanManageBeneficiariesAsync(lifetime.Token);
+            all = await Repository.GetAllAsync(true, lifetime.Token);
+            thresholdDays = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.RiskAnalysisExpiry, RiskAnalysisRules.DefaultThresholdDays, lifetime.Token);
+            loaded = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analyses loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Analizele de risc nu au putut fi încărcate.";
+        }
+        finally { loading = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

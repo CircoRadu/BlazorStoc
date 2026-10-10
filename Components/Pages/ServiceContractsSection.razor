@@ -51,10 +51,9 @@
                 @if (CanManage)
                 {
                     <td>
-                        <button class="refresh act-edit" disabled="@Locked" @onclick="() => OpenEdit(details)">Editează</button>
-                        @if (contract.IsActive) { <button class="refresh act-edit" disabled="@Locked" @onclick="() => DeactivateAsync(contract)">Dezactivează</button> }
-                        else { <button class="refresh act-confirm" disabled="@Locked" @onclick="() => OpenActivationAsync(contract)">Activează</button> }
-                        <button class="danger" disabled="@Locked" @onclick="() => OpenDelete(contract)">Șterge</button>
+                        <ToggleSwitch Compact Value="@contract.IsActive" ValueChanged="@(value => value ? OpenActivationAsync(contract) : DeactivateAsync(contract))" Disabled="Locked" AriaLabel="@($"Contractul {contract.Label} activ (On/Off)")" />
+                        <button class="row-icon edit" disabled="@Locked" aria-label="@($"Editează contractul {contract.Label}")" title="@($"Editează contractul {contract.Label}")" @onclick="() => OpenEdit(details)"></button>
+                        <button class="row-icon delete" disabled="@Locked" aria-label="@($"Șterge contractul {contract.Label}")" title="@($"Șterge contractul {contract.Label}")" @onclick="() => OpenDelete(contract)"></button>
                     </td>
                 }
             </tr>

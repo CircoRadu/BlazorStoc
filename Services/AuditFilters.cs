@@ -23,6 +23,7 @@ public static class AuditFilterOptions
         (AuditEntities.Notification, "Notificări"), (AuditEntities.NotificationSettings, "Setări notificări"),
         (AuditEntities.WorkPoint, "Puncte de lucru (ștergeri)"), (AuditEntities.ServicePhoto, "Fotografii puncte de lucru (ștergeri)"),
         (AuditEntities.ServiceContract, "Contracte mentenanță (ștergeri)"), (AuditEntities.ServiceIntervention, "Intervenții mentenanță (ștergeri)"),
+        (AuditEntities.RiskAnalysis, "Analize de risc (ștergeri)"),
         (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă"),
         (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori"),
         (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.OfferTemplate, "Șabloane oferte")
@@ -51,6 +52,10 @@ public static class AuditFilterOptions
         (AuditActions.DeactivateServiceContract, AuditActions.DeactivateServiceContract), (AuditActions.AddContractPoint, AuditActions.AddContractPoint),
         (AuditActions.RemoveContractPoint, AuditActions.RemoveContractPoint), (AuditActions.EditMaintenanceCycle, AuditActions.EditMaintenanceCycle),
         (AuditActions.RescheduleMaintenance, AuditActions.RescheduleMaintenance), (AuditActions.MoveContractPoint, AuditActions.MoveContractPoint),
+        (AuditActions.CreateRiskAnalysis, AuditActions.CreateRiskAnalysis), (AuditActions.EditRiskAnalysis, AuditActions.EditRiskAnalysis),
+        (AuditActions.EditRiskAnalysisValidity, AuditActions.EditRiskAnalysisValidity), (AuditActions.RenewRiskAnalysis, AuditActions.RenewRiskAnalysis),
+        (AuditActions.UndoRiskAnalysisRenewal, AuditActions.UndoRiskAnalysisRenewal), (AuditActions.ActivateRiskAnalysis, AuditActions.ActivateRiskAnalysis),
+        (AuditActions.DeactivateRiskAnalysis, AuditActions.DeactivateRiskAnalysis),
         (AuditActions.RecordMaintenance, AuditActions.RecordMaintenance), (AuditActions.EditMaintenanceIntervention, AuditActions.EditMaintenanceIntervention),
         (AuditActions.RecordOnDemand, AuditActions.RecordOnDemand), (AuditActions.EditOnDemandIntervention, AuditActions.EditOnDemandIntervention),
         (AuditActions.AddInterventionPhoto, AuditActions.AddInterventionPhoto),

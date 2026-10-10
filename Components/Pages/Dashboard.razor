@@ -3,6 +3,8 @@
 @using BlazorStoc.Services
 @inject IStockMovementRepository Movements
 @inject IExpiryNotificationService Notifications
+@inject IRiskAnalysisRepository RiskAnalyses
+@inject TimeProvider Clock
 <PageBoundary>
 
 <PageTitle>Pagina principală · BlazorStoc</PageTitle>
@@ -25,6 +27,7 @@
     <a href="/oferte/preluare"><span class="main-menu-icon">▤</span><div><h2>Oferte</h2><p>Preia devizele-ofertă Excel (.xlsx) în proiecte; șabloanele lor sunt la Oferte → Șabloane.</p></div><span class="main-menu-arrow">→</span></a>
     <a href="/vehicule"><span class="main-menu-icon">▨</span><div><h2>Vehicule</h2><p>Administrează autovehiculele firmei și stocul aflat în ele.</p></div><span class="main-menu-arrow">→</span></a>
     <a href="/mentenanta"><span class="main-menu-icon">⚒</span><div><h2>Mentenanță</h2><p>Scadențe, registrul de intervenții, contracte și harta punctelor de lucru.</p></div><span class="main-menu-arrow">→</span></a>
+    <a href="/analize-risc"><span class="main-menu-icon">⚠</span><div><h2>Analize de risc</h2><p>Analizele de risc ale punctelor de lucru, reînnoirile și expirarea lor.@if (riskDue > 0) { <text> </text><strong class="awaiting-count" title="Analize de risc active expirate sau care expiră în curând">@riskDue @(riskDue == 1 ? "analiză expiră" : "analize expiră")</strong> }</p></div><span class="main-menu-arrow">→</span></a>
     <a href="/notificari" class="@(alertCount > 0 ? "nav-alert" : null)" data-notification-nav><span class="main-menu-icon">✉</span><div><h2>Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span></h2><p>Notificările de expirare și de mentenanță care cer atenție.</p></div><span class="main-menu-arrow">→</span></a>
     <AuthorizeView Roles="Administrator">
         <Authorized>
@@ -44,6 +47,8 @@
     private int toRegularize;
     // Notifications that warn now; the same source as the red mark of the side menu entry.
     private int alertCount;
+    // Active risk analyses that are expired or expire within the threshold of their notification template.
+    private int riskDue;
 
     protected override async Task OnInitializedAsync()
     {
@@ -51,6 +56,13 @@
         catch (Exception) { awaiting = 0; }
         try { toRegularize = (await Movements.GetToRegularizeAsync()).Count; }
         catch (Exception) { toRegularize = 0; }
+        try
+        {
+            var threshold = await Notifications.GetThresholdDaysAsync(ExpirySourceKeys.RiskAnalysisExpiry, RiskAnalysisRules.DefaultThresholdDays);
+            var today = DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+            riskDue = (await RiskAnalyses.GetAllAsync(false)).Count(item => RiskAnalysisRules.State(item.Analysis, today, threshold) is RiskAnalysisState.Expired or RiskAnalysisState.ExpiresSoon);
+        }
+        catch (Exception) { riskDue = 0; }
         try { alertCount = await Notifications.AlertCountAsync(); }
         catch (Exception) { alertCount = 0; }
     }

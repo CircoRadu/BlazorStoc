@@ -304,13 +304,13 @@ else
                                         }
                                         @if (m.Kind == StockMovementKind.Exit && m.OperationId is { } operationId)
                                         {
-                                            <a class="row-action" target="_blank" rel="noopener" href="@($"/api/iesiri/{operationId}/bon.pdf")" aria-label="Bonul de consum al operației @operationId">Bon</a>
+                                            <a class="row-icon receipt" target="_blank" rel="noopener" href="@($"/api/iesiri/{operationId}/bon.pdf")" aria-label="Bonul de consum al operației @operationId" title="Bonul de consum al operației @operationId"></a>
                                             @if (!m.IsVoided)
                                             {
-                                                <button class="row-action delete" aria-label="Stornează operația @operationId" @onclick="() => RequestVoid(m)">Stornează</button>
+                                                <button class="row-icon void" aria-label="Stornează operația @operationId" title="Stornează operația @operationId" @onclick="() => RequestVoid(m)"></button>
                                             }
                                         }
-                                        @if (m.Modified) { <button class="row-action" aria-label="Istoricul modificărilor mișcării din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenHistoryAsync(m)">Istoric</button> }
+                                        @if (m.Modified) { <button class="row-icon history" aria-label="Istoricul modificărilor mișcării din @StockMovementRules.DisplayDate(m.Date)" title="Istoricul modificărilor mișcării din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenHistoryAsync(m)"></button> }
                                     </td>
                                 }
                             </tr>

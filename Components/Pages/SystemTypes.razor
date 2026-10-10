@@ -35,16 +35,16 @@
             var position = index;
             <tr @key="type.Id" class="@(type.Active ? "" : "inactive-row")" id="@($"system-type-{type.Id}")">
                 <td>
-                    <button type="button" class="row-action" aria-label="@($"Mută {type.Name} mai sus")" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(type, -1)" title="@($"Mută {type.Name} mai sus")">▲</button>
-                    <button type="button" class="row-action" aria-label="@($"Mută {type.Name} mai jos")" disabled="@(busy || position == types.Count - 1)" @onclick="() => MoveAsync(type, 1)" title="@($"Mută {type.Name} mai jos")">▼</button>
+                    <button type="button" class="row-icon up" aria-label="@($"Mută {type.Name} mai sus")" disabled="@(busy || position == 0)" @onclick="() => MoveAsync(type, -1)" title="@($"Mută {type.Name} mai sus")"></button>
+                    <button type="button" class="row-icon down" aria-label="@($"Mută {type.Name} mai jos")" disabled="@(busy || position == types.Count - 1)" @onclick="() => MoveAsync(type, 1)" title="@($"Mută {type.Name} mai jos")"></button>
                 </td>
                 <td>
                     @if (renamingId == type.Id)
                     {
                         <form @onsubmit="() => RenameAsync(type)" @onsubmit:preventDefault>
                             <input aria-label="@($"Denumirea nouă a tipului {type.Name}")" maxlength="@SystemTypeRules.NameMaximumLength" disabled="@busy" @bind="renameText" @bind:event="oninput" />
-                            <button type="submit" class="primary" disabled="@busy">Salvează</button>
-                            <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => renamingId = null">Renunț</button>
+                            <button type="submit" class="row-icon check" disabled="@busy" aria-label="@($"Salvează denumirea tipului {type.Name}")" title="Salvează denumirea"></button>
+                            <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la redenumire" title="Renunță" @onclick="() => renamingId = null"></button>
                         </form>
                     }
                     else

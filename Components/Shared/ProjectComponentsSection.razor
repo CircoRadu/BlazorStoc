@@ -38,7 +38,7 @@
                     </td>
                     <td class="muted">@Delivered(component)</td>
                     <td>
-                        @if (component.Archived) { <button type="button" class="row-action edit" disabled="@busy" @onclick="() => ReactivateAsync(component)">Reactivează</button> }
+                        @if (component.Archived) { <button type="button" class="row-icon reactivate" disabled="@busy" aria-label="@($"Reactivează componenta {component.SystemTypeName}")" title="@($"Reactivează componenta {component.SystemTypeName}")" @onclick="() => ReactivateAsync(component)"></button> }
                         else { <button type="button" class="row-icon delete" disabled="@busy" aria-label="@($"Scoate componenta {component.SystemTypeName}")" @onclick="() => StartArchive(component)" title="@($"Scoate componenta {component.SystemTypeName}")"></button> }
                     </td>
                 </tr>

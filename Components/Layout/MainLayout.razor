@@ -49,7 +49,7 @@
                                 Expanded="@productsExpanded">
                 <Header><span>▦</span> Produse</Header>
                 <ChildContent>
-                    <a class="@(productsMenuSection && !onInvoicePickupPage ? "active" : "")" href="/produse">Stoc</a>
+                    <a class="@(onStockPage ? "active" : "")" href="/produse">Stoc</a>
                     <NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink>
                     <NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink>
                     <NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink>
@@ -85,6 +85,7 @@
             </CollapsibleSection>
             <NavLink class="nav-item" href="/oferte" Match="NavLinkMatch.Prefix"><span>▤</span> Oferte <span class="nav-arrow">→</span></NavLink>
             <NavLink class="nav-item" href="/mentenanta" Match="NavLinkMatch.Prefix"><span>⚒</span> Mentenanță <span class="nav-arrow">→</span></NavLink>
+            <NavLink class="nav-item" href="/analize-risc" Match="NavLinkMatch.Prefix"><span>⚠</span> Analize de risc <span class="nav-arrow">→</span></NavLink>
             <NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink>
             <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             <AuthorizeView Roles="Administrator,Utilizator"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
@@ -116,7 +117,7 @@
 @code {
     private IReadOnlyList<BlazorStoc.Services.ProductGroup> groups = Array.Empty<BlazorStoc.Services.ProductGroup>();
     private List<string> categories = [];
-    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, productsMenuSection, productsExpanded, onInvoicePickupPage, onRestorePage, onWaitingPage;
+    private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, productsMenuSection, productsExpanded, onStockPage, onInvoicePickupPage, onRestorePage, onWaitingPage;
     private string selectedCategory = "", selectedSubcategory = "";
     private OperationLockInfo? activeOperation;
     private int alertCount;
@@ -186,9 +187,15 @@
             uri.AbsolutePath.StartsWith("/furnizori", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/facturi", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/vehicule", StringComparison.OrdinalIgnoreCase) ||
-            uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase);
+            uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/nomenclator", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/proiecte", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/observatii", StringComparison.OrdinalIgnoreCase);
         if (administrationSection) administrationExpanded = true;
-        productsMenuSection = uri.AbsolutePath.StartsWith("/produse", StringComparison.OrdinalIgnoreCase) || uri.AbsolutePath.StartsWith("/consum", StringComparison.OrdinalIgnoreCase);
+        productsMenuSection = uri.AbsolutePath.StartsWith("/produse", StringComparison.OrdinalIgnoreCase) || uri.AbsolutePath.StartsWith("/consum", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/iesiri", StringComparison.OrdinalIgnoreCase) || uri.AbsolutePath.StartsWith("/miscari", StringComparison.OrdinalIgnoreCase);
+        onStockPage = uri.AbsolutePath.StartsWith("/produse", StringComparison.OrdinalIgnoreCase) && !uri.AbsolutePath.StartsWith("/produse/preluare-factura", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/miscari", StringComparison.OrdinalIgnoreCase);
         if (productsMenuSection) productsExpanded = true;
         onInvoicePickupPage = uri.AbsolutePath.StartsWith("/produse/preluare-factura", StringComparison.OrdinalIgnoreCase);
         inventorySection = uri.AbsolutePath.StartsWith("/inventar", StringComparison.OrdinalIgnoreCase);

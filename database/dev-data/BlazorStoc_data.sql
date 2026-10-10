@@ -91,6 +91,11 @@ REPLACE INTO `archive_relations` (`id`, `archive_id`, `relation_type`, `original
 /*!40000 ALTER TABLE `archive_relations` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `archive_risk_analyses` WRITE;
+/*!40000 ALTER TABLE `archive_risk_analyses` DISABLE KEYS */;
+/*!40000 ALTER TABLE `archive_risk_analyses` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `archive_service_contracts` WRITE;
 /*!40000 ALTER TABLE `archive_service_contracts` DISABLE KEYS */;
 /*!40000 ALTER TABLE `archive_service_contracts` ENABLE KEYS */;
@@ -187,8 +192,8 @@ UNLOCK TABLES;
 
 LOCK TABLES `categories` WRITE;
 /*!40000 ALTER TABLE `categories` DISABLE KEYS */;
-REPLACE INTO `categories` (`id`, `name`, `normalized_name`, `sort_order`) VALUES (6,'TVCI','TVCI',2),
-(9,'Control Acces','CONTROL ACCES',1);
+REPLACE INTO `categories` (`id`, `name`, `normalized_name`, `sort_order`) VALUES (6,'TVCI','TVCI',1),
+(9,'Control Acces','CONTROL ACCES',2);
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -232,7 +237,8 @@ UNLOCK TABLES;
 
 LOCK TABLES `notification_template_seeds` WRITE;
 /*!40000 ALTER TABLE `notification_template_seeds` DISABLE KEYS */;
-REPLACE INTO `notification_template_seeds` (`source_key`, `seeded_utc`) VALUES ('contract.expirare','2026-10-08T08:47:08.958Z'),
+REPLACE INTO `notification_template_seeds` (`source_key`, `seeded_utc`) VALUES ('analiza-risc.expirare','2026-10-10T10:21:46.026Z'),
+('contract.expirare','2026-10-08T08:47:08.958Z'),
 ('intrare.factura-asteptata','2026-10-08T08:47:08.965Z'),
 ('mentenanta.scadenta','2026-10-08T08:47:08.955Z'),
 ('proiect.deficit-termen','2026-10-08T08:47:08.984Z'),
@@ -262,7 +268,8 @@ REPLACE INTO `notification_templates` (`id`, `source_key`, `subject`, `body`, `t
 (10,'proiect.deficit-termen','Deficit la proiectul <proiect>','Proiectul <proiect> are termen la <termen proiect> și încă <numar repere de achizitionat> repere de achiziționat (vezi lista de achiziție din situația proiectului). Zile rămase: <zile ramase>; zile de depășire: <zile depasire>.',14,1,0,'proiect.deficit-termen'),
 (11,'sistem.backup-lipsa','Backup lipsă – ultimul: <ultimul backup>','Nu s-a făcut niciun backup de peste <vechime maxima> zile. Ultimul backup: <ultimul backup>. Ultima eroare: <ultima eroare backup>. Verifică Setări → Backup NAS și programarea zilnică.',1,1,0,'sistem.backup-lipsa'),
 (12,'sistem.copie-nas-lipsa','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: <ultima copiere>. Cauza: <cauza copiere>. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.',1,1,0,'sistem.copie-nas-lipsa'),
-(13,'sistem.ceas-server-decalat','Ceasul serverului este decalat','Ceasul serverului este <decalaj ceas> față de ora de pe internet (constatat: <constatat ceas>). Backup-urile iau ora de pe internet, iar ștergerea automată a pachetelor vechi este oprită până la corectare. Verifică data și ora serverului.',1,1,0,'sistem.ceas-server-decalat');
+(13,'sistem.ceas-server-decalat','Ceasul serverului este decalat','Ceasul serverului este <decalaj ceas> față de ora de pe internet (constatat: <constatat ceas>). Backup-urile iau ora de pe internet, iar ștergerea automată a pachetelor vechi este oprită până la corectare. Verifică data și ora serverului.',1,1,0,'sistem.ceas-server-decalat'),
+(14,'analiza-risc.expirare','Expirare analiză de risc – <beneficiar>, <punct de lucru>','Analiza de risc nr. <numar inregistrare> a punctului de lucru <punct de lucru> (<adresa punct de lucru>) al beneficiarului <beneficiar>, întocmită de <intocmit de>, expiră la data de <data expirare> (ultima reînnoire: <data ultima reinnoire>; valabilitate: <valabilitate luni> luni; zile rămase: <zile ramase>; zile de depășire: <zile depasire>).',60,1,0,'analiza-risc.expirare');
 /*!40000 ALTER TABLE `notification_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -389,6 +396,17 @@ REPLACE INTO `projects` (`id`, `beneficiary_id`, `name`, `normalized_name`, `obs
 (9,2,'test','TEST','',0,'2026-10-09T13:50:02.774Z','2026-10-09T13:50:02.774Z'),
 (10,10,'Oferta extindere retea internet + telefonie birou administrativ','OFERTA EXTINDERE RETEA INTERNET + TELEFONIE BIROU ADMINISTRATIV','',0,'2026-10-09T13:51:54.858Z','2026-10-09T13:51:54.858Z');
 /*!40000 ALTER TABLE `projects` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `risk_analyses` WRITE;
+/*!40000 ALTER TABLE `risk_analyses` DISABLE KEYS */;
+REPLACE INTO `risk_analyses` (`id`, `beneficiary_id`, `work_point_id`, `registration_number`, `author`, `initial_date`, `last_renewal_date`, `validity_months`, `is_active`, `active_work_point_id`, `notes`, `version`) VALUES (1,2,2,'11/10.10.2026','Krech Stefan Alexandru','2026-10-10','2026-10-10',36,1,2,'',0);
+/*!40000 ALTER TABLE `risk_analyses` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `risk_analysis_renewals` WRITE;
+/*!40000 ALTER TABLE `risk_analysis_renewals` DISABLE KEYS */;
+/*!40000 ALTER TABLE `risk_analysis_renewals` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `service_contract_points` WRITE;

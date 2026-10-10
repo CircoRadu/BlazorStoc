@@ -20,6 +20,7 @@ public static class ArchiveSchemaRegistry
             new ArchiveEntitySchema(AuditEntities.WorkPoint, "archive_work_points", true, true),
             new ArchiveEntitySchema(AuditEntities.ServicePhoto, "archive_service_photos", false, true),
             new ArchiveEntitySchema(AuditEntities.ServiceContract, "archive_service_contracts", true, false),
+            new ArchiveEntitySchema(AuditEntities.RiskAnalysis, "archive_risk_analyses", true, false),
             new ArchiveEntitySchema(AuditEntities.ServiceIntervention, "archive_service_interventions", true, true),
             new ArchiveEntitySchema(AuditEntities.Supplier, "archive_suppliers", false, false)
         }.ToDictionary(schema => schema.EntityType, StringComparer.Ordinal);
@@ -200,6 +201,19 @@ public static class ArchiveRequests
         var relations = value.Points.Select(point => ArchiveRelationSnapshot.Create(ServiceContractPointRelation, point.Point.Id.ToString(), point));
         return new(ArchiveSnapshot.Create(AuditEntities.ServiceContract, contract.Id.ToString(), contract.Version, contract, relations),
             ServiceContractRules.Target(contract.BeneficiaryId, beneficiaryName, contract.Label), details, motif);
+    }
+
+    public const string RiskAnalysisRenewalRelation = "ReinnoireAnalizaRisc";
+
+    // The renewals of the analysis travel with it as relations.
+    public static ArchiveRequest RiskAnalysis(RiskAnalysisView value, string motif)
+    {
+        var analysis = value.Analysis;
+        var details = AuditDetails.Identification(("Număr înregistrare", analysis.Number), ("Beneficiar", value.BeneficiaryName), ("Punct de lucru", value.WorkPointName),
+            ("Stare", analysis.IsActive ? "activă (On)" : "inactivă (Off)"), ("Reînnoiri", value.Renewals.Count.ToString()));
+        var relations = value.Renewals.Select(renewal => ArchiveRelationSnapshot.Create(RiskAnalysisRenewalRelation, renewal.Id.ToString(), renewal));
+        return new(ArchiveSnapshot.Create(AuditEntities.RiskAnalysis, analysis.Id.ToString(), analysis.Version, analysis, relations),
+            RiskAnalysisRules.Target(analysis.BeneficiaryId, value.BeneficiaryName, analysis.Number), details, motif);
     }
 
     // The photos of the intervention travel with it as relations (their files as archived files).

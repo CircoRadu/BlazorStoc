@@ -1,0 +1,71 @@
+@using System.Globalization
+@using BlazorStoc.Services
+@inject IRiskAnalysisRepository Repository
+@inject TimeProvider Clock
+@inject ILogger<RiskAnalysisRenewalForm> Logger
+@implements IDisposable
+
+<UnsavedChangesTracker @ref="tracker" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="risk-renewal-title">
+    <div class="catalog-heading"><h2 id="risk-renewal-title">Reînnoiește analiza de risc @Analysis.Analysis.Number</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnSubmit="SubmitAsync" FormName="risk-analysis-renewal">
+        <fieldset disabled="@saving">
+            <div class="form-note">@Analysis.BeneficiaryName · @Analysis.WorkPointName. Ultima reînnoire: <strong>@StockMovementRules.DisplayDate(Analysis.Analysis.LastRenewalDate)</strong>, expiră <strong>@StockMovementRules.DisplayDate(Analysis.Analysis.ExpiryDate)</strong>. Reînnoirea este o revizie a aceleiași analize (același număr de înregistrare).</div>
+            <div class="editor-grid">
+                <label for="risk-renewal-date">Data reînnoirii *<PickOnlyDate Id="risk-renewal-date" @bind-Value="input.Date" Min="@MinText" Max="@MaxText" Disabled="saving" /><small>Noua expirare: <strong>@NewExpiry</strong> (valabilitate @RiskAnalysisRules.ValidityText(Analysis.Analysis.ValidityMonths)).</small></label>
+                <label for="risk-renewal-notes" class="full-width">Observații<textarea id="risk-renewal-notes" rows="2" maxlength="@RiskAnalysisInput.NotesMaximumLength" @bind="input.Notes" @bind:event="oninput"></textarea></label>
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Înregistrează reînnoirea")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public RiskAnalysisView Analysis { get; set; } = default!;
+    [Parameter] public EventCallback<RiskAnalysisView> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private UnsavedChangesTracker? tracker;
+    private readonly RiskAnalysisRenewalInput input = new();
+    private bool saving;
+    private string? error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+    private string MinText => Analysis.Analysis.LastRenewalDate.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private string MaxText => Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private string NewExpiry => input.Date is { } date ? StockMovementRules.DisplayDate(RiskAnalysisRules.ExpiryDate(date, Analysis.Analysis.ValidityMonths)) : "—";
+
+    protected override void OnInitialized()
+    {
+        // The date proposed is today, when it is after the last renewal.
+        input.Date = Today > Analysis.Analysis.LastRenewalDate ? Today : null;
+    }
+
+    private string CurrentSnapshot() => FormSnapshot.Of(input);
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    private async Task SubmitAsync()
+    {
+        if (saving) return;
+        error = RiskAnalysisRules.RenewalDateError(input.Date, Analysis.Analysis.LastRenewalDate, Today);
+        if (error is not null) return;
+        saving = true;
+        RiskAnalysisView? saved = null;
+        try { saved = await Repository.RenewAsync(Analysis.Analysis, input, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (RiskAnalysisOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analysis renewal failed ({ErrorType}).", exception.GetType().Name);
+            error = "Reînnoirea nu a putut fi înregistrată. Actualizează pagina înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

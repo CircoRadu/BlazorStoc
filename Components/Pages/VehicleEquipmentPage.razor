@@ -63,8 +63,8 @@ else if (vehicle is not null)
                     <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(item.ProductId)"><strong>@item.ProductCode</strong></a></td>
                     <td class="number">@item.Quantity</td>
                     <td class="movement-actions">
-                        <button class="row-action edit" disabled="@(dialog is not null)" aria-label="Restituie în depozit @item.ProductCode" @onclick="() => Open(TransferKind.Return, item)">Restituie în depozit</button>
-                        <button class="row-action" disabled="@(dialog is not null)" aria-label="Mută în altă mașină @item.ProductCode" @onclick="() => Open(TransferKind.Move, item)">Mută în altă mașină</button>
+                        <button class="row-icon return" disabled="@(dialog is not null)" aria-label="Restituie în depozit @item.ProductCode" title="Restituie în depozit @item.ProductCode" @onclick="() => Open(TransferKind.Return, item)"></button>
+                        <button class="row-icon move" disabled="@(dialog is not null)" aria-label="Mută în altă mașină @item.ProductCode" title="Mută în altă mașină @item.ProductCode" @onclick="() => Open(TransferKind.Move, item)"></button>
                     </td>
                 </tr>
             }
@@ -90,7 +90,7 @@ else if (vehicle is not null)
                         <td class="number">@target.Target</td>
                         <td class="number">@held</td>
                         <td class="number">@VehicleTargetRules.Missing(target.Target, held)</td>
-                        <td><button type="button" class="danger" aria-label="@($"Elimină nivelul țintă pentru {target.ProductName}")" disabled="@targetBusy" @onclick="() => RemoveTargetAsync(target)" title="@($"Elimină nivelul țintă pentru {target.ProductName}")">×</button></td>
+                        <td><button type="button" class="row-icon delete" aria-label="@($"Elimină nivelul țintă pentru {target.ProductName}")" disabled="@targetBusy" @onclick="() => RemoveTargetAsync(target)" title="@($"Elimină nivelul țintă pentru {target.ProductName}")"></button></td>
                     </tr>
                 }
                 </tbody></table></div>

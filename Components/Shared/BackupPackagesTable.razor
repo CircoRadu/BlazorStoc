@@ -76,7 +76,7 @@
                             <td class="row-actions">
                                 @if (nasEnabled && nasRead && row.OnLocal && !row.OnNas)
                                 {
-                                    <button type="button" class="refresh act-confirm" disabled="@Busy" @onclick="() => CopyToNasAsync(row)">Copiază pe NAS</button>
+                                    <button type="button" class="row-icon nas" disabled="@Busy" aria-label="@($"Copiază {row.FileName} pe NAS")" title="@($"Copiază {row.FileName} pe NAS")" @onclick="() => CopyToNasAsync(row)"></button>
                                 }
                                 @if (row.CanDelete)
                                 {

@@ -7,6 +7,7 @@
 @inject IWorkPointRepository WorkPointStore
 @inject IServicePhotoStore PhotoStore
 @inject IServiceContractRepository ContractStore
+@inject IRiskAnalysisRepository RiskStore
 @inject IExpiryNotificationService NotificationService
 @inject TimeProvider Clock
 @inject ExitFormDraft ExitDraft
@@ -74,7 +75,7 @@ else if (beneficiary is not null)
             @if (canManage) { <button class="refresh act-confirm" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
         </div>
         @if (workPointError is not null) { <div class="error-banner" role="alert">@workPointError</div> }
-        <div class="table-scroll"><table><thead><tr><th>NUME</th><th>ADRESĂ</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th><th>DESCRIERE</th><th>COORDONATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th>@if (canManage) { <th></th> }</tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th>NUME</th><th>ADRESĂ</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th><th>DESCRIERE</th><th>COORDONATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th><th>ANALIZĂ DE RISC</th>@if (canManage) { <th></th> }</tr></thead><tbody>
             @foreach (var workPoint in workPoints)
             {
                 <tr @key="workPoint.Id"><td><strong>@workPoint.Name</strong>@if (workPoint.IsPrimary) { <span class="anaf-source ok work-point-badge">Principal</span> }</td><td>@workPoint.Address</td><td>@workPoint.Phone</td><td>@workPoint.ContactPerson</td>
@@ -82,6 +83,7 @@ else if (beneficiary is not null)
                     <td>@(workPoint.HasCoordinates ? WorkPointCoordinates.Format(workPoint.Latitude, workPoint.Longitude) : "")</td>
                     <td class="number">@(photoCounts.TryGetValue(workPoint.Id, out var photoCount) ? photoCount.ToString() : "")</td>
                     <td>@{ var coverage = ActiveCoverage(workPoint.Id); }@if (coverage is { } covered) { <span>@covered.Contract.Label</span><text> </text><span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(covered.Point.NextDue, Today, thresholdDays))">@StockMovementRules.DisplayDate(covered.Point.NextDue)</span> } else if (InOffContract(workPoint.Id)) { <span class="contract-state off">Contract Off</span> }</td>
+                    <td>@RiskAnalysisCell(workPoint)</td>
                     @if (canManage)
                     {
                         <td class="row-actions work-point-actions">
@@ -91,10 +93,10 @@ else if (beneficiary is not null)
                             }
                             else
                             {
-                                <button class="refresh act-edit" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="() => OpenEditWorkPoint(workPoint)">Editează</button>
+                                <button class="row-icon edit" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" aria-label="Editează punctul de lucru @workPoint.Name" title="Editează punctul de lucru @workPoint.Name" @onclick="() => OpenEditWorkPoint(workPoint)"></button>
                                 @if (!workPoint.IsPrimary)
                                 {
-                                    <button class="danger" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="() => DeleteWorkPointAsync(workPoint)">Șterge</button>
+                                    <button class="row-icon delete" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" aria-label="Șterge punctul de lucru @workPoint.Name" title="Șterge punctul de lucru @workPoint.Name" @onclick="() => DeleteWorkPointAsync(workPoint)"></button>
                                 }
                                 else
                                 {
@@ -113,6 +115,8 @@ else if (beneficiary is not null)
     <ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" />
+
+    <RiskAnalysesSection BeneficiaryId="Id" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canManage" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" />
 
     <section class="catalog">
         <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
@@ -170,6 +174,9 @@ else if (beneficiary is not null)
     private IReadOnlyDictionary<int, int> photoCounts = new Dictionary<int, int>();
     // Every maintenance contract of the beneficiary (On and Off) with its covered points.
     private IReadOnlyList<ServiceContractDetails> contracts = Array.Empty<ServiceContractDetails>();
+    // Every risk analysis of the beneficiary (On and Off), with its renewals.
+    private IReadOnlyList<RiskAnalysisView> riskAnalyses = Array.Empty<RiskAnalysisView>();
+    private int riskThresholdDays = RiskAnalysisRules.DefaultThresholdDays;
     // The days before a due date within which the maintenance state shows "In curand" (the threshold of the active template of the source).
     private int thresholdDays = ServiceDueRules.DefaultThresholdDays;
     private bool addingWorkPoint, workPointBusy;
@@ -286,6 +293,7 @@ else if (beneficiary is not null)
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
             contracts = await ContractStore.GetForBeneficiaryAsync(Id, lifetime.Token);
+            riskAnalyses = await RiskStore.GetForBeneficiaryAsync(Id, lifetime.Token);
             await LoadThresholdAsync();
             addingWorkPoint = false;
             editingWorkPoint = null;
@@ -389,6 +397,40 @@ else if (beneficiary is not null)
         catch (OperationCanceledException) { }
         catch (Exception exception) { Logger.LogWarning("Maintenance threshold loading failed ({ErrorType}).", exception.GetType().Name); }
     }
+
+    private async Task ReloadRiskAnalysesAsync()
+    {
+        try
+        {
+            riskAnalyses = await RiskStore.GetForBeneficiaryAsync(Id, lifetime.Token);
+            riskThresholdDays = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.RiskAnalysisExpiry, RiskAnalysisRules.DefaultThresholdDays, lifetime.Token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Risk analysis list refresh failed ({ErrorType}).", exception.GetType().Name);
+            workPointError = "Lista analizelor de risc nu a putut fi actualizată.";
+        }
+    }
+
+    // The "Analiză de risc" column of the work point table: the state of the active analysis, or the missing one.
+    private RenderFragment RiskAnalysisCell(WorkPoint workPoint) => builder =>
+    {
+        if (workPoint.Id <= 0) return;
+        var active = riskAnalyses.FirstOrDefault(item => item.Analysis.IsActive && item.Analysis.WorkPointId == workPoint.Id)?.Analysis;
+        builder.OpenElement(0, "span");
+        if (active is null)
+        {
+            builder.AddAttribute(1, "class", "due-chip due-overdue");
+            builder.AddContent(2, "Fără analiză de risc înregistrată");
+        }
+        else
+        {
+            builder.AddAttribute(1, "class", RiskAnalysisRules.StateCssClass(RiskAnalysisRules.State(active, Today, riskThresholdDays)));
+            builder.AddContent(2, $"Nr. {active.Number} · expiră {StockMovementRules.DisplayDate(active.ExpiryDate)}");
+        }
+        builder.CloseElement();
+    };
 
     private async Task ReloadContractsAsync()
     {

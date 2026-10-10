@@ -30,6 +30,7 @@ public static class StructureChecks
             "Routes: the product movements page answers at /produse/{id} and /produse/{id}/miscari");
         check(TemplatesOf("InvoicePickup").SequenceEqual(["/produse/preluare-factura"]),
             "Routes: the invoice pickup page answers at /produse/preluare-factura");
+        check(TemplatesOf("RiskAnalyses").SequenceEqual(["/analize-risc"]), "Routes: the risk analyses page answers at /analize-risc");
         check(routed.Count >= 30 && routed.GroupBy(item => item.Template, StringComparer.OrdinalIgnoreCase).All(group => group.Count() == 1),
             "Routes: every page has its own address (no two pages share a route)");
 

@@ -133,6 +133,7 @@ internal static class ServiceRegistration
         services.AddScoped<IWorkPointRepository, MariaWorkPointRepository>();
         services.AddScoped<IServicePhotoStore, MariaServicePhotoStore>();
         services.AddScoped<IServiceContractRepository, MariaServiceContractRepository>();
+        services.AddScoped<IRiskAnalysisRepository, MariaRiskAnalysisRepository>();
         services.AddScoped<IServiceInterventionRepository, MariaServiceInterventionRepository>();
         services.Configure<MapOptions>(configuration.GetSection(MapOptions.SectionName));
         services.AddSingleton<MapConfigStore>();
@@ -150,6 +151,8 @@ internal static class ServiceRegistration
         services.AddScoped<IMaintenanceNotificationReader, MariaMaintenanceNotificationReader>();
         services.AddScoped<IExpirySource, MaintenanceDueSource>();
         services.AddScoped<IExpirySource, ContractExpirySource>();
+        services.AddScoped<IRiskAnalysisNotificationReader, MariaRiskAnalysisNotificationReader>();
+        services.AddScoped<IExpirySource, RiskAnalysisExpirySource>();
         services.AddScoped<IAwaitedEntryReader, MariaAwaitedEntryReader>();
         services.AddScoped<IExpirySource, AwaitedInvoiceSource>();
         services.AddScoped<IOverStockReader, MariaOverStockReader>();

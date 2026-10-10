@@ -52,8 +52,8 @@
                 @if (CanManage)
                 {
                     <td>
-                        <button class="refresh act-edit" disabled="@Locked" @onclick="() => OpenEdit(item)">Editează</button>
-                        <button class="danger" disabled="@Locked" @onclick="() => OpenDelete(item)">Șterge</button>
+                        <button class="row-icon edit" disabled="@Locked" aria-label="Editează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" title="Editează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" @onclick="() => OpenEdit(item)"></button>
+                        <button class="row-icon delete" disabled="@Locked" aria-label="Șterge intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" title="Șterge intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" @onclick="() => OpenDelete(item)"></button>
                     </td>
                 }
             </tr>

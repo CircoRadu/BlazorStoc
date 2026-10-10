@@ -27,6 +27,9 @@ public static class AuditEntities
     // Only the deletion of a maintenance contract is recorded under this type (it is archived); the other operations on contracts
     // are recorded under the beneficiary the contract belongs to.
     public const string ServiceContract = "ContractMentenanta";
+    // Only the deletion of a risk analysis is recorded under this type (it is archived); the other operations on analyses
+    // are recorded under the beneficiary the analysis belongs to.
+    public const string RiskAnalysis = "AnalizaRisc";
     // Only the deletion of an intervention (either kind) is recorded under this type (it is archived); the other operations on
     // interventions are recorded under the beneficiary they belong to.
     public const string ServiceIntervention = "InterventieMentenanta";
@@ -105,6 +108,14 @@ public static class AuditActions
     public const string EditMaintenanceCycle = "Modificare ciclicitate mentenanță";
     public const string RescheduleMaintenance = "Reprogramare intervenție mentenanță";
     public const string MoveContractPoint = "Mutare punct de lucru în alt contract";
+    // Risk analyses of work points: each kind of change is named exactly. Deleting one is the archived "Ștergere".
+    public const string CreateRiskAnalysis = "Adăugare analiză de risc";
+    public const string EditRiskAnalysis = "Modificare analiză de risc";
+    public const string EditRiskAnalysisValidity = "Modificare valabilitate analiză de risc";
+    public const string RenewRiskAnalysis = "Reînnoire analiză de risc";
+    public const string UndoRiskAnalysisRenewal = "Anulare reînnoire analiză de risc";
+    public const string ActivateRiskAnalysis = "Activare analiză de risc";
+    public const string DeactivateRiskAnalysis = "Dezactivare analiză de risc";
     // Interventions (register): each kind of change is named exactly. Deleting one is the archived "Ștergere".
     public const string RecordMaintenance = "Înregistrare intervenție mentenanță";
     public const string EditMaintenanceIntervention = "Modificare intervenție mentenanță";
@@ -217,6 +228,7 @@ public static class AuditActions
             or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto
             or CreateServiceContract or EditServiceContract or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
+            or CreateRiskAnalysis or EditRiskAnalysis or EditRiskAnalysisValidity or RenewRiskAnalysis or UndoRiskAnalysisRenewal or ActivateRiskAnalysis or DeactivateRiskAnalysis
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier

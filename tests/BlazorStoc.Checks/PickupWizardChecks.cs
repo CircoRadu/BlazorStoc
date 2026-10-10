@@ -225,10 +225,10 @@ public static class PickupWizardChecks
         context.Services.AddSupplierFakes();
         var cut = context.Render<BlazorStoc.Components.Shared.InvoiceTemplatesList>();
         cut.WaitForAssertion(() => cut.Find("#invoice-template-1"), TimeSpan.FromSeconds(10));
-        var before = cut.FindAll("#invoice-template-1 button").Any(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal));
-        cut.FindAll("#invoice-template-1 button").First(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal)).Click();
+        var before = cut.FindAll("#invoice-template-1 button").Any(button => (button.GetAttribute("title") ?? "").Contains("Leagă șablonul de un furnizor", StringComparison.Ordinal));
+        cut.FindAll("#invoice-template-1 button").First(button => (button.GetAttribute("title") ?? "").Contains("Leagă șablonul de un furnizor", StringComparison.Ordinal)).Click();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("a fost legat de furnizorul", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
-        check(before && !cut.FindAll("#invoice-template-1 button").Any(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal)) && cut.Markup.Contains("Furnizor Test SRL", StringComparison.Ordinal),
+        check(before && !cut.FindAll("#invoice-template-1 button").Any(button => (button.GetAttribute("title") ?? "").Contains("Leagă șablonul de un furnizor", StringComparison.Ordinal)) && cut.Markup.Contains("Furnizor Test SRL", StringComparison.Ordinal),
             "Templates list: the \"Leagă de furnizor\" button links an unlinked template to the supplier of the register (the button then disappears, the supplier's own name is shown)");
     }
     // A file whose supplier has no template: the pickup warns, offers to create the template in a window over the page (on the file already read)
