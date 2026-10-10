@@ -1,5 +1,5 @@
-@page "/furnizori"
-@attribute [Authorize]
+﻿@page "/furnizori"
+@attribute [Authorize(Policy = "perm:furnizori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject UnsavedChanges Guard
@@ -13,7 +13,7 @@
 
 <PageTitle>Furnizori · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Furnizori</h1><p class="muted">Registrul furnizorilor ale căror facturi se preiau în stoc. Un furnizor se identifică prin CUI (sau codul de TVA al unui stat UE) și nu poate apărea de două ori.</p></div><div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă furnizor</button></div></div>
+<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Furnizori</h1><p class="muted">Registrul furnizorilor ale căror facturi se preiau în stoc. Un furnizor se identifică prin CUI (sau codul de TVA al unui stat UE) și nu poate apărea de două ori.</p></div><div class="heading-actions">@if (permAdd) { <button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă furnizor</button> }</div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 @if (editing) { <SupplierEditor @key="editorKey" Original="editingSupplier" Saved="SupplierSavedAsync" Closed="CloseEditorAsync" /> }
@@ -71,8 +71,8 @@
                 <td>@(supplier.Phone.Length == 0 ? "—" : supplier.Phone)</td>
                 <td>@(supplier.InvoiceCount == 0 ? "—" : $"{supplier.InvoiceCount} ({supplier.MovementCount} {(supplier.MovementCount == 1 ? "intrare" : "intrări")})")</td>
                 <td><div class="row-buttons">
-                    <button class="row-icon edit" aria-label="Editează @supplier.Name" title="Editează" disabled="@(editing || deleting is not null)" @onclick="() => OpenEditorAsync(supplier)"></button>
-                    <button class="row-icon delete" aria-label="Șterge @supplier.Name" title="@DeleteHint(supplier)" disabled="@(!canDelete || supplier.InUse)" @onclick="() => RequestDeleteAsync(supplier)"></button>
+                    @if (permEdit) { <button class="row-icon edit" aria-label="Editează @supplier.Name" title="Editează" disabled="@(editing || deleting is not null)" @onclick="() => OpenEditorAsync(supplier)"></button> }
+                    @if (permDelete) { <button class="row-icon delete" aria-label="Șterge @supplier.Name" title="@DeleteHint(supplier)" disabled="@(!canDelete || supplier.InUse)" @onclick="() => RequestDeleteAsync(supplier)"></button> }
                 </div></td>
             </tr>
         }
@@ -92,6 +92,13 @@
 </PageBoundary>
 
 @code {
+    private bool permAdd, permEdit, permDelete;
+    private async Task LoadPermissionsAsync()
+    {
+        permAdd = await Access.HasAsync("furnizori.add");
+        permEdit = await Access.HasAsync("furnizori.edit");
+        permDelete = await Access.HasAsync("furnizori.delete");
+    }
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
     [SupplyParameterFromQuery(Name = "adauga")] public string? AddFlag { get; set; }
     private bool addFlagHandled;
@@ -149,6 +156,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPermissionsAsync();
         try { canDelete = await Access.IsAdministratorAsync(lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         await LoadAsync(true);

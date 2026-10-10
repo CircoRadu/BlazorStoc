@@ -1,7 +1,8 @@
-@page "/beneficiari"
-@attribute [Authorize]
+﻿@page "/beneficiari"
+@attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
+@inject IAccessControl Access
 @inject UnsavedChanges Guard
 @inject ExitFormDraft ExitDraft
 @inject IBeneficiaryRepository Repository
@@ -12,7 +13,7 @@
 
 <PageTitle>Beneficiari · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele fizice și juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button></div></div>
+<div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele fizice și juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions">@if (permAdd) { <button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button> }</div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 @if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBeneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditorAsync" /> }
@@ -34,7 +35,7 @@
         <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TIP / CUI</th><th>ADRESĂ</th><th>TELEFON</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var beneficiary in Filtered)
         {
-            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Identifier</span></td><td>@(beneficiary.Address.Length == 0 ? "—" : beneficiary.Address)</td><td>@(beneficiary.Phone.Length == 0 ? "—" : beneficiary.Phone)</td><td><div class="row-buttons"><button class="row-icon edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)" title="Editează @beneficiary.Name"></button><button class="row-icon delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)" title="Șterge @beneficiary.Name"></button></div></td></tr>
+            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Identifier</span></td><td>@(beneficiary.Address.Length == 0 ? "—" : beneficiary.Address)</td><td>@(beneficiary.Phone.Length == 0 ? "—" : beneficiary.Phone)</td><td><div class="row-buttons">@if (permEdit) { <button class="row-icon edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)" title="Editează @beneficiary.Name"></button> }@if (permDelete) { <button class="row-icon delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)" title="Șterge @beneficiary.Name"></button> }</div></td></tr>
         }
         </tbody></table></div>
     }
@@ -52,6 +53,13 @@
 </PageBoundary>
 
 @code {
+    private bool permAdd, permEdit, permDelete;
+    private async Task LoadPermissionsAsync()
+    {
+        permAdd = await Access.HasAsync("beneficiari.add");
+        permEdit = await Access.HasAsync("beneficiari.edit");
+        permDelete = await Access.HasAsync("beneficiari.delete");
+    }
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
     // /beneficiari?adauga=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
     [SupplyParameterFromQuery(Name = "adauga")] public string? AddFlag { get; set; }
@@ -69,6 +77,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPermissionsAsync();
         await LoadAsync(true);
         SynchronizePeriodicallyAsync().FireAndForget(Logger, "periodic synchronization");
     }

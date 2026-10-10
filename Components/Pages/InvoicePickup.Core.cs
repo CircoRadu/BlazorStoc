@@ -26,7 +26,7 @@ public partial class InvoicePickup
 
     protected override async Task OnInitializedAsync()
     {
-        if (!await Access.CanManageProductsAsync(lifetime.Token)) loadError = "Nu ai dreptul să preiei facturi.";
+        if (!await Access.HasModuleWriteAsync("preluare-factura", lifetime.Token)) loadError = "Nu ai dreptul să preiei facturi.";
         loading = false;
     }
 

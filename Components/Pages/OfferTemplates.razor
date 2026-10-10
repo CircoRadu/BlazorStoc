@@ -1,5 +1,5 @@
-@page "/oferte/sabloane"
-@attribute [Authorize]
+﻿@page "/oferte/sabloane"
+@attribute [Authorize(Policy = "perm:oferte.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IOfferTemplateRepository Repository

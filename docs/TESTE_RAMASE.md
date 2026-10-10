@@ -763,3 +763,7 @@ Ordinea categoriilor, preluare factura cu produse deja preluate, popup harta, pa
 Refactorizare fara schimbari de functionalitate (10.10.2026): paginile impartite au fost verificate in browser de agent (vezi Teste efectuate, 10.10.2026); raman de verificat pasul 3 al preluarii facturii (intrarea in stoc), salvarea unui sablon si iesirea de pe pagina de miscari (Teste utilizator/ 02 si 04); schema-mariadb.sql ramane de intretinut in paralel cu fisierele de migrare
 
 Analize de risc (punct de lucru, reinnoiri, notificare de expirare) (10.10.2026): Analize de risc: de verificat in browser (Teste utilizator/15_Analize_de_risc.md); migrarea 39 se aplica pe baza BlazorStoc la pornirea aplicatiei; suita completa inainte de commit
+
+Tipuri de utilizatori cu permisiuni (10.10.2026): Tipuri de utilizatori: de verificat in browser (Teste utilizator/16)
+
+Permisiuni pe operatii, modul Stoc, ordinea subcategoriilor si corectii (10.10.2026): De verificat in browser: Teste utilizator/16 si 01 (ordinea subcategoriilor)

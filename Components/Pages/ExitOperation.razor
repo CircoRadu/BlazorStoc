@@ -1,4 +1,5 @@
-@page "/iesiri/multipla"
+﻿@page "/iesiri/multipla"
+@attribute [Authorize(Policy = "perm:iesire-multipla.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProductRepository Products
@@ -188,7 +189,7 @@ else
         lines = [new Line { Key = nextKey++ }];
         try
         {
-            canManage = await Access.CanManageProductsAsync(lifetime.Token);
+            canManage = await Access.HasModuleWriteAsync("iesire-multipla", lifetime.Token);
             if (canManage) await LoadAsync();
             if (canManage && InitialProductId is { } initial) await ProductChangedAsync(lines[0], initial);
             if (canManage && !Embedded && FillVehicleId is { } fillVehicle) await FillVehicleAsync(fillVehicle);

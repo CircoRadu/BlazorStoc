@@ -37,6 +37,10 @@ public static partial class MariaExtendedChecks
             await Section("Maintenance interventions: register, due date choices, corrections, photos, archive, guards", () => ServiceInterventionsAsync(configuration, admin, audit, probe, assets));
             await Section("Maintenance notifications: due dates and contract expiry sources, automatic close and reopen, threshold", () => MaintenanceNotificationsAsync(configuration, admin, audit, probe));
             await Section("Risk analyses: one active per point, renewals and history, notification, replace, guards, archive", () => RiskAnalysesAsync(configuration, admin, audit, probe));
+            await Section("User types: system types, catalog permissions, seeding, assignment", () => UserTypesAsync(configuration, admin, audit, probe));
+            await Section("Stock permissions: each kind of movement asks for its own key", () => StockPermissionsAsync(configuration, admin, audit));
+            await Section("Module permissions: registers are read by anyone with a permission, add/edit/delete each ask for their key", () => ModulePermissionsAsync(configuration, admin, audit));
+            await Section("Subcategory order: arranged by the administrator, new ones at the end, journal", () => SubcategoryOrderAsync(configuration, admin, audit));
             await Section("Journal: server-side filtering, paging, window, ranges, removals, summary", () => AuditQueryAsync(configuration, audit, probe));
             await Section("Change events", () => ChangeEventsAsync(configuration, admin, audit));
             await Section("Expiry notifications: templates, engine, take over, reminder", () => NotificationsAsync(configuration, admin, audit, probe));

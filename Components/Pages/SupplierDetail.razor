@@ -1,5 +1,5 @@
-@page "/furnizori/{Id:int}"
-@attribute [Authorize]
+﻿@page "/furnizori/{Id:int}"
+@attribute [Authorize(Policy = "perm:furnizori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject ISupplierRepository Suppliers

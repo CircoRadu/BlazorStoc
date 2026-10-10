@@ -19,7 +19,7 @@ public partial class ProductMovements
     private Product? product;
     private StockMovementPage pageData = new([], 0, 0, false);
     private int stock, inVehicles;
-    private bool loading = true, canManage, saving, editSaving, deleteBusy, imagePreview;
+    private bool loading = true, canManage, stockIn, stockOut, stockModify, stockVoid, permEdit, permDelete, saving, editSaving, deleteBusy, imagePreview;
     private string? error, notice, formError, editError, deleteError, historyError;
     private StockMovementKind? filter;
     private EntrySource source = EntrySource.All;

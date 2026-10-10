@@ -26,11 +26,16 @@ public static class AuditFilterOptions
         (AuditEntities.RiskAnalysis, "Analize de risc (ștergeri)"),
         (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă"),
         (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori"),
-        (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.OfferTemplate, "Șabloane oferte")
+        (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.OfferTemplate, "Șabloane oferte"),
+        (AuditEntities.UserType, "Tipuri de utilizatori")
     ];
 
     public static readonly IReadOnlyList<(string Value, string Label)> Actions =
     [
+        (AuditActions.CreateUserType, AuditActions.CreateUserType), (AuditActions.RenameUserType, AuditActions.RenameUserType),
+        (AuditActions.EditUserTypeDescription, AuditActions.EditUserTypeDescription), (AuditActions.GrantPermission, AuditActions.GrantPermission),
+        (AuditActions.RevokePermission, AuditActions.RevokePermission), (AuditActions.DeleteUserType, AuditActions.DeleteUserType),
+        (AuditActions.ChangeUserType, AuditActions.ChangeUserType), (AuditActions.AccessDenied, AuditActions.AccessDenied),
         (AuditActions.Create, "Adăugare"), (AuditActions.Edit, "Editare"), (AuditActions.Delete, "Ștergere"), (AuditActions.Login, "Conectare"),
         (AuditActions.Logout, "Deconectare"), (AuditActions.Unlock, "Deblocare"), (AuditActions.Generate, "Generare"),
         (AuditActions.ExportJournal, AuditActions.ExportJournal),
@@ -69,7 +74,7 @@ public static class AuditFilterOptions
         (AuditActions.MoveSupplierInvoice, AuditActions.MoveSupplierInvoice),
         (AuditActions.AddSupplierAlias, AuditActions.AddSupplierAlias), (AuditActions.RemoveSupplierAlias, AuditActions.RemoveSupplierAlias),
         (AuditActions.DeleteCategory, AuditActions.DeleteCategory), (AuditActions.DeleteSubcategory, AuditActions.DeleteSubcategory),
-        (AuditActions.ReorderCategories, AuditActions.ReorderCategories),
+        (AuditActions.ReorderCategories, AuditActions.ReorderCategories), (AuditActions.ReorderSubcategories, AuditActions.ReorderSubcategories),
         (AuditActions.AddSubcategoryParameter, AuditActions.AddSubcategoryParameter), (AuditActions.EditSubcategoryParameter, AuditActions.EditSubcategoryParameter),
         (AuditActions.DeleteSubcategoryParameter, AuditActions.DeleteSubcategoryParameter), (AuditActions.AddParameterValue, AuditActions.AddParameterValue),
         (AuditActions.DeleteParameterValue, AuditActions.DeleteParameterValue), (AuditActions.EditParameterValue, AuditActions.EditParameterValue),

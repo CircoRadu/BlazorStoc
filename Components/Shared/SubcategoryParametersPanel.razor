@@ -56,20 +56,28 @@
                             {
                                 <button class="row-icon edit" disabled="@busy" aria-label="@($"Editează valoarea {parameter.Display(value.Value)}")" title="@($"Editează valoarea {parameter.Display(value.Value)}")" @onclick="() => { editingValue = (parameter, value); notice = null; }"></button>
                             }
+                            @if (canEdit)
+                            {
                             <button class="row-icon delete" disabled="@(busy || value.ProductCount > 0)" aria-label="@($"Șterge valoarea {parameter.Display(value.Value)}")"
                                     title="@(value.ProductCount > 0 ? $"Folosită de {value.ProductCount} produse: nu se poate șterge." : $"Șterge valoarea {parameter.Display(value.Value)}")"
                                     @onclick="() => { deletingValue = (parameter, value); deleteError = null; }"></button>
+                            }
                         </td></tr>
                     }
                     </tbody></table></div>
                 }
+                @if (canEdit)
+                {
                 <div class="parameter-add">
                     <input aria-label="@($"Valoare nouă pentru {parameter.Name}")" maxlength="@ProductParameterRules.ValueMaximumLength" placeholder="@(parameter.Kind == ParameterKind.Number ? "Valoare nouă (număr, ex. 2,8)" : "Valoare nouă")"
                            value="@NewValue(parameter.Id)" @oninput="args => newValues[parameter.Id] = args.Value?.ToString() ?? string.Empty" @onkeydown="args => AddValueKeyAsync(args, parameter)" disabled="@busy" autocomplete="off" />
                     <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => AddValueAsync(parameter)">Adaugă valoarea</button>
                 </div>
+                }
             </div>
         }
+        @if (canEdit)
+        {
         <h3 class="parameter-add-title">Parametru nou</h3>
         <div class="editor-grid">
             <label for="new-parameter-name">Denumire parametru *<input id="new-parameter-name" maxlength="@ProductParameterRules.NameMaximumLength" @bind="newName" @bind:event="oninput" disabled="@busy" autocomplete="off" placeholder="ex. Lentilă" /></label>
@@ -84,6 +92,7 @@
             }
         </div>
         <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="AddParameterAsync">Adaugă parametrul</button></div>
+        }
         @if (!isAdministrator) { <p class="form-note">Valorile se pot adăuga și șterge (dacă nu sunt folosite) de orice utilizator; editarea valorilor și a parametrilor o face administratorul.</p> }
     }
 </section>
@@ -125,7 +134,7 @@
     private readonly string instanceId = Guid.NewGuid().ToString("N");
     private string TitleId => $"parameters-title-{instanceId}";
     private IReadOnlyList<SubcategoryParameter> parameters = [];
-    private bool loading = true, busy, deleteBusy, isAdministrator;
+    private bool loading = true, busy, deleteBusy, isAdministrator, canEdit;
     private string? error, notice, deleteError;
     private readonly Dictionary<int, string> newValues = [];
     private string newName = "", newUnit = "";
@@ -143,7 +152,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try { isAdministrator = await Access.IsAdministratorAsync(lifetime.Token); }
+        try { isAdministrator = await Access.IsAdministratorAsync(lifetime.Token); canEdit = await Access.HasAsync("categorii.edit", lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         await LoadAsync();
     }

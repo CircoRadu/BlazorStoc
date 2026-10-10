@@ -1,5 +1,5 @@
-@page "/proiecte/{Id:int}/situatie"
-@attribute [Authorize]
+﻿@page "/proiecte/{Id:int}/situatie"
+@attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProjectSituationReader Reader
@@ -7,6 +7,7 @@
 @inject IProjectComponentRepository ComponentRepository
 @inject IProductRepository ProductRepository
 @inject ILogger<ProjectSituationPage> Logger
+@inject IAccessControl Access
 @implements IDisposable
 <PageBoundary>
 
@@ -43,7 +44,7 @@ else if (situation is not null)
     {
         <section class="catalog" aria-label="@component.Name">
             <div class="catalog-heading"><h2>@component.Name</h2><small>predat @ProjectSituationRules.Format(component.Delivered) din @ProjectSituationRules.Format(component.Needed) (bucăți)</small></div>
-            <div class="heading-actions section-actions"><button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => ReserveComponentAsync(component)">Rezervă cât se poate pentru componentă</button></div>
+            <div class="heading-actions section-actions">@if (canReserve) { <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => ReserveComponentAsync(component)">Rezervă cât se poate pentru componentă</button> }</div>
             <div class="table-scroll"><table><thead><tr><th>SECȚIUNE</th><th>DENUMIRE</th><th class="number">NECESAR</th><th class="number">PREDAT</th><th class="number">DIN STOC</th><th class="number">DIN CARE REZERVAT</th><th class="number">INTRAT PT. OFERTĂ</th><th class="number">DEFICIT</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
             @foreach (var line in component.Lines)
             {
@@ -57,7 +58,7 @@ else if (situation is not null)
                     <td class="number">@(line.InStock && line.Received > 0 ? ProjectSituationRules.Format(line.Received) : "—")</td>
                     <td class="number">@(line.InStock ? ProjectSituationRules.Format(line.Deficit) : "—")</td>
                     <td>@ProjectSituationRules.StateLabel(line.State)</td>
-                    <td>@if (CanReserve(line)) { <button type="button" class="row-icon reserve" disabled="@busy" aria-label="@($"Rezervă cât se poate din {ProjectSituationRules.FirstLine(line.Name)}")" title="Rezervă cât se poate" @onclick="() => ReserveLineAsync(component, line)"></button> }</td>
+                    <td>@if (canReserve && CanReserve(line)) { <button type="button" class="row-icon reserve" disabled="@busy" aria-label="@($"Rezervă cât se poate din {ProjectSituationRules.FirstLine(line.Name)}")" title="Rezervă cât se poate" @onclick="() => ReserveLineAsync(component, line)"></button> }</td>
                 </tr>
             }
             </tbody></table></div>
@@ -65,6 +66,8 @@ else if (situation is not null)
     }
     <section class="catalog" aria-label="Rezervările proiectului">
         <div class="catalog-heading"><h2>Rezervările proiectului <span>@reservations.Count</span></h2><small>Rezervarea nu schimbă stocul: scade stocul liber; ieșirea pentru acest proiect o consumă prima</small></div>
+        @if (canReserve)
+        {
         <div class="filters">
             <div class="relation-row">
                 <SearchableSelect Id="reserve-product" Label="Produs de rezervat" Placeholder="Caută sau alege produsul…" EmptyText="Niciun produs găsit." Options="ProductOptions"
@@ -78,6 +81,7 @@ else if (situation is not null)
             <label class="movement-page-size">Cantitate <input type="number" min="1" max="@StockMovementRules.MaxQuantity" @bind="manualQuantity" @bind:event="oninput" disabled="@busy" /></label>
             <button type="button" class="primary" disabled="@(busy || manualProduct is null || manualQuantity is null)" @onclick="ReserveManualAsync">Rezervă</button>
         </div>
+        }
         @if (reservations.Count == 0)
         {
             <p class="muted">Proiectul nu are rezervări.</p>
@@ -99,7 +103,7 @@ else if (situation is not null)
                             <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Scade rezervarea pentru {reservation.ProductName}")" title="Scade rezervarea" @onclick="() => ReduceAsync(reservation)"></button>
                             <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la scădere" title="Renunță" @onclick="() => reducing = null"></button>
                         }
-                        else { <button type="button" class="row-icon reduce" disabled="@busy" aria-label="@($"Scade sau eliberează rezervarea pentru {reservation.ProductName}")" title="Scade / eliberează rezervarea" @onclick="() => StartReduce(reservation)"></button> }
+                        else if (canReserve) { <button type="button" class="row-icon reduce" disabled="@busy" aria-label="@($"Scade sau eliberează rezervarea pentru {reservation.ProductName}")" title="Scade / eliberează rezervarea" @onclick="() => StartReduce(reservation)"></button> }
                     </td>
                 </tr>
             }
@@ -143,7 +147,7 @@ else if (situation is not null)
 
     private readonly CancellationTokenSource lifetime = new();
     private ProjectSituation? situation;
-    private bool loading = true, busy;
+    private bool loading = true, busy, canReserve;
     private string? error, notice, actionError, reduceReason = "";
     private IReadOnlyList<Reservation> reservations = [];
     private IReadOnlyList<ProjectComponent> activeComponents = [];
@@ -160,6 +164,7 @@ else if (situation is not null)
         loading = true; error = null;
         try
         {
+            canReserve = await Access.HasAsync("stoc.rezervare", lifetime.Token);
             situation = await Reader.GetAsync(Id, lifetime.Token);
             reservations = await Reservations.GetForProjectAsync(Id, lifetime.Token);
             activeComponents = await ComponentRepository.GetForProjectAsync(Id, false, lifetime.Token);

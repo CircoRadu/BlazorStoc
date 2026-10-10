@@ -1,4 +1,5 @@
-@page "/produse"
+﻿@page "/produse"
+@attribute [Authorize(Policy = "perm:stoc.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProductRepository Repository
@@ -18,7 +19,7 @@
 
 <PageTitle>Produse și stocuri · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<div class="page-heading"><div><p class="eyebrow">INVENTAR CENTRALIZAT</p><h1>Produse și stocuri</h1><p class="muted">Găsește rapid produsele și verifică disponibilitatea lor.</p></div><div class="heading-actions"><a class="refresh act-nav" href="/">← Meniu principal</a>@if (canManage) { <a class="refresh act-nav" href="/iesiri/multipla">Ieșire multiplă</a><a class="refresh act-nav" href="/categorii">Administrează categorii</a><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă produs</button> }<button class="refresh act-reload" disabled="@(loading || editing || deleting is not null)" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
+<div class="page-heading"><div><p class="eyebrow">INVENTAR CENTRALIZAT</p><h1>Produse și stocuri</h1><p class="muted">Găsește rapid produsele și verifică disponibilitatea lor.</p></div><div class="heading-actions"><a class="refresh act-nav" href="/">← Meniu principal</a>@if (permMultiExit) { <a class="refresh act-nav" href="/iesiri/multipla">Ieșire multiplă</a><a class="refresh act-nav" href="/categorii">Administrează categorii</a>@if (permAdd) { <button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă produs</button> } }<button class="refresh act-reload" disabled="@(loading || editing || deleting is not null)" @onclick="LoadAsync"><span>↻</span> @(loading ? "Se încarcă…" : "Actualizează")</button></div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
@@ -45,7 +46,7 @@ else
 <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după cod produs sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label></div>
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh act-reload" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
-else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }@if (incompleteProducts.Contains(p.Id)) { <small class="lock-badge incomplete-badge" title="Subcategoria cere parametri obligatori pe care produsul nu îi are încă: este blocat pentru mișcări de stoc până se editează.">⚠ Parametri obligatorii necompletați · blocat</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td>@if (canManage) { <button class="row-icon exit" title="Ieșire rapidă" aria-label="@($"Ieșire rapidă {p.Name}")" @onclick="() => quickExit = p"></button> }<button class="row-icon view" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)" title="@($"Deschide mișcările produsului {p.Name}")"></button></td></tr> }</tbody></table></div> }
+else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }@if (incompleteProducts.Contains(p.Id)) { <small class="lock-badge incomplete-badge" title="Subcategoria cere parametri obligatori pe care produsul nu îi are încă: este blocat pentru mișcări de stoc până se editează.">⚠ Parametri obligatorii necompletați · blocat</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td>@if (stockOut) { <button class="row-icon exit" title="Ieșire rapidă" aria-label="@($"Ieșire rapidă {p.Name}")" @onclick="() => quickExit = p"></button> }<button class="row-icon view" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)" title="@($"Deschide mișcările produsului {p.Name}")"></button></td></tr> }</tbody></table></div> }
 <footer class="table-footer"><span>@Filtered.Count @(Filtered.Count == 1 ? "rezultat" : "rezultate")</span><div class="pagination"><button disabled="@(page <= 1)" @onclick="() => page--" aria-label="Pagina anterioară">‹</button><span>Pagina @(page) din @Pages</span><button disabled="@(page >= Pages)" @onclick="() => page++" aria-label="Pagina următoare">›</button></div></footer></section>
 <p class="workspace-note"><span class="status-dot"></span> Date din BlazorStoc <span>·</span> Catalog și gestiune produse</p>
 }
@@ -100,7 +101,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private IReadOnlyList<ProductGroup> groups = Array.Empty<ProductGroup>();
     private Product? editingProduct, deleting;
     private bool editing, deleteBusy;
-    private bool canManage;
+    private bool canManage, stockOut, permMultiExit, permAdd, permEdit, permDelete;
     private Guid editorKey;
     private bool loading, loaded;
     private bool quantityDescending = true;
@@ -183,13 +184,13 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         if (EditId is > 0 && loaded && (!editing || editingProduct?.Id != EditId.Value))
         {
             var requested = products.FirstOrDefault(product => product.Id == EditId.Value);
-            if (requested is not null && canManage) await OpenEditorAsync(requested);
+            if (requested is not null && permEdit) await OpenEditorAsync(requested);
             else if (requested is null) error = "Produsul solicitat pentru editare nu mai există.";
         }
         if (DeleteId is > 0 && loaded && deleting?.Id != DeleteId.Value)
         {
             var requested = products.FirstOrDefault(product => product.Id == DeleteId.Value);
-            if (requested is not null && canManage) await RequestDeleteAsync(requested);
+            if (requested is not null && permDelete) await RequestDeleteAsync(requested);
             else if (requested is null) error = "Produsul solicitat pentru ștergere nu mai există.";
         }
     }
@@ -201,13 +202,15 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         {
             var productsTask = Repository.GetProductsAsync(lifetime.Token);
             var groupsTask = Repository.GetGroupsAsync(lifetime.Token);
-            var accessTask = Access.CanManageProductsAsync(lifetime.Token);
+            var accessTask = Access.HasModuleWriteAsync("stoc", lifetime.Token);
             var vehiclesTask = Movements.GetQuantitiesInVehiclesAsync(lifetime.Token);
             await Task.WhenAll(productsTask, groupsTask, accessTask, vehiclesTask);
             products = await productsTask;
             groups = await groupsTask;
             inVehicles = await vehiclesTask;
             canManage = await accessTask;
+            stockOut = await Access.HasAsync("stoc.iesire", lifetime.Token); permMultiExit = await Access.HasAsync("iesire-multipla.view", lifetime.Token);
+            permAdd = await Access.HasAsync("produse.add", lifetime.Token); permEdit = await Access.HasAsync("produse.edit", lifetime.Token); permDelete = await Access.HasAsync("produse.delete", lifetime.Token);
             loaded = true; lastLoaded = DateTime.UtcNow; ResetPage();
             await RefreshIncompleteAsync();
             await RefreshLocksAsync();

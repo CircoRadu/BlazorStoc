@@ -1,6 +1,6 @@
-@page "/produse/{Id:int}"
+﻿@page "/produse/{Id:int}"
 @page "/produse/{Id:int}/miscari"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "perm:stoc.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProductRepository Products
@@ -65,9 +65,9 @@ else
                 @if (canManage)
                 {
                     <div class="movement-product-actions">
-                        @if (holder is null) { <a class="refresh act-edit" href="@ReturnNavigation.EditUrl(product.Id, CurrentPath)">Editează</a> }
-                        else { <button type="button" class="row-icon edit" disabled title="@ProductLockRules.HeldMessage(holder)" aria-label="Editează mișcarea"></button> }
-                        <a class="danger movement-link-danger" href="@ReturnNavigation.DeleteUrl(product.Id, CurrentPath)">Șterge produs</a>
+                        @if (permEdit) { if (holder is null) { <a class="refresh act-edit" href="@ReturnNavigation.EditUrl(product.Id, CurrentPath)">Editează</a> }
+                        else { <button type="button" class="row-icon edit" disabled title="@ProductLockRules.HeldMessage(holder)" aria-label="Editează mișcarea"></button> } }
+                        @if (permDelete) { <a class="danger movement-link-danger" href="@ReturnNavigation.DeleteUrl(product.Id, CurrentPath)">Șterge produs</a> }
                     </div>
                 }
             </div>
@@ -75,7 +75,7 @@ else
 
         <ProductReservationsInfo ProductId="Id" Stock="stock" Version="reservationVersion" />
         @if (canManage) { <ProductWhere ProductId="Id" Stock="stock" Version="reservationVersion" /> }
-        @if (canManage)
+        @if (stockIn || stockOut || stockVoid)
         {
             <ReserveSuggestions ProductId="Id" Trigger="suggestionTrigger" Reserved="() => { reservationVersion++; }" />
             <section class="movement-card movement-form" aria-labelledby="movement-form-title">
@@ -92,10 +92,16 @@ else
                             <label class="movement-date" for="movement-date">Data mișcării *
                                 <PickOnlyDate Id="movement-date" @bind-Value="form.Date" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
                             <div class="movement-kind" role="tablist" aria-label="Tipul mișcării">
+                                @if (stockIn || stockVoid)
+                                {
                                 <button type="button" class="kind-button kind-in @(form.Kind == StockMovementKind.Entry ? "selected" : "")" role="tab" aria-selected="@(form.Kind == StockMovementKind.Entry)" @onclick="() => SetKindAsync(StockMovementKind.Entry)">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v13m0 0-5-5m5 5 5-5M5 20h14" /></svg> Intrare</button>
+                                }
+                                @if (stockOut)
+                                {
                                 <button type="button" class="kind-button kind-out @(form.Kind == StockMovementKind.Exit ? "selected" : "")" role="tab" aria-selected="@(form.Kind == StockMovementKind.Exit)" @onclick="() => SetKindAsync(StockMovementKind.Exit)">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V7m0 0-5 5m5-5 5 5M5 4h14" /></svg> Ieșire</button>
+                                }
                             </div>
                         </div>
                         @if (form.Kind == StockMovementKind.Entry)
@@ -297,7 +303,7 @@ else
                                 @if (canManage)
                                 {
                                     <td class="movement-actions">
-                                        @if (!m.IsVoided)
+                                        @if (!m.IsVoided && stockModify)
                                         {
                                             <button class="row-icon edit" aria-label="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenEditAsync(m)" title="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)"></button>
                                             <button class="row-icon delete" aria-label="Șterge mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => RequestDelete(m)" title="Șterge mișcarea din @StockMovementRules.DisplayDate(m.Date)"></button>
@@ -305,7 +311,7 @@ else
                                         @if (m.Kind == StockMovementKind.Exit && m.OperationId is { } operationId)
                                         {
                                             <a class="row-icon receipt" target="_blank" rel="noopener" href="@($"/api/iesiri/{operationId}/bon.pdf")" aria-label="Bonul de consum al operației @operationId" title="Bonul de consum al operației @operationId"></a>
-                                            @if (!m.IsVoided)
+                                            @if (!m.IsVoided && stockVoid)
                                             {
                                                 <button class="row-icon void" aria-label="Stornează operația @operationId" title="Stornează operația @operationId" @onclick="() => RequestVoid(m)"></button>
                                             }

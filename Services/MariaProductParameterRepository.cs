@@ -373,6 +373,7 @@ public sealed class MariaProductParameterRepository(IConfiguration configuration
         MariaDb.WriteAsync(configuration, action, message => new ProductOperationException(message), token,
             "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
+    // Parameters and their values belong to editing the categories.
+    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureAsync("categorii.edit", token) ?? Task.CompletedTask;
     private Task EnsureAdministratorAsync(CancellationToken token) => accessControl?.EnsureAdministratorAsync(token) ?? Task.CompletedTask;
 }

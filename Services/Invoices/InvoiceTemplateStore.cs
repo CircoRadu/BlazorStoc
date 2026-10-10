@@ -386,7 +386,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task<InvoiceTemplateRecord> CreateAsync(InvoiceTemplateInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("setari-facturi", cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await CheckUniqueNameAsync(input, null, cancellationToken).ConfigureAwait(false);
         var created = await store.CreateAsync(input, actor, cancellationToken).ConfigureAwait(false);
@@ -398,7 +398,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task<InvoiceTemplateRecord> SaveAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("setari-facturi", cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await CheckUniqueNameAsync(input, original.Id, cancellationToken).ConfigureAwait(false);
         var before = await store.GetAsync(original.Id, cancellationToken).ConfigureAwait(false);
@@ -419,7 +419,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
     // Chooses whether a template is used when invoices are read (a supplier may have several templates); journaled as its own operation.
     public async Task<InvoiceTemplateInfo> SetActiveAsync(InvoiceTemplateInfo original, bool active, CancellationToken cancellationToken = default)
     {
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("setari-facturi", cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var saved = await store.SetActiveAsync(original, active, actor, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordEditAsync(audit, access, AuditEntities.InvoiceTemplate, Id(saved), saved.Name,
@@ -430,7 +430,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task<InvoiceTemplateInfo> UpdateDetailsAsync(InvoiceTemplateInfo original, InvoiceTemplateInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("setari-facturi", cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await CheckUniqueNameAsync(input, original.Id, cancellationToken).ConfigureAwait(false);
         var saved = await store.UpdateDetailsAsync(original, input, actor, cancellationToken).ConfigureAwait(false);
@@ -442,7 +442,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task DeleteAsync(InvoiceTemplateInfo original, string reason, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-facturi.delete", cancellationToken).ConfigureAwait(false);
         await store.DeleteAsync(original, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.InvoiceTemplate, AuditActions.DeleteInvoiceTemplate, Id(original), original.Name,
             AuditDetails.Identification(("Furnizor", Supplier(original))),
@@ -451,7 +451,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task<InvoiceTemplateInfo> LinkSupplierAsync(InvoiceTemplateInfo original, Supplier supplier, CancellationToken cancellationToken = default)
     {
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("setari-facturi", cancellationToken).ConfigureAwait(false);
         var actor = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await CheckUniqueNameAsync(new InvoiceTemplateInput { Name = original.Name, SupplierName = supplier.Name, SupplierCui = supplier.Cui }, original.Id, cancellationToken).ConfigureAwait(false);
         var saved = await store.UpdateDetailsAsync(original, new InvoiceTemplateInput { Name = original.Name, SupplierName = supplier.Name, SupplierCui = supplier.Cui, SupplierId = supplier.Id }, actor, cancellationToken).ConfigureAwait(false);
@@ -462,7 +462,7 @@ public sealed class InvoiceTemplateService(IInvoiceTemplateStore store, IAccessC
 
     public async Task<int> RenameSupplierAsync(string supplierCui, string oldName, string newName, CancellationToken cancellationToken = default)
     {
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("setari-facturi", cancellationToken).ConfigureAwait(false);
         var cui = InvoiceValues.NormalizeCui(supplierCui);
         newName = (newName ?? "").Trim();
         if (cui.Length == 0 || newName.Length == 0) return 0;

@@ -15,6 +15,7 @@ public static class StructureChecks
         Routes(check);
         SettleNumbers(check);
         OverStock(check);
+        PermissionCatalog(check);
     }
 
     // ---- routes ----
@@ -120,5 +121,21 @@ public static class StructureChecks
             "Over stock: an entry is never over");
         check(MariaStockMovementRepository.OverStockOf(Movement(exit, 6, sourceVehicleId: 7), 1, 0, false) == 5,
             "Over stock: the warehouse figure is used when it is known, even if a vehicle is named");
+    }
+
+    // ---- permission catalog ----
+
+    private static void PermissionCatalog(Action<bool, string> check)
+    {
+        var keys = Permissions.AllKeys;
+        check(keys.Count == keys.Distinct(StringComparer.Ordinal).Count() && keys.All(key => key.Length <= 80 && key.Contains('.')),
+            "Permissions: the keys of the catalog are unique, module.action, at most 80 characters");
+        check(Permissions.Modules.All(module => module.Actions.Count > 0 && module.Actions.Select(action => action.Id).Distinct().Count() == module.Actions.Count),
+            "Permissions: every module has actions, none repeated");
+        check(Permissions.DefaultUserKeys.All(Permissions.IsKnown) && !Permissions.DefaultUserKeys.Any(key => key.StartsWith("utilizatori.") || key.StartsWith("tipuri-utilizatori.") ||
+              key.StartsWith("nomenclator.") || key.StartsWith("jurnal.") || key.StartsWith("setari-backup.") || key == "setari-facturi.delete"),
+            "Permissions: the default of \"Utilizator\" holds no administration of the system, no backup and no template deletion");
+        check(Permissions.Normalize(["stoc.intrare", "nu.exista"]).SequenceEqual(["stoc.view", "stoc.intrare"]),
+            "Permissions: an action implies viewing the module and unknown keys are dropped");
     }
 }

@@ -1,5 +1,5 @@
-@page "/nomenclator"
-@attribute [Authorize(Roles = AccessRoles.Administrator)]
+﻿@page "/nomenclator"
+@attribute [Authorize(Policy = "perm:nomenclator.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject ISystemTypeRepository Repository

@@ -4,6 +4,24 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 
 ## Modificari de testat
 
+### 10.10.2026 - Ordinea subcategoriilor (drag and drop)
+
+**Ce s-a adaugat:** aceeasi aranjare prin tragere, acum si pentru subcategoriile fiecarei categorii (migrarea 41, `subcategories.sort_order`; jurnal „Reordonare subcategorii").
+
+**Ce face acum:** pe pagina Categorii, administratorul vede un maner pe fiecare rand de subcategorie si il trage (sau foloseste sagetile sus/jos pe maner) in cadrul aceleiasi categorii; ordinea se salveaza imediat si este ordinea din meniul lateral. O subcategorie noua se adauga la sfarsitul categoriei; cele nearanjate raman alfabetice. Doar administratorul poate aranja.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | /categorii, categorie cu cel putin 3 subcategorii: trage maner-ul unui rand peste alt rand | Linie verde deasupra/dedesubtul randului tinta; la lasare randul se muta | |
+| 2 | Mesajul de dupa mutare | „Subcategoria ... a fost mutata pe pozitia N din ..." | |
+| 3 | Meniul lateral „Categorii produse", aceeasi categorie | Subcategoriile in noua ordine | |
+| 4 | Reincarca pagina | Ordinea ramane | |
+| 5 | Adauga o subcategorie noua in categorie | Apare ultima | |
+| 6 | Pe maner: sageata sus / jos de la tastatura | Randul se muta o pozitie | |
+| 7 | Incearca sa tragi un rand in alta categorie | Nu se intampla nimic (doar in aceeasi categorie) | |
+| 8 | /jurnal, actiunea „Reordonare subcategorii" | Un eveniment cu ordinea veche si cea noua | |
+| 9 | Cont care nu este administrator | Fara manere pe subcategorii | |
+
 ### 10.10.2026 - Ordinea categoriilor (drag and drop) si tipul parametrului cu comutatoare
 
 **Ce s-a adaugat:** pe pagina Categorii si subcategorii, un maner (⋮⋮) la inceputul fiecarui card de categorie, vizibil numai administratorului (migrarea 38: coloana `categories.sort_order`); actiunea de jurnal „Reordonare categorii"; la „Parametru nou", alegerea tipului (Text liber / Numar) cu doua comutatoare On/Off intr-un chenar „Tip".

@@ -27,7 +27,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
 
     public async Task<IReadOnlyList<Project>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT id,beneficiary_id,name,observations,version,created_utc,updated_utc
@@ -41,14 +41,14 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
 
     public async Task<Project?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await GetAsync(connection, null, id, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<Project> CreateAsync(ProjectInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var nowUtc = MariaTimeText.Now(); // A15 fix: match Format/Parse precision so CheckCurrent equality survives a round trip
         try
@@ -80,7 +80,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
 
     public async Task<Project> UpdateAsync(Project original, ProjectInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated(true);
         var nowUtc = MariaTimeText.Now(); // A15 fix: match Format/Parse precision so CheckCurrent equality survives a round trip
         Project updated;
@@ -122,7 +122,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
 
     public async Task DeleteAsync(Project original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new ProjectOperationException(reasonError);
         var observations = await GetObservationsAsync(original.Id, cancellationToken).ConfigureAwait(false);
@@ -177,7 +177,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
 
     public async Task<IReadOnlyList<ProjectObservation>> GetObservationsAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT id,project_id,name,content,author,version,created_utc,updated_utc
@@ -191,7 +191,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
 
     public async Task<ProjectObservation?> GetObservationAsync(int id, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await GetObservationAsync(connection, null, id, cancellationToken).ConfigureAwait(false);
     }
@@ -199,7 +199,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     public async Task<ProjectObservation> CreateObservationAsync(int projectId, ProjectObservationInput input, string author,
         CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var nowUtc = MariaTimeText.Now(); // A15 fix: match Format/Parse precision so CheckCurrent equality survives a round trip
         var (observation, projectName) = await WriteAsync(async (connection, transaction) =>
@@ -223,7 +223,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
     public async Task<ProjectObservation> UpdateObservationAsync(ProjectObservation original, ProjectObservationInput input,
         CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated(true);
         var nowUtc = MariaTimeText.Now(); // A15 fix: match Format/Parse precision so CheckCurrent equality survives a round trip
         var updated = await WriteAsync(async (connection, transaction) =>
@@ -248,7 +248,7 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
 
     public async Task DeleteObservationAsync(ProjectObservation original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new ProjectOperationException(reasonError);
         var observationFiles = await files.GetFilesAsync(original.Id, cancellationToken).ConfigureAwait(false);
@@ -380,5 +380,4 @@ public sealed class MariaProjectRepository(IConfiguration configuration, IWebHos
         exception.ErrorCode == MySqlErrorCode.DuplicateKeyEntry &&
         exception.Message.Contains("projects", StringComparison.OrdinalIgnoreCase);
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

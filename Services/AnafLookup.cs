@@ -327,7 +327,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
 
     public async Task<AnafState> GetStateAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken);
+        await access.EnsureAsync("setari-anaf.edit", cancellationToken);
         await store.FileGate.WaitAsync(cancellationToken);
         try
         {
@@ -342,7 +342,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
 
     public async Task<AnafRequest> PreviewAsync(AnafConfig config, string cui, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken);
+        await access.EnsureAsync("setari-anaf.edit", cancellationToken);
         return AnafRules.Prepare(config, cui, DateOnly.FromDateTime(DateTime.Today));
     }
 
@@ -353,7 +353,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
 
     public async Task<AnafTestResult> TestAsync(AnafConfig config, string cui, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken);
+        await access.EnsureAsync("setari-anaf.edit", cancellationToken);
         var request = AnafRules.Prepare(config, cui, DateOnly.FromDateTime(DateTime.Today));
         if (!config.Enabled) throw new AnafException("Integrarea este dezactivată. Activează comutatorul pentru testare.");
         var result = await SendAsync(config, request, cancellationToken);
@@ -365,7 +365,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
     // the administrator role, so every user who can add a beneficiary can pull the company data.
     public async Task<AnafCompanyResult> LookupCompanyAsync(string cui, CancellationToken cancellationToken = default)
     {
-        await access.EnsureBeneficiaryOperatorAsync(cancellationToken);
+        await access.EnsureModuleAsync("beneficiari", cancellationToken);
         AnafState state;
         await store.FileGate.WaitAsync(cancellationToken);
         try { state = await store.ReadAsync(cancellationToken); }
@@ -460,7 +460,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
 
     public async Task SaveDraftAsync(AnafConfig config, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken);
+        await access.EnsureAsync("setari-anaf.edit", cancellationToken);
         AnafRules.Prepare(config, "9178894", DateOnly.FromDateTime(DateTime.Today));
         await store.FileGate.WaitAsync(cancellationToken);
         try
@@ -474,7 +474,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
 
     public async Task<AnafState> ActivateAsync(AnafConfig config, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken);
+        await access.EnsureAsync("setari-anaf.edit", cancellationToken);
         if (AnafRules.Validate(config) is { } problem) throw new AnafException(problem);
         if (!WasTestedSuccessfully(config)) throw new AnafException("Testează cu succes această configurație înainte de activare.");
         return await AppendVersionAsync(state => (config.Clone(), null), "Activare configurație", cancellationToken);
@@ -482,7 +482,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
 
     public async Task<AnafState> RollbackAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken);
+        await access.EnsureAsync("setari-anaf.edit", cancellationToken);
         return await AppendVersionAsync(state =>
         {
             if (state.History.Count < 2) throw new AnafException("Nu există o versiune anterioară.");
@@ -493,7 +493,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
 
     public async Task<AnafState> ActivateVersionAsync(int versionId, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken);
+        await access.EnsureAsync("setari-anaf.edit", cancellationToken);
         return await AppendVersionAsync(state =>
         {
             var version = state.History.FirstOrDefault(item => item.Id == versionId) ?? throw new AnafException("Versiunea nu mai există. Actualizează lista.");
@@ -504,7 +504,7 @@ public sealed class AnafService(AnafStore store, IHttpClientFactory httpClientFa
 
     public async Task<AnafState> DeleteVersionAsync(int versionId, string reason, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken);
+        await access.EnsureAsync("setari-anaf.edit", cancellationToken);
         if (string.IsNullOrWhiteSpace(reason)) throw new AnafException("Motivul ștergerii este obligatoriu.");
         await store.FileGate.WaitAsync(cancellationToken);
         try

@@ -209,7 +209,7 @@ internal static class BackupPackageStore
         {
             if (manifest?.TimeSource != TrustedClock.SourceUnverified)
                 return BackupDeleteResult.Failed("Pachetele generate automat inainte de o restaurare nu pot fi sterse (cu exceptia celor cu ora neverificata).");
-            await access.EnsureAdministratorAsync(token).ConfigureAwait(false);
+            await access.EnsureAsync("setari-backup.backup", token).ConfigureAwait(false);
         }
 
         // The dialog (DeleteConfirmationDialog, subtask 3.2) already resolved the default/custom choice into a

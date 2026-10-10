@@ -192,8 +192,8 @@ UNLOCK TABLES;
 
 LOCK TABLES `categories` WRITE;
 /*!40000 ALTER TABLE `categories` DISABLE KEYS */;
-REPLACE INTO `categories` (`id`, `name`, `normalized_name`, `sort_order`) VALUES (6,'TVCI','TVCI',1),
-(9,'Control Acces','CONTROL ACCES',2);
+REPLACE INTO `categories` (`id`, `name`, `normalized_name`, `sort_order`) VALUES (6,'TVCI','TVCI',2),
+(9,'Control Acces','CONTROL ACCES',1);
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -348,10 +348,10 @@ UNLOCK TABLES;
 LOCK TABLES `products` WRITE;
 /*!40000 ALTER TABLE `products` DISABLE KEYS */;
 REPLACE INTO `products` (`id`, `category_id`, `subcategory_id`, `name`, `normalized_name`, `description`, `quantity`, `version`, `base_model`) VALUES (21,6,13,'DS-2CD1343G2-LIU-2.8mm','DS-2CD1343G2-LIU-2.8MM','Camera IP, 4MP, lentila 2.8mm, IR 30m, WL 30m, Mic - HIKVISION',2,1,NULL),
-(22,6,13,'DS-2CD1B43G2-LIU-2.8mm - 2.8 mm','DS-2CD1B43G2-LIU-2.8MM - 2.8 MM','Camera IP 4MP, lentila 2.8mm, IR 60m, WL 60m, Mic. - HIKVISION',7,2,'DS-2CD1B43G2-LIU-2.8mm'),
+(22,6,13,'DS-2CD1B43G2-LIU-2.8mm - 2.8 mm','DS-2CD1B43G2-LIU-2.8MM - 2.8 MM','Camera IP 4MP, lentila 2.8mm, IR 60m, WL 60m, Mic. - HIKVISION',6,2,'DS-2CD1B43G2-LIU-2.8mm'),
 (25,6,12,'DS-7116HQHI-K1','DS-7116HQHI-K1','',1,1,NULL),
 (27,9,17,'CASETA ELECTRONICA PENTRU LASKOMEX','CASETA ELECTRONICA PENTRU LASKOMEX','CASETA ELECTRONICA CASETA ELECTRONICA PENTRU LASKOMEX',2,0,NULL),
-(28,6,14,'DS-2CD2T43G2-2LI - 2.8 mm','DS-2CD2T43G2-2LI - 2.8 MM','DS-2CD2T43G2-2LI 2.8MM CAMERA IP BULLET 4MP, IR SI WHITE LIGHT 60M',11,0,NULL);
+(28,6,14,'DS-2CD2T43G2-2LI - 2.8 mm','DS-2CD2T43G2-2LI - 2.8 MM','DS-2CD2T43G2-2LI 2.8MM CAMERA IP BULLET 4MP, IR SI WHITE LIGHT 60M',-1,0,NULL);
 /*!40000 ALTER TABLE `products` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -433,6 +433,9 @@ UNLOCK TABLES;
 
 LOCK TABLES `stock_movement_history` WRITE;
 /*!40000 ALTER TABLE `stock_movement_history` DISABLE KEYS */;
+REPLACE INTO `stock_movement_history` (`id`, `movement_id`, `actor`, `timestamp_utc`, `changes`, `stock_correction`, `reason`) VALUES (6,52,'utilizator.demo','2026-10-10T12:27:22.936Z','Cantitate: 11 → 12; Corecție stoc: -1',-1,'Cantitate: 11 → 12'),
+(7,52,'utilizator.demo','2026-10-10T12:32:12.731Z','Stornat (operația #52)',12,'test'),
+(8,53,'utilizator.demo','2026-10-10T12:39:10.123Z','Cantitate: 14 → 12; Corecție stoc: +2',2,'Cantitate: 14 → 12');
 /*!40000 ALTER TABLE `stock_movement_history` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -443,18 +446,21 @@ REPLACE INTO `stock_movements` (`id`, `product_id`, `beneficiary_id`, `quantity`
 (45,21,NULL,1,'2026-10-06T12:23:17.752Z',NULL,1,'2026-10-06','243.8 RON factura 111094321 din data 22.09.2026 SC TELESYSTEM SRL','administrator.demo',0,'2026-10-06T12:23:17.752Z',NULL,NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL),
 (46,22,NULL,7,'2026-10-06T12:23:17.758Z',NULL,1,'2026-10-06','335.6 RON factura 111094321 din data 22.09.2026 SC TELESYSTEM SRL','administrator.demo',0,'2026-10-06T12:23:17.758Z',NULL,NULL,NULL,2,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL),
 (49,27,NULL,2,'2026-10-10T06:38:24.066Z',NULL,1,'2026-10-10','260.01 factura FV26CJ0012075 din data 08.10.2026  SECPRAL COM SRL','administrator.demo',0,'2026-10-10T06:38:24.066Z',NULL,NULL,NULL,3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL),
-(50,28,NULL,11,'2026-10-10T06:38:24.100Z',NULL,1,'2026-10-10','457.75 factura FV26CJ0012075 din data 08.10.2026  SECPRAL COM SRL','administrator.demo',0,'2026-10-10T06:38:24.100Z',NULL,NULL,NULL,3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL);
+(50,28,NULL,11,'2026-10-10T06:38:24.100Z',NULL,1,'2026-10-10','457.75 factura FV26CJ0012075 din data 08.10.2026  SECPRAL COM SRL','administrator.demo',0,'2026-10-10T06:38:24.100Z',NULL,NULL,NULL,3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,NULL),
+(52,28,NULL,12,'2026-10-10T12:26:36.073Z',NULL,0,'2026-10-10','test stoc negativ','utilizator.demo',2,'2026-10-10T12:32:12.731Z',3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,52,'2026-10-10T12:32:12.731Z','test','utilizator.demo',NULL,NULL,0,NULL),
+(53,28,NULL,12,'2026-10-10T12:32:54.574Z',NULL,0,'2026-10-10','fafa','utilizator.demo',1,'2026-10-10T12:39:10.123Z',3,NULL,NULL,NULL,NULL,NULL,NULL,2,53,NULL,NULL,NULL,NULL,NULL,0,NULL),
+(54,22,NULL,1,'2026-10-10T13:12:19.606Z',NULL,0,'2026-10-10','test','administrator.demo',0,'2026-10-10T13:12:19.606Z',3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,54,NULL,NULL,NULL,NULL,NULL,0,NULL);
 /*!40000 ALTER TABLE `stock_movements` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `subcategories` WRITE;
 /*!40000 ALTER TABLE `subcategories` DISABLE KEYS */;
-REPLACE INTO `subcategories` (`id`, `category_id`, `name`, `normalized_name`) VALUES (9,6,'Generic','GENERIC'),
-(11,6,'NVR','NVR'),
-(12,6,'DVR','DVR'),
-(13,6,'Camere IP','CAMERE IP'),
-(14,6,'Camere analogice','CAMERE ANALOGICE'),
-(17,9,'Diverse','DIVERSE');
+REPLACE INTO `subcategories` (`id`, `category_id`, `name`, `normalized_name`, `sort_order`) VALUES (9,6,'Generic','GENERIC',5),
+(11,6,'NVR','NVR',1),
+(12,6,'DVR','DVR',2),
+(13,6,'Camere IP','CAMERE IP',3),
+(14,6,'Camere analogice','CAMERE ANALOGICE',4),
+(17,9,'Diverse','DIVERSE',0);
 /*!40000 ALTER TABLE `subcategories` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -524,6 +530,148 @@ REPLACE INTO `system_types` (`id`, `name`, `name_key`, `active`, `sort_order`, `
 /*!40000 ALTER TABLE `system_types` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `user_type_permissions` WRITE;
+/*!40000 ALTER TABLE `user_type_permissions` DISABLE KEYS */;
+REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (1,'analize-risc.add'),
+(1,'analize-risc.delete'),
+(1,'analize-risc.edit'),
+(1,'analize-risc.view'),
+(1,'beneficiari.add'),
+(1,'beneficiari.delete'),
+(1,'beneficiari.edit'),
+(1,'beneficiari.export'),
+(1,'beneficiari.view'),
+(1,'categorii.add'),
+(1,'categorii.delete'),
+(1,'categorii.edit'),
+(1,'categorii.view'),
+(1,'export-consum.export'),
+(1,'export-consum.view'),
+(1,'facturi.add'),
+(1,'facturi.delete'),
+(1,'facturi.edit'),
+(1,'facturi.export'),
+(1,'facturi.view'),
+(1,'furnizori.add'),
+(1,'furnizori.delete'),
+(1,'furnizori.edit'),
+(1,'furnizori.view'),
+(1,'iesire-multipla.add'),
+(1,'iesire-multipla.view'),
+(1,'inventar-preluare.add'),
+(1,'inventar-preluare.view'),
+(1,'inventar.export'),
+(1,'inventar.view'),
+(1,'jurnal.export'),
+(1,'jurnal.view'),
+(1,'mentenanta.add'),
+(1,'mentenanta.contracte'),
+(1,'mentenanta.delete'),
+(1,'mentenanta.edit'),
+(1,'mentenanta.export'),
+(1,'mentenanta.view'),
+(1,'nomenclator.add'),
+(1,'nomenclator.delete'),
+(1,'nomenclator.edit'),
+(1,'nomenclator.view'),
+(1,'notificari.edit'),
+(1,'notificari.view'),
+(1,'oferte.add'),
+(1,'oferte.delete'),
+(1,'oferte.edit'),
+(1,'oferte.export'),
+(1,'oferte.sabloane'),
+(1,'oferte.view'),
+(1,'preluare-factura.add'),
+(1,'preluare-factura.view'),
+(1,'produse.add'),
+(1,'produse.delete'),
+(1,'produse.edit'),
+(1,'produse.export'),
+(1,'setari-anaf.edit'),
+(1,'setari-anaf.view'),
+(1,'setari-backup.backup'),
+(1,'setari-backup.edit'),
+(1,'setari-backup.restore'),
+(1,'setari-backup.view'),
+(1,'setari-facturi.add'),
+(1,'setari-facturi.delete'),
+(1,'setari-facturi.edit'),
+(1,'setari-facturi.view'),
+(1,'setari-harta.edit'),
+(1,'setari-harta.view'),
+(1,'setari-notificari.edit'),
+(1,'setari-notificari.view'),
+(1,'stoc.iesire'),
+(1,'stoc.intrare'),
+(1,'stoc.minim'),
+(1,'stoc.modificare'),
+(1,'stoc.rezervare'),
+(1,'stoc.stornare'),
+(1,'stoc.view'),
+(1,'tipuri-utilizatori.add'),
+(1,'tipuri-utilizatori.delete'),
+(1,'tipuri-utilizatori.edit'),
+(1,'tipuri-utilizatori.view'),
+(1,'utilizatori.add'),
+(1,'utilizatori.delete'),
+(1,'utilizatori.edit'),
+(1,'utilizatori.view'),
+(1,'vehicule.add'),
+(1,'vehicule.delete'),
+(1,'vehicule.edit'),
+(1,'vehicule.view'),
+(2,'analize-risc.add'),
+(2,'analize-risc.delete'),
+(2,'analize-risc.edit'),
+(2,'analize-risc.view'),
+(2,'beneficiari.add'),
+(2,'beneficiari.delete'),
+(2,'beneficiari.edit'),
+(2,'beneficiari.export'),
+(2,'beneficiari.view'),
+(2,'categorii.delete'),
+(2,'categorii.view'),
+(2,'facturi.add'),
+(2,'facturi.delete'),
+(2,'facturi.edit'),
+(2,'facturi.export'),
+(2,'facturi.view'),
+(2,'furnizori.add'),
+(2,'furnizori.delete'),
+(2,'furnizori.edit'),
+(2,'furnizori.view'),
+(2,'mentenanta.add'),
+(2,'mentenanta.contracte'),
+(2,'mentenanta.delete'),
+(2,'mentenanta.edit'),
+(2,'mentenanta.export'),
+(2,'mentenanta.view'),
+(2,'notificari.edit'),
+(2,'notificari.view'),
+(2,'oferte.add'),
+(2,'oferte.delete'),
+(2,'oferte.edit'),
+(2,'oferte.export'),
+(2,'oferte.sabloane'),
+(2,'oferte.view'),
+(2,'setari-facturi.add'),
+(2,'setari-facturi.edit'),
+(2,'setari-facturi.view'),
+(2,'vehicule.add'),
+(2,'vehicule.delete'),
+(2,'vehicule.edit'),
+(2,'vehicule.view');
+/*!40000 ALTER TABLE `user_type_permissions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `user_types` WRITE;
+/*!40000 ALTER TABLE `user_types` DISABLE KEYS */;
+REPLACE INTO `user_types` (`id`, `name`, `normalized_name`, `description`, `is_system`, `version`) VALUES (1,'Administrator','ADMINISTRATOR','Acces complet la toate modulele si la administrarea sistemului.',1,0),
+(2,'Utilizator','UTILIZATOR','Lucru curent in module, fara administrarea sistemului.',1,26);
+/*!40000 ALTER TABLE `user_types` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `vehicle_target_levels` WRITE;
 /*!40000 ALTER TABLE `vehicle_target_levels` DISABLE KEYS */;
 /*!40000 ALTER TABLE `vehicle_target_levels` ENABLE KEYS */;
@@ -538,8 +686,8 @@ UNLOCK TABLES;
 
 LOCK TABLES `web_users` WRITE;
 /*!40000 ALTER TABLE `web_users` DISABLE KEYS */;
-REPLACE INTO `web_users` (`id`, `username`, `normalized_username`, `display_name`, `password_hash`, `role`, `is_active`, `version`) VALUES (1,'administrator.demo','ADMINISTRATOR.DEMO','Administrator demonstratie','AQAAAAIAAYagAAAAEIeR3dzbxxPEXnPWJ2h6E1QnJg7VWSxKvvZFsk1/hylP26VxVBIILKj/Fr3b6PgsNA==','Administrator',1,0),
-(2,'utilizator.demo','UTILIZATOR.DEMO','Utilizator demonstratie','AQAAAAIAAYagAAAAEG6GfKQW+dSJCuHG4T16Zl9QvtaQHTwtCCh2KIHJ9kP9C37eKheuYMQLSONzkTzCpg==','Utilizator',1,0);
+REPLACE INTO `web_users` (`id`, `username`, `normalized_username`, `display_name`, `password_hash`, `role`, `is_active`, `version`, `user_type_id`) VALUES (1,'administrator.demo','ADMINISTRATOR.DEMO','Administrator demonstratie','AQAAAAIAAYagAAAAEIeR3dzbxxPEXnPWJ2h6E1QnJg7VWSxKvvZFsk1/hylP26VxVBIILKj/Fr3b6PgsNA==','Administrator',1,0,1),
+(2,'utilizator.demo','UTILIZATOR.DEMO','Utilizator demonstratie','AQAAAAIAAYagAAAAEG6GfKQW+dSJCuHG4T16Zl9QvtaQHTwtCCh2KIHJ9kP9C37eKheuYMQLSONzkTzCpg==','Utilizator',1,0,2);
 /*!40000 ALTER TABLE `web_users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

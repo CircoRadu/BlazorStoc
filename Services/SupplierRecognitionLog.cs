@@ -39,7 +39,7 @@ public sealed class MariaSupplierRecognitionLog(IConfiguration configuration, IA
 
     public async Task RecordAsync(SupplierRecognitionEntry entry, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["furnizori.edit", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) return;
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
@@ -63,7 +63,7 @@ public sealed class MariaSupplierRecognitionLog(IConfiguration configuration, IA
 
     public async Task<string> ExportCsvAsync(CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT r.created_utc, i.number, r.method, r.confidence, r.read_name, r.read_cui, COALESCE(rs.name, ''), COALESCE(cs.name, ''), r.corrected, r.template_changed
@@ -93,7 +93,7 @@ public sealed class MariaSupplierRecognitionLog(IConfiguration configuration, IA
 
     public async Task<SupplierRecognitionSummary> SummaryAsync(CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var counts = new List<SupplierRecognitionCount>();
         await using (var command = new MySqlCommand("SELECT method, confidence, COUNT(*), COALESCE(SUM(corrected),0), COALESCE(SUM(template_changed),0) FROM supplier_recognitions GROUP BY method, confidence ORDER BY method, confidence", connection))

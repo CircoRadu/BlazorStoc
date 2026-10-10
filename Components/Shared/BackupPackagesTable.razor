@@ -1,4 +1,4 @@
-@using BlazorStoc.Services
+﻿@using BlazorStoc.Services
 @using System.Globalization
 @inject IDatabaseBackupService BackupService
 @inject IDatabaseRestoreService RestoreService
@@ -127,7 +127,7 @@
         loading = true; error = null;
         try
         {
-            if (!await Access.IsAdministratorAsync(lifetime.Token)) { error = "Nu ai drepturi de administrator."; return; }
+            if (!await Access.HasAsync("setari-backup.view", lifetime.Token)) { error = "Nu ai dreptul să vezi copiile de siguranță."; return; }
             nasEnabled = (await NasSettings.GetAsync(lifetime.Token)).CopyEnabled;
             local = await BackupService.ListPackagesAsync(lifetime.Token);
             Rebuild();

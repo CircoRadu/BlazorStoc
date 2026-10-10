@@ -19,6 +19,21 @@ public sealed partial class DemoProductRepository
             TextNormalization.UniquenessKey(name), name, AuditDetails.Identification(("Denumire", name)), cancellationToken);
     }
 
+    public async Task ReorderSubcategoriesAsync(string category, IReadOnlyList<string> orderedSubcategories, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (gate)
+        {
+            var positions = Enumerable.Range(0, groups.Count).Where(index => TextNormalization.SameUniqueValue(groups[index].Category, category) && groups[index].Subcategory.Length > 0).ToList();
+            var current = positions.Select(index => groups[index]).ToList();
+            var arranged = orderedSubcategories.Select(name => current.FirstOrDefault(group => TextNormalization.SameUniqueValue(group.Subcategory, name))).ToList();
+            if (arranged.Count != current.Count || arranged.Any(group => group is null) || arranged.Distinct().Count() != arranged.Count)
+                throw new ProductOperationException("Lista subcategoriilor s-a schimbat între timp. Actualizează lista și reia aranjarea.");
+            for (var slot = 0; slot < positions.Count; slot++) groups[positions[slot]] = arranged[slot]!;
+        }
+    }
+
     public async Task ReorderCategoriesAsync(IReadOnlyList<string> orderedCategories, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken);

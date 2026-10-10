@@ -1,5 +1,6 @@
-@using BlazorStoc.Services
+﻿@using BlazorStoc.Services
 @inject IUserRepository Repository
+@inject IUserTypeRepository UserTypes
 @inject ILogger<UserEditor> Logger
 @implements IDisposable
 
@@ -18,7 +19,7 @@
                 <label class="password-field" for="user-password-confirmation">@(Original is null ? "Confirmă parola *" : "Confirmă parola nouă")<InputTextLive id="user-password-confirmation" type="@PasswordType" @bind-Value="input.PasswordConfirmation" maxlength="200" autocomplete="new-password" /><small>Repetă parola pentru verificare.</small>
                     <span class="password-match @(ConfirmationMatches ? "ok" : "bad")" role="status" aria-live="polite">@ConfirmationText</span></label>
                 <label class="toggle-switch full-width" for="user-password-show"><input id="user-password-show" type="checkbox" role="switch" @bind="showPassword" /><span class="toggle-track" aria-hidden="true"></span><span>Arată parola</span></label>
-                <label for="user-role">Nivel de acces *<InputSelect id="user-role" @bind-Value="input.Role"><option value="@AccessRoles.LimitedUser">Utilizator — gestiune produse</option><option value="@AccessRoles.Administrator">Administrator — acces complet</option></InputSelect></label>
+                <label for="user-type">Tip utilizator *<InputSelect id="user-type" @bind-Value="input.TypeId">@foreach (var type in types) { <option value="@type.Id">@type.Name@(type.IsSystem ? " (sistem)" : "") — @type.PermissionCount permisiuni</option> }</InputSelect><small>Drepturile fiecărui tip se definesc în Setări → Tipuri de utilizatori.</small></label>
                 @if (Original is not null)
                 {
                     <ToggleSwitch Id="user-active" Class="full-width" @bind-Value="input.IsActive">Cont activ</ToggleSwitch>
@@ -49,7 +50,7 @@
     private string customReason = "";
     private string AutoSummary => Original is null ? "" : ChangeReasonSummary.Build(
     [
-        new("Nume utilizator", Original.Username, input.Username), new("Nume afișat", Original.DisplayName, input.DisplayName), new("Nivel de acces", Original.Role, input.Role),
+        new("Nume utilizator", Original.Username, input.Username), new("Nume afișat", Original.DisplayName, input.DisplayName), new("Tip utilizator", OriginalTypeName, TypeNameOf(input.TypeId)),
         new("Cont activ", Original.IsActive ? "Da" : "Nu", input.IsActive ? "Da" : "Nu"),
         new("Parolă", "neschimbată", input.Password.Length > 0 ? "va fi schimbată" : "neschimbată")
     ]);
@@ -66,10 +67,22 @@
         : ConfirmationMatches ? "Parolele coincid." : "Parolele nu coincid.";
     private readonly CancellationTokenSource lifetime = new();
 
-    protected override Task OnInitializedAsync()
+    private IReadOnlyList<UserTypeSummary> types = [];
+    // A user not migrated to a type yet is shown with the system type of its role.
+    private string OriginalTypeName => Original is null ? "" : Original.TypeName.Length > 0 ? Original.TypeName : Original.Role;
+    private string TypeNameOf(long? id) => types.FirstOrDefault(type => type.Id == id)?.Name ?? "";
+
+    protected override async Task OnInitializedAsync()
     {
         input = Original is null ? new WebUserInput() : WebUserInput.From(Original);
-        return Task.CompletedTask;
+        try { types = await UserTypes.GetTypesAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AccessDeniedException or UserOperationException or MySqlConnector.MySqlException)
+        {
+            error = "Lista tipurilor de utilizatori nu a putut fi încărcată.";
+        }
+        // A new user starts with the system type "Utilizator"; a user without a type (not migrated yet) with the one of its role.
+        input.TypeId ??= types.FirstOrDefault(type => type.IsSystem && type.Name == (Original?.Role ?? AccessRoles.LimitedUser))?.Id;
     }
 
     private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
@@ -90,7 +103,7 @@
                 var value = input.Validated(false);
                 pendingChanges = SaveSummary.Changed(
                     new("Nume utilizator", Original.Username, value.Username), new("Nume afișat", Original.DisplayName, value.DisplayName),
-                    new("Nivel de acces", Original.Role, value.Role),
+                    new("Tip utilizator", OriginalTypeName, TypeNameOf(value.TypeId)),
                     new("Cont activ", Original.IsActive ? "Da" : "Nu", value.IsActive ? "Da" : "Nu"),
                     new("Parolă", "neschimbată", value.Password.Length > 0 ? "va fi schimbată" : "neschimbată"));
             }

@@ -47,6 +47,8 @@ public static class AuditEntities
     public const string SystemType = "TipSistem";
     // Oferte -> Sabloane: the templates of offer sheets (.xlsx).
     public const string OfferTemplate = "SablonOferta";
+    // Setari -> Tipuri de utilizatori: the user types (named sets of permissions) the administrator defines.
+    public const string UserType = "TipUtilizator";
 }
 
 public static class AuditActions
@@ -205,6 +207,16 @@ public static class AuditActions
     public const string ComponentExitLeft = "Rămas la beneficiar la scoaterea componentei";
     public const string ComponentExitMoved = "Mutare ieșire pe altă componentă";
     public const string ComponentExitConsumed = "Consumat la scoaterea componentei";
+    // User types (Setari -> Tipuri de utilizatori): each operation names exactly what happened; a permission granted or revoked is one event per key.
+    public const string CreateUserType = "Adăugare tip utilizator";
+    public const string RenameUserType = "Redenumire tip utilizator";
+    public const string EditUserTypeDescription = "Modificare descriere tip utilizator";
+    public const string GrantPermission = "Acordare permisiune";
+    public const string RevokePermission = "Revocare permisiune";
+    public const string DeleteUserType = "Ștergere tip utilizator";
+    public const string ChangeUserType = "Schimbare tip utilizator";
+    public const string AccessDenied = "Acces refuzat";
+    public const string ReorderSubcategories = "Reordonare subcategorii";
     public const string AddSystemType = "Adăugare tip de sistem";
     public const string RenameSystemType = "Modificare denumire tip de sistem";
     public const string ActivateSystemType = "Activare tip de sistem";

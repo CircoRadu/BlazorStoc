@@ -1,5 +1,5 @@
-@page "/jurnal"
-@attribute [Authorize(Roles = AccessRoles.Administrator)]
+﻿@page "/jurnal"
+@attribute [Authorize(Policy = "perm:jurnal.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IAuditTrail AuditTrail

@@ -1,7 +1,8 @@
-@page "/vehicule/{Id:int}"
-@attribute [Authorize]
+﻿@page "/vehicule/{Id:int}"
+@attribute [Authorize(Policy = "perm:vehicule.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
+@inject IAccessControl Access
 @inject IVehicleRepository Repository
 @inject NavigationManager Navigation
 @inject IChangeFeed ChangeFeed
@@ -48,7 +49,7 @@ else if (vehicle is not null)
                 <tr><td>Descriere</td><td><strong>@vehicle.Description</strong></td><td></td></tr>
                 @foreach (var (field, date) in Expiries(vehicle))
                 {
-                    <tr><td>@field.Label</td><td><strong>@VehicleRules.DisplayExpiry(date)</strong> <button class="row-icon edit" aria-label="Modifică @field.Label.ToLowerInvariant()" disabled="@(editing || editingExpiry is not null)" @onclick="() => editingExpiry = field" title="Modifică @field.Label.ToLowerInvariant()"></button></td><td>@ExpiryBadge(date)</td></tr>
+                    <tr><td>@field.Label</td><td><strong>@VehicleRules.DisplayExpiry(date)</strong> @if (permEdit) { <button class="row-icon edit" aria-label="Modifică @field.Label.ToLowerInvariant()" disabled="@(editing || editingExpiry is not null)" @onclick="() => editingExpiry = field" title="Modifică @field.Label.ToLowerInvariant()"></button> }</td><td>@ExpiryBadge(date)</td></tr>
                 }
             </tbody></table></div>
         </div>
@@ -72,6 +73,13 @@ else if (vehicle is not null)
 </PageBoundary>
 
 @code {
+    private bool permAdd, permEdit, permDelete;
+    private async Task LoadPermissionsAsync()
+    {
+        permAdd = await Access.HasAsync("vehicule.add");
+        permEdit = await Access.HasAsync("vehicule.edit");
+        permDelete = await Access.HasAsync("vehicule.delete");
+    }
     [Parameter] public int Id { get; set; }
     private Vehicle? vehicle;
     private bool loading = true, editing, deleting, deleteBusy;
@@ -103,6 +111,7 @@ else if (vehicle is not null)
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPermissionsAsync();
         // Vehicle changes have no change events; the periodic fallback keeps the page current.
         // An open form or dialog is never replaced.
         live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Vehicle,

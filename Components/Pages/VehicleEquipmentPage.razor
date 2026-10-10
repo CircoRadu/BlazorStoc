@@ -1,5 +1,5 @@
-@page "/vehicule/{Id:int}/echipamente"
-@attribute [Authorize]
+﻿@page "/vehicule/{Id:int}/echipamente"
+@attribute [Authorize(Policy = "perm:vehicule.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IVehicleRepository Vehicles
@@ -178,7 +178,7 @@ else if (vehicle is not null)
 
     private async Task LoadTargetsAsync()
     {
-        canManage = await Access.CanManageProductsAsync(lifetime.Token);
+        canManage = await Access.HasModuleWriteAsync("vehicule", lifetime.Token);
         if (!canManage) return;
         targets = await Targets.GetForVehicleAsync(Id, lifetime.Token);
         allProducts = (await ProductsRepository.GetProductsAsync(lifetime.Token)).OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();

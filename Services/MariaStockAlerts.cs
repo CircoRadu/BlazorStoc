@@ -20,11 +20,12 @@ internal static class StockAlertSql
 
 public sealed class MariaProductMinStockRepository(IConfiguration configuration, IAccessControl? accessControl = null, IAuditTrail? auditTrail = null) : IProductMinStockRepository
 {
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
+    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureAsync("stoc.minim", token) ?? Task.CompletedTask;
+    private Task EnsureViewAsync(CancellationToken token) => accessControl?.EnsureAsync("stoc.view", token) ?? Task.CompletedTask;
 
     public async Task<int?> GetAsync(int productId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureViewAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var value = await StockAlertSql.ValueAsync(connection, "SELECT min_quantity FROM product_min_stock WHERE product_id=@id", productId, cancellationToken).ConfigureAwait(false);
         return value is null ? null : int.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
@@ -75,11 +76,11 @@ public sealed class MariaProductMinStockRepository(IConfiguration configuration,
 
 public sealed class MariaProjectDeadlineRepository(IConfiguration configuration, IAccessControl? accessControl = null, IAuditTrail? auditTrail = null) : IProjectDeadlineRepository
 {
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
+    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureModuleAsync("beneficiari", token) ?? Task.CompletedTask;
 
     public async Task<DateOnly?> GetAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["beneficiari.view", "stoc.view"], cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var value = await StockAlertSql.ValueAsync(connection, "SELECT deadline FROM project_deadlines WHERE project_id=@id", projectId, cancellationToken).ConfigureAwait(false);
         return value is null ? null : StockMovementRules.ParseStorageDate(value);

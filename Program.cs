@@ -1,4 +1,4 @@
-using BlazorStoc.Components;
+﻿using BlazorStoc.Components;
 using BlazorStoc.Services;
 using BlazorStoc.Startup;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
@@ -85,7 +85,7 @@ app.Use(async (context, next) =>
 });
 app.MapStaticAssets().AllowAnonymous();
 app.MapGet("/api/furnizori/recunoastere.csv", async (ISupplierRecognitionLog log, CancellationToken token) =>
-    Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await log.ExportCsvAsync(token))).ToArray(), "text/csv; charset=utf-8", "recunoastere-furnizori.csv")).RequireAuthorization();
+    Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await log.ExportCsvAsync(token))).ToArray(), "text/csv; charset=utf-8", "recunoastere-furnizori.csv")).RequireAuthorization(PermissionPolicy.For("furnizori.view"));
 app.MapGet("/health/live", () => Results.Text("healthy")).AllowAnonymous();
 // For monitoring and the supervisor: 200 when the process and the database answer, 503 when the database does not (no details are given).
 app.MapGet("/health", async (IConfiguration configuration, CancellationToken token) =>
@@ -112,7 +112,7 @@ app.MapGet("/api/iesiri/{operationId:int}/bon.pdf", async (int operationId, ISto
         return operation is null ? Results.NotFound() : Results.File(writer.Write(operation, DateTime.Now), "application/pdf");
     }
     catch (AccessDeniedException) { return Results.Forbid(); }
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
 // Situatia proiectului: PDF and CSV exports (the same calculation as the page).
 app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, string? pana, IConsumptionReader reader, CancellationToken token) =>
 {
@@ -123,13 +123,13 @@ app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, 
         return Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray(), "text/csv; charset=utf-8", "consum.csv");
     }
     catch (AccessDeniedException) { return Results.Forbid(); }
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("export-consum.export"));
 app.MapGet("/api/proiecte/{projectId:int}/situatie.pdf", async (int projectId, IProjectSituationReader reader, IProjectSituationPdfWriter writer, CancellationToken token) =>
 {
     try { return Results.File(writer.Write(await reader.GetAsync(projectId, token), DateTime.Now), "application/pdf"); }
     catch (OfferException) { return Results.NotFound(); }
     catch (AccessDeniedException) { return Results.Forbid(); }
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("beneficiari.export"));
 app.MapGet("/api/proiecte/{projectId:int}/situatie.csv", async (int projectId, IProjectSituationReader reader, CancellationToken token) =>
 {
     try
@@ -140,7 +140,7 @@ app.MapGet("/api/proiecte/{projectId:int}/situatie.csv", async (int projectId, I
     }
     catch (OfferException) { return Results.NotFound(); }
     catch (AccessDeniedException) { return Results.Forbid(); }
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("beneficiari.export"));
 app.MapGet("/api/maintenance", (HttpContext context) =>
 {
     context.Response.Headers.CacheControl = "no-store";
@@ -165,28 +165,27 @@ app.MapGet("/media/products/{productId:int}", async (int productId, IProductImag
     return image is null
         ? Results.Redirect(ProductImageRules.PlaceholderUrl)
         : Results.File(image.Content, image.ContentType, enableRangeProcessing: true);
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
 app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileStore files, CancellationToken token) =>
 {
     var file = await files.GetContentAsync(fileId, token);
     return file is null
         ? Results.NotFound()
         : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("beneficiari.view"));
 // A page picture of the invoice under analysis (Settings -> Facturi): kept in memory, served only to the administrator who uploaded the file.
 app.MapGet("/media/invoice-analysis/{id:guid}/{page:int}", (Guid id, int page, HttpContext context, IInvoiceAnalysisStore store) =>
 {
-    if (!context.User.IsInRole(AccessRoles.Administrator) && !context.User.IsInRole(AccessRoles.LimitedUser)) return Results.Forbid();
     var session = store.Get(id, context.User.Identity?.Name ?? "necunoscut");
     if (session is null || page < 1 || page > session.Previews.Count) return Results.NotFound();
     context.Response.Headers.CacheControl = "no-store";
     return Results.File(session.Previews[page - 1], "image/png");
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("preluare-factura.view", "setari-facturi.view"));
 app.MapGet("/media/service-photos/{photoId:int}", async (int photoId, IServicePhotoStore photos, CancellationToken token) =>
 {
     var photo = await photos.GetContentAsync(photoId, token);
     return photo is null ? Results.NotFound() : Results.File(photo.Content, photo.ContentType, photo.OriginalName, enableRangeProcessing: true);
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("mentenanta.view"));
 app.MapHub<ChangesHub>(ChangesHub.Path);
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
@@ -206,6 +205,7 @@ var migrateOnly = args.Contains("--migrate-schema");
         {
             await MariaBackupSettingsStore.CopyFromNasSettingsAsync(app.Configuration);
             // The main work point of the beneficiaries that existed before migration 7 (idempotent: creates only what is missing).
+            await UserTypeSeeder.EnsureAsync(app.Configuration);
             var backfill = await WorkPointBackfill.EnsurePrimariesAsync(app.Configuration);
             if (backfill.Created + backfill.Promoted > 0 || backfill.EmptyAddress > 0)
                 app.Logger.LogInformation("Main work points: {Created} created, {Promoted} promoted from an additional point, {Empty} beneficiary(ies) without an address.", backfill.Created, backfill.Promoted, backfill.EmptyAddress);

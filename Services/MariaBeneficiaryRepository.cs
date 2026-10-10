@@ -16,7 +16,7 @@ public sealed class MariaBeneficiaryRepository(
 
     public async Task<IReadOnlyList<Beneficiary>> GetBeneficiariesAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT id, name, cui, version, kind, address, phone, registry_number, postal_code, caen_code, anaf_verified FROM beneficiaries ORDER BY name, id
@@ -29,7 +29,7 @@ public sealed class MariaBeneficiaryRepository(
 
     public async Task<Beneficiary> CreateAsync(BeneficiaryInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.add", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var beneficiary = await WriteAsync(async (connection, transaction) =>
         {
@@ -52,7 +52,7 @@ public sealed class MariaBeneficiaryRepository(
 
     public async Task<Beneficiary> UpdateAsync(Beneficiary original, BeneficiaryInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated(true);
         var beneficiary = await WriteAsync(async (connection, transaction) =>
         {
@@ -83,7 +83,7 @@ public sealed class MariaBeneficiaryRepository(
 
     public async Task DeleteAsync(Beneficiary original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.delete", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new BeneficiaryOperationException(reasonError);
         // The work points of the beneficiary and their photos are archived with it (rows as relations, photo files moved to the
@@ -263,5 +263,4 @@ public sealed class MariaBeneficiaryRepository(
         }
     }
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

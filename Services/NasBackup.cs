@@ -122,7 +122,7 @@ public sealed class MariaNasBackupStore(IConfiguration configuration, IDataProte
 
     public async Task<NasBackupSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         return (await ReadAsync(cancellationToken).ConfigureAwait(false)).Settings;
     }
 
@@ -155,7 +155,7 @@ public sealed class MariaNasBackupStore(IConfiguration configuration, IDataProte
 
     public async Task SaveAsync(NasBackupInput input, CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         if (NasBackupRules.Validate(input) is { } error) throw new NasBackupException(error);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new NasBackupException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         var old = (await ReadAsync(cancellationToken).ConfigureAwait(false)).Settings;
@@ -255,7 +255,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
 
     public async Task<NasCopyResult> TestAsync(NasBackupInput input, CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         if ((NasBackupRules.PathError(input.Path) ?? NasBackupRules.UserError(input.UserName)) is { } error) return new(false, 0, 0, 0, error);
         var password = string.IsNullOrEmpty(input.Password) ? (await store.ReadAsync(cancellationToken).ConfigureAwait(false)).Password : input.Password;
         if (string.IsNullOrEmpty(password)) return new(false, 0, 0, 0, "Introdu parola contului (nu este salvată nici una).");
@@ -291,7 +291,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
 
     public async Task<NasCopyResult> CopyMissingAsync(CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         return await CopyCoreAsync(null, cancellationToken).ConfigureAwait(false);
     }
 
@@ -299,7 +299,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
 
     public async Task<NasShareListing> ListShareAsync(CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         var (settings, _) = await store.ReadAsync(cancellationToken).ConfigureAwait(false);
         if (!settings.CopyEnabled) return new(false, "Copierea pe NAS este oprită.", []);
         var credentials = await store.CredentialsAsync(cancellationToken).ConfigureAwait(false);
@@ -330,7 +330,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
 
     public async Task<NasCopyResult> FetchAsync(string fileName, CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         if (fileName.Length == 0 || fileName != Path.GetFileName(fileName) || !fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || fileName.StartsWith("."))
             return new(false, 0, 0, 1, "Pachet invalid.");
         var credentials = await store.CredentialsAsync(cancellationToken).ConfigureAwait(false);

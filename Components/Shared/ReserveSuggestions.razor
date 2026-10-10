@@ -1,8 +1,9 @@
 @using BlazorStoc.Services
 @inject IServiceProvider Services
 @inject ILogger<ReserveSuggestions> Logger
+@inject IAccessControl Access
 @* After an entry: projects whose need for the product is covered by free stock but not reserved yet, with a button to reserve for each. Nothing is reserved without the click. *@
-@if (suggestions.Count > 0)
+@if (suggestions.Count > 0 && canReserve)
 {
     <div class="info-banner reserve-suggestions" role="status">
         <p>Stocul liber acoperă necesarul unor proiecte care nu au rezervat produsul:</p>
@@ -23,12 +24,14 @@
     [Parameter] public EventCallback Reserved { get; set; }
 
     private IReadOnlyList<ReserveSuggestion> suggestions = [];
+    private bool canReserve;
     private int loadedTrigger = -1;
     private bool busy;
     private string? error;
 
     protected override async Task OnParametersSetAsync()
     {
+        canReserve = await Access.HasAsync("stoc.rezervare");
         if (loadedTrigger == Trigger) return;
         loadedTrigger = Trigger; suggestions = []; error = null;
         if (Trigger == 0 || Services.GetService<IProjectSituationReader>() is not { } reader) return;

@@ -1,6 +1,6 @@
-@page "/mentenanta/harta/fereastra"
+﻿@page "/mentenanta/harta/fereastra"
 @layout Layout.PopoutLayout
-@attribute [Authorize]
+@attribute [Authorize(Policy = "perm:mentenanta.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 <PageBoundary>

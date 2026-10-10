@@ -15,7 +15,7 @@ public sealed class MariaOfferTemplateRepository(
 
     public async Task<IReadOnlyList<OfferTemplateRecord>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadAsync(connection, null, $"{Select} ORDER BY name,id", cancellationToken).ConfigureAwait(false);
     }
@@ -34,7 +34,7 @@ public sealed class MariaOfferTemplateRepository(
 
     public async Task<OfferTemplateRecord> CreateAsync(string name, OfferTemplateDefinition definition, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("oferte.sabloane", cancellationToken).ConfigureAwait(false);
         var text = SystemTypeRules.Clean(name);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var id = await WriteAsync(async (connection, transaction) =>
@@ -56,7 +56,7 @@ public sealed class MariaOfferTemplateRepository(
 
     public async Task<OfferTemplateRecord> SaveAsync(OfferTemplateRecord original, string name, OfferTemplateDefinition definition, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("oferte.sabloane", cancellationToken).ConfigureAwait(false);
         var text = SystemTypeRules.Clean(name);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var before = await WriteAsync(async (connection, transaction) =>
@@ -88,7 +88,7 @@ public sealed class MariaOfferTemplateRepository(
 
     public async Task<OfferTemplateRecord> SetActiveAsync(OfferTemplateRecord original, bool active, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("oferte.sabloane", cancellationToken).ConfigureAwait(false);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var current = await WriteAsync(async (connection, transaction) =>
         {
@@ -136,7 +136,6 @@ public sealed class MariaOfferTemplateRepository(
             exception => exception.Number == 1062 ? new OfferTemplateException("Există deja un șablon cu această denumire.") : null, token,
             "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 }
 
 public static class OfferTemplateMessages

@@ -1,5 +1,5 @@
-@page "/proiecte/{Id:int}/echipamente"
-@attribute [Authorize]
+﻿@page "/proiecte/{Id:int}/echipamente"
+@attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProjectRepository Repository

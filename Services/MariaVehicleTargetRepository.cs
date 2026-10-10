@@ -6,7 +6,6 @@ namespace BlazorStoc.Services;
 // MariaDB mode: `vehicle_target_levels` (migration 28), one row per vehicle and product. Changes need a product operator and are journaled under the vehicle.
 public sealed class MariaVehicleTargetRepository(IConfiguration configuration, IAccessControl? accessControl = null, IAuditTrail? auditTrail = null) : IVehicleTargetRepository
 {
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 
     private static async Task<string?> TextAsync(MySqlConnection connection, string sql, int id, CancellationToken token) =>
         await Command(connection, sql, ("@id", id)).ExecuteScalarAsync(token).ConfigureAwait(false) as string;
@@ -20,7 +19,7 @@ public sealed class MariaVehicleTargetRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<VehicleTarget>> GetForVehicleAsync(int vehicleId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, """
             SELECT t.vehicle_id,t.product_id,p.name,t.target_quantity FROM vehicle_target_levels t INNER JOIN products p ON p.id=t.product_id
@@ -35,7 +34,7 @@ public sealed class MariaVehicleTargetRepository(IConfiguration configuration, I
 
     public async Task SetAsync(int vehicleId, int productId, int target, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("vehicule.edit", cancellationToken).ConfigureAwait(false);
         if (target is < 1 or > StockMovementRules.MaxQuantity) throw new VehicleTargetException(VehicleTargetRules.QuantityMessage);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new VehicleTargetException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         var actor = (await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false)).Username;
@@ -62,7 +61,7 @@ public sealed class MariaVehicleTargetRepository(IConfiguration configuration, I
 
     public async Task RemoveAsync(int vehicleId, int productId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("vehicule.edit", cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new VehicleTargetException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         string? plate, product;
         int old;

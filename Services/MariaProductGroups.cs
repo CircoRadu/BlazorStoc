@@ -7,7 +7,7 @@ public sealed partial class MariaProductRepository
 {
     public async Task CreateCategoryAsync(string category, CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureKeyAsync("categorii.add", cancellationToken).ConfigureAwait(false);
         var name = ProductGroupManagementRules.Name(category, "Denumire categorie");
         var id = await WriteAsync(async (connection, transaction) =>
         {
@@ -61,10 +61,43 @@ public sealed partial class MariaProductRepository
             "Ordinea categoriilor din meniu a fost schimbată prin tragere.", cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task ReorderSubcategoriesAsync(string category, IReadOnlyList<string> orderedSubcategories, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        var wanted = orderedSubcategories.Select(TextNormalization.UniquenessKey).ToList();
+        var change = await WriteAsync(async (connection, transaction) =>
+        {
+            int categoryId; string categoryName;
+            await using (var find = Command(connection, transaction, "SELECT id,name FROM categories WHERE normalized_name=@key", ("@key", TextNormalization.UniquenessKey(category))))
+            await using (var reader = await find.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) throw new ProductOperationException("Categoria nu mai există. Actualizează lista.");
+                categoryId = checked((int)reader.GetInt64(0)); categoryName = reader.GetString(1);
+            }
+            var current = new List<(int Id, string Name)>();
+            await using (var read = Command(connection, transaction, "SELECT id,name FROM subcategories WHERE category_id=@category ORDER BY sort_order,name FOR UPDATE", ("@category", categoryId)))
+            await using (var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) current.Add((checked((int)reader.GetInt64(0)), reader.GetString(1)));
+            var byKey = current.ToDictionary(item => TextNormalization.UniquenessKey(item.Name));
+            if (wanted.Count != current.Count || wanted.Distinct().Count() != wanted.Count || wanted.Any(key => !byKey.ContainsKey(key)))
+                throw new ProductOperationException("Lista subcategoriilor s-a schimbat între timp. Actualizează lista și reia aranjarea.");
+            var arranged = wanted.Select(key => byKey[key]).ToList();
+            if (arranged.Select(item => item.Id).SequenceEqual(current.Select(item => item.Id))) return (Changed: false, Category: categoryName, Before: "", After: "");
+            for (var position = 0; position < arranged.Count; position++)
+                await using (var update = Command(connection, transaction, "UPDATE subcategories SET sort_order=@position WHERE id=@id", ("@position", position + 1), ("@id", arranged[position].Id)))
+                    await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            return (Changed: true, Category: categoryName, Before: string.Join(", ", current.Select(item => item.Name)), After: string.Join(", ", arranged.Select(item => item.Name)));
+        }, cancellationToken).ConfigureAwait(false);
+        if (!change.Changed) return;
+        await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Subcategory, AuditActions.ReorderSubcategories,
+            string.Empty, $"Ordinea subcategoriilor din {change.Category}", AuditDetails.Identification(("Categorie", change.Category), ("Ordinea veche", change.Before), ("Ordinea nouă", change.After)),
+            "Ordinea subcategoriilor a fost schimbată prin tragere.", cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<ProductGroup> CreateSubcategoryAsync(string category, string subcategory,
         CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureKeyAsync("categorii.add", cancellationToken).ConfigureAwait(false);
         var requestedCategory = ProductGroupManagementRules.Name(category, "Categorie");
         var name = ProductGroupManagementRules.Name(subcategory, "Denumire subcategorie");
         var result = await WriteAsync(async (connection, transaction) =>
@@ -94,7 +127,7 @@ public sealed partial class MariaProductRepository
                 if (await asCategory.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string categoryNamed)
                     throw new ProductOperationException(ProductGroupManagementRules.NameTakenByCategory(categoryNamed));
             await using var insert = Command(connection, transaction,
-                "INSERT INTO subcategories(category_id,name,normalized_name) VALUES(@category,@name,@key)",
+                "INSERT INTO subcategories(category_id,name,normalized_name,sort_order) SELECT @category,@name,@key,COALESCE(MAX(sort_order),0)+1 FROM subcategories WHERE category_id=@category",
                 ("@category", categoryId), ("@name", name), ("@key", TextNormalization.UniquenessKey(name)));
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return (Id: checked((int)insert.LastInsertedId), Group: new ProductGroup(storedCategory, name));
@@ -108,7 +141,7 @@ public sealed partial class MariaProductRepository
 
     public async Task DeleteCategoryAsync(string category, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureKeyAsync("categorii.delete", cancellationToken).ConfigureAwait(false);
         var motif = ProductGroupManagementRules.Reason(reason);
         var deleted = await WriteAsync(async (connection, transaction) =>
         {
@@ -139,7 +172,7 @@ public sealed partial class MariaProductRepository
 
     public async Task DeleteSubcategoryAsync(ProductGroup group, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureKeyAsync("categorii.delete", cancellationToken).ConfigureAwait(false);
         var motif = ProductGroupManagementRules.Reason(reason);
         var deleted = await WriteAsync(async (connection, transaction) =>
         {
@@ -171,7 +204,7 @@ public sealed partial class MariaProductRepository
     public async Task RenameCategoryAsync(string originalCategory, string newCategory, string reason,
         CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureKeyAsync("categorii.edit", cancellationToken).ConfigureAwait(false);
         var name = ProductGroupManagementRules.Name(newCategory, "Denumire categorie");
         var motif = ProductGroupManagementRules.Reason(reason);
         var result = await WriteAsync(async (connection, transaction) =>
@@ -213,7 +246,7 @@ public sealed partial class MariaProductRepository
     public async Task<ProductGroup> UpdateSubcategoryAsync(ProductGroup original, string newSubcategory,
         string targetCategory, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureKeyAsync("categorii.edit", cancellationToken).ConfigureAwait(false);
         var name = ProductGroupManagementRules.Name(newSubcategory, "Denumire subcategorie");
         var requestedCategory = ProductGroupManagementRules.Name(targetCategory, "Categorie");
         var motif = ProductGroupManagementRules.Reason(reason);

@@ -1,5 +1,5 @@
-@page "/inventar"
-@attribute [Authorize]
+﻿@page "/inventar"
+@attribute [Authorize(Policy = "perm:inventar.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @using System.Globalization
@@ -162,7 +162,7 @@ else if (loadError is null)
 
     protected override async Task OnInitializedAsync()
     {
-        if (!await Access.CanManageProductsAsync(lifetime.Token)) { loadError = "Nu ai dreptul să consulți catalogul."; return; }
+        if (!await Access.HasAsync("inventar.view", lifetime.Token)) { loadError = "Nu ai dreptul să consulți catalogul."; return; }
         await LoadAsync();
     }
 

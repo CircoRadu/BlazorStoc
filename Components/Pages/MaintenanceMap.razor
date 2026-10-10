@@ -1,5 +1,5 @@
-@page "/mentenanta/harta"
-@attribute [Authorize]
+﻿@page "/mentenanta/harta"
+@attribute [Authorize(Policy = "perm:mentenanta.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 <PageBoundary>

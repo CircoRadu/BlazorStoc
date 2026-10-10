@@ -18,7 +18,7 @@ public sealed class MariaWorkPointRepository(
 
     public async Task<IReadOnlyList<WorkPoint>> GetAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var result = new List<WorkPoint>();
         await using (var command = Command(connection, null,
@@ -38,7 +38,7 @@ public sealed class MariaWorkPointRepository(
 
     public async Task<WorkPoint> CreateAsync(int beneficiaryId, WorkPointInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var (workPoint, ownerName) = await WriteAsync(async (connection, transaction) =>
         {
@@ -60,7 +60,7 @@ public sealed class MariaWorkPointRepository(
 
     public async Task<WorkPoint> UpdateAsync(WorkPoint original, WorkPointInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         if (original.Id == 0) throw new WorkPointOperationException("Punctul de lucru principal nu a fost încă creat. Actualizează pagina.");
         // The address and the phone of the main work point follow the beneficiary: whatever the form holds is replaced by what is stored.
         if (original.IsPrimary) { input.Address = original.Address; input.Phone = original.Phone; }
@@ -90,7 +90,7 @@ public sealed class MariaWorkPointRepository(
     // archive directory, all in one database transaction (the files are copied first and the live ones removed after the commit).
     public async Task DeleteAsync(WorkPoint original, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         if (original.IsPrimary) throw WorkPointRules.PrimaryNotDeletable();
         string ownerName;
         IReadOnlyList<ServicePhoto> photos;
@@ -204,7 +204,6 @@ public sealed class MariaWorkPointRepository(
         ("@latitude", value.Latitude is { } latitude ? latitude : DBNull.Value), ("@longitude", value.Longitude is { } longitude ? longitude : DBNull.Value)
     ];
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }
 
 // Creates the main work point row of every beneficiary that lacks one (the beneficiaries that existed before migration 7), with the

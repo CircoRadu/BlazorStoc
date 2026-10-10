@@ -27,7 +27,7 @@ public sealed class MariaSupplierRepository(
 
     public async Task<IReadOnlyList<Supplier>> GetSuppliersAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, $"{Select} ORDER BY s.name, s.id");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -40,7 +40,7 @@ public sealed class MariaSupplierRepository(
 
     public async Task<Supplier?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var supplier = await GetAsync(connection, null, id, false, cancellationToken).ConfigureAwait(false);
         return supplier is null ? null : supplier with { Aliases = (await AliasesAsync(connection, cancellationToken).ConfigureAwait(false)).GetValueOrDefault(id) };
@@ -62,7 +62,7 @@ public sealed class MariaSupplierRepository(
 
     public async Task<Supplier> AddAliasAsync(Supplier supplier, string alias, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["furnizori.edit", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         var text = (alias ?? "").Trim();
         var current = await GetAsync(supplier.Id, cancellationToken).ConfigureAwait(false) ?? throw new SupplierOperationException(SupplierRules.StaleMessage);
         if (SupplierRules.AliasProblem(text, current, await GetSuppliersAsync(cancellationToken).ConfigureAwait(false)) is { } problem) throw new SupplierOperationException(problem);
@@ -82,7 +82,7 @@ public sealed class MariaSupplierRepository(
 
     public async Task<Supplier> RemoveAliasAsync(Supplier supplier, string alias, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["furnizori.edit", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new SupplierOperationException("Modificările sunt permise numai în baza BlazorStoc.");
         var text = (alias ?? "").Trim();
         int removed;
@@ -101,7 +101,7 @@ public sealed class MariaSupplierRepository(
 
     public async Task<Supplier> CreateAsync(SupplierInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["furnizori.add", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = MariaTimeText.Now();   // the precision the database keeps, so what is returned equals what is read back later
@@ -127,7 +127,7 @@ public sealed class MariaSupplierRepository(
 
     public async Task<Supplier> UpdateAsync(Supplier original, SupplierInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("furnizori.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated(true);
         var now = MariaTimeText.Now();
         var supplier = await WriteAsync(async (connection, transaction) =>
@@ -252,5 +252,4 @@ public sealed class MariaSupplierRepository(
         catch (Exception exception) when (exception is not OperationCanceledException) { return null; }
     }
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 }

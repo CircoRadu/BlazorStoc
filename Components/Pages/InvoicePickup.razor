@@ -1,5 +1,5 @@
-@page "/produse/preluare-factura"
-@attribute [Authorize]
+﻿@page "/produse/preluare-factura"
+@attribute [Authorize(Policy = "perm:preluare-factura.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Globalization
 @using BlazorStoc.Services

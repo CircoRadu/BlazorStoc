@@ -1,4 +1,4 @@
-@inherits LayoutComponentBase
+﻿@inherits LayoutComponentBase
 @implements IDisposable
 @using Microsoft.AspNetCore.WebUtilities
 @using BlazorStoc.Services
@@ -41,7 +41,7 @@
         {
             <p class="nav-label">SPAȚIU DE LUCRU</p>
             <NavLink class="nav-item" href="/" Match="NavLinkMatch.All"><span>⌂</span> Pagina principală <span class="nav-arrow">→</span></NavLink>
-            <CollapsibleSection Id="products-menu"
+            <AuthorizeView Policy="perm:stoc.view|preluare-factura.view|iesire-multipla.view|export-consum.view"><Authorized Context="menuSection"><CollapsibleSection Id="products-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
                                 ToggleClass="@($"nav-item administration-parent {(productsMenuSection ? "active" : "")}")"
@@ -49,13 +49,13 @@
                                 Expanded="@productsExpanded">
                 <Header><span>▦</span> Produse</Header>
                 <ChildContent>
-                    <a class="@(onStockPage ? "active" : "")" href="/produse">Stoc</a>
-                    <NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink>
-                    <NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink>
-                    <NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink>
+                    <AuthorizeView Policy="perm:stoc.view"><Authorized><a class="@(onStockPage ? "active" : "")" href="/produse">Stoc</a></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:preluare-factura.view"><Authorized><NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:iesire-multipla.view"><Authorized><NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
-            </CollapsibleSection>
-            <CollapsibleSection Id="inventory-menu"
+            </CollapsibleSection></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:inventar.view|inventar-preluare.view"><Authorized Context="menuSection"><CollapsibleSection Id="inventory-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
                                 ToggleClass="@($"nav-item administration-parent {(inventorySection ? "active" : "")}")"
@@ -63,11 +63,11 @@
                                 Expanded="@inventoryExpanded">
                 <Header><span>▥</span> Inventar</Header>
                 <ChildContent>
-                    <NavLink href="/inventar" Match="NavLinkMatch.All">Generare situație inventar</NavLink>
-                    <NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix">Preluare inventar</NavLink>
+                    <AuthorizeView Policy="perm:inventar.view"><Authorized><NavLink href="/inventar" Match="NavLinkMatch.All">Generare situație inventar</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:inventar-preluare.view"><Authorized><NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix">Preluare inventar</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
-            </CollapsibleSection>
-            <CollapsibleSection Id="administration-menu"
+            </CollapsibleSection></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|utilizatori.view|nomenclator.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
                                 ToggleClass="@($"nav-item administration-parent {(administrationSection ? "active" : "")}")"
@@ -75,20 +75,20 @@
                                 Expanded="@administrationExpanded">
                 <Header><span>⚙</span> Administrare</Header>
                 <ChildContent>
-                    <NavLink href="/categorii" Match="NavLinkMatch.Prefix">Categorii</NavLink>
-                    <NavLink href="/beneficiari" Match="NavLinkMatch.Prefix">Beneficiari</NavLink>
-                    <NavLink href="/furnizori" Match="NavLinkMatch.Prefix">Furnizori</NavLink>
-                    <NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink>
-                    <NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink>
-                    <AuthorizeView Roles="Administrator"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:categorii.view"><Authorized><NavLink href="/categorii" Match="NavLinkMatch.Prefix">Categorii</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:beneficiari.view"><Authorized><NavLink href="/beneficiari" Match="NavLinkMatch.Prefix">Beneficiari</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:furnizori.view"><Authorized><NavLink href="/furnizori" Match="NavLinkMatch.Prefix">Furnizori</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:vehicule.view"><Authorized><NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:utilizatori.view"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView><AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
-            </CollapsibleSection>
-            <NavLink class="nav-item" href="/oferte" Match="NavLinkMatch.Prefix"><span>▤</span> Oferte <span class="nav-arrow">→</span></NavLink>
-            <NavLink class="nav-item" href="/mentenanta" Match="NavLinkMatch.Prefix"><span>⚒</span> Mentenanță <span class="nav-arrow">→</span></NavLink>
-            <NavLink class="nav-item" href="/analize-risc" Match="NavLinkMatch.Prefix"><span>⚠</span> Analize de risc <span class="nav-arrow">→</span></NavLink>
-            <NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink>
-            <AuthorizeView Roles="Administrator"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
-            <AuthorizeView Roles="Administrator,Utilizator"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            </CollapsibleSection></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:oferte.view"><Authorized><NavLink class="nav-item" href="/oferte" Match="NavLinkMatch.Prefix"><span>▤</span> Oferte <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:mentenanta.view"><Authorized><NavLink class="nav-item" href="/mentenanta" Match="NavLinkMatch.Prefix"><span>⚒</span> Mentenanță <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:analize-risc.view"><Authorized><NavLink class="nav-item" href="/analize-risc" Match="NavLinkMatch.Prefix"><span>⚠</span> Analize de risc <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:notificari.view"><Authorized><NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:jurnal.view"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>BlazorStoc · MariaDB</small></div>
     </aside>
@@ -217,8 +217,7 @@
         .Where(g => string.Equals(g.Category, category, StringComparison.OrdinalIgnoreCase))
         .Select(g => g.Subcategory)
         .Where(s => !string.IsNullOrWhiteSpace(s))
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .Order(StringComparer.CurrentCultureIgnoreCase);
+        .Distinct(StringComparer.OrdinalIgnoreCase);
 
     private static string ProductUrl(string category, string? subcategory = null)
     {

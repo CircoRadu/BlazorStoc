@@ -17,7 +17,7 @@ public sealed class MariaProjectSituationReader(
 {
     public async Task<ProjectSituation> GetAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.view", cancellationToken).ConfigureAwait(false);
         var project = await projects.GetAsync(projectId, cancellationToken).ConfigureAwait(false) ?? throw new OfferException(OfferMessages.ProjectMissing);
         var all = await components.GetForProjectAsync(projectId, true, cancellationToken).ConfigureAwait(false);
         var archived = all.Where(component => component.Archived).Select(component => component.SystemTypeId).ToHashSet();
@@ -63,7 +63,7 @@ public sealed class MariaProjectSituationReader(
 
     public async Task<IReadOnlyList<ReserveSuggestion>> GetReserveSuggestionsAsync(int productId, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.view", cancellationToken).ConfigureAwait(false);
         var product = await products.GetProductAsync(productId, cancellationToken).ConfigureAwait(false);
         if (product is null) return [];
         var free = ReservationRules.Free(product.Quantity, (await reservations.GetHoldersAsync(productId, cancellationToken).ConfigureAwait(false)).Sum(holder => holder.Quantity));

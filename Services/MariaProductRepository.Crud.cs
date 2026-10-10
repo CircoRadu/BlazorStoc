@@ -12,7 +12,7 @@ public sealed partial class MariaProductRepository
         await using var command = new MySqlCommand("""
             SELECT c.name,COALESCE(s.name,'')
             FROM categories c LEFT JOIN subcategories s ON s.category_id=c.id
-            ORDER BY c.sort_order,c.name,s.name
+            ORDER BY c.sort_order,c.name,s.sort_order,s.name
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var groups = new List<ProductGroup>();
@@ -23,7 +23,7 @@ public sealed partial class MariaProductRepository
 
     public async Task<Product> CreateAsync(ProductInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["produse.add", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         (Product Product, GroupResolution Group, string Parameters) result;
         try
@@ -59,7 +59,7 @@ public sealed partial class MariaProductRepository
 
     public async Task<Product> UpdateAsync(Product original, ProductInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureKeyAsync("produse.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated(original);
         (Product Product, GroupResolution Group, string Parameters) result;
         try
@@ -102,7 +102,7 @@ public sealed partial class MariaProductRepository
 
     public async Task DeleteAsync(Product original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureKeyAsync("produse.delete", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError)
             throw new ProductOperationException(reasonError);
@@ -233,5 +233,5 @@ public sealed partial class MariaProductRepository
     // equivalent unique index).
     private static bool IsDuplicateKey(MySqlException exception) => exception.Number == 1062;
 
-    private Task EnsureProductOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
+    private Task EnsureKeyAsync(string key, CancellationToken token) => accessControl?.EnsureAsync(key, token) ?? Task.CompletedTask;
 }

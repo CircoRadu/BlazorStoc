@@ -1,5 +1,5 @@
-@page "/setari"
-@attribute [Authorize(Roles = AccessRoles.Administrator + "," + AccessRoles.LimitedUser)]
+﻿@page "/setari"
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject UnsavedChanges Guard
@@ -40,13 +40,13 @@
                 </div>
             }
         </div>
-    @if (isAdmin && activeTab == AnafTab)
+    @if (activeTab == AnafTab && allowedTabs.Contains(AnafTab))
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
             <AnafConfigurator />
         </div>
     }
-    else if (isAdmin && activeTab == NotificationsTab)
+    else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))
     {
         <div role="tabpanel" id="panel-@NotificationsTab" aria-labelledby="tab-@NotificationsTab" class="settings-body">
             @SubtabBar(NotificationSubtabs, "Secțiuni notificări")
@@ -60,7 +60,7 @@
             }
         </div>
     }
-    else if (isAdmin && activeTab == BackupTab)
+    else if (activeTab == BackupTab && allowedTabs.Contains(BackupTab))
     {
         <div role="tabpanel" id="panel-@BackupTab" aria-labelledby="tab-@BackupTab" class="settings-body">
             @SubtabBar(BackupSubtabs, "Secțiuni backup")
@@ -78,7 +78,7 @@
             }
         </div>
     }
-    else if (isAdmin && activeTab == MapTab)
+    else if (activeTab == MapTab && allowedTabs.Contains(MapTab))
     {
         <div role="tabpanel" id="panel-@MapTab" aria-labelledby="tab-@MapTab" class="settings-body">
             @SubtabBar(MapSubtabs, "Secțiuni hartă")
@@ -92,6 +92,12 @@
             }
         </div>
     }
+    else if (activeTab == UserTypesTab && allowedTabs.Contains(UserTypesTab))
+    {
+        <div role="tabpanel" id="panel-@UserTypesTab" aria-labelledby="tab-@UserTypesTab" class="settings-body">
+            <UserTypesPanel />
+        </div>
+    }
 </section>
 
 </PageBoundary>
@@ -102,23 +108,32 @@
     private const string MapTab = SettingsNavigation.MapTab;
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private const string BackupTab = "backup";
+    private const string UserTypesTab = "tipuri-utilizatori";
     // Backup is one tab with three sub-tabs: backup and restore, the NAS copy, the check of the server clock.
     private const string BackupMainSubtab = "backup-main";
     private const string NasTab = "backup-nas";
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (UserTypesTab, "Tipuri de utilizatori")];
+    // The key that opens each tab (what the user type of the signed-in user allows).
+    private static readonly Dictionary<string, string> TabKeys = new()
+    {
+        [AnafTab] = "setari-anaf.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
+        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [UserTypesTab] = "tipuri-utilizatori.view"
+    };
+    private readonly HashSet<string> allowedTabs = [];
     private string activeTab = AnafTab;
 
     // The administrator has every tab; a user without that role only reaches the invoice templates (creating and changing them).
-    private bool isAdmin;
-    private (string Id, string Title)[] VisibleTabs => isAdmin ? Tabs : [.. Tabs.Where(tab => tab.Id == InvoicesTab)];
+    private bool isAdmin => allowedTabs.Any(tab => tab != InvoicesTab);
+    private (string Id, string Title)[] VisibleTabs => [.. Tabs.Where(tab => allowedTabs.Contains(tab.Id))];
 
     protected override async Task OnInitializedAsync()
     {
-        isAdmin = await Access.IsAdministratorAsync();
-        if (!isAdmin) activeTab = InvoicesTab;
+        foreach (var (tab, key) in TabKeys)
+            if (await Access.HasAsync(key)) allowedTabs.Add(tab);
+        if (!allowedTabs.Contains(activeTab) && VisibleTabs.Length > 0) activeTab = VisibleTabs[0].Id;
     }
 
     private const string TemplatesSubtab = SettingsNavigation.TemplatesSubtab;
@@ -198,7 +213,7 @@
         appliedLink = link;
         if (VisibleTabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
         // The old address of the NAS tab keeps working.
-        if (isAdmin && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
+        if (allowedTabs.Contains(BackupTab) && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
         if (BackupSubtabs.Any(tab => tab.Id == SubtabQuery)) { backupSubtab = SubtabQuery!; if (isAdmin && TabQuery is null or BackupTab) activeTab = BackupTab; }
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;

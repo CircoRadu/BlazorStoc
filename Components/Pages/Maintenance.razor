@@ -1,5 +1,5 @@
-@page "/intretinere"
-@attribute [Authorize]
+﻿@page "/intretinere"
+@attribute [Authorize(Policy = "perm:mentenanta.view")]
 @using BlazorStoc.Services
 <PageBoundary>
 

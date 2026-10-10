@@ -29,14 +29,14 @@ public sealed class MariaOfferRepository(
 
     public async Task<OfferRecord?> GetLatestAsync(string number, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return (await ReadOffersAsync(connection, null, $"{Select} WHERE o.number_key=@key ORDER BY o.revision DESC LIMIT 1", cancellationToken, ("@key", OfferRules.Key(number))).ConfigureAwait(false)).FirstOrDefault();
     }
 
     public async Task<IReadOnlyList<OfferRecord>> GetForProjectAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadOffersAsync(connection, null, $"{Select} WHERE o.project_id=@project ORDER BY o.number,o.revision DESC", cancellationToken, ("@project", projectId)).ConfigureAwait(false);
     }
@@ -52,7 +52,7 @@ public sealed class MariaOfferRepository(
 
     public async Task<IReadOnlyList<OfferLineRecord>> GetLinesAsync(int offerId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadLinesAsync(connection, null, offerId, cancellationToken).ConfigureAwait(false);
     }
@@ -80,7 +80,7 @@ public sealed class MariaOfferRepository(
 
     public async Task<IReadOnlyDictionary<string, int>> GetRememberedMatchesAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, "SELECT m.name_key,m.product_id FROM offer_line_matches m INNER JOIN products p ON p.id=m.product_id");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -93,7 +93,7 @@ public sealed class MariaOfferRepository(
     {
         var key = OfferRules.Key(text);
         if (key.Length == 0) return null;
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, "SELECT beneficiary_id FROM beneficiary_aliases WHERE alias_key=@key", ("@key", key));
         return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is { } id ? Convert.ToInt32(id) : null;
@@ -101,7 +101,7 @@ public sealed class MariaOfferRepository(
 
     public async Task<OfferImportResult> ImportAsync(OfferImportRequest request, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("oferte.add", cancellationToken).ConfigureAwait(false);
         var number = SystemTypeRules.Clean(request.Number);
         if (OfferRules.Key(number).Length == 0) throw new OfferException(OfferMessages.NumberRequired);
         if (request.BeneficiaryId <= 0) throw new OfferException(OfferMessages.BeneficiaryRequired);
@@ -222,5 +222,4 @@ public sealed class MariaOfferRepository(
         MariaDb.WriteAsync(configuration, action, message => new OfferException(message), token,
             "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 }

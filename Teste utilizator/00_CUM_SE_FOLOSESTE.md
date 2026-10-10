@@ -46,3 +46,4 @@ Directorul contine, pentru fiecare componenta a aplicatiei, un fisier cu pasii p
 | 13_Oferte_sabloane.md | Sabloane de devize-oferta (xlsx) | /oferte/sabloane |
 | 14_Oferte_preluare.md | Preluarea devizului-oferta | /oferte/preluare |
 | 15_Analize_de_risc.md | Analize de risc, reinnoiri, notificare de expirare | /analize-risc, fisa beneficiarului |
+| 16_Tipuri_de_utilizatori.md | Tipuri de utilizatori, permisiuni pe module/actiuni, Acces refuzat | /setari (Tipuri de utilizatori), /utilizatori |

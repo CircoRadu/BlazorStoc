@@ -32,7 +32,7 @@ public sealed class MariaSupplierProductCodes(IConfiguration configuration, IAcc
 
     public async Task<IReadOnlyDictionary<string, int>> GetAsync(int supplierId, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         var result = new Dictionary<string, int>(StringComparer.Ordinal);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("SELECT code_key, product_id FROM supplier_product_codes WHERE supplier_id=@supplier", connection);
@@ -44,7 +44,7 @@ public sealed class MariaSupplierProductCodes(IConfiguration configuration, IAcc
 
     public async Task<bool> LinkAsync(int supplierId, string code, int productId, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["furnizori.edit", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         if (!SupplierProductCodeRules.IsLinkable(code) || !MariaDatabaseGuard.IsAllowedDatabase(configuration)) return false;
         var text = code.Trim();
         var key = SupplierProductCodeRules.Key(text);

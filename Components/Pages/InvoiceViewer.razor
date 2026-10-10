@@ -1,6 +1,6 @@
-@page "/produse/preluare-factura/factura/{SessionId:guid}"
+﻿@page "/produse/preluare-factura/factura/{SessionId:guid}"
 @layout Layout.PopoutLayout
-@attribute [Authorize]
+@attribute [Authorize(Policy = "perm:preluare-factura.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IAccessControl Access
@@ -51,7 +51,7 @@ else
     // The session belongs to the user who opened the file (the same rule as the page pictures); this window has a circuit of its own, so it reads the store directly.
     protected override async Task OnInitializedAsync()
     {
-        var user = await Access.CanManageProductsAsync() ? await Access.GetUsernameAsync() : null;
+        var user = await Access.HasModuleWriteAsync("preluare-factura") ? await Access.GetUsernameAsync() : null;
         session = user is null ? null : Store.Get(SessionId, user);
         loaded = true;
     }

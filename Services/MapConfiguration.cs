@@ -332,7 +332,7 @@ public sealed class MapConfigurationService(MapConfigStore store, Microsoft.Exte
 
     public async Task<MapSettingsState> GetStateAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-harta.edit", cancellationToken).ConfigureAwait(false);
         await store.FileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -349,7 +349,7 @@ public sealed class MapConfigurationService(MapConfigStore store, Microsoft.Exte
 
     public async Task SaveEngineAsync(MapEngineSettings input, long expectedVersion, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-harta.edit", cancellationToken).ConfigureAwait(false);
         var value = MapEngineRules.Normalize(input);
         if (MapEngineRules.Validate(value) is { } problem) throw new MapOperationException(problem);
         await store.FileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -370,7 +370,7 @@ public sealed class MapConfigurationService(MapConfigStore store, Microsoft.Exte
 
     public async Task ResetEngineAsync(long expectedVersion, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-harta.edit", cancellationToken).ConfigureAwait(false);
         await store.FileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -388,7 +388,7 @@ public sealed class MapConfigurationService(MapConfigStore store, Microsoft.Exte
 
     public async Task<MapPinType> SavePinTypeAsync(MapPinType input, long expectedVersion, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-harta.edit", cancellationToken).ConfigureAwait(false);
         var value = MapPinRules.Normalize(input);
         await store.FileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -435,7 +435,7 @@ public sealed class MapConfigurationService(MapConfigStore store, Microsoft.Exte
 
     public async Task DeletePinTypeAsync(int id, string reason, long expectedVersion, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-harta.edit", cancellationToken).ConfigureAwait(false);
         if (ChangeReasonRules.ValidationError(ChangeReasonRules.Normalize(reason)) is { } reasonProblem) throw new MapOperationException(reasonProblem);
         await store.FileGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try

@@ -19,6 +19,8 @@ public interface IProductRepository
     Task DeleteCategoryAsync(string category, string reason, CancellationToken cancellationToken = default);
     // The order of the categories (side menu and catalog page): every category once, in the wanted order. Administrator only.
     Task ReorderCategoriesAsync(IReadOnlyList<string> orderedCategories, CancellationToken cancellationToken = default);
+    // The order of the subcategories of one category: every subcategory of it once, in the wanted order. Administrator only.
+    Task ReorderSubcategoriesAsync(string category, IReadOnlyList<string> orderedSubcategories, CancellationToken cancellationToken = default);
     Task DeleteSubcategoryAsync(ProductGroup group, string reason, CancellationToken cancellationToken = default);
     Task<Product> CreateAsync(ProductInput input, CancellationToken cancellationToken = default);
     Task<Product> UpdateAsync(Product original, ProductInput input, CancellationToken cancellationToken = default);

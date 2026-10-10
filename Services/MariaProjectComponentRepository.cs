@@ -20,7 +20,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<IReadOnlyList<ProjectComponent>> GetForProjectAsync(int projectId, bool includeArchived = false, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadAsync(connection, null, $"{Select} WHERE c.project_id=@project {(includeArchived ? "" : "AND c.archived_utc IS NULL")} ORDER BY t.sort_order,t.id",
             cancellationToken, ("@project", projectId)).ConfigureAwait(false);
@@ -41,7 +41,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<IReadOnlyList<ProjectComponent>> AddAsync(int projectId, IReadOnlyCollection<int> systemTypeIds, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var ids = systemTypeIds.Distinct().ToList();
         if (ids.Count == 0) return [];
         var (added, projectName) = await WriteAsync(async (connection, transaction) =>
@@ -82,7 +82,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<ProjectComponent> SetStateAsync(ProjectComponent component, ComponentState state, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         if (!Enum.IsDefined(state)) throw new ProjectComponentException("Starea aleasă nu există.");
         var (current, changed) = await ChangeAsync(component, found =>
         {
@@ -97,7 +97,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<ProjectComponent> ArchiveAsync(ProjectComponent component, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         if (ChangeReasonRules.ValidationError(reason) is { } problem) throw new ProjectComponentException(problem);
         reason = TextNormalization.ForStorage(reason);
         if (await GetPendingExitsAsync(component.Id, cancellationToken).ConfigureAwait(false) is { Count: > 0 } pending) throw new ProjectComponentHasExitsException(pending);
@@ -113,7 +113,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<IReadOnlyList<ComponentChoice>> GetChoicesAsync(int projectId, int productId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var withProduct = new HashSet<int>();
         await using (var command = Command(connection, null, ComponentExitSql.ComponentsWithProduct, ("@product", productId), ("@project", projectId)))
@@ -125,7 +125,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<IReadOnlyList<ComponentExit>> GetPendingExitsAsync(int componentId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, $"""
             SELECT e.id,e.product_id,p.name,e.movement_date,e.reference,e.quantity,{RemainingSql} AS remaining FROM stock_movements e INNER JOIN products p ON p.id=e.product_id
@@ -142,7 +142,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task ResolveExitsAsync(ProjectComponent component, IReadOnlyList<ComponentExitResolution> resolutions, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         if (resolutions.Count == 0) return;
         var pending = await GetPendingExitsAsync(component.Id, cancellationToken).ConfigureAwait(false);
         var choices = (await GetChoicesAsync(component.ProjectId, 0, cancellationToken).ConfigureAwait(false)).ToDictionary(item => item.ComponentId);
@@ -195,7 +195,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<IReadOnlyList<OfferComponent>> GetComponentsWithProductAsync(int productId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT DISTINCT pc.id,pc.project_id,p.name,t.name FROM project_components pc
@@ -214,7 +214,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<IReadOnlyDictionary<(int SystemTypeId, int ProductId), int>> GetReceivedAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT pc.system_type_id,m.product_id,SUM(m.quantity) FROM stock_movements m INNER JOIN project_components pc ON pc.id=m.project_component_id
@@ -228,7 +228,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<IReadOnlyList<ComponentNet>> GetNetByComponentAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT e.project_component_id,pc.system_type_id,e.outside_offer,e.product_id,p.name,
@@ -264,7 +264,7 @@ public sealed class MariaProjectComponentRepository(
 
     public async Task<ProjectComponent> ReactivateAsync(ProjectComponent component, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var (current, _) = await ChangeAsync(component, found => found.Archived
             ? ("archived_utc=NULL,archive_reason=NULL", [])
             : throw new ProjectComponentException(ProjectComponentRules.NotArchivedMessage), cancellationToken).ConfigureAwait(false);
@@ -310,5 +310,4 @@ public sealed class MariaProjectComponentRepository(
             exception => exception.Number == 1062 ? new ProjectComponentException(ProjectComponentRules.AlreadyExistsMessage) : null, token,
             "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

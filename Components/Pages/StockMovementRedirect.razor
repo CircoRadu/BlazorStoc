@@ -1,5 +1,5 @@
-@page "/miscari/{Id:int}"
-@attribute [Authorize]
+﻿@page "/miscari/{Id:int}"
+@attribute [Authorize(Policy = "perm:stoc.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IStockMovementRepository Movements

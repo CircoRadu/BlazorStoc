@@ -18,7 +18,7 @@ public sealed class MariaVehicleRepository(
 
     public async Task<IReadOnlyList<Vehicle>> GetVehiclesAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT id, plate_number, description, version, itp_expiry, insurance_expiry, rovinieta_expiry FROM vehicles ORDER BY plate_number, id
@@ -32,7 +32,7 @@ public sealed class MariaVehicleRepository(
 
     public async Task<Vehicle?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT id, plate_number, description, version, itp_expiry, insurance_expiry, rovinieta_expiry FROM vehicles WHERE id=@id
@@ -44,7 +44,7 @@ public sealed class MariaVehicleRepository(
 
     public async Task<Vehicle> CreateAsync(VehicleInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("vehicule.add", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var vehicle = await WriteAsync(async (connection, transaction) =>
         {
@@ -66,7 +66,7 @@ public sealed class MariaVehicleRepository(
 
     public async Task<Vehicle> UpdateAsync(Vehicle original, VehicleInput input, CancellationToken cancellationToken = default, string? auditAction = null)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("vehicule.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated(true);
         var vehicle = await WriteAsync(async (connection, transaction) =>
         {
@@ -94,7 +94,7 @@ public sealed class MariaVehicleRepository(
 
     public async Task DeleteAsync(Vehicle original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("vehicule.delete", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new VehicleOperationException(reasonError);
         await archiver.ExecuteAsync(ArchiveRequests.Vehicle(original, motif), async (operation, token) =>
@@ -172,5 +172,4 @@ public sealed class MariaVehicleRepository(
         }
     }
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 }

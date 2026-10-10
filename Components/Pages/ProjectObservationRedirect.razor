@@ -1,5 +1,5 @@
-@page "/observatii/{Id:int}"
-@attribute [Authorize]
+﻿@page "/observatii/{Id:int}"
+@attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProjectRepository Repository

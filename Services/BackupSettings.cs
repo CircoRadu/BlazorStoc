@@ -107,7 +107,7 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
 {
     public async Task<BackupSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         return (await ReadAsync(cancellationToken).ConfigureAwait(false)).Settings;
     }
 
@@ -140,7 +140,7 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
 
     public async Task SaveAsync(BackupSettingsInput input, CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         if (BackupSettingsRules.Validate(input) is { } error) throw new NasBackupException(error);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new NasBackupException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         var old = (await ReadAsync(cancellationToken).ConfigureAwait(false)).Settings;
@@ -186,7 +186,7 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
 
     public async Task<IReadOnlyList<TimeProbeEntry>> ProbeTimeAsync(IReadOnlyList<string> servers, CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         if (servers.Count is < 1 or > BackupTimeRules.MaxServers || servers.Any(server => BackupTimeRules.Validate(server) is not null)) throw new NasBackupException(BackupTimeRules.ServersMessage);
         return await TrustedClock.ProbeAsync(servers, cancellationToken).ConfigureAwait(false);
     }
@@ -322,7 +322,7 @@ public sealed class BackupRetentionService(IConfiguration configuration, Microso
 {
     public async Task<BackupRetentionPreview> PreviewAsync(int retentionDays, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         var nasOn = (await new MariaNasBackupStore(configuration, protection).ReadAsync(cancellationToken).ConfigureAwait(false)).Settings.CopyEnabled;
         var packages = await BackupRetention.SelectAsync(configuration, retentionDays, nasOn, copier, cancellationToken).ConfigureAwait(false);
         return new(packages.Packages, packages.Blocked is null ? null : packages.Blocked + " Salvarea nu șterge nimic acum; ștergerea automată reîncearcă.");
@@ -330,7 +330,7 @@ public sealed class BackupRetentionService(IConfiguration configuration, Microso
 
     public async Task<RetentionResult> RunAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         var (settings, _) = await new MariaBackupSettingsStore(configuration).ReadAsync(cancellationToken).ConfigureAwait(false);
         var nasOn = (await new MariaNasBackupStore(configuration, protection).ReadAsync(cancellationToken).ConfigureAwait(false)).Settings.CopyEnabled;
         return await BackupRetention.RunAsync(configuration, settings, nasOn, copier, audit, logger, cancellationToken, access).ConfigureAwait(false);

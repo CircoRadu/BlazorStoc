@@ -311,13 +311,13 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
 
     public async Task<IReadOnlyList<NotificationTemplate>> GetTemplatesAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-notificari.edit", cancellationToken).ConfigureAwait(false);
         return await repository.GetTemplatesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<NotificationTemplate> CreateTemplateAsync(NotificationTemplateInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-notificari.edit", cancellationToken).ConfigureAwait(false);
         var value = ExpiryTemplateRules.Validated(input, Find(input.SourceKey));
         await EnsureSingleActiveAsync(value, null, cancellationToken).ConfigureAwait(false);
         var created = await repository.CreateTemplateAsync(value, cancellationToken).ConfigureAwait(false);
@@ -331,7 +331,7 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
 
     public async Task<NotificationTemplate> UpdateTemplateAsync(NotificationTemplate original, NotificationTemplateInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-notificari.edit", cancellationToken).ConfigureAwait(false);
         var value = ExpiryTemplateRules.Validated(input, Find(input.SourceKey));
         await EnsureSingleActiveAsync(value, original.Id, cancellationToken).ConfigureAwait(false);
         var updated = await repository.UpdateTemplateAsync(original, value, cancellationToken).ConfigureAwait(false);
@@ -353,7 +353,7 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
 
     public async Task DeleteTemplateAsync(NotificationTemplate original, string reason, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-notificari.edit", cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(reason)) throw new NotificationOperationException("Motivul ștergerii este obligatoriu.");
         await repository.DeleteTemplateAsync(original, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordActionAsync(auditTrail, access, AuditEntities.NotificationTemplate, AuditActions.DeleteNotificationTemplate,
@@ -368,7 +368,7 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
 
     public async Task<int> CountOpenNotificationsAsync(NotificationTemplate template, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-notificari.edit", cancellationToken).ConfigureAwait(false);
         return await repository.CountOpenAsync(template.Id, cancellationToken).ConfigureAwait(false);
     }
 
@@ -437,13 +437,13 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
 
     public async Task<NotificationSettings> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-notificari.edit", cancellationToken).ConfigureAwait(false);
         return await repository.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<NotificationPurgePlan> PreviewPurgeAsync(int months, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-notificari.edit", cancellationToken).ConfigureAwait(false);
         EnsureValidMonths(months);
         return await PlanPurgeAsync(months, cancellationToken).ConfigureAwait(false);
     }
@@ -458,7 +458,7 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
     // (switch turned on, or period shortened) is what happens; the daily run then continues from today.
     public async Task<NotificationSettingsSaved> SaveSettingsAsync(NotificationSettings original, bool enabled, int months, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAsync("setari-notificari.edit", cancellationToken).ConfigureAwait(false);
         EnsureValidMonths(months);
         var changes = NotificationPurgeRules.Changes(original, enabled, months).ToArray();
         if (changes.Length == 0) return new(original, 0, null);

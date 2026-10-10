@@ -102,9 +102,13 @@ public partial class ProductMovements
         try
         {
             var productTask = Products.GetProductAsync(Id, lifetime.Token);
-            var accessTask = Access.CanManageProductsAsync(lifetime.Token);
+            var accessTask = Access.HasModuleWriteAsync("stoc", lifetime.Token);
             await Task.WhenAll(productTask, accessTask);
             product = await productTask; canManage = await accessTask;
+            stockIn = await Access.HasAsync("stoc.intrare", lifetime.Token); stockOut = await Access.HasAsync("stoc.iesire", lifetime.Token);
+            stockModify = await Access.HasAsync("stoc.modificare", lifetime.Token); stockVoid = await Access.HasAsync("stoc.stornare", lifetime.Token);
+            if (!stockIn && !stockVoid && stockOut) form.Kind = StockMovementKind.Exit;
+            permEdit = await Access.HasAsync("produse.edit", lifetime.Token); permDelete = await Access.HasAsync("produse.delete", lifetime.Token);
             if (!stateApplied) { ApplyStateFromAddress(); stateApplied = true; }
             isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
             if (product is not null) { await LoadPageAsync(); await RefreshHolderAsync(); }

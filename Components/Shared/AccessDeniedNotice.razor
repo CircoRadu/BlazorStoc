@@ -1,0 +1,22 @@
+@using BlazorStoc.Services
+@inject NavigationManager Navigation
+@inject IAuditTrail Audit
+@inject IAccessControl Access
+
+<div class="error-banner" role="alert">
+    <strong>Acces refuzat.</strong> Tipul tău de utilizator nu are dreptul să deschidă această pagină. Cere administratorului să îți modifice tipul de utilizator.
+    <a class="refresh act-nav" href="/">Înapoi la pagina principală</a>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var path = new Uri(Navigation.Uri).AbsolutePath;
+        try
+        {
+            await AuditRecorder.RecordActionAsync(Audit, Access, AuditEntities.User, AuditActions.AccessDenied, string.Empty, $"Pagina {path}",
+                AuditDetails.Identification(("Adresă", path)), string.Empty, CancellationToken.None);
+        }
+        catch (Exception) { /* the journal must not hide the refusal */ }
+    }
+}

@@ -1,5 +1,5 @@
-@page "/consum"
-@attribute [Authorize]
+﻿@page "/consum"
+@attribute [Authorize(Policy = "perm:export-consum.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IConsumptionReader Reader
@@ -96,7 +96,7 @@ else
     {
         try
         {
-            canManage = await Access.CanManageProductsAsync(lifetime.Token);
+            canManage = await Access.HasModuleWriteAsync("export-consum", lifetime.Token);
             if (canManage) beneficiaries = (await Beneficiaries.GetBeneficiariesAsync(lifetime.Token)).OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }

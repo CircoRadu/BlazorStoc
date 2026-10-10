@@ -1,6 +1,6 @@
-@page "/oferte/preluare"
+﻿@page "/oferte/preluare"
 @page "/oferte"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "perm:oferte.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IOfferRepository Offers

@@ -1,5 +1,5 @@
-@page "/categorii"
-@attribute [Authorize]
+﻿@page "/categorii"
+@attribute [Authorize(Policy = "perm:categorii.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProductRepository Repository
@@ -14,7 +14,7 @@
 <UnsavedChangesHost />
 <div class="page-heading">
     <div><p class="eyebrow">ORGANIZARE CATALOG</p><h1>Categorii și subcategorii</h1><p class="muted">Redenumește categoriile și mută subcategoriile fără să pierzi produsele asociate.@(isAdministrator ? " Trage categoriile de mânerul din dreapta ca să le aranjezi: ordinea de aici este ordinea din meniul lateral." : "")</p></div>
-    <div class="heading-actions"><button class="primary" disabled="@(saving || IsEditing)" @onclick="CreateCategory">+ Adaugă categorie</button></div>
+    <div class="heading-actions">@if (permAdd) { <button class="primary" disabled="@(saving || IsEditing)" @onclick="CreateCategory">+ Adaugă categorie</button> }</div>
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -94,8 +94,8 @@ else
                 </Header>
                 <Actions>
                     <button class="row-icon add" disabled="@(saving || IsEditing)" aria-label="@($"Adaugă subcategorie în {category}")" title="@($"Adaugă subcategorie în {category}")" @onclick="() => CreateSubcategory(category)"></button>
-                    <button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează categoria {category}")" title="@($"Editează categoria {category}")" @onclick="() => EditCategory(category)"></button>
-                    <button class="row-icon delete" disabled="@(saving || IsEditing || !CategoryIsEmpty(category))" aria-label="@($"Șterge categoria {category}")" title="@(DeleteCategoryTitle(category))" @onclick="() => RequestDeleteCategory(category)"></button>
+                    @if (permEdit) { <button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează categoria {category}")" title="@($"Editează categoria {category}")" @onclick="() => EditCategory(category)"></button> }
+                    @if (permDelete) { <button class="row-icon delete" disabled="@(saving || IsEditing || !CategoryIsEmpty(category))" aria-label="@($"Șterge categoria {category}")" title="@(DeleteCategoryTitle(category))" @onclick="() => RequestDeleteCategory(category)"></button> }
                 </Actions>
                 <ChildContent>
                     @if (Subcategories(category).Count == 0)
@@ -104,13 +104,20 @@ else
                     }
                     else
                     {
-                        <div class="table-scroll"><table><thead><tr><th>SUBCATEGORIE</th><th>PRODUSE</th><th>PARAMETRI OBLIGATORII</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                        <div class="table-scroll"><table><thead><tr>@if (isAdministrator) { <th class="drag-column"><span class="sr-only">Ordine</span></th> }<th>SUBCATEGORIE</th><th>PRODUSE</th><th>PARAMETRI OBLIGATORII</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
                         @foreach (var group in Subcategories(category))
                         {
-                            <tr @key="@($"{group.Category}:{group.Subcategory}")"><td><strong>@group.Subcategory</strong></td><td>@ProductCount(group) produse</td><td><span class="count-badge">@ParameterCount(group)</span></td><td class="row-actions"><button type="button" class="row-icon params" disabled="@(saving || IsEditing)" aria-label="@($"Parametri obligatori ai subcategoriei {group.Subcategory}")" title="@($"Parametri obligatori ai subcategoriei {group.Subcategory}")" @onclick="() => OpenParameters(group)"></button><button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează sau mută subcategoria {group.Subcategory}")" title="@($"Editează sau mută subcategoria {group.Subcategory}")" @onclick="() => EditSubcategory(group)"></button>
+                            var subIndex = Subcategories(category).IndexOf(group);
+                            <tr @key="@($"{group.Category}:{group.Subcategory}")" data-subcategory-index="@subIndex" data-subcategory-category="@category" data-subcategory-name="@group.Subcategory">
+                                @if (isAdministrator)
+                                {
+                                    <td class="drag-column"><span role="button" tabindex="0" class="row-icon drag" draggable="@(saving || IsEditing ? "false" : "true")" data-subcategory-handle aria-disabled="@((saving || IsEditing).ToString().ToLowerInvariant())" aria-label="@($"Mută subcategoria {group.Subcategory}")" title="Trage pentru a muta; sau săgețile sus/jos pe element"
+                                          @onkeydown="args => SubcategoryKeyAsync(args, category, subIndex)"></span></td>
+                                }
+                                <td><strong>@group.Subcategory</strong></td><td>@ProductCount(group) produse</td><td><span class="count-badge">@ParameterCount(group)</span></td><td class="row-actions"><button type="button" class="row-icon params" disabled="@(saving || IsEditing)" aria-label="@($"Parametri obligatori ai subcategoriei {group.Subcategory}")" title="@($"Parametri obligatori ai subcategoriei {group.Subcategory}")" @onclick="() => OpenParameters(group)"></button>@if (permEdit) { <button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează sau mută subcategoria {group.Subcategory}")" title="@($"Editează sau mută subcategoria {group.Subcategory}")" @onclick="() => EditSubcategory(group)"></button> }
                                 @if (ProductCount(group) == 0)
                                 {
-                                    <button class="row-icon delete" disabled="@(saving || IsEditing)" aria-label="@($"Șterge subcategoria goală {group.Subcategory}")" title="@($"Șterge subcategoria goală {group.Subcategory}")" @onclick="() => RequestDeleteSubcategory(group)"></button>
+                                    @if (permDelete) { <button class="row-icon delete" disabled="@(saving || IsEditing)" aria-label="@($"Șterge subcategoria goală {group.Subcategory}")" title="@($"Șterge subcategoria goală {group.Subcategory}")" @onclick="() => RequestDeleteSubcategory(group)"></button> }
                                 }
                             </td></tr>
                         }
@@ -127,6 +134,13 @@ else
 </PageBoundary>
 
 @code {
+    private bool permAdd, permEdit, permDelete;
+    private async Task LoadPermissionsAsync()
+    {
+        permAdd = await Access.HasAsync("categorii.add");
+        permEdit = await Access.HasAsync("categorii.edit");
+        permDelete = await Access.HasAsync("categorii.delete");
+    }
     private IReadOnlyList<ProductGroup> groups = Array.Empty<ProductGroup>();
     private IReadOnlyList<Product> products = Array.Empty<Product>();
     private string? editingCategory;
@@ -161,6 +175,38 @@ else
 
     [JSInvokable]
     public Task MoveCategory(int from, int to) => InvokeAsync(() => MoveCategoryAsync(from, to));
+
+    [JSInvokable]
+    public Task MoveSubcategory(string category, int from, int to) => InvokeAsync(() => MoveSubcategoryAsync(category, from, to));
+
+    private Task SubcategoryKeyAsync(KeyboardEventArgs args, string category, int index) => args.Key switch
+    {
+        "ArrowUp" => MoveSubcategoryAsync(category, index, index - 1),
+        "ArrowDown" => MoveSubcategoryAsync(category, index, index + 1),
+        _ => Task.CompletedTask
+    };
+
+    private async Task MoveSubcategoryAsync(string category, int from, int to)
+    {
+        var order = Subcategories(category).Select(group => group.Subcategory).ToList();
+        if (!isAdministrator || saving || IsEditing || from == to || from < 0 || to < 0 || from >= order.Count || to >= order.Count) return;
+        var moved = order[from];
+        order.RemoveAt(from);
+        order.Insert(to, moved);
+        saving = true; error = null; notice = null;
+        try
+        {
+            await Repository.ReorderSubcategoriesAsync(category, order, lifetime.Token);
+            notice = $"Subcategoria „{moved}” a fost mutată pe poziția {to + 1} din „{category}”; ordinea se vede și în meniul lateral.";
+        }
+        catch (ProductOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Subcategory reordering failed ({ErrorType}).", exception.GetType().Name); error = "Ordinea subcategoriilor nu a putut fi salvată."; }
+        finally { saving = false; }
+        await LoadAsync();
+        StateHasChanged();
+    }
 
     private Task CategoryKeyAsync(KeyboardEventArgs args, int index) => args.Key switch
     {
@@ -214,7 +260,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (!await Access.CanManageProductsAsync(lifetime.Token)) { error = "Nu ai dreptul să administrezi catalogul."; return; }
+        await LoadPermissionsAsync();
+        if (!await Access.HasAsync("categorii.view", lifetime.Token)) { error = "Nu ai dreptul să vezi catalogul."; return; }
         isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
         reference = DotNetObjectReference.Create(this);
         await LoadAsync();
@@ -239,8 +286,7 @@ else
     }
 
     private List<ProductGroup> Subcategories(string category) => groups
-        .Where(group => string.Equals(group.Category, category, StringComparison.OrdinalIgnoreCase) && group.Subcategory.Length > 0)
-        .OrderBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase).ToList();
+        .Where(group => string.Equals(group.Category, category, StringComparison.OrdinalIgnoreCase) && group.Subcategory.Length > 0).ToList();
     private int ProductCount(string category) => products.Count(product => string.Equals(product.Category, category, StringComparison.OrdinalIgnoreCase));
     private string SubcategoryCountLabel(string category)
     {

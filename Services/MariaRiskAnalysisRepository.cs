@@ -29,7 +29,7 @@ public sealed class MariaRiskAnalysisRepository(
 
     public async Task<IReadOnlyList<RiskAnalysisView>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return (await ReadViewsAsync(connection, null, "WHERE a.beneficiary_id=@id", [("@id", beneficiaryId)], cancellationToken).ConfigureAwait(false))
             .OrderByDescending(view => view.Analysis.IsActive).ThenByDescending(view => view.Analysis.InitialDate).ThenByDescending(view => view.Analysis.Id).ToArray();
@@ -37,7 +37,7 @@ public sealed class MariaRiskAnalysisRepository(
 
     public async Task<IReadOnlyList<RiskAnalysisView>> GetAllAsync(bool includeOff, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return (await ReadViewsAsync(connection, null, includeOff ? "WHERE 1=1" : "WHERE a.is_active=1", [], cancellationToken).ConfigureAwait(false))
             .OrderByDescending(view => view.Analysis.IsActive).ThenBy(view => view.Analysis.ExpiryDate).ThenBy(view => view.BeneficiaryName, StringComparer.CurrentCultureIgnoreCase)
@@ -46,7 +46,7 @@ public sealed class MariaRiskAnalysisRepository(
 
     public async Task<RiskAnalysisView> CreateAsync(int beneficiaryId, RiskAnalysisInput input, bool deactivateExisting, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("analize-risc.add", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var initial = value.InitialDate!.Value;
         if (RiskAnalysisRules.InitialDateError(initial, Today) is { } dateError) throw new RiskAnalysisOperationException(dateError);
@@ -84,7 +84,7 @@ public sealed class MariaRiskAnalysisRepository(
 
     public async Task<RiskAnalysisView> UpdateAsync(RiskAnalysis original, RiskAnalysisInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("analize-risc.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var initial = value.InitialDate!.Value;
         var pending = new List<Pending>();
@@ -127,7 +127,7 @@ public sealed class MariaRiskAnalysisRepository(
 
     public async Task<RiskAnalysisView> RenewAsync(RiskAnalysis original, RiskAnalysisRenewalInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("analize-risc.edit", cancellationToken).ConfigureAwait(false);
         if (RiskAnalysisRules.RenewalDateError(input.Date, original.LastRenewalDate, Today) is { } dateError) throw new RiskAnalysisOperationException(dateError);
         var date = input.Date!.Value;
         var notes = TextNormalization.ForStorage((input.Notes ?? "").Replace("\r\n", "\n"));
@@ -164,7 +164,7 @@ public sealed class MariaRiskAnalysisRepository(
 
     public async Task<RiskAnalysisView> UndoLastRenewalAsync(RiskAnalysis original, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("analize-risc.edit", cancellationToken).ConfigureAwait(false);
         var pending = new List<Pending>();
         var view = await WriteAsync(async (connection, transaction) =>
         {
@@ -196,7 +196,7 @@ public sealed class MariaRiskAnalysisRepository(
 
     public async Task<RiskAnalysisView> ActivateAsync(RiskAnalysis original, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("analize-risc.edit", cancellationToken).ConfigureAwait(false);
         var pending = new List<Pending>();
         var view = await WriteAsync(async (connection, transaction) =>
         {
@@ -218,7 +218,7 @@ public sealed class MariaRiskAnalysisRepository(
 
     public async Task<RiskAnalysisView> DeactivateAsync(RiskAnalysis original, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("analize-risc.edit", cancellationToken).ConfigureAwait(false);
         var pending = new List<Pending>();
         var view = await WriteAsync(async (connection, transaction) =>
         {
@@ -239,7 +239,7 @@ public sealed class MariaRiskAnalysisRepository(
     // Archived deletion: the analysis goes to archive_risk_analyses and its renewals to archive_relations, in one transaction.
     public async Task DeleteAsync(RiskAnalysis original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("analize-risc.delete", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new RiskAnalysisOperationException(reasonError);
         RiskAnalysisView view;
@@ -402,5 +402,4 @@ public sealed class MariaRiskAnalysisRepository(
 
     private static DateTime SqlDate(DateOnly date) => date.ToDateTime(TimeOnly.MinValue);
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

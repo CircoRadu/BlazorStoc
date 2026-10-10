@@ -103,7 +103,7 @@ public sealed class InvoiceAnalysisService(IInvoicePdfReader reader, IInvoiceAna
     public async Task<InvoiceAnalysisSession> AnalyzeAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default)
     {
         // Settings -> Facturi and Produse -> Preluare factura read files (any product operator); creating and changing templates is also open to every product operator, only deleting one is reserved for the administrator.
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("preluare-factura", cancellationToken).ConfigureAwait(false);
         owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var read = await reader.ReadAsync(pdf, cancellationToken).ConfigureAwait(false);
         // The numbers of the table that the OCR did not read as numbers are read again, cell by cell, once the table is known.
@@ -114,7 +114,7 @@ public sealed class InvoiceAnalysisService(IInvoicePdfReader reader, IInvoiceAna
 
     public async Task<InvoiceAnalysisSession> OpenAsync(Stream pdf, string fileName, CancellationToken cancellationToken = default)
     {
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("preluare-factura", cancellationToken).ConfigureAwait(false);
         owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var read = await reader.ReadAsync(pdf, cancellationToken).ConfigureAwait(false);
         return store.Add(owner, fileName, read, new InvoiceAnalysis(read.Document.Pages, [], null, []));
@@ -122,7 +122,7 @@ public sealed class InvoiceAnalysisService(IInvoicePdfReader reader, IInvoiceAna
 
     public async Task<InvoiceAnalysisSession> OpenXmlAsync(byte[] content, string fileName, CancellationToken cancellationToken = default)
     {
-        await access.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureModuleAsync("preluare-factura", cancellationToken).ConfigureAwait(false);
         owner = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         var xml = InvoiceXmlReader.Parse(content);
         var pages = new List<InvoicePageData> { new(1, 595, 842, InvoiceSources.Text, []) };

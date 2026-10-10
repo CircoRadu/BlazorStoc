@@ -24,7 +24,7 @@ public sealed class MariaReservationRepository(
 
     public async Task<IReadOnlyList<Reservation>> GetForProjectAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["stoc.view", "beneficiari.view"], cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, $"{Select} WHERE r.project_id=@project ORDER BY pr.name,r.id", ("@project", projectId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -35,7 +35,7 @@ public sealed class MariaReservationRepository(
 
     public async Task<IReadOnlyList<ReservationHolder>> GetHoldersAsync(int productId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["stoc.view", "beneficiari.view"], cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReservationSql.HoldersAsync(connection, null, productId, cancellationToken).ConfigureAwait(false);
     }
@@ -137,7 +137,7 @@ public sealed class MariaReservationRepository(
             reason, cancellationToken).ConfigureAwait(false);
     }
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
+    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureAsync("stoc.rezervare", token) ?? Task.CompletedTask;
 }
 
 // SQL shared with the exit repository (inside its transaction).

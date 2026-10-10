@@ -1,5 +1,5 @@
-@page "/beneficiari/{Id:int}"
-@attribute [Authorize]
+﻿@page "/beneficiari/{Id:int}"
+@attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IBeneficiaryRepository Beneficiaries
@@ -48,7 +48,7 @@ else if (beneficiary is not null)
             }</div>
         <div class="heading-actions">
             @if (canManage) { <button class="refresh act-edit" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenEditBeneficiaryAsync">Editează</button> }
-            <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button>
+            @if (permAdd) { @if (permAdd) { <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button> } }
         </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -93,10 +93,10 @@ else if (beneficiary is not null)
                             }
                             else
                             {
-                                <button class="row-icon edit" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" aria-label="Editează punctul de lucru @workPoint.Name" title="Editează punctul de lucru @workPoint.Name" @onclick="() => OpenEditWorkPoint(workPoint)"></button>
+                                @if (permEdit) { <button class="row-icon edit" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" aria-label="Editează punctul de lucru @workPoint.Name" title="Editează punctul de lucru @workPoint.Name" @onclick="() => OpenEditWorkPoint(workPoint)"></button> }
                                 @if (!workPoint.IsPrimary)
                                 {
-                                    <button class="row-icon delete" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" aria-label="Șterge punctul de lucru @workPoint.Name" title="Șterge punctul de lucru @workPoint.Name" @onclick="() => DeleteWorkPointAsync(workPoint)"></button>
+                                    @if (permDelete) { <button class="row-icon delete" disabled="@(workPointBusy || addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" aria-label="Șterge punctul de lucru @workPoint.Name" title="Șterge punctul de lucru @workPoint.Name" @onclick="() => DeleteWorkPointAsync(workPoint)"></button> }
                                 }
                                 else
                                 {
@@ -112,11 +112,11 @@ else if (beneficiary is not null)
 
     <NetConsumptionSection BeneficiaryId="Id" />
 
-    <ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
+    <ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
-    <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canManage" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" />
+    <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" />
 
-    <RiskAnalysesSection BeneficiaryId="Id" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canManage" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" />
+    <RiskAnalysesSection BeneficiaryId="Id" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" />
 
     <section class="catalog">
         <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
@@ -155,6 +155,13 @@ else if (beneficiary is not null)
 </PageBoundary>
 
 @code {
+    private bool permAdd, permEdit, permDelete;
+    private async Task LoadPermissionsAsync()
+    {
+        permAdd = await Access.HasAsync("beneficiari.add");
+        permEdit = await Access.HasAsync("beneficiari.edit");
+        permDelete = await Access.HasAsync("beneficiari.delete");
+    }
     [Parameter] public int Id { get; set; }
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.QueryParameter)] public string? QueryText { get; set; }
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
@@ -166,7 +173,7 @@ else if (beneficiary is not null)
     private string? returnTo;
     private Beneficiary? beneficiary;
     private IReadOnlyList<Project> projects = Array.Empty<Project>();
-    private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage;
+    private bool loading = true, projectsLoading, addingProject, editingBeneficiary, canManage, canMaintenance, canRisk;
     private string? error, notice, workPointError;
     // The additional work points; the main one is derived from the beneficiary itself (WorkPointRules.Primary).
     private IReadOnlyList<WorkPoint> workPoints = Array.Empty<WorkPoint>();
@@ -229,6 +236,7 @@ else if (beneficiary is not null)
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPermissionsAsync();
         changeSubscription = ChangeFeed.Subscribe(OnChangeAsync);
         ApplyStateFromAddress();
         await LoadAsync();
@@ -286,7 +294,8 @@ else if (beneficiary is not null)
         error = null;
         try
         {
-            canManage = await Access.CanManageBeneficiariesAsync(lifetime.Token);
+            canManage = await Access.HasModuleWriteAsync("beneficiari", lifetime.Token);
+            canMaintenance = await Access.HasModuleWriteAsync("mentenanta", lifetime.Token); canRisk = await Access.HasModuleWriteAsync("analize-risc", lifetime.Token);
             var all = await Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
             beneficiary = all.FirstOrDefault(item => item.Id == Id);
             if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }

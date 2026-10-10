@@ -14,7 +14,7 @@ public sealed class MariaSupplierInvoiceRepository(
 
     public async Task<IReadOnlyList<SupplierInvoice>> GetForSupplierAsync(int supplierId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT i.id,i.supplier_id,s.name,i.`number`,i.issue_date,i.created_by,i.created_utc,
@@ -33,7 +33,7 @@ public sealed class MariaSupplierInvoiceRepository(
 
     public async Task<IReadOnlyList<SupplierInvoice>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT i.id,i.supplier_id,s.name,i.`number`,i.issue_date,i.created_by,i.created_utc,
@@ -52,7 +52,7 @@ public sealed class MariaSupplierInvoiceRepository(
 
     public async Task<SupplierInvoice?> FindAsync(int supplierId, string number, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT i.id,i.supplier_id,s.name,i.`number`,i.issue_date,i.created_by,i.created_utc,
@@ -69,7 +69,7 @@ public sealed class MariaSupplierInvoiceRepository(
 
     public async Task<IReadOnlyList<InvoiceEntry>> GetEntriesAsync(int invoiceId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT m.id,m.product_id,p.name,m.quantity,m.movement_date FROM stock_movements m INNER JOIN products p ON p.id=m.product_id
@@ -85,7 +85,7 @@ public sealed class MariaSupplierInvoiceRepository(
 
     public async Task<SupplierInvoice> CreateAsync(SupplierInvoiceInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["facturi.add", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         var value = SupplierInvoiceRules.Validated(input);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = MariaTimeText.Now();
@@ -190,5 +190,4 @@ public sealed class MariaSupplierInvoiceRepository(
         _ => null
     };
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 }

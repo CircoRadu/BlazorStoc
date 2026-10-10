@@ -402,3 +402,12 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Interfata: pagina /analize-risc (meniu), sectiunea de pe fisa beneficiarului (RiskAnalysesSection, RiskAnalysisEditor, RiskAnalysisRenewalForm), coloana Analiza de risc in tabelul punctelor de lucru.
 - Jurnal: Adaugare, Modificare, Modificare valabilitate, Reinnoire, Anulare reinnoire, Activare, Dezactivare analiza de risc (AuditActions, filtru Audit, IsCreateOrEdit) + Stergere arhivata.
 - Verificari: build Release; MariaDB sectiunea Risk analyses 45 trecute (migrarea 39 aplicata pe blazorstoc_test); grupurile structure+ui 337 trecute; sectiunile Journal, Work points, Beneficiaries, Maintenance trecute. Propunere si decizii: docs/PROPUNERE_ANALIZE_RISC.md.
+
+## Finalizat la 10.10.2026 14:29 - Tipuri de utilizatori cu permisiuni
+
+- Setari -> Tipuri de utilizatori (doar administrator): tipuri cu permisiuni pe module si actiuni (catalog modul.actiune), un tip per utilizator, drepturi aplicate imediat; tipuri de sistem Administrator (toate drepturile, nemodificabil) si Utilizator (drepturile de pana acum); migrarea 40; politici pe pagini si endpoint-uri, verificari pe server in repository-uri, meniu si butoane dupa permisiuni, pagina Acces refuzat; jurnal cu actiuni specifice (Acordare/Revocare permisiune, Schimbare tip utilizator, Acces refuzat),Verificari: suita in memorie 1094 trecute, MariaDB 1819 trecute
+
+## Finalizat la 10.10.2026 16:23 - Permisiuni pe operatii, modul Stoc, ordinea subcategoriilor si corectii
+
+- Modulul Stoc (vizualizare, intrare, iesire, modificare, stornare, stoc minim, rezervare) separat de Produse (catalog); fiecare operatie din registre cere cheia ei, citirea cere orice permisiune; parametrii categoriilor sub Editare; pagina principala cu carduri pe permisiuni; aranjarea subcategoriilor prin tragere (migrarea 41, jurnal Reordonare subcategorii); butoane radio unitare si grupuri pliabile in matrice; corectat 500 la bonul de consum PDF si la exporturi (utilizatorul se ia din cererea HTTP in afara circuitului Blazor)
+- Verificari: suita in memorie 1094, MariaDB 1852, componente 341 trecute

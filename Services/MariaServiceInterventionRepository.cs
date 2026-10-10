@@ -32,7 +32,7 @@ public sealed class MariaServiceInterventionRepository(
 
     public async Task<IReadOnlyList<ServiceIntervention>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null,
             $"SELECT {Columns} FROM service_interventions WHERE beneficiary_id=@id ORDER BY performed_on DESC, id DESC", ("@id", beneficiaryId));
@@ -44,7 +44,7 @@ public sealed class MariaServiceInterventionRepository(
 
     public async Task<ServiceInterventionPage> GetPageAsync(ServiceInterventionQuery query, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         var where = new List<string>();
         var parameters = new List<(string, object?)>();
         if (query.BeneficiaryId is { } beneficiaryId) { where.Add("i.beneficiary_id=@beneficiary"); parameters.Add(("@beneficiary", beneficiaryId)); }
@@ -79,7 +79,7 @@ public sealed class MariaServiceInterventionRepository(
 
     public async Task<ServiceInterventionSaved> RecordAsync(int beneficiaryId, ServiceInterventionInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.add", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var performedOn = value.PerformedOn!.Value;
         if (ServiceInterventionRules.PerformedOnError(performedOn, Today) is { } dateError) throw new ServiceInterventionOperationException(dateError);
@@ -144,7 +144,7 @@ public sealed class MariaServiceInterventionRepository(
 
     public async Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var performedOn = value.PerformedOn!.Value;
         var pending = new List<Pending>();
@@ -193,7 +193,7 @@ public sealed class MariaServiceInterventionRepository(
     // archive directory, all in one database transaction. The latest due-moving maintenance intervention gives the due date back.
     public async Task DeleteAsync(ServiceIntervention original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.delete", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new ServiceInterventionOperationException(reasonError);
         string ownerName;
@@ -334,5 +334,4 @@ public sealed class MariaServiceInterventionRepository(
 
     private static DateTime SqlDate(DateOnly date) => date.ToDateTime(TimeOnly.MinValue);
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

@@ -1,5 +1,5 @@
-@page "/analize-risc"
-@attribute [Authorize]
+﻿@page "/analize-risc"
+@attribute [Authorize(Policy = "perm:analize-risc.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IRiskAnalysisRepository Repository
@@ -72,7 +72,7 @@ else
         error = null;
         try
         {
-            canManage = await Access.CanManageBeneficiariesAsync(lifetime.Token);
+            canManage = await Access.HasModuleWriteAsync("analize-risc", lifetime.Token);
             all = await Repository.GetAllAsync(true, lifetime.Token);
             thresholdDays = await NotificationService.GetThresholdDaysAsync(ExpirySourceKeys.RiskAnalysisExpiry, RiskAnalysisRules.DefaultThresholdDays, lifetime.Token);
             loaded = true;

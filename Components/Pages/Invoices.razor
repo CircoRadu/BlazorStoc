@@ -1,5 +1,5 @@
-@page "/facturi"
-@attribute [Authorize]
+﻿@page "/facturi"
+@attribute [Authorize(Policy = "perm:facturi.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject ISupplierInvoiceRepository Repository
@@ -74,8 +74,8 @@ else
                 <td><div class="row-buttons">
                     @if (isAdmin)
                     {
-                        <button class="row-icon edit" aria-label="Editează factura @invoice.Number" title="Editează" disabled="@(saving || deleting is not null)" @onclick="() => OpenEditor(invoice)"></button>
-                        <button class="row-icon delete" aria-label="Șterge factura @invoice.Number" title="@(invoice.MovementCount > 0 ? SupplierInvoiceRules.DeleteBlockedMessage(invoice.MovementCount) : "Șterge")" disabled="@(invoice.MovementCount > 0 || saving)" @onclick="() => RequestDelete(invoice)"></button>
+                        @if (permEdit) { <button class="row-icon edit" aria-label="Editează factura @invoice.Number" title="Editează" disabled="@(saving || deleting is not null)" @onclick="() => OpenEditor(invoice)"></button> }
+                        @if (permDelete) { <button class="row-icon delete" aria-label="Șterge factura @invoice.Number" title="@(invoice.MovementCount > 0 ? SupplierInvoiceRules.DeleteBlockedMessage(invoice.MovementCount) : "Șterge")" disabled="@(invoice.MovementCount > 0 || saving)" @onclick="() => RequestDelete(invoice)"></button> }
                     }</div></td>
             </tr>
         }
@@ -123,6 +123,13 @@ else
 </PageBoundary>
 
 @code {
+    private bool permAdd, permEdit, permDelete;
+    private async Task LoadPermissionsAsync()
+    {
+        permAdd = await Access.HasAsync("facturi.add");
+        permEdit = await Access.HasAsync("facturi.edit");
+        permDelete = await Access.HasAsync("facturi.delete");
+    }
     private readonly CancellationTokenSource lifetime = new();
     private int tab;
     [SupplyParameterFromQuery(Name = "tab")] public string? TabName { get; set; }
@@ -209,6 +216,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPermissionsAsync();
         try { isAdmin = await Access.IsAdministratorAsync(lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         await LoadAsync();

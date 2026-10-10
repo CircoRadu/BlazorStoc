@@ -33,7 +33,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<StockMovementPage> GetPageAsync(int productId, StockMovementQuery query, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var stock = await GetStockAsync(connection, null, productId, cancellationToken).ConfigureAwait(false)
                     ?? throw new StockMovementOperationException(ProductMissingMessage);
@@ -159,7 +159,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<StockMovementResult> RegularizeNegativeStockAsync(int productId, int realWarehouseQuantity, string context, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(["stoc.intrare", "stoc.modificare", "preluare-factura.add", "inventar-preluare.add"], cancellationToken).ConfigureAwait(false);
         if (realWarehouseQuantity is < 0 or > StockMovementRules.MaxQuantity) throw new StockMovementOperationException(StockMovementRules.RealQuantityMessage);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
@@ -195,7 +195,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<RegularizationItem>> GetToRegularizeAsync(RegularizationQuery? query = null, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         return StockMovementRules.FilterRegularization(await ReadToRegularizeAsync(connection, cancellationToken).ConfigureAwait(false), query, StockMovementRules.Today);
     }
@@ -242,7 +242,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<VehicleStock>> GetVehicleStocksAsync(int productId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var held = (await VehicleQuantitiesAsync(connection, null, productId, cancellationToken).ConfigureAwait(false))
             .Where(entry => entry.Quantity > 0).ToDictionary(entry => entry.VehicleId, entry => entry.Quantity);
@@ -260,7 +260,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<VehicleEquipment>> GetVehicleEquipmentAsync(int vehicleId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var held = (await VehicleQuantitiesAsync(connection, null, null, cancellationToken).ConfigureAwait(false))
             .Where(entry => entry.VehicleId == vehicleId && entry.Quantity > 0).ToList();
@@ -274,7 +274,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<StockMovement>> TransferFromVehicleAsync(VehicleTransfer transfer, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(["stoc.stornare", "stoc.intrare", "stoc.iesire", "vehicule.edit"], cancellationToken).ConfigureAwait(false);
         StockMovementRules.ValidateTransfer(transfer);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
@@ -346,7 +346,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyDictionary<int, int>> GetQuantitiesInVehiclesAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         return (await VehicleQuantitiesAsync(connection, null, null, cancellationToken).ConfigureAwait(false))
             .Where(entry => entry.Quantity > 0).GroupBy(entry => entry.ProductId)
@@ -355,7 +355,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyDictionary<int, int>> GetMovementCountsByVehicleAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT vid,COUNT(*) FROM (
@@ -372,21 +372,21 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<StockMovement?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         return await GetMovementAsync(connection, null, id, false, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<StockMovementHistoryEntry>> GetHistoryAsync(int movementId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         return await GetHistoryAsync(connection, null, movementId, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<ProjectStockMovement>> GetForProjectAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT m.id,m.product_id,p.name,m.quantity,m.movement_date,m.operator
@@ -404,7 +404,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<StockMovementResult> CreateAsync(int productId, StockMovementInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(CreateKeys(input), cancellationToken).ConfigureAwait(false);
         var value = StockMovementRules.Validated(input, input.Kind, false);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
@@ -427,7 +427,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<ReturnableExit>> GetReturnableExitsAsync(int productId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT e.id,e.operation_id,e.movement_date,e.reference,b.name,p.name,e.quantity,
@@ -559,7 +559,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<NetConsumption>> GetNetConsumptionAsync(int? projectId, int? beneficiaryId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         if (projectId is null && beneficiaryId is null) return [];
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         // The exits to the project (or beneficiary) per product, and the returns tied to those exits.
@@ -580,7 +580,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<ExitOperationDetails?> GetOperationAsync(int operationId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var movements = new List<StockMovement>();
         await using (var command = Command(connection, null, $"{SelectMovement} WHERE m.operation_id=@op AND m.kind=0 ORDER BY m.id", ("@op", operationId)))
@@ -606,7 +606,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task VoidExitOperationAsync(int operationId, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(["stoc.stornare"], cancellationToken).ConfigureAwait(false);
         if (ChangeReasonRules.ValidationError(reason) is { } problem) throw new StockMovementOperationException(problem);
         reason = TextNormalization.ForStorage(reason);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
@@ -702,7 +702,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<ExitLinePreview>> PreviewExitOperationAsync(IReadOnlyList<ExitOperationLine> lines, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(["iesire-multipla.add", "stoc.iesire"], cancellationToken).ConfigureAwait(false);
         var values = ValidatedOperation(lines).Select(line => (line.ProductId, Value: WithPreviewReason(line.Value))).ToList();
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
@@ -733,7 +733,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<ExitOperationResult> CreateExitOperationAsync(IReadOnlyList<ExitOperationLine> lines, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(["iesire-multipla.add", "stoc.iesire"], cancellationToken).ConfigureAwait(false);
         var values = ValidatedOperation(lines);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
@@ -940,7 +940,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<StockMovementResult> UpdateAsync(StockMovement original, StockMovementInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(["stoc.modificare"], cancellationToken).ConfigureAwait(false);
         var value = StockMovementRules.Validated(input, original.Kind, true, allowVehicleTransfer: original.IsVehicleTransfer);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
@@ -998,7 +998,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<int> DeleteAsync(StockMovement original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(["stoc.modificare"], cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new StockMovementOperationException(reasonError);
         string productCode;
@@ -1038,7 +1038,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     public async Task<IReadOnlyList<FreeEntry>> GetFreeEntriesAsync(FreeEntryQuery query, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureAnyKeyAsync(ReadKeys, cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         object cutoff = query.OlderThanDays is { } days ? StockMovementRules.StorageDate(StockMovementRules.Today.AddDays(-days)) : DBNull.Value;
         await using var command = Command(connection, null, """
@@ -1062,7 +1062,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     public async Task<IReadOnlyList<StockMovement>> AttachToInvoiceAsync(IReadOnlyList<StockMovement> entries, int invoiceId, string reason,
         bool viaPickup = false, CancellationToken cancellationToken = default)
     {
-        if (viaPickup) await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (viaPickup) await EnsureAnyKeyAsync(["preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         else if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
         if (entries.Count == 0) throw new StockMovementOperationException(StockMovementRules.NothingToAttachMessage);
         var motif = ChangeReasonRules.Normalize(reason);
@@ -1376,6 +1376,15 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 
     private static int ToInt32(long value) => checked((int)value);
 
-    private Task EnsureOperatorAsync(CancellationToken token) =>
-        accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
+    private Task EnsureAnyKeyAsync(IEnumerable<string> keys, CancellationToken token) => accessControl?.EnsureAnyAsync(keys, token) ?? Task.CompletedTask;
+
+    // Reading movements: the stock page and every module that shows stock (vehicles, projects, invoices, inventory, consumption).
+    private static readonly string[] ReadKeys = ["stoc.view", "vehicule.view", "beneficiari.view", "facturi.view", "inventar.view", "export-consum.view"];
+
+    // What a new movement needs: an exit, a return received from a beneficiary, an entry taken from an invoice (invoice pickup) or a free entry.
+    private static string[] CreateKeys(StockMovementInput input) =>
+        input.Kind == StockMovementKind.Exit ? ["stoc.iesire", "inventar-preluare.add"]
+        : input.ReturnOfMovementId is not null ? ["stoc.stornare"]
+        : input.InvoiceId is not null ? ["preluare-factura.add"]
+        : ["stoc.intrare", "inventar-preluare.add"];
 }

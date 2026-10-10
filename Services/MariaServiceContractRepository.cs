@@ -26,7 +26,7 @@ public sealed class MariaServiceContractRepository(
 
     public async Task<IReadOnlyList<ServiceContractDetails>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var contracts = new List<ServiceContract>();
         await using (var command = Command(connection, null,
@@ -42,7 +42,7 @@ public sealed class MariaServiceContractRepository(
 
     public async Task<IReadOnlyList<ServiceDueRow>> GetDueListAsync(bool includeOff, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT c.id, c.beneficiary_id, c.contract_number, c.contract_date, c.cycle_months, c.valid_until, c.is_active, c.notes, c.version,
@@ -69,7 +69,7 @@ public sealed class MariaServiceContractRepository(
 
     public async Task<ServiceContractDetails> CreateAsync(int beneficiaryId, ServiceContractInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.add", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var pending = new List<Pending>();
         var details = await WriteAsync(async (connection, transaction) =>
@@ -97,7 +97,7 @@ public sealed class MariaServiceContractRepository(
 
     public async Task<ServiceContractDetails> UpdateAsync(ServiceContract original, ServiceContractInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var pending = new List<Pending>();
         var details = await WriteAsync(async (connection, transaction) =>
@@ -133,7 +133,7 @@ public sealed class MariaServiceContractRepository(
 
     public async Task<ServiceContractActivationPlan> PrepareActivationAsync(int contractId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var details = await LoadDetailsAsync(connection, null, contractId, cancellationToken).ConfigureAwait(false);
         var conflicts = new List<ServiceContractConflict>();
@@ -146,7 +146,7 @@ public sealed class MariaServiceContractRepository(
     public async Task<ServiceContractDetails> ActivateAsync(ServiceContract original, IReadOnlyList<ServiceContractReschedule> reschedules,
         bool removeConflicting, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.edit", cancellationToken).ConfigureAwait(false);
         foreach (var reschedule in reschedules)
             if (!ServiceContractRules.InRange(reschedule.NextDue)) throw new ServiceContractOperationException("Una dintre noile scadențe nu este o dată validă.");
         var pending = new List<Pending>();
@@ -200,7 +200,7 @@ public sealed class MariaServiceContractRepository(
 
     public async Task<ServiceContractDetails> DeactivateAsync(ServiceContract original, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.edit", cancellationToken).ConfigureAwait(false);
         var pending = new List<Pending>();
         var details = await WriteAsync(async (connection, transaction) =>
         {
@@ -224,7 +224,7 @@ public sealed class MariaServiceContractRepository(
     // Archived deletion: the contract goes to archive_service_contracts and its coverage to archive_relations, in one transaction.
     public async Task DeleteAsync(ServiceContract original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.delete", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new ServiceContractOperationException(reasonError);
         ServiceContractDetails details;
@@ -476,5 +476,4 @@ public sealed class MariaServiceContractRepository(
 
     private static DateTime SqlDate(DateOnly date) => date.ToDateTime(TimeOnly.MinValue);
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

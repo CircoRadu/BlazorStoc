@@ -7,7 +7,7 @@ public sealed class MariaProductPlacementReader(IConfiguration configuration, IA
 {
     public async Task<IReadOnlyList<ProductDelivery>> GetDeliveriesAsync(int productId, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureModuleAsync("stoc", cancellationToken).ConfigureAwait(false);
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """

@@ -19,6 +19,7 @@ internal static class ServiceRegistration
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
         {
             options.LoginPath = "/Account/Login";
+            options.AccessDeniedPath = "/Account/AccessDenied";
             options.Cookie.Name = "BlazorStoc.Session";
             options.Cookie.HttpOnly = true;
             options.Cookie.SameSite = SameSiteMode.Lax;
@@ -54,6 +55,10 @@ internal static class ServiceRegistration
     public static IServiceCollection AddCoreServices(this IServiceCollection services)
     {
         services.AddSingleton<MariaSchemaMigrator>();
+        services.AddHttpContextAccessor();
+        services.AddSingleton<IUserPermissions, MariaUserPermissions>();
+        services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
+        services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
         services.AddScoped<IAccessControl, CurrentUserAccess>();
         services.AddHttpClient(AnafService.ClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
@@ -68,6 +73,7 @@ internal static class ServiceRegistration
     public static IServiceCollection AddUserServices(this IServiceCollection services)
     {
         services.AddScoped<IUserRepository, MariaUserRepository>();
+        services.AddScoped<IUserTypeRepository, MariaUserTypeRepository>();
         services.AddScoped<IUserAuthenticator>(provider => (IUserAuthenticator)provider.GetRequiredService<IUserRepository>());
         return services;
     }

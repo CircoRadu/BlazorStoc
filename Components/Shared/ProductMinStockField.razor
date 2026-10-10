@@ -1,14 +1,22 @@
 @using BlazorStoc.Services
 @inject IServiceProvider Services
 @inject ILogger<ProductMinStockField> Logger
+@inject IAccessControl Access
 @implements IDisposable
 @* The minimum stock of a product: below it a notification "Stoc sub minim" is raised (Setari -> Notificari). Set or removed here; each change is journaled. *@
+@if (!canEdit)
+{
+    <div class="min-stock-field"><span>Stoc minim: <strong>@(minimum is { } shown ? $"{shown} buc." : "fără minim")</strong></span></div>
+}
+else
+{
 <div class="min-stock-field">
     <label for="@($"min-stock-{ProductId}")">Stoc minim (buc.)</label>
     <input id="@($"min-stock-{ProductId}")" type="number" min="1" max="@StockMovementRules.MaxQuantity" placeholder="fără minim" @bind="input" @bind:event="oninput" disabled="@busy" />
     <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="SaveAsync">Setează</button>
     @if (minimum is not null) { <button type="button" class="danger" aria-label="Elimină stocul minim" disabled="@busy" @onclick="RemoveAsync" title="Elimină stocul minim">×</button> }
 </div>
+}
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (minimum is { } min && Stock < min) { <p class="muted" role="status">⚠ Stoc sub minim: lipsesc <strong>@(min - Stock) buc.</strong> până la minimul de @min buc.</p> }
 
@@ -21,6 +29,7 @@
     private bool busy;
     private string? error;
     private int loadedFor = -1;
+    private bool canEdit;
 
     private IProductMinStockRepository? Repository => Services.GetService<IProductMinStockRepository>();
 
@@ -28,6 +37,7 @@
     {
         if (loadedFor == ProductId) return;
         loadedFor = ProductId;
+        canEdit = await Access.HasAsync("stoc.minim", lifetime.Token);
         try { minimum = Repository is { } repository ? await repository.GetAsync(ProductId, lifetime.Token) : null; input = minimum; }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception) { minimum = null; }

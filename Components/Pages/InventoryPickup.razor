@@ -1,5 +1,5 @@
-@page "/inventar/preluare"
-@attribute [Authorize]
+﻿@page "/inventar/preluare"
+@attribute [Authorize(Policy = "perm:inventar-preluare.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @using Microsoft.AspNetCore.Components.Forms
@@ -23,8 +23,11 @@
         {
             <button type="button" class="refresh act-nav" @onclick="ReopenPdfViewerAsync">Redeschide formularul PDF</button>
         }
-        <label class="primary file-upload-label" for="pickup-file-input">@(scanning ? "Se proceseaza…" : "Preia inventar")</label>
-        <InputFile id="pickup-file-input" class="sr-only" OnChange="FileSelectedAsync" accept=".pdf" disabled="@scanning" />
+        @if (loadError is null)
+        {
+            <label class="primary file-upload-label" for="pickup-file-input">@(scanning ? "Se proceseaza…" : "Preia inventar")</label>
+            <InputFile id="pickup-file-input" class="sr-only" OnChange="FileSelectedAsync" accept=".pdf" disabled="@scanning" />
+        }
     </div>
 </div>
 
@@ -217,7 +220,7 @@ else if (review is not null)
 
     protected override async Task OnInitializedAsync()
     {
-        if (!await Access.CanManageProductsAsync(lifetime.Token)) { loadError = "Nu ai dreptul să preiei inventarul."; loading = false; return; }
+        if (!await Access.HasModuleWriteAsync("inventar-preluare", lifetime.Token)) { loadError = "Nu ai dreptul să preiei inventarul."; loading = false; return; }
         loading = false;
     }
 

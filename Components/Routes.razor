@@ -8,7 +8,10 @@
     </NotFound>
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
-            <NotAuthorized><p class="error-banner">Nu ai acces la această pagină. <a href="/Account/Login">Autentifică-te</a>.</p></NotAuthorized>
+            <NotAuthorized Context="denied">
+                @if (denied.User.Identity?.IsAuthenticated == true) { <Shared.AccessDeniedNotice /> }
+                else { <p class="error-banner">Nu ai acces la această pagină. <a href="/Account/Login">Autentifică-te</a>.</p> }
+            </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>

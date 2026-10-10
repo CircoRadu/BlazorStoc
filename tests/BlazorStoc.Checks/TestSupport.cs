@@ -1,4 +1,4 @@
-using BlazorStoc.Checks;
+﻿using BlazorStoc.Checks;
 using BlazorStoc.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -91,6 +91,7 @@ sealed class FakeInventoryProductRepository(IReadOnlyList<Product> products, IRe
     public Task<ProductGroup> UpdateSubcategoryAsync(ProductGroup original, string newSubcategory, string targetCategory, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task DeleteCategoryAsync(string category, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task ReorderCategoriesAsync(IReadOnlyList<string> orderedCategories, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task ReorderSubcategoriesAsync(string category, IReadOnlyList<string> orderedSubcategories, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task DeleteSubcategoryAsync(ProductGroup group, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<Product> CreateAsync(ProductInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<Product> UpdateAsync(Product original, ProductInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -210,4 +211,20 @@ sealed class FakeMaintenanceReader(IReadOnlyList<MaintenanceDueItem> due, IReadO
 static class MapPinTestExtensions
 {
     public static MapPinType With(this MapPinType type, Action<MapPinType> change) { var copy = type.Clone(); change(copy); return copy; }
+}
+
+// The two system user types, in memory, for the pages that render the user form.
+sealed class FakeUserTypeRepository : IUserTypeRepository
+{
+    private static readonly UserTypeSummary[] Types =
+    [
+        new(1, AccessRoles.Administrator, "Acces complet", true, 1, Permissions.AllKeys.Count, 0),
+        new(2, AccessRoles.LimitedUser, "Lucru curent", true, 1, Permissions.DefaultUserKeys.Count, 0)
+    ];
+    public Task<IReadOnlyList<UserTypeSummary>> GetTypesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<UserTypeSummary>>(Types);
+    public Task<UserTypeDetail?> GetAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult<UserTypeDetail?>(Types.Where(type => type.Id == id).Select(type => new UserTypeDetail(type, new HashSet<string>(Permissions.DefaultUserKeys))).FirstOrDefault());
+    public Task<UserTypeDetail> CreateAsync(UserTypeInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<UserTypeDetail> UpdateAsync(UserTypeDetail original, UserTypeInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task DeleteAsync(UserTypeDetail original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }

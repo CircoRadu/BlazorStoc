@@ -1118,3 +1118,19 @@ button.blocked { opacity: .45; cursor: default; }
 .row-icon.reduce, .row-icon.void, .row-icon.close, .row-icon.undo { border-color:#e1b4b0; }
 a.row-icon { display:inline-block; text-decoration:none; }
 .row-icon.receipt { color:#4f6b73; --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h12v18l-3-2-3 2-3-2-3 2Z'/%3E%3Cpath d='M9 8h6M9 12h6'/%3E%3C/svg%3E"); }
+
+.permission-group{margin:22px 0 8px;font-size:14px}.permission-matrix td{vertical-align:middle}.permission-actions{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center}.permission-actions .row-toggle{margin:0}
+.permission-details{margin:12px 0;border:1px solid var(--line,#dfe7e2);border-radius:8px;overflow:hidden}.permission-summary{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;background:#f6f9f7;list-style:none;font-weight:700}.permission-summary::-webkit-details-marker{display:none}.permission-summary::before{content:"▸";color:#748a7e;transition:transform .15s}.permission-details[open]>.permission-summary::before{transform:rotate(90deg)}.permission-title{margin-right:auto}.perm-badge{display:inline-block;font-size:11px;font-weight:700;line-height:1;padding:6px 10px;border-radius:5px}.perm-badge.grant{background:#d8efe7;color:#0d6b52}.perm-badge.deny{background:#f6e3e1;color:#a83d35}.permission-details .table-scroll{padding:0 8px}
+
+/* Radio buttons everywhere: the same small round control (the generic input rule gave them the padding and height of a text field). */
+input[type=radio]{flex:none;display:inline-block;width:16px;height:16px;min-height:0;padding:0;margin:0;accent-color:var(--green);vertical-align:middle}
+.destination-options label,.cause-choice label{display:inline-flex;align-items:center;gap:7px;line-height:1.3}
+.movement-dialog textarea,.movement-dialog input:not([type=radio]):not([type=checkbox]),.movement-dialog select{font-weight:400}
+
+/* Subcategory rows: the drag handle column and the drop indicator while a row is dragged inside its category. */
+.drag-column{width:44px;padding-left:12px;padding-right:0}
+tr[data-subcategory-index] .row-icon.drag{position:relative;display:inline-block;vertical-align:middle}
+.drag-column{vertical-align:middle}
+tr[data-subcategory-index].dragging{opacity:.5}
+tr[data-subcategory-index].drop-before>td{box-shadow:inset 0 3px 0 var(--green)}
+tr[data-subcategory-index].drop-after>td{box-shadow:inset 0 -3px 0 var(--green)}

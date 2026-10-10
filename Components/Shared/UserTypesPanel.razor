@@ -1,0 +1,268 @@
+@using BlazorStoc.Services
+@inject IUserTypeRepository Repository
+@inject IAccessControl Access
+@inject ILogger<UserTypesPanel> Logger
+@implements IDisposable
+
+@if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="() => LoadAsync()">Reîncearcă</button></div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (input is not null)
+{
+    <UnsavedChangesTracker @ref="tracker" Adding="@(original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+    <section class="product-editor" aria-labelledby="user-type-editor-title">
+        <div class="catalog-heading"><h2 id="user-type-editor-title">@(original is null ? "Adaugă tip de utilizator" : $"Editează tipul „{original.Name}”")</h2><button type="button" class="refresh act-close" disabled="@saving" @onclick="CloseEditorAsync">Închide</button></div>
+        <div class="catalog-body">
+            @if (original is { Summary.IsSystem: true } && IsAdministratorType)
+            {
+                <p class="muted">Tipul Administrator are întotdeauna toate drepturile și nu poate fi modificat.</p>
+            }
+            else if (original is { Summary.IsSystem: true })
+            {
+                <p class="muted">Tip de sistem: îi poți schimba drepturile, dar nu numele și nu poate fi șters.</p>
+            }
+            <fieldset disabled="@saving">
+                <div class="editor-grid">
+                    <label for="user-type-name">Nume *<InputText id="user-type-name" @bind-Value="input.Name" maxlength="60" autocomplete="off" disabled="@(original?.Summary.IsSystem == true)" /></label>
+                    <label for="user-type-description">Descriere<InputText id="user-type-description" @bind-Value="input.Description" maxlength="300" autocomplete="off" disabled="@IsAdministratorType" /></label>
+                    @if (otherTypes.Count > 0 && !IsAdministratorType)
+                    {
+                        <label for="user-type-copy">Copiază drepturile din<select id="user-type-copy" @onchange="CopyFromAsync"><option value="">— alege un tip —</option>@foreach (var type in otherTypes) { <option value="@type.Id">@type.Name</option> }</select><small>Înlocuiește drepturile de mai jos cu cele ale tipului ales; poți apoi să le ajustezi.</small></label>
+                    }
+                </div>
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-confirm" disabled="@IsAdministratorType" @onclick="GrantAll">Acordă tot</button>
+                    <button type="button" class="refresh act-close" disabled="@IsAdministratorType" @onclick="RevokeAll">Revocă tot</button>
+                </div>
+                @foreach (var group in Permissions.Modules.GroupBy(module => module.Group))
+                {
+                    var granted = GroupKeys(group).Count(key => input.Keys.Contains(key));
+                    var total = GroupKeys(group).Count();
+                    <details class="permission-details">
+                    <summary class="permission-summary"><span class="permission-title">@group.Key</span>
+                        <span class="perm-badge grant" title="Permisiuni acordate">@granted acordate</span>
+                        <span class="perm-badge deny" title="Permisiuni refuzate">@(total - granted) refuzate</span></summary>
+                    <div class="table-scroll"><table class="permission-matrix"><thead><tr><th>MODUL</th><th>ACCES</th><th>ACȚIUNI</th></tr></thead><tbody>
+                    @foreach (var module in group)
+                    {
+                        <tr @key="module.Id">
+                            <td><strong>@module.Title</strong></td>
+                            <td><ToggleSwitch Compact="true" Disabled="IsAdministratorType" Value="ModuleOn(module)" ValueChanged="on => SetModule(module, on)" AriaLabel="@($"Acces la {module.Title}")" /></td>
+                            <td><div class="permission-actions">
+                                @foreach (var action in module.Actions.Where(action => action.Id != Permissions.View))
+                                {
+                                    var key = module.Key(action.Id);
+                                    <ToggleSwitch Compact="true" Disabled="IsAdministratorType" Value="input.Keys.Contains(key)" ValueChanged="on => SetKey(module, key, on)" AriaLabel="@($"{module.Title}: {action.Label}")">@action.Label</ToggleSwitch>
+                                }
+                            </div></td>
+                        </tr>
+                    }
+                    </tbody></table></div>
+                    </details>
+                }
+                <h3 class="permission-group">Meniul văzut de acest tip</h3>
+                <p class="muted">@(MenuPreview.Length == 0 ? "Niciun modul." : MenuPreview)</p>
+                @if (original is not null && !IsAdministratorType)
+                {
+                    <div class="editor-grid"><ChangeReasonField Id="user-type-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" /></div>
+                }
+                <div class="editor-actions">
+                    @if (!IsAdministratorType) { <button class="primary" type="button" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează tipul")</button> }
+                    <button class="refresh act-close" type="button" @onclick="CloseEditorAsync">Anulează</button>
+                </div>
+            </fieldset>
+        </div>
+    </section>
+}
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Tipuri de utilizatori <span class="count-badge">@types.Count</span></h2>
+        @if (canAdd) { <button class="primary" disabled="@(input is not null)" @onclick="OpenNew">+ Adaugă tip</button> }</div>
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă tipurile</h3></div> }
+    else
+    {
+        <div class="table-scroll"><table><thead><tr><th>TIP</th><th>DESCRIERE</th><th>UTILIZATORI</th><th>PERMISIUNI</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        @foreach (var type in types)
+        {
+            <tr @key="type.Id"><td><strong>@type.Name</strong> @if (type.IsSystem) { <span class="role-badge admin">sistem</span> }</td><td>@type.Description</td><td>@type.UserCount</td><td>@(type.Name == AccessRoles.Administrator && type.IsSystem ? "toate" : type.PermissionCount.ToString())</td>
+                <td><div class="row-buttons">
+                    @if (canEdit || (IsAdministratorSummary(type))) { <button class="row-icon @(IsAdministratorSummary(type) ? "view" : "edit")" aria-label="@(IsAdministratorSummary(type) ? "Vezi" : "Editează") tipul @type.Name" title="@(IsAdministratorSummary(type) ? "Vezi" : "Editează") tipul @type.Name" disabled="@(input is not null)" @onclick="() => OpenEditAsync(type)"></button> }
+                    @if (canDelete && !type.IsSystem) { <button class="row-icon delete" aria-label="Șterge tipul @type.Name" title="@(type.UserCount > 0 ? $"Tipul are {type.UserCount} utilizatori; mută-i întâi" : $"Șterge tipul {type.Name}")" disabled="@(type.UserCount > 0 || input is not null)" @onclick="() => RequestDeleteAsync(type)"></button> }
+                </div></td></tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+@if (pendingChanges is not null && original is not null)
+{
+    <SaveConfirmationDialog Title="Salvezi modificările tipului?" ObjectLabel="@original.Name" Changes="pendingChanges"
+                            Reason="@input!.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog @key="deleting.Id" Title="Ștergi tipul de utilizator?" Subject="Tipul" ObjectLabel="@deleting.Name"
+                              Description="Tipul nu este atribuit niciunui utilizator. Drepturile lui se pierd."
+                              ConfirmationNote="Operația va fi înregistrată în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteAsync" Cancelled="CancelDeleteAsync" />
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<UserTypeSummary> types = [];
+    private bool loading = true, canAdd, canEdit, canDelete, saving, deleteBusy, reasonAuto = true;
+    private string? error, notice, reasonError, deleteError;
+    private string customReason = "";
+    private UserTypeDetail? original, deleting;
+    private UserTypeInput? input;
+    private IReadOnlyList<AuditChange>? pendingChanges;
+    private UnsavedChangesTracker? tracker;
+
+    private bool IsAdministratorType => original is { Summary.IsSystem: true } && original.Name == AccessRoles.Administrator;
+    private static bool IsAdministratorSummary(UserTypeSummary type) => type.IsSystem && type.Name == AccessRoles.Administrator;
+    private IReadOnlyList<UserTypeSummary> otherTypes => [.. types.Where(type => type.Id != original?.Id)];
+    private string CurrentSnapshot() => input is null ? "" : string.Join("|", input.Name, input.Description, string.Join(",", input.Keys.Order()));
+
+    private static IEnumerable<string> GroupKeys(IEnumerable<PermissionModule> group) => group.SelectMany(module => module.Actions.Select(action => module.Key(action.Id)));
+
+    private string MenuPreview => input is null ? "" : string.Join(", ", Permissions.Modules.Where(module => input.Keys.Contains(module.Key(Permissions.View)) ||
+        (module.Actions.All(action => action.Id != Permissions.View) && module.Actions.Any(action => input.Keys.Contains(module.Key(action.Id))))).Select(module => module.Title));
+
+    private string AutoSummary => original is null || input is null ? "" : ChangeReasonSummary.Build(SummaryChanges());
+
+    private IEnumerable<AuditChange> SummaryChanges()
+    {
+        yield return new("Nume", original!.Name, input!.Name);
+        yield return new("Descriere", original.Summary.Description, input.Description);
+        var granted = input.Keys.Except(original.Keys).Order().ToArray();
+        var revoked = original.Keys.Except(input.Keys).Order().ToArray();
+        yield return new("Permisiuni acordate", "—", granted.Length == 0 ? "—" : string.Join("; ", granted.Select(MariaUserTypeRepository.PermissionLabel)));
+        yield return new("Permisiuni revocate", "—", revoked.Length == 0 ? "—" : string.Join("; ", revoked.Select(MariaUserTypeRepository.PermissionLabel)));
+    }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            canAdd = await Access.HasAsync(Permissions.Key("tipuri-utilizatori", Permissions.Add), lifetime.Token);
+            canEdit = await Access.HasAsync(Permissions.Key("tipuri-utilizatori", Permissions.Edit), lifetime.Token);
+            canDelete = await Access.HasAsync(Permissions.Key("tipuri-utilizatori", Permissions.Delete), lifetime.Token);
+            types = await Repository.GetTypesAsync(lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("User types loading failed ({ErrorType}).", exception.GetType().Name); error = "Tipurile de utilizatori nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private Task OpenNew()
+    {
+        original = null; notice = null; error = null; reasonAuto = true; customReason = "";
+        input = new UserTypeInput { Keys = [.. Permissions.DefaultUserKeys.Where(key => key.EndsWith(".view", StringComparison.Ordinal))] };
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenEditAsync(UserTypeSummary type)
+    {
+        notice = null; error = null; reasonAuto = true; customReason = "";
+        try
+        {
+            var detail = await Repository.GetAsync(type.Id, lifetime.Token);
+            if (detail is null) { error = "Tipul nu mai există. Lista a fost actualizată."; await LoadAsync(); return; }
+            original = detail; input = UserTypeInput.From(detail);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+    }
+
+    private Task CloseEditorAsync() => saving ? Task.CompletedTask : tracker is null ? DiscardAsync() : tracker.RunAfterConfirmAsync(DiscardAsync);
+    private Task DiscardAsync() { input = null; original = null; pendingChanges = null; return Task.CompletedTask; }
+
+    private bool ModuleOn(PermissionModule module) => module.Actions.Any(action => input!.Keys.Contains(module.Key(action.Id)));
+
+    // The module switch: on gives viewing (or, for a module without it, nothing yet: the actions are chosen on the right), off removes every action.
+    private void SetModule(PermissionModule module, bool on)
+    {
+        if (on) { if (module.Actions.Any(action => action.Id == Permissions.View)) input!.Keys.Add(module.Key(Permissions.View)); else input!.Keys.Add(module.Key(module.Actions[0].Id)); }
+        else foreach (var action in module.Actions) input!.Keys.Remove(module.Key(action.Id));
+    }
+
+    // An action implies viewing the module; removing viewing is done through the module switch.
+    private void SetKey(PermissionModule module, string key, bool on)
+    {
+        if (on) { input!.Keys.Add(key); if (module.Actions.Any(action => action.Id == Permissions.View)) input.Keys.Add(module.Key(Permissions.View)); }
+        else input!.Keys.Remove(key);
+    }
+
+    private void GrantAll() => input!.Keys = [.. Permissions.AllKeys];
+    private void RevokeAll() => input!.Keys = [];
+
+    private async Task CopyFromAsync(ChangeEventArgs args)
+    {
+        if (!long.TryParse(args.Value?.ToString(), out var id)) return;
+        try { var source = await Repository.GetAsync(id, lifetime.Token); if (source is not null) input!.Keys = [.. source.Keys]; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (saving || input is null) return;
+        error = null;
+        if (original is null) { await PersistAsync(); return; }
+        input.Reason = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
+        reasonError = ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason);
+        if (reasonError is not null) return;
+        pendingChanges = SaveSummary.Changed(SummaryChanges().ToArray());
+        if (pendingChanges.Count == 0) { reasonError = ChangeReasonSummary.NoChangesMessage; pendingChanges = null; }
+    }
+
+    private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
+    private Task CancelConfirmation() { pendingChanges = null; return Task.CompletedTask; }
+
+    private async Task PersistAsync()
+    {
+        if (saving || input is null) return;
+        saving = true; error = null;
+        UserTypeDetail? saved = null;
+        try { saved = original is null ? await Repository.CreateAsync(input, lifetime.Token) : await Repository.UpdateAsync(original, input, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("User type saving failed ({ErrorType}).", exception.GetType().Name); error = "Tipul nu a putut fi salvat. Datele formularului sunt păstrate."; }
+        finally { saving = false; }
+        if (saved is null) return;
+        var created = original is null;
+        tracker?.Rebase();
+        input = null; original = null;
+        notice = created ? "Tipul a fost adăugat." : "Tipul a fost actualizat; drepturile se aplică imediat.";
+        await LoadAsync();
+    }
+
+    private async Task RequestDeleteAsync(UserTypeSummary type)
+    {
+        notice = null; deleteError = null;
+        try { deleting = await Repository.GetAsync(type.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+    }
+
+    private Task CancelDeleteAsync() { deleting = null; deleteError = null; return Task.CompletedTask; }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleteBusy || deleting is null) return;
+        deleteBusy = true; deleteError = null;
+        try { await Repository.DeleteAsync(deleting, reason, lifetime.Token); deleting = null; notice = "Tipul a fost șters."; await LoadAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (UserOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("User type deletion failed ({ErrorType}).", exception.GetType().Name); deleteError = "Tipul nu a putut fi șters. Actualizează lista și reîncearcă."; }
+        finally { deleteBusy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}
