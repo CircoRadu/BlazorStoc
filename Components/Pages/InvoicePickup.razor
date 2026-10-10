@@ -220,6 +220,12 @@ else if (session is not null)
                 }
                 else
                 {
+                    @if (existingInvoice is not null && createdInvoice is null)
+                    {
+                        <div class="invoice-warning" role="status">⚠ Factura @existingInvoice.Number din @StockMovementRules.DisplayDate(existingInvoice.Date) a furnizorului @existingInvoice.SupplierName a mai fost preluată@(takenEntries.Count == 0 ? ", dar fără intrări în stoc" : $" ({takenEntries.Count} {(takenEntries.Count == 1 ? "intrare" : "intrări")})").
+                            @if (takenPreview.Count > 0) { <text>Rândurile marcate au produse deja preluate și au selectorul oprit; le poți bifa dacă vrei să se preia din nou.</text> } else { <text>Niciun rând citit nu corespunde unui produs deja preluat.</text> }</div>
+                    }
+                    else if (takenChecking) { <p class="muted" role="status">Se verifică dacă produsele au mai fost preluate de pe această factură…</p> }
                     <div class="table-scroll">
                         <table>
                             <thead><tr>
@@ -230,11 +236,12 @@ else if (session is not null)
                                 {
                                     var row = rows[index];
                                     var at = index;
-                                    <tr class="selectable-row @(excluded.Contains(index) ? "row-off" : "selected")" @onclick="() => ToggleRow(at, excluded.Contains(at))">
+                                    <tr class="selectable-row @(excluded.Contains(index) ? "row-off" : "selected") @(takenPreview.ContainsKey(index) ? "row-taken" : null)" @onclick="() => ToggleRow(at, excluded.Contains(at))">
                                         <td><RowSelect Selected="@(!excluded.Contains(index))" AriaLabel="@($"Preia rândul {index + 1}")" SelectedChanged="@(value => ToggleRow(at, value))" /></td>
                                         <td>@(index + 1)</td>
                                         @foreach (var column in ShownColumns) { <td>@row.Cells.GetValueOrDefault(column.Id, "")</td> }
-                                        <td>@(session.IsXml ? "" : row.Page) @foreach (var flag in row.Flags) { <span class="uncertain-badge" title="@flag">⚠ @flag</span> }</td>
+                                        <td>@(session.IsXml ? "" : row.Page) @foreach (var flag in row.Flags) { <span class="uncertain-badge" title="@flag">⚠ @flag</span> }
+                                            @if (takenPreview.TryGetValue(index, out var taken)) { <span class="uncertain-badge" title="Produsul a fost preluat deja de pe această factură: la pasul 3 se sare, dacă nu alegi să se preia din nou.">⚠ Deja preluat: @taken.Product · @taken.Quantity buc.</span> }</td>
                                     </tr>
                                 }
                             </tbody>
@@ -336,10 +343,10 @@ else if (step == 2)
                     </div>
                 }
             </section>
-            <p class="muted">@pick.Count(item => item.ProductId is not null || item.Staged is not null) din @pick.Count rânduri au un produs ales sau pregătit. Nimic nu se salvează în acest pas; salvarea se face la pasul 3.</p>
+            <p class="muted">@TakenRows.Count(item => item.ProductId is not null || item.Staged is not null) din @TakenRows.Count rânduri preluate au un produs ales sau pregătit. Rândurile cu selectorul oprit nu se preiau. Nimic nu se salvează în acest pas; salvarea se face la pasul 3.</p>
             <div class="table-scroll">
                 <table class="pickup-match">
-                    <thead><tr><th>#</th>@foreach (var column in ShownColumns) { <th class="@ColumnClass(column)">@column.Title</th> }<th>Produs din catalog</th></tr></thead>
+                    <thead><tr><th><span class="row-select-all"><RowSelect Selected="@(excluded.Count == 0)" Mixed="@(excluded.Count > 0 && excluded.Count < rows.Count)" AriaLabel="Preia toate rândurile" SelectedChanged="ToggleAll" />Preia</span></th><th>#</th>@foreach (var column in ShownColumns) { <th class="@ColumnClass(column)">@column.Title</th> }<th>Produs din catalog</th></tr></thead>
                     <tbody>
                         @for (var index = 0; index < pick.Count; index++)
                         {
@@ -347,8 +354,9 @@ else if (step == 2)
                             var item = pick[index];
                             var rowHasBadNumber = ShownColumns.Any(column => NotANumber(column, item.Cells.GetValueOrDefault(column.Id, "")));
                             var warningColumnId = (ShownColumns.FirstOrDefault(column => column.Meaning == InvoiceColumnMeanings.Name) ?? ShownColumns.First()).Id;
-                            <tr>
-                                <td>@(index + 1)</td>
+                            <tr class="@(IsOff(item) ? "row-off" : null)">
+                                <td><RowSelect Selected="@(!IsOff(item))" AriaLabel="@($"Preia rândul {item.RowIndex + 1}")" SelectedChanged="@(value => ToggleRow(item.RowIndex, value))" /></td>
+                                <td>@(item.RowIndex + 1)</td>
                                 @foreach (var column in ShownColumns)
                                 {
                                     var id = column.Id;
@@ -369,6 +377,10 @@ else if (step == 2)
                                     <PickupProductCell Match="item.Match" Staged="item.Staged" ProductId="item.ProductId" Index="index" Incomplete="incompleteProducts"
                                         OnPick="productId => { item.ProductId = productId; item.Staged = null; }" OnNone="() => item.ProductId = null"
                                         OnOpenNew="() => OpenNewProduct(at)" OnDiscardStaged="() => item.Staged = null" />
+                                    @if (existingInvoice is not null && createdInvoice is null && TakenQuantity(item) is { } taken)
+                                    {
+                                        <span class="uncertain-badge" title="Produsul a fost preluat deja de pe această factură: la pasul 3 se sare, dacă nu alegi să se preia din nou.">⚠ Deja preluat de pe această factură: @taken buc.</span>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -429,7 +441,7 @@ else
                 <PickOnlyDate Id="entry-date-existing" @bind-Value="existingDate" Disabled="@(finalizing || finished)" Min="@StockMovementRules.StorageDate(StockMovementRules.EarliestDate)" Max="@StockMovementRules.StorageDate(StockMovementRules.Today)" /></label>
             @foreach (var line in ExistingLines) { @EntryCard(line) }
         }
-        @if (pick.Count(item => item.ProductId is null && item.Staged is null) is > 0 and var skipped) { <p class="muted">@skipped @(skipped == 1 ? "rând fără produs ales nu va fi introdus" : "rânduri fără produs ales nu vor fi introduse").</p> }
+        @if (TakenRows.Count(item => item.ProductId is null && item.Staged is null) is > 0 and var skipped) { <p class="muted">@skipped @(skipped == 1 ? "rând fără produs ales nu va fi introdus" : "rânduri fără produs ales nu vor fi introduse").</p> }
         <div class="editor-actions">
             @if (finished) { <button type="button" class="primary" @onclick="NewPickupAsync">Preluare nouă</button> }
             else { <button type="button" class="primary @(!CanFinalize ? "blocked" : "")" aria-disabled="@(!CanFinalize ? "true" : null)" disabled="@finalizing" @onclick="FinalizeAsync">@(finalizing ? "Se salvează…" : "Finalizează preluarea")</button> }
@@ -475,7 +487,7 @@ else
     private bool showBlockers, showFinalizeBlockers;
     private bool NextBlocked => (step == 1 && !CanLeaveStep1) || (step == 2 && !CanLeaveStep2);
     private bool CanLeaveStep1 => session is not null && reading is not null && rows.Count - excluded.Count > 0;
-    private bool CanLeaveStep2 => !step2Loading && step2Error is null && pick.Any(item => item.ProductId is not null || item.Staged is not null) && HeaderConfirmed;
+    private bool CanLeaveStep2 => !step2Loading && step2Error is null && TakenRows.Any(item => item.ProductId is not null || item.Staged is not null) && HeaderConfirmed;
 
     private async Task NextStep()
     {
@@ -494,8 +506,11 @@ else
     private bool finalizing, finished;
     private string? finalizeError, finalizeNotice;
 
-    private List<PickRow> NewLines => pick.Where(item => item.Staged is not null).ToList();
-    private List<PickRow> ExistingLines => pick.Where(item => item.Staged is null && item.ProductId is not null).ToList();
+    // The rows of step 2 the user keeps taking (the selector of step 1 and the one of step 2 are the same choice).
+    private bool IsOff(PickRow item) => excluded.Contains(item.RowIndex);
+    private List<PickRow> TakenRows => pick.Where(item => !IsOff(item)).ToList();
+    private List<PickRow> NewLines => pick.Where(item => !IsOff(item) && item.Staged is not null).ToList();
+    private List<PickRow> ExistingLines => pick.Where(item => !IsOff(item) && item.Staged is null && item.ProductId is not null).ToList();
     // Rows whose product was already taken from this invoice are left out unless the user chose to take them again.
     private int? TakenQuantity(PickRow line) => line.Staged is null && line.ProductId is { } id && takenEntries.Where(entry => entry.ProductId == id).Sum(entry => entry.Quantity) is > 0 and var sum ? sum : null;
     // Stock of the existing product when it is negative (an operating error to be settled before the entry), else null.
@@ -967,6 +982,8 @@ else
     private sealed class PickRow
     {
         public required Dictionary<string, string> Cells { get; init; }
+        // The index of the row among the rows read in step 1: the choice "taken / not taken" (excluded) is shared by steps 1 and 2.
+        public int RowIndex { get; set; }
         // The row of step 1 this one was made from (as read, before any correction): going back to step 1 and forward again keeps
         // the work done on the rows that are still taken (corrections, chosen or prepared products, descriptions).
         public string SourceKey { get; init; } = "";
@@ -1029,13 +1046,14 @@ else
             groups = await ProductsRepository.GetGroupsAsync(lifetime.Token);
             try { freeEntries = await Movements.GetFreeEntriesAsync(new FreeEntryQuery(), lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { freeEntries = []; }
             var previous = pick.ToList();
-            pick = [.. rows.Where((_, index) => !excluded.Contains(index)).Select(row =>
+            pick = [.. rows.Select((row, rowIndex) =>
             {
                 var key = SourceKey(row);
                 var again = previous.FindIndex(item => item.SourceKey == key);
-                if (again < 0) return new PickRow { Cells = new Dictionary<string, string>(row.Cells), SourceKey = key, Page = row.Page, Top = row.Top, Bottom = row.Bottom };
+                if (again < 0) return new PickRow { Cells = new Dictionary<string, string>(row.Cells), SourceKey = key, Page = row.Page, Top = row.Top, Bottom = row.Bottom, RowIndex = rowIndex };
                 var kept = previous[again];
                 previous.RemoveAt(again);
+                kept.RowIndex = rowIndex;
                 return kept;
             })];
             await LoadSupplierCodesAsync();
@@ -1315,7 +1333,7 @@ else
         overlay = reading is null || definition is null ? null
             : chosen is not null ? InvoiceTemplateDraft.FromDefinition(definition, session!.Document, chosen.Info.SupplierName, chosen.Info.SupplierCui)
             : InvoiceTemplateDraft.FromAnalysis(session!.Analysis);
-        excluded.Clear();
+        excluded.Clear(); takenAutoDone.Clear();
         regionPictures.Clear();
         if (createdInvoice is null) headerPrefilledFor = null;   // another reading of the file: the number, date and supplier are read again
         ResetSeparators();
@@ -1335,7 +1353,73 @@ else
     {
         var before = rows.Count;
         rows = reading is null ? [] : InvoicePickupReader.Reread(reading, session!.Document, separators);
-        if (rows.Count != before) excluded.Clear();   // the rows changed: the choices made on the old ones no longer apply
+        if (rows.Count != before) { excluded.Clear(); takenAutoDone.Clear(); }   // the rows changed: the choices made on the old ones no longer apply
+        QueueTakenPreview();
+    }
+
+    // ---- step 1: which rows stand for products already taken from this invoice (the same warning as in steps 2 and 3, so the rows are chosen knowing it) ----
+
+    private Dictionary<int, (string Product, int Quantity)> takenPreview = [];
+    private bool takenChecking;
+    private int takenPreviewVersion;
+    private int? takenPreviewSupplier;
+    private readonly SemaphoreSlim takenPreviewGate = new(1, 1);
+    // Rows already switched off because their product was taken before: done once per row, so a row the user switched on again stays on.
+    private readonly HashSet<string> takenAutoDone = [];
+
+    private void QueueTakenPreview()
+    {
+        takenPreview = [];
+        if (session is null || reading is null || rows.Count == 0) { takenPreviewVersion++; takenChecking = false; return; }
+        takenChecking = true;
+        _ = RefreshTakenPreviewAsync(++takenPreviewVersion);
+    }
+
+    private async Task RefreshTakenPreviewAsync(int version)
+    {
+        try
+        {
+            await takenPreviewGate.WaitAsync(lifetime.Token);
+            try
+            {
+                if (version != takenPreviewVersion || session is null || reading is null) return;   // a newer reading of the rows is queued
+                var firstLoad = headerPrefilledFor != session.Id || catalog.Count == 0;
+                if (firstLoad)
+                {
+                    await LoadSuppliersAsync();   // the number, date and supplier read from the invoice, and what was taken from that invoice before
+                    catalog = await ProductsRepository.GetProductsAsync(lifetime.Token);
+                    await LoadVariantsAsync();
+                }
+                if (firstLoad || takenPreviewSupplier != supplierId) { await LoadSupplierCodesAsync(); takenPreviewSupplier = supplierId; }
+                if (version != takenPreviewVersion) return;
+                var preview = new Dictionary<int, (string Product, int Quantity)>();
+                if (existingInvoice is not null && takenEntries.Count > 0)
+                {
+                    for (var index = 0; index < rows.Count; index++)
+                    {
+                        var probe = new PickRow { Cells = new Dictionary<string, string>(rows[index].Cells) };
+                        Rematch(probe);
+                        if (TakenQuantity(probe) is { } quantity) preview[index] = (catalog.FirstOrDefault(product => product.Id == probe.ProductId)?.Name ?? "", quantity);
+                    }
+                }
+                takenPreview = preview;
+                foreach (var index in preview.Keys.Where(index => index < rows.Count))
+                    if (takenAutoDone.Add(SourceKey(rows[index]))) excluded.Add(index);   // products already taken start unselected
+            }
+            finally
+            {
+                takenPreviewGate.Release();
+                if (version == takenPreviewVersion) takenChecking = false;
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Checking the rows already taken from the invoice failed ({ErrorType}).", exception.GetType().Name);
+            takenPreview = [];
+            takenChecking = false;
+        }
+        await InvokeAsync(StateHasChanged);
     }
 
     private void ToggleRow(int index, bool take) { if (take) excluded.Remove(index); else excluded.Add(index); }
@@ -1375,7 +1459,7 @@ else
     // columns are read too; they are only without a meaning until the label is recognised or named). A saved template keeps hiding the columns it does not use.
     private bool ShowUnnamedColumns => chosen is null;
 
-    private void ClearReading() { pick = []; isEFacturaPdf = false; session = null; reading = null; overlay = null; excluded.Clear(); separators = []; rows = []; templateInfo = null; suggestions = []; allTemplates = []; xmlTemplates = []; creatingTemplate = false; chosen = null; selectedId = ""; ResetInvoiceHeader(); }
+    private void ClearReading() { pick = []; isEFacturaPdf = false; session = null; reading = null; overlay = null; excluded.Clear(); takenAutoDone.Clear(); separators = []; rows = []; templateInfo = null; suggestions = []; allTemplates = []; xmlTemplates = []; creatingTemplate = false; chosen = null; selectedId = ""; ResetInvoiceHeader(); }
 
     private void Select(string id) => selectedId = selectedId == id ? "" : id;
 

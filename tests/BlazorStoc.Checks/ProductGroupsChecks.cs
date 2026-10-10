@@ -45,11 +45,25 @@ public static class ProductGroupsChecks
               && afterDelete.All(group => group.Category != "Categorie goala test" && group.Subcategory != "Subcategorie goala test"),
             "Categories: a category with subcategories or products and a subcategory with products cannot be deleted; an empty subcategory and then the empty category are deleted");
 
+        // The order of the categories (side menu and this page) is arranged by the administrator only; the repository returns the arranged order.
+        var arrangedBefore = (await uniqueRepository.GetGroupsAsync()).Select(group => group.Category).Distinct().ToList();
+        var reversed = Enumerable.Reverse(arrangedBefore).ToList();
+        await uniqueRepository.ReorderCategoriesAsync(reversed);
+        var arrangedAfter = (await uniqueRepository.GetGroupsAsync()).Select(group => group.Category).Distinct().ToList();
+        var limitedRefused = false;
+        try { await new DemoProductRepository(new TestAccessControl(false, "groups.limited")).ReorderCategoriesAsync(reversed); }
+        catch (AccessDeniedException) { limitedRefused = true; }
+        check(arrangedBefore.Count > 1 && arrangedAfter.SequenceEqual(reversed) && limitedRefused
+              && await Rejected(() => uniqueRepository.ReorderCategoriesAsync(reversed.Take(reversed.Count - 1).ToList())),
+            "Categories: the administrator arranges the order of the categories and the repository returns it; a limited user and an incomplete list are refused");
+
         var page = context.Render<ProductGroups>();
         page.WaitForAssertion(() => { if (page.FindAll(".category-management-card").Count < 2) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         var cards = page.FindAll(".category-management-card");
         var title = cards[1].QuerySelector(".category-title")!.TextContent;
         var existingSubcategories = cards[1].QuerySelectorAll("tbody tr").Length;
+
+        check(page.FindAll("[data-category-handle]").Count == cards.Count, "Categories page: the administrator has a drag handle on every category card");
 
         // The header of a category has icons: add subcategory, edit, delete; the delete icon is there but disabled for a category that is not empty, and says why in its tooltip.
         var deleteIcons = page.FindAll("button.row-icon.delete").Where(button => (button.GetAttribute("aria-label") ?? "").StartsWith("Șterge categoria")).ToList();
@@ -123,7 +137,7 @@ public static class ProductGroupsChecks
         firstSubcategory.Click();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".subcategory-parameters"), TimeSpan.FromSeconds(5));
         parametersPage.Find("#new-parameter-name").Input("Lentila");
-        parametersPage.FindAll("input[type=radio][name='new-parameter-kind']")[1].Change(true);
+        parametersPage.FindAll("fieldset.parameter-kind input[type=checkbox]")[1].Change(true);   // the kind is chosen with two switches (turning one on turns the other off)
         parametersPage.Find("#new-parameter-unit").Input("mm");
         parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă parametrul")).Click();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".parameter-card"), TimeSpan.FromSeconds(5));

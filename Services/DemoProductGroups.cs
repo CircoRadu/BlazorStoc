@@ -19,6 +19,27 @@ public sealed partial class DemoProductRepository
             TextNormalization.UniquenessKey(name), name, AuditDetails.Identification(("Denumire", name)), cancellationToken);
     }
 
+    public async Task ReorderCategoriesAsync(IReadOnlyList<string> orderedCategories, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        string before, after;
+        lock (gate)
+        {
+            var arranged = orderedCategories.Select(name => categories.FirstOrDefault(value => TextNormalization.SameUniqueValue(value, name))).ToList();
+            if (arranged.Count != categories.Count || arranged.Any(value => value is null) || arranged.Distinct().Count() != arranged.Count)
+                throw new ProductOperationException("Lista categoriilor s-a schimbat între timp. Actualizează lista și reia aranjarea.");
+            if (arranged.SequenceEqual(categories)) return;
+            before = string.Join(", ", categories);
+            categories.Clear();
+            categories.AddRange(arranged!);
+            after = string.Join(", ", categories);
+        }
+        await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Category, AuditActions.ReorderCategories,
+            string.Empty, "Ordinea categoriilor", AuditDetails.Identification(("Ordinea veche", before), ("Ordinea nouă", after)),
+            "Ordinea categoriilor din meniu a fost schimbată prin tragere.", cancellationToken);
+    }
+
     public async Task<ProductGroup> CreateSubcategoryAsync(string category, string subcategory,
         CancellationToken cancellationToken = default)
     {

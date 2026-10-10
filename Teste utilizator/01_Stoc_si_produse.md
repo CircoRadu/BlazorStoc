@@ -4,6 +4,20 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 
 ## Modificari de testat
 
+### 10.10.2026 - Ordinea categoriilor (drag and drop) si tipul parametrului cu comutatoare
+
+**Ce s-a adaugat:** pe pagina Categorii si subcategorii, un maner (⋮⋮) la inceputul fiecarui card de categorie, vizibil numai administratorului (migrarea 38: coloana `categories.sort_order`); actiunea de jurnal „Reordonare categorii"; la „Parametru nou", alegerea tipului (Text liber / Numar) cu doua comutatoare On/Off intr-un chenar „Tip".
+
+**Ce face acum:** administratorul trage cardurile de categorie (sau foloseste sagetile sus/jos pe maner); ordinea se salveaza imediat si este ordinea din meniul lateral „Categorii produse". Categoriile nearanjate raman alfabetic, iar o categorie noua se adauga la sfarsit. Utilizatorul fara drept de administrator nu vede manerul. La „Parametru nou", pornirea unui comutator il opreste pe celalalt.
+
+1. Ca administrator, deschide „Categorii": fiecare card are in stanga un maner cu puncte. Trage o categorie peste alta: o linie verde arata unde ajunge; la eliberare apare mesajul cu pozitia noua.
+2. Reincarca pagina si deschide meniul lateral „Produse": categoriile sunt in noua ordine, la fel pe pagina Categorii.
+3. Pune focusul pe un maner (Tab) si apasa sageata jos / sus: categoria se muta cu o pozitie.
+4. Adauga o categorie noua: apare ultima, in pagina si in meniu.
+5. Conecteaza-te ca utilizator fara drept de administrator: nu exista manere, iar ordinea aranjata se vede in meniu.
+6. In Jurnal apare „Reordonare categorii" cu „Ordinea veche" si „Ordinea noua".
+7. La „Parametru nou" ai doua comutatoare in chenarul „Tip": „Text liber" si „Numar"; pornind unul se opreste celalalt, iar la „Numar" apare campul „Unitate de masura".
+
 ### 09.10.2026 - Parametri obligatori pe subcategorie (etapa 1)
 
 **Ce s-a adaugat:** pe pagina Categorii si subcategorii, butonul „Parametri" pe fiecare subcategorie (migrarea 37: tabelele `subcategory_parameters`, `parameter_values`, `product_parameter_values` si coloana `products.base_model`); in formularul de produs, model + o valoare pentru fiecare parametru; marcajul „Parametri obligatorii necompletati · blocat" in lista de produse.

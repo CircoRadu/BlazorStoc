@@ -2,6 +2,20 @@
 
 Fluxul: Mentenanta -> puncte de lucru (adresa, poze, coordonate) -> contracte de mentenanta si acoperire -> registru de interventii -> harta cu pinuri.
 
+## Modificari de testat
+
+### 10.10.2026 - Detaliile punctului de pe harta, in fereastra popup
+
+**Ce s-a adaugat:** detaliile unui punct (beneficiar, contract, termen, ciclicitate, scadenta, ultima interventie, butoanele) se deschid intr-o fereastra popup, nu in panoul din dreapta; harta ocupa toata latimea.
+
+**Ce face acum:** apasarea unui pin deschide popup-ul centrat; se inchide cu ×, cu clic pe fundal sau cu Escape; „Alte puncte la aceeasi locatie" schimba continutul popup-ului. Insignele (On, In curand etc.) au padding mai mare (regula 6 px / 12 px, aplicata la toate insignele aplicatiei).
+
+1. Deschide Harta mentenantei si apasa un pin: apare popup-ul cu detaliile; harta ramane in spate, pe toata latimea.
+2. Inchide-l cu ×, cu clic pe fundal, apoi cu Escape.
+3. La un punct cu alte puncte la aceeasi locatie, apasa unul din lista: popup-ul trece la acel punct.
+4. „Fisa beneficiarului" si „+ Inregistreaza interventie" duc la paginile corecte.
+5. Ecran ingust: popup-ul incape fara depasire orizontala.
+
 ## Verificari ramase (fara modificari recente; detalii in docs/TESTE_RAMASE.md, sectiunile N7-N27)
 
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |

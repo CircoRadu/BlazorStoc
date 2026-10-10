@@ -64,6 +64,7 @@ public static class AuditFilterOptions
         (AuditActions.MoveSupplierInvoice, AuditActions.MoveSupplierInvoice),
         (AuditActions.AddSupplierAlias, AuditActions.AddSupplierAlias), (AuditActions.RemoveSupplierAlias, AuditActions.RemoveSupplierAlias),
         (AuditActions.DeleteCategory, AuditActions.DeleteCategory), (AuditActions.DeleteSubcategory, AuditActions.DeleteSubcategory),
+        (AuditActions.ReorderCategories, AuditActions.ReorderCategories),
         (AuditActions.AddSubcategoryParameter, AuditActions.AddSubcategoryParameter), (AuditActions.EditSubcategoryParameter, AuditActions.EditSubcategoryParameter),
         (AuditActions.DeleteSubcategoryParameter, AuditActions.DeleteSubcategoryParameter), (AuditActions.AddParameterValue, AuditActions.AddParameterValue),
         (AuditActions.DeleteParameterValue, AuditActions.DeleteParameterValue), (AuditActions.EditParameterValue, AuditActions.EditParameterValue),

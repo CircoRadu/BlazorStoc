@@ -17,7 +17,7 @@ public partial class InvoicePickup
         }
         else if (step == 2 && !CanLeaveStep2 && !step2Loading && step2Error is null)
         {
-            if (!pick.Any(item => item.ProductId is not null || item.Staged is not null)) reasons.Add("Alege sau pregătește un produs pentru cel puțin un rând.");
+            if (!TakenRows.Any(item => item.ProductId is not null || item.Staged is not null)) reasons.Add("Alege sau pregătește un produs pentru cel puțin un rând preluat (selectorul din stânga rândului).");
             if (!NumberValid) reasons.Add("Numărul facturii lipsește."); else if (VerifyNeeded && !numberVerified) reasons.Add("Confirmă numărul facturii (comutatorul „Verificat”).");
             if (ResolvedSupplier is null) reasons.Add("Furnizorul nu este ales: scrie CUI-ul lui sau adaugă-l în registru."); else if (VerifyNeeded && !cuiVerified) reasons.Add("Confirmă CUI-ul furnizorului (comutatorul „Verificat”).");
             if (!DateValid) reasons.Add("Data facturii lipsește."); else if (VerifyNeeded && !dateVerified) reasons.Add("Confirmă data facturii (comutatorul „Verificat”).");

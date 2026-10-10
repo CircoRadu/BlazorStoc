@@ -22,14 +22,42 @@ public sealed partial class MariaProductRepository
             await using (var asReader = await asSubcategory.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 if (await asReader.ReadAsync(cancellationToken).ConfigureAwait(false))
                     throw new ProductOperationException(ProductGroupManagementRules.NameTakenBySubcategory(asReader.GetString(0), asReader.GetString(1)));
+            // A new category goes to the end of the arranged order.
             await using var insert = Command(connection, transaction,
-                "INSERT INTO categories(name,normalized_name) VALUES(@name,@key)",
+                "INSERT INTO categories(name,normalized_name,sort_order) SELECT @name,@key,COALESCE(MAX(sort_order),0)+1 FROM categories",
                 ("@name", name), ("@key", TextNormalization.UniquenessKey(name)));
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return checked((int)insert.LastInsertedId);
         }, cancellationToken).ConfigureAwait(false);
         await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.Category, id.ToString(), name,
             AuditDetails.Identification(("Denumire", name)), cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task ReorderCategoriesAsync(IReadOnlyList<string> orderedCategories, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        var wanted = orderedCategories.Select(TextNormalization.UniquenessKey).ToList();
+        var change = await WriteAsync(async (connection, transaction) =>
+        {
+            var current = new List<(int Id, string Name)>();
+            await using (var read = Command(connection, transaction, "SELECT id,name FROM categories ORDER BY sort_order,name FOR UPDATE"))
+            await using (var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) current.Add((checked((int)reader.GetInt64(0)), reader.GetString(1)));
+            var byKey = current.ToDictionary(item => TextNormalization.UniquenessKey(item.Name));
+            if (wanted.Count != current.Count || wanted.Distinct().Count() != wanted.Count || wanted.Any(key => !byKey.ContainsKey(key)))
+                throw new ProductOperationException("Lista categoriilor s-a schimbat între timp. Actualizează lista și reia aranjarea.");
+            var arranged = wanted.Select(key => byKey[key]).ToList();
+            if (arranged.Select(item => item.Id).SequenceEqual(current.Select(item => item.Id))) return (Changed: false, Before: "", After: "");
+            for (var position = 0; position < arranged.Count; position++)
+                await using (var update = Command(connection, transaction, "UPDATE categories SET sort_order=@position WHERE id=@id",
+                    ("@position", position + 1), ("@id", arranged[position].Id)))
+                    await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            return (Changed: true, Before: string.Join(", ", current.Select(item => item.Name)), After: string.Join(", ", arranged.Select(item => item.Name)));
+        }, cancellationToken).ConfigureAwait(false);
+        if (!change.Changed) return;
+        await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Category, AuditActions.ReorderCategories,
+            string.Empty, "Ordinea categoriilor", AuditDetails.Identification(("Ordinea veche", change.Before), ("Ordinea nouă", change.After)),
+            "Ordinea categoriilor din meniu a fost schimbată prin tragere.", cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ProductGroup> CreateSubcategoryAsync(string category, string subcategory,

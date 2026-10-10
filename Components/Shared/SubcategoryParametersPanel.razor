@@ -75,8 +75,8 @@
             <label for="new-parameter-name">Denumire parametru *<input id="new-parameter-name" maxlength="@ProductParameterRules.NameMaximumLength" @bind="newName" @bind:event="oninput" disabled="@busy" autocomplete="off" placeholder="ex. Lentilă" /></label>
             <fieldset class="parameter-kind" aria-describedby="new-parameter-kind-note">
                 <legend>Tip *</legend>
-                <label class="reason-option"><input type="radio" name="new-parameter-kind" checked="@(newKind == ParameterKind.Text)" disabled="@busy" @onchange="() => newKind = ParameterKind.Text" /> <span>Text liber (ex. culoare)</span></label>
-                <label class="reason-option"><input type="radio" name="new-parameter-kind" checked="@(newKind == ParameterKind.Number)" disabled="@busy" @onchange="() => newKind = ParameterKind.Number" /> <span>Număr (ex. 2,8)</span></label>
+                <ToggleSwitch Value="@(newKind == ParameterKind.Text)" Disabled="@busy" ValueChanged="on => newKind = on ? ParameterKind.Text : ParameterKind.Number">Text liber (ex. culoare)</ToggleSwitch>
+                <ToggleSwitch Value="@(newKind == ParameterKind.Number)" Disabled="@busy" ValueChanged="on => newKind = on ? ParameterKind.Number : ParameterKind.Text">Număr (ex. 2,8)</ToggleSwitch>
             </fieldset>
             @if (newKind == ParameterKind.Number)
             {

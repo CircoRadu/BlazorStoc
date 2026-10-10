@@ -134,6 +134,7 @@ public static class AuditActions
     public const string RemoveSupplierAlias = "Ștergere denumire alternativă furnizor";
     public const string LinkSupplierProductCode = "Legare cod furnizor de produs";
     public const string DeleteCategory = "Ștergere categorie goală";
+    public const string ReorderCategories = "Reordonare categorii";
     public const string DeleteSubcategory = "Ștergere subcategorie goală";
     // Required parameters of a subcategory (model + values in the product code): each kind of change has its own action.
     public const string AddSubcategoryParameter = "Adăugare parametru obligatoriu subcategorie";

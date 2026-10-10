@@ -2504,6 +2504,7 @@ sealed class FakeInventoryProductRepository(IReadOnlyList<Product> products, IRe
     public Task RenameCategoryAsync(string originalCategory, string newCategory, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<ProductGroup> UpdateSubcategoryAsync(ProductGroup original, string newSubcategory, string targetCategory, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task DeleteCategoryAsync(string category, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task ReorderCategoriesAsync(IReadOnlyList<string> orderedCategories, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task DeleteSubcategoryAsync(ProductGroup group, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<Product> CreateAsync(ProductInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<Product> UpdateAsync(Product original, ProductInput input, CancellationToken cancellationToken = default) => throw new NotSupportedException();

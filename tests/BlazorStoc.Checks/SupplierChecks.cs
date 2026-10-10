@@ -462,6 +462,14 @@ public static class SupplierChecks
         cut.WaitForAssertion(() => cut.Find("input[type=file]"), TimeSpan.FromSeconds(10));
         cut.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(pdf, fileName, null, "application/pdf"));
         void Click(string text) => cut.FindAll("button").First(button => button.TextContent.Contains(text)).Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("tr.selectable-row").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(60));
+        // A repeated pickup: the rows whose products were already taken start unselected (the warning of step 1); the pickup takes them again.
+        try
+        {
+            cut.WaitForAssertion(() => { if (!cut.Markup.Contains("a mai fost preluată")) throw new Exception("pending"); }, TimeSpan.FromSeconds(3));
+            if (cut.FindAll("tr.selectable-row.row-off").Count > 0) cut.Find(".row-select-all .row-select").Click();
+        }
+        catch (Bunit.Extensions.WaitForHelpers.WaitForFailedException) { }
         cut.WaitForAssertion(() => { if (!cut.FindAll("button").Any(button => button.TextContent.Contains("Pasul următor") && !button.HasAttribute("aria-disabled"))) throw new Exception("pending"); }, TimeSpan.FromSeconds(60));
         Click("Pasul următor");
         cut.WaitForAssertion(() => { if (cut.FindAll("table.pickup-match").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));

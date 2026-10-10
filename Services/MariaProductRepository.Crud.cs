@@ -12,7 +12,7 @@ public sealed partial class MariaProductRepository
         await using var command = new MySqlCommand("""
             SELECT c.name,COALESCE(s.name,'')
             FROM categories c LEFT JOIN subcategories s ON s.category_id=c.id
-            ORDER BY c.name,s.name
+            ORDER BY c.sort_order,c.name,s.name
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var groups = new List<ProductGroup>();

@@ -13,7 +13,7 @@
 <PageTitle>Categorii produse · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
 <div class="page-heading">
-    <div><p class="eyebrow">ORGANIZARE CATALOG</p><h1>Categorii și subcategorii</h1><p class="muted">Redenumește categoriile și mută subcategoriile fără să pierzi produsele asociate.</p></div>
+    <div><p class="eyebrow">ORGANIZARE CATALOG</p><h1>Categorii și subcategorii</h1><p class="muted">Redenumește categoriile și mută subcategoriile fără să pierzi produsele asociate.@(isAdministrator ? " Trage categoriile de mânerul din dreapta ca să le aranjezi: ordinea de aici este ordinea din meniul lateral." : "")</p></div>
     <div class="heading-actions"><button class="primary" disabled="@(saving || IsEditing)" @onclick="CreateCategory">+ Adaugă categorie</button></div>
 </div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
@@ -73,6 +73,14 @@ else
     <div class="category-management-list">
         @foreach (var category in Categories)
         {
+            var categoryIndex = Categories.IndexOf(category);
+            <div class="category-drag-item @(isAdministrator ? "has-handle" : null)" data-category-index="@categoryIndex" data-category-name="@category">
+                @if (isAdministrator)
+                {
+                    @* A span, not a button: Firefox does not start a drag from a button. *@
+                    <span role="button" tabindex="0" class="row-icon drag" draggable="@(saving || IsEditing ? "false" : "true")" data-category-handle aria-disabled="@((saving || IsEditing).ToString().ToLowerInvariant())" aria-label="@($"Mută categoria {category} (trage sau folosește săgețile sus / jos)")" title="@($"Trage ca să muți categoria {category} în meniu")"
+                          @onkeydown="args => CategoryKeyAsync(args, categoryIndex)"></span>
+                }
             <CollapsibleSection Id="@CategoryId(category)"
                                 RootClass="catalog category-management-card"
                                 HeaderRowClass="catalog-heading collapsible-header"
@@ -111,6 +119,7 @@ else
                     @if (creatingSubcategory && string.Equals(targetCategory, category, StringComparison.Ordinal)) { @SubcategoryEditor }
                 </ChildContent>
             </CollapsibleSection>
+            </div>
         }
     </div>
 }
@@ -142,8 +151,45 @@ else
     private async Task DiscardEditAsync() { CancelEdit(); await InvokeAsync(StateHasChanged); }
     private Task RequestCancelEditAsync() => groupTracker is null ? DiscardEditAsync() : groupTracker.RunAfterConfirmAsync(DiscardEditAsync);
     private bool IsEditing => creatingCategory || creatingSubcategory || editingCategory is not null || editingSubcategory is not null;
+    // In the order the administrator arranged (the repository returns them that way); the same order is used by the side menu.
     private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
-        .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+        .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    // ---- the order of the categories (administrator only): drag the handle (category-order.js) or Up / Down on the focused handle ----
+    private bool isAdministrator;
+    private DotNetObjectReference<ProductGroups>? reference;
+
+    [JSInvokable]
+    public Task MoveCategory(int from, int to) => InvokeAsync(() => MoveCategoryAsync(from, to));
+
+    private Task CategoryKeyAsync(KeyboardEventArgs args, int index) => args.Key switch
+    {
+        "ArrowUp" => MoveCategoryAsync(index, index - 1),
+        "ArrowDown" => MoveCategoryAsync(index, index + 1),
+        _ => Task.CompletedTask
+    };
+
+    private async Task MoveCategoryAsync(int from, int to)
+    {
+        var order = Categories;
+        if (!isAdministrator || saving || IsEditing || from == to || from < 0 || to < 0 || from >= order.Count || to >= order.Count) return;
+        var moved = order[from];
+        order.RemoveAt(from);
+        order.Insert(to, moved);
+        saving = true; error = null; notice = null;
+        try
+        {
+            await Repository.ReorderCategoriesAsync(order, lifetime.Token);
+            notice = $"Categoria „{moved}” a fost mutată pe poziția {to + 1}; ordinea se vede și în meniul lateral.";
+        }
+        catch (ProductOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Category reordering failed ({ErrorType}).", exception.GetType().Name); error = "Ordinea categoriilor nu a putut fi salvată."; }
+        finally { saving = false; }
+        await LoadAsync();
+        StateHasChanged();
+    }
 
     // The form of a subcategory: for a new one it opens inside its category, under the last subcategory; for an edit it opens above the list.
     private RenderFragment SubcategoryEditor => @<section class="product-editor" aria-labelledby="subcategory-editor-title">
@@ -169,6 +215,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         if (!await Access.CanManageProductsAsync(lifetime.Token)) { error = "Nu ai dreptul să administrezi catalogul."; return; }
+        isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
+        reference = DotNetObjectReference.Create(this);
         await LoadAsync();
     }
 
@@ -219,7 +267,7 @@ else
         SetCategoryExpanded(category, true);
         showNewSubcategory = true;
     }
-    private bool showNewSubcategory;
+    private bool showNewSubcategory, orderRegistered;
 
     // The required parameters of a subcategory (values chosen when a product is saved): panel under the editors, opened from the row or after a subcategory is created.
     private ProductGroup? parametersGroup;
@@ -276,6 +324,15 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender || (isAdministrator && !orderRegistered))
+        {
+            if (isAdministrator && reference is not null)
+            {
+                orderRegistered = true;
+                try { await JS.InvokeVoidAsync("blazorStocCategoryOrder.register", reference); }
+                catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException or JSDisconnectedException) { }
+            }
+        }
         if (!showNewSubcategory) return;
         showNewSubcategory = false;
         try { await JS.InvokeVoidAsync("blazorStocScrollTo", "subcategory-name"); }
@@ -355,5 +412,5 @@ else
         finally { saving = false; }
     }
 
-    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); reference?.Dispose(); }
 }

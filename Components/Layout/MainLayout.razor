@@ -203,7 +203,7 @@
     private async Task LoadGroupsAsync()
     {
         groups = await Products.GetGroupsAsync(lifetime.Token);
-        categories = groups.Select(g => g.Category).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+        categories = groups.Select(g => g.Category).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();   // the order arranged on the catalog page (the repository returns it)
     }
 
     private IEnumerable<string> Subcategories(string category) => groups

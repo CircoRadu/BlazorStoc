@@ -64,10 +64,11 @@ public partial class InvoicePickup
         session.Analysis = session.Analysis with { Warnings = extraction.Warnings };
         templateInfo = chosen is not null ? $"Șablon XML detectat: {chosen.Info.Name} · {SupplierLabel(chosen.Info)}"
             : "Nu există un șablon XML pentru acest furnizor: factura este citită cu căile standard UBL. Verifică rândurile; un șablon propriu se creează în Setări → Facturi → Șabloane salvate.";
-        excluded.Clear();
+        excluded.Clear(); takenAutoDone.Clear();
         regionPictures.Clear();
         if (createdInvoice is null) headerPrefilledFor = null;
         separators = [];
+        QueueTakenPreview();
     }
 
     private void ChooseXmlTemplate(ChangeEventArgs e)

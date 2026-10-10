@@ -16,6 +16,8 @@ public interface IProductRepository
         string reason, CancellationToken cancellationToken = default);
     // Only an empty category (no subcategory, no product) and an empty subcategory (no product) can be deleted.
     Task DeleteCategoryAsync(string category, string reason, CancellationToken cancellationToken = default);
+    // The order of the categories (side menu and catalog page): every category once, in the wanted order. Administrator only.
+    Task ReorderCategoriesAsync(IReadOnlyList<string> orderedCategories, CancellationToken cancellationToken = default);
     Task DeleteSubcategoryAsync(ProductGroup group, string reason, CancellationToken cancellationToken = default);
     Task<Product> CreateAsync(ProductInput input, CancellationToken cancellationToken = default);
     Task<Product> UpdateAsync(Product original, ProductInput input, CancellationToken cancellationToken = default);

@@ -1107,6 +1107,16 @@ public static class MariaSchemaMigrations
             ("products", "base_model"),
             ("product_parameter_values", "product_id"), ("product_parameter_values", "parameter_id"), ("product_parameter_values", "value_id")
         ])
+        ,
+        // The order of the categories in the side menu and on the catalog page, set by drag and drop (administrator only). 0 = never arranged: such
+        // categories keep the alphabetical order (the order is sort_order, then name); an arrangement writes 1..n for all of them.
+        new(38, "Categorii: ordinea de afisare (sort_order)",
+        [
+            "ALTER TABLE `categories` ADD COLUMN IF NOT EXISTS `sort_order` INT NOT NULL DEFAULT 0"
+        ],
+        [
+            ("categories", "sort_order")
+        ])
     ];
 }
 

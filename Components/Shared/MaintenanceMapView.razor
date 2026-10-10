@@ -82,48 +82,48 @@ else
         </div>
         <p class="muted map-count">@Markers.Count @(Markers.Count == 1 ? "punct afișat" : "puncte afișate")@(Unplaced.Count > 0 ? $" · {Unplaced.Count} fără coordonate" : "")</p>
     </div>
-
-    <aside class="map-panel" aria-label="Detalii punct" aria-live="polite">
-        @if (Selected is { } row)
-        {
-            var today = Today;
-            var due = row.Point.Point.NextDue;
-            var dueState = ServiceDueRules.State(due, today, dueThreshold);
-            <div class="map-panel-heading"><h2>@row.Point.WorkPointName</h2><button type="button" class="link-button" aria-label="Închide detaliile" @onclick="ClearSelectionAsync" title="Închide detaliile">×</button></div>
-            <p><a class="category-table-link" href="@($"/beneficiari/{row.BeneficiaryId}")"><strong>@row.BeneficiaryName</strong></a></p>
-            <p class="muted">@row.Point.WorkPointAddress<br />Coordonate: @MaintenanceMapRules.CoordinatesText(row)</p>
-            <dl class="map-facts">
-                <dt>Contract</dt><dd>@row.Contract.Label @if (!row.Contract.IsActive) { <span class="contract-state off">Off</span> } else { <span class="contract-state on">On</span> }</dd>
-                <dt>Termen contract</dt>
-                <dd>@ServiceDueRules.ExpiryText(row.Contract, today, expiryThreshold)@if (row.Contract.IsActive && ServiceDueRules.ExpiryState(row.Contract, today, expiryThreshold) is ServiceExpiryState.Expired or ServiceExpiryState.ExpiresSoon) { <text> <span class="contract-state expired">@(ServiceDueRules.IsExpired(row.Contract, today) ? "Expirat" : "Expiră în curând")</span></text> }
-                    @if (row.Contract.ValidUntil is { } validUntil) { <br /><small class="muted">Valabil până la @StockMovementRules.DisplayDate(validUntil)</small> }</dd>
-                <dt>Ciclicitate</dt><dd>@ServiceContractRules.CycleText(ServiceDueRules.EffectiveCycle(row.Point.Point.CycleMonths, row.Contract.CycleMonths))</dd>
-                <dt>Următoarea scadență</dt>
-                <dd>@StockMovementRules.DisplayDate(due)@if (row.Contract.IsActive) { <text> <span class="due-chip @ServiceDueRules.CssClass(dueState)">@ServiceDueRules.Label(dueState)</span></text> }</dd>
-                <dt>Ultima intervenție de mentenanță</dt><dd>@(row.LastIntervention is { } last ? StockMovementRules.DisplayDate(last) : "nicio intervenție")</dd>
-            </dl>
-            <div class="map-panel-actions">
-                <a class="refresh act-nav" href="@($"/beneficiari/{row.BeneficiaryId}")">Fișa beneficiarului</a>
-                <a class="primary" href="@MaintenanceMapRules.AddInterventionUrl(row.BeneficiaryId, row.Point.Point.WorkPointId)">+ Înregistrează intervenție</a>
-            </div>
-            @if (sameLocation.Count > 0)
-            {
-                <h3>Alte puncte la aceeași locație</h3>
-                <ul class="map-same">
-                    @foreach (var other in sameLocation)
-                    {
-                        <li><button type="button" class="link-button" @onclick="() => SelectAsync(other.Point.Point.Id, false)">@other.BeneficiaryName · @other.Point.WorkPointName</button>
-                            <small class="muted">@StockMovementRules.DisplayDate(other.Point.Point.NextDue)</small></li>
-                    }
-                </ul>
-            }
-        }
-        else
-        {
-            <p class="muted">Alege un punct pe hartă ca să vezi beneficiarul, contractul, scadența și legăturile către fișe.</p>
-        }
-    </aside>
 </div>
+
+@if (Selected is { } row)
+{
+    <div class="delete-overlay" @onclick="ClearSelectionAsync" @onkeydown="MapDialogKeyAsync">
+        <section class="delete-dialog map-dialog" role="dialog" aria-modal="true" aria-labelledby="map-dialog-title" @onclick:stopPropagation="true">
+                @{
+                    var today = Today;
+                    var due = row.Point.Point.NextDue;
+                    var dueState = ServiceDueRules.State(due, today, dueThreshold);
+                }
+                <div class="map-panel-heading"><h2 id="map-dialog-title">@row.Point.WorkPointName</h2><button type="button" class="link-button" aria-label="Închide detaliile" autofocus @onclick="ClearSelectionAsync" title="Închide detaliile">×</button></div>
+                <p><a class="category-table-link" href="@($"/beneficiari/{row.BeneficiaryId}")"><strong>@row.BeneficiaryName</strong></a></p>
+                <p class="muted">@row.Point.WorkPointAddress<br />Coordonate: @MaintenanceMapRules.CoordinatesText(row)</p>
+                <dl class="map-facts">
+                    <dt>Contract</dt><dd>@row.Contract.Label @if (!row.Contract.IsActive) { <span class="contract-state off">Off</span> } else { <span class="contract-state on">On</span> }</dd>
+                    <dt>Termen contract</dt>
+                    <dd>@ServiceDueRules.ExpiryText(row.Contract, today, expiryThreshold)@if (row.Contract.IsActive && ServiceDueRules.ExpiryState(row.Contract, today, expiryThreshold) is ServiceExpiryState.Expired or ServiceExpiryState.ExpiresSoon) { <text> <span class="contract-state expired">@(ServiceDueRules.IsExpired(row.Contract, today) ? "Expirat" : "Expiră în curând")</span></text> }
+                        @if (row.Contract.ValidUntil is { } validUntil) { <br /><small class="muted">Valabil până la @StockMovementRules.DisplayDate(validUntil)</small> }</dd>
+                    <dt>Ciclicitate</dt><dd>@ServiceContractRules.CycleText(ServiceDueRules.EffectiveCycle(row.Point.Point.CycleMonths, row.Contract.CycleMonths))</dd>
+                    <dt>Următoarea scadență</dt>
+                    <dd>@StockMovementRules.DisplayDate(due)@if (row.Contract.IsActive) { <text> <span class="due-chip @ServiceDueRules.CssClass(dueState)">@ServiceDueRules.Label(dueState)</span></text> }</dd>
+                    <dt>Ultima intervenție de mentenanță</dt><dd>@(row.LastIntervention is { } last ? StockMovementRules.DisplayDate(last) : "nicio intervenție")</dd>
+                </dl>
+                <div class="map-panel-actions">
+                    <a class="refresh act-nav" href="@($"/beneficiari/{row.BeneficiaryId}")">Fișa beneficiarului</a>
+                    <a class="primary" href="@MaintenanceMapRules.AddInterventionUrl(row.BeneficiaryId, row.Point.Point.WorkPointId)">+ Înregistrează intervenție</a>
+                </div>
+                @if (sameLocation.Count > 0)
+                {
+                    <h3>Alte puncte la aceeași locație</h3>
+                    <ul class="map-same">
+                        @foreach (var other in sameLocation)
+                        {
+                            <li><button type="button" class="link-button" @onclick="() => SelectAsync(other.Point.Point.Id, false)">@other.BeneficiaryName · @other.Point.WorkPointName</button>
+                                <small class="muted">@StockMovementRules.DisplayDate(other.Point.Point.NextDue)</small></li>
+                        }
+                    </ul>
+                }
+        </section>
+    </div>
+}
 
 <section class="catalog map-unplaced">
     <div class="catalog-heading"><h2>Puncte fără coordonate <span>@Unplaced.Count</span></h2></div>
@@ -360,6 +360,11 @@ else
         if (module is null) return;
         try { await module.InvokeVoidAsync("select", mapElement, id, zoomTo); }
         catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+    }
+
+    private async Task MapDialogKeyAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") await ClearSelectionAsync();
     }
 
     private async Task ClearSelectionAsync()

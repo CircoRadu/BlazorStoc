@@ -4,6 +4,18 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 
 ## Modificari de testat
 
+### 10.10.2026 - Preluare factura: produse deja preluate si selectorul de randuri la pasul 2
+
+**Ce s-a adaugat:** la pasul 1, avertizarea „deja preluat" (aceeasi ca la pasii 2 si 3) pe randurile ale caror produse au mai fost preluate de pe aceeasi factura; la pasul 2, selectorul rotund de preluare a randurilor (cu „Preia" pentru toate), aceeasi alegere ca la pasul 1.
+
+**Ce face acum:** dupa citirea facturii se afla furnizorul si numarul ei; daca factura a mai fost preluata, apare avertizarea deasupra tabelului, iar randurile cu produse deja preluate au insigna „Deja preluat: produs, N buc.", o bara galbena pe margine si pornesc cu selectorul oprit. La pasul 2 se vad toate randurile; cele oprite sunt estompate si nu intra in pasul 3. Un rand pornit manual ramane pornit.
+
+1. Preia o factura (de exemplu din 09.10.2026) si finalizeaza intrarea in stoc. Preia aceeasi factura a doua oara: la pasul 1 apare „Factura ... a mai fost preluata", iar randurile deja preluate au insigna si selectorul oprit.
+2. Porneste manual selectorul unui rand cu insigna; muta o linie de demarcare: randul ramane pornit. „Selecteaza tot" le porneste pe toate.
+3. Trece la pasul 2: vezi toate randurile cu selector in stanga; opreste un rand: devine estompat. „Pasul urmator" ramane blocat daca niciun rand preluat nu are produs ales (mesajul trimite la selectorul din stanga).
+4. Revino la pasul 1: alegerea de la pasul 2 se vede si aici. La pasul 3 intra doar randurile preluate.
+5. La o factura noua (necunoscuta) nu apare nicio avertizare si toate randurile pornesc selectate.
+
 ### 09.10.2026 - Preluare factura: alegerea variantei (parametri obligatori, etapa 2)
 
 **Ce s-a adaugat:** in pasul 2 al preluarii (PDF, OCR, XML), un rand al carui cod este modelul unor produse cu parametri obligatori (de exemplu „DS-2CD1043" pentru „DS-2CD1043 - 2.8 mm" si „DS-2CD1043 - 4 mm") arata variantele ca optiuni.

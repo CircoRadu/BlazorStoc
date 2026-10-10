@@ -1,6 +1,6 @@
 # Starea curenta a proiectului
 
-Actualizat: 08.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`). Istoricul vechi: `docs/arhiva/` (vezi `docs/arhiva/INDEX.md`). Cand ceva de aici se invecheste, se inlocuieste, nu se aduna.
+Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`). Istoricul vechi: `docs/arhiva/` (vezi `docs/arhiva/INDEX.md`). Cand ceva de aici se invecheste, se inlocuieste, nu se aduna.
 
 ## Aplicatia
 
@@ -8,6 +8,13 @@ Actualizat: 08.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Module: produse/stoc, categorii, beneficiari/proiecte, vehicule, mentenanta (contracte, interventii, harta), notificari, jurnal, furnizori si facturi, preluare factura PDF/OCR cu sabloane, preluare inventar.
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
+
+## Ultimul lucru facut (10.10.2026, catalog si preluare factura)
+
+- Ordinea categoriilor prin drag and drop (administrator; migrarea 38 `categories.sort_order`, `ReorderCategoriesAsync`, `wwwroot/category-order.js`), aceeasi ordine in meniul lateral; jurnal "Reordonare categorii".
+- Preluare factura: avertizarea "deja preluat" si deselectarea implicita a randurilor deja preluate la pasul 1 (`RefreshTakenPreviewAsync`), selector de randuri si la pasul 2 (`excluded` comun, `PickRow.RowIndex`).
+- Popup pentru detaliile punctului de pe harta; tipul parametrului cu comutatoare; padding minim 6/12 px la insigne; baza locala curatata de categoriile in afara de TVCI si Control Acces.
+- Suita in memorie 1065 trecute; suita MariaDB nerulata, migrarea 38 aplicata doar pe `BlazorStoc` (nu pe `blazorstoc_test`). De verificat in browser: `Teste utilizator/` 01, 04, 08.
 
 ## Ultimul lucru facut (09.10.2026, parametri obligatori)
 
