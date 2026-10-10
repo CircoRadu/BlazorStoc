@@ -10,11 +10,8 @@ Fluxul: Administrare -> Vehicule -> pagina vehiculului (taburi: date, expirari I
 
 **Ce face acum:** tabelul arata nivelul tinta, cate bucati are masina si cate lipsesc. „Completeaza la nivel" deschide „Iesire multipla" cu destinatia masina si cate o linie pentru fiecare produs care lipseste (cantitatea lipsa), descrierea „Completare la nivel"; tu verifici si salvezi (aceleasi reguli ca la orice iesire: peste stoc, rezervari, bon PDF). Nivelul nu schimba stocul singur.
 
-1. Deschide o masina, tabul „Materiale si echipamente": in „Nivel tinta" alege un produs, scrie nivelul si apasa „Setează nivelul"; apare in tabel.
-2. Schimba nivelul aceluiasi produs: valoarea se inlocuieste (nu apare un al doilea rand).
-3. Daca masina are mai putine bucati decat nivelul, coloana „Lipseste" arata diferenta si apare „Completeaza la nivel".
-4. Apasa „Completeaza la nivel": se deschide iesirea multipla cu masina si liniile pregatite; salveaza-o, apoi revino pe pagina masinii: „Lipseste" este 0 si butonul dispare.
-5. Elimina un nivel cu ×. In Jurnal apar „Setare nivel tinta vehicul" si „Eliminare nivel tinta vehicul", cu valoarea veche si noua.
+1. Schimba nivelul aceluiasi produs: valoarea se inlocuieste (nu apare un al doilea rand).
+2. Apasa „Completeaza la nivel": se deschide iesirea multipla cu masina si liniile pregatite; salveaza-o, apoi revino pe pagina masinii: „Lipseste" este 0 si butonul dispare.
 
 **Detalii:**
 

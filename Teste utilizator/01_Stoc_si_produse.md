@@ -11,12 +11,7 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 **Ce face acum:** administratorul trage cardurile de categorie (sau foloseste sagetile sus/jos pe maner); ordinea se salveaza imediat si este ordinea din meniul lateral „Categorii produse". Categoriile nearanjate raman alfabetic, iar o categorie noua se adauga la sfarsit. Utilizatorul fara drept de administrator nu vede manerul. La „Parametru nou", pornirea unui comutator il opreste pe celalalt.
 
 1. Ca administrator, deschide „Categorii": fiecare card are in stanga un maner cu puncte. Trage o categorie peste alta: o linie verde arata unde ajunge; la eliberare apare mesajul cu pozitia noua.
-2. Reincarca pagina si deschide meniul lateral „Produse": categoriile sunt in noua ordine, la fel pe pagina Categorii.
-3. Pune focusul pe un maner (Tab) si apasa sageata jos / sus: categoria se muta cu o pozitie.
-4. Adauga o categorie noua: apare ultima, in pagina si in meniu.
-5. Conecteaza-te ca utilizator fara drept de administrator: nu exista manere, iar ordinea aranjata se vede in meniu.
-6. In Jurnal apare „Reordonare categorii" cu „Ordinea veche" si „Ordinea noua".
-7. La „Parametru nou" ai doua comutatoare in chenarul „Tip": „Text liber" si „Numar"; pornind unul se opreste celalalt, iar la „Numar" apare campul „Unitate de masura".
+2. Conecteaza-te ca utilizator fara drept de administrator: nu exista manere, iar ordinea aranjata se vede in meniu.
 
 ### 09.10.2026 - Parametri obligatori pe subcategorie (etapa 1)
 
@@ -24,8 +19,8 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 
 **Ce face acum:** pentru o subcategorie cu parametri (de exemplu „Lentila", numar, unitate mm), un produs se salveaza ca „<model> - <valoare> - <valoare>" (ordinea parametrilor) si nu poate fi salvat fara model si fara valoarea fiecarui parametru. Produsele care existau deja in subcategorie raman blocate (nicio intrare/iesire/rezervare pe ele) pana li se aleg valorile prin editare. Orice utilizator adauga parametri si valori noi si sterge valorile nefolosite; doar administratorul editeaza parametri si valori. O valoare folosita se modifica numai de administrator, cu previzualizare a produselor redenumite; daca un cod nou ar exista deja, modificarea se refuza.
 
-1. Deschide „Categorii", la o subcategorie apasa „Parametri": panoul se deschide sub formulare. La o subcategorie nou creata panoul se deschide singur.
-2. Adauga parametrul „Lentila", tip „Numar", unitate „mm". Adauga valorile „2,8" si „4": apar ca „2.8 mm" si „4 mm". Scrie „2.80": se refuza (exista deja).
+1. Deschide „Categorii", la o subcategorie apasa „Parametri": panoul se deschide sub formulare.
+2. La parametrul Lentila (Numar, mm) adauga valoarea 4: apare ca 4 mm.
 3. In „Produse" cauta un produs deja existent in subcategorie: are marcajul „Parametri obligatorii necompletati · blocat". Incearca o intrare sau o iesire pe el: se refuza si mesajul numeste parametrii lipsa.
 4. Editeaza produsul: campul „Model" contine vechiul cod; alege valoarea lentilei: sub formular se vede „Codul produsului rezultat: <model> - 2.8 mm". Salveaza (motivarea automata arata si „Parametri"). Marcajul dispare, intrarea/iesirea merg.
 5. Adauga un produs nou in aceeasi subcategorie: cere model si valoarea; fara valoare apare „Subcategoria ... cere modelul si valoarea fiecarui parametru". Aceeasi combinatie model + valoare a doua oara: „Codul produsului ... exista deja".
@@ -33,7 +28,7 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 7. Pe panou, cu iconita cos de la o valoare folosita de produse: este inactiva, cu explicatia „Folosita de N produse". La o valoare nefolosita: stergere cu motivare.
 8. Ca administrator, creionul de la o valoare folosita: scrie „2.9" si „Verifica modificarea": tabelul arata codurile vechi si noi; „Continua", motivare, „Aplica modificarea": produsele sunt redenumite cu stocul pastrat. Daca exista deja un produs cu unul dintre codurile noi, modificarea e refuzata si nu se schimba nimic.
 9. Ca utilizator fara drept de administrator: panoul nu arata iconitele de editare a parametrilor si valorilor.
-10. In Jurnal: „Adaugare parametru obligatoriu subcategorie", „Adaugare valoare parametru", „Stergere valoare parametru", „Modificare valoare parametru" si, pentru fiecare produs, „Redenumire produs (valoare parametru)".
+10. In Jurnal: Stergere valoare parametru, Modificare valoare parametru si, pentru fiecare produs, Redenumire produs (valoare parametru).
 
 **Detalii:** preluarea de pe factura (alegerea variantei) este in `04_Preluare_factura_si_sabloane.md`.
 

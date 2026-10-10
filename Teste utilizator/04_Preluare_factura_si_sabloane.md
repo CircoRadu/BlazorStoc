@@ -9,9 +9,8 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 **Ce s-a schimbat:** nimic vizibil; codul paginii `/produse/preluare-factura` si al ferestrei de sabloane (Setari -> Facturi) a fost impartit pe fisiere, iar citirea randurilor din PDF a fost desfacuta in pasi. Verificarea este ca nimic nu s-a schimbat.
 
 **Ce faci:**
-1. Deschide `/produse/preluare-factura`, incarca un PDF cu sablon cunoscut si treci prin pasii 1, 2 si 3 pana la intrarea in stoc pe un produs TEST.
-2. Incarca o factura fara sablon si deschide fereastra de sabloane: marcheaza regiunile, salveaza sablonul, redeschide-l din Setari -> Facturi -> Sabloane salvate.
-3. Incearca si un fisier XML (e-Factura), daca ai unul.
+1. Continua preluarea de la pasul 3 (confirma numarul, data si CUI-ul) si fa intrarea in stoc pe un produs TEST.
+2. Pe o factura fara sablon, marcheaza regiunile in fereastra de sabloane, salveaza sablonul si redeschide-l din Setari -> Facturi -> Sabloane salvate.
 
 **Ce trebuie sa vezi:** aceleasi randuri citite ca inainte pe aceleasi facturi (numar, CUI, data, produse), aceleasi avertizari; nicio eroare. Rezultat: ...
 
@@ -49,7 +48,6 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 |---|---|---|---|
 | 1 | Setari -> Facturi -> Sabloane salvate -> „Sablon XML nou"; alege furnizorul, „Completeaza cu caile UBL standard", incarca un XML de proba | Se vad numarul, data, furnizorul si primele 10 linii citite; denumirea si furnizorul sunt obligatorii | |
 | 2 | Salveaza; sablonul apare in lista cu sursa „Fisier XML"; deschide detaliile | Caile salvate; creionul deschide aceeasi fereastra (nu editorul PDF) | |
-| 3 | Produse -> Preluare factura -> alege o factura .xml a furnizorului | „Sablon XML detectat: ...", tabelul cu liniile, fara imaginea paginii | |
 | 4 | Aceeasi factura XML fara sablon al furnizorului | Mesaj ca s-au folosit caile UBL standard; liniile se citesc | |
 | 5 | Un fisier XML invalid sau fara linii | Mesaj clar in romana; nimic preluat | |
 | 6 | Continua pana la pasul 3 si salveaza; apoi repeta cu aceeasi factura | Intrarile apar legate de factura; a doua oara avertisment de duplicat | |

@@ -16,7 +16,7 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Pagini mari impartite in clase partiale (`ProductMovements`, `InvoicePickup`, `InvoiceTemplateWorkbench`); metode lungi desfacute (`InvoiceRowScan`, `InventoryPickupOcr.ScanPageAsync`, `GetPageAsync`/`InsertMovementAsync`, `StockMovements.Validated`); fisierele de teste impartite pe subiecte (`FullRun.*.cs`, `MariaExtendedChecks.*.cs`).
 - Schimbari de comportament voite: retry la deadlock si pentru Project, ProjectComponent, Offer, OfferTemplate, SystemType; Project verifica `IsAllowedDatabase`; anularea se verifica inainte de deschiderea conexiunii.
 - Teste noi `StructureChecks` (grupul `structure`, 23): rutele (`@page` din .razor = rutele compilate; prinde un `@` pierdut), `SettleNumbers`, `OverStockOf`. Verificat pe 30 de PDF-uri reale (raport identic) si pe fixturile OCR (identic).
-- Suita in memorie 1089 trecute, MariaDB 1744 trecute, 0 esecuri; migrarea 38 aplicata acum si pe `blazorstoc_test`. Neverificat in browser: paginile impartite (`Teste utilizator/` 02 si 04).
+- Suita in memorie 1089 trecute, MariaDB 1744 trecute, 0 esecuri; migrarea 38 aplicata acum si pe `blazorstoc_test`. Paginile impartite verificate in browser de agent (miscari produs, preluare factura PDF/ZIP, sabloane, categorii, vehicule, harta, nomenclator, inventar); raman de verificat de utilizator pasul 3 al preluarii facturii si salvarea unui sablon (`Teste utilizator/` 02 si 04).
 ## Ultimul lucru facut (10.10.2026, catalog si preluare factura)
 
 - Ordinea categoriilor prin drag and drop (administrator; migrarea 38 `categories.sort_order`, `ReorderCategoriesAsync`, `wwwroot/category-order.js`), aceeasi ordine in meniul lateral; jurnal "Reordonare categorii".

@@ -18,7 +18,6 @@ Fluxul: Administrare -> Furnizori (registru dupa CUI) -> facturile se inregistre
 
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
 |---|---|---|---|
-| 1 | Furnizori: lista, cautare, filtrul "Doar cei de verificat" | Se restrange corect | |
 | 2 | Furnizor nou cu CUI real, ANAF activ | Formularul se completeaza; sursa "Date preluate din ANAF"; modifici adresa -> "Preluate din ANAF, editate manual" | |
 | 3 | ANAF oprit sau dezactivat din Setari | Se salveaza ca "Introdus manual (ANAF indisponibil)" | |
 | 4 | CUI valid dar necunoscut ANAF | "CUI negasit", se accepta manual cu avertizare | |
@@ -38,7 +37,6 @@ Fluxul: Administrare -> Furnizori (registru dupa CUI) -> facturile se inregistre
 |---|---|---|---|
 | 1 | Deschide /facturi din meniu Administrare si de pe pagina principala | Casete de rezumat, tabel (numar, furnizor cu link, data, intrari, preluata de) | |
 | 2 | Filtre: text, furnizor, interval de date, "doar fara intrari" | Rezultate corecte | |
-| 3 | Apasa numarul facturii (buton) | Se deschide fereastra cu produsele preluate; numele produsului duce la /produse/{id}/miscari | |
 | 4 | Administrator: corecteaza numarul, data, furnizorul (cu motiv) | Jurnal: "Modificare numar factura", "Modificare data factura", "Mutare factura la alt furnizor" | |
 | 5 | Numar deja existent la acelasi furnizor | Mesaj de duplicat | |
 | 6 | Sterge o factura fara intrari; incearca la una cu intrari | Prima dispare (si din pagina furnizorului); a doua are butonul dezactivat cu explicatie | |

@@ -23,7 +23,6 @@ Fluxul: Generare situatie inventar (PDF cu categoriile alese) -> tiparesti, comp
 
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
 |---|---|---|---|
-| 1 | Inventar: selecteaza subcategorii (marcaj rotund, clic pe rand, "Selecteaza tot") | Selectia functioneaza, fara casete de bifat | |
 | 2 | Preluare inventar: selectie pe randuri | La fel | |
 
 ### Verificari ramase din etapele anterioare (vezi docs/TESTE_RAMASE.md grupa H)

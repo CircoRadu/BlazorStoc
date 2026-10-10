@@ -10,11 +10,8 @@ Fluxul: Mentenanta -> puncte de lucru (adresa, poze, coordonate) -> contracte de
 
 **Ce face acum:** apasarea unui pin deschide popup-ul centrat; se inchide cu ×, cu clic pe fundal sau cu Escape; „Alte puncte la aceeasi locatie" schimba continutul popup-ului. Insignele (On, In curand etc.) au padding mai mare (regula 6 px / 12 px, aplicata la toate insignele aplicatiei).
 
-1. Deschide Harta mentenantei si apasa un pin: apare popup-ul cu detaliile; harta ramane in spate, pe toata latimea.
-2. Inchide-l cu ×, cu clic pe fundal, apoi cu Escape.
-3. La un punct cu alte puncte la aceeasi locatie, apasa unul din lista: popup-ul trece la acel punct.
-4. „Fisa beneficiarului" si „+ Inregistreaza interventie" duc la paginile corecte.
-5. Ecran ingust: popup-ul incape fara depasire orizontala.
+1. La un punct cu alte puncte la aceeasi locatie, apasa unul din lista: popup-ul trece la acel punct.
+2. Ecran ingust: popup-ul incape fara depasire orizontala.
 
 ## Verificari ramase (fara modificari recente; detalii in docs/TESTE_RAMASE.md, sectiunile N7-N27)
 

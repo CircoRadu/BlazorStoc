@@ -9,9 +9,8 @@ Fluxul: deschizi un produs -> pagina de miscari -> adaugi intrare sau iesire -> 
 **Ce s-a schimbat:** nimic vizibil; codul paginii `/produse/{id}/miscari` a fost impartit pe fisiere. Verificarea este ca totul se comporta ca inainte.
 
 **Ce faci:**
-1. Deschide un produs din lista si, de acolo, pagina de miscari. Adresele `/produse/<id>` si `/produse/<id>/miscari` trebuie sa se deschida amandoua.
-2. Adauga o intrare si o iesire (taburile Intrare / Iesire), apoi modifica si sterge una dintre miscarile TEST.
-3. Foloseste filtrele (cautare, liste, filtru pe zi) si schimba pagina tabelului.
+1. Adauga o iesire (tabul Iesire) pe un produs TEST si sterge-o.
+2. Foloseste cautarea, listele de provenienta si de destinatie si filtrul pe zi, apoi schimba pagina tabelului.
 
 **Ce trebuie sa vezi:** aceleasi ecrane si mesaje ca inainte; nicio eroare in pagina. Rezultat: ...
 

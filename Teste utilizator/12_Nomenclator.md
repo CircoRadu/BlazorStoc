@@ -14,10 +14,7 @@ Fluxul: Administrare -> Nomenclator (sau cardul de pe pagina principala) -> adau
 |---|---|---|---|
 | 1 | Meniul Administrare -> Nomenclator (si cardul „Nomenclator” de pe pagina principala) | Se deschide pagina „Tipuri de sisteme”; un cont „Utilizator” nu vede intrarea in meniu, iar adresa /nomenclator ii este refuzata | |
 | 2 | Adauga „Antiefracție”, „TVCI”, „Control acces”, „Incendiu”, „Rețelistică” | Apar in ordinea adaugarii, mesaj „Tipul a fost adăugat.”, campul se goleste | |
-| 3 | Adauga „antiefractie” sau „CONTROL-ACCES” | Refuzat: „Există deja un tip de sistem sau o denumire alternativă…” | |
 | 4 | „Redenumește” un tip (de ex. „Incendiu” -> „Detecție incendiu”), apoi „Renunț” la alta redenumire | Denumirea se schimba; „Renunț” nu schimba nimic; redenumirea in aceeasi denumire: „Denumirea nu s-a modificat.” | |
-| 5 | La TVCI scrie „CCTV” in campul „+ denumire alternativă” si Enter | Apare ca eticheta sub TVCI; aceeasi denumire pe alt tip este refuzata | |
-| 6 | Sterge eticheta „CCTV” cu × | Dispare | |
 | 7 | Muta un tip cu ▲ / ▼ | Ordinea se schimba; primul nu poate urca, ultimul nu poate cobori | |
 | 8 | Dezactiveaza un tip (comutatorul Activ) | Randul se estompeaza, mesaj „…nu mai apare la alegeri noi”; reactiveaza-l, redevine normal | |
 | 9 | Deschide pagina in doua taburi, redenumeste in primul, apoi incearca alta schimbare pe acelasi tip in al doilea | Al doilea afiseaza „Tipul de sistem a fost modificat între timp…” si lista se reincarca | |
