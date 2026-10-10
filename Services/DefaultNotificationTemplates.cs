@@ -11,8 +11,7 @@ public static class DefaultNotificationTemplates
         IAuditTrail? audit, ILogger logger, CancellationToken cancellationToken = default)
     {
         var existing = await repository.GetTemplatesAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var done = new HashSet<string>(StringComparer.Ordinal);
         await using (var read = new MySqlCommand("SELECT source_key FROM notification_template_seeds", connection))
         await using (var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))

@@ -203,3 +203,9 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 - **Task:** ANAF (reguli pe camp, versiuni), pagina produsului (taburi, filtre ca in Jurnal), uniformizarea interfetei
 - **Rezumat:** `Services/AnafApply.cs`, `AnafDifferencesDialog`, `ActivateVersionAsync`/`DeleteVersionAsync` in `AnafService`, filtrul `Text`/`Date` in `StockMovementQuery`, `TrustedClock`-ul ramas neschimbat; CSS: butoane `act-*`, inaltime fixa, `count-badge`, liste de alegere peste card, `fieldset` fara chenar, cautare cu SVG; regulile noi sunt in `CLAUDE.md`.
 - **Teste:** suita in memorie 979, MariaDB 1588, componente 229; verificat in browserul din aplicatie (taburi, filtre, clickuri reale in liste, inaltimea butoanelor pe 30 de pagini).
+
+## 2026-10-10T12:30:00.0000000Z - claude
+
+- **Task:** Refactorizare fara schimbari de functionalitate (MariaDb comun, Program.cs, date scoase din cod, Demo* in teste, pagini si metode lungi, fisiere de teste)
+- **Rezumat:** `Services/MariaDb.cs`, `Startup/ServiceRegistration.cs`, `Startup/PrivateConfiguration.cs`, `Services/EmbeddedData.cs`, `Assets/Data/*.tsv`, `Assets/Migrations/NNN.sql`, `Services/Invoices/InvoiceRowScan.cs`; clase partiale pentru `ProductMovements`, `InvoicePickup`, `InvoiceTemplateWorkbench`; teste impartite (`FullRun.*`, `MariaExtendedChecks.*`) si `StructureChecks`.
+- **Teste:** in memorie 1089, MariaDB 1744, 0 esecuri; migrarile, raportul pe 30 de PDF-uri si dump-ul OCR identice cu varianta veche; paginile impartite neverificate in browser (`Teste utilizator/` 02, 04).

@@ -9,12 +9,20 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (10.10.2026, refactorizare fara schimbari de functionalitate)
+
+- Acces la baza de date comun in `Services/MariaDb.cs` (conexiune, comanda, tranzactie de scriere Serializable cu retry la deadlock); toate repository-urile si serviciile Maria* il folosesc. `Program.cs` are ~230 de randuri: inregistrarile DI pe module in `Startup/ServiceRegistration.cs`, fisierele private de conturi in `Startup/PrivateConfiguration.cs`.
+- Date scoase din cod: codurile de unitate in `Assets/Data/*.tsv` (`EmbeddedData`), migrarile 1-38 in `Assets/Migrations/NNN.sql` (`MariaSchemaMigrations`, acelasi `All`); verificat identic cu varianta veche (38 migrari, 83 instructiuni, 393 coloane). Dublurile `Demo*` au trecut in `tests/BlazorStoc.Checks/Demo/`.
+- Pagini mari impartite in clase partiale (`ProductMovements`, `InvoicePickup`, `InvoiceTemplateWorkbench`); metode lungi desfacute (`InvoiceRowScan`, `InventoryPickupOcr.ScanPageAsync`, `GetPageAsync`/`InsertMovementAsync`, `StockMovements.Validated`); fisierele de teste impartite pe subiecte (`FullRun.*.cs`, `MariaExtendedChecks.*.cs`).
+- Schimbari de comportament voite: retry la deadlock si pentru Project, ProjectComponent, Offer, OfferTemplate, SystemType; Project verifica `IsAllowedDatabase`; anularea se verifica inainte de deschiderea conexiunii.
+- Teste noi `StructureChecks` (grupul `structure`, 23): rutele (`@page` din .razor = rutele compilate; prinde un `@` pierdut), `SettleNumbers`, `OverStockOf`. Verificat pe 30 de PDF-uri reale (raport identic) si pe fixturile OCR (identic).
+- Suita in memorie 1089 trecute, MariaDB 1744 trecute, 0 esecuri; migrarea 38 aplicata acum si pe `blazorstoc_test`. Neverificat in browser: paginile impartite (`Teste utilizator/` 02 si 04).
 ## Ultimul lucru facut (10.10.2026, catalog si preluare factura)
 
 - Ordinea categoriilor prin drag and drop (administrator; migrarea 38 `categories.sort_order`, `ReorderCategoriesAsync`, `wwwroot/category-order.js`), aceeasi ordine in meniul lateral; jurnal "Reordonare categorii".
 - Preluare factura: avertizarea "deja preluat" si deselectarea implicita a randurilor deja preluate la pasul 1 (`RefreshTakenPreviewAsync`), selector de randuri si la pasul 2 (`excluded` comun, `PickRow.RowIndex`).
 - Popup pentru detaliile punctului de pe harta; tipul parametrului cu comutatoare; padding minim 6/12 px la insigne; baza locala curatata de categoriile in afara de TVCI si Control Acces.
-- Suita in memorie 1065 trecute; suita MariaDB nerulata, migrarea 38 aplicata doar pe `BlazorStoc` (nu pe `blazorstoc_test`). De verificat in browser: `Teste utilizator/` 01, 04, 08.
+- De verificat in browser: `Teste utilizator/` 01, 04, 08.
 
 ## Ultimul lucru facut (09.10.2026, parametri obligatori)
 
@@ -58,7 +66,7 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 
 ## Validari
 
-- Suita in memorie: 979 verificari trecute; suita MariaDB `blazorstoc_test`: 1588 trecute, 0 esecuri; UI pe componente: 229 (08.10.2026, inainte de commit). Migrarile 1-35 aplicate pe `blazorstoc_test`; pe `BlazorStoc` migrarile 34-35 se aplica la repornirea aplicatiei.
+- Suita in memorie: 1089 verificari trecute; suita MariaDB `blazorstoc_test`: 1744 trecute, 0 esecuri (10.10.2026). Migrarile 1-38 aplicate pe `blazorstoc_test` si pe `BlazorStoc`.
 - Neverificat in browser: tot ce e in `Teste utilizator/` marcat 07.10.2026 (utilizatorul nu a testat inca nimic).
 
 ## Preview

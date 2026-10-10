@@ -155,12 +155,7 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
         return held;
     }
 
-    private async Task<MySqlConnection> OpenAsync(CancellationToken token)
-    {
-        var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        return connection;
-    }
+    private Task<MySqlConnection> OpenAsync(CancellationToken token) => MariaDb.OpenAsync(configuration, token);
 
     private static async Task<int> ExecuteAsync(MySqlConnection connection, string sql, CancellationToken token,
         params (string Name, object Value)[] parameters)

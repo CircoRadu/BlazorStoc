@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -14,13 +15,11 @@ public sealed class MariaVehicleRepository(
     IArchiveService? archiveService = null) : IVehicleRepository
 {
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<Vehicle>> GetVehiclesAsync(CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT id, plate_number, description, version, itp_expiry, insurance_expiry, rovinieta_expiry FROM vehicles ORDER BY plate_number, id
             """, connection);
@@ -34,8 +33,7 @@ public sealed class MariaVehicleRepository(
     public async Task<Vehicle?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT id, plate_number, description, version, itp_expiry, insurance_expiry, rovinieta_expiry FROM vehicles WHERE id=@id
             """, ("@id", id));
@@ -127,31 +125,9 @@ public sealed class MariaVehicleRepository(
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
         string? savedPlate = null, int? savedId = null) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token, savedPlate, savedId), token);
-
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
-        string? savedPlate, int? savedId)
-    {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new VehicleOperationException("Modificările sunt permise numai în baza BlazorStoc.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (Exception exception)
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            if (savedPlate is not null && exception is MySqlException { Number: 1062 })
-                throw await ConcurrentDuplicateAsync(savedPlate, savedId, token).ConfigureAwait(false);
-            throw;
-        }
-    }
-
+        MariaDb.WriteAsync(configuration, action, message => new VehicleOperationException(message), async (exception, cancellation) =>
+            savedPlate is not null && exception.Number == 1062 ? await ConcurrentDuplicateAsync(savedPlate, savedId, cancellation).ConfigureAwait(false) : null,
+            token);
     private static async Task<Vehicle?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
@@ -179,8 +155,7 @@ public sealed class MariaVehicleRepository(
     {
         try
         {
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(token).ConfigureAwait(false);
+            await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
             await using var command = Command(connection, null, """
                 SELECT plate_number, description FROM vehicles
                 WHERE normalized_plate=@normalized AND (@id IS NULL OR id<>@id)
@@ -195,13 +170,6 @@ public sealed class MariaVehicleRepository(
         {
             return new(VehicleRules.DuplicatePlateMessage(null, null));
         }
-    }
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
     }
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;

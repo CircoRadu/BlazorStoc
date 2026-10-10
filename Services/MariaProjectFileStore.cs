@@ -1,6 +1,7 @@
 using System.Data;
 using System.Security.Cryptography;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -25,12 +26,10 @@ public sealed class MariaProjectFileStore(IWebHostEnvironment environment, IConf
 
     public static string ArchivePath(IWebHostEnvironment environment, IConfiguration configuration) => MariaAssetPaths.ArchiveFiles(configuration);
 
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<ProjectObservationFile>> GetFilesAsync(int observationId, CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT id,observation_id,original_name,relative_path,content_type,byte_length,sha256,author,uploaded_utc
             FROM project_observation_files WHERE observation_id=@observation ORDER BY uploaded_utc,id
@@ -43,8 +42,7 @@ public sealed class MariaProjectFileStore(IWebHostEnvironment environment, IConf
 
     public async Task<ProjectFileContent?> GetContentAsync(int fileId, CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null,
             "SELECT relative_path,content_type,original_name FROM project_observation_files WHERE id=@id", ("@id", fileId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -66,8 +64,7 @@ public sealed class MariaProjectFileStore(IWebHostEnvironment environment, IConf
         {
             Directory.CreateDirectory(rootPath);
             var destination = Resolve(prepared.StoredName);
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
             await using (var count = Command(connection, null,
                 "SELECT COUNT(*) FROM project_observation_files WHERE observation_id=@observation", ("@observation", observationId)))
                 if (Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) >= ProjectFileRules.MaximumFilesPerObservation)
@@ -126,8 +123,7 @@ public sealed class MariaProjectFileStore(IWebHostEnvironment environment, IConf
     {
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new ProjectOperationException(reasonError);
-        await using var lookupConnection = CreateConnection();
-        await lookupConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var lookupConnection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var lookup = Command(lookupConnection, null, """
             SELECT id,observation_id,original_name,relative_path,content_type,byte_length,sha256,author,uploaded_utc
             FROM project_observation_files WHERE id=@id
@@ -146,8 +142,7 @@ public sealed class MariaProjectFileStore(IWebHostEnvironment environment, IConf
                 prepared = await ArchiveFileSafety.PrepareAsync(rootPath, archivePath,
                     file.StoredName, operation, AuditEntities.ProjectObservationFile, file.Id.ToString(),
                     file.ContentType, file.OriginalName, file.SizeBytes, token).ConfigureAwait(false);
-                await using var connection = CreateConnection();
-                await connection.OpenAsync(token).ConfigureAwait(false);
+                await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
                 await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
                 try
                 {
@@ -186,12 +181,4 @@ public sealed class MariaProjectFileStore(IWebHostEnvironment environment, IConf
     private static ProjectObservationFile Read(MySqlDataReader reader) => new(reader.GetInt32(0), reader.GetInt32(1),
         reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetInt64(5), reader.GetString(6),
         reader.GetString(7), MariaTimeText.Parse(reader.GetString(8)));
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql,
-        params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
 }

@@ -750,3 +750,5 @@ Sabloane XML si preluare facturi XML/PDF, categorii, liste de alegere (09.10.202
 Parametri obligatori pe subcategorie, variante la preluarea facturii si caractere nesigure (09.10.2026): Parametri obligatori, variante la preluare si caractere nesigure: de verificat in browser (Teste utilizator 01 si 04)
 
 Ordinea categoriilor, preluare factura cu produse deja preluate, popup harta, padding insigne (10.10.2026): drag and drop al categoriilor, avertizarea deja preluat la pasul 1, popup-ul hartii si padding-ul insignelor: de verificat in browser (Teste utilizator/ 01, 04, 08); suita MariaDB si migrarea 38 pe blazorstoc_test
+
+Refactorizare fara schimbari de functionalitate (10.10.2026): paginile impartite (produs -> miscari, preluare factura, sabloane de facturi) si fluxurile lor: de verificat in browser (Teste utilizator/ 02 si 04); schema-mariadb.sql ramane de intretinut in paralel cu fisierele de migrare

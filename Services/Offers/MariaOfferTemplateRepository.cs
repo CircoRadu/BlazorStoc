@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -10,19 +11,17 @@ public sealed class MariaOfferTemplateRepository(
     IAccessControl? accessControl = null,
     IAuditTrail? auditTrail = null) : IOfferTemplateRepository
 {
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
     private const string Select = "SELECT id,name,active,definition,version,updated_by,updated_utc FROM offer_templates";
 
     public async Task<IReadOnlyList<OfferTemplateRecord>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadAsync(connection, null, $"{Select} ORDER BY name,id", cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<List<OfferTemplateRecord>> ReadAsync(MySqlConnection connection, MySqlTransaction? transaction, string sql, CancellationToken token,
-        params (string Name, object Value)[] parameters)
+        params (string Name, object? Value)[] parameters)
     {
         await using var command = Command(connection, transaction, sql, parameters);
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -127,43 +126,15 @@ public sealed class MariaOfferTemplateRepository(
 
     private async Task<OfferTemplateRecord> GetAsync(int id, CancellationToken token)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
         return (await ReadAsync(connection, null, $"{Select} WHERE id=@id", token, ("@id", id)).ConfigureAwait(false)).FirstOrDefault()
                ?? throw new OfferTemplateException(OfferTemplateMessages.Stale);
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
-    {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new OfferTemplateException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (MySqlException exception) when (exception.Number == 1062)
-        {
-            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw new OfferTemplateException("Există deja un șablon cu această denumire.");
-        }
-        catch
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
-    }
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaDb.WriteAsync(configuration, action, message => new OfferTemplateException(message),
+            exception => exception.Number == 1062 ? new OfferTemplateException("Există deja un șablon cu această denumire.") : null, token,
+            "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 }

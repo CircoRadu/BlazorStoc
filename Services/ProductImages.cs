@@ -39,48 +39,6 @@ public static class ProductImageRules
     };
 }
 
-public sealed class DemoProductImageStore : IProductImageStore
-{
-    private readonly object gate = new();
-    private readonly Dictionary<int, ProductImageData> images = [];
-
-    public Task<bool> ExistsAsync(int productId, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (gate) return Task.FromResult(images.ContainsKey(productId));
-    }
-
-    public Task<ProductImageData?> GetAsync(int productId, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (gate) return Task.FromResult(images.GetValueOrDefault(productId));
-    }
-
-    public Task SaveAsync(int productId, ProductImageData image, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var contentType = ProductImageRules.DetectContentType(image.Content);
-        lock (gate) images[productId] = image with { ContentType = contentType, Content = image.Content.ToArray() };
-        return Task.CompletedTask;
-    }
-
-    public Task DeleteAsync(int productId, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        lock (gate) images.Remove(productId);
-        return Task.CompletedTask;
-    }
-
-    public async Task ArchiveDeleteAsync(int productId, ArchiveOperation operation,
-        Func<ArchiveFileRecord?, CancellationToken, Task> commitDatabase,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(commitDatabase);
-        await commitDatabase(null, cancellationToken).ConfigureAwait(false);
-        lock (gate) images.Remove(productId);
-    }
-}
 
 // Subtask 2.7 (Task 2): this store is only used in MariaDB mode (demo mode uses SqliteProductImageStore, which
 // keeps images in the SQLite database itself). Directories come from MariaAssetPaths (Services/MariaTimeText.cs),

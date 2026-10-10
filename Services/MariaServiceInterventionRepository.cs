@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -18,7 +19,6 @@ public sealed class MariaServiceInterventionRepository(
         "performed_on, planned_due, next_due_basis, next_due_set, notes, recorded_by, recorded_utc, version";
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
     private DateOnly Today => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
 
     private sealed record Pending(string Action, string Target, string Details, string Motif);
@@ -33,8 +33,7 @@ public sealed class MariaServiceInterventionRepository(
     public async Task<IReadOnlyList<ServiceIntervention>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null,
             $"SELECT {Columns} FROM service_interventions WHERE beneficiary_id=@id ORDER BY performed_on DESC, id DESC", ("@id", beneficiaryId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -61,8 +60,7 @@ public sealed class MariaServiceInterventionRepository(
         }
         var filter = where.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", where);
         var size = Math.Clamp(query.PageSize, 1, 200);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         int total;
         await using (var count = Command(connection, null, "SELECT COUNT(*) FROM service_interventions i JOIN beneficiaries b ON b.id=i.beneficiary_id" + filter, [.. parameters]))
             total = Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
@@ -200,9 +198,8 @@ public sealed class MariaServiceInterventionRepository(
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new ServiceInterventionOperationException(reasonError);
         string ownerName;
         IReadOnlyList<ServicePhoto> photos;
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var owner = Command(connection, null, "SELECT name FROM beneficiaries WHERE id=@id", ("@id", original.BeneficiaryId));
             ownerName = await owner.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string ?? throw ServiceInterventionRules.BeneficiaryMissing();
             ServiceInterventionRules.CheckCurrent(await GetLockedAsync(connection, null, original.Id, cancellationToken, false).ConfigureAwait(false), original);
@@ -324,29 +321,8 @@ public sealed class MariaServiceInterventionRepository(
     }
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
-
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
-    {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new ServiceInterventionOperationException("Modificările sunt permise numai în baza BlazorStoc.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (Exception exception)
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            if (exception is MySqlException { Number: 1451 })
-                throw new ServiceInterventionOperationException("Intervenția nu poate fi ștearsă: are date asociate.");
-            throw;
-        }
-    }
+        MariaDb.WriteAsync(configuration, action, message => new ServiceInterventionOperationException(message),
+            exception => exception.Number == 1451 ? new ServiceInterventionOperationException("Intervenția nu poate fi ștearsă: are date asociate.") : null, token);
 
     private static ServiceIntervention Read(MySqlDataReader reader) =>
         new(checked((int)reader.GetInt64(0)), ServiceInterventionRules.ParseKind(reader.GetString(1)), checked((int)reader.GetInt64(2)), checked((int)reader.GetInt64(3)),
@@ -357,13 +333,6 @@ public sealed class MariaServiceInterventionRepository(
     private static DateOnly ReadDate(MySqlDataReader reader, int ordinal) => DateOnly.FromDateTime(reader.GetDateTime(ordinal));
 
     private static DateTime SqlDate(DateOnly date) => date.ToDateTime(TimeOnly.MinValue);
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object? Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
-        return command;
-    }
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

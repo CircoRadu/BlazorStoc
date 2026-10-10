@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.AspNetCore.Identity;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -24,8 +25,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         password ??= "";
         if (username.Length == 0 || password.Length == 0) return new(AuthenticationStatus.InvalidCredentials);
 
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT id,username,display_name,role,password_hash,is_active
             FROM web_users WHERE normalized_username=@username LIMIT 1
@@ -57,8 +57,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     public async Task<IReadOnlyList<WebUser>> GetUsersAsync(CancellationToken cancellationToken = default)
     {
         await EnsureAdministratorAsync(cancellationToken);
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand(
             "SELECT id,username,display_name,role,is_active,version FROM web_users ORDER BY username,id", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -186,8 +185,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
 
     private async Task<string> GetPasswordHashAsync(int id, CancellationToken token)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
         await using var command = Command(connection, null,
             "SELECT password_hash FROM web_users WHERE id=@id LIMIT 1", ("@id", id));
         return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string
@@ -211,29 +209,8 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     ];
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
-
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new UserOperationException("Administrarea utilizatorilor este permisă numai în baza BlazorStoc.");
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch
-        {
-            if (transaction.Connection is not null)
-                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
-    }
+        MariaDb.WriteAsync(configuration, action, message => new UserOperationException(message), token,
+            "Administrarea utilizatorilor este permisă numai în baza BlazorStoc.");
 
     private static async Task EnsureUniqueUsernameAsync(MySqlConnection connection, MySqlTransaction transaction,
         string normalizedUsername, int? excludedId, CancellationToken token)
@@ -268,11 +245,4 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     private Task EnsureAdministratorAsync(CancellationToken token) => accessControl?.EnsureAdministratorAsync(token) ?? Task.CompletedTask;
     private Task<string?> GetCurrentUsernameAsync(CancellationToken token) => accessControl?.GetUsernameAsync(token) ?? Task.FromResult<string?>(null);
     private static WebUser ReadUser(MySqlDataReader reader) => new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2),
-        reader.GetString(3), reader.GetBoolean(4), reader.GetInt64(5));
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
-}
+        reader.GetString(3), reader.GetBoolean(4), reader.GetInt64(5));}

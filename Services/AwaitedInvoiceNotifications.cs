@@ -19,8 +19,7 @@ public sealed class MariaAwaitedEntryReader(IConfiguration configuration) : IAwa
 {
     public async Task<IReadOnlyList<AwaitedEntryItem>> GetAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT m.id,m.free_supplier_id,s.name,m.movement_date,p.name,m.quantity
             FROM stock_movements m INNER JOIN suppliers s ON s.id=m.free_supplier_id INNER JOIN products p ON p.id=m.product_id

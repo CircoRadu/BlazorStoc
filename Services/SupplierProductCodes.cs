@@ -1,4 +1,5 @@
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -28,14 +29,12 @@ public static class SupplierProductCodeRules
 
 public sealed class MariaSupplierProductCodes(IConfiguration configuration, IAccessControl? accessControl = null, IAuditTrail? auditTrail = null) : ISupplierProductCodes
 {
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyDictionary<string, int>> GetAsync(int supplierId, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
         var result = new Dictionary<string, int>(StringComparer.Ordinal);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("SELECT code_key, product_id FROM supplier_product_codes WHERE supplier_id=@supplier", connection);
         command.Parameters.AddWithValue("@supplier", supplierId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -53,9 +52,8 @@ public sealed class MariaSupplierProductCodes(IConfiguration configuration, IAcc
         var now = MariaTimeText.Format(MariaTimeText.Now());
         string supplierName, newName;
         string? oldName = null;
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             supplierName = await Scalar(connection, "SELECT name FROM suppliers WHERE id=@id", supplierId, cancellationToken).ConfigureAwait(false) ?? "";
             newName = await Scalar(connection, "SELECT name FROM products WHERE id=@id", productId, cancellationToken).ConfigureAwait(false) ?? "";
             if (supplierName.Length == 0 || newName.Length == 0) return false;

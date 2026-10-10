@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -14,12 +15,10 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
         "id, template_id, source_key, object_id, expiry_date, created_utc, acknowledged_by, acknowledged_utc, snooze_until, snooze_days, version, " +
         "resolved_by, resolved_utc, resolved_reason, resolved_auto, object_label, snapshot_values, snapshot_subject, snapshot_body, snapshot_source";
 
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<NotificationTemplate>> GetTemplatesAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, $"SELECT {TemplateColumns} FROM notification_templates ORDER BY source_key, threshold_days, id");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<NotificationTemplate>();
@@ -30,8 +29,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     public async Task<NotificationTemplate> CreateTemplateAsync(NotificationTemplateInput input, CancellationToken cancellationToken = default)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             INSERT INTO notification_templates (source_key, subject, body, threshold_days, is_active, version)
             VALUES (@key, @subject, @body, @days, @active, 0)
@@ -44,8 +42,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     public async Task<NotificationTemplate> UpdateTemplateAsync(NotificationTemplate original, NotificationTemplateInput input, CancellationToken cancellationToken = default)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var version = checked(original.Version + 1);
         await using var command = Command(connection, null, """
             UPDATE notification_templates SET source_key=@key, subject=@subject, body=@body, threshold_days=@days, is_active=@active, version=@version
@@ -62,8 +59,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     public async Task DeleteTemplateAsync(NotificationTemplate original, CancellationToken cancellationToken = default)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         // The notifications of the template are removed with it (foreign key ON DELETE CASCADE).
         await using var command = Command(connection, null, "DELETE FROM notification_templates WHERE id=@id AND version=@version",
             ("@id", original.Id), ("@version", original.Version));
@@ -73,8 +69,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
 
     public async Task<IReadOnlyList<ExpiryNotification>> GetNotificationsAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, $"SELECT {NotificationColumns} FROM expiry_notifications ORDER BY expiry_date, id");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<ExpiryNotification>();
@@ -87,8 +82,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     public async Task<CreatedNotification?> CreateNotificationAsync(SyncEntry entry, CancellationToken cancellationToken = default)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var insert = Command(connection, null, """
             INSERT IGNORE INTO expiry_notifications (template_id, source_key, object_id, expiry_date, created_utc, object_label, snapshot_values, version)
             VALUES (@template, @source, @object, @expiry, @created, @label, @values, 0)
@@ -102,8 +96,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     public async Task<ExpiryNotification?> ResolveAsync(ExpiryNotification original, NotificationResolution resolution, CancellationToken cancellationToken = default)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         await using var update = Command(connection, null, """
             UPDATE expiry_notifications SET resolved_by=@by, resolved_utc=@now, resolved_reason=@reason, resolved_auto=@auto, object_label=@label,
@@ -132,8 +125,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     public async Task<bool> ReopenAsync(ExpiryNotification original, CancellationToken cancellationToken = default)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var update = Command(connection, null, """
             UPDATE expiry_notifications SET resolved_by=NULL, resolved_utc=NULL, resolved_reason=NULL, resolved_auto=0,
                 snapshot_subject=NULL, snapshot_body=NULL, snapshot_source=NULL,
@@ -145,8 +137,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
 
     public async Task<int> CountOpenAsync(int templateId, CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null,
             "SELECT COUNT(*) FROM expiry_notifications WHERE template_id=@id AND resolved_utc IS NULL", ("@id", templateId));
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
@@ -154,8 +145,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
 
     public async Task<NotificationSettings> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, "SELECT purge_enabled, purge_months, last_purge_utc, version FROM notification_settings WHERE id=1");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
@@ -168,8 +158,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
         CancellationToken cancellationToken = default)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         object last = lastPurgeUtc is { } value ? MariaTimeText.Format(value) : DBNull.Value;
         var version = original.Version < 0 ? 0 : checked(original.Version + 1);
         int changed;
@@ -195,8 +184,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     {
         if (notifications.Count == 0) return 0;
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken).ConfigureAwait(false);
         try
         {
@@ -226,8 +214,7 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     private async Task<ExpiryNotification> ChangeStateAsync(ExpiryNotification original, string username, int? days, DateOnly today, CancellationToken token)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, token).ConfigureAwait(false);
         try
         {
@@ -289,18 +276,11 @@ public sealed class MariaExpiryNotificationRepository(IConfiguration configurati
     private static NotificationTemplate Build(int id, NotificationTemplateInput input, long version) =>
         new(id, input.SourceKey, input.Subject, input.Body, input.ThresholdDays ?? 0, input.Active, version);
 
-    private static (string, object)[] Fields(NotificationTemplateInput input) =>
+    private static (string, object?)[] Fields(NotificationTemplateInput input) =>
     [
         ("@key", input.SourceKey), ("@subject", input.Subject), ("@body", input.Body),
         ("@days", input.ThresholdDays ?? 0), ("@active", input.Active ? 1 : 0)
     ];
 
     private static object SqlDate(DateOnly date) => date.ToDateTime(TimeOnly.MinValue);
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
 }

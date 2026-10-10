@@ -25,8 +25,7 @@ public sealed class MariaMaintenanceNotificationReader(IConfiguration configurat
 {
     public async Task<IReadOnlyList<MaintenanceDueItem>> GetDueAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT p.id, c.beneficiary_id, b.name, w.name, w.address, c.contract_number, c.contract_date, p.next_due,
                    (SELECT MAX(i.performed_on) FROM service_interventions i WHERE i.work_point_id = p.work_point_id AND i.kind = 'M')
@@ -46,8 +45,7 @@ public sealed class MariaMaintenanceNotificationReader(IConfiguration configurat
 
     public async Task<IReadOnlyList<ContractExpiryItem>> GetContractExpiriesAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT c.id, c.beneficiary_id, b.name, c.contract_number, c.contract_date, c.valid_until
             FROM service_contracts c JOIN beneficiaries b ON b.id = c.beneficiary_id

@@ -303,18 +303,16 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
             var tables = MariaArchiveSchema.RequiredTables.ToArray();
             progress?.Report(new(BackupStage.Exporting, BackupRules.StageMessage(BackupStage.Exporting)));
             CanonicalSnapshot before, after;
-            await using (var connection = DatabaseConnections.Create(configuration))
+            await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 before = await CanonicalRowHasher.ComputeAsync(connection, tables, cancellationToken).ConfigureAwait(false);
             }
 
             tempCredentialsFile = await WriteCredentialsFileAsync(configuration, cancellationToken).ConfigureAwait(false);
             await RunMariaDumpAsync(configuration, tempCredentialsFile, tempSql, cancellationToken).ConfigureAwait(false);
 
-            await using (var connection = DatabaseConnections.Create(configuration))
+            await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 after = await CanonicalRowHasher.ComputeAsync(connection, tables, cancellationToken).ConfigureAwait(false);
             }
 

@@ -41,8 +41,7 @@ public static class MariaArchiveSchema
 
     public static async Task InitializeAsync(IConfiguration configuration, CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand(
             "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()", connection);
         var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

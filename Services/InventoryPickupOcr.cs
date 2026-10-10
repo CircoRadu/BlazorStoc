@@ -131,17 +131,50 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         }
     }
 
-    // One data row read from the page before its "Nr. crt." is settled (see ScanPageAsync): Block numbers the tables of
+    // One data row read from the page before its "Nr. crt." is settled (see SettleNumbers): Block numbers the tables of
     // the page (a table starts at its "Cod produs" header row) and Index is the row's position inside its table.
-    private sealed record PendingRow(int Block, int Index, string Code, int? Value, bool Uncertain, int? PrintedNumber);
+    internal sealed record PendingRow(int Block, int Index, string Code, int? Value, bool Uncertain, int? PrintedNumber);
+
+    // The page as the table reading needs it: upright (deskewed), with its contrast stretched when the ink is faint, and a black-and-white copy.
+    private sealed class PreparedPage(Mat deskewed, Mat? stretched, Mat binary) : IDisposable
+    {
+        public Mat Gray => stretched ?? deskewed;
+        public Mat Binary => binary;
+        public void Dispose() { binary.Dispose(); stretched?.Dispose(); deskewed.Dispose(); }
+    }
+
+    // The x positions (pixels) of the columns of one table block, and whether the table has the leading "Nr. crt." column.
+    private readonly record struct BlockColumns(int Left, int Code, int Stock, int Real, int Right, bool HasNumber, bool Fallback);
 
     private async Task<List<InventoryPickupScanRow>> ScanPageAsync(SKBitmap page, int pageNumber, CancellationToken cancellationToken)
     {
         var scale = RenderDpi / 72.0;
-        var pageWidthPoints = page.Width / scale;
-        var columns = InventoryPdfLayout.ComputeColumns(pageWidthPoints);
+        var columns = InventoryPdfLayout.ComputeColumns(page.Width / scale);
         var debug = Environment.GetEnvironmentVariable("INVENTORY_OCR_DEBUG") == "1";
 
+        using var prepared = PreparePage(page, debug);
+        var gray = prepared.Gray;
+        var gridLines = FindPageGridLines(prepared, columns, scale, debug);
+        if (gridLines.Count < 2) return [];
+
+        using var verticalSource = new Mat();
+        Cv2.Dilate(prepared.Binary, verticalSource, Cv2.GetStructuringElement(MorphShapes.Rect, new Size(DividerDetectionDilationWidth, 1)));
+
+        var blocks = FindTableBlocks(gridLines, gray, verticalSource, debug);
+        var pending = new List<PendingRow>();
+        var hasNumberColumn = false;
+        for (var blockNumber = 1; blockNumber <= blocks.Count; blockNumber++)
+        {
+            var bands = blocks[blockNumber - 1];
+            var layout = FindBlockColumns(verticalSource, bands, columns, blockNumber, debug);
+            if (await ReadBlockAsync(gray, verticalSource, bands, layout, blockNumber, scale, pending, debug, cancellationToken).ConfigureAwait(false))
+                hasNumberColumn = true;
+        }
+        return SettleNumbers(pending, hasNumberColumn, pageNumber);
+    }
+
+    private static PreparedPage PreparePage(SKBitmap page, bool debug)
+    {
         using var grayRaw = ToGrayMat(page);
         // A real scan is never perfectly straight (paper feed skew), and confirmed real user scans went from a
         // fraction of a degree up to a couple of degrees. The whole page is deskewed first, before any other
@@ -149,40 +182,54 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         // page.
         var skewDegrees = FindSkewDegrees(grayRaw);
         if (debug) Console.WriteLine($"[debug] estimated skew = {skewDegrees:F2} degrees");
-        using var deskewed = Math.Abs(skewDegrees) >= MinCorrectedSkewDegrees ? Rotate(grayRaw, skewDegrees, Scalar.White) : grayRaw.Clone();
-        // A washed-out scan (faint print, pencil) is stretched to the full gray range first, so the rule lines and text
-        // survive the thresholding below; a page with normal contrast, or none at all, is left untouched.
-        var pageContrast = InkContrast(deskewed);
-        using var stretchedPage = pageContrast < FaintInkContrast ? StretchContrast(deskewed) : null;
-        var gray = stretchedPage ?? deskewed;
-        if (debug) Console.WriteLine($"[debug] page ink contrast = {pageContrast}{(stretchedPage is not null ? " (faint: stretched)" : "")}");
-        using var binary = new Mat();
-        Cv2.Threshold(gray, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
+        var deskewed = Math.Abs(skewDegrees) >= MinCorrectedSkewDegrees ? Rotate(grayRaw, skewDegrees, Scalar.White) : grayRaw.Clone();
+        Mat? stretched = null;
+        try
+        {
+            // A washed-out scan (faint print, pencil) is stretched to the full gray range first, so the rule lines and text
+            // survive the thresholding below; a page with normal contrast, or none at all, is left untouched.
+            var pageContrast = InkContrast(deskewed);
+            stretched = pageContrast < FaintInkContrast ? StretchContrast(deskewed) : null;
+            if (debug) Console.WriteLine($"[debug] page ink contrast = {pageContrast}{(stretched is not null ? " (faint: stretched)" : "")}");
+            var binary = new Mat();
+            Cv2.Threshold(stretched ?? deskewed, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
+            return new PreparedPage(deskewed, stretched, binary);
+        }
+        catch
+        {
+            stretched?.Dispose();
+            deskewed.Dispose();
+            throw;
+        }
+    }
 
-        // The table grid is found in the deskewed page itself: long horizontal rule lines give the row edges (and how
-        // far the table extends), and the vertical rule lines inside each row band give that row's column edges. No
-        // position or cell size is assumed. The geometry computed from the generated PDF (InventoryPdfLayout) is only
-        // a fallback for a row whose vertical rules cannot be told apart (faint or broken lines), see below.
-        var gridLines = FindGridLines(binary);
+    // The table grid is found in the deskewed page itself: long horizontal rule lines give the row edges (and how
+    // far the table extends), and the vertical rule lines inside each row band give that row's column edges. No
+    // position or cell size is assumed. The geometry computed from the generated PDF (InventoryPdfLayout) is only
+    // a fallback for a row whose vertical rules cannot be told apart (faint or broken lines), see FindBlockColumns.
+    private static List<GridLine> FindPageGridLines(PreparedPage prepared, InventoryTableColumns columns, double scale, bool debug)
+    {
+        var gray = prepared.Gray;
+        var gridLines = FindGridLines(prepared.Binary);
         var legacyLeft = ToPixel(columns.NumberX, scale, gray.Cols);
         var legacyRight = ToPixel(columns.RightEdge, scale, gray.Cols);
         if (gridLines.Count < 2)
         {
             // No long rule lines at all: fall back to searching only where the generated layout puts the table.
-            gridLines = FindHorizontalLines(binary, legacyLeft, legacyRight)
+            gridLines = FindHorizontalLines(prepared.Binary, legacyLeft, legacyRight)
                 .Select(y => new GridLine(y, legacyLeft, legacyRight)).ToList();
             if (debug) Console.WriteLine($"[debug] no grid lines detected, legacy lines: {gridLines.Count}");
         }
         if (debug) Console.WriteLine($"[debug] gray {gray.Rows}x{gray.Cols}, grid lines ({gridLines.Count}): {string.Join(", ", gridLines.Select(line => $"y={line.Y} x={line.Left}-{line.Right}"))}");
-        if (gridLines.Count < 2) return [];
+        return gridLines;
+    }
 
-        using var verticalSource = new Mat();
-        Cv2.Dilate(binary, verticalSource, Cv2.GetStructuringElement(MorphShapes.Rect, new Size(DividerDetectionDilationWidth, 1)));
-
-        // Table blocks: consecutive row bands that carry the table's own left and right borders. A band between two
-        // tables (a subcategory heading's text) has no borders, so it ends a block. The column structure is then read
-        // ONCE per block, from the vertical rules that run through the whole block starting at its header row: text
-        // strokes inside a short row can look like a rule, but only a real rule stays continuous down the table.
+    // Table blocks: consecutive row bands that carry the table's own left and right borders. A band between two
+    // tables (a subcategory heading's text) has no borders, so it ends a block. The column structure is then read
+    // ONCE per block, from the vertical rules that run through the whole block starting at its header row: text
+    // strokes inside a short row can look like a rule, but only a real rule stays continuous down the table.
+    private static List<List<TableBand>> FindTableBlocks(List<GridLine> gridLines, Mat gray, Mat verticalSource, bool debug)
+    {
         var blocks = new List<List<TableBand>>();
         List<TableBand>? currentBlock = null;
         for (var i = 0; i + 1 < gridLines.Count; i++)
@@ -202,94 +249,90 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
             if (currentBlock is null) { currentBlock = []; blocks.Add(currentBlock); }
             currentBlock.Add(new TableBand(top, bottom, rowLeft, rowRight));
         }
+        return blocks;
+    }
 
-        var codeFraction = (columns.CodeX - columns.PageMargin) / columns.ContentWidth;
-        var stockFraction = (columns.StockX - columns.PageMargin) / columns.ContentWidth;
-        var realFraction = (columns.RealX - columns.PageMargin) / columns.ContentWidth;
-        var horizontalPad = (int)Math.Round(CellPaddingPoints * scale);
-        var pending = new List<PendingRow>();
-        var hasNumberColumn = false;
-        for (var blockNumber = 1; blockNumber <= blocks.Count; blockNumber++)
+    // Vertical rules along the whole block. Five = Nr. crt. | Cod produs | Valoare stoc | Valoare reala; four = the
+    // same table without the leading "Nr. crt." column (forms printed before that column existed).
+    private static BlockColumns FindBlockColumns(Mat verticalSource, List<TableBand> bands, InventoryTableColumns columns, int blockNumber, bool debug)
+    {
+        var blockLeft = bands.Min(band => band.Left);
+        var blockRight = bands.Max(band => band.Right);
+        var dividers = FindDividers(verticalSource, bands[0].Top, bands[^1].Bottom, blockLeft, blockRight);
+        BlockColumns layout;
+        if (dividers.Count == 5)
+            layout = new(dividers[0], dividers[1], dividers[2], dividers[3], dividers[4], HasNumber: true, Fallback: false);
+        else if (dividers.Count == 4)
+            layout = new(dividers[0], dividers[0], dividers[1], dividers[2], dividers[3], HasNumber: false, Fallback: false);
+        else
         {
-            var bands = blocks[blockNumber - 1];
-            var blockLeft = bands.Min(band => band.Left);
-            var blockRight = bands.Max(band => band.Right);
-            // Vertical rules along the whole block. Five = Nr. crt. | Cod produs | Valoare stoc | Valoare reala; four = the
-            // same table without the leading "Nr. crt." column (forms printed before that column existed).
-            var dividers = FindDividers(verticalSource, bands[0].Top, bands[^1].Bottom, blockLeft, blockRight);
-            int xLeft, xCode, xStock, xReal, xRight;
-            bool blockHasNumber;
-            var fallbackColumns = false;
-            if (dividers.Count == 5)
-            {
-                (xLeft, xCode, xStock, xReal, xRight) = (dividers[0], dividers[1], dividers[2], dividers[3], dividers[4]);
-                blockHasNumber = true;
-            }
-            else if (dividers.Count == 4)
-            {
-                (xLeft, xStock, xReal, xRight) = (dividers[0], dividers[1], dividers[2], dividers[3]);
-                xCode = xLeft;
-                blockHasNumber = false;
-            }
-            else
-            {
-                // Not a complete set of rules (faint or broken ones): use the block's horizontal extent and the same
-                // column FRACTIONS the generated PDF used (invariant to print/scan scale).
-                xLeft = blockLeft;
-                xRight = blockRight;
-                xCode = xLeft + (int)Math.Round(codeFraction * (xRight - xLeft));
-                xStock = xLeft + (int)Math.Round(stockFraction * (xRight - xLeft));
-                xReal = xLeft + (int)Math.Round(realFraction * (xRight - xLeft));
-                blockHasNumber = true;
-                fallbackColumns = true;
-            }
-            if (debug) Console.WriteLine($"[debug] table {blockNumber}: rows {bands[0].Top}-{bands[^1].Bottom}, {dividers.Count} rules ({string.Join(",", dividers)}) -> xLeft={xLeft} xCode={xCode} xStock={xStock} xReal={xReal} xRight={xRight} numberColumn={blockHasNumber}{(fallbackColumns ? " (fallback fractions)" : "")}");
-
-            var indexInBlock = 0;
-            foreach (var band in bands)
-            {
-                var top = band.Top;
-                var bottom = band.Bottom;
-                var height = bottom - top;
-                // The vertical inset only needs to clear the rule lines' own stroke width (a handful of pixels
-                // regardless of DPI): rows can be as short as one text line, so scaling this from PDF points the way
-                // the horizontal inset does would eat a large share of a short row's actual content.
-                var verticalPad = Math.Min(6, height / 6);
-                var codeCell = SafeCrop(gray, xCode + horizontalPad, top + verticalPad, xStock - xCode - 2 * horizontalPad, height - 2 * verticalPad);
-                var realCell = SafeCrop(gray, xReal + horizontalPad, top + verticalPad, xRight - xReal - 2 * horizontalPad, height - 2 * verticalPad);
-                if (codeCell is null || realCell is null) { codeCell?.Dispose(); realCell?.Dispose(); continue; }
-
-                string code;
-                try { code = await ReadCodeAsync(codeCell, cancellationToken).ConfigureAwait(false); }
-                finally { codeCell.Dispose(); }
-                if (debug) Console.WriteLine($"[debug] {top}-{bottom}: code='{code}'");
-
-                // The header row ("Cod produs") is not data; the rows after it are numbered from 1 within this table.
-                if (TextNormalization.SameUniqueValue(code, InventoryPickupOcrRules.HeaderCode)) { realCell.Dispose(); indexInBlock = 0; continue; }
-                indexInBlock++;
-                if (code.Length == 0) { realCell.Dispose(); continue; }
-
-                var (hasInk, value, uncertain) = ReadHandwrittenWithContrast(realCell, debug);
-                if (debug) Console.WriteLine($"[debug] {top}-{bottom}: hasInk={hasInk} value={value} uncertain={uncertain}");
-                realCell.Dispose();
-                if (!hasInk) continue; // empty cell: "neinventariat", no row at all (subtask 1.2)
-
-                int? printedNumber = null;
-                if (blockHasNumber)
-                {
-                    hasNumberColumn = true;
-                    using var numberCell = SafeCrop(gray, xLeft + horizontalPad, top + verticalPad, xCode - xLeft - 2 * horizontalPad, height - 2 * verticalPad);
-                    if (numberCell is not null) printedNumber = await ReadPrintedNumberAsync(numberCell, cancellationToken).ConfigureAwait(false);
-                    if (debug) Console.WriteLine($"[debug] {top}-{bottom}: printed number={printedNumber?.ToString() ?? "?"} (index {indexInBlock} in table {blockNumber})");
-                }
-                pending.Add(new PendingRow(blockNumber, indexInBlock, code, value, uncertain, printedNumber));
-            }
+            // Not a complete set of rules (faint or broken ones): use the block's horizontal extent and the same
+            // column FRACTIONS the generated PDF used (invariant to print/scan scale).
+            var codeFraction = (columns.CodeX - columns.PageMargin) / columns.ContentWidth;
+            var stockFraction = (columns.StockX - columns.PageMargin) / columns.ContentWidth;
+            var realFraction = (columns.RealX - columns.PageMargin) / columns.ContentWidth;
+            layout = new(blockLeft, blockLeft + (int)Math.Round(codeFraction * (blockRight - blockLeft)),
+                blockLeft + (int)Math.Round(stockFraction * (blockRight - blockLeft)), blockLeft + (int)Math.Round(realFraction * (blockRight - blockLeft)),
+                blockRight, HasNumber: true, Fallback: true);
         }
+        if (debug) Console.WriteLine($"[debug] table {blockNumber}: rows {bands[0].Top}-{bands[^1].Bottom}, {dividers.Count} rules ({string.Join(",", dividers)}) -> xLeft={layout.Left} xCode={layout.Code} xStock={layout.Stock} xReal={layout.Real} xRight={layout.Right} numberColumn={layout.HasNumber}{(layout.Fallback ? " (fallback fractions)" : "")}");
+        return layout;
+    }
 
-        // "Nr. crt." is settled per table from the sequence: the numbers run 1, 2, 3... down a table (continuing on the
-        // next page when a subcategory does not fit), so each read number implies the table's starting offset
-        // (number - position). The offset most reads agree on wins, which corrects an isolated misread digit and fills
-        // in a row whose number could not be read at all. A table where nothing was read keeps no number.
+    // Reads the rows of one table block into `pending`; true when a row was read in a block that has the "Nr. crt." column.
+    private async Task<bool> ReadBlockAsync(Mat gray, Mat verticalSource, List<TableBand> bands, BlockColumns layout, int blockNumber, double scale,
+        List<PendingRow> pending, bool debug, CancellationToken cancellationToken)
+    {
+        var horizontalPad = (int)Math.Round(CellPaddingPoints * scale);
+        var hasNumberColumn = false;
+        var indexInBlock = 0;
+        foreach (var band in bands)
+        {
+            var top = band.Top;
+            var bottom = band.Bottom;
+            var height = bottom - top;
+            // The vertical inset only needs to clear the rule lines' own stroke width (a handful of pixels
+            // regardless of DPI): rows can be as short as one text line, so scaling this from PDF points the way
+            // the horizontal inset does would eat a large share of a short row's actual content.
+            var verticalPad = Math.Min(6, height / 6);
+            var codeCell = SafeCrop(gray, layout.Code + horizontalPad, top + verticalPad, layout.Stock - layout.Code - 2 * horizontalPad, height - 2 * verticalPad);
+            var realCell = SafeCrop(gray, layout.Real + horizontalPad, top + verticalPad, layout.Right - layout.Real - 2 * horizontalPad, height - 2 * verticalPad);
+            if (codeCell is null || realCell is null) { codeCell?.Dispose(); realCell?.Dispose(); continue; }
+
+            string code;
+            try { code = await ReadCodeAsync(codeCell, cancellationToken).ConfigureAwait(false); }
+            finally { codeCell.Dispose(); }
+            if (debug) Console.WriteLine($"[debug] {top}-{bottom}: code='{code}'");
+
+            // The header row ("Cod produs") is not data; the rows after it are numbered from 1 within this table.
+            if (TextNormalization.SameUniqueValue(code, InventoryPickupOcrRules.HeaderCode)) { realCell.Dispose(); indexInBlock = 0; continue; }
+            indexInBlock++;
+            if (code.Length == 0) { realCell.Dispose(); continue; }
+
+            var (hasInk, value, uncertain) = ReadHandwrittenWithContrast(realCell, debug);
+            if (debug) Console.WriteLine($"[debug] {top}-{bottom}: hasInk={hasInk} value={value} uncertain={uncertain}");
+            realCell.Dispose();
+            if (!hasInk) continue; // empty cell: "neinventariat", no row at all (subtask 1.2)
+
+            int? printedNumber = null;
+            if (layout.HasNumber)
+            {
+                hasNumberColumn = true;
+                using var numberCell = SafeCrop(gray, layout.Left + horizontalPad, top + verticalPad, layout.Code - layout.Left - 2 * horizontalPad, height - 2 * verticalPad);
+                if (numberCell is not null) printedNumber = await ReadPrintedNumberAsync(numberCell, cancellationToken).ConfigureAwait(false);
+                if (debug) Console.WriteLine($"[debug] {top}-{bottom}: printed number={printedNumber?.ToString() ?? "?"} (index {indexInBlock} in table {blockNumber})");
+            }
+            pending.Add(new PendingRow(blockNumber, indexInBlock, code, value, uncertain, printedNumber));
+        }
+        return hasNumberColumn;
+    }
+
+    // "Nr. crt." is settled per table from the sequence: the numbers run 1, 2, 3... down a table (continuing on the
+    // next page when a subcategory does not fit), so each read number implies the table's starting offset
+    // (number - position). The offset most reads agree on wins, which corrects an isolated misread digit and fills
+    // in a row whose number could not be read at all. A table where nothing was read keeps no number.
+    internal static List<InventoryPickupScanRow> SettleNumbers(IReadOnlyList<PendingRow> pending, bool hasNumberColumn, int pageNumber)
+    {
         var offsets = pending.Where(row => row.PrintedNumber is not null)
             .GroupBy(row => row.Block)
             .ToDictionary(group => group.Key, group => group
@@ -299,7 +342,6 @@ public sealed class InventoryPickupOcrService : IInventoryPickupOcrService, IDis
         return pending.Select(row => new InventoryPickupScanRow(pageNumber, row.Code, row.Value, row.Uncertain,
             hasNumberColumn && offsets.TryGetValue(row.Block, out var offset) && row.Index + offset > 0 ? row.Index + offset : null)).ToList();
     }
-
     internal static Mat ToGrayMat(SKBitmap bitmap)
     {
         using var normalized = bitmap.ColorType == SKColorType.Gray8 ? null : bitmap.Copy(SKColorType.Gray8);

@@ -1,5 +1,6 @@
 using System.Globalization;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -124,12 +125,10 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
     // The supplier of the input: the one given, else the Romanian supplier with the tax id.
     private const string SupplierIdSql = "COALESCE(@supplierId, (SELECT id FROM suppliers WHERE normalized_cui=@cui AND country='RO' LIMIT 1))";
 
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<InvoiceTemplateInfo>> ListAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand($"SELECT {InfoColumns} {From} ORDER BY t.supplier_name, t.name, t.id", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<InvoiceTemplateInfo>();
@@ -139,8 +138,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
 
     public async Task<InvoiceTemplateRecord?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand($"SELECT {InfoColumns}, t.definition {From} WHERE t.id=@id", connection);
         command.Parameters.AddWithValue("@id", id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -149,8 +147,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
 
     public async Task<IReadOnlyList<InvoiceTemplateRecord>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand($"SELECT {InfoColumns}, t.definition {From} ORDER BY t.supplier_name, t.name, t.id", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<InvoiceTemplateRecord>();
@@ -160,8 +157,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
 
     public async Task<InvoiceTemplateModel?> GetModelAsync(int id, CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("SELECT file_name, content, sha256, version_number, created_by, created_utc FROM invoice_template_models WHERE template_id=@id ORDER BY id DESC LIMIT 1", connection);
         command.Parameters.AddWithValue("@id", id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -176,8 +172,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         var definition = clean.Definition ?? throw new InvoiceTemplateOperationException(InvoiceTemplateRules.DefinitionRequiredMessage);
         var json = InvoiceTemplateJson.Serialize(definition);
         var now = MariaTimeText.Format(DateTime.UtcNow);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -215,8 +210,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         var definition = clean.Definition ?? throw new InvoiceTemplateOperationException(InvoiceTemplateRules.DefinitionRequiredMessage);
         var json = InvoiceTemplateJson.Serialize(definition);
         var now = MariaTimeText.Format(DateTime.UtcNow);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -256,8 +250,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
     {
         EnsureWritable();
         var now = MariaTimeText.Format(DateTime.UtcNow);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var update = new MySqlCommand("UPDATE invoice_templates SET active=@active, updated_by=@actor, updated_utc=@now, version=version+1 WHERE id=@id AND version=@oldVersion", connection);
         update.Parameters.AddWithValue("@active", active ? 1 : 0);
         update.Parameters.AddWithValue("@actor", actor);
@@ -273,8 +266,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
         EnsureWritable();
         var clean = InvoiceTemplateRules.Clean(input);
         var now = MariaTimeText.Format(DateTime.UtcNow);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var update = new MySqlCommand("""
             UPDATE invoice_templates SET name=@name, supplier_name=@supplier, supplier_cui=@cui, supplier_id=SUPPLIER_ID, updated_by=@actor, updated_utc=@now, version=version+1
             WHERE id=@id AND version=@oldVersion
@@ -300,8 +292,7 @@ public sealed class MariaInvoiceTemplateStore(IConfiguration configuration) : II
     public async Task DeleteAsync(InvoiceTemplateInfo original, CancellationToken cancellationToken = default)
     {
         EnsureWritable();
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         // The versions go with the template (foreign key ON DELETE CASCADE).
         await using var command = new MySqlCommand("DELETE FROM invoice_templates WHERE id=@id AND version=@version", connection);
         command.Parameters.AddWithValue("@id", original.Id);

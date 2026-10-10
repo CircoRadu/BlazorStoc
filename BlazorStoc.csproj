@@ -36,6 +36,12 @@
     <None Remove="Assets/Fonts/**" />
     <EmbeddedResource Include="Assets/Fonts/PTSans-Regular.ttf" />
     <EmbeddedResource Include="Assets/Fonts/PTSans-Bold.ttf" />
+    <Content Remove="Assets/Data/**" />
+    <None Remove="Assets/Data/**" />
+    <EmbeddedResource Include="Assets/Data/**" LogicalName="BlazorStoc.Data.%(Filename)%(Extension)" />
+    <Content Remove="Assets/Migrations/**" />
+    <None Remove="Assets/Migrations/**" />
+    <EmbeddedResource Include="Assets/Migrations/*.sql" LogicalName="BlazorStoc.Migrations.%(Filename)%(Extension)" />
     <Content Remove="Assets/Models/**" />
     <None Remove="Assets/Models/**" />
     <EmbeddedResource Include="Assets/Models/mnist-12.onnx" />

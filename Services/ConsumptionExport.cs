@@ -44,8 +44,7 @@ public sealed class MariaConsumptionReader(IConfiguration configuration, IAccess
     public async Task<IReadOnlyList<ConsumptionRow>> GetAsync(ConsumptionQuery query, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT p.name,b.name,pr.name,SUM(e.quantity),
                    SUM((SELECT COALESCE(SUM(r.quantity),0) FROM stock_movements r WHERE r.return_of_movement_id=e.id AND r.voided_utc IS NULL))

@@ -113,8 +113,7 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
 
     internal async Task<(BackupSettings Settings, string? LastScheduledDate)> ReadAsync(CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT schedule_enabled,schedule_time,last_scheduled_date,max_age_days,retention_enabled,retention_days,last_error_utc,last_error,ntp_check_enabled,ntp_servers,schedule_days FROM backup_settings WHERE id=1
             """, connection);
@@ -131,8 +130,7 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
     /// </summary>
     public static async Task CopyFromNasSettingsAsync(IConfiguration configuration, CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             INSERT IGNORE INTO backup_settings (id,schedule_enabled,schedule_time,last_scheduled_date,max_age_days,last_error_utc,last_error,updated_by,updated_utc)
             SELECT id,schedule_enabled,schedule_time,last_scheduled_date,max_age_days,last_error_utc,last_error,updated_by,updated_utc FROM backup_nas_settings WHERE id=1
@@ -148,9 +146,8 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
         var old = (await ReadAsync(cancellationToken).ConfigureAwait(false)).Settings;
         var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
         var time = NasBackupRules.TryParseTime(input.ScheduleTime, out var parsed) ? parsed.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) : old.ScheduleTime;
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var command = new MySqlCommand("""
                 INSERT INTO backup_settings (id,schedule_enabled,schedule_time,last_scheduled_date,max_age_days,retention_enabled,retention_days,ntp_check_enabled,ntp_servers,schedule_days,updated_by,updated_utc)
                 VALUES (1,@schedule,@time,IF(@resetSchedule=1,@scheduleDate,NULL),@maxAge,@retention,@days,@ntpOn,@ntp,@weekdays,@by,@now)
@@ -201,8 +198,7 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
     internal async Task RecordClockAsync(ClockCheck check, CancellationToken cancellationToken)
     {
         if (!check.Trusted && check.Skew is null) return;
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         if (check.Trusted)
         {
             await using var clear = new MySqlCommand("UPDATE backup_settings SET clock_issue_utc=NULL,clock_skew_minutes=0 WHERE id=1 AND clock_issue_utc IS NOT NULL", connection);
@@ -221,8 +217,7 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
     /// <summary>The last failed backup (cause and time) for the notification text; written by the backup flow, never by a user.</summary>
     internal async Task RecordBackupErrorAsync(string message, CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             INSERT INTO backup_settings (id,last_error_utc,last_error) VALUES (1,@now,@message)
             ON DUPLICATE KEY UPDATE last_error_utc=@now,last_error=@message
@@ -234,8 +229,7 @@ public sealed class MariaBackupSettingsStore(IConfiguration configuration, IAcce
 
     internal async Task MarkScheduledAsync(string date, CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("UPDATE backup_settings SET last_scheduled_date=@date WHERE id=1", connection);
         command.Parameters.AddWithValue("@date", date);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);

@@ -5,12 +5,8 @@ namespace BlazorStoc.Services;
 // MariaDB mode: `product_min_stock` and `project_deadlines` (migration 29). Changes need a product operator and are journaled under the product / the project.
 internal static class StockAlertSql
 {
-    public static MySqlCommand Command(MySqlConnection connection, string sql, params (string Name, object? Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
-        return command;
-    }
+    public static MySqlCommand Command(MySqlConnection connection, string sql, params (string Name, object? Value)[] parameters) =>
+        MariaDb.Command(connection, sql, parameters);
 
     public static async Task<string?> TextAsync(MySqlConnection connection, string sql, int id, CancellationToken token) =>
         await Command(connection, sql, ("@id", id)).ExecuteScalarAsync(token).ConfigureAwait(false) as string;
@@ -29,8 +25,7 @@ public sealed class MariaProductMinStockRepository(IConfiguration configuration,
     public async Task<int?> GetAsync(int productId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var value = await StockAlertSql.ValueAsync(connection, "SELECT min_quantity FROM product_min_stock WHERE product_id=@id", productId, cancellationToken).ConfigureAwait(false);
         return value is null ? null : int.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
     }
@@ -43,9 +38,8 @@ public sealed class MariaProductMinStockRepository(IConfiguration configuration,
         var actor = (await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false)).Username;
         string product;
         string? old;
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             product = await StockAlertSql.TextAsync(connection, "SELECT name FROM products WHERE id=@id", productId, cancellationToken).ConfigureAwait(false)
                 ?? throw new StockAlertException("Produsul nu mai există.");
             old = await StockAlertSql.ValueAsync(connection, "SELECT min_quantity FROM product_min_stock WHERE product_id=@id", productId, cancellationToken).ConfigureAwait(false);
@@ -65,9 +59,8 @@ public sealed class MariaProductMinStockRepository(IConfiguration configuration,
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new StockAlertException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         string? product, old;
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             old = await StockAlertSql.ValueAsync(connection, "SELECT min_quantity FROM product_min_stock WHERE product_id=@id", productId, cancellationToken).ConfigureAwait(false);
             if (old is null) return;
             product = await StockAlertSql.TextAsync(connection, "SELECT name FROM products WHERE id=@id", productId, cancellationToken).ConfigureAwait(false);
@@ -87,8 +80,7 @@ public sealed class MariaProjectDeadlineRepository(IConfiguration configuration,
     public async Task<DateOnly?> GetAsync(int projectId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var value = await StockAlertSql.ValueAsync(connection, "SELECT deadline FROM project_deadlines WHERE project_id=@id", projectId, cancellationToken).ConfigureAwait(false);
         return value is null ? null : StockMovementRules.ParseStorageDate(value);
     }
@@ -101,9 +93,8 @@ public sealed class MariaProjectDeadlineRepository(IConfiguration configuration,
         var actor = (await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false)).Username;
         string project;
         string? old;
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             project = await StockAlertSql.TextAsync(connection, "SELECT name FROM projects WHERE id=@id", projectId, cancellationToken).ConfigureAwait(false)
                 ?? throw new StockAlertException("Proiectul nu mai există.");
             old = await StockAlertSql.ValueAsync(connection, "SELECT deadline FROM project_deadlines WHERE project_id=@id", projectId, cancellationToken).ConfigureAwait(false);
@@ -124,9 +115,8 @@ public sealed class MariaProjectDeadlineRepository(IConfiguration configuration,
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new StockAlertException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         string? project, old;
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             old = await StockAlertSql.ValueAsync(connection, "SELECT deadline FROM project_deadlines WHERE project_id=@id", projectId, cancellationToken).ConfigureAwait(false);
             if (old is null) return;
             project = await StockAlertSql.TextAsync(connection, "SELECT name FROM projects WHERE id=@id", projectId, cancellationToken).ConfigureAwait(false);
@@ -144,8 +134,7 @@ public sealed class MariaStockAlertReader(IConfiguration configuration) : IStock
 {
     public async Task<IReadOnlyList<BelowMinimumItem>> GetBelowMinimumAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = StockAlertSql.Command(connection, """
             SELECT p.id,p.name,p.quantity,s.min_quantity,s.set_date,
                    (SELECT MAX(m.movement_date) FROM stock_movements m WHERE m.product_id=p.id AND m.voided_utc IS NULL)
@@ -166,8 +155,7 @@ public sealed class MariaStockAlertReader(IConfiguration configuration) : IStock
 
     public async Task<IReadOnlyList<StaleReservationItem>> GetStaleReservationsAsync(int olderThanDays, CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = StockAlertSql.Command(connection, """
             SELECT r.id,r.project_id,p.name,r.product_id,pr.name,r.quantity,r.updated_utc
             FROM project_reservations r INNER JOIN projects p ON p.id=r.project_id INNER JOIN products pr ON pr.id=r.product_id
@@ -188,8 +176,7 @@ public sealed class MariaStockAlertReader(IConfiguration configuration) : IStock
 
     public async Task<IReadOnlyList<ProjectDeadlineItem>> GetProjectDeadlinesAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = StockAlertSql.Command(connection, """
             SELECT d.project_id,p.name,d.deadline FROM project_deadlines d INNER JOIN projects p ON p.id=d.project_id ORDER BY d.deadline,d.project_id
             """);

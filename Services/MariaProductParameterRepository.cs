@@ -1,6 +1,7 @@
 using System.Data;
 using System.Globalization;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -10,12 +11,10 @@ namespace BlazorStoc.Services;
 public sealed class MariaProductParameterRepository(IConfiguration configuration, IAccessControl? accessControl = null, IAuditTrail? auditTrail = null)
     : IProductParameterRepository
 {
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<SubcategoryParameter>> GetParametersAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT sp.id,c.name,s.name,sp.name,sp.unit,sp.kind,sp.position,sp.version,
                    v.id,v.value,(SELECT COUNT(*) FROM product_parameter_values pv WHERE pv.value_id=v.id)
@@ -200,8 +199,7 @@ public sealed class MariaProductParameterRepository(IConfiguration configuration
     public async Task<ParameterValueChange> PreviewValueChangeAsync(int valueId, string newValue, CancellationToken cancellationToken = default)
     {
         await EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return (await ComputeChangeAsync(connection, null, valueId, newValue, cancellationToken).ConfigureAwait(false)).Change;
     }
 
@@ -239,8 +237,7 @@ public sealed class MariaProductParameterRepository(IConfiguration configuration
 
     public async Task<ProductParameterState> GetProductStateAsync(int productId, CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         string model;
         await using (var select = Command(connection, null, "SELECT COALESCE(base_model,'') FROM products WHERE id=@id", ("@id", productId)))
             model = await select.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string ?? string.Empty;
@@ -254,8 +251,7 @@ public sealed class MariaProductParameterRepository(IConfiguration configuration
 
     public async Task<IReadOnlySet<int>> GetIncompleteProductIdsAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT DISTINCT p.id FROM products p INNER JOIN subcategory_parameters sp ON sp.subcategory_id=p.subcategory_id
             WHERE NOT EXISTS(SELECT 1 FROM product_parameter_values pv WHERE pv.product_id=p.id AND pv.parameter_id=sp.id)
@@ -268,8 +264,7 @@ public sealed class MariaProductParameterRepository(IConfiguration configuration
 
     public async Task<IReadOnlyDictionary<int, string>> GetBaseModelsAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, "SELECT id,base_model FROM products WHERE base_model IS NOT NULL AND base_model<>''");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var models = new Dictionary<int, string>();
@@ -375,35 +370,8 @@ public sealed class MariaProductParameterRepository(IConfiguration configuration
     }
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
-
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new ProductOperationException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
-    }
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
+        MariaDb.WriteAsync(configuration, action, message => new ProductOperationException(message), token,
+            "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
     private Task EnsureAdministratorAsync(CancellationToken token) => accessControl?.EnsureAdministratorAsync(token) ?? Task.CompletedTask;

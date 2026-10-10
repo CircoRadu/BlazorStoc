@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -14,13 +15,11 @@ public sealed class MariaWorkPointRepository(
 {
     internal const string Columns = "id, beneficiary_id, name, address, phone, contact_person, version, is_primary, description, latitude, longitude";
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<WorkPoint>> GetAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var result = new List<WorkPoint>();
         await using (var command = Command(connection, null,
             $"SELECT {Columns} FROM beneficiary_work_points WHERE beneficiary_id=@id ORDER BY is_primary DESC, name, id", ("@id", beneficiaryId)))
@@ -95,9 +94,8 @@ public sealed class MariaWorkPointRepository(
         if (original.IsPrimary) throw WorkPointRules.PrimaryNotDeletable();
         string ownerName;
         IReadOnlyList<ServicePhoto> photos;
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var owner = Command(connection, null, "SELECT name FROM beneficiaries WHERE id=@id", ("@id", original.BeneficiaryId));
             ownerName = await owner.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
                 ?? throw new WorkPointOperationException("Beneficiarul nu mai există. Actualizează lista.");
@@ -144,31 +142,15 @@ public sealed class MariaWorkPointRepository(
     }
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
+        MariaDb.WriteAsync(configuration, action, message => new WorkPointOperationException(message), Translate, token);
 
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
+    private static Exception? Translate(MySqlException exception) => exception.Number switch
     {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new WorkPointOperationException("Modificările sunt permise numai în baza BlazorStoc.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (Exception exception)
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            if (exception is MySqlException { Number: 1451 }) throw new WorkPointOperationException("Punctul de lucru este acoperit de un contract sau are date asociate și nu poate fi șters. Scoate-l mai întâi din contract.");
-            // A concurrent save passed the check above and hit uq_beneficiary_work_points_0.
-            if (exception is MySqlException { Number: 1062 })
-                throw new WorkPointOperationException("Există deja un punct de lucru cu această adresă.");
-            throw;
-        }
-    }
+        1451 => new WorkPointOperationException("Punctul de lucru este acoperit de un contract sau are date asociate și nu poate fi șters. Scoate-l mai întâi din contract."),
+        // A concurrent save passed the check above and hit uq_beneficiary_work_points_0.
+        1062 => new WorkPointOperationException("Există deja un punct de lucru cu această adresă."),
+        _ => null
+    };
 
     internal static async Task<WorkPoint?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
@@ -210,20 +192,13 @@ public sealed class MariaWorkPointRepository(
     private static WorkPoint Build(int id, int beneficiaryId, WorkPointInput value, long version, bool isPrimary) =>
         new(id, beneficiaryId, value.Name, value.Address, value.Phone, value.ContactPerson, version, isPrimary, value.Description, value.Latitude, value.Longitude);
 
-    private static (string, object)[] Fields(int beneficiaryId, WorkPointInput value) =>
+    private static (string, object?)[] Fields(int beneficiaryId, WorkPointInput value) =>
     [
         ("@beneficiaryId", beneficiaryId), ("@name", value.Name), ("@address", value.Address),
         ("@normalizedAddress", AddressNormalization.Key(value.Address)), ("@phone", value.Phone),
         ("@contactPerson", value.ContactPerson), ("@description", value.Description),
         ("@latitude", value.Latitude is { } latitude ? latitude : DBNull.Value), ("@longitude", value.Longitude is { } longitude ? longitude : DBNull.Value)
     ];
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }
@@ -239,8 +214,7 @@ public static class WorkPointBackfill
     public static async Task<Result> EnsurePrimariesAsync(IConfiguration configuration, CancellationToken cancellationToken = default)
     {
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) return new(0, 0, 0);
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var missing = new List<(int Id, string Address, string Phone)>();
         await using (var select = new MySqlCommand("""
             SELECT b.id, b.address, b.phone FROM beneficiaries b

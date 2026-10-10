@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -7,8 +8,7 @@ public sealed partial class MariaProductRepository
 {
     public async Task<IReadOnlyList<ProductGroup>> GetGroupsAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT c.name,COALESCE(s.name,'')
             FROM categories c LEFT JOIN subcategories s ON s.category_id=c.id
@@ -144,36 +144,13 @@ public sealed partial class MariaProductRepository
     private readonly record struct GroupResolution(int CategoryId, int SubcategoryId, string Category, string Subcategory,
         bool CategoryCreated, bool SubcategoryCreated);
 
-    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
-
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
     {
-        token.ThrowIfCancellationRequested();
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new ProductOperationException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        // Subtask 2.10: the old check here validated a Database:ApplicationUserId/legacy `user` row before writing;
-        // that concept is gone (the real schema has no such table, the operator is a username string via
-        // IAccessControl/IAuditTrail like SQLite). What remains worth checking before ever opening a connection is
-        // that the database is actually configured at all, so a missing setup fails fast with a clear message
-        // instead of a raw connection-timeout/authentication error.
+        // Fails fast with a clear message when the database is not configured at all, instead of a raw connection-timeout/authentication error.
         if (string.IsNullOrWhiteSpace(configuration["Database:Password"]))
             throw new ProductOperationException("Salvarea nu este configurată. Administratorul trebuie să configureze conexiunea la baza de date.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch
-        {
-            if (transaction.Connection is not null)
-                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
+        return MariaDb.WriteAsync(configuration, action, message => new ProductOperationException(message), token,
+            "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
     }
 
     private static async Task<Product?> GetLocked(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
@@ -255,13 +232,6 @@ public sealed partial class MariaProductRepository
     // message SqliteProductRepository uses for its own concurrent-duplicate race (SQLITE_CONSTRAINT on the
     // equivalent unique index).
     private static bool IsDuplicateKey(MySqlException exception) => exception.Number == 1062;
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
 
     private Task EnsureProductOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 }

@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -13,7 +14,6 @@ public sealed class MariaSupplierRepository(
     IInvoiceTemplateService? invoiceTemplates = null) : ISupplierRepository
 {
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     // The columns of a supplier and, after them, what refers to it (entries through its invoices, invoices, templates by CUI).
     private const string Select = """
@@ -28,8 +28,7 @@ public sealed class MariaSupplierRepository(
     public async Task<IReadOnlyList<Supplier>> GetSuppliersAsync(CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, $"{Select} ORDER BY s.name, s.id");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<Supplier>();
@@ -42,8 +41,7 @@ public sealed class MariaSupplierRepository(
     public async Task<Supplier?> GetAsync(int id, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var supplier = await GetAsync(connection, null, id, false, cancellationToken).ConfigureAwait(false);
         return supplier is null ? null : supplier with { Aliases = (await AliasesAsync(connection, cancellationToken).ConfigureAwait(false)).GetValueOrDefault(id) };
     }
@@ -70,9 +68,8 @@ public sealed class MariaSupplierRepository(
         if (SupplierRules.AliasProblem(text, current, await GetSuppliersAsync(cancellationToken).ConfigureAwait(false)) is { } problem) throw new SupplierOperationException(problem);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new SupplierOperationException("Modificările sunt permise numai în baza BlazorStoc.");
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var insert = Command(connection, null, "INSERT INTO supplier_aliases (supplier_id, alias, alias_key, created_by, created_utc) VALUES (@supplier, @alias, @key, @by, @now)",
                 ("@supplier", current.Id), ("@alias", text), ("@key", SupplierRules.NameKey(text)), ("@by", actor.Username), ("@now", MariaTimeText.Format(MariaTimeText.Now())));
             try { await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false); }
@@ -89,9 +86,8 @@ public sealed class MariaSupplierRepository(
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new SupplierOperationException("Modificările sunt permise numai în baza BlazorStoc.");
         var text = (alias ?? "").Trim();
         int removed;
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var delete = Command(connection, null, "DELETE FROM supplier_aliases WHERE supplier_id=@supplier AND alias_key=@key",
                 ("@supplier", supplier.Id), ("@key", SupplierRules.NameKey(text)));
             removed = await delete.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -239,47 +235,21 @@ public sealed class MariaSupplierRepository(
     }
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token, string? duplicateKey, int? excludedId) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token, duplicateKey, excludedId), token);
-
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token, string? duplicateKey, int? excludedId)
-    {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new SupplierOperationException("Modificările sunt permise numai în baza BlazorStoc.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (Exception exception)
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            // A concurrent save passed the check and hit the unique key: report the stored supplier (read after the rollback).
-            if (duplicateKey is not null && exception is MySqlException { Number: 1062 })
-                throw new SupplierOperationException(SupplierRules.DuplicateMessage(await ConcurrentNameAsync(duplicateKey, excludedId, token).ConfigureAwait(false)));
-            throw;
-        }
-    }
+        // A concurrent save passed the check and hit the unique key: report the stored supplier (read after the rollback).
+        MariaDb.WriteAsync(configuration, action, message => new SupplierOperationException(message), async (exception, cancellation) =>
+            duplicateKey is not null && exception.Number == 1062
+                ? new SupplierOperationException(SupplierRules.DuplicateMessage(await ConcurrentNameAsync(duplicateKey, excludedId, cancellation).ConfigureAwait(false)))
+                : null,
+            token);
 
     private async Task<string?> ConcurrentNameAsync(string key, int? excludedId, CancellationToken token)
     {
         try
         {
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(token).ConfigureAwait(false);
+            await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
             return await ExistingNameAsync(connection, null, key, excludedId, token).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { return null; }
-    }
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
     }
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;

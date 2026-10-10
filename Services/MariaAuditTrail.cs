@@ -6,8 +6,7 @@ public sealed class MariaAuditTrail(IConfiguration configuration) : IAuditTrail
 {
     public async Task RecordAsync(AuditWrite entry, CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             INSERT INTO audit_events
                 (id,timestamp_utc,actor_username,actor_role,entity_type,action,target,details,motif,entity_id,archive_operation_id)
@@ -32,8 +31,7 @@ public sealed class MariaAuditTrail(IConfiguration configuration) : IAuditTrail
 
     public async Task<IReadOnlyList<AuditEvent>> GetEventsAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT id,timestamp_utc,actor_username,actor_role,entity_type,action,target,details,motif,
                    entity_id,archive_operation_id
@@ -84,8 +82,7 @@ public sealed class MariaAuditTrail(IConfiguration configuration) : IAuditTrail
 
     public async Task<AuditPage> QueryAsync(AuditQuery query, int page, int pageSize, int? window = null, CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var journalTotal = await ScalarAsync(connection, "SELECT COUNT(*) FROM audit_events", null, cancellationToken).ConfigureAwait(false);
         // "Window": the latest N events of the whole journal are the ones searched (a derived table keeps the newest N first).
         var source = window is { } limit
@@ -118,8 +115,7 @@ public sealed class MariaAuditTrail(IConfiguration configuration) : IAuditTrail
 
     public async Task<AuditSummary> SummaryAsync(DateTime todayStartUtc, CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT COUNT(*),
                    COALESCE(SUM(timestamp_utc>=@today),0),
@@ -140,8 +136,7 @@ public sealed class MariaAuditTrail(IConfiguration configuration) : IAuditTrail
         var objects = events.Where(entry => entry.EntityId.Length > 0).Select(entry => (entry.EntityType, entry.EntityId)).Distinct().Take(500).ToList();
         var result = new Dictionary<string, DateTime>(StringComparer.Ordinal);
         if (objects.Count == 0) return result;
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("", connection);
         var conditions = new List<string>();
         for (var index = 0; index < objects.Count; index++)

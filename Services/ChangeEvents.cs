@@ -78,8 +78,7 @@ public sealed class MariaChangeEventSource(IConfiguration configuration) : IChan
 
     public async Task EnsureAsync(CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         if (!await TableExistsAsync(connection, ChangeEventTriggers.EventTable, cancellationToken).ConfigureAwait(false))
         {
             if (!warned)
@@ -125,16 +124,14 @@ public sealed class MariaChangeEventSource(IConfiguration configuration) : IChan
 
     public async Task<long> LatestIdAsync(CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand($"SELECT COALESCE(MAX(id),0) FROM {ChangeEventTriggers.EventTable}", connection);
         return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
     }
 
     public async Task<IReadOnlyList<StoredChange>> ReadAfterAsync(long afterId, int limit, CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand($"""
             SELECT id,entity_type,action,entity_id,project_id,observation_id,beneficiary_id,created_utc
             FROM {ChangeEventTriggers.EventTable} WHERE id>@after ORDER BY id LIMIT @limit
@@ -152,8 +149,7 @@ public sealed class MariaChangeEventSource(IConfiguration configuration) : IChan
 
     public async Task PurgeAsync(long throughId, DateTime olderThanUtc, CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand(
             $"DELETE FROM {ChangeEventTriggers.EventTable} WHERE id<=@through AND created_utc<@older", connection);
         command.Parameters.AddWithValue("@through", throughId);

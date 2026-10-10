@@ -125,9 +125,8 @@ public sealed class MariaDatabaseRestoreService(IConfiguration configuration, IA
             // Pas 3 - continut, cu aceeasi comparatie canonica tip-si-hash folosita la backup (Services/CanonicalRowHasher.cs).
             progress?.Report(new(RestoreStage.ComparingContent, RestoreRules.StageMessage(RestoreStage.ComparingContent)));
             CanonicalSnapshot live;
-            await using (var connection = DatabaseConnections.Create(configuration))
+            await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 live = await CanonicalRowHasher.ComputeAsync(connection, tables, cancellationToken).ConfigureAwait(false);
             }
             if (string.Equals(live.OverallHash, manifest.CanonicalHash, StringComparison.Ordinal))

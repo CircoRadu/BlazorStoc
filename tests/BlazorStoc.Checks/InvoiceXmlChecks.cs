@@ -161,6 +161,7 @@ public static class InvoiceXmlChecks
         // The unit codes come from the UN/ECE Rec 20 list used by Peppol: XPP is a piece, an uncommon code shows the name of the list, an unknown one stays as written.
         check(InvoiceUnitCodes.Display("XPP") == "buc" && InvoiceUnitCodes.NameOf("XPP") == "Piece", "XML invoice: unit code XPP is read as a piece (UN/ECE Rec 20)");
         check(InvoiceUnitCodes.Display("KJO") == "kilojoule" && InvoiceUnitCodes.Display("KWH") == "kWh" && InvoiceUnitCodes.Display("ZZ9") == "ZZ9", "XML invoice: an uncommon unit code shows the list name, an unknown one stays as written");
+        check(InvoiceUnitCodes.NameCount == 2162 && InvoiceUnitCodes.NameOf("N13") == "centimetre of mercury (0 ºC)" && InvoiceUnitCodes.NameOf("zz") == "mutually defined" && InvoiceUnitCodes.Display("LTR") == "l", "XML invoice: the unit code list is read whole from the embedded data file");
 
         // Own mapping: another structure, an attribute, '//' paths.
         const string custom = "<Factura><Antet nr=\"F-9\"><Data>2026-09-30</Data></Antet><Continut><Rand><Cod>Z9</Cod><Den>Tub</Den><Cant>3</Cant><UM>buc</UM></Rand><Rand><Cod>Z8</Cod><Den>Cot</Den><Cant>1</Cant><UM>buc</UM></Rand></Continut></Factura>";

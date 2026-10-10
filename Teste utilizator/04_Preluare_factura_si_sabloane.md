@@ -4,6 +4,17 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 
 ## Modificari de testat
 
+### 10.10.2026 - Preluare factura si fereastra de sabloane, reorganizate in cod
+
+**Ce s-a schimbat:** nimic vizibil; codul paginii `/produse/preluare-factura` si al ferestrei de sabloane (Setari -> Facturi) a fost impartit pe fisiere, iar citirea randurilor din PDF a fost desfacuta in pasi. Verificarea este ca nimic nu s-a schimbat.
+
+**Ce faci:**
+1. Deschide `/produse/preluare-factura`, incarca un PDF cu sablon cunoscut si treci prin pasii 1, 2 si 3 pana la intrarea in stoc pe un produs TEST.
+2. Incarca o factura fara sablon si deschide fereastra de sabloane: marcheaza regiunile, salveaza sablonul, redeschide-l din Setari -> Facturi -> Sabloane salvate.
+3. Incearca si un fisier XML (e-Factura), daca ai unul.
+
+**Ce trebuie sa vezi:** aceleasi randuri citite ca inainte pe aceleasi facturi (numar, CUI, data, produse), aceleasi avertizari; nicio eroare. Rezultat: ...
+
 ### 10.10.2026 - Preluare factura: produse deja preluate si selectorul de randuri la pasul 2
 
 **Ce s-a adaugat:** la pasul 1, avertizarea „deja preluat" (aceeasi ca la pasii 2 si 3) pe randurile ale caror produse au mai fost preluate de pe aceeasi factura; la pasul 2, selectorul rotund de preluare a randurilor (cu „Preia" pentru toate), aceeasi alegere ca la pasul 1.

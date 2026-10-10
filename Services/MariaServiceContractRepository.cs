@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -19,7 +20,6 @@ public sealed class MariaServiceContractRepository(
         FROM service_contract_points p JOIN beneficiary_work_points w ON w.id = p.work_point_id
         """;
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     // One journal entry produced by an operation; written after the transaction commits, under the beneficiary the contract belongs to.
     private sealed record Pending(string Action, string Target, string Details, string Motif);
@@ -27,8 +27,7 @@ public sealed class MariaServiceContractRepository(
     public async Task<IReadOnlyList<ServiceContractDetails>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var contracts = new List<ServiceContract>();
         await using (var command = Command(connection, null,
             $"SELECT {ContractColumns} FROM service_contracts WHERE beneficiary_id=@id ORDER BY contract_date DESC, id DESC", ("@id", beneficiaryId)))
@@ -44,8 +43,7 @@ public sealed class MariaServiceContractRepository(
     public async Task<IReadOnlyList<ServiceDueRow>> GetDueListAsync(bool includeOff, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT c.id, c.beneficiary_id, c.contract_number, c.contract_date, c.cycle_months, c.valid_until, c.is_active, c.notes, c.version,
                    p.id, p.contract_id, p.work_point_id, p.cycle_months, p.next_due, p.version, w.name, w.address, w.is_primary, b.name,
@@ -136,8 +134,7 @@ public sealed class MariaServiceContractRepository(
     public async Task<ServiceContractActivationPlan> PrepareActivationAsync(int contractId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var details = await LoadDetailsAsync(connection, null, contractId, cancellationToken).ConfigureAwait(false);
         var conflicts = new List<ServiceContractConflict>();
         foreach (var point in details.Points)
@@ -232,9 +229,8 @@ public sealed class MariaServiceContractRepository(
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new ServiceContractOperationException(reasonError);
         ServiceContractDetails details;
         string ownerName;
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             details = await LoadDetailsAsync(connection, null, original.Id, cancellationToken).ConfigureAwait(false);
             if (await MariaServiceInterventionRepository.CountAsync(connection, null, "contract_id", original.Id, cancellationToken).ConfigureAwait(false) is var interventions and > 0)
                 throw ServiceInterventionRules.ContractHasInterventions(interventions);
@@ -455,34 +451,17 @@ public sealed class MariaServiceContractRepository(
     }
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
+        MariaDb.WriteAsync(configuration, action, message => new ServiceContractOperationException(message), Translate, token);
 
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
+    // A concurrent operation passed the checks and hit a unique key (the checks run under the beneficiary lock, so this is rare).
+    private static Exception? Translate(MySqlException exception) => exception.Number switch
     {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new ServiceContractOperationException("Modificările sunt permise numai în baza BlazorStoc.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (Exception exception)
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            // A concurrent operation passed the checks above and hit a unique key (the checks run under the beneficiary lock, so this is rare).
-            if (exception is MySqlException { Number: 1062 } duplicate)
-                throw duplicate.Message.Contains("uq_service_contracts_number", StringComparison.Ordinal)
-                    ? new ServiceContractOperationException("Beneficiarul are deja un contract cu acest număr și această dată.")
-                    : new ServiceContractOperationException("Un punct de lucru din contract este deja într-un contract activ sau în acest contract. Actualizează pagina și reia operația.");
-            if (exception is MySqlException { Number: 1451 })
-                throw new ServiceContractOperationException("Contractul nu poate fi șters: are date asociate.");
-            throw;
-        }
-    }
+        1062 => exception.Message.Contains("uq_service_contracts_number", StringComparison.Ordinal)
+            ? new ServiceContractOperationException("Beneficiarul are deja un contract cu acest număr și această dată.")
+            : new ServiceContractOperationException("Un punct de lucru din contract este deja într-un contract activ sau în acest contract. Actualizează pagina și reia operația."),
+        1451 => new ServiceContractOperationException("Contractul nu poate fi șters: are date asociate."),
+        _ => null
+    };
 
     private static ServiceContract ReadContract(MySqlDataReader reader) =>
         new(checked((int)reader.GetInt64(0)), checked((int)reader.GetInt64(1)), reader.GetString(2), ReadDate(reader, 3), reader.GetInt32(4),
@@ -496,13 +475,6 @@ public sealed class MariaServiceContractRepository(
     private static DateOnly ReadDate(MySqlDataReader reader, int ordinal) => DateOnly.FromDateTime(reader.GetDateTime(ordinal));
 
     private static DateTime SqlDate(DateOnly date) => date.ToDateTime(TimeOnly.MinValue);
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object? Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
-        return command;
-    }
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

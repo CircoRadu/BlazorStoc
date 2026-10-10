@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -12,7 +13,6 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
 {
     private const string ProductMissingMessage = "Produsul nu mai există. Actualizează catalogul.";
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     private const string SelectMovement = """
         SELECT m.id,m.product_id,m.kind,m.quantity,m.movement_date,m.description,m.beneficiary_id,b.name,m.project_id,p.name,
@@ -37,92 +37,108 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var stock = await GetStockAsync(connection, null, productId, cancellationToken).ConfigureAwait(false)
                     ?? throw new StockMovementOperationException(ProductMissingMessage);
-        object kind = query.Kind is null ? DBNull.Value : (int)query.Kind.Value;
-        // Source and supplier narrow the entries only (an exit never has an invoice).
-        object source = query.Source == EntrySource.All ? DBNull.Value : (int)query.Source;
-        object supplier = query.SupplierId is { } supplierFilter ? supplierFilter : DBNull.Value;
         var overStock = await OverStockIdsAsync(connection, productId, stock, cancellationToken).ConfigureAwait(false);
-        var overStockFilter = query.OverStockOnly ? $" AND m.id IN ({(overStock.Count == 0 ? "0" : string.Join(",", overStock))})" : "";
-        var sourceFilter = $"""
-            AND (@source IS NULL OR (m.kind=1 AND ((@source=1 AND m.invoice_id IS NOT NULL) OR (@source=2 AND m.invoice_id IS NULL))))
-            AND (@supplier IS NULL OR (m.kind=1 AND m.invoice_id IN (SELECT id FROM supplier_invoices WHERE supplier_id=@supplier)))
-            AND (@destination IS NULL OR (m.kind=0 AND m.destination=@destination))
-            AND (@beneficiary IS NULL OR (m.kind=0 AND m.beneficiary_id=@beneficiary))
-            AND (@vehicle IS NULL OR (m.kind=0 AND (m.vehicle_id=@vehicle OR m.source_vehicle_id=@vehicle)))
-            AND (@day IS NULL OR m.movement_date=@day)
-            AND (@text IS NULL OR m.description LIKE @text OR IFNULL(m.reference,'') LIKE @text
-                 OR EXISTS(SELECT 1 FROM supplier_invoices si2 LEFT JOIN suppliers su2 ON su2.id=si2.supplier_id WHERE si2.id=m.invoice_id AND (si2.`number` LIKE @text OR su2.name LIKE @text))
-                 OR EXISTS(SELECT 1 FROM suppliers fs2 WHERE fs2.id=m.free_supplier_id AND fs2.name LIKE @text)
-                 OR EXISTS(SELECT 1 FROM beneficiaries b2 WHERE b2.id=m.beneficiary_id AND b2.name LIKE @text)
-                 OR EXISTS(SELECT 1 FROM projects p2 WHERE p2.id=m.project_id AND p2.name LIKE @text)
-                 OR EXISTS(SELECT 1 FROM vehicles v2 WHERE v2.id IN (m.vehicle_id,m.source_vehicle_id) AND v2.plate_number LIKE @text))
-            {overStockFilter}
-            """;
-        object destinationFilter = query.Destination is { } chosenDestination ? (int)chosenDestination : DBNull.Value;
-        object beneficiaryFilter = query.BeneficiaryId is { } chosenBeneficiary ? chosenBeneficiary : DBNull.Value;
-        object vehicleFilter = query.VehicleId is { } chosenVehicle ? chosenVehicle : DBNull.Value;
-        // The text filter: part of a description, reference, invoice number, supplier, beneficiary, project or plate (the characters of LIKE are taken literally).
-        object textFilter = string.IsNullOrWhiteSpace(query.Text) ? DBNull.Value
-            : "%" + query.Text.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
-        object dayFilter = query.Date is { } chosenDay ? StockMovementRules.StorageDate(chosenDay) : DBNull.Value;
-        int total;
-        await using (var count = Command(connection, null,
-            $"SELECT COUNT(*) FROM stock_movements m WHERE m.product_id=@product AND (@kind IS NULL OR m.kind=@kind) {sourceFilter}",
-            ("@product", productId), ("@kind", kind), ("@source", source), ("@supplier", supplier),
-            ("@destination", destinationFilter), ("@beneficiary", beneficiaryFilter), ("@vehicle", vehicleFilter), ("@text", textFilter), ("@day", dayFilter)))
-            total = Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
-        bool anyModified;
-        await using (var modified = Command(connection, null, """
+        var filter = PageFilter.Of(productId, query, overStock);
+        var total = Convert.ToInt32(await ScalarAsync(connection, $"SELECT COUNT(*) FROM stock_movements m WHERE {filter.Conditions}", filter.Parameters, cancellationToken).ConfigureAwait(false));
+        var anyModified = Convert.ToBoolean(await ScalarAsync(connection, """
             SELECT EXISTS(SELECT 1 FROM stock_movement_history h INNER JOIN stock_movements m ON m.id=h.movement_id
                           WHERE m.product_id=@product)
-            """, ("@product", productId)))
-            anyModified = Convert.ToBoolean(await modified.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+            """, [("@product", productId)], cancellationToken).ConfigureAwait(false));
+        var items = await ReadPageItemsAsync(connection, filter, query, cancellationToken).ConfigureAwait(false);
+        var inVehicles = (await VehicleQuantitiesAsync(connection, null, productId, cancellationToken).ConfigureAwait(false))
+            .Sum(entry => Math.Max(0, entry.Quantity));
+        var suppliers = await ReadPairsAsync(connection, productId, """
+            SELECT DISTINCT su.id, su.name FROM stock_movements m
+            INNER JOIN supplier_invoices si ON si.id=m.invoice_id INNER JOIN suppliers su ON su.id=si.supplier_id
+            WHERE m.product_id=@product ORDER BY su.name
+            """, cancellationToken).ConfigureAwait(false);
+        var exitBeneficiaries = await ReadPairsAsync(connection, productId, """
+            SELECT DISTINCT b.id, b.name FROM stock_movements m INNER JOIN beneficiaries b ON b.id=m.beneficiary_id
+            WHERE m.product_id=@product AND m.kind=0 ORDER BY b.name
+            """, cancellationToken).ConfigureAwait(false);
+        var exitVehicles = await ReadPairsAsync(connection, productId, """
+            SELECT DISTINCT v.id, v.plate_number FROM stock_movements m
+            INNER JOIN vehicles v ON v.id=m.vehicle_id OR v.id=m.source_vehicle_id
+            WHERE m.product_id=@product AND m.kind=0 ORDER BY v.plate_number
+            """, cancellationToken).ConfigureAwait(false);
+        return new StockMovementPage(items, total, stock, anyModified, inVehicles, suppliers, overStock, exitBeneficiaries, exitVehicles);
+    }
+
+    // What the filters of the movement list ask for: the SQL conditions on the movements of one product and the parameters they use.
+    private sealed record PageFilter(string Conditions, (string Name, object? Value)[] Parameters)
+    {
+        public static PageFilter Of(int productId, StockMovementQuery query, IReadOnlySet<int> overStock)
+        {
+            // Source and supplier narrow the entries only (an exit never has an invoice).
+            var overStockFilter = query.OverStockOnly ? $" AND m.id IN ({(overStock.Count == 0 ? "0" : string.Join(",", overStock))})" : "";
+            var conditions = $"""
+                m.product_id=@product AND (@kind IS NULL OR m.kind=@kind)
+                AND (@source IS NULL OR (m.kind=1 AND ((@source=1 AND m.invoice_id IS NOT NULL) OR (@source=2 AND m.invoice_id IS NULL))))
+                AND (@supplier IS NULL OR (m.kind=1 AND m.invoice_id IN (SELECT id FROM supplier_invoices WHERE supplier_id=@supplier)))
+                AND (@destination IS NULL OR (m.kind=0 AND m.destination=@destination))
+                AND (@beneficiary IS NULL OR (m.kind=0 AND m.beneficiary_id=@beneficiary))
+                AND (@vehicle IS NULL OR (m.kind=0 AND (m.vehicle_id=@vehicle OR m.source_vehicle_id=@vehicle)))
+                AND (@day IS NULL OR m.movement_date=@day)
+                AND (@text IS NULL OR m.description LIKE @text OR IFNULL(m.reference,'') LIKE @text
+                     OR EXISTS(SELECT 1 FROM supplier_invoices si2 LEFT JOIN suppliers su2 ON su2.id=si2.supplier_id WHERE si2.id=m.invoice_id AND (si2.`number` LIKE @text OR su2.name LIKE @text))
+                     OR EXISTS(SELECT 1 FROM suppliers fs2 WHERE fs2.id=m.free_supplier_id AND fs2.name LIKE @text)
+                     OR EXISTS(SELECT 1 FROM beneficiaries b2 WHERE b2.id=m.beneficiary_id AND b2.name LIKE @text)
+                     OR EXISTS(SELECT 1 FROM projects p2 WHERE p2.id=m.project_id AND p2.name LIKE @text)
+                     OR EXISTS(SELECT 1 FROM vehicles v2 WHERE v2.id IN (m.vehicle_id,m.source_vehicle_id) AND v2.plate_number LIKE @text))
+                {overStockFilter}
+                """;
+            // The text filter: part of a description, reference, invoice number, supplier, beneficiary, project or plate (the characters of LIKE are taken literally).
+            object text = string.IsNullOrWhiteSpace(query.Text) ? DBNull.Value
+                : "%" + query.Text.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+            return new(conditions,
+            [
+                ("@product", productId),
+                ("@kind", query.Kind is null ? DBNull.Value : (int)query.Kind.Value),
+                ("@source", query.Source == EntrySource.All ? DBNull.Value : (int)query.Source),
+                ("@supplier", query.SupplierId is { } supplier ? supplier : DBNull.Value),
+                ("@destination", query.Destination is { } destination ? (int)destination : DBNull.Value),
+                ("@beneficiary", query.BeneficiaryId is { } beneficiary ? beneficiary : DBNull.Value),
+                ("@vehicle", query.VehicleId is { } vehicle ? vehicle : DBNull.Value),
+                ("@text", text),
+                ("@day", query.Date is { } day ? StockMovementRules.StorageDate(day) : DBNull.Value)
+            ]);
+        }
+    }
+
+    private static async Task<object?> ScalarAsync(MySqlConnection connection, string sql, (string Name, object? Value)[] parameters, CancellationToken token)
+    {
+        await using var command = Command(connection, null, sql, parameters);
+        return await command.ExecuteScalarAsync(token).ConfigureAwait(false);
+    }
+
+    // The movements of the requested page, in the requested order.
+    private static async Task<List<StockMovement>> ReadPageItemsAsync(MySqlConnection connection, PageFilter filter, StockMovementQuery query, CancellationToken token)
+    {
         var direction = query.Descending ? "DESC" : "ASC";
         // MySQL/MariaDB LIMIT needs a non-negative bound; long.MaxValue stands in for "no limit" (PageSize <= 0).
         var limit = query.PageSize <= 0 ? long.MaxValue : query.PageSize;
         var offset = query.PageSize <= 0 ? 0 : (long)(Math.Max(1, query.Page) - 1) * query.PageSize;
         var items = new List<StockMovement>();
-        // The reader must be closed before the next command: MySqlConnector allows one open reader per connection.
-        await using (var command = Command(connection, null, $"""
+        await using var command = Command(connection, null, $"""
             {SelectMovement}
-            WHERE m.product_id=@product AND (@kind IS NULL OR m.kind=@kind) {sourceFilter}
+            WHERE {filter.Conditions}
             ORDER BY m.movement_date {direction}, m.id {direction}
             LIMIT @limit OFFSET @offset
-            """, ("@product", productId), ("@kind", kind), ("@source", source), ("@supplier", supplier), ("@limit", limit), ("@offset", offset),
-            ("@destination", destinationFilter), ("@beneficiary", beneficiaryFilter), ("@vehicle", vehicleFilter), ("@text", textFilter), ("@day", dayFilter)))
-        await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
-            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) items.Add(ReadMovement(reader));
-        var inVehicles = (await VehicleQuantitiesAsync(connection, null, productId, cancellationToken).ConfigureAwait(false))
-            .Sum(entry => Math.Max(0, entry.Quantity));
-        var suppliers = new List<MovementSupplier>();
-        await using (var supplierCommand = Command(connection, null, """
-            SELECT DISTINCT su.id, su.name FROM stock_movements m
-            INNER JOIN supplier_invoices si ON si.id=m.invoice_id INNER JOIN suppliers su ON su.id=si.supplier_id
-            WHERE m.product_id=@product ORDER BY su.name
-            """, ("@product", productId)))
-        await using (var supplierReader = await supplierCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
-            while (await supplierReader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                suppliers.Add(new(ToInt32(supplierReader.GetInt64(0)), supplierReader.GetString(1)));
-        var exitBeneficiaries = new List<MovementSupplier>();
-        await using (var beneficiaryCommand = Command(connection, null, """
-            SELECT DISTINCT b.id, b.name FROM stock_movements m INNER JOIN beneficiaries b ON b.id=m.beneficiary_id
-            WHERE m.product_id=@product AND m.kind=0 ORDER BY b.name
-            """, ("@product", productId)))
-        await using (var beneficiaryReader = await beneficiaryCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
-            while (await beneficiaryReader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                exitBeneficiaries.Add(new(ToInt32(beneficiaryReader.GetInt64(0)), beneficiaryReader.GetString(1)));
-        var exitVehicles = new List<MovementSupplier>();
-        await using (var vehicleCommand = Command(connection, null, """
-            SELECT DISTINCT v.id, v.plate_number FROM stock_movements m
-            INNER JOIN vehicles v ON v.id=m.vehicle_id OR v.id=m.source_vehicle_id
-            WHERE m.product_id=@product AND m.kind=0 ORDER BY v.plate_number
-            """, ("@product", productId)))
-        await using (var vehicleReader = await vehicleCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
-            while (await vehicleReader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                exitVehicles.Add(new(ToInt32(vehicleReader.GetInt64(0)), vehicleReader.GetString(1)));
-        return new StockMovementPage(items, total, stock, anyModified, inVehicles, suppliers, overStock, exitBeneficiaries, exitVehicles);
+            """, [.. filter.Parameters, ("@limit", limit), ("@offset", offset)]);
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        while (await reader.ReadAsync(token).ConfigureAwait(false)) items.Add(ReadMovement(reader));
+        return items;
     }
 
+    // A list of (id, name) pairs for the filters of the page; `sql` selects the two columns for @product.
+    private static async Task<List<MovementSupplier>> ReadPairsAsync(MySqlConnection connection, int productId, string sql, CancellationToken token)
+    {
+        var pairs = new List<MovementSupplier>();
+        await using var command = Command(connection, null, sql, ("@product", productId));
+        await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
+        while (await reader.ReadAsync(token).ConfigureAwait(false)) pairs.Add(new(ToInt32(reader.GetInt64(0)), reader.GetString(1)));
+        return pairs;
+    }
     // Ids of the exits that took more than the warehouse held (see StockMovementRules.OverStockExits).
     private static async Task<IReadOnlySet<int>> OverStockIdsAsync(MySqlConnection connection, int productId, int totalStock, CancellationToken token)
     {
@@ -738,99 +754,117 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     private async Task<CreatedMovement> InsertMovementAsync(MySqlConnection connection, MySqlTransaction transaction, int productId,
         StockMovementInput value, string operatorName, DateTime now, int? operationId, CancellationToken cancellationToken)
     {
-        var actor = (Username: operatorName, Role: string.Empty);
         var nowText = MariaTimeText.Format(now);
-        var overStock = 0;
-            var productCode = await LockProductAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
-            var (beneficiaryName, projectName) = await ResolveRelationsAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
-            var (vehiclePlate, sourcePlate) = await ResolveVehiclesAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
-            // Moves between vehicles and returns are physical: they cannot take more than the vehicle holds. Using a product from a vehicle
-            // (beneficiary, sale, correction) can be recorded above what the vehicle is known to hold (marked "peste stoc").
-            var physicalMove = value.Destination is ExitDestination.Vehicle or ExitDestination.WarehouseReturn;
-            var vehicleBefore = 0;
-            if (value.SourceVehicleId is { } sourceVehicleId)
-            {
-                var held = (await VehicleQuantitiesAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false))
-                    .Where(entry => entry.VehicleId == sourceVehicleId).Sum(entry => entry.Quantity);
-                if (physicalMove && value.Quantity!.Value > held)
-                    throw new StockMovementOperationException(StockMovementRules.NotEnoughInVehicleMessage(sourcePlate!, held));
-                vehicleBefore = Math.Max(0, held);
-            }
-            var duplicateExit = false;
-            if (value.Kind == StockMovementKind.Exit)
-                duplicateExit = await CheckDuplicateExitAsync(connection, transaction, productId, productCode, value, cancellationToken).ConfigureAwait(false);
-            var (invoiceNumber, supplierName, supplierId) = await ResolveInvoiceAsync(connection, transaction, value.InvoiceId, cancellationToken).ConfigureAwait(false);
-            string? freeSupplierName = null;
-            if (value.FreeSupplierId is { } freeSupplierId)
-            {
-                await using var freeSupplier = Command(connection, transaction, "SELECT name FROM suppliers WHERE id=@id", ("@id", freeSupplierId));
-                freeSupplierName = await freeSupplier.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string
-                                   ?? throw new StockMovementOperationException("Furnizorul ales nu mai există. Actualizează lista și reia operația.");
-            }
-            var confirmedDuplicate = duplicateExit;
-            if (value.InvoiceId is { } checkedInvoice)
-                confirmedDuplicate = await CheckInvoiceEntryAsync(connection, transaction, checkedInvoice, productId, productCode, value, cancellationToken).ConfigureAwait(false);
-            if (value.ReturnOfMovementId is { } returnOf)
-            {
-                var returnable = await ReturnableAsync(connection, transaction, returnOf, cancellationToken).ConfigureAwait(false);
-                if (returnable is null || returnable.Value.ProductId != productId) throw new StockMovementOperationException(StockMovementRules.ReturnMissingMessage);
-                if (value.Quantity!.Value > returnable.Value.Remaining) throw new StockMovementOperationException(StockMovementRules.ReturnTooMuchMessage(Math.Max(0, returnable.Value.Remaining)));
-            }
-            await using var insert = Command(connection, transaction, """
-                INSERT INTO stock_movements
-                    (product_id,beneficiary_id,project_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc,
-                     destination,vehicle_id,source_vehicle_id,invoice_id,free_entry_type,free_supplier_id,reference,over_stock_cause,operation_id,return_of_movement_id)
-                VALUES(@product,@beneficiary,@project,@quantity,@created,@kind,@date,@description,@operator,0,@created,
-                       @destination,@vehicle,@sourceVehicle,@invoice,@freeType,@freeSupplier,@reference,@cause,@operation,@returnOf)
-                """, ("@product", productId), ("@beneficiary", value.BeneficiaryId), ("@project", value.ProjectId),
-                ("@quantity", value.Quantity), ("@created", nowText), ("@kind", (int)value.Kind),
-                ("@date", StockMovementRules.StorageDate(value.Date!.Value)), ("@description", value.Description),
-                ("@operator", actor.Username), ("@destination", (int?)value.Destination), ("@vehicle", value.VehicleId),
-                ("@sourceVehicle", value.SourceVehicleId), ("@invoice", value.InvoiceId), ("@freeType", (int?)value.FreeType),
-                ("@freeSupplier", value.FreeSupplierId), ("@reference", value.Reference), ("@cause", (int?)value.OverStockCause), ("@operation", operationId), ("@returnOf", value.ReturnOfMovementId));
-            await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            var id = checked((int)insert.LastInsertedId);
-            if (value is { Kind: StockMovementKind.Exit, Destination: ExitDestination.Beneficiary, ProjectId: { } componentProject })
-                await LinkComponentAsync(connection, transaction, id, componentProject, productId, value, cancellationToken).ConfigureAwait(false);
-            else if (value is { Kind: StockMovementKind.Entry, ProjectComponentId: { } entryComponent })
-                await LinkEntryComponentAsync(connection, transaction, id, entryComponent, cancellationToken).ConfigureAwait(false);
-            var reservation = await ApplyReservationsAsync(connection, transaction, productId, productCode, value, cancellationToken).ConfigureAwait(false);
-            // Every exit belongs to an operation: the first exit of an operation gives it its id (a single exit is an operation of one line).
-            if (value.Kind == StockMovementKind.Exit && operationId is null)
-            {
-                operationId = id;
-                await using var own = Command(connection, transaction, "UPDATE stock_movements SET operation_id=@id WHERE id=@id", ("@id", id));
-                await own.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            }
-            if (value is { InvoiceId: { } lineInvoice, InvoiceQuantity: { } lineQuantity })
-                await using (var line = Command(connection, transaction, """
-                    INSERT INTO supplier_invoice_lines(invoice_id,product_id,quantity) VALUES(@invoice,@product,@quantity)
-                    ON DUPLICATE KEY UPDATE quantity=VALUES(quantity)
-                    """, ("@invoice", lineInvoice), ("@product", productId), ("@quantity", lineQuantity)))
-                    await line.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            var movement = new StockMovement(id, productId, value.Kind, value.Quantity!.Value, value.Date.Value, value.Description,
-                value.BeneficiaryId, beneficiaryName, value.ProjectId, projectName, actor.Username, 0, now, now, false,
-                value.Destination, value.VehicleId, vehiclePlate, value.SourceVehicleId, sourcePlate,
-                value.InvoiceId, invoiceNumber, supplierName, supplierId, value.FreeType, value.FreeSupplierId, freeSupplierName, value.Reference,
-                value.OverStockCause, operationId, ReturnOfMovementId: value.ReturnOfMovementId);
-            var warehouseBefore = movement.Kind == StockMovementKind.Exit && movement.SourceVehicleId is null
-                ? StockMovementRules.WarehouseStock(await GetStockAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false) ?? 0,
-                    (await VehicleQuantitiesAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false)).Sum(entry => Math.Max(0, entry.Quantity)))
-                : (int?)null;
-            var stock = await ApplyStockAsync(connection, transaction, productId, movement.Effect, cancellationToken).ConfigureAwait(false);
-            overStock = warehouseBefore is { } before && movement.Quantity > Math.Max(0, before) ? movement.Quantity - Math.Max(0, before)
-                : movement.Kind == StockMovementKind.Exit && movement.SourceVehicleId is not null && !physicalMove && movement.Quantity > vehicleBefore ? movement.Quantity - vehicleBefore
-                : 0;
-            // The cause is kept only for an exit that really went over the stock.
-            if (overStock == 0 && movement.OverStockCause is not null)
-            {
-                await using var clear = Command(connection, transaction, "UPDATE stock_movements SET over_stock_cause=NULL WHERE id=@id", ("@id", movement.Id));
-                await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                movement = movement with { OverStockCause = null };
-            }
-            return new CreatedMovement(movement, stock, productCode, confirmedDuplicate, overStock, reservation);
+        var productCode = await LockProductAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
+        var (beneficiaryName, projectName) = await ResolveRelationsAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
+        var (vehiclePlate, sourcePlate) = await ResolveVehiclesAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
+        // Moves between vehicles and returns are physical: they cannot take more than the vehicle holds. Using a product from a vehicle
+        // (beneficiary, sale, correction) can be recorded above what the vehicle is known to hold (marked "peste stoc").
+        var physicalMove = value.Destination is ExitDestination.Vehicle or ExitDestination.WarehouseReturn;
+        var vehicleBefore = await HeldBySourceVehicleAsync(connection, transaction, productId, value, sourcePlate, physicalMove, cancellationToken).ConfigureAwait(false);
+        var duplicateExit = false;
+        if (value.Kind == StockMovementKind.Exit)
+            duplicateExit = await CheckDuplicateExitAsync(connection, transaction, productId, productCode, value, cancellationToken).ConfigureAwait(false);
+        var (invoiceNumber, supplierName, supplierId) = await ResolveInvoiceAsync(connection, transaction, value.InvoiceId, cancellationToken).ConfigureAwait(false);
+        var freeSupplierName = await ResolveFreeSupplierAsync(connection, transaction, value.FreeSupplierId, cancellationToken).ConfigureAwait(false);
+        var confirmedDuplicate = duplicateExit;
+        if (value.InvoiceId is { } checkedInvoice)
+            confirmedDuplicate = await CheckInvoiceEntryAsync(connection, transaction, checkedInvoice, productId, productCode, value, cancellationToken).ConfigureAwait(false);
+        if (value.ReturnOfMovementId is { } returnOf)
+            await CheckReturnAsync(connection, transaction, returnOf, productId, value, cancellationToken).ConfigureAwait(false);
+        var id = await InsertRowAsync(connection, transaction, productId, value, operatorName, nowText, operationId, cancellationToken).ConfigureAwait(false);
+        if (value is { Kind: StockMovementKind.Exit, Destination: ExitDestination.Beneficiary, ProjectId: { } componentProject })
+            await LinkComponentAsync(connection, transaction, id, componentProject, productId, value, cancellationToken).ConfigureAwait(false);
+        else if (value is { Kind: StockMovementKind.Entry, ProjectComponentId: { } entryComponent })
+            await LinkEntryComponentAsync(connection, transaction, id, entryComponent, cancellationToken).ConfigureAwait(false);
+        var reservation = await ApplyReservationsAsync(connection, transaction, productId, productCode, value, cancellationToken).ConfigureAwait(false);
+        // Every exit belongs to an operation: the first exit of an operation gives it its id (a single exit is an operation of one line).
+        if (value.Kind == StockMovementKind.Exit && operationId is null)
+        {
+            operationId = id;
+            await using var own = Command(connection, transaction, "UPDATE stock_movements SET operation_id=@id WHERE id=@id", ("@id", id));
+            await own.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        if (value is { InvoiceId: { } lineInvoice, InvoiceQuantity: { } lineQuantity })
+            await using (var line = Command(connection, transaction, """
+                INSERT INTO supplier_invoice_lines(invoice_id,product_id,quantity) VALUES(@invoice,@product,@quantity)
+                ON DUPLICATE KEY UPDATE quantity=VALUES(quantity)
+                """, ("@invoice", lineInvoice), ("@product", productId), ("@quantity", lineQuantity)))
+                await line.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        var movement = new StockMovement(id, productId, value.Kind, value.Quantity!.Value, value.Date!.Value, value.Description,
+            value.BeneficiaryId, beneficiaryName, value.ProjectId, projectName, operatorName, 0, now, now, false,
+            value.Destination, value.VehicleId, vehiclePlate, value.SourceVehicleId, sourcePlate,
+            value.InvoiceId, invoiceNumber, supplierName, supplierId, value.FreeType, value.FreeSupplierId, freeSupplierName, value.Reference,
+            value.OverStockCause, operationId, ReturnOfMovementId: value.ReturnOfMovementId);
+        var warehouseBefore = movement.Kind == StockMovementKind.Exit && movement.SourceVehicleId is null
+            ? StockMovementRules.WarehouseStock(await GetStockAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false) ?? 0,
+                (await VehicleQuantitiesAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false)).Sum(entry => Math.Max(0, entry.Quantity)))
+            : (int?)null;
+        var stock = await ApplyStockAsync(connection, transaction, productId, movement.Effect, cancellationToken).ConfigureAwait(false);
+        var overStock = OverStockOf(movement, warehouseBefore, vehicleBefore, physicalMove);
+        // The cause is kept only for an exit that really went over the stock.
+        if (overStock == 0 && movement.OverStockCause is not null)
+        {
+            await using var clear = Command(connection, transaction, "UPDATE stock_movements SET over_stock_cause=NULL WHERE id=@id", ("@id", movement.Id));
+            await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            movement = movement with { OverStockCause = null };
+        }
+        return new CreatedMovement(movement, stock, productCode, confirmedDuplicate, overStock, reservation);
     }
 
+    // What the source vehicle of an exit holds before it (0 when there is none or it holds less than nothing); a physical move cannot take more.
+    private static async Task<int> HeldBySourceVehicleAsync(MySqlConnection connection, MySqlTransaction transaction, int productId, StockMovementInput value,
+        string? sourcePlate, bool physicalMove, CancellationToken token)
+    {
+        if (value.SourceVehicleId is not { } sourceVehicleId) return 0;
+        var held = (await VehicleQuantitiesAsync(connection, transaction, productId, token).ConfigureAwait(false))
+            .Where(entry => entry.VehicleId == sourceVehicleId).Sum(entry => entry.Quantity);
+        if (physicalMove && value.Quantity!.Value > held)
+            throw new StockMovementOperationException(StockMovementRules.NotEnoughInVehicleMessage(sourcePlate!, held));
+        return Math.Max(0, held);
+    }
+
+    private static async Task<string?> ResolveFreeSupplierAsync(MySqlConnection connection, MySqlTransaction transaction, int? freeSupplierId, CancellationToken token)
+    {
+        if (freeSupplierId is not { } id) return null;
+        await using var freeSupplier = Command(connection, transaction, "SELECT name FROM suppliers WHERE id=@id", ("@id", id));
+        return await freeSupplier.ExecuteScalarAsync(token).ConfigureAwait(false) as string
+               ?? throw new StockMovementOperationException("Furnizorul ales nu mai există. Actualizează lista și reia operația.");
+    }
+
+    // A return takes back an exit of the same product, and not more than is left of it.
+    private static async Task CheckReturnAsync(MySqlConnection connection, MySqlTransaction transaction, int returnOf, int productId, StockMovementInput value, CancellationToken token)
+    {
+        var returnable = await ReturnableAsync(connection, transaction, returnOf, token).ConfigureAwait(false);
+        if (returnable is null || returnable.Value.ProductId != productId) throw new StockMovementOperationException(StockMovementRules.ReturnMissingMessage);
+        if (value.Quantity!.Value > returnable.Value.Remaining) throw new StockMovementOperationException(StockMovementRules.ReturnTooMuchMessage(Math.Max(0, returnable.Value.Remaining)));
+    }
+
+    private static async Task<int> InsertRowAsync(MySqlConnection connection, MySqlTransaction transaction, int productId, StockMovementInput value,
+        string operatorName, string nowText, int? operationId, CancellationToken token)
+    {
+        await using var insert = Command(connection, transaction, """
+            INSERT INTO stock_movements
+                (product_id,beneficiary_id,project_id,quantity,created_utc,kind,movement_date,description,operator,version,updated_utc,
+                 destination,vehicle_id,source_vehicle_id,invoice_id,free_entry_type,free_supplier_id,reference,over_stock_cause,operation_id,return_of_movement_id)
+            VALUES(@product,@beneficiary,@project,@quantity,@created,@kind,@date,@description,@operator,0,@created,
+                   @destination,@vehicle,@sourceVehicle,@invoice,@freeType,@freeSupplier,@reference,@cause,@operation,@returnOf)
+            """, ("@product", productId), ("@beneficiary", value.BeneficiaryId), ("@project", value.ProjectId),
+            ("@quantity", value.Quantity), ("@created", nowText), ("@kind", (int)value.Kind),
+            ("@date", StockMovementRules.StorageDate(value.Date!.Value)), ("@description", value.Description),
+            ("@operator", operatorName), ("@destination", (int?)value.Destination), ("@vehicle", value.VehicleId),
+            ("@sourceVehicle", value.SourceVehicleId), ("@invoice", value.InvoiceId), ("@freeType", (int?)value.FreeType),
+            ("@freeSupplier", value.FreeSupplierId), ("@reference", value.Reference), ("@cause", (int?)value.OverStockCause), ("@operation", operationId), ("@returnOf", value.ReturnOfMovementId));
+        await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        return checked((int)insert.LastInsertedId);
+    }
+
+    // How much of an exit went over the stock: over the warehouse stock before it (an exit from the warehouse), or over what its source vehicle
+    // held (using a product from a vehicle; a physical move cannot go over, it is refused).
+    internal static int OverStockOf(StockMovement movement, int? warehouseBefore, int vehicleBefore, bool physicalMove) =>
+        warehouseBefore is { } before && movement.Quantity > Math.Max(0, before) ? movement.Quantity - Math.Max(0, before)
+        : movement.Kind == StockMovementKind.Exit && movement.SourceVehicleId is not null && !physicalMove && movement.Quantity > vehicleBefore ? movement.Quantity - vehicleBefore
+        : 0;
     private async Task RecordCreatedAsync(CreatedMovement created, StockMovementInput value, CancellationToken cancellationToken)
     {
         var (movement, _, productCode, confirmed, overStock, reservation) = created;
@@ -1131,43 +1165,11 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token).ConfigureAwait(false));
     }
 
-    private async Task<MySqlConnection> OpenAsync(CancellationToken token)
-    {
-        var connection = CreateConnection();
-        try
-        {
-            await connection.OpenAsync(token).ConfigureAwait(false);
-            return connection;
-        }
-        catch
-        {
-            await connection.DisposeAsync().ConfigureAwait(false);
-            throw;
-        }
-    }
+    private Task<MySqlConnection> OpenAsync(CancellationToken token) => MariaDb.OpenAsync(configuration, token);
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token), token);
-
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
-    {
-        token.ThrowIfCancellationRequested();
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new StockMovementOperationException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        await using var connection = await OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
-    }
+        MariaDb.WriteAsync(configuration, action, message => new StockMovementOperationException(message), token,
+            "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
     // Locks the product row for the rest of the transaction: every stock/vehicle-quantity check and the final
     // UPDATE products SET quantity=... below run under this lock, so two concurrent movements on the same product
@@ -1373,14 +1375,6 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     }
 
     private static int ToInt32(long value) => checked((int)value);
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql,
-        params (string Name, object? Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
-        return command;
-    }
 
     private Task EnsureOperatorAsync(CancellationToken token) =>
         accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;

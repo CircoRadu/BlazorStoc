@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -11,7 +12,6 @@ public sealed class MariaProjectComponentRepository(
     IAuditTrail? auditTrail = null,
     IStockMovementRepository? movements = null) : IProjectComponentRepository
 {
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     private const string Select = """
         SELECT c.id,c.project_id,c.system_type_id,t.name,c.state,c.archived_utc,c.archive_reason,c.version
@@ -21,14 +21,13 @@ public sealed class MariaProjectComponentRepository(
     public async Task<IReadOnlyList<ProjectComponent>> GetForProjectAsync(int projectId, bool includeArchived = false, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadAsync(connection, null, $"{Select} WHERE c.project_id=@project {(includeArchived ? "" : "AND c.archived_utc IS NULL")} ORDER BY t.sort_order,t.id",
             cancellationToken, ("@project", projectId)).ConfigureAwait(false);
     }
 
     private static async Task<List<ProjectComponent>> ReadAsync(MySqlConnection connection, MySqlTransaction? transaction, string sql, CancellationToken token,
-        params (string Name, object Value)[] parameters)
+        params (string Name, object? Value)[] parameters)
     {
         await using var command = Command(connection, transaction, sql, parameters);
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -115,8 +114,7 @@ public sealed class MariaProjectComponentRepository(
     public async Task<IReadOnlyList<ComponentChoice>> GetChoicesAsync(int projectId, int productId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var withProduct = new HashSet<int>();
         await using (var command = Command(connection, null, ComponentExitSql.ComponentsWithProduct, ("@product", productId), ("@project", projectId)))
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
@@ -128,8 +126,7 @@ public sealed class MariaProjectComponentRepository(
     public async Task<IReadOnlyList<ComponentExit>> GetPendingExitsAsync(int componentId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, $"""
             SELECT e.id,e.product_id,p.name,e.movement_date,e.reference,e.quantity,{RemainingSql} AS remaining FROM stock_movements e INNER JOIN products p ON p.id=e.product_id
             WHERE e.kind=0 AND e.voided_utc IS NULL AND e.component_settled IS NULL AND e.destination=@destination AND e.project_component_id=@component
@@ -189,10 +186,9 @@ public sealed class MariaProjectComponentRepository(
         }
     }
 
-    private async Task ExecuteAsync(string sql, (string Name, object Value)[] parameters, CancellationToken token)
+    private async Task ExecuteAsync(string sql, (string Name, object? Value)[] parameters, CancellationToken token)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
         await using var command = Command(connection, null, sql, parameters);
         await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
     }
@@ -200,8 +196,7 @@ public sealed class MariaProjectComponentRepository(
     public async Task<IReadOnlyList<OfferComponent>> GetComponentsWithProductAsync(int productId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT DISTINCT pc.id,pc.project_id,p.name,t.name FROM project_components pc
             INNER JOIN projects p ON p.id=pc.project_id INNER JOIN system_types t ON t.id=pc.system_type_id
@@ -220,8 +215,7 @@ public sealed class MariaProjectComponentRepository(
     public async Task<IReadOnlyDictionary<(int SystemTypeId, int ProductId), int>> GetReceivedAsync(int projectId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT pc.system_type_id,m.product_id,SUM(m.quantity) FROM stock_movements m INNER JOIN project_components pc ON pc.id=m.project_component_id
             WHERE m.kind=1 AND m.voided_utc IS NULL AND pc.project_id=@project AND pc.archived_utc IS NULL GROUP BY pc.system_type_id,m.product_id
@@ -235,8 +229,7 @@ public sealed class MariaProjectComponentRepository(
     public async Task<IReadOnlyList<ComponentNet>> GetNetByComponentAsync(int projectId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
             SELECT e.project_component_id,pc.system_type_id,e.outside_offer,e.product_id,p.name,
                    SUM(e.quantity-COALESCE((SELECT SUM(r.quantity) FROM stock_movements r WHERE r.return_of_movement_id=e.id AND r.voided_utc IS NULL),0))
@@ -256,9 +249,8 @@ public sealed class MariaProjectComponentRepository(
     private async Task ReleaseReservationsAsync(ProjectComponent component, CancellationToken token)
     {
         var released = new List<(int Id, string Product, int Quantity)>();
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false))
         {
-            await connection.OpenAsync(token).ConfigureAwait(false);
             await using (var select = Command(connection, null, "SELECT r.id,p.name,r.quantity FROM project_reservations r INNER JOIN products p ON p.id=r.product_id WHERE r.project_component_id=@id", ("@id", component.Id)))
             await using (var reader = await select.ExecuteReaderAsync(token).ConfigureAwait(false))
                 while (await reader.ReadAsync(token).ConfigureAwait(false)) released.Add((checked((int)reader.GetInt64(0)), reader.GetString(1), Convert.ToInt32(reader.GetValue(2))));
@@ -282,7 +274,7 @@ public sealed class MariaProjectComponentRepository(
 
     // Applies one change under the version read; the callback returns the assignments (null = nothing to change) or refuses.
     private async Task<(ProjectComponent Current, bool Changed)> ChangeAsync(ProjectComponent original,
-        Func<ProjectComponent, (string Assignments, (string Name, object Value)[] Parameters)?> decide, CancellationToken token) =>
+        Func<ProjectComponent, (string Assignments, (string Name, object? Value)[] Parameters)?> decide, CancellationToken token) =>
         await WriteAsync(async (connection, transaction) =>
         {
             var found = (await ReadAsync(connection, transaction, $"{Select} WHERE c.id=@id FOR UPDATE", token, ("@id", original.Id)).ConfigureAwait(false)).FirstOrDefault();
@@ -297,9 +289,8 @@ public sealed class MariaProjectComponentRepository(
     private async Task RecordAsync(ProjectComponent component, string action, AuditChange[] changes, string reason, CancellationToken token)
     {
         string name;
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false))
         {
-            await connection.OpenAsync(token).ConfigureAwait(false);
             await using var command = Command(connection, null, "SELECT name FROM projects WHERE id=@id", ("@id", component.ProjectId));
             name = await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string ?? $"#{component.ProjectId}";
         }
@@ -309,43 +300,15 @@ public sealed class MariaProjectComponentRepository(
 
     private async Task<ProjectComponent> GetAsync(int id, CancellationToken token)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
         return (await ReadAsync(connection, null, $"{Select} WHERE c.id=@id", token, ("@id", id)).ConfigureAwait(false)).FirstOrDefault()
                ?? throw new ProjectComponentException(ProjectComponentRules.StaleMessage);
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
-    {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new ProjectComponentException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (MySqlException exception) when (exception.Number == 1062)
-        {
-            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw new ProjectComponentException(ProjectComponentRules.AlreadyExistsMessage);
-        }
-        catch
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
-    }
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaDb.WriteAsync(configuration, action, message => new ProjectComponentException(message),
+            exception => exception.Number == 1062 ? new ProjectComponentException(ProjectComponentRules.AlreadyExistsMessage) : null, token,
+            "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

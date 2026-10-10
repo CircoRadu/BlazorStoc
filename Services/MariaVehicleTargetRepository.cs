@@ -1,4 +1,5 @@
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -6,13 +7,6 @@ namespace BlazorStoc.Services;
 public sealed class MariaVehicleTargetRepository(IConfiguration configuration, IAccessControl? accessControl = null, IAuditTrail? auditTrail = null) : IVehicleTargetRepository
 {
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
-
-    private static MySqlCommand Command(MySqlConnection connection, string sql, params (string Name, object? Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
-        return command;
-    }
 
     private static async Task<string?> TextAsync(MySqlConnection connection, string sql, int id, CancellationToken token) =>
         await Command(connection, sql, ("@id", id)).ExecuteScalarAsync(token).ConfigureAwait(false) as string;
@@ -27,8 +21,7 @@ public sealed class MariaVehicleTargetRepository(IConfiguration configuration, I
     public async Task<IReadOnlyList<VehicleTarget>> GetForVehicleAsync(int vehicleId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, """
             SELECT t.vehicle_id,t.product_id,p.name,t.target_quantity FROM vehicle_target_levels t INNER JOIN products p ON p.id=t.product_id
             WHERE t.vehicle_id=@vehicle ORDER BY p.name,t.product_id
@@ -48,9 +41,8 @@ public sealed class MariaVehicleTargetRepository(IConfiguration configuration, I
         var actor = (await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false)).Username;
         string plate, product;
         int? old;
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             plate = await TextAsync(connection, "SELECT plate_number FROM vehicles WHERE id=@id", vehicleId, cancellationToken).ConfigureAwait(false)
                 ?? throw new VehicleTargetException("Vehiculul nu mai există.");
             product = await TextAsync(connection, "SELECT name FROM products WHERE id=@id", productId, cancellationToken).ConfigureAwait(false)
@@ -74,9 +66,8 @@ public sealed class MariaVehicleTargetRepository(IConfiguration configuration, I
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new VehicleTargetException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         string? plate, product;
         int old;
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             plate = await TextAsync(connection, "SELECT plate_number FROM vehicles WHERE id=@id", vehicleId, cancellationToken).ConfigureAwait(false);
             product = await TextAsync(connection, "SELECT name FROM products WHERE id=@id", productId, cancellationToken).ConfigureAwait(false);
             if (await CurrentAsync(connection, vehicleId, productId, cancellationToken).ConfigureAwait(false) is not { } current) return;

@@ -91,8 +91,7 @@ public sealed class MariaProjectSituationReader(
     {
         var result = new Dictionary<int, string>();
         if (productIds.Count == 0) return result;
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         // The newest entry of each product that names a supplier (through its invoice, or free): by date, then by id.
         await using var command = new MySqlCommand($"""
             SELECT m.product_id,COALESCE(su.name,fs.name) FROM stock_movements m

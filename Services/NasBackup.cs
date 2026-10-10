@@ -128,8 +128,7 @@ public sealed class MariaNasBackupStore(IConfiguration configuration, IDataProte
 
     internal async Task<(NasBackupSettings Settings, string? Password)> ReadAsync(CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT unc_path,username,password_protected,copy_enabled,last_attempt_utc,last_ok,last_message FROM backup_nas_settings WHERE id=1
             """, connection);
@@ -163,9 +162,8 @@ public sealed class MariaNasBackupStore(IConfiguration configuration, IDataProte
         var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
         var path = NasBackupRules.NormalizePath(input.Path);
         var passwordChanged = !string.IsNullOrEmpty(input.Password);
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var command = new MySqlCommand("""
                 INSERT INTO backup_nas_settings (id,unc_path,username,password_protected,copy_enabled,updated_by,updated_utc)
                 VALUES (1,@path,@user,@pass,@copy,@by,@now)
@@ -194,8 +192,7 @@ public sealed class MariaNasBackupStore(IConfiguration configuration, IDataProte
 
     internal async Task RecordResultAsync(bool ok, string message, CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("UPDATE backup_nas_settings SET last_attempt_utc=@now,last_ok=@ok,last_message=@message WHERE id=1", connection);
         command.Parameters.AddWithValue("@now", MariaTimeText.Format(DateTime.UtcNow));
         command.Parameters.AddWithValue("@ok", ok);

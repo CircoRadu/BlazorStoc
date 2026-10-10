@@ -15,8 +15,7 @@ public sealed class MariaOverStockReader(IConfiguration configuration) : IOverSt
 {
     public async Task<IReadOnlyList<RegularizationItem>> GetAsync(CancellationToken cancellationToken = default)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await MariaStockMovementRepository.ReadToRegularizeAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 }

@@ -1,6 +1,7 @@
 using System.Data;
 using System.Globalization;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -15,7 +16,6 @@ public sealed class MariaOfferRepository(
     IAccessControl? accessControl = null,
     IAuditTrail? auditTrail = null) : IOfferRepository
 {
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     private const string Select = """
         SELECT o.id,o.number,o.revision,o.title,o.category,o.beneficiary_id,COALESCE(b.name,''),o.project_id,COALESCE(p.name,''),o.system_type_id,t.name,o.template_id,o.file_name,o.created_by,o.created_utc
@@ -30,20 +30,18 @@ public sealed class MariaOfferRepository(
     public async Task<OfferRecord?> GetLatestAsync(string number, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return (await ReadOffersAsync(connection, null, $"{Select} WHERE o.number_key=@key ORDER BY o.revision DESC LIMIT 1", cancellationToken, ("@key", OfferRules.Key(number))).ConfigureAwait(false)).FirstOrDefault();
     }
 
     public async Task<IReadOnlyList<OfferRecord>> GetForProjectAsync(int projectId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadOffersAsync(connection, null, $"{Select} WHERE o.project_id=@project ORDER BY o.number,o.revision DESC", cancellationToken, ("@project", projectId)).ConfigureAwait(false);
     }
 
-    private static async Task<List<OfferRecord>> ReadOffersAsync(MySqlConnection connection, MySqlTransaction? transaction, string sql, CancellationToken token, params (string Name, object Value)[] parameters)
+    private static async Task<List<OfferRecord>> ReadOffersAsync(MySqlConnection connection, MySqlTransaction? transaction, string sql, CancellationToken token, params (string Name, object? Value)[] parameters)
     {
         await using var command = Command(connection, transaction, sql, parameters);
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -55,8 +53,7 @@ public sealed class MariaOfferRepository(
     public async Task<IReadOnlyList<OfferLineRecord>> GetLinesAsync(int offerId, CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadLinesAsync(connection, null, offerId, cancellationToken).ConfigureAwait(false);
     }
 
@@ -84,8 +81,7 @@ public sealed class MariaOfferRepository(
     public async Task<IReadOnlyDictionary<string, int>> GetRememberedMatchesAsync(CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, "SELECT m.name_key,m.product_id FROM offer_line_matches m INNER JOIN products p ON p.id=m.product_id");
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new Dictionary<string, int>();
@@ -98,8 +94,7 @@ public sealed class MariaOfferRepository(
         var key = OfferRules.Key(text);
         if (key.Length == 0) return null;
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, "SELECT beneficiary_id FROM beneficiary_aliases WHERE alias_key=@key", ("@key", key));
         return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is { } id ? Convert.ToInt32(id) : null;
     }
@@ -205,8 +200,7 @@ public sealed class MariaOfferRepository(
     {
         try
         {
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(token).ConfigureAwait(false);
+            await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
             await using var insert = Command(connection, null, "INSERT INTO beneficiary_aliases(beneficiary_id,alias,alias_key,created_by,created_utc) VALUES(@beneficiary,@alias,@key,@by,@now)",
                 ("@beneficiary", beneficiaryId), ("@alias", Cut(text, 200)), ("@key", OfferRules.Key(text)), ("@by", by), ("@now", MariaTimeText.Format(DateTime.UtcNow)));
             await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
@@ -224,32 +218,9 @@ public sealed class MariaOfferRepository(
         return value.Length <= length ? value : value[..length];
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
-    {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new OfferException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
-    }
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object? Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
-        return command;
-    }
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaDb.WriteAsync(configuration, action, message => new OfferException(message), token,
+            "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
 
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
 }
