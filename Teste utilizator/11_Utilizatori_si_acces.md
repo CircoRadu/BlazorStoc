@@ -23,3 +23,12 @@ Fluxul: administratorul creeaza conturi (Administrator / Utilizator) -> autentif
 ## Fluxul de baza
 
 1. Utilizator nou -> autentificare -> operatii permise -> operatii interzise respinse cu mesaj.
+
+## Modificari de testat - 12.10.2026 (pagina de intretinere)
+
+**Ce s-a adaugat:** pagina „Backup sau restaurare in curs" cere doar autentificare (nu mai cere dreptul de la Mentenanta); `/Error` nu mai este redirectionata spre ea.
+**Ce face acum:** in timpul unui backup, orice utilizator conectat vede pagina de asteptare, fara bucla de redirectionari si fara eroarea 414.
+
+| Nr | Pas | Rezultat asteptat | Rezultat obtinut |
+|---|---|---|---|
+| 1 | Administratorul porneste un backup manual; un utilizator fara drept la Mentenanta deschide o pagina | Pagina „Backup sau restaurare in curs"; la final revine singur | |

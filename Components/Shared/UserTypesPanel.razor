@@ -34,7 +34,7 @@
                     <button type="button" class="refresh act-confirm" disabled="@IsAdministratorType" @onclick="GrantAll">Acordă tot</button>
                     <button type="button" class="refresh act-close" disabled="@IsAdministratorType" @onclick="RevokeAll">Revocă tot</button>
                 </div>
-                @foreach (var group in Permissions.Modules.GroupBy(module => module.Group))
+                @foreach (var group in Permissions.Modules.Where(module => IsAdministratorType || !Permissions.AdminOnlyModules.Contains(module.Id)).GroupBy(module => module.Group))
                 {
                     var granted = GroupKeys(group).Count(key => input.Keys.Contains(key));
                     var total = GroupKeys(group).Count();
@@ -60,6 +60,11 @@
                     </tbody></table></div>
                     </details>
                 }
+                @if (!IsAdministratorType && Permissions.MissingRequirements(input.Keys) is { Count: > 0 } missingRequirements)
+                {
+                    <div class="invoice-warning" role="alert" id="user-type-missing">⚠ Drepturi incomplete, tipul nu poate fi salvat:
+                        <ul>@foreach (var line in missingRequirements) { <li>@line</li> }</ul></div>
+                }
                 <h3 class="permission-group">Meniul văzut de acest tip</h3>
                 <p class="muted">@(MenuPreview.Length == 0 ? "Niciun modul." : MenuPreview)</p>
                 @if (original is not null && !IsAdministratorType)
@@ -67,7 +72,7 @@
                     <div class="editor-grid"><ChangeReasonField Id="user-type-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" /></div>
                 }
                 <div class="editor-actions">
-                    @if (!IsAdministratorType) { <button class="primary" type="button" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează tipul")</button> }
+                    @if (!IsAdministratorType) { <button class="primary" type="button" disabled="@(Permissions.MissingRequirements(input.Keys).Count > 0)" @onclick="SaveAsync">@(saving ? "Se salvează…" : "Salvează tipul")</button> }
                     <button class="refresh act-close" type="button" @onclick="CloseEditorAsync">Anulează</button>
                 </div>
             </fieldset>
@@ -197,13 +202,13 @@
         else input!.Keys.Remove(key);
     }
 
-    private void GrantAll() => input!.Keys = [.. Permissions.AllKeys];
+    private void GrantAll() => input!.Keys = [.. Permissions.GrantableKeys];
     private void RevokeAll() => input!.Keys = [];
 
     private async Task CopyFromAsync(ChangeEventArgs args)
     {
         if (!long.TryParse(args.Value?.ToString(), out var id)) return;
-        try { var source = await Repository.GetAsync(id, lifetime.Token); if (source is not null) input!.Keys = [.. source.Keys]; }
+        try { var source = await Repository.GetAsync(id, lifetime.Token); if (source is not null) input!.Keys = [.. source.Keys.Where(key => !Permissions.IsAdminOnly(key))]; }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException exception) { error = exception.Message; }
     }

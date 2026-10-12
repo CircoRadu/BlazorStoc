@@ -302,7 +302,8 @@ else if (step == 2)
                 @if (ResolvedSupplier is null && supplierCuiText.Trim().Length > 0 && !InvoiceLocked)
                 {
                     <div class="invoice-warning" role="status">⚠ Furnizorul cu acest CUI nu este în registru.
-                        <button type="button" class="refresh act-confirm" @onclick="() => OpenAddSupplier(true)">+ Adaugă furnizorul</button></div>
+                        @if (canAddSupplier) { <button type="button" class="refresh act-confirm" @onclick="() => OpenAddSupplier(true)">+ Adaugă furnizorul</button> }
+                        else { <span class="muted">Nu ai dreptul să adaugi furnizori; cere unui administrator să îl adauge.</span> }</div>
                 }
                 @if (recognition is { Supplier: not null, NeedsConfirmation: false } known && ResolvedSupplier?.Id == known.Supplier!.Id)
                 {
@@ -319,7 +320,7 @@ else if (step == 2)
                         <button type="button" class="refresh act-confirm" @onclick="RememberAliasAsync">Ține minte această denumire pentru @ResolvedSupplier!.Name</button></div>
                 }
                 @if (aliasNotice.Length > 0) { <p class="success-banner" role="status">@aliasNotice</p> }
-                @if (!InvoiceLocked) { <p><button type="button" class="refresh act-confirm" @onclick="() => OpenAddSupplier(false)">+ Adaugă alt furnizor</button></p> }
+                @if (!InvoiceLocked && canAddSupplier) { <p><button type="button" class="refresh act-confirm" @onclick="() => OpenAddSupplier(false)">+ Adaugă alt furnizor</button></p> }
                 @if (similarInvoices.Count > 0 && createdInvoice is null)
                 {
                     <div class="invoice-warning" role="alert">

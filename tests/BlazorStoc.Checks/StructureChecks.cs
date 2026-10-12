@@ -137,5 +137,10 @@ public static class StructureChecks
             "Permissions: the default of \"Utilizator\" holds no administration of the system, no backup and no template deletion");
         check(Permissions.Normalize(["stoc.intrare", "nu.exista"]).SequenceEqual(["stoc.view", "stoc.intrare"]),
             "Permissions: an action implies viewing the module and unknown keys are dropped");
+        check(Permissions.Normalize(["setari-anaf.edit", "setari-backup.backup", "stoc.intrare"]).SequenceEqual(["stoc.view", "stoc.intrare"]) && Permissions.GrantableKeys.All(key => !Permissions.IsAdminOnly(key)),
+            "Permissions: the ANAF and backup settings are administrator-only and never kept for another type");
+        check(Permissions.MissingRequirements(["preluare-factura.add"]).Count == 1 && Permissions.MissingRequirements(["facturi.add"]).Count == 1 && Permissions.MissingRequirements(["preluare-factura.add", "facturi.add", "furnizori.view"]).Count == 0
+              && Permissions.MissingRequirements(Permissions.DefaultUserKeys).Count == 0 && Permissions.Requires.All(pair => Permissions.IsKnown(pair.Key) && pair.Value.All(Permissions.IsKnown)),
+            "Permissions: a right without its prerequisites is reported, the default type is consistent and every prerequisite key exists");
     }
 }

@@ -38,3 +38,16 @@ Pregatire: conectat ca administrator; un al doilea cont de test pentru verificar
 | 22 | Pagina principala | Cardurile (inclusiv Preluare factura, Iesire multipla, Export consum, Preluare inventar) apar doar cu dreptul de vizualizare | |
 | 23 | Categorii: tip cu doar „Stergere" | Fara „+ Adauga categorie", fara iconite de editare, fara panou de parametri editabil | |
 | 24 | Bonul de consum (iconita de pe randul unei iesiri) | Se deschide PDF-ul, si pentru vanzare generica | |
+
+## Modificari de testat - 12.10.2026 (drepturi dependente si module rezervate administratorului)
+
+**Ce s-a adaugat:** dependente intre drepturi (Preluare factura - Preluare in stoc necesita Facturi - Adaugare; Facturi - Adaugare necesita Furnizori - Vizualizare); modulele „Setari: Preluare date ANAF" si „Setari: Backup" sunt numai pentru administrator.
+**Ce face acum:** ecranul tipului arata un avertisment „Drepturi incomplete" si butonul „Salveaza tipul" ramane blocat pana se acorda drepturile necesare (nu se acorda automat); cele doua module nu mai apar la alte tipuri, iar un drept vechi pe ele este ignorat.
+
+| Nr | Pas | Rezultat asteptat | Rezultat obtinut |
+|---|---|---|---|
+| 25 | Tip nou, acorda „Preluare in stoc" (Preluare factura) fara „Adaugare" la Facturi | Avertisment cu „necesita Facturi - Adaugare"; salvarea blocata | |
+| 26 | Acorda si Facturi - Adaugare | Avertisment nou: necesita Furnizori - Vizualizare; dupa acordare, salvarea merge | |
+| 27 | Ecranul oricarui tip diferit de Administrator, grupul Setari | Nu exista „Setari: Preluare date ANAF" si „Setari: Backup"; „Acorda tot" nu le adauga | |
+| 28 | Utilizator cu tip fara Facturi - Adaugare, pagina Preluare factura | Mesaj „Nu ai dreptul sa adaugi facturi"; procesul nu porneste | |
+| 29 | Utilizator fara Furnizori - Adaugare, Preluare factura cu furnizor nou | Nu apare „+ Adauga furnizorul", doar un mesaj; nu poate crea furnizorul | |

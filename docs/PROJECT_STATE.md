@@ -99,3 +99,9 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 ## Urmatorul pas
 
 Il stabileste utilizatorul.
+
+## Actualizare 12.10.2026
+
+- Drepturi: dependente intre permisiuni (`Permissions.Requires`), module rezervate administratorului (ANAF, Backup); fluxurile nu mai inlocuiesc drepturile de domeniu (furnizori.add, facturi.add).
+- Baza locala golita de produse/facturi/oferte/jurnal si reincarcata cu 370 de produse din ESP_Stoc prin `tests/BlazorStoc.EspImport` (analiza si fisierele in `artifacts/esp-import`, necomise).
+- Verificari ramase: pasii din `Teste utilizator/16_...` (25-29) si `11_...`.

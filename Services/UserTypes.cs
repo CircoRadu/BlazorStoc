@@ -39,6 +39,8 @@ public sealed class UserTypeInput
         var results = new List<ValidationResult>();
         if (!Validator.TryValidateObject(normalized, new ValidationContext(normalized), results, true))
             throw new UserOperationException(string.Join(" ", results.Select(result => result.ErrorMessage)));
+        if (Permissions.MissingRequirements(normalized.Keys) is { Count: > 0 } missing)
+            throw new UserOperationException("Drepturi incomplete: " + string.Join(" ", missing));
         return normalized;
     }
 

@@ -39,6 +39,7 @@ public sealed class MariaUserPermissions(IConfiguration configuration, TimeProvi
         IReadOnlySet<string> keys;
         try { keys = await LoadAsync(userId, cancellationToken).ConfigureAwait(false) ?? FromRole(user); }
         catch (MySqlException) { keys = FromRole(user); }   // schema not migrated yet: the rights of the role, as before user types existed
+        if (!user.IsInRole(AccessRoles.Administrator)) keys = keys.Where(key => !Permissions.IsAdminOnly(key)).ToHashSet(StringComparer.Ordinal);   // rows saved before the modules became administrator-only
         lock (gate)
         {
             if (time.GetUtcNow() - loadedAt >= Lifetime) { byUser = []; loadedAt = time.GetUtcNow(); }

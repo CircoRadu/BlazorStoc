@@ -9,7 +9,7 @@ public static class MaintenanceSupport
     // the live circuit, framework and static files, the maintenance status endpoint, sign-in/out - passes untouched.
     private static readonly string[] PassThroughPrefixes =
     [
-        WaitingPath, "/api/maintenance", "/Account", "/_blazor", "/_framework", "/_content", "/hubs", "/health", "/media"
+        WaitingPath, "/api/maintenance", "/Account", "/_blazor", "/_framework", "/_content", "/hubs", "/health", "/media", "/Error"
     ];
 
     public static bool ShouldRedirect(HttpRequest request, OperationLockInfo? active)
@@ -28,7 +28,7 @@ public static class MaintenanceSupport
     // The page to come back to: a local path only (never another site), and never the waiting page itself.
     public static string SafeReturnUrl(string? returnUrl) =>
         !string.IsNullOrEmpty(returnUrl) && returnUrl[0] == '/' && !returnUrl.StartsWith("//", StringComparison.Ordinal) &&
-        !returnUrl.StartsWith("/\\", StringComparison.Ordinal) && !returnUrl.StartsWith(WaitingPath, StringComparison.OrdinalIgnoreCase)
+        !returnUrl.StartsWith("/\\", StringComparison.Ordinal) && !returnUrl.StartsWith(WaitingPath, StringComparison.OrdinalIgnoreCase) && !returnUrl.StartsWith("/Error", StringComparison.OrdinalIgnoreCase)
             ? returnUrl
             : "/";
 }

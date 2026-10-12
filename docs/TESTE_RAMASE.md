@@ -767,3 +767,5 @@ Analize de risc (punct de lucru, reinnoiri, notificare de expirare) (10.10.2026)
 Tipuri de utilizatori cu permisiuni (10.10.2026): Tipuri de utilizatori: de verificat in browser (Teste utilizator/16)
 
 Permisiuni pe operatii, modul Stoc, ordinea subcategoriilor si corectii (10.10.2026): De verificat in browser: Teste utilizator/16 si 01 (ordinea subcategoriilor)
+
+Drepturi dependente, module admin si import din baza veche (12.10.2026): Teste utilizator 16 (25-29) si 11: de verificat in browser

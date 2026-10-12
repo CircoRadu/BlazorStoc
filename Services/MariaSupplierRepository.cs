@@ -101,7 +101,7 @@ public sealed class MariaSupplierRepository(
 
     public async Task<Supplier> CreateAsync(SupplierInput input, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureAnyAsync(["furnizori.add", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["furnizori.add"], cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = MariaTimeText.Now();   // the precision the database keeps, so what is returned equals what is read back later

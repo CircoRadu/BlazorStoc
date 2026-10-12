@@ -85,7 +85,7 @@ public sealed class MariaSupplierInvoiceRepository(
 
     public async Task<SupplierInvoice> CreateAsync(SupplierInvoiceInput input, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureAnyAsync(["facturi.add", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["facturi.add"], cancellationToken).ConfigureAwait(false);
         var value = SupplierInvoiceRules.Validated(input);
         var actor = await RepositoryAudit.ActorAsync(accessControl, cancellationToken).ConfigureAwait(false);
         var now = MariaTimeText.Now();

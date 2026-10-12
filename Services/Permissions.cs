@@ -74,12 +74,44 @@ public static class Permissions
     public static IReadOnlyList<string> WriteKeys(string module) =>
         Modules.Single(item => item.Id == module).Actions.Where(action => action.Id != View).Select(action => Key(module, action.Id)).ToArray();
 
+    // Hard prerequisites between permissions: a key listed here is useless (or would escalate through the workflow) without the keys it needs.
+    // Never granted automatically: the configuration screen reports what is missing and the save is refused until the administrator grants it.
+    public static readonly IReadOnlyDictionary<string, string[]> Requires = new Dictionary<string, string[]>(StringComparer.Ordinal)
+    {
+        ["preluare-factura.add"] = ["facturi.add"],
+        ["facturi.add"] = ["furnizori.view"]
+    };
+
+    private static string Label(string key)
+    {
+        foreach (var module in Modules)
+            foreach (var action in module.Actions)
+                if (module.Key(action.Id) == key) return $"{module.Title} - {action.Label}";
+        return key;
+    }
+
+    // What is granted without what it requires, as readable messages (empty when consistent).
+    public static IReadOnlyList<string> MissingRequirements(IEnumerable<string> keys)
+    {
+        var set = Normalize(keys).ToHashSet(StringComparer.Ordinal);
+        return [.. Requires.Where(pair => set.Contains(pair.Key)).SelectMany(pair => pair.Value.Where(need => !set.Contains(need))
+            .Select(need => $"„{Label(pair.Key)}” necesită „{Label(need)}”."))];
+    }
+
     public static bool IsKnown(string key) => AllKeys.Contains(key, StringComparer.Ordinal);
+
+    // Modules reserved to the administrator: never offered to, saved for, or honoured for any other user type.
+    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup" };
+
+    public static bool IsAdminOnly(string key) => AdminOnlyModules.Contains(key[..Math.Max(key.IndexOf('.'), 0)]);
+
+    // Every key a type other than the administrator may hold.
+    public static IReadOnlyList<string> GrantableKeys { get; } = [.. AllKeys.Where(key => !IsAdminOnly(key))];
 
     // Consistency: any action on a module implies viewing it, and unknown keys are dropped. Returns the keys in catalog order.
     public static IReadOnlyList<string> Normalize(IEnumerable<string> keys)
     {
-        var set = keys.Where(IsKnown).ToHashSet(StringComparer.Ordinal);
+        var set = keys.Where(key => IsKnown(key) && !IsAdminOnly(key)).ToHashSet(StringComparer.Ordinal);
         foreach (var module in Modules)
             if (module.Actions.Any(action => set.Contains(module.Key(action.Id))) && module.Actions.Any(action => action.Id == View))
                 set.Add(module.Key(View));

@@ -411,3 +411,11 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 
 - Modulul Stoc (vizualizare, intrare, iesire, modificare, stornare, stoc minim, rezervare) separat de Produse (catalog); fiecare operatie din registre cere cheia ei, citirea cere orice permisiune; parametrii categoriilor sub Editare; pagina principala cu carduri pe permisiuni; aranjarea subcategoriilor prin tragere (migrarea 41, jurnal Reordonare subcategorii); butoane radio unitare si grupuri pliabile in matrice; corectat 500 la bonul de consum PDF si la exporturi (utilizatorul se ia din cererea HTTP in afara circuitului Blazor)
 - Verificari: suita in memorie 1094, MariaDB 1852, componente 341 trecute
+
+## Finalizat la 12.10.2026 10:08 - Drepturi dependente, module admin si import din baza veche
+
+- Furnizori: crearea cere furnizori.add, nu preluare-factura.add; preluarea de factura cere facturi.add (pagina se opreste la intrare, repository facturi cere facturi.add). Butoanele + Adauga furnizorul apar numai cu dreptul.
+- Permissions.Requires (preluare-factura.add -> facturi.add, facturi.add -> furnizori.view), MissingRequirements: ecranul Tipuri de utilizatori semnaleaza si blocheaza salvarea; UserTypeInput.Validated refuza.
+- Setari ANAF si Backup rezervate administratorului (AdminOnlyModules, GrantableKeys, filtrare in MariaUserPermissions).
+- Pagina de intretinere: [Authorize] simplu, /Error exceptata (bucla 414).
+- Import din baza veche ESP_Stoc: tests/BlazorStoc.EspImport (simulare/--apply), 370 produse cu stoc, 9 categorii, 82 subcategorii, 1777 bucati, imagini; subcategoriile cu nume repetat primesc categoria in paranteza. Baza golita inainte (produse, facturi preluate, oferte, jurnal); copie in data/manual-backups.

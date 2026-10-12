@@ -27,8 +27,12 @@ public partial class InvoicePickup
     protected override async Task OnInitializedAsync()
     {
         if (!await Access.HasModuleWriteAsync("preluare-factura", lifetime.Token)) loadError = "Nu ai dreptul să preiei facturi.";
+        else if (!await Access.HasAsync("facturi.add")) loadError = "Nu ai dreptul să adaugi facturi, deci nu poți prelua facturi.";
+        else canAddSupplier = await Access.HasAsync("furnizori.add");
         loading = false;
     }
+
+    private bool canAddSupplier;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
