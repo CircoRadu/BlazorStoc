@@ -84,37 +84,6 @@
     new MutationObserver(find).observe(document.body, { childList: true });
     find();
 
-    // ---- 3. Recovery after a restart of the application ---------------------------------------------------------------
-    // The supervisor restarts a dead application in a few seconds; the circuits of the open pages are gone with it. While the reconnection dialog is shown, the page asks
-    // /health/live every 3 s and reloads itself as soon as the application answers again after having been unreachable, or when Blazor gave up reconnecting
-    // (the restarted application does not know the old circuit) and the application answers. At most one automatic reload every 20 s, so it can never loop.
-    const RELOAD_KEY = "blazorstoc-recovery-reload";
-    const stateOf = () => {
-        const host = document.getElementById("components-reconnect-modal");
-        if (!host) return "";
-        for (const name of ["rejected", "failed", "paused", "retrying", "show"]) if (host.classList.contains("components-reconnect-" + name)) return name;
-        return "";
-    };
-    let sawDown = false;
-    let checking = false;
-    const recoverIfBack = async () => {
-        const state = stateOf();
-        if (!state) { sawDown = false; return; }
-        if (checking) return;
-        checking = true;
-        let answers = false;
-        try { answers = (await fetch("/health/live", { cache: "no-store" })).ok; } catch { answers = false; }
-        checking = false;
-        if (!answers) { sawDown = true; return; }
-        if (!(sawDown || state === "failed" || state === "rejected")) return;
-        let last = 0;
-        try { last = Number(sessionStorage.getItem(RELOAD_KEY) || 0); } catch { }
-        if (Date.now() - last < 20000) return;
-        try { sessionStorage.setItem(RELOAD_KEY, String(Date.now())); } catch { }
-        location.reload();
-    };
-    setInterval(recoverIfBack, 3000);
-
     // Exposed for the automated browser checks.
     window.blazorStocRomanianUi = { messageFor, translate };
 })();

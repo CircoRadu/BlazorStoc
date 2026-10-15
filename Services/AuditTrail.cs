@@ -398,7 +398,13 @@ public static class SettingsNavigation
     public static string InvoiceTemplateUrl(int templateId) =>
         $"/setari?{TabParameter}={InvoicesTab}&{SubtabParameter}={InvoiceTemplatesSubtab}&{InvoiceTemplateParameter}={templateId}";
 
-    public static string NotificationSettingsUrl => $"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
+    public const string ModulesTab = "module";
+    public const string RefreshParameter = "reaplica";
+
+    // The banner's link: the changing value makes Settings apply it even when the address is the one it already applied.
+    public static string ModulesUrl() => $"/setari?{TabParameter}={ModulesTab}&{RefreshParameter}={DateTime.UtcNow.Ticks}";
+
+    public static string NotificationSettingsUrl =>$"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
 }
 
 // Filters of the journal, applied on the server. Dates are UTC instants: From included, To excluded (the caller converts the local

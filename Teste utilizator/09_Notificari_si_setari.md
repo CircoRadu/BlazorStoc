@@ -15,6 +15,7 @@ Pasi:
 1. Intra ca administrator in Setari -> Module: toate modulele apar "Functioneaza".
 2. Porneste aplicatia cu `Modules__analize-risc__Enabled=false`: fila arata modulul "Oprit (oprit din configurare)" si apare bannerul de deasupra paginilor; un utilizator obisnuit nu vede nici fila, nici bannerul.
 3. La un modul oprit dupa erori repetate, apasa iconita Reincearca: apare mesajul "va fi reincercat la urmatoarea utilizare" si, in Jurnal, "Reincercare modul" pe numele tau.
+4. Cu bannerul afisat, trece pe alta fila din Setari (de exemplu Notificari) si apasa "Detalii" din banner: se deschide fila Module (si cand adresa ramasese aceeasi, ?tab=module).
 
 ### 08.10.2026 - Iconite pe randurile tabelelor si numar ca insigna pe taburi
 

@@ -95,7 +95,11 @@ public sealed class RunMarker(string path, TimeProvider? clock = null)
             {
                 var exit = JsonSerializer.Deserialize<ExitData>(File.ReadAllText(ExitPath), NoteOptions);
                 if (exit is not null)
-                    exitInfo = string.Join(", ", new[] { exit.Reason, exit.ExitCode is { } code ? $"cod de ieșire {code}" : null }.Where(part => !string.IsNullOrEmpty(part)));
+                    {
+                    // The reason the supervisor gives usually already says the code ("exited with code -1"); it is added only when the reason does not.
+                    var codeText = exit.ExitCode is { } code && !(exit.Reason?.Contains("code " + code.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal) ?? false) ? $"cod de ieșire {code}" : null;
+                    exitInfo = string.Join(", ", new[] { exit.Reason, codeText }.Where(part => !string.IsNullOrEmpty(part)));
+                }
                 File.Delete(ExitPath);
             }
         }

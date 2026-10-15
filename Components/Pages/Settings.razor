@@ -115,7 +115,7 @@
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private const string BackupTab = "backup";
     private const string UserTypesTab = "tipuri-utilizatori";
-    private const string ModulesTab = "module";
+    private const string ModulesTab = SettingsNavigation.ModulesTab;
     // Backup is one tab with three sub-tabs: backup and restore, the NAS copy, the check of the server clock.
     private const string BackupMainSubtab = "backup-main";
     private const string NasTab = "backup-nas";
@@ -208,6 +208,8 @@
     [SupplyParameterFromQuery(Name = SettingsNavigation.TemplateParameter)] public int? TemplateParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.PinParameter)] public int? PinParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.InvoiceTemplateParameter)] public int? InvoiceTemplateParameter { get; set; }
+    // A fresh value forces a link that points at the same address as before (the banner's "Detalii" while the user moved to another tab) to be applied again.
+    [SupplyParameterFromQuery(Name = SettingsNavigation.RefreshParameter)] public string? RefreshQuery { get; set; }
     private string? appliedLink;
 
     // A link with the id of a template opens its editing (the "Editare șablon" sub-tab) at once.
@@ -215,7 +217,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}";
+        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}|{RefreshQuery}";
         if (link == appliedLink) return;
         appliedLink = link;
         if (VisibleTabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;

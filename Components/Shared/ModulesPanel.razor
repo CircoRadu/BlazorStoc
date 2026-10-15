@@ -11,7 +11,7 @@
         <button type="button" class="refresh act-reload" @onclick="Reload">↻ Actualizează</button></div>
     <div class="catalog-body">
         <p class="muted">Un modul oprit nu afectează restul aplicației. Se oprește singur după erori repetate și se reîncearcă automat după 30 de secunde; aici poți cere reîncercarea imediat.
-            Modulele care nu au pornit sau sunt oprite din configurare (<code>Modules:&lt;id&gt;:Enabled</code>) cer repornirea aplicației.</p>
+            Modulele care nu au pornit sau au fost oprite intenționat din configurare (setarea <code>Modules:analize-risc:Enabled = false</code> oprește modulul „analize-risc”; identificatorul fiecărui modul este cel din paranteză, în tabel) cer repornirea aplicației.</p>
         @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
         @if (notice is not null) { <div class="notice-banner" role="status">@notice</div> }
     </div>

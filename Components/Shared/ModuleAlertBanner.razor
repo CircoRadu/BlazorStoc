@@ -8,12 +8,15 @@
     <div class="error-banner module-alert" role="alert">
         <strong>@(outModules.Count == 1 ? "Un modul este oprit:" : "Module oprite:")</strong>
         @string.Join(", ", outModules.Select(module => $"{module.Name} ({module.Origin})"))
-        <a class="refresh act-nav" href="/setari?tab=module">Detalii</a>
+        <a class="refresh act-nav" href="@SettingsNavigation.ModulesUrl()" @onclick="OpenDetails" @onclick:preventDefault>Detalii</a>
     </div>
 }
 
 @code {
     private IReadOnlyList<ModuleInfo> outModules = [];
+
+    // The address changes at every click, so the Settings page opens the Modules tab even when it is already on that address.
+    private void OpenDetails() => Navigation.NavigateTo(SettingsNavigation.ModulesUrl());
 
     protected override async Task OnInitializedAsync()
     {

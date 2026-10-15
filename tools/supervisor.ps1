@@ -242,8 +242,8 @@ function Start-App {
         $env:Database__PrivateConfigPath = $ConfigPath
         $env:ASPNETCORE_URLS = "http://127.0.0.1:$Port"
         $env:ASPNETCORE_WEBROOT = Join-Path $AppDirectory 'wwwroot'
+        # (the note about the previous run is NOT removed here: the application that starts now reads it and reports the unexpected stop with its cause)
         $env:App__RunMarkerPath = $runMarker
-        Remove-Item "$runMarker.exit" -Force -ErrorAction SilentlyContinue
         $toolsBin = Get-ChildItem -Path $MariaRoot -Directory -Filter 'mariadb-*' -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName 'bin' }
         if ($toolsBin -and (Test-Path (Join-Path $toolsBin 'mariadb-dump.exe'))) {
             $env:Database__MariaDumpExecutablePath = Join-Path $toolsBin 'mariadb-dump.exe'

@@ -4,6 +4,7 @@ using BlazorStoc.Pages.Account;
 using BlazorStoc.Services;
 using BlazorStoc.Startup;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -62,6 +63,7 @@ public static class RunTrackingChecks
         await ServiceAsync(check);
         await ScreensAsync(check);
         await LoginAsync(check);
+        SupervisorNote(check);
     }
 
     private static void Constants(Action<bool, string> check)
@@ -203,8 +205,11 @@ public static class RunTrackingChecks
             marker.Start();
             File.WriteAllText(marker.ExitPath, "{\"exitCode\":-1,\"reason\":\"exited with code -1\",\"atUtc\":\"2026-10-15T10:00:00Z\"}");
             var withExit = new RunMarker(marker.Path, clock).ReadPrevious();
-            check(withExit?.ExitInfo is { } info && info.Contains("exited with code -1") && info.Contains("cod de ieșire -1") && !File.Exists(marker.ExitPath),
+            check(withExit?.ExitInfo is { } info && info == "exited with code -1" && !File.Exists(marker.ExitPath),
                 "Marker: the supervisor's note says why the run ended, and is used up once read");
+            marker.Start();
+            File.WriteAllText(marker.ExitPath, "{\"exitCode\":0,\"reason\":\"not answering (/health/live 0, 3 times)\",\"atUtc\":\"2026-10-15T10:00:00Z\"}");
+            check(new RunMarker(marker.Path, clock).ReadPrevious()?.ExitInfo == "not answering (/health/live 0, 3 times), cod de ieșire 0", "Marker: when the reason does not say the exit code it is added");
             var entry = RunTrackingService.Entry(withExit!);
             check(entry is { Action: AuditActions.ApplicationUnexpectedStop, EntityType: AuditEntities.Application, ActorUsername: "sistem", ActorRole: "Sistem" }
                 && entry.Details.Contains("Ultima activitate") && entry.Details.Contains("Pornită la") && entry.Details.Contains("Cauză") && entry.Details.Contains("Proces"),
@@ -262,7 +267,13 @@ public static class RunTrackingChecks
 
         var banner = admin.Render<ModuleAlertBanner>();
         check(banner.FindAll(".module-alert").Count == 1 && banner.Markup.Contains("Modul broken") && banner.Markup.Contains("Modul off") && !banner.Markup.Contains("Modul failing")
-            && banner.Find("a").GetAttribute("href") == "/setari?tab=module", "Screen: the administrator sees a banner naming the modules that are out, linking to the status screen");
+            && banner.Find("a").GetAttribute("href")!.StartsWith("/setari?tab=module&reaplica="), "Screen: the administrator sees a banner naming the modules that are out, linking to the status screen");
+        var navigation = admin.Services.GetRequiredService<NavigationManager>();
+        banner.Find("a").Click();
+        var firstOpen = navigation.Uri;
+        banner.Find("a").Click();
+        check(firstOpen.Contains("/setari?tab=module&reaplica=") && navigation.Uri.Contains("/setari?tab=module&reaplica=") && navigation.Uri != firstOpen,
+            "Screen: every click on \"Detalii\" goes to a new address, so the Settings page opens the Modules tab even when the address was already applied");
 
         using var ordinary = new BunitContext();
         ordinary.Services.AddSingleton(registry);
@@ -314,6 +325,23 @@ public static class RunTrackingChecks
         }
         check(await SignInErrorAsync(() => throw new InvalidOperationException("bug")) == LoginMessages.WrongCredentials, "Sign-in: an unexpected error keeps the generic message (nothing is revealed about it)");
         check(LoginMessages.DatabaseUnavailable.Contains("backup") && LoginMessages.DatabaseUnavailable.Contains("Nu este o problemă a contului"), "Sign-in: the message tells the user it is not his account and to try again in a moment");
+    }
+
+    // The supervisor writes the note about why the application ended, and the application that starts next reads it: the supervisor must not delete it when it starts
+    // that application (it did once, so the journal never had the cause).
+    private static void SupervisorNote(Action<bool, string> check)
+    {
+        var root = AppContext.BaseDirectory;
+        while (root is not null && !File.Exists(Path.Combine(root, "BlazorStoc.csproj"))) root = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar));
+        if (root is null) { check(false, "Supervisor note: the project folder was not found"); return; }
+        var script = File.ReadAllText(Path.Combine(root, "tools", "supervisor.ps1"));
+        var start = script.IndexOf("function Start-App", StringComparison.Ordinal);
+        var end = script.IndexOf("$recent = New-Object", StringComparison.Ordinal);
+        var startApp = script[start..end];
+        check(start > 0 && end > start && !startApp.Contains(".exit", StringComparison.Ordinal),
+            "Supervisor note: starting the application does not delete the note about why the previous run ended (the new run reports it in the journal)");
+        check(script.Contains("Write-ExitNote $childExit $reason", StringComparison.Ordinal) && script.Contains("Remove-Item $runMarker", StringComparison.Ordinal),
+            "Supervisor note: the supervisor writes the note after a failure and removes the marker when the stop was asked for");
     }
 
     // ---- the service ----
