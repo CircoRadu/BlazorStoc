@@ -1,5 +1,8 @@
 using System.Threading.RateLimiting;
 using BlazorStoc.Components;
+using BlazorStoc.Modules;
+using BlazorStoc.Modules.Ocr;
+using BlazorStoc.Modules.RiskAnalyses;
 using BlazorStoc.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -44,9 +47,7 @@ internal static class ServiceRegistration
                 context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
                 await context.HttpContext.Response.WriteAsync("Prea multe încercări. Așteaptă un minut și încearcă din nou.", token);
             };
-            options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
-                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy("login", LoginRateLimit.Partition);
         });
         return services;
     }
@@ -97,7 +98,7 @@ internal static class ServiceRegistration
         services.AddScoped<IInventoryReportBuilder, InventoryReportBuilder>();
         services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();
         services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
-        services.AddSingleton<IInventoryPickupOcrService, InventoryPickupOcrService>();
+        // IInventoryPickupOcrService and IInvoicePdfReader are registered by the Ocr module (Modules/Ocr): in a worker process or in-process (Ocr:Mode).
         services.AddScoped<IInventoryPickupBuilder, InventoryPickupBuilder>();
         services.AddScoped<IInventoryPickupApplier, InventoryPickupApplier>();
         return services;
@@ -124,12 +125,20 @@ internal static class ServiceRegistration
         services.AddScoped<ISupplierProductCodes, MariaSupplierProductCodes>();
         services.AddScoped<ISupplierRecognitionLog, MariaSupplierRecognitionLog>();
         services.AddScoped<ISupplierInvoiceRepository, MariaSupplierInvoiceRepository>();
-        services.AddSingleton<IInvoicePdfReader, InvoicePdfReader>();
         services.AddSingleton<IInvoiceAnalysisStore, InvoiceAnalysisStore>();
         services.AddScoped<IInvoiceAnalysisService, InvoiceAnalysisService>();
         services.AddSingleton<InvoiceLabSettings>();
         services.AddScoped<IInvoiceTemplateStore, MariaInvoiceTemplateStore>();
         services.AddScoped<IInvoiceTemplateService, InvoiceTemplateService>();
+        return services;
+    }
+
+    // The modules (see Modules/): each registers itself through IModule; one that fails to start is disabled and the others go on.
+    public static IServiceCollection AddModules(this IServiceCollection services, IConfiguration configuration, ModuleRegistry registry)
+    {
+        services.AddSingleton(registry);
+        registry.Add(new OcrModule(), services, configuration);
+        registry.Add(new RiskAnalysesModule(), services, configuration);
         return services;
     }
 
@@ -139,7 +148,6 @@ internal static class ServiceRegistration
         services.AddScoped<IWorkPointRepository, MariaWorkPointRepository>();
         services.AddScoped<IServicePhotoStore, MariaServicePhotoStore>();
         services.AddScoped<IServiceContractRepository, MariaServiceContractRepository>();
-        services.AddScoped<IRiskAnalysisRepository, MariaRiskAnalysisRepository>();
         services.AddScoped<IServiceInterventionRepository, MariaServiceInterventionRepository>();
         services.Configure<MapOptions>(configuration.GetSection(MapOptions.SectionName));
         services.AddSingleton<MapConfigStore>();
@@ -148,7 +156,7 @@ internal static class ServiceRegistration
     }
 
     // The notification templates and the sources that raise them. The registration order of the IExpirySource entries is the order the sources are evaluated in.
-    public static IServiceCollection AddNotificationServices(this IServiceCollection services)
+    public static IServiceCollection AddNotificationServices(this IServiceCollection services, ModuleRegistry modules)
     {
         services.AddScoped<IExpiryNotificationRepository, MariaExpiryNotificationRepository>();
         services.AddScoped<IExpirySource>(provider => new VehicleExpirySource(provider.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Itp, ExpirySourceKeys.VehicleItp, "ITP"));
@@ -157,8 +165,8 @@ internal static class ServiceRegistration
         services.AddScoped<IMaintenanceNotificationReader, MariaMaintenanceNotificationReader>();
         services.AddScoped<IExpirySource, MaintenanceDueSource>();
         services.AddScoped<IExpirySource, ContractExpirySource>();
-        services.AddScoped<IRiskAnalysisNotificationReader, MariaRiskAnalysisNotificationReader>();
-        services.AddScoped<IExpirySource, RiskAnalysisExpirySource>();
+        // The sources of the modules (for example the risk analyses) are registered here, between the maintenance sources and the awaited invoices.
+        modules.AddNotificationSources(services);
         services.AddScoped<IAwaitedEntryReader, MariaAwaitedEntryReader>();
         services.AddScoped<IExpirySource, AwaitedInvoiceSource>();
         services.AddScoped<IOverStockReader, MariaOverStockReader>();

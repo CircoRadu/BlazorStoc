@@ -16,7 +16,7 @@ namespace BlazorStoc.Services;
 public sealed record InventoryPickupScanRow(int Page, string RawCode, int? RecognizedValue, bool Uncertain, int? Number = null);
 public sealed record InventoryPickupScanResult(int PageCount, IReadOnlyList<InventoryPickupScanRow> Rows, IReadOnlyList<int> UnreadablePages);
 
-public sealed class InventoryPickupOcrException(string message) : Exception(message);
+public sealed class InventoryPickupOcrException(string message) : Exception(message), BlazorStoc.Modules.IExpectedAnswer;
 
 public static class InventoryPickupOcrRules
 {

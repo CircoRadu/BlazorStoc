@@ -7,12 +7,28 @@
         </LayoutView>
     </NotFound>
     <Found Context="routeData">
+        @if (UnavailableModule(routeData.PageType))
+        {
+            <LayoutView Layout="typeof(Layout.MainLayout)"><ModuleUnavailable /></LayoutView>
+        }
+        else
+        {
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized Context="denied">
-                @if (denied.User.Identity?.IsAuthenticated == true) { <Shared.AccessDeniedNotice /> }
+                @if (denied.User.Identity?.IsAuthenticated == true) { <AccessDeniedNotice /> }
                 else { <p class="error-banner">Nu ai acces la această pagină. <a href="/Account/Login">Autentifică-te</a>.</p> }
             </NotAuthorized>
         </AuthorizeRouteView>
+        }
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
+
+@code {
+    [Inject] private BlazorStoc.Modules.ModuleRegistry Modules { get; set; } = default!;
+
+    // A page of a module (attribute [Module]) is replaced by a notice while the module is not running; the other pages are not affected.
+    private bool UnavailableModule(Type page) =>
+        page.GetCustomAttributes(typeof(BlazorStoc.Modules.ModuleAttribute), inherit: false) is [BlazorStoc.Modules.ModuleAttribute { } attribute, ..]
+        && !Modules.IsAvailable(attribute.ModuleId);
+}

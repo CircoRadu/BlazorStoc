@@ -4,6 +4,19 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 
 ## Modificari de testat
 
+### 15.10.2026 - Citirea facturilor PDF ruleaza intr-un proces separat
+
+**Ce s-a adaugat:** citirea facturilor PDF (text sau scanate, cu recitirea numerelor din tabel) ruleaza acum intr-un proces worker separat; aceeasi functie in modulul `ocr` este folosita si de Setari -> Facturi (analiza unui fisier model).
+
+**Ce face acum:** o factura PDF se citeste si se analizeaza ca inainte. Daca procesul de recunoastere cade, pagina arata mesajul "Citirea fisierului a esuat: procesul de recunoastere s-a oprit..." si poti reincerca; dupa 3 esecuri la rand, "Recunoasterea documentelor este indisponibila momentan" 30 de secunde. Facturile XML/ZIP nu folosesc OCR si nu sunt afectate.
+
+Pasi:
+
+1. Preluare factura: incarca o factura PDF cu text si una scanata: furnizorul si randurile se propun ca inainte.
+2. Setari -> Facturi: incarca un fisier model PDF: se deschide pe model ca inainte.
+3. Incarca un fisier care nu e PDF sau un PDF gol: apare mesajul obisnuit al paginii.
+
+
 ### 10.10.2026 - Preluare factura si fereastra de sabloane, reorganizate in cod
 
 **Ce s-a schimbat:** nimic vizibil; codul paginii `/produse/preluare-factura` si al ferestrei de sabloane (Setari -> Facturi) a fost impartit pe fisiere, iar citirea randurilor din PDF a fost desfacuta in pasi. Verificarea este ca nimic nu s-a schimbat.

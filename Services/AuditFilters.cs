@@ -27,7 +27,7 @@ public static class AuditFilterOptions
         (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă"),
         (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori"),
         (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.OfferTemplate, "Șabloane oferte"),
-        (AuditEntities.UserType, "Tipuri de utilizatori")
+        (AuditEntities.UserType, "Tipuri de utilizatori"), (AuditEntities.Module, "Module"), (AuditEntities.Application, "Aplicație")
     ];
 
     public static readonly IReadOnlyList<(string Value, string Label)> Actions =
@@ -36,6 +36,8 @@ public static class AuditFilterOptions
         (AuditActions.EditUserTypeDescription, AuditActions.EditUserTypeDescription), (AuditActions.GrantPermission, AuditActions.GrantPermission),
         (AuditActions.RevokePermission, AuditActions.RevokePermission), (AuditActions.DeleteUserType, AuditActions.DeleteUserType),
         (AuditActions.ChangeUserType, AuditActions.ChangeUserType), (AuditActions.AccessDenied, AuditActions.AccessDenied),
+        (AuditActions.ModuleDisabled, AuditActions.ModuleDisabled), (AuditActions.ModuleRecovered, AuditActions.ModuleRecovered),
+        (AuditActions.ModuleRetry, AuditActions.ModuleRetry), (AuditActions.ApplicationUnexpectedStop, AuditActions.ApplicationUnexpectedStop),
         (AuditActions.Create, "Adăugare"), (AuditActions.Edit, "Editare"), (AuditActions.Delete, "Ștergere"), (AuditActions.Login, "Conectare"),
         (AuditActions.Logout, "Deconectare"), (AuditActions.Unlock, "Deblocare"), (AuditActions.Generate, "Generare"),
         (AuditActions.ExportJournal, AuditActions.ExportJournal),

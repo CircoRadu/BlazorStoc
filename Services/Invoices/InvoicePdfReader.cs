@@ -8,7 +8,7 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 
 namespace BlazorStoc.Services;
 
-public sealed class InvoiceAnalysisException(string message) : Exception(message);
+public sealed class InvoiceAnalysisException(string message) : Exception(message), BlazorStoc.Modules.IExpectedAnswer;
 
 public static class InvoiceAnalysisRules
 {

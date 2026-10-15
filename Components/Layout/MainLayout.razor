@@ -2,6 +2,7 @@
 @implements IDisposable
 @using Microsoft.AspNetCore.WebUtilities
 @using BlazorStoc.Services
+@inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject IProductRepository Products
 @inject IOperationLockService OperationLock
 @inject IExpiryNotificationService Notifications
@@ -85,7 +86,10 @@
             </CollapsibleSection></Authorized></AuthorizeView>
             <AuthorizeView Policy="perm:oferte.view"><Authorized><NavLink class="nav-item" href="/oferte" Match="NavLinkMatch.Prefix"><span>▤</span> Oferte <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             <AuthorizeView Policy="perm:mentenanta.view"><Authorized><NavLink class="nav-item" href="/mentenanta" Match="NavLinkMatch.Prefix"><span>⚒</span> Mentenanță <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
-            <AuthorizeView Policy="perm:analize-risc.view"><Authorized><NavLink class="nav-item" href="/analize-risc" Match="NavLinkMatch.Prefix"><span>⚠</span> Analize de risc <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            @foreach (var module in Modules.NavItems())
+            {
+                <AuthorizeView Policy="@($"perm:{module.PermissionModule}.view")"><Authorized><NavLink class="nav-item" href="@module.Href" Match="NavLinkMatch.Prefix"><span>@module.Icon</span> @module.Label <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            }
             <AuthorizeView Policy="perm:notificari.view"><Authorized><NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             <AuthorizeView Policy="perm:jurnal.view"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             <AuthorizeView Policy="perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
@@ -99,7 +103,7 @@
                 Backup/restaurare in curs (@activeOperation.OperatorName) - datele pot fi temporar indisponibile. Reveniti mai tarziu.
             </div>
         }
-        <main class="workspace">@Body</main></div>
+        <main class="workspace"><ModuleAlertBanner />@Body</main></div>
 </div>
 <dialog id="logout-dialog" class="delete-dialog logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description">
     <form method="post" action="/Account/Logout">
@@ -112,7 +116,7 @@
         </div>
     </form>
 </dialog>
-<div id="blazor-error-ui" role="alert">Conexiunea cu aplicația a fost întreruptă. <a href="" class="reload">Reîncarcă pagina</a><a class="dismiss" title="Închide" aria-label="Închide">×</a></div>
+<div id="blazor-error-ui" role="alert">Conexiunea cu aplicația a fost întreruptă. Dacă aplicația se repornește singură, durează câteva secunde. <a href="" class="reload">Reîncarcă pagina</a><a class="dismiss" title="Închide" aria-label="Închide">×</a></div>
 
 @code {
     private IReadOnlyList<BlazorStoc.Services.ProductGroup> groups = Array.Empty<BlazorStoc.Services.ProductGroup>();

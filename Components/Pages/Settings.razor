@@ -1,5 +1,5 @@
 ﻿@page "/setari"
-@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|tipuri-utilizatori.view")]
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject UnsavedChanges Guard
@@ -92,6 +92,12 @@
             }
         </div>
     }
+    else if (activeTab == ModulesTab && allowedTabs.Contains(ModulesTab))
+    {
+        <div role="tabpanel" id="panel-@ModulesTab" aria-labelledby="tab-@ModulesTab" class="settings-body">
+            <ModulesPanel />
+        </div>
+    }
     else if (activeTab == UserTypesTab && allowedTabs.Contains(UserTypesTab))
     {
         <div role="tabpanel" id="panel-@UserTypesTab" aria-labelledby="tab-@UserTypesTab" class="settings-body">
@@ -109,18 +115,19 @@
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private const string BackupTab = "backup";
     private const string UserTypesTab = "tipuri-utilizatori";
+    private const string ModulesTab = SettingsNavigation.ModulesTab;
     // Backup is one tab with three sub-tabs: backup and restore, the NAS copy, the check of the server clock.
     private const string BackupMainSubtab = "backup-main";
     private const string NasTab = "backup-nas";
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (UserTypesTab, "Tipuri de utilizatori")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (ModulesTab, "Module"), (UserTypesTab, "Tipuri de utilizatori")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
         [AnafTab] = "setari-anaf.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
-        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [UserTypesTab] = "tipuri-utilizatori.view"
+        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [UserTypesTab] = "tipuri-utilizatori.view"
     };
     private readonly HashSet<string> allowedTabs = [];
     private string activeTab = AnafTab;
@@ -201,6 +208,8 @@
     [SupplyParameterFromQuery(Name = SettingsNavigation.TemplateParameter)] public int? TemplateParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.PinParameter)] public int? PinParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.InvoiceTemplateParameter)] public int? InvoiceTemplateParameter { get; set; }
+    // A fresh value forces a link that points at the same address as before (the banner's "Detalii" while the user moved to another tab) to be applied again.
+    [SupplyParameterFromQuery(Name = SettingsNavigation.RefreshParameter)] public string? RefreshQuery { get; set; }
     private string? appliedLink;
 
     // A link with the id of a template opens its editing (the "Editare șablon" sub-tab) at once.
@@ -208,7 +217,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}";
+        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}|{RefreshQuery}";
         if (link == appliedLink) return;
         appliedLink = link;
         if (VisibleTabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;

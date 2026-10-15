@@ -42,7 +42,7 @@ if (Test-Path $config) {
 }
 $assetsTarget = Join-Path $target 'assets'
 if (Test-Path $assetsRoot) {
-    robocopy $assetsRoot $assetsTarget /MIR /XD database-backups /NFL /NDL /NJH /NJS /NP | Out-Null
+    robocopy $assetsRoot $assetsTarget /MIR /XD database-backups run-state /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw 'robocopy failed.' }
     $global:LASTEXITCODE = 0
     Write-Host "Files copied from $assetsRoot to $assetsTarget."

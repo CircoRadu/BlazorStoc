@@ -49,6 +49,9 @@ public static class AuditEntities
     public const string OfferTemplate = "SablonOferta";
     // Setari -> Tipuri de utilizatori: the user types (named sets of permissions) the administrator defines.
     public const string UserType = "TipUtilizator";
+    // Modules (Modules/) and the application itself: written by the system (a module taken out or back, an unexpected stop of the application).
+    public const string Module = "Modul";
+    public const string Application = "Aplicatie";
 }
 
 public static class AuditActions
@@ -228,6 +231,12 @@ public static class AuditActions
     public const string ActivateAnafVersion = "Activare versiune configurație ANAF";
     public const string VoidExitOperation = "Stornare operație de ieșire";
     public const string ReturnFromBeneficiary = "Retur de la beneficiar";
+    // The system records when a module is taken out of service after repeated failures and when it comes back; the administrator's "try again" is recorded under his name.
+    public const string ModuleDisabled = "Oprire modul";
+    public const string ModuleRecovered = "Revenire modul";
+    public const string ModuleRetry = "Reîncercare modul";
+    // Found at the next start: the previous run of the application did not end normally (killed, crashed, the machine went down).
+    public const string ApplicationUnexpectedStop = "Oprire neașteptată aplicație";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
@@ -389,7 +398,13 @@ public static class SettingsNavigation
     public static string InvoiceTemplateUrl(int templateId) =>
         $"/setari?{TabParameter}={InvoicesTab}&{SubtabParameter}={InvoiceTemplatesSubtab}&{InvoiceTemplateParameter}={templateId}";
 
-    public static string NotificationSettingsUrl => $"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
+    public const string ModulesTab = "module";
+    public const string RefreshParameter = "reaplica";
+
+    // The banner's link: the changing value makes Settings apply it even when the address is the one it already applied.
+    public static string ModulesUrl() => $"/setari?{TabParameter}={ModulesTab}&{RefreshParameter}={DateTime.UtcNow.Ticks}";
+
+    public static string NotificationSettingsUrl =>$"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
 }
 
 // Filters of the journal, applied on the server. Dates are UTC instants: From included, To excluded (the caller converts the local

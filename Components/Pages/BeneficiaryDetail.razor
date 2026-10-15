@@ -2,12 +2,14 @@
 @attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
+@using BlazorStoc.Modules.RiskAnalyses
 @inject IBeneficiaryRepository Beneficiaries
 @inject IProjectRepository Projects
 @inject IWorkPointRepository WorkPointStore
 @inject IServicePhotoStore PhotoStore
 @inject IServiceContractRepository ContractStore
 @inject IRiskAnalysisRepository RiskStore
+@inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject IExpiryNotificationService NotificationService
 @inject TimeProvider Clock
 @inject ExitFormDraft ExitDraft
@@ -116,7 +118,7 @@ else if (beneficiary is not null)
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" />
 
-    <RiskAnalysesSection BeneficiaryId="Id" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" />
+    <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
 
     <section class="catalog">
         <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
@@ -302,7 +304,8 @@ else if (beneficiary is not null)
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
             contracts = await ContractStore.GetForBeneficiaryAsync(Id, lifetime.Token);
-            riskAnalyses = await RiskStore.GetForBeneficiaryAsync(Id, lifetime.Token);
+            // The risk analyses are another module: if it fails, the file of the beneficiary still opens (the section and the column say so).
+            riskAnalyses = await Modules.TryRunAsync(RiskAnalysesModule.ModuleId, () => RiskStore.GetForBeneficiaryAsync(Id, lifetime.Token), Array.Empty<RiskAnalysisView>());
             await LoadThresholdAsync();
             addingWorkPoint = false;
             editingWorkPoint = null;
@@ -426,6 +429,14 @@ else if (beneficiary is not null)
     private RenderFragment RiskAnalysisCell(WorkPoint workPoint) => builder =>
     {
         if (workPoint.Id <= 0) return;
+        if (!Modules.IsAvailable(RiskAnalysesModule.ModuleId))
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "class", "muted");
+            builder.AddContent(2, "Modul indisponibil momentan");
+            builder.CloseElement();
+            return;
+        }
         var active = riskAnalyses.FirstOrDefault(item => item.Analysis.IsActive && item.Analysis.WorkPointId == workPoint.Id)?.Analysis;
         builder.OpenElement(0, "span");
         if (active is null)

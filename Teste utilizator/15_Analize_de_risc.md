@@ -4,6 +4,18 @@ Fluxul: beneficiar -> punct de lucru -> analiza de risc (numar de inregistrare, 
 
 ## Modificari de testat
 
+### 15.10.2026 - Modulul Analize de risc (izolare de erori)
+
+**Ce s-a adaugat:** Analizele de risc sunt primul modul din noua structura de module (`Modules/RiskAnalyses`): se inregistreaza singure, au intrarea de meniu proprie, un circuit breaker (3 erori la rand scot modulul 30 de secunde) si un comutator in configurare (`Modules:analize-risc:Enabled=false`). Starea modulelor se vede la `/health/modules` (cere autentificare).
+
+**Ce face acum:** cu modulul pornit, pagina `/analize-risc`, sectiunea din fisa beneficiarului, coloana din tabelul punctelor de lucru, tile-ul si numarul de pe pagina principala, notificarea de expirare si jurnalul functioneaza ca inainte. Cu modulul oprit (configurare sau erori repetate): meniul si tile-ul din pagina principala dispar, `/analize-risc` arata "Modul indisponibil", fisa beneficiarului si pagina principala se deschid normal (fara sectiunea de analize, coloana arata "Modul indisponibil momentan"), iar restul aplicatiei merge.
+
+Pasi:
+
+1. Deschide `/analize-risc`, o fisa de beneficiar cu puncte de lucru si pagina principala: totul arata si merge ca inainte (adauga, reinnoieste, dezactiveaza o analiza).
+2. Deschide `/health/modules` dupa autentificare: `analize-risc` apare cu starea `healthy`.
+3. Porneste aplicatia cu `Modules__analize-risc__Enabled=false`: meniul nu mai are "Analize de risc", `/analize-risc` arata "Modul indisponibil", fisa beneficiarului se deschide fara sectiunea de analize, `/health/modules` arata `disabled`, iar celelalte module (stoc, furnizori, vehicule) merg normal.
+
 ### 10.10.2026 - Sectiunea „Analize de risc"
 
 **Ce s-a adaugat:** analiza de risc legata de un beneficiar si de un punct de lucru, cu numar de inregistrare, data inregistrarii, persoana care a intocmit-o, valabilitate editabila (36 de luni implicit), data ultimei reinnoiri si istoric de reinnoiri; sectiune pe fisa beneficiarului, pagina proprie `/analize-risc` (meniu lateral), coloana „Analiza de risc" in tabelul punctelor de lucru si sursa de notificari „Expirare analiza de risc" (prag implicit 60 de zile, sablon creat singur la pornire).

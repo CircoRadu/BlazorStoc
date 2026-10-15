@@ -34,10 +34,12 @@ public static class RobustnessChecks
         if (root is not null)
         {
             var pages = Directory.GetFiles(Path.Combine(root, "Components", "Pages"), "*.razor")
+                .Concat(Directory.GetFiles(Path.Combine(root, "Modules"), "*.razor", SearchOption.AllDirectories))
                 .Select(file => (file, text: File.ReadAllText(file))).Where(item => item.text.Contains("\n@page ") || item.text.StartsWith("@page ") || item.text.Contains("\n@page\t")).ToList();
             var without = pages.Where(item => !item.text.Contains("<PageBoundary>") || !item.text.Contains("</PageBoundary>")).Select(item => Path.GetFileName(item.file)).ToList();
             check(pages.Count >= 30 && without.Count == 0, $"Robustness: every page is wrapped in the page boundary ({pages.Count} pages; missing: {string.Join(", ", without)})");
             var loose = Directory.GetFiles(Path.Combine(root, "Components"), "*.razor", SearchOption.AllDirectories)
+                .Concat(Directory.GetFiles(Path.Combine(root, "Modules"), "*.razor", SearchOption.AllDirectories))
                 .Where(file => File.ReadAllText(file).Contains("        _ = ") && File.ReadAllText(file).Contains("PeriodicallyAsync()")).Select(Path.GetFileName).ToList();
             check(loose.Count == 0, $"Robustness: periodic page tasks are started through FireAndForget ({string.Join(", ", loose)})");
         }
