@@ -1,5 +1,7 @@
 ﻿@page "/oferte/sabloane"
+@namespace BlazorStoc.Components.Pages
 @attribute [Authorize(Policy = "perm:oferte.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Offers.OffersModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IOfferTemplateRepository Repository

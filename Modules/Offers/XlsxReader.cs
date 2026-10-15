@@ -34,7 +34,8 @@ public sealed class XlsxWorkbook(IReadOnlyList<XlsxSheet> sheets)
     public XlsxSheet? Sheet(string? name) => string.IsNullOrWhiteSpace(name) ? Sheets.FirstOrDefault() : Sheets.FirstOrDefault(sheet => string.Equals(sheet.Name, name, StringComparison.OrdinalIgnoreCase));
 }
 
-public class XlsxFormatException(string message) : Exception(message);
+// A file that is not a readable offer is an answer for the user, not a fault of the module.
+public class XlsxFormatException(string message) : Exception(message), BlazorStoc.Modules.IExpectedAnswer;
 
 public static class XlsxReader
 {

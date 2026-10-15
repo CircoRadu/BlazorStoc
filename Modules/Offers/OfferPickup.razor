@@ -1,6 +1,8 @@
 ﻿@page "/oferte/preluare"
+@namespace BlazorStoc.Components.Pages
 @page "/oferte"
 @attribute [Authorize(Policy = "perm:oferte.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Offers.OffersModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IOfferRepository Offers

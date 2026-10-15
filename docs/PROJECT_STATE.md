@@ -147,3 +147,10 @@ Il stabileste utilizatorul.
 - Mentenanta (contracte, interventii, harta si sursele de notificari) este al treilea modul (`Modules/Maintenance/`, id `mentenanta`), ordonat dupa Vehicule si inaintea Analizelor de risc. Punctele de lucru si pozele lor au ramas la fisa beneficiarului (le folosesc fisa, analizele de risc si contractele); asta face ca Analizele de risc sa citeasca punctele de lucru din nucleu, nu din modul.
 - Cu modulul oprit: paginile Mentenanta si harta arata "Modul indisponibil", meniul si tile-ul dispar, fisa beneficiarului se deschide fara sectiunile de contracte/interventii, Setari -> Harta arata nota de modul oprit.
 - Verificat: suita in memorie 1273 + verificarile noi din `MaintenanceModuleChecks` (grupul modules: 93), MariaDB sectiunile Maintenance contracts (47), interventions (58), notifications (13), Expiry notifications (58), Risk analyses (45); in browser pe un build separat cu modulul oprit si pornit.
+
+## Actualizare 15.10.2026 - modulul Oferte, banner reimprospatat, defectiuni reale
+- Oferte (preluarea devizelor xlsx si sabloanele) este al patrulea modul (`Modules/Offers/`, id `oferte`). Componentele proiectelor, rezervarile si iesirile au ramas in nucleul de stoc; situatia proiectului depinde de oferte si, cu modulul oprit, spune asta explicit.
+- Defectiuni reale (rand cu date 0000-00-00 in baza de test) provocate pentru Vehicule si Mentenanta: fiecare a iesit din functiune dupa erori repetate, restul aplicatiei a mers, Jurnalul are Oprire modul si Revenire modul, modulele au revenit dupa restaurarea datelor. Pentru Oferte circuit breaker-ul e acoperit doar de teste.
+- Banner-ul de module oprite se actualizeaza singur (eveniment + ceas de 10 s). Verificat in browser: Vehicule a disparut din banner dupa pauza de 30 s fara navigare.
+- Cont de test pentru agent (`claude.test`) in `local-secrets/test-login.private.json`, comis in repo-ul privat; creat doar in baza de test.
+- Verificat: suita in memorie 1312 PASS; MariaDB: Offer import (13), Offer templates (5), Project components (10), Reservations (10); in browser cu Oferte oprit din configurare si pornit.

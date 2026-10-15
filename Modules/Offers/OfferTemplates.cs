@@ -339,7 +339,8 @@ public static class OfferTemplateEngine
 // A saved template.
 public sealed record OfferTemplateRecord(int Id, string Name, bool Active, OfferTemplateDefinition Definition, long Version, string UpdatedBy, string UpdatedUtc);
 
-public class OfferTemplateException(string message) : Exception(message);
+// An answer for the user (validation, conflict), not a fault of the module: the circuit breaker does not count it.
+public class OfferTemplateException(string message) : Exception(message), BlazorStoc.Modules.IExpectedAnswer;
 
 public interface IOfferTemplateRepository
 {

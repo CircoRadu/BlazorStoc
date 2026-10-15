@@ -3,6 +3,7 @@ using BlazorStoc.Components;
 using BlazorStoc.Modules;
 using BlazorStoc.Modules.Maintenance;
 using BlazorStoc.Modules.Ocr;
+using BlazorStoc.Modules.Offers;
 using BlazorStoc.Modules.RiskAnalyses;
 using BlazorStoc.Modules.Vehicles;
 using BlazorStoc.Services;
@@ -109,8 +110,6 @@ internal static class ServiceRegistration
     {
         services.AddScoped<IBeneficiaryRepository, MariaBeneficiaryRepository>();
         services.AddScoped<IProjectComponentRepository, MariaProjectComponentRepository>();
-        services.AddScoped<IOfferRepository, MariaOfferRepository>();
-        services.AddScoped<IOfferTemplateRepository, MariaOfferTemplateRepository>();
         services.AddScoped<IProjectSituationReader, MariaProjectSituationReader>();
         services.AddSingleton<IProjectSituationPdfWriter, ProjectSituationPdfWriter>();
         return services;
@@ -138,8 +137,9 @@ internal static class ServiceRegistration
     {
         services.AddSingleton(registry);
         registry.Add(new OcrModule(), services, configuration);
-        // The order is the order of the menu entries and of the notification sources: vehicles, maintenance, risk analyses (as before the modules).
+        // The order is the order of the menu entries and of the notification sources: vehicles, offers, maintenance, risk analyses (as before the modules).
         registry.Add(new VehiclesModule(), services, configuration);
+        registry.Add(new OffersModule(), services, configuration);
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
         return services;

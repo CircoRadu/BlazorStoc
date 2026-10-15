@@ -49,7 +49,8 @@ public sealed class OfferImportRequest
 public sealed record OfferDiff(int PreviousRevision, int Added, int Removed, int QuantityChanged, int Unchanged, IReadOnlyList<string> Details);
 public sealed record OfferImportResult(OfferRecord Offer, bool IsRevision, OfferDiff? Diff, int LinkedLines, int ToPurchaseLines, int OutOfStockLines, int ProjectId);
 
-public class OfferException(string message) : Exception(message);
+// An answer for the user (validation, conflict), not a fault of the module: the circuit breaker does not count it.
+public class OfferException(string message) : Exception(message), BlazorStoc.Modules.IExpectedAnswer;
 
 public static class OfferMessages
 {

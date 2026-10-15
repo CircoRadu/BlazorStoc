@@ -84,7 +84,6 @@
                     <AuthorizeView Policy="perm:utilizatori.view"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView><AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
-            <AuthorizeView Policy="perm:oferte.view"><Authorized><NavLink class="nav-item" href="/oferte" Match="NavLinkMatch.Prefix"><span>▤</span> Oferte <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             @foreach (var module in Modules.NavItems())
             {
                 <AuthorizeView Policy="@($"perm:{module.PermissionModule}.view")"><Authorized><NavLink class="nav-item" href="@module.Href" Match="NavLinkMatch.Prefix"><span>@module.Icon</span> @module.Label <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>

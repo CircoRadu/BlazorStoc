@@ -48,6 +48,21 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
     private readonly List<Action<ModuleChange>> subscribers = [];
     private readonly List<ModuleChange> startupChanges = [];
 
+    /// <summary>Raised when a module changes state in a way a screen shows (taken out, back, "try again", circuit opened again); a screen re-reads <see cref="Snapshot"/>.</summary>
+    public event Action? Changed;
+
+    private void NotifyChanged()
+    {
+        var handlers = Changed;
+        if (handlers is null) return;
+        foreach (var handler in handlers.GetInvocationList().Cast<Action>())
+        {
+            // A screen that is being torn down must never reach the code that reported the failure.
+            try { handler(); }
+            catch (Exception exception) { logger?.LogWarning("A listener of the module state failed ({ErrorType}).", exception.GetType().Name); }
+        }
+    }
+
     /// <summary>
     /// Tells the subscriber every time a module is taken out of service or comes back (not the first failures: only the change of state). The modules that were already
     /// out at startup (a failed registration, a switch in the configuration) are announced to the first subscriber, since nobody listened when it happened.
@@ -66,6 +81,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
     private void Raise(ModuleChange? change)
     {
         if (change is null) return;
+        NotifyChanged();
         List<Action<ModuleChange>> targets;
         lock (gate) targets = [.. subscribers];
         foreach (var handler in targets) Invoke(handler, change);
@@ -249,8 +265,9 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
             if (!entries.TryGetValue(moduleId, out var entry) || entry.StartupFailed || Current(entry) != ModuleStatus.Disabled) return false;
             entry.OpenUntil = time.GetUtcNow();
             Current(entry);
-            return true;
         }
+        NotifyChanged();
+        return true;
     }
 
     public void ReportFailure(string moduleId, Exception exception)
@@ -283,6 +300,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
             else if (entry.Status == ModuleStatus.Healthy) { entry.Status = ModuleStatus.Degraded; entry.SinceUtc = time.GetUtcNow().UtcDateTime; }
         }
         Raise(change);
+        if (opened && change is null) NotifyChanged();
         if (opened) logger?.LogError("Module {ModuleId} is taken out for {Seconds} s after repeated failures ({ErrorType}).", moduleId, (int)Cooldown.TotalSeconds, exception.GetType().Name);
         else logger?.LogWarning("Module {ModuleId} call failed ({ErrorType}).", moduleId, exception.GetType().Name);
     }

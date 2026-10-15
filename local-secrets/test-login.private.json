@@ -1,0 +1,6 @@
+{
+  "Purpose": "Dedicated test account of the agent (Claude): Administrator on LOCAL development and test instances only, never used in production. Committed on purpose (private repository, development passwords only).",
+  "Username": "claude.test",
+  "DisplayName": "Cont de test (Claude)",
+  "Password": "duZ8BPfFha6KiMBAV5Ydw4Zf"
+}

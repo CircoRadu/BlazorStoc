@@ -172,6 +172,7 @@ else if (situation is not null)
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) when (ex is OfferException or AccessDeniedException) { error = ex.Message; }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { error = "Modulul Oferte este oprit momentan: situația proiectului se calculează din oferte și nu poate fi afișată. Reîncearcă peste câteva momente."; }
         catch (Exception ex) { Logger.LogError("Project situation failed ({ErrorType}).", ex.GetType().Name); error = "Situația nu a putut fi calculată. Reîncearcă."; }
         finally { loading = false; }
     }
