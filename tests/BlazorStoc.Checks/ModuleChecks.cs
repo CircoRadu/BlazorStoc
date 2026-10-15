@@ -47,6 +47,8 @@ public static class ModuleChecks
         await WiringAsync(check);
         Gate(check);
         Architecture(check);
+        await VehicleModuleChecks.RunAsync(check);
+        await MaintenanceModuleChecks.RunAsync(check);
     }
 
     private static void Registration(Action<bool, string> check)

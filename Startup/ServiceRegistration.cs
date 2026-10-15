@@ -1,8 +1,10 @@
 using System.Threading.RateLimiting;
 using BlazorStoc.Components;
 using BlazorStoc.Modules;
+using BlazorStoc.Modules.Maintenance;
 using BlazorStoc.Modules.Ocr;
 using BlazorStoc.Modules.RiskAnalyses;
+using BlazorStoc.Modules.Vehicles;
 using BlazorStoc.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -87,8 +89,6 @@ internal static class ServiceRegistration
         services.AddScoped<IStockMovementRepository, MariaStockMovementRepository>();
         services.AddScoped<IReservationRepository, MariaReservationRepository>();
         services.AddScoped<IProductPlacementReader, MariaProductPlacementReader>();
-        services.AddScoped<IVehicleRepository, MariaVehicleRepository>();
-        services.AddScoped<IVehicleTargetRepository, MariaVehicleTargetRepository>();
         services.AddScoped<ISystemTypeRepository, MariaSystemTypeRepository>();
         services.AddScoped<IProductMinStockRepository, MariaProductMinStockRepository>();
         services.AddScoped<IProjectDeadlineRepository, MariaProjectDeadlineRepository>();
@@ -138,20 +138,18 @@ internal static class ServiceRegistration
     {
         services.AddSingleton(registry);
         registry.Add(new OcrModule(), services, configuration);
+        // The order is the order of the menu entries and of the notification sources: vehicles, maintenance, risk analyses (as before the modules).
+        registry.Add(new VehiclesModule(), services, configuration);
+        registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
         return services;
     }
 
-    // Work points, contracts, interventions, photos and the map.
+    // Work points and their photos (the contracts, the interventions and the map belong to the maintenance module).
     public static IServiceCollection AddMaintenanceServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<IWorkPointRepository, MariaWorkPointRepository>();
         services.AddScoped<IServicePhotoStore, MariaServicePhotoStore>();
-        services.AddScoped<IServiceContractRepository, MariaServiceContractRepository>();
-        services.AddScoped<IServiceInterventionRepository, MariaServiceInterventionRepository>();
-        services.Configure<MapOptions>(configuration.GetSection(MapOptions.SectionName));
-        services.AddSingleton<MapConfigStore>();
-        services.AddScoped<IMapConfigurationService, MapConfigurationService>();
         return services;
     }
 
@@ -159,13 +157,7 @@ internal static class ServiceRegistration
     public static IServiceCollection AddNotificationServices(this IServiceCollection services, ModuleRegistry modules)
     {
         services.AddScoped<IExpiryNotificationRepository, MariaExpiryNotificationRepository>();
-        services.AddScoped<IExpirySource>(provider => new VehicleExpirySource(provider.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Itp, ExpirySourceKeys.VehicleItp, "ITP"));
-        services.AddScoped<IExpirySource>(provider => new VehicleExpirySource(provider.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Insurance, ExpirySourceKeys.VehicleInsurance, "Asigurare"));
-        services.AddScoped<IExpirySource>(provider => new VehicleExpirySource(provider.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Rovinieta, ExpirySourceKeys.VehicleRovinieta, "Rovinietă"));
-        services.AddScoped<IMaintenanceNotificationReader, MariaMaintenanceNotificationReader>();
-        services.AddScoped<IExpirySource, MaintenanceDueSource>();
-        services.AddScoped<IExpirySource, ContractExpirySource>();
-        // The sources of the modules (for example the risk analyses) are registered here, between the maintenance sources and the awaited invoices.
+        // The sources of the modules (vehicles, maintenance, risk analyses) are registered here, before the awaited invoices.
         modules.AddNotificationSources(services);
         services.AddScoped<IAwaitedEntryReader, MariaAwaitedEntryReader>();
         services.AddScoped<IExpirySource, AwaitedInvoiceSource>();
