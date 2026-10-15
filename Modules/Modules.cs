@@ -59,4 +59,22 @@ public sealed class ModuleUnavailableException(string moduleId)
     public string ModuleId { get; } = moduleId;
 }
 
-public sealed record ModuleInfo(string Id, string Name, string Version, ModuleStatus Status);
+/// <summary>
+/// A module as the status screen shows it: Since is when it entered its present status (UTC); Reason is the type of the failure (never shown to ordinary users);
+/// Origin is one of <see cref="ModuleOrigins"/>; Failures is the number of consecutive failures counted by the circuit breaker.
+/// </summary>
+public sealed record ModuleInfo(string Id, string Name, string Version, ModuleStatus Status, DateTime SinceUtc = default, string? Reason = null,
+    string? Origin = null, int Failures = 0);
+
+/// <summary>Why a module is out (shown to the administrator).</summary>
+public static class ModuleOrigins
+{
+    public const string Configuration = "oprit din configurare";
+    public const string Startup = "nu a pornit";
+    public const string RepeatedFailures = "erori repetate";
+}
+
+public enum ModuleChangeKind { Disabled, Recovered }
+
+/// <summary>A module taken out of service or back in: what the journal records (see <see cref="ModuleRegistry.Subscribe"/>).</summary>
+public sealed record ModuleChange(string Id, string Name, ModuleChangeKind Kind, string? Reason, string Origin, DateTime AtUtc);

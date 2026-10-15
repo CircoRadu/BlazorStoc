@@ -37,6 +37,51 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
         public bool HalfOpen;
         public int Failures;
         public DateTimeOffset OpenUntil;
+        public string Origin = "";
+        public DateTime SinceUtc;
+        // A "Disabled" change was announced and no "Recovered" has followed: the next return to health is announced too.
+        public bool Announced;
+    }
+
+    // ---- changes (for the journal) ----
+
+    private readonly List<Action<ModuleChange>> subscribers = [];
+    private readonly List<ModuleChange> startupChanges = [];
+
+    /// <summary>
+    /// Tells the subscriber every time a module is taken out of service or comes back (not the first failures: only the change of state). The modules that were already
+    /// out at startup (a failed registration, a switch in the configuration) are announced to the first subscriber, since nobody listened when it happened.
+    /// </summary>
+    public void Subscribe(Action<ModuleChange> handler)
+    {
+        List<ModuleChange> replay;
+        lock (gate)
+        {
+            subscribers.Add(handler);
+            replay = [.. startupChanges];
+        }
+        foreach (var change in replay) Invoke(handler, change);
+    }
+
+    private void Raise(ModuleChange? change)
+    {
+        if (change is null) return;
+        List<Action<ModuleChange>> targets;
+        lock (gate) targets = [.. subscribers];
+        foreach (var handler in targets) Invoke(handler, change);
+    }
+
+    private void Invoke(Action<ModuleChange> handler, ModuleChange change)
+    {
+        // A subscriber that fails (the journal while the database is down) must never reach the code that reported the failure.
+        try { handler(change); }
+        catch (Exception exception) { logger?.LogWarning("A subscriber of the module changes failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private void RecordStartupChange(Entry entry)
+    {
+        var change = new ModuleChange(entry.Module.Id, entry.Module.Name, ModuleChangeKind.Disabled, entry.Reason, entry.Origin, time.GetUtcNow().UtcDateTime);
+        lock (gate) startupChanges.Add(change);
     }
 
     /// <summary>Registers a module: its services are added through <see cref="IModule.Register"/>; a failure disables only this module.</summary>
@@ -51,7 +96,10 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
             entry.Status = ModuleStatus.Disabled;
             entry.StartupFailed = true;
             entry.Reason = "disabled-by-configuration";
+            entry.Origin = ModuleOrigins.Configuration;
+            entry.SinceUtc = time.GetUtcNow().UtcDateTime;
             AddUnavailable(module, services);
+            RecordStartupChange(entry);
             lock (gate)
             {
                 entries[module.Id] = entry;
@@ -69,8 +117,12 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
             entry.Status = ModuleStatus.Disabled;
             entry.StartupFailed = true;
             entry.Reason = exception.GetType().Name;
+            entry.Origin = ModuleOrigins.Startup;
+            entry.SinceUtc = time.GetUtcNow().UtcDateTime;
             AddUnavailable(module, services);
+            RecordStartupChange(entry);
         }
+        if (entry.SinceUtc == default) entry.SinceUtc = time.GetUtcNow().UtcDateTime;
         lock (gate)
         {
             entries[module.Id] = entry;
@@ -107,7 +159,12 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
             }
             catch (Exception exception)
             {
-                lock (gate) { entry.Status = ModuleStatus.Disabled; entry.StartupFailed = true; entry.Reason = exception.GetType().Name; }
+                lock (gate)
+                {
+                    entry.Status = ModuleStatus.Disabled; entry.StartupFailed = true; entry.Reason = exception.GetType().Name;
+                    entry.Origin = ModuleOrigins.Startup; entry.SinceUtc = time.GetUtcNow().UtcDateTime;
+                }
+                RecordStartupChange(entry);
             }
         }
     }
@@ -122,7 +179,13 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
     public IReadOnlyList<ModuleInfo> Snapshot()
     {
         lock (gate)
-            return [.. order.Select(id => { var entry = entries[id]; return new ModuleInfo(id, entry.Module.Name, entry.Module.Version.ToString(), Current(entry)); })];
+            return [.. order.Select(id =>
+            {
+                var entry = entries[id];
+                var status = Current(entry);
+                return new ModuleInfo(id, entry.Module.Name, entry.Module.Version.ToString(), status, entry.SinceUtc,
+                    status == ModuleStatus.Healthy ? null : entry.Reason, status == ModuleStatus.Healthy ? null : entry.Origin, entry.Failures);
+            })];
     }
 
     /// <summary>The status of a module now (an open circuit whose cooldown ended is Degraded). An unknown module is reported as Disabled.</summary>
@@ -153,15 +216,40 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
 
     public void ReportSuccess(string moduleId)
     {
+        ModuleChange? change = null;
         lock (gate)
         {
             if (!entries.TryGetValue(moduleId, out var entry) || entry.StartupFailed) return;
             // A call that was already running when the circuit opened does not close it; only the cooldown does.
             if (Current(entry) == ModuleStatus.Disabled) return;
+            var wasOut = entry.Announced;
             entry.Failures = 0;
             entry.HalfOpen = false;
+            if (entry.Status != ModuleStatus.Healthy) entry.SinceUtc = time.GetUtcNow().UtcDateTime;
             entry.Status = ModuleStatus.Healthy;
             entry.Reason = null;
+            entry.Origin = "";
+            if (wasOut)
+            {
+                entry.Announced = false;
+                change = new ModuleChange(entry.Module.Id, entry.Module.Name, ModuleChangeKind.Recovered, null, "", time.GetUtcNow().UtcDateTime);
+            }
+        }
+        Raise(change);
+    }
+
+    /// <summary>
+    /// Lets the next call of a module that was taken out for repeated failures through at once, without waiting for the cooldown (the administrator's "try again").
+    /// A module that did not start, or is switched off in the configuration, needs a restart of the application: false.
+    /// </summary>
+    public bool Retry(string moduleId)
+    {
+        lock (gate)
+        {
+            if (!entries.TryGetValue(moduleId, out var entry) || entry.StartupFailed || Current(entry) != ModuleStatus.Disabled) return false;
+            entry.OpenUntil = time.GetUtcNow();
+            Current(entry);
+            return true;
         }
     }
 
@@ -169,6 +257,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
     {
         if (!IsFault(exception)) return;
         var opened = false;
+        ModuleChange? change = null;
         lock (gate)
         {
             if (!entries.TryGetValue(moduleId, out var entry) || entry.StartupFailed) return;
@@ -182,9 +271,18 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
                 entry.Status = ModuleStatus.Disabled;
                 entry.OpenUntil = time.GetUtcNow() + Cooldown;
                 opened = true;
+                entry.Origin = ModuleOrigins.RepeatedFailures;
+                entry.SinceUtc = time.GetUtcNow().UtcDateTime;
+                // Announced once per outage: a circuit that opens again right after the cooldown (a fault while half-open) is the same outage.
+                if (!entry.Announced)
+                {
+                    entry.Announced = true;
+                    change = new ModuleChange(entry.Module.Id, entry.Module.Name, ModuleChangeKind.Disabled, entry.Reason, ModuleOrigins.RepeatedFailures, entry.SinceUtc);
+                }
             }
-            else if (entry.Status == ModuleStatus.Healthy) entry.Status = ModuleStatus.Degraded;
+            else if (entry.Status == ModuleStatus.Healthy) { entry.Status = ModuleStatus.Degraded; entry.SinceUtc = time.GetUtcNow().UtcDateTime; }
         }
+        Raise(change);
         if (opened) logger?.LogError("Module {ModuleId} is taken out for {Seconds} s after repeated failures ({ErrorType}).", moduleId, (int)Cooldown.TotalSeconds, exception.GetType().Name);
         else logger?.LogWarning("Module {ModuleId} call failed ({ErrorType}).", moduleId, exception.GetType().Name);
     }

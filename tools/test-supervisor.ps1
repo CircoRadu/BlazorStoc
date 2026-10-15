@@ -37,8 +37,10 @@ function Log-Lines([int]$Port) {
     if (-not (Test-Path $file)) { return @() }
     return @(Get-Content $file | Where-Object { $_ -match "\[$Port\]" })
 }
-function Start-Supervisor([int]$Port, [string[]]$AppArguments, [hashtable]$Extra = @{}) {
-    Remove-Item (Join-Path $stateDir "state-$Port.json"), (Join-Path $stateDir "stop-$Port.flag") -Force -ErrorAction SilentlyContinue
+function Start-Supervisor([int]$Port, [string[]]$AppArguments, [hashtable]$Extra = @{}, [switch]$KeepState) {
+    # (KeepState: the state file of the supervisor that died stays, as it does in real life, so that its leftover application is known)
+    if (-not $KeepState) { Remove-Item (Join-Path $stateDir "state-$Port.json") -Force -ErrorAction SilentlyContinue }
+    Remove-Item (Join-Path $stateDir "stop-$Port.flag") -Force -ErrorAction SilentlyContinue
     $parameters = @{
         Action = 'run'; Port = $Port; AppCommand = 'powershell.exe'; AppArguments = $AppArguments
         HealthIntervalSeconds = 1; HealthFailures = 2; HealthTimeoutSeconds = 1; StartupGraceSeconds = 3
@@ -73,9 +75,12 @@ try {
     Check (Alive $grandchild) 'Supervisor: the application has a child process of its own (to check the tree)'
     $second = & $supervisor -Action run -Port $port -AppCommand powershell.exe -AppArguments (Fake $port 'normal') | Out-String
     Check ($second -match 'already running') 'Supervisor: a second supervisor for the same port refuses to start'
+    # (the marker the real application keeps while it runs; the fake one does not, so a stand-in is made)
+    Set-Content -Path (Join-Path $stateDir "run-$port.json") -Value 'marker' -Encoding ASCII
     Stop-Supervisor $port
     $ended = Wait-Until { $jobs[-1].State -ne 'Running' } 20
     $state = Read-State $port
+    Check (-not (Test-Path (Join-Path $stateDir "run-$port.json")) -and -not (Test-Path (Join-Path $stateDir "run-$port.json.exit"))) 'Supervisor: a stop that was asked for removes the run marker (it is not reported as an unexpected stop at the next start)'
     Check ($ended -and $state.status -eq 'stopped') 'Supervisor: stop ends the supervisor and records the state "stopped"'
     Check (-not (Alive $firstPid)) 'Supervisor: stop ends the application'
     Check (-not (Alive $grandchild)) 'Supervisor: stop ends the processes the application started too'
@@ -89,6 +94,9 @@ try {
     Check (@($lines | Where-Object { $_ -match 'restarting in 1 s' }).Count -ge 1 -and @($lines | Where-Object { $_ -match 'restarting in 2 s' }).Count -ge 1 -and @($lines | Where-Object { $_ -match 'restarting in 4 s' }).Count -ge 1) `
         'Supervisor: the delay before a restart doubles (1 s, 2 s, 4 s) up to the maximum'
     Check (@($lines | Where-Object { $_ -match 'exited with code 1' }).Count -ge 2) 'Supervisor: the log says why the application ended (exit code)'
+    $exitNote = Join-Path $stateDir "run-$port.json.exit"
+    $note = if (Test-Path $exitNote) { try { Get-Content $exitNote -Raw | ConvertFrom-Json } catch { $null } } else { $null }
+    Check ($note -and [int]$note.exitCode -eq 1 -and $note.reason -match 'exited with code 1' -and $note.atUtc) 'Supervisor: after a crash it leaves a note beside the run marker with the exit code and the reason (the application reports it in the journal at the next start)'
     Stop-Supervisor $port
 
     # 3. the application hangs: alive but silent -> killed and restarted
@@ -153,10 +161,27 @@ try {
     Stop-Supervisor $port
     $ended = Wait-Until { $jobs[-1].State -ne 'Running' } 25
     Check ($ended -and $watch.Elapsed.TotalSeconds -lt 20) "Supervisor: a stop request is obeyed with a database process left behind ($([int]$watch.Elapsed.TotalSeconds) s)"
+
+    # 9. the supervisor itself is killed: its application is left alone; a new supervisor stops that one and starts a clean one (no second application on the same port)
+    $port = $BasePort + 8
+    $jobs += Start-Supervisor $port (Fake $port 'normal')
+    $null = Wait-Until { $s = Read-State $port; $s -and $s.childPid -gt 0 -and $s.healthLive -eq 200 } 25
+    $before = Read-State $port
+    $orphan = [int]$before.childPid
+    & taskkill.exe /PID ([int]$before.supervisorPid) /F *> $null
+    Start-Sleep -Seconds 2
+    Check ((Alive $orphan) -and -not (Alive ([int]$before.supervisorPid))) 'Supervisor: killing the supervisor leaves its application running on its own (the situation to recover from)'
+    $jobs += Start-Supervisor $port (Fake $port 'normal') @{} -KeepState
+    $replaced = Wait-Until { $s = Read-State $port; $s -and [int]$s.supervisorPid -ne [int]$before.supervisorPid -and [int]$s.childPid -gt 0 -and [int]$s.childPid -ne $orphan -and $s.healthLive -eq 200 } 40
+    Check $replaced 'Supervisor: a new supervisor starts a clean application and sees it answer'
+    Check (-not (Alive $orphan)) 'Supervisor: the application left by the dead supervisor is stopped (no second application fighting for the port)'
+    Check (@(Log-Lines $port | Where-Object { $_ -match 'still running without one' }).Count -ge 1) 'Supervisor: the log says a leftover application was stopped'
+    Check ((Read-State $port).restarts -eq 0 -and (Read-State $port).status -eq 'running') 'Supervisor: after taking over the supervision is normal (no failures counted)'
+    Stop-Supervisor $port
 }
 finally {
     foreach ($job in $jobs) { Stop-Job $job -ErrorAction SilentlyContinue; Remove-Job $job -Force -ErrorAction SilentlyContinue }
-    foreach ($offset in 0..7) {
+    foreach ($offset in 0..8) {
         $state = Read-State ($BasePort + $offset)
         if ($state) { foreach ($id in @($state.childPid, $state.supervisorPid)) { if (Alive ([int]$id)) { & taskkill.exe /PID $id /T /F *> $null } } }
     }

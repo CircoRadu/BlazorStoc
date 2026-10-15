@@ -53,7 +53,8 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["robustness"] = () => RobustnessChecks.RunAsync(Check),
             ["structure"] = () => { StructureChecks.Run(Check); return Task.CompletedTask; },
             ["modules"] = () => ModuleChecks.RunAsync(Check),
-            ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check)
+            ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
+            ["runtracking"] = () => RunTrackingChecks.RunAsync(Check)
         };
         var selectedGroups = (Environment.GetEnvironmentVariable("CHECKS_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         if (Environment.GetEnvironmentVariable("INVOICE_CHECKS_ONLY") == "1") selectedGroups.Add("invoices");

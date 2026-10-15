@@ -4,6 +4,18 @@ Regula: jurnalul numeste exact operatia (nu "Creare"/"Editare" generic). Fiecare
 
 ## Modificari de testat
 
+### 15.10.2026 - Module si oprirea aplicatiei in Jurnal
+
+**Ce s-a adaugat:** Jurnalul de activitate inregistreaza acum, de catre utilizatorul "sistem": "Oprire modul" (un modul scos din functiune dupa erori repetate, sau care nu a pornit / e oprit din configurare), "Revenire modul", "Reincercare modul" (cand administratorul apasa Reincearca, pe numele lui) si "Oprire neasteptata aplicatie" (la pornirea de dupa o cadere: ultima activitate, ora pornirii, procesul si cauza, cand se cunoaste). Entitatile "Module" si "Aplicatie" si cele patru actiuni apar in filtrele paginii.
+
+**Ce face acum:** o cadere a aplicatiei lasa urma in Jurnal la urmatoarea pornire; o oprire ceruta (supervizorul `-Action stop`, oprirea normala) nu lasa nicio intrare. Un modul oprit apare o singura data in Jurnal pe durata iesirii din functiune.
+
+Pasi:
+
+1. Omoara procesul aplicatiei (sau lasa supervizorul sa o reporneasca dupa o cadere), apoi deschide Jurnal activitate: apare "Oprire neasteptata aplicatie" (entitate Aplicatie, utilizator sistem), cu ultima activitate si cauza ("exited with code ...").
+2. Opreste aplicatia normal (`tools\supervisor.ps1 -Action stop`): la pornirea urmatoare nu apare nicio intrare noua.
+3. Filtreaza dupa entitatea "Module": apar intrarile "Oprire modul" / "Revenire modul" / "Reincercare modul", daca au existat.
+
 ### 07.10.2026 - Cauza iesirii peste stoc
 
 **Ce s-a adaugat:** detaliile evenimentelor de iesire contin „Cauza peste stoc” si „Operație: #id”; actiuni noi: Regularizare stoc negativ (din lista), Stornare operatie de iesire, Retur de la beneficiar, actiunile pentru Nomenclator si componentele proiectului (filtrele jurnalului le contin).

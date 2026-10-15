@@ -33,9 +33,12 @@ builder.Services
     .AddMaintenanceServices(builder.Configuration)
     .AddNotificationServices(modules)
     .AddBackupServices(builder.Configuration)
-    .AddChangeTracking();
+    .AddChangeTracking()
+    .AddRunTracking(builder.Configuration);
 var app = builder.Build();
 modules.AttachLogger(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("BlazorStoc.Modules"));
+// The changes of state of the modules go to the journal of activity (the modules out since startup are announced now, nobody listened before).
+app.Services.GetRequiredService<BlazorStoc.Startup.ModuleJournal>().Start();
 // A database that does not answer at startup does not stop the application: /health reports 503 and the pages show their own error until it is back.
 // A database that answers but lacks the expected tables is still fatal (InvalidOperationException).
 try { await MariaArchiveSchema.InitializeAsync(app.Configuration); }

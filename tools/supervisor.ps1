@@ -6,7 +6,8 @@
     run        start the application and supervise it until stopped (this is what the scheduled task runs)
     status     show the supervisor, the application and what /health/live and /health answer now
     stop       ask a running supervisor to stop the application and exit
-    install    register a per-user scheduled task that starts the supervisor at logon (restarts the supervisor itself on failure)
+    install    register a per-user scheduled task that starts the supervisor at logon and every 5 minutes (a supervisor that is running makes the repetition a no-op,
+               a dead one is replaced)
     uninstall  remove that task
 
   What it does while running:
@@ -54,6 +55,9 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $stateDir = Join-Path $repo 'artifacts\supervisor'
 $logDir = Join-Path $repo 'logs'
 $statePath = Join-Path $stateDir "state-$Port.json"
+# The application writes a marker here while it runs (App__RunMarkerPath) and deletes it on a normal stop; one found at the next start is an unexpected stop, which
+# the application records in the journal of activity. The supervisor adds why ("<marker>.exit") and removes the marker when the stop was asked for.
+$runMarker = Join-Path $stateDir "run-$Port.json"
 $stopFlag = Join-Path $stateDir "stop-$Port.flag"
 $taskName = "BlazorStocSupervisor-$Port"
 New-Item -ItemType Directory -Force $stateDir, $logDir | Out-Null
@@ -97,6 +101,10 @@ function Get-StatusCode([string]$Url, [int]$TimeoutSeconds) {
     catch { return 0 }
 }
 
+function Write-ExitNote([object]$ExitCode, [string]$Reason) {
+    try { (@{ exitCode = $ExitCode; reason = $Reason; atUtc = (Get-Date).ToUniversalTime().ToString('o') } | ConvertTo-Json) | Set-Content -Path "$runMarker.exit" -Encoding ASCII -ErrorAction Stop } catch { }
+}
+
 function Stop-Tree([int]$ProcessId) {
     if (Test-ProcessAlive $ProcessId) { & taskkill.exe /PID $ProcessId /T /F *> $null }
 }
@@ -131,12 +139,16 @@ switch ($Action) {
         if ($AppDirectory) { $arguments += " -AppDirectory `"$AppDirectory`"" }
         if ($ConfigPath) { $arguments += " -ConfigPath `"$ConfigPath`"" }
         $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments -WorkingDirectory $repo
-        $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+        # At logon, and every 5 minutes after: while the supervisor lives the task ignores the repetition (MultipleInstances IgnoreNew); if the supervisor itself was
+        # killed, the next repetition starts a new one (the scheduler's own restart-on-failure does not react to a killed process).
+        $logon = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
+        $repeat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
+        $trigger = @($logon, $repeat)
         $settings = New-ScheduledTaskSettingsSet -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) `
             -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
         Register-ScheduledTask -TaskName $taskName -Action $taskAction -Trigger $trigger -Settings $settings `
             -Description "Keeps BlazorStoc running on port $Port (tools\supervisor.ps1)" -Force | Out-Null
-        Write-Output "Scheduled task $taskName registered (starts at logon of $env:USERNAME). Start it now with: Start-ScheduledTask -TaskName $taskName"
+        Write-Output "Scheduled task $taskName registered (starts at logon of $env:USERNAME and is checked every 5 minutes). Start it now with: Start-ScheduledTask -TaskName $taskName"
         exit 0
     }
     'uninstall' {
@@ -158,6 +170,21 @@ if ($previous -and $previous.status -in @('running', 'stopping') -and (Test-Proc
     exit 1
 }
 Remove-Item $stopFlag -Force -ErrorAction SilentlyContinue
+
+# The application of a supervisor that died (killed, crashed, the machine's session ended) is still running, alone, and would hold the port against the new one.
+# It is recognised by the state file (pid and start time, so a reused pid is never taken for it) and stopped; the new supervisor then starts a clean one.
+if ($previous -and [int]$previous.childPid -gt 0) {
+    $leftover = Get-Process -Id ([int]$previous.childPid) -ErrorAction SilentlyContinue
+    if ($leftover -and $previous.startedUtc) {
+        $recorded = ([datetime]$previous.startedUtc).ToUniversalTime()
+        if ([math]::Abs(($leftover.StartTime.ToUniversalTime() - $recorded).TotalSeconds) -lt 15) {
+            Write-Log "The application of a previous supervisor (pid $($leftover.Id)) is still running without one: stopping it before starting a new one."
+            Write-ExitNote $null 'supervizorul anterior s-a oprit; aplicatia ramasa a fost oprita de noul supervizor'
+            & taskkill.exe /PID $leftover.Id /T /F *> $null
+            Start-Sleep -Seconds 1
+        }
+    }
+}
 
 if (-not $AppDirectory) { $AppDirectory = Join-Path $repo 'artifacts\notif-build' }
 if (-not $ConfigPath) { $ConfigPath = Join-Path $repo 'local-secrets\application-connection.private.json' }
@@ -215,6 +242,8 @@ function Start-App {
         $env:Database__PrivateConfigPath = $ConfigPath
         $env:ASPNETCORE_URLS = "http://127.0.0.1:$Port"
         $env:ASPNETCORE_WEBROOT = Join-Path $AppDirectory 'wwwroot'
+        $env:App__RunMarkerPath = $runMarker
+        Remove-Item "$runMarker.exit" -Force -ErrorAction SilentlyContinue
         $toolsBin = Get-ChildItem -Path $MariaRoot -Directory -Filter 'mariadb-*' -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName 'bin' }
         if ($toolsBin -and (Test-Path (Join-Path $toolsBin 'mariadb-dump.exe'))) {
             $env:Database__MariaDumpExecutablePath = Join-Path $toolsBin 'mariadb-dump.exe'
@@ -281,6 +310,9 @@ while ($true) {
         if ($reason -eq 'stop') { break }
         if ($reason -like 'not answering*') { Write-Log "Killing the unresponsive application (pid $($child.Id)) and its processes."; Stop-Tree $child.Id }
         $state.lastReason = $reason
+        $childExit = $null
+        if ($child.HasExited) { $childExit = $child.ExitCode }
+        Write-ExitNote $childExit $reason
     }
     else { $reason = $state.lastReason }
 
@@ -310,6 +342,8 @@ while ($true) {
 if ($exitCode -eq 0) {
     $state.status = 'stopping'; Save-State
     if ($child -and -not $child.HasExited) { Write-Log "Stop requested: stopping the application (pid $($child.Id))."; Stop-Tree $child.Id }
+    # A stop that was asked for is not an unexpected stop of the application: no marker is left for the next start to report.
+    Remove-Item $runMarker, "$runMarker.exit" -Force -ErrorAction SilentlyContinue
     $state.status = 'stopped'
 }
 $state.childPid = 0

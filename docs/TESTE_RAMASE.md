@@ -771,3 +771,5 @@ Permisiuni pe operatii, modul Stoc, ordinea subcategoriilor si corectii (10.10.2
 Drepturi dependente, module admin si import din baza veche (12.10.2026): Teste utilizator 16 (25-29) si 11: de verificat in browser
 
 Module: contract, izolare de erori, pilot Analize de risc, worker OCR, supervizor (15.10.2026): Module/OCR/supervizor: de rulat tools\supervisor.ps1 -Action install (cu acordul utilizatorului), de verificat in browser pagina Acces refuzat cu un cont limitat (ramura NotAuthorized din Routes.razor nu e atinsa in practica), de decis worker OCR pentru memoria nativa (Job Object Windows); esecul MariaDB User types nu vine din aceste modificari.
+
+Vizibilitate (15.10.2026): de verificat in browser: (1) Setari -> Module cu un modul oprit (banner + iconita Reincearca + intrarea din Jurnal), (2) "Oprire neasteptata aplicatie" in Jurnal dupa ce aplicatia de pe 5087 e omorata, (3) mesajul de la login cu baza oprita, (4) reincarcarea automata a paginii dupa repornirea aplicatiei de catre supervizor.

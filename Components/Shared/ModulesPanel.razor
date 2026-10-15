@@ -1,0 +1,98 @@
+@using BlazorStoc.Modules
+@using BlazorStoc.Services
+@inject ModuleRegistry Registry
+@inject IAccessControl Access
+@inject IAuditTrail Audit
+@inject TimeProvider Clock
+@* Setari -> Module (administrator only): the state of every module, since when and why it is out, and "try again" for a module that was taken out after repeated
+   failures (the same as waiting for the cooldown, now). A module that did not start, or is switched off in the configuration, needs a restart of the application. *@
+<section class="catalog" aria-labelledby="modules-title">
+    <div class="catalog-heading"><h2 id="modules-title">Module <span class="count-badge">@modules.Count</span></h2>
+        <button type="button" class="refresh act-reload" @onclick="Reload">↻ Actualizează</button></div>
+    <div class="catalog-body">
+        <p class="muted">Un modul oprit nu afectează restul aplicației. Se oprește singur după erori repetate și se reîncearcă automat după 30 de secunde; aici poți cere reîncercarea imediat.
+            Modulele care nu au pornit sau sunt oprite din configurare (<code>Modules:&lt;id&gt;:Enabled</code>) cer repornirea aplicației.</p>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="notice-banner" role="status">@notice</div> }
+    </div>
+    <div class="table-scroll">
+        <table class="catalog-table">
+            <thead><tr><th>Modul</th><th>Versiune</th><th>Stare</th><th>De când</th><th>Cauză</th><th>Erori la rând</th><th><span class="sr-only">Operații</span></th></tr></thead>
+            <tbody>
+            @foreach (var module in modules)
+            {
+                <tr>
+                    <td><strong>@module.Name</strong> <span class="muted">(@module.Id)</span></td>
+                    <td>@module.Version</td>
+                    <td><span class="due-chip @StateClass(module.Status)">@StateText(module.Status)</span></td>
+                    <td>@(module.SinceUtc == default ? "-" : Local(module.SinceUtc))</td>
+                    <td>@(module.Status == ModuleStatus.Healthy ? "-" : $"{module.Origin}{(string.IsNullOrEmpty(module.Reason) || module.Reason == "disabled-by-configuration" ? "" : $" ({module.Reason})")}")</td>
+                    <td>@(module.Failures == 0 ? "-" : module.Failures.ToString())</td>
+                    <td>
+                        @if (canRetry && module.Status == ModuleStatus.Disabled && module.Origin == ModuleOrigins.RepeatedFailures)
+                        {
+                            <button type="button" class="row-icon renew" aria-label="@($"Reîncearcă modulul {module.Name}")" title="@($"Reîncearcă modulul {module.Name} acum")" @onclick="() => RetryAsync(module)"></button>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private IReadOnlyList<ModuleInfo> modules = [];
+    private bool canRetry;
+    private string? error, notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canRetry = await Access.HasAsync("setari-module.retry");
+        modules = Registry.Snapshot();
+    }
+
+    private void Reload()
+    {
+        error = notice = null;
+        modules = Registry.Snapshot();
+    }
+
+    // (the journal and the screen show the time of the machine, dd.MM.yyyy HH:mm)
+    public static string Local(DateTime utc) => DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    public static string StateText(ModuleStatus status) => status switch
+    {
+        ModuleStatus.Healthy => "Funcționează",
+        ModuleStatus.Degraded => "Cu erori",
+        _ => "Oprit"
+    };
+
+    public static string StateClass(ModuleStatus status) => status switch
+    {
+        ModuleStatus.Healthy => "due-ok",
+        ModuleStatus.Degraded => "due-soon",
+        _ => "due-overdue"
+    };
+
+    private async Task RetryAsync(ModuleInfo module)
+    {
+        error = notice = null;
+        try
+        {
+            await Access.EnsureAsync("setari-module.retry");
+            if (!Registry.Retry(module.Id))
+            {
+                notice = $"Modulul «{module.Name}» nu mai este oprit după erori repetate.";
+            }
+            else
+            {
+                await AuditRecorder.RecordActionAsync(Audit, Access, AuditEntities.Module, AuditActions.ModuleRetry, module.Id, module.Name,
+                    AuditDetails.Identification(("Stare înainte", StateText(module.Status)), ("Cauză", module.Origin ?? "-")), string.Empty, CancellationToken.None);
+                notice = $"Modulul «{module.Name}» va fi reîncercat la următoarea utilizare.";
+            }
+        }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        modules = Registry.Snapshot();
+    }
+}

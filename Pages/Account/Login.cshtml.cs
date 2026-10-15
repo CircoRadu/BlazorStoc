@@ -46,6 +46,8 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         catch (Exception exception)
         {
             logger.LogError("Database user authentication failed ({ErrorType}).", exception.GetType().Name);
+            // A database that does not answer (or a backup/restore that holds it) is not a wrong password: say so, so nobody keeps retyping credentials.
+            if (LoginMessages.IsDatabaseUnavailable(exception)) return InvalidLogin(LoginMessages.DatabaseUnavailable);
         }
         return InvalidLogin();
     }
@@ -65,7 +67,7 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/");
     }
 
-    private IActionResult InvalidLogin(string message = "Utilizator sau parolă incorectă.")
+    private IActionResult InvalidLogin(string message = LoginMessages.WrongCredentials)
     {
         Error = message;
         return Page();
