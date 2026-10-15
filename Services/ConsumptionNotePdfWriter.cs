@@ -16,10 +16,10 @@ public sealed class ConsumptionNotePdfWriter : IConsumptionNotePdfWriter
     private const double PageMargin = 40;
     private const double LineHeight = 16;
     private const double CellPadding = 5;
-    private static readonly bool FontResolverReady = InventoryPdfWriter.EnsureFontResolver();
-    private static readonly XFont NormalFont = new(InventoryPdfWriter.FamilyName, 11, XFontStyleEx.Regular);
-    private static readonly XFont BoldFont = new(InventoryPdfWriter.FamilyName, 11, XFontStyleEx.Bold);
-    private static readonly XFont TitleFont = new(InventoryPdfWriter.FamilyName, 16, XFontStyleEx.Bold);
+    private static readonly bool FontResolverReady = PdfFonts.EnsureResolver();
+    private static readonly XFont NormalFont = new(PdfFonts.FamilyName, 11, XFontStyleEx.Regular);
+    private static readonly XFont BoldFont = new(PdfFonts.FamilyName, 11, XFontStyleEx.Bold);
+    private static readonly XFont TitleFont = new(PdfFonts.FamilyName, 16, XFontStyleEx.Bold);
     private static readonly XSolidBrush BlackBrush = new(XColors.Black);
     private static readonly XSolidBrush RedBrush = new(XColors.Red);
     private static readonly XPen RulePen = new(XColors.Black, 0.75);
@@ -126,7 +126,7 @@ public sealed class ConsumptionNotePdfWriter : IConsumptionNotePdfWriter
         gfx.DrawString("Predat de (nume, semnătură)", NormalFont, BlackBrush, new XRect(PageMargin + CellPadding, y + CellPadding, half, LineHeight), XStringFormats.TopLeft);
         gfx.DrawString("Primit de (nume, semnătură)", NormalFont, BlackBrush, new XRect(PageMargin + half + 20 + CellPadding, y + CellPadding, half, LineHeight), XStringFormats.TopLeft);
 
-        var footerFont = new XFont(InventoryPdfWriter.FamilyName, 9, XFontStyleEx.Regular);
+        var footerFont = new XFont(PdfFonts.FamilyName, 9, XFontStyleEx.Regular);
         gfx.DrawString($"Generat la {generatedLocal.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)}", footerFont, BlackBrush,
             new XRect(PageMargin, page.Height.Point - PageMargin, width, 12), XStringFormats.TopLeft);
         using var stream = new MemoryStream();

@@ -1,5 +1,7 @@
 ﻿@page "/inventar"
+@namespace BlazorStoc.Components.Pages
 @attribute [Authorize(Policy = "perm:inventar.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Inventory.InventoryModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @using System.Globalization

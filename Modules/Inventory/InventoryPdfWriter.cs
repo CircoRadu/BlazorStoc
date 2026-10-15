@@ -16,7 +16,7 @@ public interface IInventoryPdfWriter
 // directly with XGraphics (see docs/PROJECT_STATE.md for the library decision).
 public sealed class InventoryPdfWriter : IInventoryPdfWriter
 {
-    internal const string FamilyName = "PT Sans";
+    private const string FamilyName = PdfFonts.FamilyName;
     private const double PageMargin = 40;
     private const double LineHeight = 16;
     // Height of a data row of the table: room for a handwritten "Valoare reala" that the scan/OCR can read (the text
@@ -31,18 +31,12 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
 
     // Static field initializers run in declaration order and, unlike an explicit static constructor, are guaranteed
     // to run before the XFont fields below are initialized — the resolver must already be in place by then.
-    private static readonly bool FontResolverReady = EnsureFontResolver();
+    private static readonly bool FontResolverReady = PdfFonts.EnsureResolver();
     private static readonly XFont NormalFont = new(FamilyName, 12, XFontStyleEx.Regular);
     private static readonly XFont HeadingFont = new(FamilyName, 14, XFontStyleEx.Bold);
     private static readonly XSolidBrush BlackBrush = new(XColors.Black);
     private static readonly XSolidBrush RedBrush = new(XColors.Red);
     private static readonly XPen RulePen = new(XColors.Black, 0.75);
-
-    internal static bool EnsureFontResolver()
-    {
-        if (GlobalFontSettings.FontResolver is not InventoryFontResolver) GlobalFontSettings.FontResolver = new InventoryFontResolver();
-        return true;
-    }
 
     public byte[] Write(InventoryReport report, DateTime generatedLocal)
     {
@@ -193,36 +187,5 @@ public sealed class InventoryPdfWriter : IInventoryPdfWriter
         var candidate = $"{lines[^1]} {word}";
         if (gfx.MeasureString(candidate, font).Width <= maxWidth) lines[^1] = candidate;
         else lines.Add(word);
-    }
-
-    private sealed class InventoryFontResolver : IFontResolver
-    {
-        private const string RegularFace = "PTSansRegular";
-        private const string BoldFace = "PTSansBold";
-        private static readonly Lazy<byte[]> Regular = new(() => ReadResource("PTSans-Regular.ttf"));
-        private static readonly Lazy<byte[]> Bold = new(() => ReadResource("PTSans-Bold.ttf"));
-
-        public byte[] GetFont(string faceName) => faceName switch
-        {
-            RegularFace => Regular.Value,
-            BoldFace => Bold.Value,
-            _ => throw new InvalidOperationException($"Font necunoscut: {faceName}")
-        };
-
-        public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic) =>
-            string.Equals(familyName, FamilyName, StringComparison.OrdinalIgnoreCase)
-                ? new FontResolverInfo(isBold ? BoldFace : RegularFace)
-                : null;
-
-        private static byte[] ReadResource(string fileName)
-        {
-            var assembly = typeof(InventoryFontResolver).Assembly;
-            var name = $"{assembly.GetName().Name}.Assets.Fonts.{fileName}";
-            using var resourceStream = assembly.GetManifestResourceStream(name)
-                ?? throw new InvalidOperationException($"Fontul „{fileName}” lipsește din resursele aplicației.");
-            using var memory = new MemoryStream();
-            resourceStream.CopyTo(memory);
-            return memory.ToArray();
-        }
     }
 }

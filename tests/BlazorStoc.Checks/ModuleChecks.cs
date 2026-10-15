@@ -50,6 +50,8 @@ public static class ModuleChecks
         await VehicleModuleChecks.RunAsync(check);
         await MaintenanceModuleChecks.RunAsync(check);
         await OfferModuleChecks.RunAsync(check);
+        await InventoryModuleChecks.RunAsync(check);
+        await AnafModuleChecks.RunAsync(check);
     }
 
     private static void Registration(Action<bool, string> check)

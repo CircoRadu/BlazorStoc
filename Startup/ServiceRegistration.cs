@@ -1,6 +1,8 @@
 using System.Threading.RateLimiting;
 using BlazorStoc.Components;
 using BlazorStoc.Modules;
+using BlazorStoc.Modules.Anaf;
+using BlazorStoc.Modules.Inventory;
 using BlazorStoc.Modules.Maintenance;
 using BlazorStoc.Modules.Ocr;
 using BlazorStoc.Modules.Offers;
@@ -64,10 +66,6 @@ internal static class ServiceRegistration
         services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
         services.AddScoped<IAccessControl, CurrentUserAccess>();
-        services.AddHttpClient(AnafService.ClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-        services.AddSingleton<AnafStore>();
-        services.AddScoped<IAnafService, AnafService>();
         services.AddScoped<IArchiveService, ArchiveService>();
         services.AddSingleton<IAuditTrail, MariaAuditTrail>();
         services.AddSingleton(TimeProvider.System);
@@ -96,12 +94,8 @@ internal static class ServiceRegistration
         services.AddScoped<IConsumptionReader, MariaConsumptionReader>();
         services.AddSingleton<IConsumptionNotePdfWriter, ConsumptionNotePdfWriter>();
         services.AddSingleton<IProductImageStore, FileProductImageStore>();
-        services.AddScoped<IInventoryReportBuilder, InventoryReportBuilder>();
-        services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();
         services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
         // IInventoryPickupOcrService and IInvoicePdfReader are registered by the Ocr module (Modules/Ocr): in a worker process or in-process (Ocr:Mode).
-        services.AddScoped<IInventoryPickupBuilder, InventoryPickupBuilder>();
-        services.AddScoped<IInventoryPickupApplier, InventoryPickupApplier>();
         return services;
     }
 
@@ -140,6 +134,8 @@ internal static class ServiceRegistration
         // The order is the order of the menu entries and of the notification sources: vehicles, offers, maintenance, risk analyses (as before the modules).
         registry.Add(new VehiclesModule(), services, configuration);
         registry.Add(new OffersModule(), services, configuration);
+        registry.Add(new InventoryModule(), services, configuration);
+        registry.Add(new AnafModule(), services, configuration);
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
         return services;

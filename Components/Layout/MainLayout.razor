@@ -56,6 +56,8 @@
                     <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
+            @if (Modules.IsAvailable(BlazorStoc.Modules.Inventory.InventoryModule.ModuleId))
+            {
             <AuthorizeView Policy="perm:inventar.view|inventar-preluare.view"><Authorized Context="menuSection"><CollapsibleSection Id="inventory-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
@@ -68,6 +70,7 @@
                     <AuthorizeView Policy="perm:inventar-preluare.view"><Authorized><NavLink href="/inventar/preluare" Match="NavLinkMatch.Prefix">Preluare inventar</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
+            }
             <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|utilizatori.view|nomenclator.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"

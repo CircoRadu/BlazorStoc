@@ -43,7 +43,7 @@
     @if (activeTab == AnafTab && allowedTabs.Contains(AnafTab))
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
-            <AnafConfigurator />
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId"><AnafConfigurator /></ModuleGate>
         </div>
     }
     else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))

@@ -154,3 +154,11 @@ Il stabileste utilizatorul.
 - Banner-ul de module oprite se actualizeaza singur (eveniment + ceas de 10 s). Verificat in browser: Vehicule a disparut din banner dupa pauza de 30 s fara navigare.
 - Cont de test pentru agent (`claude.test`) in `local-secrets/test-login.private.json`, comis in repo-ul privat; creat doar in baza de test.
 - Verificat: suita in memorie 1312 PASS; MariaDB: Offer import (13), Offer templates (5), Project components (10), Reservations (10); in browser cu Oferte oprit din configurare si pornit.
+
+## Actualizare 15.10.2026 - modulul Inventar
+- Inventarul (generarea situatiei si preluarea foii numarate) este al cincilea modul (`Modules/Inventory/`, id `inventar`). Motorul OCR (`InventoryPickupOcr`) ramane in nucleu (il foloseste si modulul Ocr si citirea facturilor), la fel `InventoryPdfLayout`; fontul PDF comun a trecut in `PdfFonts`.
+- Cu modulul oprit: /inventar si /inventar/preluare arata "Modul indisponibil", sectiunea de meniu si tile-urile dispar; restul aplicatiei nu e afectat. Verificat in browser oprit din configurare si pornit; suita in memorie 1327 PASS.
+
+## Actualizare 15.10.2026 - modulul ANAF
+- Interogarea ANAF (date firme dupa CUI) si configuratorul ei sunt al saselea modul (`Modules/Anaf/`, id `anaf`). Circuit breaker-ul numara raspunsurile "indisponibil" ale serviciului extern; cu circuitul deschis cautarea raspunde imediat, fara sa astepte timeout-ul. Editoarele de beneficiari si furnizori nu s-au schimbat (folosesc fluxul existent pentru ANAF indisponibil).
+- Verificat: suita in memorie 1340 PASS, MariaDB Suppliers and invoices (65); in browser cu modulul oprit (Setari -> ANAF cu nota, editorul de furnizori spune ca modulul e oprit si propune introducerea manuala) si pornit (Setari -> ANAF).

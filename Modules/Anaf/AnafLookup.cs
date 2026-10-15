@@ -12,7 +12,8 @@ namespace BlazorStoc.Services;
 // field mapping, live test and versioned activation. The mapping policies (missing / update) are stored as
 // metadata for the future company update flow; this module never changes company data.
 
-public sealed class AnafException(string message) : Exception(message);
+// A refused configuration (invalid JSON, no active version, ...) is an answer for the user, not a fault of the module: the circuit breaker does not count it.
+public sealed class AnafException(string message) : Exception(message), BlazorStoc.Modules.IExpectedAnswer;
 
 public sealed class AnafHeader
 {
