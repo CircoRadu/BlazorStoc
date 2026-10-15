@@ -23,7 +23,7 @@ public static partial class FullRun
             var projectRoot = AppContext.BaseDirectory;
             while (projectRoot is not null && !File.Exists(Path.Combine(projectRoot, "BlazorStoc.csproj"))) projectRoot = Path.GetDirectoryName(projectRoot.TrimEnd(Path.DirectorySeparatorChar));
             Check(projectRoot is not null, "The project folder was found for the message scan");
-            var files = new[] { "Services", "Components", "Pages" }
+            var files = new[] { "Services", "Components", "Pages", "Modules" }
                 .SelectMany(folder => Directory.EnumerateFiles(Path.Combine(projectRoot!, folder), "*.*", SearchOption.AllDirectories))
                 .Where(file => file.EndsWith(".cs") || file.EndsWith(".razor") || file.EndsWith(".cshtml"))
                 .Append(Path.Combine(projectRoot!, "Program.cs")).ToArray();

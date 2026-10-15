@@ -769,3 +769,5 @@ Tipuri de utilizatori cu permisiuni (10.10.2026): Tipuri de utilizatori: de veri
 Permisiuni pe operatii, modul Stoc, ordinea subcategoriilor si corectii (10.10.2026): De verificat in browser: Teste utilizator/16 si 01 (ordinea subcategoriilor)
 
 Drepturi dependente, module admin si import din baza veche (12.10.2026): Teste utilizator 16 (25-29) si 11: de verificat in browser
+
+Module: contract, izolare de erori, pilot Analize de risc, worker OCR, supervizor (15.10.2026): Module/OCR/supervizor: de rulat tools\supervisor.ps1 -Action install (cu acordul utilizatorului), de verificat in browser pagina Acces refuzat cu un cont limitat (ramura NotAuthorized din Routes.razor nu e atinsa in practica), de decis worker OCR pentru memoria nativa (Job Object Windows); esecul MariaDB User types nu vine din aceste modificari.

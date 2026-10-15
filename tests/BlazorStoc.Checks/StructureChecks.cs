@@ -16,6 +16,53 @@ public static class StructureChecks
         SettleNumbers(check);
         OverStock(check);
         PermissionCatalog(check);
+        LoginRateLimits(check);
+        StartupResilience(check);
+    }
+
+    // ---- startup ----
+
+    // The steps of Program.cs that touch the database before the application listens must not end the process when a backup/restore holds the data (a lock left by a
+    // killed process stays for its two-minute lease): the process would die at every start and a supervisor would restart it in a loop.
+    private static void StartupResilience(Action<bool, string> check)
+    {
+        var root = FindApplicationRoot();
+        if (root is null) { check(false, "Startup: the application folder was not found"); return; }
+        var program = File.ReadAllText(Path.Combine(root, "Program.cs"));
+        var beforeListening = program[..program.IndexOf("app.Run();", StringComparison.Ordinal)];
+        foreach (var step in new[] { "MariaArchiveSchema.InitializeAsync", "DefaultNotificationTemplates.SeedAsync" })
+        {
+            var at = beforeListening.IndexOf(step, StringComparison.Ordinal);
+            var handler = at < 0 ? "" : beforeListening[at..Math.Min(beforeListening.Length, at + 900)];
+            check(at >= 0 && handler.Contains("catch", StringComparison.Ordinal) && handler.Contains("MaintenanceInProgressException", StringComparison.Ordinal),
+                $"Startup: {step} does not end the process while a backup/restore holds the data (MaintenanceInProgressException is handled)");
+        }
+    }
+
+    // ---- login rate limit ----
+
+    private static void LoginRateLimits(Action<bool, string> check)
+    {
+        using var limiter = System.Threading.RateLimiting.PartitionedRateLimiter.Create<Microsoft.AspNetCore.Http.HttpContext, string>(BlazorStoc.Startup.LoginRateLimit.Partition);
+        Microsoft.AspNetCore.Http.HttpContext Request(string method, string path, string address)
+        {
+            var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+            context.Request.Method = method;
+            context.Request.Path = path;
+            context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse(address);
+            return context;
+        }
+        bool Allowed(Microsoft.AspNetCore.Http.HttpContext context) => limiter.AttemptAcquire(context).IsAcquired;
+
+        var pages = Enumerable.Range(0, 60).All(_ => Allowed(Request("GET", "/Account/Login", "10.0.0.1")) && Allowed(Request("GET", "/Account/AccessDenied", "10.0.0.1"))
+            && Allowed(Request("POST", "/Account/Logout", "10.0.0.1")));
+        check(pages, "Login limit: opening the login page, being sent to Acces refuzat and signing out are never refused (they use no permit)");
+        var granted = Enumerable.Range(0, BlazorStoc.Startup.LoginRateLimit.PermitLimit).Count(_ => Allowed(Request("POST", "/Account/Login", "10.0.0.2")));
+        check(granted == BlazorStoc.Startup.LoginRateLimit.PermitLimit, $"Login limit: the first {BlazorStoc.Startup.LoginRateLimit.PermitLimit} submissions of the login form in a minute are accepted");
+        check(!Allowed(Request("POST", "/Account/Login", "10.0.0.2")), "Login limit: the next submission from the same address is refused (guessing passwords stays limited)");
+        check(!Allowed(Request("POST", "/account/login", "10.0.0.2")), "Login limit: the path is matched without regard to case");
+        check(Allowed(Request("POST", "/Account/Login", "10.0.0.3")), "Login limit: another address has its own count");
+        check(Allowed(Request("GET", "/Account/Login", "10.0.0.2")), "Login limit: an address that used its submissions can still open the login page");
     }
 
     // ---- routes ----
@@ -39,7 +86,8 @@ public static class StructureChecks
         if (root is null) { check(false, "Routes: the application folder (BlazorStoc.csproj) was not found from the test output"); return; }
         var declared = new List<(string File, string Template)>();
         var damaged = new List<string>();
-        foreach (var file in Directory.GetFiles(Path.Combine(root, "Components"), "*.razor", SearchOption.AllDirectories))
+        foreach (var file in Directory.GetFiles(Path.Combine(root, "Components"), "*.razor", SearchOption.AllDirectories)
+            .Concat(Directory.GetFiles(Path.Combine(root, "Modules"), "*.razor", SearchOption.AllDirectories)))
         {
             var source = File.ReadAllText(file);
             foreach (Match match in Regex.Matches(source, "^\uFEFF?@page\\s+\"([^\"]+)\"", RegexOptions.Multiline))

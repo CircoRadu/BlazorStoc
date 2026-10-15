@@ -4,6 +4,19 @@ Fluxul: Generare situatie inventar (PDF cu categoriile alese) -> tiparesti, comp
 
 ## Modificari de testat
 
+### 15.10.2026 - Citirea inventarului scanat ruleaza intr-un proces separat
+
+**Ce s-a adaugat:** recunoasterea (OCR) fisierului scanat de la Preluare inventar ruleaza acum intr-un proces worker separat, nu in aplicatia web.
+
+**Ce face acum:** incarcarea unui inventar scanat da aceleasi randuri ca inainte. Daca procesul de recunoastere se opreste sau depaseste timpul (5 minute), pagina arata "Citirea fisierului a esuat: procesul de recunoastere s-a oprit..." iar aplicatia continua sa mearga; dupa 3 esecuri la rand pagina spune "Recunoasterea documentelor este indisponibila momentan" pentru 30 de secunde, apoi merge din nou fara repornire.
+
+Pasi:
+
+1. Pe Inventar -> Preluare inventar, incarca un inventar scanat: se citesc randurile ca inainte (cod citit, valoare reala).
+2. Incarca un fisier care nu e PDF: apare mesajul obisnuit al paginii (nu mesajul de proces oprit).
+3. In `/health/modules` apare modulul `ocr` cu starea `healthy`.
+
+
 ### 07.10.2026 - Produsele negative primele
 
 **Ce s-a adaugat:** in situatia de inventar, in fiecare subcategorie, produsele cu stoc negativ apar primele (marcate), ca sa fie numarate si regularizate intai; legatura cu tabul „De regularizat” de pe pagina Produse (vezi 01 si 02).

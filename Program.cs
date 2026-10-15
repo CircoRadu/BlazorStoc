@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 
+// Worker mode of the OCR (Modules/Ocr): the application started with --ocr-worker <job folder> reads one file and exits; no web host, no database.
+if (args is ["--ocr-worker", var ocrJobFolder]) return await BlazorStoc.Modules.Ocr.OcrWorker.RunAsync(ocrJobFolder);
+
 var builder = WebApplication.CreateBuilder(args);
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 // The passwords of the MariaDB accounts come from private files outside the repository (see Startup/PrivateConfiguration).
@@ -18,22 +21,28 @@ builder.AddFileLogging();
 if (string.IsNullOrWhiteSpace(builder.Configuration["Database:Password"]) ||
     (builder.Configuration["Authentication:Password"]?.Length ?? 0) < 12)
     throw new InvalidOperationException("Configurați Database__Password și Authentication__Password (minimum 12 caractere) pentru conexiunea MariaDB.");
+var modules = new BlazorStoc.Modules.ModuleRegistry();
 builder.Services
     .AddWebAndSecurity(builder.Configuration)
     .AddCoreServices()
+    .AddModules(builder.Configuration, modules)
     .AddUserServices()
     .AddStockServices()
     .AddProjectServices()
     .AddSupplierAndInvoiceServices()
     .AddMaintenanceServices(builder.Configuration)
-    .AddNotificationServices()
+    .AddNotificationServices(modules)
     .AddBackupServices(builder.Configuration)
     .AddChangeTracking();
 var app = builder.Build();
+modules.AttachLogger(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("BlazorStoc.Modules"));
 // A database that does not answer at startup does not stop the application: /health reports 503 and the pages show their own error until it is back.
 // A database that answers but lacks the expected tables is still fatal (InvalidOperationException).
 try { await MariaArchiveSchema.InitializeAsync(app.Configuration); }
-catch (MySqlConnector.MySqlException exception) { app.Logger.LogError("MariaDB did not answer at startup ({ErrorType}); the application starts without it.", exception.GetType().Name); }
+// A backup/restore in progress (also the lock a killed process left behind, until its lease of two minutes runs out) is the same: the application starts and the
+// pages show the waiting page; stopping here would put a supervisor in a restart loop.
+catch (Exception exception) when (exception is MySqlConnector.MySqlException or MaintenanceInProgressException)
+{ app.Logger.LogError("MariaDB did not answer at startup or a backup/restore holds it ({ErrorType}); the application starts without it.", exception.GetType().Name); }
 // Each notification event without a template gets its starting template once (see DefaultNotificationTemplates).
 try
 {
@@ -42,7 +51,7 @@ try
         seedScope.ServiceProvider.GetServices<IExpirySource>(), seedScope.ServiceProvider.GetService<IAuditTrail>(), app.Logger);
     if (made > 0) app.Logger.LogInformation("{Count} default notification templates were created.", made);
 }
-catch (Exception exception) when (exception is MySqlConnector.MySqlException or InvalidOperationException)
+catch (Exception exception) when (exception is MySqlConnector.MySqlException or InvalidOperationException or MaintenanceInProgressException)
 { app.Logger.LogWarning("The default notification templates were not created ({ErrorType}).", exception.GetType().Name); }
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/Error", createScopeForErrors: true);
 // Romanian culture for every request and circuit: framework texts and number formats follow it (Task 1).
@@ -86,6 +95,16 @@ app.Use(async (context, next) =>
 app.MapStaticAssets().AllowAnonymous();
 app.MapGet("/api/furnizori/recunoastere.csv", async (ISupplierRecognitionLog log, CancellationToken token) =>
     Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await log.ExportCsvAsync(token))).ToArray(), "text/csv; charset=utf-8", "recunoastere-furnizori.csv")).RequireAuthorization(PermissionPolicy.For("furnizori.view"));
+// The state of every module (no details: the reasons are in the log). For logged-in users and the supervisor of the modules.
+app.MapGet("/health/modules", (BlazorStoc.Modules.ModuleRegistry registry) =>
+{
+    var all = registry.Snapshot();
+    return Results.Json(new
+    {
+        status = all.All(item => item.Status == BlazorStoc.Modules.ModuleStatus.Healthy) ? "healthy" : "degraded",
+        modules = all.Select(item => new { id = item.Id, name = item.Name, version = item.Version, status = item.Status.ToString().ToLowerInvariant() })
+    });
+}).RequireAuthorization();
 app.MapGet("/health/live", () => Results.Text("healthy")).AllowAnonymous();
 // For monitoring and the supervisor: 200 when the process and the database answer, 503 when the database does not (no details are given).
 app.MapGet("/health", async (IConfiguration configuration, CancellationToken token) =>
