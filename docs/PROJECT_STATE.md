@@ -138,3 +138,27 @@ Il stabileste utilizatorul.
 - Reconectare: mesaj mai clar in dialogul Blazor si in #blazor-error-ui; reincarcarea automata a paginii o face Blazor (verificat in browser: aplicatia oprita 70 s, pagina deschisa se reincarca singura la revenire). Un script propriu de recuperare s-a dovedit inutil si a fost scos.
 - Verificat: grupul `runtracking` (56) trece; supervizorul scrie nota de iesire si sterge marcajul la oprirea ceruta (teste noi in tools/test-supervisor.ps1). Verificare in browser: vezi TESTE_RAMASE.
 - Module: butonul "Detalii" din bannerul de module oprite deschide fila Module si cand adresa era deja aplicata (parametrul `reaplica`, `SettingsNavigation.ModulesUrl`); verificat in browser cu o defectiune reala (circuit breaker, Reincearca, intrarile din Jurnal), cu un modul oprit din configurare, cu login la baza oprita si cu cauza oprii in Jurnal.
+
+## Actualizare 15.10.2026 - modulul Vehicule
+- Vehiculele sunt al doilea modul (`Modules/Vehicles/`, id `vehicule`): repository-urile (vehicule si niveluri tinta) trec prin circuit breaker, paginile sunt marcate `[Module]`, sursele de notificari (ITP, asigurare, rovinieta) sunt ale modulului; cu modulul oprit (configurare `Modules:vehicule:Enabled=false` sau erori repetate) paginile de stoc raman functionale (lista de vehicule goala, nota in selectorul de destinatie).
+- Verificat: suita in memorie 1273 PASS (15 verificari noi in `VehicleModuleChecks`), MariaDB sectiunile Vehicles (31) si Vehicle target levels (4); in browser, modul oprit din configurare (pagina Vehicule, Iesire multipla, miscarile unui produs, Notificari) si modul pornit (lista, fisa, echipamente).
+
+## Actualizare 15.10.2026 - modulul Mentenanta
+- Mentenanta (contracte, interventii, harta si sursele de notificari) este al treilea modul (`Modules/Maintenance/`, id `mentenanta`), ordonat dupa Vehicule si inaintea Analizelor de risc. Punctele de lucru si pozele lor au ramas la fisa beneficiarului (le folosesc fisa, analizele de risc si contractele); asta face ca Analizele de risc sa citeasca punctele de lucru din nucleu, nu din modul.
+- Cu modulul oprit: paginile Mentenanta si harta arata "Modul indisponibil", meniul si tile-ul dispar, fisa beneficiarului se deschide fara sectiunile de contracte/interventii, Setari -> Harta arata nota de modul oprit.
+- Verificat: suita in memorie 1273 + verificarile noi din `MaintenanceModuleChecks` (grupul modules: 93), MariaDB sectiunile Maintenance contracts (47), interventions (58), notifications (13), Expiry notifications (58), Risk analyses (45); in browser pe un build separat cu modulul oprit si pornit.
+
+## Actualizare 15.10.2026 - modulul Oferte, banner reimprospatat, defectiuni reale
+- Oferte (preluarea devizelor xlsx si sabloanele) este al patrulea modul (`Modules/Offers/`, id `oferte`). Componentele proiectelor, rezervarile si iesirile au ramas in nucleul de stoc; situatia proiectului depinde de oferte si, cu modulul oprit, spune asta explicit.
+- Defectiuni reale (rand cu date 0000-00-00 in baza de test) provocate pentru Vehicule si Mentenanta: fiecare a iesit din functiune dupa erori repetate, restul aplicatiei a mers, Jurnalul are Oprire modul si Revenire modul, modulele au revenit dupa restaurarea datelor. Pentru Oferte circuit breaker-ul e acoperit doar de teste.
+- Banner-ul de module oprite se actualizeaza singur (eveniment + ceas de 10 s). Verificat in browser: Vehicule a disparut din banner dupa pauza de 30 s fara navigare.
+- Cont de test pentru agent (`claude.test`) in `local-secrets/test-login.private.json`, comis in repo-ul privat; creat doar in baza de test.
+- Verificat: suita in memorie 1312 PASS; MariaDB: Offer import (13), Offer templates (5), Project components (10), Reservations (10); in browser cu Oferte oprit din configurare si pornit.
+
+## Actualizare 15.10.2026 - modulul Inventar
+- Inventarul (generarea situatiei si preluarea foii numarate) este al cincilea modul (`Modules/Inventory/`, id `inventar`). Motorul OCR (`InventoryPickupOcr`) ramane in nucleu (il foloseste si modulul Ocr si citirea facturilor), la fel `InventoryPdfLayout`; fontul PDF comun a trecut in `PdfFonts`.
+- Cu modulul oprit: /inventar si /inventar/preluare arata "Modul indisponibil", sectiunea de meniu si tile-urile dispar; restul aplicatiei nu e afectat. Verificat in browser oprit din configurare si pornit; suita in memorie 1327 PASS.
+
+## Actualizare 15.10.2026 - modulul ANAF
+- Interogarea ANAF (date firme dupa CUI) si configuratorul ei sunt al saselea modul (`Modules/Anaf/`, id `anaf`). Circuit breaker-ul numara raspunsurile "indisponibil" ale serviciului extern; cu circuitul deschis cautarea raspunde imediat, fara sa astepte timeout-ul. Editoarele de beneficiari si furnizori nu s-au schimbat (folosesc fluxul existent pentru ANAF indisponibil).
+- Verificat: suita in memorie 1340 PASS, MariaDB Suppliers and invoices (65); in browser cu modulul oprit (Setari -> ANAF cu nota, editorul de furnizori spune ca modulul e oprit si propune introducerea manuala) si pornit (Setari -> ANAF).

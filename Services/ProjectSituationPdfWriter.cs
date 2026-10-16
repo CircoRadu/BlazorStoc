@@ -13,11 +13,11 @@ public interface IProjectSituationPdfWriter
 public sealed class ProjectSituationPdfWriter : IProjectSituationPdfWriter
 {
     private const double Margin = 40, RowHeight = 15;
-    private static readonly bool FontResolverReady = InventoryPdfWriter.EnsureFontResolver();
-    private static readonly XFont Normal = new(InventoryPdfWriter.FamilyName, 9, XFontStyleEx.Regular);
-    private static readonly XFont Bold = new(InventoryPdfWriter.FamilyName, 9, XFontStyleEx.Bold);
-    private static readonly XFont Heading = new(InventoryPdfWriter.FamilyName, 12, XFontStyleEx.Bold);
-    private static readonly XFont Title = new(InventoryPdfWriter.FamilyName, 16, XFontStyleEx.Bold);
+    private static readonly bool FontResolverReady = PdfFonts.EnsureResolver();
+    private static readonly XFont Normal = new(PdfFonts.FamilyName, 9, XFontStyleEx.Regular);
+    private static readonly XFont Bold = new(PdfFonts.FamilyName, 9, XFontStyleEx.Bold);
+    private static readonly XFont Heading = new(PdfFonts.FamilyName, 12, XFontStyleEx.Bold);
+    private static readonly XFont Title = new(PdfFonts.FamilyName, 16, XFontStyleEx.Bold);
     private static readonly XSolidBrush Black = new(XColors.Black);
 
     public byte[] Write(ProjectSituation situation, DateTime generatedLocal)
@@ -89,7 +89,7 @@ public sealed class ProjectSituationPdfWriter : IProjectSituationPdfWriter
                 y += 6;
             }
         }
-        var footer = new XFont(InventoryPdfWriter.FamilyName, 8, XFontStyleEx.Regular);
+        var footer = new XFont(PdfFonts.FamilyName, 8, XFontStyleEx.Regular);
         gfx.DrawString($"Generat la {generatedLocal.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)}", footer, Black, new XRect(Margin, page.Height.Point - Margin, width, 12), XStringFormats.TopLeft);
         using var stream = new MemoryStream();
         document.Save(stream);

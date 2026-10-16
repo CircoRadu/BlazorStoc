@@ -8,6 +8,7 @@
 @inject IProjectRepository ProjectsRepository
 @inject IVehicleRepository VehiclesRepository
 @inject IVehicleTargetRepository VehicleTargets
+@inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject IAccessControl Access
 @inject ILogger<ExitOperation> Logger
 @implements IDisposable
@@ -221,7 +222,7 @@ else
         var productsTask = Products.GetProductsAsync(lifetime.Token);
         var vehicleQuantities = Movements.GetQuantitiesInVehiclesAsync(lifetime.Token);
         var beneficiariesTask = Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
-        var vehiclesTask = VehiclesRepository.GetVehiclesAsync(lifetime.Token);
+        var vehiclesTask = Modules.TryRunAsync(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId, () => VehiclesRepository.GetVehiclesAsync(lifetime.Token), (IReadOnlyList<Vehicle>)[]);
         await Task.WhenAll(productsTask, vehicleQuantities, beneficiariesTask, vehiclesTask);
         products = (await productsTask).OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
         inVehicles = await vehicleQuantities;

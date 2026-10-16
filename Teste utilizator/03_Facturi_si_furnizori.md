@@ -4,6 +4,18 @@ Fluxul: Administrare -> Furnizori (registru dupa CUI) -> facturile se inregistre
 
 ## Modificari de testat
 
+### 15.10.2026 - ANAF ca modul (cautarea firmelor dupa CUI)
+
+**Ce s-a adaugat:** interogarea ANAF (date firme dupa CUI) si configuratorul ei (Setari -> ANAF) sunt un modul. Daca ANAF nu raspunde de mai multe ori la rand, modulul se opreste scurt (30 s) si cautarile urmatoare raspund imediat ca "ANAF indisponibil", fara sa astepte de fiecare data timeout-ul; apoi se reincearca singur.
+
+**Ce face acum:** in editorul de furnizor si de beneficiar, "Preia date din ANAF" cu ANAF cazut spune ca ANAF nu raspunde si ca datele se pot introduce manual (furnizorul ramane marcat pentru verificare), cu modulul oprit din configurare mesajul este "Modulul ANAF este oprit momentan"; un CUI negasit sau invalid da mesajele de pana acum si nu opreste modulul. Setari -> ANAF arata nota de modul oprit cat timp modulul e oprit.
+
+Pasi:
+
+1. Cu modulul pornit (normal): Setari -> ANAF si "Preia date din ANAF" in editorul de furnizor merg ca pana acum.
+2. Porneste aplicatia cu `Modules__anaf__Enabled=false`: Setari -> ANAF arata nota de modul oprit; in editorul de furnizor, "Preia date din ANAF" spune "Modulul ANAF este oprit momentan" si furnizorul se poate salva manual; Setari -> Module arata ANAF "Oprit (oprit din configurare)".
+3. Cu ANAF nereachabil (fara internet): dupa trei cautari esuate, urmatoarea raspunde imediat "ANAF nu raspunde si interogarile sunt oprite pentru scurt timp"; dupa 30 s se reincearca.
+
 ### 07.10.2026 - Preluarea facturii: intrare legata de oferta si propuneri de rezervare
 
 **Ce s-a adaugat:** in pasul 3 al preluarii facturii (PDF) si in dialogul "Adauga produs la factura", fiecare produs din catalog care apare in oferta unui proiect are selectorul **Pentru oferta** (propunere automata cand e intr-o singura componenta; se poate lasa nelegat). Dupa finalizarea preluarii apar propunerile **"Rezerva N buc. pentru proiectul X"** pentru produsele facturii al caror necesar e acoperit de stocul liber, dar nerezervat; nimic nu se rezerva fara clic. Pasi: 1) preia o factura cu un produs aflat intr-o oferta de proiect; in pasul 3 alege/lasa propunerea la "Pentru oferta"; 2) finalizeaza: in Situatia proiectului, linia are "Intrat pt. oferta"; 3) daca stocul liber acopera necesarul, apare propunerea de rezervare dupa finalizare. (Produsele noi din factura nu au inca oferta, deci nu au selectorul.)

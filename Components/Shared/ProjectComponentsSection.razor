@@ -207,7 +207,9 @@
         try { Replace(await Repository.ArchiveAsync(archiving!, archiveReason, lifetime.Token)); }
         catch (ProjectComponentHasExitsException blocked) { pendingExits = blocked.Exits; actions.Clear(); targets.Clear(); throw; }
         archiving = null;
-        situation = await Services.GetRequiredService<IProjectSituationReader>().GetAsync(ProjectId, lifetime.Token);
+        // The situation is a convenience: while the offers module is out the column stays empty (the component was archived all the same).
+        try { situation = await Services.GetRequiredService<IProjectSituationReader>().GetAsync(ProjectId, lifetime.Token); }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { situation = null; }
     }, "Componenta a fost scoasă (arhivată).");
 
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }

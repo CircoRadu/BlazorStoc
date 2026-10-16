@@ -275,6 +275,26 @@ public static class RunTrackingChecks
         check(firstOpen.Contains("/setari?tab=module&reaplica=") && navigation.Uri.Contains("/setari?tab=module&reaplica=") && navigation.Uri != firstOpen,
             "Screen: every click on \"Detalii\" goes to a new address, so the Settings page opens the Modules tab even when the address was already applied");
 
+        // The banner follows the state of the modules: "try again" (or the circuit opening/closing) updates it without a navigation.
+        var live = new ModuleRegistry(clock);
+        live.Add(new FakeModule("later"), new ServiceCollection(), Empty());
+        for (var i = 0; i < ModuleRegistry.FailureThreshold; i++) live.ReportFailure("later", new InvalidOperationException());
+        using var liveContext = new BunitContext();
+        liveContext.Services.AddSingleton(live);
+        liveContext.Services.AddSingleton<IAccessControl>(new TestAccessControl(true, "admin.demo"));
+        liveContext.Services.AddSingleton<IAuditTrail>(new TestAuditTrail());
+        liveContext.Services.AddSingleton<TimeProvider>(clock);
+        var liveBanner = liveContext.Render<ModuleAlertBanner>();
+        check(liveBanner.Markup.Contains("Modul later"), "Screen: the banner lists a module that is out");
+        live.Retry("later");
+        try { liveBanner.WaitForState(() => !liveBanner.Markup.Contains("Modul later"), TimeSpan.FromSeconds(3)); } catch (Exception) { }
+        check(!liveBanner.Markup.Contains("Modul later"), "Screen: the banner drops a module as soon as \"try again\" lets it through, without a navigation");
+        for (var i = 0; i < ModuleRegistry.FailureThreshold; i++) live.ReportFailure("later", new InvalidOperationException());
+        try { liveBanner.WaitForState(() => liveBanner.Markup.Contains("Modul later"), TimeSpan.FromSeconds(3)); } catch (Exception) { }
+        check(liveBanner.Markup.Contains("Modul later"), "Screen: the banner shows the module again when its circuit opens again");
+        liveBanner.Dispose();
+        check(true, "Screen: the banner unsubscribes from the registry when it is disposed");
+
         using var ordinary = new BunitContext();
         ordinary.Services.AddSingleton(registry);
         ordinary.Services.AddSingleton<IAccessControl>(new TestAccessControl(false, "operator"));

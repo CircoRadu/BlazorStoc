@@ -53,7 +53,12 @@ public partial class ProductMovements
     private async Task EnsureVehiclesAsync()
     {
         if (vehiclesLoaded) return;
-        try { vehicles = await VehicleRepository.GetVehiclesAsync(lifetime.Token); vehiclesLoaded = true; }
+        try
+        {
+            // A vehicles module that is out leaves the list empty (and is asked again at the next use) instead of failing the form.
+            vehicles = await Modules.TryRunAsync(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId, () => VehicleRepository.GetVehiclesAsync(lifetime.Token), (IReadOnlyList<Vehicle>)[]);
+            vehiclesLoaded = Modules.IsAvailable(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId);
+        }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) { Logger.LogError("Vehicle list loading failed ({ErrorType}).", ex.GetType().Name); formError = "Lista vehiculelor nu a putut fi încărcată."; }
     }

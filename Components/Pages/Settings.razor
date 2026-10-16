@@ -43,7 +43,7 @@
     @if (activeTab == AnafTab && allowedTabs.Contains(AnafTab))
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
-            <AnafConfigurator />
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId"><AnafConfigurator /></ModuleGate>
         </div>
     }
     else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))
@@ -84,11 +84,11 @@
             @SubtabBar(MapSubtabs, "Secțiuni hartă")
             @if (mapSubtab == MapEngineSubtab)
             {
-                <div role="tabpanel" id="subpanel-@MapEngineSubtab" aria-labelledby="subtab-@MapEngineSubtab"><MapEngineEditor /></div>
+                <div role="tabpanel" id="subpanel-@MapEngineSubtab" aria-labelledby="subtab-@MapEngineSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><MapEngineEditor /></ModuleGate></div>
             }
             else
             {
-                <div role="tabpanel" id="subpanel-@MapOverlaySubtab" aria-labelledby="subtab-@MapOverlaySubtab"><MapPinTypesEditor FocusPinTypeId="PinParameter" /></div>
+                <div role="tabpanel" id="subpanel-@MapOverlaySubtab" aria-labelledby="subtab-@MapOverlaySubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><MapPinTypesEditor FocusPinTypeId="PinParameter" /></ModuleGate></div>
             }
         </div>
     }

@@ -114,9 +114,9 @@ else if (beneficiary is not null)
 
     <NetConsumptionSection BeneficiaryId="Id" />
 
-    <ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
+    <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
-    <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" />
+    <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" /></ModuleGate>
 
     <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
 
@@ -303,7 +303,8 @@ else if (beneficiary is not null)
             if (beneficiary is null) { error = "Beneficiarul solicitat nu mai există."; return; }
             workPoints = await WorkPointStore.GetAsync(Id, lifetime.Token);
             photoCounts = await PhotoStore.CountsForBeneficiaryAsync(Id, lifetime.Token);
-            contracts = await ContractStore.GetForBeneficiaryAsync(Id, lifetime.Token);
+            // The contracts and the risk analyses are other modules: if one fails, the file of the beneficiary still opens (the section and the column say so).
+            contracts = await Modules.TryRunAsync(BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId, () => ContractStore.GetForBeneficiaryAsync(Id, lifetime.Token), Array.Empty<ServiceContractDetails>());
             // The risk analyses are another module: if it fails, the file of the beneficiary still opens (the section and the column say so).
             riskAnalyses = await Modules.TryRunAsync(RiskAnalysesModule.ModuleId, () => RiskStore.GetForBeneficiaryAsync(Id, lifetime.Token), Array.Empty<RiskAnalysisView>());
             await LoadThresholdAsync();

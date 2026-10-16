@@ -1,9 +1,0 @@
-﻿@page "/mentenanta/harta/fereastra"
-@layout Layout.PopoutLayout
-@attribute [Authorize(Policy = "perm:mentenanta.view")]
-@rendermode @(new InteractiveServerRenderMode(prerender: false))
-@using BlazorStoc.Services
-<PageBoundary>
-
-<MaintenanceMapView Popout="true" />
-</PageBoundary>
