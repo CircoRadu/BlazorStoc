@@ -52,8 +52,9 @@
 
 @if (step == 1)
 {
-<FileDropZone Id="invoice-pickup-file" Accept=".pdf,application/pdf,.xml,text/xml,application/xml,.zip,application/zip,application/x-zip-compressed" Text="Alege factura PDF, XML sau ZIP" OnChange="FileSelectedAsync" Disabled="@(loading || loadError is not null || busy)" />
+<FileDropZone Id="invoice-pickup-file" Accept=".pdf,application/pdf,.xml,text/xml,application/xml,.zip,application/zip,application/x-zip-compressed" Text="Alege factura PDF, XML sau ZIP" OnChange="FileSelectedAsync" Disabled="@(loading || loadError is not null || busy || !SuppliersUp)" />
 
+@if (!SuppliersUp) { <div class="error-banner" role="alert">Registrul de furnizori și facturile de furnizor sunt indisponibile momentan, deci o factură nu poate fi preluată acum. Reîncearcă peste câteva momente.</div> }
 @if (loadError is not null) { <div class="error-banner" role="alert">@loadError</div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -485,6 +486,9 @@ else
 </PageBoundary>
 
 @code {
+    // The suppliers belong to their own module (named by its id, not by its class: a module does not refer to another one): without them an invoice cannot be assigned.
+    private bool SuppliersUp => Services.GetService<BlazorStoc.Modules.ModuleRegistry>()?.IsAvailable("furnizori") ?? true;
+
     private RenderFragment EntryCard(PickRow line) => @<article class="pickup-entry @(line.Done ? "done" : "")">
         <header>
             @if (line.Staged is { } staged)

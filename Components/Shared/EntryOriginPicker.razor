@@ -8,8 +8,8 @@
 <div class="entry-origin">
     <div class="settings-tabs origin-tabs" role="tablist" aria-label="Proveniența intrării">
         <button type="button" role="tab" class="settings-tab @(origin == Origin.Free ? "active" : "")" aria-selected="@(origin == Origin.Free)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Free)">Intrare liberă</button>
-        <button type="button" role="tab" class="settings-tab @(origin == Origin.Existing ? "active" : "")" aria-selected="@(origin == Origin.Existing)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Existing)">Factură existentă</button>
-        <button type="button" role="tab" class="settings-tab @(origin == Origin.New ? "active" : "")" aria-selected="@(origin == Origin.New)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.New)">Factură nouă (manual)</button>
+        @if (SuppliersUp) { <button type="button" role="tab" class="settings-tab @(origin == Origin.Existing ? "active" : "")" aria-selected="@(origin == Origin.Existing)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.Existing)">Factură existentă</button> }
+        @if (SuppliersUp) { <button type="button" role="tab" class="settings-tab @(origin == Origin.New ? "active" : "")" aria-selected="@(origin == Origin.New)" disabled="@Disabled" @onclick="() => SetOrigin(Origin.New)">Factură nouă (manual)</button> }
         @if (Modules.IsAvailable(BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId)) { <a class="refresh act-confirm origin-pdf" href="/produse/preluare-factura">Preia din PDF</a> }
     </div>
     @if (origin == Origin.Free)
@@ -18,7 +18,7 @@
             <label for="@($"{Prefix}-free-type")">Motivul intrării libere *
                 <select id="@($"{Prefix}-free-type")" disabled="@Disabled" @onchange="FreeTypeChanged">
                     <option value="" selected="@(Model.FreeType is null)">— alege motivul —</option>
-                    @foreach (var type in Enum.GetValues<FreeEntryType>()) { <option value="@((int)type)" selected="@(Model.FreeType == type)">@StockMovementRules.FreeTypeLabel(type)</option> }
+                    @foreach (var type in Enum.GetValues<FreeEntryType>().Where(type => type != FreeEntryType.AwaitedInvoice || SuppliersUp)) { <option value="@((int)type)" selected="@(Model.FreeType == type)">@StockMovementRules.FreeTypeLabel(type)</option> }
                 </select></label>
             <div>
                 <span class="field-label">Furnizor@(Model.FreeType == FreeEntryType.AwaitedInvoice ? " *" : " (opțional)")</span>
@@ -83,6 +83,9 @@
 
 @code {
     private enum Origin { Free, Existing, New }
+
+    // The invoices and the suppliers belong to their own module: while it is out only the free entry without a supplier is offered.
+    private bool SuppliersUp => Modules.IsAvailable(BlazorStoc.Modules.Suppliers.SuppliersModule.ModuleId);
 
     [Parameter, EditorRequired] public StockMovementInput Model { get; set; } = new();
     [Parameter] public bool Disabled { get; set; }
@@ -200,6 +203,7 @@
             return null;
         }
         catch (Exception exception) when (exception is SupplierInvoiceOperationException or AccessDeniedException) { return exception.Message; }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { return "Facturile de furnizor sunt indisponibile momentan. Alege o intrare liberă sau reîncearcă peste câteva momente."; }
     }
 
     // After a saved entry: the invoice list is refreshed (entry counts) and the invoice stays chosen for the next entry.

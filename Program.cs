@@ -30,7 +30,6 @@ builder.Services
     .AddUserServices()
     .AddStockServices()
     .AddProjectServices()
-    .AddSupplierAndInvoiceServices()
     .AddMaintenanceServices(builder.Configuration)
     .AddNotificationServices(modules)
     .AddBackupServices(builder.Configuration)
@@ -100,7 +99,11 @@ app.Use(async (context, next) =>
 });
 app.MapStaticAssets().AllowAnonymous();
 app.MapGet("/api/furnizori/recunoastere.csv", async (ISupplierRecognitionLog log, CancellationToken token) =>
-    Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await log.ExportCsvAsync(token))).ToArray(), "text/csv; charset=utf-8", "recunoastere-furnizori.csv")).RequireAuthorization(PermissionPolicy.For("furnizori.view"));
+{
+    // While the suppliers module is out the log cannot be read: a clear 503, not an error page.
+    try { return Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await log.ExportCsvAsync(token))).ToArray(), "text/csv; charset=utf-8", "recunoastere-furnizori.csv"); }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+}).RequireAuthorization(PermissionPolicy.For("furnizori.view"));
 // The state of every module (no details: the reasons are in the log). For logged-in users and the supervisor of the modules.
 app.MapGet("/health/modules", (BlazorStoc.Modules.ModuleRegistry registry) =>
 {

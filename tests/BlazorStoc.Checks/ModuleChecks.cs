@@ -54,6 +54,7 @@ public static class ModuleChecks
         await AnafModuleChecks.RunAsync(check);
         await InvoiceModuleChecks.RunAsync(check);
         await NotificationModuleChecks.RunAsync(check);
+        await SupplierModuleChecks.RunAsync(check);
     }
 
     private static void Registration(Action<bool, string> check)
