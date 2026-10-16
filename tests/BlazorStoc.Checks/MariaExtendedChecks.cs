@@ -66,6 +66,7 @@ public static partial class MariaExtendedChecks
             await Section("To regularize: cause, list, notification, regularization", () => ToRegularizeAsync(configuration, admin, audit, probe));
             await Section("Required parameters: definition, values, product code, blocked until complete, value change, journal", () => ProductParametersAsync(configuration, admin, audit, probe));
             await Section("Free entries and invoice linking: reasons, awaited invoice, repeated product, overrun, attach/detach, notification", () => FreeEntriesAsync(configuration, admin, audit, probe));
+            await Section("Backup worker: real backup, lock, cancellation, restoration up to the swap, NAS copier in a worker process", () => BackupWorkerAsync(configuration, admin, audit));
         }
         finally
         {

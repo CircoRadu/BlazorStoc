@@ -308,7 +308,9 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
 
     /// <summary>What counts as a failure of the module (see the class comment).</summary>
     public static bool IsFault(Exception exception) =>
-        exception is not (OperationCanceledException or AccessDeniedException or ModuleUnavailableException or MySqlException or TimeoutException) &&
+        // A call that meets the write freeze of a backup / restoration is the application waiting its turn, not a module failing: otherwise every page that
+        // loads while a backup runs would count against the modules it uses (notifications...) and take them out.
+        exception is not (OperationCanceledException or AccessDeniedException or ModuleUnavailableException or MySqlException or TimeoutException or MaintenanceInProgressException) &&
         !IsExpectedAnswer(exception);
 
     // The operation exceptions of the modules are answers for the user (validation, conflict), not failures: by convention a type of the application named

@@ -4,6 +4,28 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
+### 16.10.2026 - Backup, restaurare si copiere NAS intr-un proces separat
+
+**Ce s-a adaugat:** backup-ul (la cerere, programat, la preluarea de inventar), restaurarea si copierea pe NAS ruleaza intr-un proces propriu al aplicatiei; modulul "Copii de siguranta si restaurare" apare in Setari -> Module.
+
+**Ce face acum:** pentru tine nimic nu se schimba in fluxuri (aceleasi butoane, mesaje si etape). Diferenta: daca procesul de backup se blocheaza sau pica, aplicatia ramane in picioare, lacatul de "backup in curs" se elibereaza imediat, iar dupa 3 caderi la rand modulul iese 30 s din functiune (mesaj "Copiile de siguranta si restaurarea sunt indisponibile momentan"; tabelul de pachete din Setari -> Backup este inlocuit de nota "modul indisponibil", setarile de program raman).
+
+Pasi:
+
+1. Setari -> Backup -> "Fa backup acum": mesajul cu numele pachetului apare dupa ~15 s; pachetul este in tabel; in Jurnal "Generare CopieSiguranta" cu utilizatorul tau.
+2. Cat dureaza backup-ul, intr-un alt browser (alta sesiune) navigheaza intr-o pagina: esti dus la pagina de asteptare; dupa backup totul merge. Modulele (Notificari etc.) nu apar oprite dupa backup.
+3. Setari -> Backup -> Backup NAS (daca NAS-ul este configurat): "Testeaza conexiunea", "Fa backup acum" cu copierea Activ: pachetul apare si pe partajare, fara fisiere .partial.
+4. Restaurare dintr-un pachet vechi (pe o baza de proba): etapele apar in fereastra, apare o copie "inainte de restaurare", baza se schimba, Jurnalul are "Restaurare".
+5. Backup programat: bifeaza ziua, pune ora peste 2 minute, Salveaza; la ora aleasa apare un pachet "Programat" facut de utilizatorul "sistem".
+6. Setari -> Module: "Copii de siguranta si restaurare" este sanatos.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Backup -> "Fa backup acum" | Pachet nou, jurnal cu actiunea si utilizatorul tau | |
+| 2 | Alta sesiune, in timpul backup-ului | Pagina de asteptare, apoi normal; niciun modul oprit | |
+| 3 | Restaurare dintr-un pachet (baza de proba) | Etape, copie inainte de restaurare, jurnal "Restaurare" | |
+| 4 | Backup programat peste 2 minute | Pachet "Programat" de la "sistem" | |
+
 ### 16.10.2026 - Notificarile ca modul (oprire fara efect asupra restului aplicatiei)
 
 **Ce s-a adaugat:** motorul de notificari (pagina Notificari, evaluarea sabloanelor, preluare / amanare / rezolvare, curatarea celor vechi si filele Sabloane si Setari din Setari -> Notificari) este un modul al aplicatiei. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge.

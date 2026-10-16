@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using BlazorStoc.Components;
 using BlazorStoc.Modules;
 using BlazorStoc.Modules.Anaf;
+using BlazorStoc.Modules.Backup;
 using BlazorStoc.Modules.Inventory;
 using BlazorStoc.Modules.Invoices;
 using BlazorStoc.Modules.Maintenance;
@@ -41,9 +42,7 @@ internal static class ServiceRegistration
             options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
         });
         services.AddCascadingAuthenticationState();
-        // An explicit App:DataProtectionPath always wins; otherwise the dedicated local asset directory from the handoff document.
-        var keysPath = configuration["App:DataProtectionPath"]
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "assets", "data-protection-keys");
+        var keysPath = DataProtectionKeys.PathFor(configuration);
         Directory.CreateDirectory(keysPath);
         services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keysPath)).SetApplicationName("BlazorStoc");
         services.AddRateLimiter(options =>
@@ -128,6 +127,7 @@ internal static class ServiceRegistration
     {
         services.AddSingleton(registry);
         registry.Add(new OcrModule(), services, configuration);
+        registry.Add(new BackupModule(), services, configuration);
         // The order is the order of the menu entries and of the notification sources: vehicles, offers, maintenance, risk analyses (as before the modules).
         registry.Add(new VehiclesModule(), services, configuration);
         registry.Add(new OffersModule(), services, configuration);
@@ -173,25 +173,18 @@ internal static class ServiceRegistration
     {
         // One shared lock file in the MariaDB backup directory; singleton because the lock and its heartbeat must be the same instance across the whole app, not
         // re-created per request.
-        var operationLockPath = Path.Combine(MariaAssetPaths.DatabaseBackups(configuration), "operation.lock.json");
+        var operationLockPath = MariaAssetPaths.OperationLock(configuration);
         services.AddSingleton<IOperationLockService>(provider => new FileOperationLockService(operationLockPath,
             provider.GetRequiredService<IAuditTrail>(), provider.GetRequiredService<ILogger<FileOperationLockService>>()));
         // While that lock is held, every session but the one holding it is refused at the data-access layer and redirected to
         // the waiting page (MaintenanceGate, MaintenanceSupport).
         MaintenanceGate.Configure(operationLockPath);
-        services.AddScoped<IDatabaseBackupService>(provider => new NasCopyingBackupService(new MariaDatabaseBackupService(provider.GetRequiredService<IConfiguration>(),
-                provider.GetRequiredService<IAccessControl>(), provider.GetRequiredService<IOperationLockService>(), provider.GetRequiredService<IAuditTrail>(),
-                provider.GetRequiredService<ILogger<MariaDatabaseBackupService>>()),
-            provider.GetRequiredService<INasBackupCopier>(), provider.GetRequiredService<ILogger<NasCopyingBackupService>>()));
-        // Backup NAS: a package made by the application is copied to the share afterwards; settings and copier for the Settings tab; the daily backup.
+        // The backup service, the NAS copier and the restoration are registered by the backup module (Modules/Backup): they run in a worker process, or in the
+        // application when Backup:Mode is InProcess. Here stay the lock, the settings of the schedule and of the share, the retention and the daily schedule.
         services.AddScoped<INasBackupSettingsRepository, MariaNasBackupStore>();
         services.AddScoped<IBackupSettingsRepository, MariaBackupSettingsStore>();
-        services.AddScoped<INasBackupCopier, NasBackupCopier>();
         services.AddScoped<IBackupRetentionService, BackupRetentionService>();
         services.AddHostedService<BackupScheduler>();
-        // Shares the same lock and backup service as above (the pre-restore snapshot in Pas 0 goes through
-        // IDatabaseBackupService.CreateBackupAsync, passing the restore's own already-held lock handle).
-        services.AddScoped<IDatabaseRestoreService, MariaDatabaseRestoreService>();
         return services;
     }
 

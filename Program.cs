@@ -8,13 +8,14 @@ using Microsoft.AspNetCore.Localization;
 // Worker mode of the OCR (Modules/Ocr): the application started with --ocr-worker <job folder> reads one file and exits; no web host, no database.
 if (args is ["--ocr-worker", var ocrJobFolder]) return await BlazorStoc.Modules.Ocr.OcrWorker.RunAsync(ocrJobFolder);
 
+// Worker mode of the backup (Modules/Backup): the application started with --backup-worker [its own arguments] does one backup, restoration or NAS operation and exits;
+// it talks over the standard streams and reads the same configuration (and so the same database and folders) as the application.
+if (args is [BlazorStoc.Modules.Backup.BackupWorkerRules.Argument, ..var backupWorkerArguments]) return await BlazorStoc.Modules.Backup.BackupWorker.RunAsync(backupWorkerArguments);
+
 var builder = WebApplication.CreateBuilder(args);
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 // The passwords of the MariaDB accounts come from private files outside the repository (see Startup/PrivateConfiguration).
-var applicationFile = builder.AddApplicationFile();
-builder.AddAccountFile("Migrator", "migration-account.private.json", applicationFile);   // schema migrations; without it the schema is only checked, never changed
-builder.AddAccountFile("Backup", "backup-account.private.json", applicationFile);        // mariadb-dump only; without it the dump runs as the application account
-builder.AddAccountFile("Restore", "restore-account.private.json", applicationFile);      // schema swap of the restoration; without it a real restoration stops before changing anything
+builder.AddPrivateAccountFiles();
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
 builder.AddFileLogging();

@@ -144,8 +144,11 @@ public static class ModuleChecks
             answers.ReportFailure("a", new OperationCanceledException());
             answers.ReportFailure("a", new TimeoutException());
             answers.ReportFailure("a", new ModuleUnavailableException("a"));
+            answers.ReportFailure("a", new MaintenanceInProgressException(MaintenanceGate.BlockedMessage));
         }
         check(answers.StatusOf("a") == ModuleStatus.Healthy, "Breaker: answers of the module (operation exception, access denied), cancellation and timeouts are not faults");
+        check(!ModuleRegistry.IsFault(new MaintenanceInProgressException(MaintenanceGate.BlockedMessage)),
+            "Breaker: a call that meets the write freeze of a backup or restoration is not a fault (pages loading during a backup must not take modules out)");
         check(ModuleRegistry.IsFault(new NullReferenceException()) && ModuleRegistry.IsFault(new InvalidOperationException()) && ModuleRegistry.IsFault(new InvalidCastException()),
             "Breaker: programming errors count as faults");
         answers.ReportFailure("unknown", fault);
