@@ -15,7 +15,15 @@ public partial class InvoicePickup
     {
         finalizeError = finalizeNotice = null;
         foreach (var line in pick.Where(item => !item.DescriptionEdited))
-            line.EntryDescription = session?.IsXml == true ? XmlEntryDescription(line) : overlay is null ? "" : InvoiceProductDescription.RenderRow(overlay, reading!.Extraction.Fields, WithCode(line), NumberHint);
+            line.EntryDescription = session?.IsXml == true ? XmlEntryDescription(line) : PdfEntryDescription(line);
+    }
+
+    // The description the template of the supplier says (labels of the fields and columns); a file without a template, or a template that has no description, gets the plain
+    // text (invoice, supplier, origin) the XML flow proposes too: the entry needs a description, and the user can still change it.
+    private string PdfEntryDescription(PickRow line)
+    {
+        var rendered = overlay is null ? "" : InvoiceProductDescription.RenderRow(overlay, reading!.Extraction.Fields, WithCode(line), NumberHint);
+        return rendered.Trim().Length > 0 ? rendered : PlainEntryDescription("preluată din PDF");
     }
 
     // Creates the new products (with their images) and records every entry. A row that was saved is never saved twice: after an error the

@@ -52,6 +52,12 @@ public sealed class ModuleAttribute(string moduleId) : Attribute
 /// </summary>
 public interface IExpectedAnswer { }
 
+/// <summary>
+/// Marks an exception that is a failure of one particular module (the Ocr module's worker exception): the circuit breaker counts it for that module only. A module that
+/// merely passes it on (the invoice module calls the OCR reading) does not take the blame.
+/// </summary>
+public interface IBelongsToModule { string ModuleId { get; } }
+
 /// <summary>Thrown by the guarded entry points of a module while its circuit is open.</summary>
 public sealed class ModuleUnavailableException(string moduleId)
     : Exception($"Modulul «{moduleId}» este indisponibil momentan.")

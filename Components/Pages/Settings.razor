@@ -20,6 +20,7 @@
     </div>
     @* The invoices panel stays mounted (hidden) when another tab is shown, so a template being edited keeps its changes. *@
         <div role="tabpanel" id="panel-@InvoicesTab" aria-labelledby="tab-@InvoicesTab" class="settings-body" hidden="@(activeTab != InvoicesTab)">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId">
             @SubtabBar(InvoiceSubtabs, "Secțiuni facturi")
             @* The analysis stays mounted (hidden) when the saved templates are shown, so switching sub-tabs does not lose the file being worked on. *@
             <div role="tabpanel" id="subpanel-@InvoiceAnalysisSubtab" aria-labelledby="subtab-@InvoiceAnalysisSubtab" hidden="@(invoiceSubtab != InvoiceAnalysisSubtab)">
@@ -39,6 +40,7 @@
                     <InvoiceTemplatesList @key="templatesVersion" FocusTemplateId="InvoiceTemplateParameter" OnEditWithFile="EditWithFile" />
                 </div>
             }
+            </ModuleGate>
         </div>
     @if (activeTab == AnafTab && allowedTabs.Contains(AnafTab))
     {

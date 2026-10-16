@@ -295,6 +295,22 @@ public static class RunTrackingChecks
         liveBanner.Dispose();
         check(true, "Screen: the banner unsubscribes from the registry when it is disposed");
 
+        // The real path: the administrator presses "try again" in the panel and the banner (same circuit, same renderer) follows at once, not at the next look of its timer.
+        var pressed = new ModuleRegistry(clock);
+        pressed.Add(new FakeModule("pressed"), new ServiceCollection(), Empty());
+        for (var i = 0; i < ModuleRegistry.FailureThreshold; i++) pressed.ReportFailure("pressed", new InvalidOperationException());
+        using var pressedContext = new BunitContext();
+        pressedContext.Services.AddSingleton(pressed);
+        pressedContext.Services.AddSingleton<IAccessControl>(new TestAccessControl(true, "admin.demo"));
+        pressedContext.Services.AddSingleton<IAuditTrail>(new TestAuditTrail());
+        pressedContext.Services.AddSingleton<TimeProvider>(clock);
+        var pressedBanner = pressedContext.Render<ModuleAlertBanner>();
+        var pressedPanel = pressedContext.Render<ModulesPanel>();
+        check(pressedBanner.Markup.Contains("Modul pressed"), "Screen: the banner lists the module before \"try again\" is pressed");
+        pressedPanel.Find("button.row-icon.renew").Click();
+        try { pressedBanner.WaitForState(() => !pressedBanner.Markup.Contains("Modul pressed"), TimeSpan.FromSeconds(1)); } catch (Exception) { }
+        check(!pressedBanner.Markup.Contains("Modul pressed"), "Screen: pressing \"try again\" in the panel drops the module from the banner at once (the banner does not wait for its timer)");
+
         using var ordinary = new BunitContext();
         ordinary.Services.AddSingleton(registry);
         ordinary.Services.AddSingleton<IAccessControl>(new TestAccessControl(false, "operator"));

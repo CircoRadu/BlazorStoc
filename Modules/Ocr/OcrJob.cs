@@ -34,7 +34,10 @@ internal sealed record OcrJobError(string Kind, string Message)
 }
 
 /// <summary>The worker did not deliver: it died, hung past the time limit, or left no usable result. A failure of the module (counted by the circuit breaker).</summary>
-public sealed class OcrWorkerException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class OcrWorkerException(string message, Exception? inner = null) : Exception(message, inner), BlazorStoc.Modules.IBelongsToModule
+{
+    public string ModuleId => OcrRules.ModuleId;
+}
 
 public static class OcrRules
 {

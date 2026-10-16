@@ -84,8 +84,13 @@ public partial class InvoicePickup
         // The description the XML template of the supplier says (labels of the linked elements); a template without one gets the plain text below.
         if (chosen?.Definition.ProductDescription is { Length: > 0 } template && reading is not null)
             return InvoiceXmlDescription.RenderRow(template, reading.Extraction, line.Cells, invoiceNumber, invoiceSupplierName);
+        return PlainEntryDescription("preluată din XML");
+    }
+
+    // "Factura <number> · <supplier> (<origin>)": the number as confirmed in step 2 (or as read), the supplier of the register (or as read).
+    private string PlainEntryDescription(string origin)
+    {
         string Field(string meaning) => reading?.Extraction.Fields.FirstOrDefault(field => field.Meaning == meaning)?.Value ?? "";
-        return $"Factura {(invoiceNumber.Length > 0 ? invoiceNumber : Field(InvoiceFieldMeanings.InvoiceNumber))}" +
-            (invoiceSupplierName.Length > 0 ? $" · {invoiceSupplierName}" : "") + " (preluată din XML)";
+        return InvoiceProductDescription.PlainEntry(invoiceNumber, Field(InvoiceFieldMeanings.InvoiceNumber), invoiceSupplierName, origin, StockMovementRules.MaxDescriptionLength);
     }
 }

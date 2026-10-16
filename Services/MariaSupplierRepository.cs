@@ -160,7 +160,7 @@ public sealed class MariaSupplierRepository(
         if (invoiceTemplates is not null && supplier.Name != original.Name && supplier.TemplateCount > 0 && supplier.Country == SupplierCountries.Romania)
         {
             try { await invoiceTemplates.RenameSupplierAsync(supplier.Cui, original.Name, supplier.Name, cancellationToken).ConfigureAwait(false); }
-            catch (Exception exception) when (exception is InvoiceTemplateOperationException or AccessDeniedException or MySqlException) { }   // the supplier is saved; templates are matched by CUI anyway
+            catch (Exception exception) when (exception is InvoiceTemplateOperationException or AccessDeniedException or MySqlException or BlazorStoc.Modules.ModuleUnavailableException) { }   // the supplier is saved; templates are matched by CUI anyway
         }
         return supplier;
     }

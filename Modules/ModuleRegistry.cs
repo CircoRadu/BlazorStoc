@@ -273,6 +273,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
     public void ReportFailure(string moduleId, Exception exception)
     {
         if (!IsFault(exception)) return;
+        if (exception is IBelongsToModule owner && owner.ModuleId != moduleId) return;
         var opened = false;
         ModuleChange? change = null;
         lock (gate)

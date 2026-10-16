@@ -233,4 +233,14 @@ public static partial class InvoiceProductDescription
         }
         return Render(draft.ProductDescription, Lookup);
     }
+
+    // The plain description of an entry taken over from an invoice when its template says nothing (no template, or a template without a description): "Factura <number> · <supplier>
+    // (<origin>)". The number is the one confirmed by the user, or else the one read from the file; the supplier is the one of the register, or else the one read (it may be missing).
+    // The result never exceeds maxLength.
+    public static string PlainEntry(string confirmedNumber, string readNumber, string supplierName, string origin, int maxLength)
+    {
+        var number = confirmedNumber.Trim().Length > 0 ? confirmedNumber.Trim() : readNumber.Trim();
+        var text = "Factura" + (number.Length > 0 ? " " + number : "") + (supplierName.Trim().Length > 0 ? " · " + supplierName.Trim() : "") + $" ({origin})";
+        return text.Length <= maxLength ? text : text[..maxLength];
+    }
 }
