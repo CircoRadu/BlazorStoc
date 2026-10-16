@@ -51,7 +51,9 @@
                 <Header><span>▦</span> Produse</Header>
                 <ChildContent>
                     <AuthorizeView Policy="perm:stoc.view"><Authorized><a class="@(onStockPage ? "active" : "")" href="/produse">Stoc</a></Authorized></AuthorizeView>
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId)) {
                     <AuthorizeView Policy="perm:preluare-factura.view"><Authorized><NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink></Authorized></AuthorizeView>
+                    }
                     <AuthorizeView Policy="perm:iesire-multipla.view"><Authorized><NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink></Authorized></AuthorizeView>
                     <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
@@ -104,7 +106,7 @@
                 Backup/restaurare in curs (@activeOperation.OperatorName) - datele pot fi temporar indisponibile. Reveniti mai tarziu.
             </div>
         }
-        <main class="workspace"><ModuleAlertBanner />@Body</main></div>
+        <main class="workspace"><ModuleAlertBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />@Body</main></div>
 </div>
 <dialog id="logout-dialog" class="delete-dialog logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description">
     <form method="post" action="/Account/Logout">

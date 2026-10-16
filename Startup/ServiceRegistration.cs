@@ -3,6 +3,7 @@ using BlazorStoc.Components;
 using BlazorStoc.Modules;
 using BlazorStoc.Modules.Anaf;
 using BlazorStoc.Modules.Inventory;
+using BlazorStoc.Modules.Invoices;
 using BlazorStoc.Modules.Maintenance;
 using BlazorStoc.Modules.Ocr;
 using BlazorStoc.Modules.Offers;
@@ -118,11 +119,6 @@ internal static class ServiceRegistration
         services.AddScoped<ISupplierProductCodes, MariaSupplierProductCodes>();
         services.AddScoped<ISupplierRecognitionLog, MariaSupplierRecognitionLog>();
         services.AddScoped<ISupplierInvoiceRepository, MariaSupplierInvoiceRepository>();
-        services.AddSingleton<IInvoiceAnalysisStore, InvoiceAnalysisStore>();
-        services.AddScoped<IInvoiceAnalysisService, InvoiceAnalysisService>();
-        services.AddSingleton<InvoiceLabSettings>();
-        services.AddScoped<IInvoiceTemplateStore, MariaInvoiceTemplateStore>();
-        services.AddScoped<IInvoiceTemplateService, InvoiceTemplateService>();
         return services;
     }
 
@@ -136,6 +132,7 @@ internal static class ServiceRegistration
         registry.Add(new OffersModule(), services, configuration);
         registry.Add(new InventoryModule(), services, configuration);
         registry.Add(new AnafModule(), services, configuration);
+        registry.Add(new InvoicesModule(), services, configuration);
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
         return services;

@@ -328,6 +328,10 @@ public static class PickupWizardChecks
             settingsContext.JSInterop.Mode = JSRuntimeMode.Loose;
             settingsContext.Services.AddLogging();
             settingsContext.Services.AddSingleton<IAccessControl>(rights);
+            // The invoice tab sits inside the gate of the invoice module, which works.
+            var settingsModules = new BlazorStoc.Modules.ModuleRegistry();
+            settingsModules.Add(new BlazorStoc.Modules.Invoices.InvoicesModule(), new ServiceCollection(), new ConfigurationBuilder().Build());
+            settingsContext.Services.AddSingleton(settingsModules);
             settingsContext.Services.AddSingleton<IInvoiceAnalysisStore>(new InvoiceAnalysisStore(TimeProvider.System));
             settingsContext.Services.AddScoped<IInvoiceAnalysisService>(provider => new InvoiceAnalysisService(new InvoicePdfReader(new TestTessdata()), provider.GetRequiredService<IInvoiceAnalysisStore>(), rights));
             var withTemplate = new MemoryTemplates();

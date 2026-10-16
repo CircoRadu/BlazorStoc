@@ -4,6 +4,19 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 
 ## Modificari de testat
 
+### 16.10.2026 - Preluarea facturilor ca modul (oprire fara efect asupra restului aplicatiei)
+
+**Ce s-a adaugat:** Preluarea facturilor (pagina Preluare factura, analiza PDF/XML, sabloanele de facturi si fila Setari -> Facturi) este un modul al aplicatiei. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge: stocul, furnizorii, registrul de facturi (/facturi) si intrarile se folosesc ca pana acum.
+
+**Ce face acum:** cu modulul oprit, /produse/preluare-factura arata "Modul indisponibil"; linkul din meniul Produse, cardul de pe pagina principala si butonul "Preia din PDF" din formularul de intrare dispar; Setari -> Facturi arata nota de modul oprit; redenumirea unui furnizor merge (sabloanele lui nu se mai actualizeaza cat modulul e oprit, dar se potrivesc dupa CUI). Un fisier care nu e factura, un sablon respins sau lipsa dreptului dau mesajul obisnuit si nu opresc modulul; o cadere a recunoasterii OCR opreste doar modulul OCR, nu si pe cel de facturi. Bannerul de module oprite se actualizeaza singur si dispare imediat dupa "Reincearca".
+
+Pasi:
+
+1. Cu modulul pornit (normal): Preluare factura (PDF si XML), Setari -> Facturi (generare si sabloane salvate) se deschid si lucreaza ca pana acum.
+2. Porneste aplicatia cu `Modules__preluare-factura__Enabled=false`: Preluare factura arata "Modul indisponibil", meniul si cardul nu mai au linkul, formularul de intrare nu are "Preia din PDF", Setari -> Facturi arata nota, Setari -> Module arata Preluare factura "Oprit (oprit din configurare)".
+3. Tot cu modulul oprit: Furnizori, Facturi (registrul) si Intrari/iesiri produs se deschid; redenumeste un furnizor (merge).
+4. Banner: oprit un modul (de exemplu din configurare), apasa "Detalii" - se deschide Setari -> Module; dupa o oprire prin erori repetate, "Reincearca" scoate bannerul in mai putin de o secunda.
+
 ### 15.10.2026 - Citirea facturilor PDF ruleaza intr-un proces separat
 
 **Ce s-a adaugat:** citirea facturilor PDF (text sau scanate, cu recitirea numerelor din tabel) ruleaza acum intr-un proces worker separat; aceeasi functie in modulul `ocr` este folosita si de Setari -> Facturi (analiza unui fisier model).

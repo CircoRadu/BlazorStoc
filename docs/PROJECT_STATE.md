@@ -162,3 +162,9 @@ Il stabileste utilizatorul.
 ## Actualizare 15.10.2026 - modulul ANAF
 - Interogarea ANAF (date firme dupa CUI) si configuratorul ei sunt al saselea modul (`Modules/Anaf/`, id `anaf`). Circuit breaker-ul numara raspunsurile "indisponibil" ale serviciului extern; cu circuitul deschis cautarea raspunde imediat, fara sa astepte timeout-ul. Editoarele de beneficiari si furnizori nu s-au schimbat (folosesc fluxul existent pentru ANAF indisponibil).
 - Verificat: suita in memorie 1340 PASS, MariaDB Suppliers and invoices (65); in browser cu modulul oprit (Setari -> ANAF cu nota, editorul de furnizori spune ca modulul e oprit si propune introducerea manuala) si pornit (Setari -> ANAF).
+
+## Actualizare 16.10.2026 - modulul Preluare factura, corectie banner
+- Preluarea facturilor (pagina, sesiunile de analiza, sabloanele si fila Setari -> Facturi) este al saptelea modul (`Modules/Invoices/`, id `preluare-factura`). Motorul de citire si analiza (~4.700 de linii) a ramas in `Services/Invoices` fiindca il foloseste si modulul Ocr; modulul are ~1.600 de linii de servicii plus interfata. Registrul facturilor de furnizor si intrarile ramasera in nucleu.
+- Regula noua `IBelongsToModule`: caderea workerului OCR nu mai scoate din functiune si modulul de facturi (o numara doar modulul Ocr).
+- Corectie: bannerul de module oprite nu se reimprospata niciodata in aplicatia reala (layout static); acum e insula interactiva si dispare in sub 0,5 s dupa "Reincearca". Gasita prin verificare in browser; testul bUnit trecea fiindcat randeaza interactiv.
+- Verificat: suita in memorie 1365 PASS (grupurile xml si pdf incluse), MariaDB 2117 PASS cu aceeasi sectiune care pica de la inceput (User types); in browser pe baza de test cu modulul oprit din configurare si cu o defectiune reala (definitie de sablon cu JSON invalid): iesire din functiune dupa 3 erori (JsonException), OCR neatins, furnizorii si intrarile merg, revenire dupa restaurare si Reincearca, Jurnal complet.

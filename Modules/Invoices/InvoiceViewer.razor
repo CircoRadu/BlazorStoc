@@ -1,6 +1,8 @@
 ﻿@page "/produse/preluare-factura/factura/{SessionId:guid}"
+@namespace BlazorStoc.Components.Pages
 @layout Layout.PopoutLayout
 @attribute [Authorize(Policy = "perm:preluare-factura.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IAccessControl Access

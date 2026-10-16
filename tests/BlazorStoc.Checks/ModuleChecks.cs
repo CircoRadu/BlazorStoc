@@ -52,6 +52,7 @@ public static class ModuleChecks
         await OfferModuleChecks.RunAsync(check);
         await InventoryModuleChecks.RunAsync(check);
         await AnafModuleChecks.RunAsync(check);
+        await InvoiceModuleChecks.RunAsync(check);
     }
 
     private static void Registration(Action<bool, string> check)
@@ -328,6 +329,10 @@ public static class ModuleChecks
             }
         }
         check(violations.Count == 0, "Architecture: no module refers to another module (" + string.Join("; ", violations) + ")");
+        // The layout is rendered statically (Routes has no render mode): a banner inside it updates only if it is an interactive island of its own.
+        var mainLayout = File.ReadAllText(Path.Combine(root, "Components", "Layout", "MainLayout.razor"));
+        check(Regex.IsMatch(mainLayout, @"<ModuleAlertBanner @rendermode=""@\(new InteractiveServerRenderMode\(prerender: false\)\)"" />"),
+            "Architecture: the banner of the modules that are out is an interactive island (the static layout would show the state of the page load forever)");
         var unmarked = Directory.GetFiles(modulesRoot, "*.razor", SearchOption.AllDirectories)
             .Where(file => Regex.IsMatch(File.ReadAllText(file), @"^﻿?@page\s", RegexOptions.Multiline) && !File.ReadAllText(file).Contains("[BlazorStoc.Modules.Module("))
             .Select(Path.GetFileName).ToList();
