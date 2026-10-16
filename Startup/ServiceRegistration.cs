@@ -5,6 +5,7 @@ using BlazorStoc.Modules.Anaf;
 using BlazorStoc.Modules.Inventory;
 using BlazorStoc.Modules.Invoices;
 using BlazorStoc.Modules.Maintenance;
+using BlazorStoc.Modules.Notifications;
 using BlazorStoc.Modules.Ocr;
 using BlazorStoc.Modules.Offers;
 using BlazorStoc.Modules.RiskAnalyses;
@@ -133,6 +134,7 @@ internal static class ServiceRegistration
         registry.Add(new InventoryModule(), services, configuration);
         registry.Add(new AnafModule(), services, configuration);
         registry.Add(new InvoicesModule(), services, configuration);
+        registry.Add(new NotificationsModule(), services, configuration);
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
         return services;
@@ -149,7 +151,6 @@ internal static class ServiceRegistration
     // The notification templates and the sources that raise them. The registration order of the IExpirySource entries is the order the sources are evaluated in.
     public static IServiceCollection AddNotificationServices(this IServiceCollection services, ModuleRegistry modules)
     {
-        services.AddScoped<IExpiryNotificationRepository, MariaExpiryNotificationRepository>();
         // The sources of the modules (vehicles, maintenance, risk analyses) are registered here, before the awaited invoices.
         modules.AddNotificationSources(services);
         services.AddScoped<IAwaitedEntryReader, MariaAwaitedEntryReader>();
@@ -164,7 +165,6 @@ internal static class ServiceRegistration
         services.AddScoped<IExpirySource, BackupMissingSource>();
         services.AddScoped<IExpirySource, NasCopyMissingSource>();
         services.AddScoped<IExpirySource, ClockSkewSource>();
-        services.AddScoped<IExpiryNotificationService, ExpiryNotificationService>();
         return services;
     }
 

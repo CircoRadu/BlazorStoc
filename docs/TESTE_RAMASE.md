@@ -823,3 +823,5 @@ Preluare factura - descrierea propusa automat (16.10.2026): FACUT si verificat.
 - Date lasate in baza de test: furnizorul Dipol Connect, factura DIP44919, un produs si o intrare (pe langa cele din fluxul anterior).
 
 Preluare factura: descrierea intrarii propusa automat (16.10.2026): Modificarea este necomisa pe ramura refactor/module-facturi (dupa comitul 59666aa).
+
+Modulul Notificari (al optulea modul) (16.10.2026): Modificarile sunt necomise pe ramura refactor/module-notificari (din refactor/module-facturi); build-ul din artifacts\notif-build (5087) nu include modulele noi.

@@ -93,7 +93,10 @@
             {
                 <AuthorizeView Policy="@($"perm:{module.PermissionModule}.view")"><Authorized><NavLink class="nav-item" href="@module.Href" Match="NavLinkMatch.Prefix"><span>@module.Icon</span> @module.Label <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             }
+            @if (Modules.IsAvailable(BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId))
+            {
             <AuthorizeView Policy="perm:notificari.view"><Authorized><NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            }
             <AuthorizeView Policy="perm:jurnal.view"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             <AuthorizeView Policy="perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
         }
