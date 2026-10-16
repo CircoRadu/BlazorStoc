@@ -10,6 +10,7 @@ using BlazorStoc.Modules.Notifications;
 using BlazorStoc.Modules.Ocr;
 using BlazorStoc.Modules.Offers;
 using BlazorStoc.Modules.RiskAnalyses;
+using BlazorStoc.Modules.Suppliers;
 using BlazorStoc.Modules.Vehicles;
 using BlazorStoc.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -110,18 +111,6 @@ internal static class ServiceRegistration
         return services;
     }
 
-    // Suppliers, their invoices and the invoice templates (Settings -> Facturi).
-    public static IServiceCollection AddSupplierAndInvoiceServices(this IServiceCollection services)
-    {
-        services.AddScoped<ISupplierRepository>(provider => new CachedSupplierRepository(new MariaSupplierRepository(provider.GetRequiredService<IConfiguration>(),
-            provider.GetRequiredService<IAccessControl>(), provider.GetRequiredService<IAuditTrail>(), provider.GetRequiredService<IArchiveService>(),
-            provider.GetRequiredService<IInvoiceTemplateService>())));
-        services.AddScoped<ISupplierProductCodes, MariaSupplierProductCodes>();
-        services.AddScoped<ISupplierRecognitionLog, MariaSupplierRecognitionLog>();
-        services.AddScoped<ISupplierInvoiceRepository, MariaSupplierInvoiceRepository>();
-        return services;
-    }
-
     // The modules (see Modules/): each registers itself through IModule; one that fails to start is disabled and the others go on.
     public static IServiceCollection AddModules(this IServiceCollection services, IConfiguration configuration, ModuleRegistry registry)
     {
@@ -134,6 +123,7 @@ internal static class ServiceRegistration
         registry.Add(new InventoryModule(), services, configuration);
         registry.Add(new AnafModule(), services, configuration);
         registry.Add(new InvoicesModule(), services, configuration);
+        registry.Add(new SuppliersModule(), services, configuration);
         registry.Add(new NotificationsModule(), services, configuration);
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);

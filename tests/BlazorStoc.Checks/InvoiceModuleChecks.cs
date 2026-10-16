@@ -129,7 +129,7 @@ public static class InvoiceModuleChecks
         check(pages.Count == 2 && pages.All(page => page.GetCustomAttributes(typeof(ModuleAttribute), false).Cast<ModuleAttribute>().SingleOrDefault()?.ModuleId == module.Id),
             "Invoices: both pages (the pickup and the viewer of the invoice) are marked with the module, so the router replaces them while it is out");
         var register = typeof(ModuleAttribute).Assembly.GetTypes().Single(type => type.Namespace == "BlazorStoc.Components.Pages" && type.Name == "Invoices");
-        check(register.GetCustomAttributes(typeof(ModuleAttribute), false).Length == 0, "Invoices: the register of supplier invoices (/facturi) stays with the suppliers and the stock");
+        check(register.GetCustomAttributes(typeof(ModuleAttribute), false).Cast<ModuleAttribute>().SingleOrDefault()?.ModuleId == "furnizori", "Invoices: the register of supplier invoices (/facturi) belongs to the suppliers module, not to the pickup module");
 
         var offRegistry = new ModuleRegistry();
         var offServices = new ServiceCollection();
@@ -174,7 +174,7 @@ public static class InvoiceModuleChecks
         check(dashboard.Contains("<ModuleGate ModuleId=\"preluare-factura\" Notice=\"false\"><AuthorizeView Policy=\"perm:preluare-factura.view\">"), "Invoices: the tile of the main page is inside the gate of the module");
         var picker = File.ReadAllText(Path.Combine(root, "Components", "Shared", "EntryOriginPicker.razor"));
         check(Regex.IsMatch(picker, @"@if \(Modules\.IsAvailable\(BlazorStoc\.Modules\.Invoices\.InvoicesModule\.ModuleId\)\) \{ <a class=""refresh act-confirm origin-pdf"""), "Invoices: the \"Preia din PDF\" link of the entry form is shown only while the module works");
-        var suppliers = File.ReadAllText(Path.Combine(root, "Services", "MariaSupplierRepository.cs"));
+        var suppliers = File.ReadAllText(Path.Combine(root, "Modules", "Suppliers", "MariaSupplierRepository.cs"));
         check(suppliers.Contains("BlazorStoc.Modules.ModuleUnavailableException"), "Invoices: renaming a supplier does not fail because the invoice module is out (the register ignores a module that is out)");
     }
 }

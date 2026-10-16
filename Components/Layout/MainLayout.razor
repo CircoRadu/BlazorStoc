@@ -83,8 +83,11 @@
                 <ChildContent>
                     <AuthorizeView Policy="perm:categorii.view"><Authorized><NavLink href="/categorii" Match="NavLinkMatch.Prefix">Categorii</NavLink></Authorized></AuthorizeView>
                     <AuthorizeView Policy="perm:beneficiari.view"><Authorized><NavLink href="/beneficiari" Match="NavLinkMatch.Prefix">Beneficiari</NavLink></Authorized></AuthorizeView>
-                    <AuthorizeView Policy="perm:furnizori.view"><Authorized><NavLink href="/furnizori" Match="NavLinkMatch.Prefix">Furnizori</NavLink></Authorized></AuthorizeView>
-                    <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink></Authorized></AuthorizeView>
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.Suppliers.SuppliersModule.ModuleId))
+                    {
+                        <AuthorizeView Policy="perm:furnizori.view"><Authorized><NavLink href="/furnizori" Match="NavLinkMatch.Prefix">Furnizori</NavLink></Authorized></AuthorizeView>
+                        <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink></Authorized></AuthorizeView>
+                    }
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId)) { <AuthorizeView Policy="perm:vehicule.view"><Authorized><NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink></Authorized></AuthorizeView> }
                     <AuthorizeView Policy="perm:utilizatori.view"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView><AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>

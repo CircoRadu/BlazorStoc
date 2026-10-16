@@ -1,4 +1,6 @@
 ﻿@page "/facturi"
+@namespace BlazorStoc.Components.Pages
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Suppliers.SuppliersModule.ModuleId)]
 @attribute [Authorize(Policy = "perm:facturi.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services

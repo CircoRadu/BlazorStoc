@@ -834,3 +834,7 @@ Backup, restaurare si copiere NAS intr-un proces separat (16.10.2026): FACUT si 
 - Sectiunea MariaDB "Backup worker" cere drepturile SHOW VIEW, TRIGGER, LOCK TABLES ale contului de test pe `blazorstoc_test` (acordate pe aceasta masina la 16.10.2026) si mariadb-dump (`MARIA_DUMP_PATH`).
 
 Backup, restaurare si copiere NAS intr-un proces separat (modulul backup) (16.10.2026): Restaurarea completa cu comutarea schemelor si copierea pe un NAS real prin worker nu au fost rulate; modificarile sunt necomise pe refactor/structura.
+
+Modulul Furnizori (16.10.2026): FACUT si verificat pe baza de test (suita in memorie 1453 PASS, MariaDB 2232 PASS, browser: modul oprit din configurare si defectiune reala). Ramas: republicarea 5087 (build vechi, fara modulele noi) si pasii din Teste utilizator/03.
+
+Furnizorii si facturile de furnizor ca modul (furnizori) (16.10.2026): Build-ul de pe 5087 este vechi.

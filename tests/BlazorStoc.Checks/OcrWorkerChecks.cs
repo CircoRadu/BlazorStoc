@@ -263,7 +263,6 @@ public static class OcrWorkerChecks
             BlazorStoc.Startup.ServiceRegistration.AddUserServices(services);
             BlazorStoc.Startup.ServiceRegistration.AddStockServices(services);
             BlazorStoc.Startup.ServiceRegistration.AddProjectServices(services);
-            BlazorStoc.Startup.ServiceRegistration.AddSupplierAndInvoiceServices(services);
             check(services.Count(descriptor => descriptor.ServiceType == typeof(IInvoicePdfReader)) == 1 && services.Count(descriptor => descriptor.ServiceType == typeof(IInventoryPickupOcrService)) == 1,
                 "OCR worker: in the registrations of the application the readers are registered once, by the module (no later registration replaces them)");
             var last = services.Last(descriptor => descriptor.ServiceType == typeof(IInvoicePdfReader));

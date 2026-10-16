@@ -1,4 +1,6 @@
 ﻿@page "/furnizori/{Id:int}"
+@namespace BlazorStoc.Components.Pages
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Suppliers.SuppliersModule.ModuleId)]
 @attribute [Authorize(Policy = "perm:furnizori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
