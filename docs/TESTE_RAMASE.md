@@ -814,3 +814,12 @@ Preluare factura - flux complet in browser (16.10.2026, instanta de test pe baza
 - Jurnalul are actiunile specifice: Adaugare furnizor, Inregistrare factura furnizor, Adaugare Produs, Adaugare MiscareStoc, Legare cod furnizor de produs.
 - Observatie de urmarit: la PDF-ul Telesystem descrierea intrarii ramane goala si finalizarea esueaza partial (factura si produsul se salveaza, intrarea nu) pana o completezi; mesajul spune clar ce lipseste. Nu e o regresie a modularizarii (acelasi flux, aceeasi regula), dar o descriere propusa automat ar scuti un pas.
 - Date lasate in baza de test (blazorstoc_test): furnizorii Telesystem si General Security, doua facturi, doua produse si doua intrari.
+
+Preluare factura - descrierea propusa automat (16.10.2026): FACUT si verificat.
+- La pasul 3 descrierea intrarii se propune singura: cea a sablonului (etichete) daca are una; altfel, pentru PDF, "Factura <numar> - <furnizor> (preluata din PDF)" (la fel ca la XML: "... (preluata din XML)"). Numarul e cel confirmat la pasul 2 (sau, daca lipseste, cel citit din fisier), furnizorul e cel din registru, textul nu depaseste 500 de caractere si ramane editabil (o descriere scrisa de utilizator nu e rescrisa).
+- Verificat in browser pe baza de test (PDF Dipol, sablon Telesystem PDF ANAF fara descriere, ANAF oprit): descrierea propusa "Factura DIP44919 - Dipol Connect SRL (preluata din PDF)", finalizare din prima fara completari (inainte, a doua incercare dupa completarea descrierii), intrare de 20 buc legata de factura cu aceasta descriere.
+- Teste: 4 verificari noi (InvoiceProductDescription.PlainEntry: numar confirmat/citit, furnizor sau numar lipsa, limita; pasul 3 al asistentului propune o descriere); suita in memorie 1369 PASS.
+- Observatia de mai sus despre descrierea goala la PDF-ul Telesystem este rezolvata.
+- Date lasate in baza de test: furnizorul Dipol Connect, factura DIP44919, un produs si o intrare (pe langa cele din fluxul anterior).
+
+Preluare factura: descrierea intrarii propusa automat (16.10.2026): Modificarea este necomisa pe ramura refactor/module-facturi (dupa comitul 59666aa).

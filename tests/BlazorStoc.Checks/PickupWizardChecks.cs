@@ -121,6 +121,9 @@ public static class PickupWizardChecks
         SupplierTestServices.ConfirmHeader(cut);
         Click("Pasul următor");
         cut.WaitForAssertion(() => cut.Find("textarea"), TimeSpan.FromSeconds(10));
+        var proposedDescription = cut.Find("textarea").GetAttribute("value") ?? cut.Find("textarea").TextContent;
+        check(proposedDescription.Trim().Length > 0 && proposedDescription.StartsWith("Factura ") && proposedDescription.Contains("(preluată din PDF)") || proposedDescription.Trim().Length > 0 && !proposedDescription.Contains("Descriere scrisa"),
+            "Pickup wizard: step 3 proposes a description for the entry (the template's, or \"Factura <număr> · <furnizor> (preluată din PDF)\" when it has none), so the entry is not refused for an empty description (\"" + proposedDescription + "\")");
         cut.Find("textarea").Input("Descriere scrisa de utilizator");
         Click("Pasul precedent");
         WaitStep2();

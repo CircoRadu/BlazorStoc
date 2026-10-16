@@ -16,6 +16,7 @@ Pasi:
 2. Porneste aplicatia cu `Modules__preluare-factura__Enabled=false`: Preluare factura arata "Modul indisponibil", meniul si cardul nu mai au linkul, formularul de intrare nu are "Preia din PDF", Setari -> Facturi arata nota, Setari -> Module arata Preluare factura "Oprit (oprit din configurare)".
 3. Tot cu modulul oprit: Furnizori, Facturi (registrul) si Intrari/iesiri produs se deschid; redenumeste un furnizor (merge).
 4. Banner: oprit un modul (de exemplu din configurare), apasa "Detalii" - se deschide Setari -> Module; dupa o oprire prin erori repetate, "Reincearca" scoate bannerul in mai putin de o secunda.
+5. La un PDF al carui sablon nu are descriere pentru intrare, pasul 3 propune singur "Factura <numar> · <furnizor> (preluata din PDF)" in campul "Descrierea intrarii in stoc" (poti sa o schimbi); "Finalizeaza preluarea" nu mai este refuzata pentru descriere goala. Cu un sablon care are descriere, ramane descrierea sablonului.
 
 ### 15.10.2026 - Citirea facturilor PDF ruleaza intr-un proces separat
 
