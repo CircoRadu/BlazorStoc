@@ -51,6 +51,7 @@
     else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))
     {
         <div role="tabpanel" id="panel-@NotificationsTab" aria-labelledby="tab-@NotificationsTab" class="settings-body">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId">
             @SubtabBar(NotificationSubtabs, "Secțiuni notificări")
             @if (notificationSubtab == TemplatesSubtab)
             {
@@ -60,6 +61,7 @@
             {
                 <div role="tabpanel" id="subpanel-@SettingsSubtab" aria-labelledby="subtab-@SettingsSubtab"><NotificationSettingsEditor /></div>
             }
+            </ModuleGate>
         </div>
     }
     else if (activeTab == BackupTab && allowedTabs.Contains(BackupTab))
