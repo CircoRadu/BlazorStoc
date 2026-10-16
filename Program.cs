@@ -34,6 +34,7 @@ builder.Services
     .AddNotificationServices(modules)
     .AddBackupServices(builder.Configuration)
     .AddChangeTracking()
+    .AddHostResilience()
     .AddRunTracking(builder.Configuration);
 var app = builder.Build();
 modules.AttachLogger(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("BlazorStoc.Modules"));

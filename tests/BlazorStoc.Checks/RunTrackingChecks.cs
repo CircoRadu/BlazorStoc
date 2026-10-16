@@ -7,6 +7,8 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BlazorStoc.Checks;
@@ -64,6 +66,50 @@ public static class RunTrackingChecks
         await ScreensAsync(check);
         await LoginAsync(check);
         SupervisorNote(check);
+        await HostResilienceAsync(check);
+    }
+
+    // ---- a background service that fails must not stop the application ----
+
+    private sealed class FailingBackgroundService : BackgroundService
+    {
+        // Like the real services: an async method, so the fault is a faulted task after the host started, not an exception of the start.
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            await Task.Yield();
+            throw new InvalidOperationException("background fault");
+        }
+    }
+
+    private static async Task<bool> HostStaysUpAsync(bool resilient)
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Logging.ClearProviders();
+        if (resilient) builder.Services.AddHostResilience();
+        builder.Services.AddHostedService<FailingBackgroundService>();
+        using var host = builder.Build();
+        var stopping = false;
+        host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping.Register(() => stopping = true);
+        await host.StartAsync();
+        await Task.Delay(400);
+        var up = !stopping;
+        await host.StopAsync();
+        return up;
+    }
+
+    private static async Task HostResilienceAsync(Action<bool, string> check)
+    {
+        check(!await HostStaysUpAsync(resilient: false), "Host: by default one background service that throws stops the whole application (the reason for the setting below)");
+        check(await HostStaysUpAsync(resilient: true), "Host: with AddHostResilience a background service that throws stops alone and the application keeps running");
+        var program = File.ReadAllText(Path.Combine(ProjectRoot(), "Program.cs"));
+        check(program.Contains(".AddHostResilience()"), "Host: the application registers the resilience of the host (Program.cs)");
+    }
+
+    private static string ProjectRoot()
+    {
+        var root = AppContext.BaseDirectory;
+        while (root is not null && !File.Exists(Path.Combine(root, "BlazorStoc.csproj"))) root = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar));
+        return root ?? throw new InvalidOperationException("The project folder was not found.");
     }
 
     private static void Constants(Action<bool, string> check)
