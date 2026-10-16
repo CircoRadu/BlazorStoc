@@ -1,5 +1,7 @@
 ﻿@page "/notificari"
+@namespace BlazorStoc.Components.Pages
 @attribute [Authorize(Policy = "perm:notificari.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IExpiryNotificationService Service

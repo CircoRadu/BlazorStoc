@@ -47,7 +47,8 @@ try { await MariaArchiveSchema.InitializeAsync(app.Configuration); }
 // pages show the waiting page; stopping here would put a supervisor in a restart loop.
 catch (Exception exception) when (exception is MySqlConnector.MySqlException or MaintenanceInProgressException)
 { app.Logger.LogError("MariaDB did not answer at startup or a backup/restore holds it ({ErrorType}); the application starts without it.", exception.GetType().Name); }
-// Each notification event without a template gets its starting template once (see DefaultNotificationTemplates).
+// Each notification event without a template gets its starting template once (see DefaultNotificationTemplates), while the notifications module works.
+if (app.Services.GetRequiredService<BlazorStoc.Modules.ModuleRegistry>().IsAvailable(BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId))
 try
 {
     using var seedScope = app.Services.CreateScope();

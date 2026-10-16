@@ -4,6 +4,18 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
+### 16.10.2026 - Notificarile ca modul (oprire fara efect asupra restului aplicatiei)
+
+**Ce s-a adaugat:** motorul de notificari (pagina Notificari, evaluarea sabloanelor, preluare / amanare / rezolvare, curatarea celor vechi si filele Sabloane si Setari din Setari -> Notificari) este un modul al aplicatiei. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge.
+
+**Ce face acum:** cu modulul oprit, /notificari arata "Modul indisponibil", intrarea Notificari din meniu (cu triunghiul de avertizare) si cardul de pe pagina principala dispar, iar Setari -> Notificari arata nota de modul oprit. Paginile care coloreaza scadentele (fisa beneficiarului, Mentenanta, harta, Analizele de risc) folosesc zilele implicite in loc de pragul din sablon, fara erori. Un modul oprit dupa erori repetate se reincearca singur dupa 30 de secunde, la prima pagina deschisa, sau imediat cu "Reincearca" din Setari -> Module. Notificarile deja create raman in lista cand modulul revine.
+
+Pasi:
+
+1. Cu modulul pornit (normal): Notificari, Setari -> Notificari (sabloane si setari) si triunghiul din meniu merg ca pana acum.
+2. Porneste aplicatia cu `Modules__notificari__Enabled=false`: /notificari arata "Modul indisponibil", meniul si pagina principala nu mai au Notificari, Setari -> Notificari arata nota, fisa unui beneficiar si Mentenanta se deschid normal, Setari -> Module arata Notificari "Oprit (oprit din configurare)".
+3. Tot cu modulul oprit: Jurnalul are "Oprire modul" pentru Notificari, iar notificarile existente nu s-au schimbat in baza de date; la repornirea cu modulul pornit apar neschimbate.
+
 ### 15.10.2026 - Setari -> Module (stare module, doar administrator)
 
 **Ce s-a adaugat:** fila "Module" in Setari (doar pentru administrator): lista modulelor cu versiune, stare (Functioneaza / Cu erori / Oprit), de cand, cauza (erori repetate cu tipul erorii, nu a pornit, oprit din configurare) si numarul de erori la rand; iconita "Reincearca" pentru un modul oprit dupa erori repetate (scrisa in Jurnal). Deasupra tuturor paginilor, administratorul vede un banner cu modulele oprite, cu link spre aceasta fila.
