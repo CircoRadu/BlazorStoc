@@ -72,6 +72,9 @@ internal static class MariaAssetPaths
     public static string DatabaseBackups(IConfiguration configuration) => Path.GetFullPath(
         configuration["Database:MariaBackupFilesPath"] ?? Path.Combine(AssetsRoot(configuration), "database-backups"));
 
+    // The lock file shared by every backup / restore (in the application and in the worker processes), next to the packages.
+    public static string OperationLock(IConfiguration configuration) => Path.Combine(DatabaseBackups(configuration), "operation.lock.json");
+
     // Distribution installed next to this asset root (docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md section 3); the
     // "mariadb-dump" executable used to export the live database (Subtask 2.2) ships in its bin/ folder.
     public static string MariaDumpExecutable(IConfiguration configuration) =>

@@ -506,7 +506,7 @@ public sealed class SystemAccess : IAccessControl
 }
 
 /// <summary>The daily backup: once a day, at the time chosen in Settings, a backup is made (and copied to the NAS). A busy lock or a failure is retried after 15 minutes.</summary>
-public sealed class BackupScheduler(IConfiguration configuration, IDataProtectionProvider protection, IOperationLockService locks, IAuditTrail audit,
+public sealed class BackupScheduler(IConfiguration configuration, IDataProtectionProvider protection, IBackupOperations operations, IAuditTrail audit,
     ILoggerFactory loggers, TimeProvider? clock = null, Func<CancellationToken, Task<ClockCheck>>? clockCheck = null) : BackgroundService
 {
     private readonly TimeProvider time = clock ?? TimeProvider.System;
@@ -549,7 +549,7 @@ public sealed class BackupScheduler(IConfiguration configuration, IDataProtectio
         var now = lastClock is { Trusted: false, Skew: { } skew, ReferenceUtc: not null } ? (serverNow - skew).ToLocalTime() : serverNow;
         var today = now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         var system = new SystemAccess();
-        var copier = new NasBackupCopier(configuration, protection, system, audit, loggers.CreateLogger<NasBackupCopier>());
+        var copier = operations.Copier(system);
         // The old packages are removed once a day, independently of the daily backup (a backup that failed must not stop the clean-up).
         if (retentionDate != today && now >= retentionRetryAfter)
         {
@@ -565,9 +565,7 @@ public sealed class BackupScheduler(IConfiguration configuration, IDataProtectio
         if (now < retryAfter) return;
         var (settings, last) = await settingsStore.ReadAsync(token).ConfigureAwait(false);
         if (!settings.ScheduleEnabled || last == today || !BackupScheduleDays.Includes(settings.ScheduleDays, now.DayOfWeek) || !NasBackupRules.TryParseTime(settings.ScheduleTime, out var at) || TimeOnly.FromDateTime(now.DateTime) < at) return;
-        IDatabaseBackupService service = new NasCopyingBackupService(
-            new MariaDatabaseBackupService(configuration, system, locks, audit, loggers.CreateLogger<MariaDatabaseBackupService>()), copier, loggers.CreateLogger<NasCopyingBackupService>());
-        var result = await service.CreateBackupAsync(BackupKind.Scheduled, null, token).ConfigureAwait(false);
+        var result = await operations.Backups(system).CreateBackupAsync(BackupKind.Scheduled, null, token).ConfigureAwait(false);
         if (result.Success) { await settingsStore.MarkScheduledAsync(today, token).ConfigureAwait(false); logger.LogInformation("Scheduled backup made: {File}", result.PackageFileName); }
         else
         {

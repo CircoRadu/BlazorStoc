@@ -54,6 +54,7 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["structure"] = () => { StructureChecks.Run(Check); return Task.CompletedTask; },
             ["modules"] = () => ModuleChecks.RunAsync(Check),
             ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
+            ["backupworker"] = () => BackupWorkerChecks.RunAsync(Check),
             ["runtracking"] = () => RunTrackingChecks.RunAsync(Check)
         };
         var selectedGroups = (Environment.GetEnvironmentVariable("CHECKS_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();

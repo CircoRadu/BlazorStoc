@@ -18,6 +18,16 @@ internal static class PrivateConfiguration
         return path;
     }
 
+    // The application file and the files of the dedicated accounts, as Program.cs and the worker processes load them. Returns the path of the application file.
+    public static string AddPrivateAccountFiles(this WebApplicationBuilder builder)
+    {
+        var applicationFile = builder.AddApplicationFile();
+        builder.AddAccountFile("Migrator", "migration-account.private.json", applicationFile);   // schema migrations; without it the schema is only checked, never changed
+        builder.AddAccountFile("Backup", "backup-account.private.json", applicationFile);        // mariadb-dump only; without it the dump runs as the application account
+        builder.AddAccountFile("Restore", "restore-account.private.json", applicationFile);      // schema swap of the restoration; without it a real restoration stops before changing anything
+        return applicationFile;
+    }
+
     // A dedicated account (blazorstoc_migrator, blazorstoc_backup, blazorstoc_restore) has a private file of the same shape as the application
     // one ({ "Database": { "User", "Password" } }) but must NOT override the application account, so its values are mapped explicitly to
     // Database:{account}User / Database:{account}Password. Looked up (unless Database:{account}PrivateConfigPath says otherwise) next to the

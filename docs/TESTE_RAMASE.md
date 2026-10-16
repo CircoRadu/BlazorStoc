@@ -826,3 +826,11 @@ Preluare factura: descrierea intrarii propusa automat (16.10.2026): Modificarea 
 
 Modulul Notificari (al optulea modul) (16.10.2026): Modificarile sunt necomise pe ramura refactor/module-notificari (din refactor/module-facturi); build-ul din artifacts\notif-build (5087) nu include modulele noi.
 Serviciile de fundal nu mai opresc aplicatia (AddHostResilience) (16.10.2026): Modificarea este necomisa pe ramura refactor/host-resilience (din refactor/structura). Nu exista un hook de defectiune pentru a o rula pe aplicatia reala; comportamentul host-ului il acopera testul.
+
+Backup, restaurare si copiere NAS intr-un proces separat (16.10.2026): FACUT si verificat pe baza de test (suita in memorie 1437 PASS, sectiunea MariaDB "Backup worker" PASS, browser pe instanta de test). Ramas:
+- Restaurare completa (comutarea schemelor `_bak` / `_old`) prin worker, cu contul `blazorstoc_restore` pe baza reala: nu a fost rulata; testul automat o opreste inainte de comutare (workerului de test nu i se da contul de restaurare). De facut dupa republicarea 5087: Setari -> Backup, alege un pachet vechi, "Restaureaza baza de date"; asteptat: etapele din fereastra, copia "dinaintea restaurarii", pagina de asteptare pentru ceilalti, jurnalul "Restaurare".
+- Copiere pe un NAS real prin worker (impersonarea contului de retea merge intr-un proces nou): nu a fost incercata, NAS-ul din test este oprit. De facut: Setari -> Backup -> Backup NAS, "Testeaza conexiunea", "Fa backup acum", pachet pe partajare.
+- Backup programat prin worker pe aplicatia supravegheata: verificat pe instanta de test (programat pentru peste 2 minute), nu pe 5087 (build vechi, fara modulul `backup`).
+- Sectiunea MariaDB "Backup worker" cere drepturile SHOW VIEW, TRIGGER, LOCK TABLES ale contului de test pe `blazorstoc_test` (acordate pe aceasta masina la 16.10.2026) si mariadb-dump (`MARIA_DUMP_PATH`).
+
+Backup, restaurare si copiere NAS intr-un proces separat (modulul backup) (16.10.2026): Restaurarea completa cu comutarea schemelor si copierea pe un NAS real prin worker nu au fost rulate; modificarile sunt necomise pe refactor/structura.
