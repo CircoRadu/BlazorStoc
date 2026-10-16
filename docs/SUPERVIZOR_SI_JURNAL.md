@@ -70,3 +70,6 @@ Supervizorul omorat (verificat 15.10.2026): aplicatia ramane orfana, iar Restart
 
 ### Marcajul de rulare si Jurnalul (15.10.2026)
 Supervizorul seteaza `App__RunMarkerPath` (`artifacts\supervisor\run-<port>.json`): aplicatia scrie acolo un marcaj la pornire, il reimprospateaza la 30 s si il sterge la oprirea normala. Un marcaj gasit la pornirea urmatoare inseamna ca rularea anterioara a fost oprita fara avertisment (omorata, cazuta, masina oprita) si aplicatia scrie in Jurnalul de activitate "Oprire neasteptata aplicatie". Supervizorul adauga langa marcaj `run-<port>.json.exit` (codul de iesire si motivul: `exited with code -1`, `not answering ...`, supervizorul anterior mort) si sterge marcajul cand oprirea a fost ceruta (`-Action stop`), ca o oprire dorita sa nu apara ca o cadere. Modulele oprite sau reveniti apar si ele in Jurnal; ecranul lor este Setari -> Module.
+
+### Serviciile de fundal (16.10.2026)
+Daca un serviciu de fundal (planificatorul de backup, releul evenimentelor de schimbare, marcajul de rulare) arunca o eroare necaptata, doar el se opreste: `AddHostResilience` (`Startup/HostResilience.cs`) seteaza `BackgroundServiceExceptionBehavior.Ignore`, deci aplicatia continua sa serveasca paginile si modulele, iar eroarea ramane in log. Implicit .NET ar fi oprit tot host-ul, iar supervizorul l-ar fi repornit in bucla.

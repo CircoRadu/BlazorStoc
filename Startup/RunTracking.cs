@@ -87,7 +87,7 @@ public sealed class RunMarker(string path, TimeProvider? clock = null)
             var data = JsonSerializer.Deserialize<Data>(File.ReadAllText(Path));
             if (data is not null) { started = data.StartedUtc; last = data.HeartbeatUtc; processId = data.ProcessId; }
         }
-        catch (Exception exception) when (exception is JsonException or IOException) { }
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException) { }
         string? exitInfo = null;
         try
         {

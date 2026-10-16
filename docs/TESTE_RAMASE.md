@@ -823,3 +823,5 @@ Preluare factura - descrierea propusa automat (16.10.2026): FACUT si verificat.
 - Date lasate in baza de test: furnizorul Dipol Connect, factura DIP44919, un produs si o intrare (pe langa cele din fluxul anterior).
 
 Preluare factura: descrierea intrarii propusa automat (16.10.2026): Modificarea este necomisa pe ramura refactor/module-facturi (dupa comitul 59666aa).
+
+Serviciile de fundal nu mai opresc aplicatia (AddHostResilience) (16.10.2026): Modificarea este necomisa pe ramura refactor/host-resilience (din refactor/structura). Nu exista un hook de defectiune pentru a o rula pe aplicatia reala; comportamentul host-ului il acopera testul.
