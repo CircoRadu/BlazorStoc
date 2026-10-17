@@ -84,10 +84,8 @@ app.UseStatusCodePages(async context =>
 app.UseStaticFiles();
 app.UseRouting();
 app.UseRateLimiter();
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseAntiforgery();
-// A page navigation made while a backup/restore is running goes to the waiting page instead of a half-loaded page.
+// A page navigation made while a backup/restore is running goes to the waiting page instead of a half-loaded page. It must come BEFORE the
+// authorization: the permission policies read the user's permissions from the database, which throws while the operation lock is held (500 instead of the page).
 app.Use(async (context, next) =>
 {
     if (MaintenanceSupport.ShouldRedirect(context.Request, MaintenanceGate.Active))
@@ -97,6 +95,9 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
 app.MapStaticAssets().AllowAnonymous();
 app.MapGet("/api/furnizori/recunoastere.csv", async (ISupplierRecognitionLog log, CancellationToken token) =>
 {

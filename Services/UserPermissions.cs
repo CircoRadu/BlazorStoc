@@ -22,9 +22,10 @@ public sealed class MariaUserPermissions(IConfiguration configuration, TimeProvi
     private readonly TimeProvider time = clock ?? TimeProvider.System;
     private readonly object gate = new();
     private Dictionary<int, IReadOnlySet<string>> byUser = [];
+    private readonly Dictionary<int, IReadOnlySet<string>> lastKnown = [];   // survives Lifetime; used only while a backup/restore keeps the database closed
     private DateTimeOffset loadedAt = DateTimeOffset.MinValue;
 
-    public void Invalidate() { lock (gate) { byUser = []; loadedAt = DateTimeOffset.MinValue; } }
+    public void Invalidate() { lock (gate) { byUser = []; lastKnown.Clear(); loadedAt = DateTimeOffset.MinValue; } }
 
     public async Task<IReadOnlySet<string>> GetKeysAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default)
     {
@@ -39,11 +40,19 @@ public sealed class MariaUserPermissions(IConfiguration configuration, TimeProvi
         IReadOnlySet<string> keys;
         try { keys = await LoadAsync(userId, cancellationToken).ConfigureAwait(false) ?? FromRole(user); }
         catch (MySqlException) { keys = FromRole(user); }   // schema not migrated yet: the rights of the role, as before user types existed
+        catch (MaintenanceInProgressException)
+        {
+            // A backup/restore holds the data: the waiting page (and the pages already open) must still be drawn, so the last known keys of the user (the rights of the
+            // role when there are none) answer, and nothing is cached: the next request after the operation reads the database again.
+            lock (gate) { if (lastKnown.TryGetValue(userId, out var known)) return known; }
+            return FromRole(user);
+        }
         if (!user.IsInRole(AccessRoles.Administrator)) keys = keys.Where(key => !Permissions.IsAdminOnly(key)).ToHashSet(StringComparer.Ordinal);   // rows saved before the modules became administrator-only
         lock (gate)
         {
             if (time.GetUtcNow() - loadedAt >= Lifetime) { byUser = []; loadedAt = time.GetUtcNow(); }
             byUser[userId] = keys;
+            lastKnown[userId] = keys;
         }
         return keys;
     }

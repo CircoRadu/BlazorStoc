@@ -141,6 +141,12 @@ public static partial class FullRun
                     Check(TryCreate() == "blocked", "A MariaDB connection is refused for a non-owner while an operation holds the lock");
                     using (MaintenanceGate.EnterOwnerScope())
                         Check(TryCreate() == "created", "The operation that holds the lock still gets its own MariaDB connections");
+                    // The permissions of a signed-in user (read from the database by every page policy and menu entry) do not throw while the lock is held: the waiting
+                    // page and the open pages are still drawn (last known keys, else the rights of the role).
+                    var permissionUser = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+                        [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, "7"), new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, AccessRoles.Administrator)], "test"));
+                    var permissionKeys = await new MariaUserPermissions(mariaGateConfiguration).GetKeysAsync(permissionUser);
+                    Check(permissionKeys.Count > 0, "Permissions are answered (rights of the role) while a backup/restore holds the data, instead of throwing");
                     await mariaHeld!.DisposeAsync();
                     Check(TryCreate() == "created", "MariaDB connections are created again once the operation ends");
                 }

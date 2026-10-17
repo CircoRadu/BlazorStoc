@@ -38,6 +38,24 @@ Pasi:
 2. Porneste aplicatia cu `Modules__notificari__Enabled=false`: /notificari arata "Modul indisponibil", meniul si pagina principala nu mai au Notificari, Setari -> Notificari arata nota, fisa unui beneficiar si Mentenanta se deschid normal, Setari -> Module arata Notificari "Oprit (oprit din configurare)".
 3. Tot cu modulul oprit: Jurnalul are "Oprire modul" pentru Notificari, iar notificarile existente nu s-au schimbat in baza de date; la repornirea cu modulul pornit apar neschimbate.
 
+### 17.10.2026 - NAS prin worker si pagina de asteptare la restaurare
+
+**Ce s-a adaugat:** restaurarea completa prin worker a fost rulata cu succes pe baza locala (comutarea schemelor, copia dinaintea restaurarii, schema `_old`); pagina de asteptare nu se desena in timpul unui backup/restaurare (500 cu corp gol, corectat: redirectul vine inaintea autorizarii, iar permisiunile folosesc ultimele valori cunoscute cat tine lacatul). Ramase de verificat: copierea pe un NAS real prin worker si pagina de asteptare in browser.
+
+**Ce face acum:** in timpul unui backup sau al unei restaurari, o a doua sesiune care deschide o pagina vede „Backup sau restaurare in curs / Te rugam sa astepti" si revine singura la pagina ceruta; backup-ul cu NAS Activ copiaza pachetul pe partajare prin worker.
+
+Pregatire: aplicatia de pe 5087 ruleaza sub supervizor (directorul real `%LOCALAPPDATA%`), unde parola NAS nu este salvata; o introduce utilizatorul, nu agentul.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Backup -> Backup NAS: cale `\\192.168.100.50\BackupStocDepozit`, cont `EspStoc`, parola, Copiere „Activ", Salveaza | „Configurarea a fost salvata"; dupa reincarcare campul parola cere din nou parola doar la schimbare | |
+| 2 | „Testeaza conexiunea" | „Conexiunea functioneaza" (fara eroare „nu este salvata nici una") | |
+| 3 | Setari -> Backup si restaurare -> „Fa backup acum" | Mesaj cu numele pachetului si „Copierea pe NAS s-a incercat automat"; dupa „Reimprospateaza NAS" randul e „Server + NAS" | |
+| 4 | Pe partajare `\\192.168.100.50\BackupStocDepozit` | Pachetul `.zip` si `.sha256` exista, fara fisiere `.partial`; Jurnal: „Copiere backup pe NAS" fara parola in detalii | |
+| 5 | In timpul pasului 3 (15-25 s), intr-o a doua fila deschide /produse | Pagina „Backup sau restaurare in curs" cu „Te rugam sa astepti"; dupa terminare revine singura la /produse | |
+| 6 | Repeta pasul 5 in timpul unei restaurari dintr-un pachet proaspat (Setari -> Backup, selectezi, „Restaureaza baza de date", scrii confirma) | Aceeasi pagina de asteptare, apoi revenire; Jurnal „Restaurare"; nicio eroare 500 | |
+| 7 | Opreste NAS-ul sau strica parola si fa un backup | Backup-ul local reuseste, mesaj in cuvinte despre NAS; apare notificarea „Copie pe NAS lipsa" | |
+
 ### 15.10.2026 - Setari -> Module (stare module, doar administrator)
 
 **Ce s-a adaugat:** fila "Module" in Setari (doar pentru administrator): lista modulelor cu versiune, stare (Functioneaza / Cu erori / Oprit), de cand, cauza (erori repetate cu tipul erorii, nu a pornit, oprit din configurare) si numarul de erori la rand; iconita "Reincearca" pentru un modul oprit dupa erori repetate (scrisa in Jurnal). Deasupra tuturor paginilor, administratorul vede un banner cu modulele oprite, cu link spre aceasta fila.

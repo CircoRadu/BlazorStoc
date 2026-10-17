@@ -37,6 +37,11 @@ public static class StructureChecks
             check(at >= 0 && handler.Contains("catch", StringComparison.Ordinal) && handler.Contains("MaintenanceInProgressException", StringComparison.Ordinal),
                 $"Startup: {step} does not end the process while a backup/restore holds the data (MaintenanceInProgressException is handled)");
         }
+        // The redirect to the waiting page must run before the authorization: the permission policies read the database, which throws while the lock is held (500, not the page).
+        var redirect = program.IndexOf("MaintenanceSupport.ShouldRedirect", StringComparison.Ordinal);
+        var authorization = program.IndexOf("app.UseAuthorization();", StringComparison.Ordinal);
+        check(redirect >= 0 && authorization >= 0 && redirect < authorization,
+            "Startup: pages are sent to the waiting page before the authorization runs (no 500 while a backup/restore holds the data)");
     }
 
     // ---- login rate limit ----
