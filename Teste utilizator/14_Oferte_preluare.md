@@ -6,6 +6,8 @@ Asistent in 5 pasi, ca la „Preluare factura", dar se recunoaste un **beneficia
 
 ### 15.10.2026 - Oferte ca modul (oprire fara efect asupra restului aplicatiei)
 
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
 **Ce s-a adaugat:** Oferte (preluarea devizelor Excel si sabloanele lor) este un modul al aplicatiei, ca Analizele de risc, Vehiculele si Mentenanta. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge. Componentele proiectelor, rezervarile si iesirile raman la stoc.
 
 **Ce face acum:** cu modulul oprit, /oferte si /oferte/sabloane arata "Modul indisponibil"; intrarea Oferte dispare din meniu si de pe pagina principala; pagina "Situatia proiectului" spune "Modulul Oferte este oprit momentan: situatia proiectului se calculeaza din oferte si nu poate fi afisata" (nu arata numere fara oferte); fisa beneficiarului si lista de componente ale proiectului se deschid fara erori. O oferta respinsa (proiect inexistent, linii lipsa), un sablon respins sau un fisier care nu e xlsx dau mesajul obisnuit si nu opresc modulul.

@@ -35,7 +35,7 @@ public sealed class MariaUserPermissions(IConfiguration configuration, TimeProvi
             return user.IsInRole(AccessRoles.Administrator) ? Everything : FromRole(user);
         lock (gate)
         {
-            if (time.GetUtcNow() - loadedAt < Lifetime && byUser.TryGetValue(userId, out var cached)) return cached;
+            if (time.GetUtcNow() - loadedAt < Lifetime && byUser.TryGetValue(userId, out var cached)) return ForRole(user, cached);
         }
         IReadOnlySet<string> keys;
         try { keys = await LoadAsync(userId, cancellationToken).ConfigureAwait(false) ?? FromRole(user); }
@@ -44,18 +44,24 @@ public sealed class MariaUserPermissions(IConfiguration configuration, TimeProvi
         {
             // A backup/restore holds the data: the waiting page (and the pages already open) must still be drawn, so the last known keys of the user (the rights of the
             // role when there are none) answer, and nothing is cached: the next request after the operation reads the database again.
-            lock (gate) { if (lastKnown.TryGetValue(userId, out var known)) return known; }
+            lock (gate) { if (lastKnown.TryGetValue(userId, out var known)) return ForRole(user, known); }
             return FromRole(user);
         }
-        if (!user.IsInRole(AccessRoles.Administrator)) keys = keys.Where(key => !Permissions.IsAdminOnly(key)).ToHashSet(StringComparer.Ordinal);   // rows saved before the modules became administrator-only
         lock (gate)
         {
             if (time.GetUtcNow() - loadedAt >= Lifetime) { byUser = []; loadedAt = time.GetUtcNow(); }
+            // What the type grants is cached as it is; the role of the session decides what of it is honoured (below), so an older session of the same user, still carrying the
+            // role it was opened with, never takes keys away from (or gives them to) a session opened after the user was moved to another type.
             byUser[userId] = keys;
             lastKnown[userId] = keys;
         }
-        return keys;
+        return ForRole(user, keys);
     }
+
+    // The keys reserved to the administrator (ANAF, backup, modules) are honoured only for the Administrator role (rows saved before those modules became
+    // administrator-only may still hold them).
+    private static IReadOnlySet<string> ForRole(ClaimsPrincipal user, IReadOnlySet<string> keys) =>
+        user.IsInRole(AccessRoles.Administrator) || !keys.Any(Permissions.IsAdminOnly) ? keys : keys.Where(key => !Permissions.IsAdminOnly(key)).ToHashSet(StringComparer.Ordinal);
 
     private static IReadOnlySet<string> FromRole(ClaimsPrincipal user) => user.IsInRole(AccessRoles.Administrator) ? Everything
         : user.IsInRole(AccessRoles.LimitedUser) ? new HashSet<string>(Permissions.DefaultUserKeys, StringComparer.Ordinal) : None;

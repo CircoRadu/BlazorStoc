@@ -1,9 +1,12 @@
 ﻿@page "/jurnal/complet"
+@namespace BlazorStoc.Components.Pages
 @attribute [Authorize(Policy = "perm:jurnal.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Journal.JournalModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using System.Globalization
 @using System.Text
 @using BlazorStoc.Services
+@inject IAuditReader Reader
 @inject IAuditTrail AuditTrail
 @inject IAccessControl Access
 @inject TimeProvider Clock
@@ -161,8 +164,8 @@
         try
         {
             var query = await BuildQueryAsync(source.Token);
-            var page = await AuditTrail.QueryAsync(query, currentPage, pageSize, null, source.Token);
-            var removed = await AuditTrail.RemovalTimesAsync(page.Events, source.Token);
+            var page = await Reader.QueryAsync(query, currentPage, pageSize, null, source.Token);
+            var removed = await Reader.RemovalTimesAsync(page.Events, source.Token);
             if (version != loadVersion) return;
             result = page; removals = removed;
             if (page.Page != currentPage) { currentPage = page.Page; SyncState(); }
@@ -186,7 +189,7 @@
         {
             await Access.EnsureAdministratorAsync(lifetime.Token);
             var query = await BuildQueryAsync(lifetime.Token);
-            var all = await AuditTrail.QueryAsync(query, 1, 0, null, lifetime.Token);
+            var all = await Reader.QueryAsync(query, 1, 0, null, lifetime.Token);
             var count = all.Events.Count;
             var limited = all.Total > count ? $" (limitat la {count:N0} din {all.Total:N0} găsite)" : "";
             var filters = AuditQueryRules.Describe(query, date => date.ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture) + " UTC");

@@ -36,6 +36,7 @@
         loadedTrigger = Trigger; suggestions = []; error = null;
         if (Trigger == 0 || Services.GetService<IProjectSituationReader>() is not { } reader) return;
         try { suggestions = await reader.GetReserveSuggestionsAsync(ProductId); }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { suggestions = []; }
         catch (Exception ex) { Logger.LogWarning("Reserve suggestions failed ({ErrorType}).", ex.GetType().Name); suggestions = []; }
     }
 

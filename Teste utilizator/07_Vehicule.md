@@ -6,6 +6,8 @@ Fluxul: Administrare -> Vehicule -> pagina vehiculului (taburi: date, expirari I
 
 ### 15.10.2026 - Vehiculele ca modul (oprire fara efect asupra stocului)
 
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
 **Ce s-a adaugat:** Vehiculele sunt un modul al aplicatiei, ca Analizele de risc: daca se opresc (din configurare sau dupa erori repetate), restul aplicatiei merge. Pagina Vehicule, fisa vehiculului si echipamentele arata "Modul indisponibil"; intrarea Vehicule dispare din meniul Administrare; administratorul vede modulul oprit in Setari -> Module si in banner.
 
 **Ce face acum:** Iesire multipla si miscarile unui produs se deschid si cu modulul oprit; la destinatia "Autovehicul" apare nota "Modulul Vehicule este oprit momentan: iesirile catre vehicule nu sunt disponibile", fara lista de vehicule. Notificarile de ITP, asigurare si rovinieta deja create raman in lista (nu se inchid din greseala).

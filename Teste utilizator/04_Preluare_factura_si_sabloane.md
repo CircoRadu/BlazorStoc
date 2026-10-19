@@ -6,6 +6,8 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 
 ### 16.10.2026 - Preluarea facturilor ca modul (oprire fara efect asupra restului aplicatiei)
 
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
 **Ce s-a adaugat:** Preluarea facturilor (pagina Preluare factura, analiza PDF/XML, sabloanele de facturi si fila Setari -> Facturi) este un modul al aplicatiei. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge: stocul, furnizorii, registrul de facturi (/facturi) si intrarile se folosesc ca pana acum.
 
 **Ce face acum:** cu modulul oprit, /produse/preluare-factura arata "Modul indisponibil"; linkul din meniul Produse, cardul de pe pagina principala si butonul "Preia din PDF" din formularul de intrare dispar; Setari -> Facturi arata nota de modul oprit; redenumirea unui furnizor merge (sabloanele lui nu se mai actualizeaza cat modulul e oprit, dar se potrivesc dupa CUI). Un fisier care nu e factura, un sablon respins sau lipsa dreptului dau mesajul obisnuit si nu opresc modulul; o cadere a recunoasterii OCR opreste doar modulul OCR, nu si pe cel de facturi. Bannerul de module oprite se actualizeaza singur si dispare imediat dupa "Reincearca".
@@ -19,6 +21,8 @@ Pasi:
 5. La un PDF al carui sablon nu are descriere pentru intrare, pasul 3 propune singur "Factura <numar> · <furnizor> (preluata din PDF)" in campul "Descrierea intrarii in stoc" (poti sa o schimbi); "Finalizeaza preluarea" nu mai este refuzata pentru descriere goala. Cu un sablon care are descriere, ramane descrierea sablonului.
 
 ### 15.10.2026 - Citirea facturilor PDF ruleaza intr-un proces separat
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
 
 **Ce s-a adaugat:** citirea facturilor PDF (text sau scanate, cu recitirea numerelor din tabel) ruleaza acum intr-un proces worker separat; aceeasi functie in modulul `ocr` este folosita si de Setari -> Facturi (analiza unui fisier model).
 

@@ -5,10 +5,13 @@ using BlazorStoc.Modules.Anaf;
 using BlazorStoc.Modules.Backup;
 using BlazorStoc.Modules.Inventory;
 using BlazorStoc.Modules.Invoices;
+using BlazorStoc.Modules.Journal;
 using BlazorStoc.Modules.Maintenance;
 using BlazorStoc.Modules.Notifications;
 using BlazorStoc.Modules.Ocr;
 using BlazorStoc.Modules.Offers;
+using BlazorStoc.Modules.ProjectObservations;
+using BlazorStoc.Modules.ProjectReports;
 using BlazorStoc.Modules.RiskAnalyses;
 using BlazorStoc.Modules.Suppliers;
 using BlazorStoc.Modules.Vehicles;
@@ -82,7 +85,7 @@ internal static class ServiceRegistration
         return services;
     }
 
-    // Products, stock movements, reservations, stock alerts, consumption, inventory and its pickup.
+    // Products, stock movements, reservations, stock alerts and the consumption note.
     public static IServiceCollection AddStockServices(this IServiceCollection services)
     {
         services.AddScoped<IProductRepository, MariaProductRepository>();
@@ -93,7 +96,6 @@ internal static class ServiceRegistration
         services.AddScoped<ISystemTypeRepository, MariaSystemTypeRepository>();
         services.AddScoped<IProductMinStockRepository, MariaProductMinStockRepository>();
         services.AddScoped<IProjectDeadlineRepository, MariaProjectDeadlineRepository>();
-        services.AddScoped<IConsumptionReader, MariaConsumptionReader>();
         services.AddSingleton<IConsumptionNotePdfWriter, ConsumptionNotePdfWriter>();
         services.AddSingleton<IProductImageStore, FileProductImageStore>();
         services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
@@ -101,13 +103,11 @@ internal static class ServiceRegistration
         return services;
     }
 
-    // Beneficiaries, components, offers and the project situation. The project and its files are in AddChangeTracking (they notify the other sessions).
+    // Beneficiaries and components (the offers and the project situation are modules). The project and its files are in AddChangeTracking (they notify the other sessions).
     public static IServiceCollection AddProjectServices(this IServiceCollection services)
     {
         services.AddScoped<IBeneficiaryRepository, MariaBeneficiaryRepository>();
         services.AddScoped<IProjectComponentRepository, MariaProjectComponentRepository>();
-        services.AddScoped<IProjectSituationReader, MariaProjectSituationReader>();
-        services.AddSingleton<IProjectSituationPdfWriter, ProjectSituationPdfWriter>();
         return services;
     }
 
@@ -120,6 +120,7 @@ internal static class ServiceRegistration
         // The order is the order of the menu entries and of the notification sources: vehicles, offers, maintenance, risk analyses (as before the modules).
         registry.Add(new VehiclesModule(), services, configuration);
         registry.Add(new OffersModule(), services, configuration);
+        registry.Add(new ProjectReportsModule(), services, configuration);
         registry.Add(new InventoryModule(), services, configuration);
         registry.Add(new AnafModule(), services, configuration);
         registry.Add(new InvoicesModule(), services, configuration);
@@ -127,6 +128,8 @@ internal static class ServiceRegistration
         registry.Add(new NotificationsModule(), services, configuration);
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
+        registry.Add(new JournalModule(), services, configuration);
+        registry.Add(new ProjectObservationsModule(), services, configuration);
         return services;
     }
 

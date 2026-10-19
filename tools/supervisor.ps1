@@ -5,9 +5,11 @@
   Actions:
     run        start the application and supervise it until stopped (this is what the scheduled task runs)
     status     show the supervisor, the application and what /health/live and /health answer now
-    stop       ask a running supervisor to stop the application and exit
+    stop       ask a running supervisor to stop the application and exit, and keep the scheduled task from starting it again for StopWindowMinutes (a maintenance
+               window, for example to publish a new build): without it the 5-minute check would bring the application back in the middle of the work
+    start      end that window and start the scheduled task now (use it instead of Start-ScheduledTask after a stop)
     install    register a per-user scheduled task that starts the supervisor at logon and every 5 minutes (a supervisor that is running makes the repetition a no-op,
-               a dead one is replaced)
+               a dead one is replaced; a run started by the task passes -Scheduled and respects the stop window)
     uninstall  remove that task
 
   What it does while running:
@@ -20,22 +22,26 @@
     - -WithMariaDb: the local development MariaDB (tools\dev-mariadb.ps1) is started again when its port stops answering.
 
   Files: logs\supervisor-yyyyMMdd.log (what the supervisor did), logs\supervised-<port>-<time>.out.log / .err.log (output of each run of the application, the
-  last ten kept), artifacts\supervisor\state-<port>.json (state), artifacts\supervisor\stop-<port>.flag (stop request).
+  last ten kept), artifacts\supervisor\state-<port>.json (state), artifacts\supervisor\stop-<port>.flag (stop request),
+  artifacts\supervisor\stopped-<port>.flag (the stop window: the time of the stop).
   Exit codes of "run": 0 stopped on request, 1 already running, 2 gave up.
 .EXAMPLE
   .\tools\supervisor.ps1 -Action run -Port 5087 -WithMariaDb
   .\tools\supervisor.ps1 -Action status -Port 5087
   .\tools\supervisor.ps1 -Action stop -Port 5087
+  .\tools\supervisor.ps1 -Action start -Port 5087
   .\tools\supervisor.ps1 -Action install -Port 5087 -WithMariaDb
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('run', 'status', 'stop', 'install', 'uninstall')][string]$Action = 'run',
+    [ValidateSet('run', 'status', 'stop', 'start', 'install', 'uninstall')][string]$Action = 'run',
     [int]$Port = 5087,
     [string]$AppDirectory,                 # the published application (default artifacts\notif-build, as tools\start-preview.ps1 publishes it)
     [string]$ConfigPath,                   # Database__PrivateConfigPath (default local-secrets\application-connection.private.json)
     [string]$MariaRoot = 'C:\Dev\BlazorStoc-MariaDB',
     [switch]$WithMariaDb,
+    [switch]$Scheduled,                    # set by the scheduled task: the run respects the stop window (a manual run ignores it and ends it)
+    [double]$StopWindowMinutes = 10,
     [int]$MariaPort = 3307,
     [string]$MariaScript,                  # default tools\dev-mariadb.ps1 (replaced by the supervisor test)
     [string]$AppCommand,                   # replaces "dotnet BlazorStoc.dll" (used by tools\test-supervisor.ps1)
@@ -59,6 +65,7 @@ $statePath = Join-Path $stateDir "state-$Port.json"
 # the application records in the journal of activity. The supervisor adds why ("<marker>.exit") and removes the marker when the stop was asked for.
 $runMarker = Join-Path $stateDir "run-$Port.json"
 $stopFlag = Join-Path $stateDir "stop-$Port.flag"
+$stoppedFlag = Join-Path $stateDir "stopped-$Port.flag"
 $taskName = "BlazorStocSupervisor-$Port"
 New-Item -ItemType Directory -Force $stateDir, $logDir | Out-Null
 
@@ -124,17 +131,25 @@ switch ($Action) {
         } | Format-List
         exit 0
     }
+    'start' {
+        Remove-Item $stoppedFlag -Force -ErrorAction SilentlyContinue
+        if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) { Start-ScheduledTask -TaskName $taskName; Write-Output "Scheduled task $taskName started." }
+        else { Write-Output "No scheduled task ${taskName}; start the supervisor with -Action run." }
+        exit 0
+    }
     'stop' {
+        # The stop window first: the scheduled task's next check must not start the application again while the stop is being used (a build published, a file replaced).
+        [DateTime]::UtcNow.ToString('o') | Set-Content -Path $stoppedFlag -Encoding ASCII
         $state = Read-State
-        if (-not $state -or -not (Test-ProcessAlive $state.supervisorPid)) { Write-Output "No supervisor is running for port $Port."; exit 0 }
+        if (-not $state -or -not (Test-ProcessAlive $state.supervisorPid)) { Write-Output "No supervisor is running for port $Port (the scheduled task will not start one for $StopWindowMinutes minutes; -Action start ends that)."; exit 0 }
         Set-Content -Path $stopFlag -Value 'stop' -Encoding ASCII
         for ($i = 0; $i -lt 60 -and (Test-ProcessAlive $state.supervisorPid); $i++) { Start-Sleep -Milliseconds 500 }
         if (Test-ProcessAlive $state.supervisorPid) { Stop-Tree $state.supervisorPid; Write-Output 'The supervisor did not stop in time and was killed.' }
-        else { Write-Output "Supervisor for port $Port stopped." }
+        else { Write-Output "Supervisor for port $Port stopped (the scheduled task will not start one for $StopWindowMinutes minutes; -Action start ends that)." }
         exit 0
     }
     'install' {
-        $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -Action run -Port $Port"
+        $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -Action run -Scheduled -Port $Port"
         if ($WithMariaDb) { $arguments += " -WithMariaDb -MariaRoot `"$MariaRoot`"" }
         if ($AppDirectory) { $arguments += " -AppDirectory `"$AppDirectory`"" }
         if ($ConfigPath) { $arguments += " -ConfigPath `"$ConfigPath`"" }
@@ -163,6 +178,17 @@ switch ($Action) {
 }
 
 # ---------------- run ----------------
+
+# The stop window (see "stop"): a run started by the scheduled task inside it ends at once; a manual run ignores the window and ends it.
+if (Test-Path $stoppedFlag) {
+    $stoppedAt = [DateTime]::MinValue
+    try { $stoppedAt = [DateTime]::Parse((Get-Content $stoppedFlag -Raw).Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind) } catch { }
+    if ($Scheduled -and $stoppedAt.ToUniversalTime().AddMinutes($StopWindowMinutes) -gt [DateTime]::UtcNow) {
+        Write-Log "Stopped on request at $($stoppedAt.ToLocalTime().ToString('HH:mm:ss')): the scheduled task does not start the application until $($stoppedAt.ToLocalTime().AddMinutes($StopWindowMinutes).ToString('HH:mm:ss')) (-Action start ends the window)."
+        exit 0
+    }
+    Remove-Item $stoppedFlag -Force -ErrorAction SilentlyContinue
+}
 
 $previous = Read-State
 if ($previous -and $previous.status -in @('running', 'stopping') -and (Test-ProcessAlive $previous.supervisorPid) -and $previous.supervisorPid -ne $PID) {

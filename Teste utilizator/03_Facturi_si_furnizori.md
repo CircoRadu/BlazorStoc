@@ -6,6 +6,8 @@ Fluxul: Administrare -> Furnizori (registru dupa CUI) -> facturile se inregistre
 
 ### 16.10.2026 - Furnizorii si facturile de furnizor ca modul
 
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
 **Ce s-a adaugat:** registrul de furnizori, fisa furnizorului si registrul facturilor (/facturi) sunt modulul "Furnizori si facturi de furnizor" (Setari -> Module).
 
 **Ce face acum:** in mod normal nimic nu se schimba. Daca modulul iese din functiune, intrarile Furnizori si Facturi dispar din meniu si de pe pagina principala, paginile lor arata "Modul indisponibil", intrarile de stoc se pot face doar ca "intrare libera", iar preluarea unei facturi spune ca furnizorii sunt indisponibili; stocul, produsele si restul aplicatiei merg, iar istoricul intrarilor arata in continuare factura si furnizorul.
@@ -16,6 +18,8 @@ Fluxul: Administrare -> Furnizori (registru dupa CUI) -> facturile se inregistre
 | 2 | Aplicatia pornita cu `Modules__furnizori__Enabled=false` | Meniul si pagina principala fara Furnizori / Facturi; /furnizori si /facturi: "Modul indisponibil"; Produse, miscari, Jurnal merg; intrare noua: doar "Intrare libera"; Preluare factura: mesaj si incarcare dezactivata; Jurnalul are "Oprire modul" | |
 
 ### 15.10.2026 - ANAF ca modul (cautarea firmelor dupa CUI)
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
 
 **Ce s-a adaugat:** interogarea ANAF (date firme dupa CUI) si configuratorul ei (Setari -> ANAF) sunt un modul. Daca ANAF nu raspunde de mai multe ori la rand, modulul se opreste scurt (30 s) si cautarile urmatoare raspund imediat ca "ANAF indisponibil", fara sa astepte de fiecare data timeout-ul; apoi se reincearca singur.
 

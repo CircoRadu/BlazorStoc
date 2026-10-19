@@ -6,6 +6,8 @@ Fluxul: beneficiar -> punct de lucru -> analiza de risc (numar de inregistrare, 
 
 ### 15.10.2026 - Modulul Analize de risc (izolare de erori)
 
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
 **Ce s-a adaugat:** Analizele de risc sunt primul modul din noua structura de module (`Modules/RiskAnalyses`): se inregistreaza singure, au intrarea de meniu proprie, un circuit breaker (3 erori la rand scot modulul 30 de secunde) si un comutator in configurare (`Modules:analize-risc:Enabled=false`). Starea modulelor se vede la `/health/modules` (cere autentificare).
 
 **Ce face acum:** cu modulul pornit, pagina `/analize-risc`, sectiunea din fisa beneficiarului, coloana din tabelul punctelor de lucru, tile-ul si numarul de pe pagina principala, notificarea de expirare si jurnalul functioneaza ca inainte. Cu modulul oprit (configurare sau erori repetate): meniul si tile-ul din pagina principala dispar, `/analize-risc` arata "Modul indisponibil", fisa beneficiarului si pagina principala se deschid normal (fara sectiunea de analize, coloana arata "Modul indisponibil momentan"), iar restul aplicatiei merge.

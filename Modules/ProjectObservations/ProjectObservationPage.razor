@@ -1,9 +1,12 @@
 ﻿@page "/proiecte/{ProjectId:int}/observatii/{Id:int}"
+@namespace BlazorStoc.Components.Pages
 @attribute [Authorize(Policy = "perm:beneficiari.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.ProjectObservations.ProjectObservationsModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProjectRepository Repository
-@inject IProjectFileStore FileStore
+@inject IProjectObservationRepository Observations
+@inject IObservationFiles FileStore
 @inject IAccessControl AccessControl
 @inject NavigationManager Navigation
 @inject IChangeFeed ChangeFeed
@@ -127,7 +130,7 @@ else if (observation is not null && project is not null)
         var formOpen = editing || deleting || removingFile is not null;
         try
         {
-            var current = await Repository.GetObservationAsync(Id, lifetime.Token);
+            var current = await Observations.GetObservationAsync(Id, lifetime.Token);
             if (current is null || current.ProjectId != ProjectId)
             {
                 if (formOpen) remoteNotice = "Observația a fost ștearsă de alt utilizator. Formularele deschise nu au fost modificate; acțiunile vor fi respinse.";
@@ -156,7 +159,7 @@ else if (observation is not null && project is not null)
         remoteNotice = null;
         try
         {
-            observation = await Repository.GetObservationAsync(Id, lifetime.Token);
+            observation = await Observations.GetObservationAsync(Id, lifetime.Token);
             if (observation is null || observation.ProjectId != ProjectId) { error = "Observația solicitată nu mai există."; return; }
             project = await Repository.GetAsync(ProjectId, lifetime.Token);
             if (project is null) { error = "Proiectul acestei observații nu mai există."; return; }
@@ -241,7 +244,7 @@ else if (observation is not null && project is not null)
         deleteError = null;
         try
         {
-            await Repository.DeleteObservationAsync(observation, reason, lifetime.Token);
+            await Observations.DeleteObservationAsync(observation, reason, lifetime.Token);
             Navigation.NavigateTo($"/proiecte/{ProjectId}");
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }

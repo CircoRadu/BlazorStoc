@@ -6,6 +6,8 @@ Fluxul: Mentenanta -> puncte de lucru (adresa, poze, coordonate) -> contracte de
 
 ### 15.10.2026 - Mentenanta ca modul (oprire fara efect asupra restului aplicatiei)
 
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
 **Ce s-a adaugat:** Mentenanta (contracte, interventii, harta punctelor de lucru, scadentele si expirarile din Notificari) este un modul al aplicatiei, ca Analizele de risc si Vehiculele. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge. Punctele de lucru si pozele lor raman la fisa beneficiarului.
 
 **Ce face acum:** cu modulul oprit, /mentenanta, harta si fereastra hartii arata "Modul indisponibil"; intrarea Mentenanta dispare din meniu si de pe pagina principala; fisa beneficiarului se deschide cu punctele de lucru si analizele de risc, fara sectiunile Contracte de mentenanta si Interventii (apare o nota); Setari -> Harta arata nota de modul oprit. Notificarile de mentenanta deja create raman in lista.

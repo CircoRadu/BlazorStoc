@@ -421,9 +421,9 @@ public sealed record AuditPage(IReadOnlyList<AuditEvent> Events, int Total, int 
 
 public sealed record AuditSummary(int Total, int Today, int Actors, int Products);
 
-public interface IAuditTrail
+// What the journal pages read (the activity journal module). IAuditTrail is the whole journal: the writing every part of the application does, plus this reading.
+public interface IAuditReader
 {
-    Task RecordAsync(AuditWrite entry, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AuditEvent>> GetEventsAsync(CancellationToken cancellationToken = default);
 
     // Filtering, search and paging on the server. window: only the latest N events of the journal are considered (null = all of it).
@@ -434,6 +434,11 @@ public interface IAuditTrail
     // The latest recorded deletion of each object that the given events are about (the events after it keep their links, see
     // AuditNavigation.TargetUrl); the deletions may be older than the page or outside the window.
     Task<IReadOnlyDictionary<string, DateTime>> RemovalTimesAsync(IEnumerable<AuditEvent> events, CancellationToken cancellationToken = default);
+}
+
+public interface IAuditTrail : IAuditReader
+{
+    Task RecordAsync(AuditWrite entry, CancellationToken cancellationToken = default);
 }
 
 public static class AuditQueryRules

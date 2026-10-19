@@ -1,8 +1,10 @@
 ﻿@page "/observatii/{Id:int}"
+@namespace BlazorStoc.Components.Pages
 @attribute [Authorize(Policy = "perm:beneficiari.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.ProjectObservations.ProjectObservationsModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
-@inject IProjectRepository Repository
+@inject IProjectObservationRepository Repository
 @inject NavigationManager Navigation
 @inject ILogger<ProjectObservationRedirect> Logger
 <PageBoundary>
