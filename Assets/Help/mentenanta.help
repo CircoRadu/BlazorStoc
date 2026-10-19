@@ -1,0 +1,30 @@
+# Mentenanță
+Ruta: /mentenanta
+Cautare: mentenanta scadente puncte de lucru contracte on off ciclicitate depasite in curand la zi harta service
+
+Scadențele punctelor de lucru acoperite de contracte active și registrul intervențiilor. Intervențiile și contractele se gestionează din fișa beneficiarului. Fereastra are două secțiuni: **Scadențe** și **Registru intervenții**.
+
+## Elemente
+### Antet
+- ⌖ Harta | link | Deschide harta punctelor de lucru ([[mentenanta-harta]]).
+- ↻ Actualizează | buton | Reîncarcă datele.
+### Scadențe pe puncte de lucru
+- Arată și contractele Off | comutator | Apare când există contracte oprite: le adaugă în listă, marcate „Contract Off”.
+- Caută | câmp | Caută după beneficiar, punct de lucru sau contract.
+- Stare | listă | Toate stările, Depășite, În curând sau La zi.
+- Scadență | coloană | Data următoarei intervenții a punctului.
+- Stare | coloană | „Depășită”, „În curând” sau „La zi”, după pragul din șablonul de notificări; „Contract Off” pentru contractele oprite.
+- Beneficiar | coloană | Apasă numele ca să deschizi fișa beneficiarului ([[beneficiari-detaliu]]).
+- Punct de lucru | coloană | Numele și adresa punctului.
+- Contract | coloană | Contractul care acoperă punctul; „Expirat” dacă data lui de expirare a trecut.
+- Ciclicitate | coloană | La câte luni se repetă intervenția (a punctului sau a contractului).
+
+## Flux: Cum văd ce intervenții urmează
+1. Deschide secțiunea „Scadențe”; lista este ordonată după scadență.
+2. Filtrează după stare („Depășite”) sau caută un beneficiar.
+3. Apasă numele beneficiarului ca să deschizi fișa și să înregistrezi intervenția ([[mentenanta-interventii]]).
+Nota: scadențele apar doar pentru contractele active (On).
+
+## Flux: Cum văd contractele oprite
+1. Pornește „Arată și contractele Off”.
+2. Rândurile contractelor oprite apar marcate „Contract Off”; scadențele lor nu mai generează avertismente.

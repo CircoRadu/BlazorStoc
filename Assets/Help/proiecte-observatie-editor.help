@@ -1,0 +1,18 @@
+# Formularul de observație
+Cautare: observatie formular denumire continut proiect
+
+Formularul pentru o observație nouă sau pentru editarea uneia existente. Se deschide în pagina proiectului sau în pagina observației.
+
+## Elemente
+### Câmpuri
+- Denumire observație * | câmp | Titlul observației, cel mult 200 de caractere.
+- Conținut | câmp | Textul observației, cel mult 8000 de caractere.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+### Butoane
+- Salvează observația | buton | Salvează; la editare cere confirmarea modificărilor.
+- Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+
+## Flux: Cum adaug o observație
+1. Scrie denumirea și, dacă vrei, conținutul.
+2. Apasă „Salvează observația”.
+3. Deschide observația din lista proiectului ca să atașezi fișiere.

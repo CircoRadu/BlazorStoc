@@ -396,7 +396,7 @@ else
     {
         <div class="invoice-modal-backdrop" @onmousedown="() => downOnBackdrop = true" @onclick="BackdropClickField">
             <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare câmp" @onclick:stopPropagation="true" @onmousedown:stopPropagation="true" @onmousedown="() => downOnBackdrop = false">
-                <h4>Editare câmp @(InvoiceTemplateDraft.EffectiveLabel(pf) is { Length: > 0 } effectiveLabel ? "· etichetă: " + effectiveLabel : "")</h4>
+                <div class="dialog-head"><h4>Editare câmp @(InvoiceTemplateDraft.EffectiveLabel(pf) is { Length: > 0 } effectiveLabel ? "· etichetă: " + effectiveLabel : "")</h4><HelpButton Topic="setari-facturi-camp" About="Editarea unui câmp al șablonului" /></div>
                 <div class="editor-grid">
                     <label>Etichetă *<input value="@pf.Name" @onchange="args => RenameField(pf, args.Value?.ToString() ?? string.Empty)" maxlength="120" autocomplete="off" /></label>
                     @if (InvoiceTemplateDraft.EffectiveLabel(pf).Length == 0)
@@ -438,7 +438,7 @@ else
     {
         <div class="invoice-modal-backdrop" @onmousedown="() => downOnBackdrop = true" @onclick="BackdropClickColumn">
             <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare coloană" @onclick:stopPropagation="true" @onmousedown:stopPropagation="true" @onmousedown="() => downOnBackdrop = false">
-                <h4>Editare coloană @(pc.Label.Length > 0 ? "· " + pc.Label : "")</h4>
+                <div class="dialog-head"><h4>Editare coloană @(pc.Label.Length > 0 ? "· " + pc.Label : "")</h4><HelpButton Topic="setari-facturi-coloana" About="Editarea unei coloane a șablonului" /></div>
                 <div class="editor-grid">
                     <label>Denumirea din antet<input value="@pc.Label" @onchange="args => RenameColumn(pc, args.Value?.ToString() ?? string.Empty)" maxlength="120" autocomplete="off" /></label>
                     <div class="full-width zone-note">
@@ -469,7 +469,7 @@ else
 {
     <div class="delete-overlay" @onkeydown="SaveAsKeyDown">
         <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="save-as-title">
-            <h2 id="save-as-title">Salvează ca șablon nou</h2>
+            <div class="dialog-head"><h2 id="save-as-title">Salvează ca șablon nou</h2><HelpButton Topic="setari-facturi-salveaza-nou" About="Salvarea ca șablon nou" /></div>
             <p>Șablonul <strong>@existing?.Info.Name</strong> rămâne neschimbat. Alege denumirea noului șablon.</p>
             <label for="save-as-name">Denumirea noului șablon *
                 <input id="save-as-name" @bind="saveAsName" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxNameLength" autocomplete="off" autofocus /></label>

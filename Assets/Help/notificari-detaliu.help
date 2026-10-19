@@ -1,0 +1,28 @@
+# Detaliile unei notificări
+Cautare: notificare detalii preiau notificarea amana zile rezolvata deschide obiectul termen depasit
+
+Fereastra arată o notificare activă și îți permite să o preiei, s-o amâni sau s-o marchezi rezolvată.
+
+## Elemente
+### Fereastra
+- Titlul și textul | text | Subiectul și mesajul notificării, cu categoria, evenimentul și obiectul.
+- Termenul | text | Data de expirare, zilele rămase (sau cu câte zile a fost depășit) și starea notificării.
+- Amintește-mi peste (zile) | câmp | Doar la avertizări: câte zile amâni; limita este numărul de zile rămase minus 2. Dacă expirarea e prea aproape, amânarea nu mai este posibilă.
+- Amână | buton | Notificarea reapare după perioada aleasă.
+- Preiau notificarea | buton | Marchezi că ai preluat problema: notificarea nu mai avertizează.
+- Marchează ca rezolvată | buton | Cere confirmare („Da, rezolvată” / „Renunț”) și mută notificarea în „Rezolvate”.
+- Deschide obiectul | link | Duce la obiectul la care se referă notificarea.
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum preiau o notificare
+1. Apasă „Preiau notificarea”.
+2. Notificarea nu mai avertizează; rămâne în listă până se rezolvă.
+
+## Flux: Cum amân o notificare
+1. Scrie în câte zile vrei să fii reamintit.
+2. Apasă „Amână”.
+Nota: notificarea avertizează din nou la sfârșitul perioadei.
+
+## Flux: Cum marchez o notificare ca rezolvată
+1. Apasă „Marchează ca rezolvată”.
+2. Confirmă cu „Da, rezolvată”; notificarea trece în „Rezolvate”.

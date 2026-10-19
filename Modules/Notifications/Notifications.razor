@@ -75,7 +75,7 @@ else if (loaded)
 {
     <div class="delete-overlay" @onkeydown="DialogKeyDown">
         <section class="delete-dialog notification-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="notification-title">
-            <h2 id="notification-title">@selected.Subject</h2>
+            <div class="dialog-head"><h2 id="notification-title">@selected.Subject</h2><HelpButton Topic="notificari-detaliu" About="Detaliile notificării" /></div>
             <p class="delete-object"><strong>@selected.Category · @selected.EventName · @selected.ObjectLabel</strong></p>
             <p class="notification-body">@selected.Body</p>
             @if (selected.IsOverdue) { <p class="notification-overdue-note">Termenul a fost depășit cu @(-selected.DaysLeft) @(-selected.DaysLeft == 1 ? "zi" : "zile").</p> }
@@ -119,7 +119,7 @@ else if (loaded)
 {
     <div class="delete-overlay" @onkeydown="DialogKeyDown">
         <section class="delete-dialog notification-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="resolved-title">
-            <h2 id="resolved-title">@selectedResolved.Subject</h2>
+            <div class="dialog-head"><h2 id="resolved-title">@selectedResolved.Subject</h2><HelpButton Topic="notificari-rezolvata" About="Notificarea rezolvată" /></div>
             <p class="delete-object"><strong>@selectedResolved.SourceText · @selectedResolved.ObjectLabel</strong></p>
             <p class="notification-body">@selectedResolved.Body</p>
             <p class="muted small">Scadență @StockMovementRules.DisplayDate(selectedResolved.Notification.ExpiryDate) · rezolvată la @ResolvedAt(selectedResolved.Notification) de @(selectedResolved.Notification.ResolvedAutomatically ? "sistem (automat)" : selectedResolved.Notification.ResolvedBy)</p>

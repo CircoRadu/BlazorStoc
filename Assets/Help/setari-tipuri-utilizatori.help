@@ -1,0 +1,27 @@
+# Setări · Tipuri de utilizatori
+Ruta: /setari
+Tab: Tipuri de utilizatori
+Cautare: tipuri de utilizatori permisiuni drepturi administrator utilizator adauga editeaza sterge module actiuni acces
+
+Definești tipurile de utilizatori și drepturile lor: la ce module au acces și ce acțiuni pot face în fiecare. Fiecare utilizator are exact un tip. Tipul Administrator are întotdeauna toate drepturile și nu se modifică.
+
+## Elemente
+### Antet
+- + Adaugă tip | buton | Deschide formularul unui tip nou ([[setari-tipuri-utilizatori-editor]]); doar cu dreptul necesar.
+### Tabelul tipurilor
+- Tip | coloană | Numele tipului; „sistem” marchează tipurile predefinite (nu se șterg).
+- Descriere | coloană | Ce este tipul.
+- Utilizatori | coloană | Câți utilizatori au tipul.
+- Permisiuni | coloană | Câte permisiuni are („toate” la Administrator).
+- Editează / Vezi tipul | iconita:edit | Deschide formularul; la Administrator doar îl poți vedea.
+- Șterge tipul | iconita:delete | Doar dacă nu are utilizatori; titlul spune de ce nu se poate.
+
+## Flux: Cum creez un tip de utilizator
+1. Apasă „+ Adaugă tip”.
+2. Scrie numele și descrierea; opțional copiază drepturile unui tip existent.
+3. Bifează accesul la module și acțiunile permise și apasă „Salvează tipul”.
+
+## Flux: Cum schimb drepturile unui tip
+1. Apasă iconița de editare de pe rândul tipului.
+2. Pornește sau oprește modulele și acțiunile.
+3. Salvează; drepturile se aplică în cel mult 30 de secunde.

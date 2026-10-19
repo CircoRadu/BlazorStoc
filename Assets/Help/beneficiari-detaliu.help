@@ -24,8 +24,8 @@ Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, c
 ### Consum net
 - Consum net | tabel | Pe produs: ieșirile către acest beneficiar, retururile legate de ele și consumul net. Apare doar dacă ai dreptul să vezi mișcările de stoc și există ceva de arătat. Apasă produsul ca să-i deschizi pagina.
 ### Alte secțiuni de pe fișă
-- Contracte de mentenanță și Intervenții | secțiuni | Din modulul Mentenanță: contractele beneficiarului și registrul intervențiilor pe punctele de lucru. Apar doar cât modulul funcționează.
-- Analize de risc | secțiune | Din modulul Analize de risc: analizele punctelor de lucru, reînnoirile și expirarea lor.
+- Contracte de mentenanță și Intervenții | secțiuni | Din modulul Mentenanță: contractele beneficiarului ([[mentenanta-contracte]]) și registrul intervențiilor pe punctele de lucru ([[mentenanta-interventii]]). Apar doar cât modulul funcționează.
+- Analize de risc | secțiune | Din modulul Analize de risc: analizele punctelor de lucru, reînnoirile și expirarea lor ([[analize-risc-sectiune]]).
 ### Proiecte
 - Caută după denumire | câmp | Filtrează proiectele beneficiarului.
 - Proiect | coloană | Apasă numele ca să deschizi pagina proiectului.

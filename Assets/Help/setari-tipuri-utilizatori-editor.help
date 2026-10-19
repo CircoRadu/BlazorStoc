@@ -1,0 +1,24 @@
+# Formularul tipului de utilizator
+Cautare: tip utilizator formular nume descriere copiaza drepturile acorda tot revoca tot module acces actiuni meniu
+
+Formularul pentru un tip nou sau pentru editarea unuia existent. Tipul Administrator are întotdeauna toate drepturile și nu poate fi modificat; la un tip de sistem poți schimba drepturile, dar nu numele.
+
+## Elemente
+### Date
+- Nume * | câmp | Numele tipului.
+- Descriere | câmp | Ce este tipul.
+- Copiază drepturile din | listă | Înlocuiește drepturile de mai jos cu cele ale tipului ales.
+### Drepturile
+- Acordă tot, Revocă tot | buton | Pornește sau oprește toate drepturile deodată.
+- Modul | coloană | Fiecare modul al aplicației.
+- Acces | comutator | Dacă tipul vede modulul în meniu și poate deschide paginile lui.
+- Acțiuni | comutatoare | Acțiunile permise în modul (de exemplu vizualizare, adăugare, editare, ștergere).
+- Meniul văzut de acest tip | text | Previzualizarea modulelor pe care le va vedea tipul.
+### Butoane
+- Salvează tipul | buton | Salvează (nu apare la Administrator).
+- Anulează, Închide | buton | Închid formularul.
+
+## Flux: Cum fac un tip „doar citire”
+1. Pornește accesul la modulele dorite.
+2. Lasă pornită doar acțiunea de vizualizare în fiecare.
+3. Verifică „Meniul văzut de acest tip” și salvează.

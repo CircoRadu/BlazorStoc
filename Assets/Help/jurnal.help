@@ -1,0 +1,35 @@
+# Jurnal activitate
+Ruta: /jurnal
+Cautare: jurnal activitate audit trasabilitate operatii operator tinta detalii motiv filtre evenimente
+
+Acțiunile operate în sistem, în ordine cronologică (cele mai recente evenimente; pentru cele mai vechi folosește „Jurnal complet”). Fiecare intrare spune cine a făcut ce, când, asupra cui, cu ce valori și de ce. Doar administratorul vede jurnalul.
+
+## Elemente
+### Antet
+- Jurnal complet (toate evenimentele) → | link | Deschide jurnalul complet, cu filtrele alese ([[jurnal-complet]]).
+### Rezumat
+- Evenimente | cifră | Câte evenimente are tot jurnalul.
+- Astăzi | cifră | Operațiile de astăzi (UTC).
+- Operatori | cifră | Câți utilizatori distincți au operat.
+- Produse | cifră | Editările de produse.
+### Filtre
+- Căutare | câmp | Utilizator, țintă, detalii sau motiv.
+- Tip înregistrare | listă | Tipul obiectului (produs, beneficiar, modul etc.).
+- Operație | listă | Operația exactă (de exemplu „Modificare expirare ITP”, „Oprire manuală modul”).
+- Filtre active | etichete | Fiecare filtru activ apare ca etichetă cu „×”; „Șterge filtrele” le scoate pe toate.
+### Tabelul
+- Data și ora | coloană | Ora locală (stocarea este UTC); apasă data ca să filtrezi după ea.
+- Operator | coloană | Utilizatorul și rolul lui; apasă numele ca să filtrezi după el.
+- Operație | coloană | Operația și tipul obiectului; apasă operația ca să filtrezi după ea.
+- Țintă | coloană | Obiectul; apasă-l ca să deschizi pagina lui.
+- Detalii | coloană | Descrierea modificării (valoarea veche și cea nouă) și motivul.
+- Evenimente pe pagină | listă | Câte evenimente se arată pe pagină; săgețile trec între pagini.
+
+## Flux: Cum aflu cine a modificat ceva
+1. Caută obiectul sau scrie numele utilizatorului în câmpul de căutare.
+2. Restrânge cu „Operație” sau „Tip înregistrare”.
+3. Citește „Detalii” și „Motiv”; apasă „Țintă” ca să deschizi obiectul.
+
+## Flux: Cum filtrez rapid din tabel
+1. Apasă o dată, un operator sau o operație din rândul care te interesează.
+2. Se adaugă un filtru activ; scoate-l cu „×” sau „Șterge filtrele”.

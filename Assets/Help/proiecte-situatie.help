@@ -1,0 +1,39 @@
+# Situația proiectului
+Ruta: /proiecte/{id:int}/situatie
+Cautare: situatia proiectului necesar predat stoc deficit rezervat achizitie componente export pdf csv termen
+
+Necesarul din ultima revizie a fiecărei oferte, ce s-a predat (net de retururi), stocul și deficitul, pe componente. Prețurile nu sunt luate în calcul.
+
+## Elemente
+### Antet
+- ← Numele proiectului | link | Revine la pagina proiectului ([[proiecte-detaliu]]).
+- Actualizează | buton | Recalculează situația.
+- Export PDF, Export CSV | link | Descarcă situația ca PDF (lista de achiziție) sau CSV.
+- Termen proiect | câmp | Data-țintă a proiectului; „Setează termenul” o salvează, „×” o elimină.
+- Proiectul nu are încă o ofertă | mesaj | Apare când nu există ofertă; preia una din „Preluare ofertă” ([[oferte-preluare]]).
+### Pe fiecare componentă
+- Titlul componentei | text | Numele și „predat X din Y” (bucăți).
+- Rezervă cât se poate pentru componentă | buton | Rezervă din stocul liber cât acoperă necesarul componentei (doar cu dreptul necesar).
+- Secțiune, Denumire | coloană | Secțiunea ofertei și linia; „de achiziționat” marchează linia fără produs din catalog.
+- Necesar | coloană | Cantitatea din ofertă, cu unitatea de măsură.
+- Predat | coloană | Cât s-a predat deja.
+- Din stoc | coloană | Cât acoperă stocul.
+- Din care rezervat | coloană | Cât din stoc este rezervat pentru proiect.
+- Intrat pt. ofertă | coloană | Cât a intrat în stoc pentru această ofertă.
+- Deficit | coloană | Cât lipsește.
+- Stare | coloană | Starea liniei.
+- Rezervă cât se poate | iconita:reserve | Rezervă pentru linia respectivă.
+### Rezervările proiectului
+- Produs de rezervat, Componenta, Cantitate, Rezervă | câmp | Rezervi manual un produs pentru proiect (rezervarea scade stocul liber, nu schimbă stocul).
+- Tabelul rezervărilor | tabel | Produsul, componenta, cantitatea rezervată.
+- Scade rezervarea | iconita:reduce | Scazi cantitatea rezervată, cu un motiv scurt; „Renunță” închide.
+
+## Flux: Cum văd ce lipsește pentru un proiect
+1. Deschide „Situația proiectului” din pagina proiectului.
+2. Pe fiecare componentă citește coloanele „Necesar”, „Predat”, „Din stoc” și „Deficit”.
+3. Pentru lista de achiziție apasă „Export PDF”.
+
+## Flux: Cum rezerv produsele unui proiect
+1. Pe componentă apasă „Rezervă cât se poate pentru componentă”, sau pe o linie iconița „Rezervă cât se poate”.
+2. Pentru un produs anume folosește „Rezervări”: alege produsul, componenta și cantitatea și apasă „Rezervă”.
+Nota: rezervarea nu schimbă stocul; ieșirea pentru acest proiect o consumă prima.

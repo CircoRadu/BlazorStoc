@@ -1,0 +1,28 @@
+# Setări · Backup NAS
+Ruta: /setari
+Tab: Backup NAS
+Cautare: nas backup copiere partajare cale cont parola testeaza conexiunea pachete lipsa
+
+Fiecare backup făcut local se copiază apoi pe NAS. Pachetele de pe NAS nu se șterg niciodată din aplicație. Parola se păstrează criptat și nu se mai afișează.
+
+## Elemente
+### Setările
+- Copiere pe NAS | comutator | Activează copierea automată a fiecărui backup.
+- Cale partajare | câmp | De forma \\server\partajare sau \\server\partajare\folder.
+- Cont | câmp | Contul de acces la partajare.
+- Parolă | câmp | Parola contului; dacă e deja salvată, lasă gol ca s-o păstrezi.
+- Salvează | buton | Salvează setările.
+- Testează conexiunea | buton | Verifică accesul la NAS.
+- Copiază pe NAS pachetele lipsă | buton | Urcă pe NAS toate pachetele locale care lipsesc de acolo (de exemplu cele făcute când NAS-ul era oprit).
+- Ultima operație pe NAS | text | Data, rezultatul și mesajul ultimei copieri.
+### Notificarea
+- Model notificare „Copie pe NAS lipsă” | text | Modelul nu se editează aici (textul se editează în Setări → Notificări → Sistem); notificarea apare numai cât copierea e activă și ultima copiere a eșuat sau e prea veche.
+
+## Flux: Cum activez copierea pe NAS
+1. Scrie calea partajării, contul și parola.
+2. Apasă „Testează conexiunea”.
+3. Pornește „Copiere pe NAS” și apasă „Salvează”.
+
+## Flux: Cum recuperez pachetele făcute cât NAS-ul era oprit
+1. Verifică conexiunea cu „Testează conexiunea”.
+2. Apasă „Copiază pe NAS pachetele lipsă”.

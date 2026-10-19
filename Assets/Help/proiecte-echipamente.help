@@ -1,0 +1,24 @@
+# Echipamentele proiectului
+Ruta: /proiecte/{id:int}/echipamente
+Cautare: echipamente proiect materiale iesiri consum net inventar miscari
+
+Materialele și echipamentele scoase din inventar pentru proiect, adică ieșirile de stoc asociate lui, plus consumul net pe produs.
+
+## Elemente
+### Antet
+- ← Numele proiectului | link | Revine la pagina proiectului ([[proiecte-detaliu]]).
+### Consum net
+- Consum net | tabel | Pe produs: ieșirile, retururile legate de ele și consumul net (apare când există de arătat).
+### Ieșirile asociate
+- Cod produs | coloană | Produsul; apasă-l ca să-i deschizi pagina.
+- Cantitate | coloană | Câte bucăți au ieșit.
+- Data | coloană | Data ieșirii.
+- Operator | coloană | Cine a înregistrat ieșirea.
+- Referință | coloană | Linkul „Mișcarea nr. N” deschide mișcarea.
+- Totalul | text | Numărul ieșirilor asociate proiectului.
+
+## Flux: Cum văd ce s-a scos din inventar pentru un proiect
+1. Deschide „Echipamente” din pagina proiectului.
+2. Citește ieșirile (produs, cantitate, dată, operator).
+3. Apasă „Mișcarea nr. N” ca să vezi detaliile ieșirii.
+Nota: ieșirile apar aici dacă au fost înregistrate cu acest proiect, ales în formularul de mișcare după selectarea beneficiarului.

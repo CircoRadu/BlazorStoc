@@ -94,7 +94,7 @@ else
                     var due = row.Point.Point.NextDue;
                     var dueState = ServiceDueRules.State(due, today, dueThreshold);
                 }
-                <div class="map-panel-heading"><h2 id="map-dialog-title">@row.Point.WorkPointName</h2><button type="button" class="link-button" aria-label="Închide detaliile" autofocus @onclick="ClearSelectionAsync" title="Închide detaliile">×</button></div>
+                <div class="map-panel-heading"><h2 id="map-dialog-title">@row.Point.WorkPointName</h2><span class="heading-actions"><HelpButton Topic="mentenanta-harta-punct" About="Detaliile punctului de pe hartă" /><button type="button" class="link-button" aria-label="Închide detaliile" autofocus @onclick="ClearSelectionAsync" title="Închide detaliile">×</button></span></div>
                 <p><a class="category-table-link" href="@($"/beneficiari/{row.BeneficiaryId}")"><strong>@row.BeneficiaryName</strong></a></p>
                 <p class="muted">@row.Point.WorkPointAddress<br />Coordonate: @MaintenanceMapRules.CoordinatesText(row)</p>
                 <dl class="map-facts">

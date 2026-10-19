@@ -21,7 +21,7 @@
 
 <div class="settings-tabs" role="tablist" aria-label="Mentenanță">
     <button type="button" role="tab" id="tab-due" class="settings-tab @(showRegister ? "" : "active")" aria-selected="@(showRegister ? "false" : "true")" aria-controls="panel-maintenance" @onclick="ShowDue">Scadente <span class="count-badge">@dueRows.Count</span></button>
-    <button type="button" role="tab" id="tab-register" class="settings-tab @(showRegister ? "active" : "")" aria-selected="@(showRegister ? "true" : "false")" aria-controls="panel-maintenance" @onclick="ShowRegisterAsync">Registru intervenții@if (registerLoaded) { <text> </text><span class="count-badge">@register.TotalCount</span> }</button>
+    <button type="button" role="tab" id="tab-register" class="settings-tab @(showRegister ? "active" : "")" aria-selected="@(showRegister ? "true" : "false")" aria-controls="panel-maintenance" @onclick="ShowRegisterAsync">Registru intervenții @if (registerLoaded) { <text> </text><span class="count-badge">@register.TotalCount</span> }</button>
 </div>
 
 <div id="panel-maintenance" role="tabpanel" aria-labelledby="@(showRegister ? "tab-register" : "tab-due")">

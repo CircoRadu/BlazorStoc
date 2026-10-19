@@ -1,0 +1,27 @@
+# Notificări
+Ruta: /notificari
+Cautare: notificari avertizari expirari scadente itp asigurare rovinieta contract mentenanta analiza de risc factura preiau amana rezolvata
+
+Expirările apropiate sau depășite, după șabloanele definite de administrator. O notificare rămâne în listă până este rezolvată. O notificare preluată nu mai avertizează; dacă o amâni, avertizează din nou la sfârșitul perioadei. Fereastra are două secțiuni: **Active** și **Rezolvate**.
+
+## Elemente
+### Antet
+- ↻ Actualizează | buton | Reîncarcă lista.
+### Notificările active
+- Scadență depășită | secțiune | Notificările cu termenul depășit; numărul și câte necesită atenție.
+- Următoarele scadențe | secțiune | Notificările active care nu au depășit încă termenul.
+- Stare | coloană | „Avertizare” sau „Preluată/Amânată”, după ce ai făcut cu ea.
+- Titlu | coloană | Titlul notificării, din șablon.
+- Obiect | coloană | Vehiculul, contractul, analiza sau factura la care se referă.
+- Scadență / Expiră la | coloană | Data de expirare.
+- Depășit cu (zile) / zile rămase | coloană | Cât a trecut sau cât a rămas.
+- Rândul | rând | Apasă un rând (sau Enter) ca să deschizi detaliile ([[notificari-detaliu]]); rândurile necitite sunt evidențiate.
+
+## Flux: Cum rezolv o notificare
+1. Apasă rândul notificării ca să-i vezi detaliile.
+2. Apasă „Deschide obiectul” ca să remediezi cauza (de exemplu reînnoirea ITP-ului).
+3. Notificarea se rezolvă singură când data obiectului se schimbă; o poți și marca tu cu „Marchează ca rezolvată”.
+
+## Flux: Cum văd notificările rezolvate
+1. Apasă „Rezolvate” sub antet ([[notificari-rezolvate]]).
+2. Apasă un rând ca să vezi motivul rezolvării.

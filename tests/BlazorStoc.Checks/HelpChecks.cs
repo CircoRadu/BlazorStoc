@@ -17,12 +17,10 @@ public static class HelpChecks
         "/Error", "/intretinere", "/miscari/{}", "/observatii/{}"
     };
 
-    // Windows whose topic is still to be written (the order of the main menu). Take a page out when its topic exists.
+    // Windows whose topic is still to be written. Empty now: every page has its topic. A new page may be listed here only for the time between adding it and writing
+    // its topic (the check below then asks to take it out as soon as the topic exists).
     private static readonly HashSet<string> Pending = new(StringComparer.OrdinalIgnoreCase)
     {
-        "/oferte", "/oferte/preluare", "/oferte/sabloane", "/mentenanta", "/mentenanta/harta", "/mentenanta/harta/fereastra", "/analize-risc",
-        "/produse/{}", "/produse/{}/miscari", "/proiecte/{}", "/proiecte/{}/situatie", "/proiecte/{}/echipamente", "/proiecte/{}/observatii/{}",
-        "/notificari", "/jurnal", "/jurnal/complet", "/setari"
     };
 
     private const string Sample = """
@@ -104,6 +102,7 @@ public static class HelpChecks
         check(good.Resolve("/Proba/7/?x=1", ["Prima (3)"]).Topic?.Key == "proba-tab", "Help: the topic of the selected tab is chosen (address and label compared without case, query and number of the label)");
         check(good.Resolve("/proba/7", ["Alta"]).Topic?.Key == "proba-alta" && good.Resolve("/proba/7", ["Prima"]).Others.Single().Key == "proba-alta",
             "Help: an unknown tab falls back to the general topic; the other topics of the page are offered as links");
+        check(good.Resolve("/proba/7", ["Prima 12"]).Topic?.Key == "proba-tab", "Help: the count that follows a tab label (\"Prima 12\", \"Prima (3)\") is not part of its name");
         check(good.Resolve("/proba/abc").Topic is null && good.Resolve("/nimic").Topic is null, "Help: a route parameter {id:int} does not accept text; an unknown address has no topic");
         check(good.Search("legatura").Count == 1 && good.Search("fereastra proba").Count == 1 && good.Search("zzz").Count == 0, "Help: the search needs every word");
 
@@ -135,6 +134,16 @@ public static class HelpChecks
     {
         var catalog = HelpCatalog.Default;
         check(catalog.Errors.Count == 0, "Help: the topics of the application (Assets/Help) have no errors" + (catalog.Errors.Count > 0 ? ": " + string.Join(" | ", catalog.Errors.Take(5)) : ""));
+
+        // Every icon shown in a topic is a row-icon that exists in the stylesheet (a name that does not exist would show an empty square).
+        var root = FindRoot();
+        if (root is not null && File.Exists(Path.Combine(root, "wwwroot", "app.css")))
+        {
+            var css = File.ReadAllText(Path.Combine(root, "wwwroot", "app.css"));
+            var missingIcons = catalog.Topics.Values.SelectMany(topic => topic.Areas).SelectMany(area => area.Elements).Where(element => element.Icon is not null)
+                .Select(element => element.Icon!).Distinct().Where(icon => !(css.Contains(".row-icon." + icon + " ") || css.Contains(".row-icon." + icon + "{") || css.Contains(".row-icon." + icon + ":"))).ToList();
+            check(missingIcons.Count == 0, "Help: every icon named in a topic exists in app.css " + (missingIcons.Count > 0 ? ": " + string.Join(", ", missingIcons) : ""));
+        }
 
         var shapes = typeof(HelpCatalog).Assembly.GetTypes()
             .Where(type => typeof(IComponent).IsAssignableFrom(type))
@@ -176,6 +185,16 @@ public static class HelpChecks
             }
         }
         check(wrong.Count == 0, "Help: every help button of a dialog points to an existing topic" + (wrong.Count > 0 ? ": " + string.Join(", ", wrong) : ""));
+        // Every file that draws a window over the page (class delete-dialog, delete-overlay or invoice-modal) has a help button, unless it is a file that only asks
+        // for a confirmation or that only wraps a form which has its own help button (listed here, with the reason).
+        var dialogsWithoutHelp = new List<string>();
+        foreach (var file in new[] { "Components", "Modules", "Pages" }.Select(folder => Path.Combine(root, folder)).Where(Directory.Exists).SelectMany(folder => Directory.EnumerateFiles(folder, "*.razor", SearchOption.AllDirectories)))
+        {
+            var text = File.ReadAllText(file);
+            if (!Regex.IsMatch(text, @"class=""(delete-dialog|invoice-modal|delete-overlay)")) continue;
+            if (!text.Contains("<HelpButton", StringComparison.Ordinal) && !DialogFilesWithoutHelp.Contains(Path.GetFileName(file))) dialogsWithoutHelp.Add(Path.GetFileName(file));
+        }
+        check(dialogsWithoutHelp.Count == 0, "Help: every file with a window over the page has a help button (or is a confirmation / a wrapper of a form that has one)" + (dialogsWithoutHelp.Count > 0 ? ": " + string.Join(", ", dialogsWithoutHelp) : ""));
         var linked = catalog.Topics.Values.SelectMany(topic => topic.Summary.Select(block => block.Text)
             .Concat(topic.Areas.SelectMany(area => area.Elements).Select(element => element.Text))
             .Concat(topic.Flows.SelectMany(flow => flow.Blocks).Select(block => block.Text)))
@@ -184,6 +203,14 @@ public static class HelpChecks
         var orphans = catalog.Topics.Values.Where(topic => topic.Routes.Count == 0 && !used.Contains(topic.Key)).Select(topic => topic.Key).ToList();
         check(orphans.Count == 0, "Help: every topic without an address (dialog, editor) is opened by a help button or a link" + (orphans.Count > 0 ? ": " + string.Join(", ", orphans) : ""));
     }
+
+    // Files with a window over the page that need no help button of their own: confirmations (they explain themselves) and files that only wrap a form with its own help button.
+    private static readonly HashSet<string> DialogFilesWithoutHelp = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "MainLayout.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor",
+        "ParameterValueEditDialog.razor", "BackupSettingsPanel.razor", "ProjectComponentsSection.razor",
+        "Home.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor"
+    };
 
     private static string? FindRoot()
     {

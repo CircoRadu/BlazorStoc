@@ -1,0 +1,41 @@
+# Harta mentenanței
+Ruta: /mentenanta/harta
+Ruta: /mentenanta/harta/fereastra
+Cautare: harta mentenanta puncte de lucru marker scadenta contract coordonate fereastra separata incadreaza
+
+Punctele de lucru acoperite de contracte, puse pe hartă la coordonatele lor. Culoarea marker-ului arată scadența, iar insigna arată contractul. Harta se poate deschide și într-o fereastră separată, care rămâne deschisă pe alt monitor cât folosești aplicația.
+
+## Elemente
+### Antet
+- ← Scadențe și registru | link | Revine la pagina Mentenanță ([[mentenanta]]).
+- ⧉ Fereastră separată | link | Deschide harta într-o fereastră de browser separată.
+- Deschide aplicația | link | În fereastra separată: deschide aplicația principală.
+- ↻ Actualizează | buton | Reîncarcă datele; mesajul de sub titlu spune când s-a făcut ultima actualizare sau dacă a eșuat.
+### Filtre
+- Caută | câmp | Beneficiar, punct de lucru sau contract.
+- Scadențe | listă | Toate, Depășite, În curând sau La zi.
+- Contracte | listă | Toate, Expirate, Expiră în curând, Cu termen valabil sau Fără termen.
+- Scadență de la, până la | câmp | Perioada scadențelor; „Fără perioadă” o șterge.
+- Arată și contractele Off | comutator | Adaugă pe hartă și contractele oprite.
+### Harta
+- Legenda | listă | Tipurile de markere folosite și semnificația lor.
+- Încadrează rezultatele | buton | Mărește sau mută harta ca să cuprindă toate punctele afișate.
+- Markerele | marker | Apasă un marker ca să deschizi detaliile punctului ([[mentenanta-harta-punct]]).
+- Fundalul hărții | mesaj | Dacă furnizorul de hărți nu răspunde, punctele rămân afișate pe fundal gol; „Reîncearcă” reia încărcarea.
+- Numărul de puncte afișate | text | Câte puncte sunt pe hartă și câte nu au coordonate.
+### Puncte fără coordonate
+- Tabelul | tabel | Punctele care nu pot fi puse pe hartă: beneficiarul, punctul, contractul, scadența și linkul „Deschide fișa pentru coordonate”. Nu se face geocodare automată: adresele nu se trimit niciunui serviciu extern.
+
+## Flux: Cum găsesc punctele cu scadența depășită
+1. Alege „Depășite” la filtrul de scadențe.
+2. Apasă „Încadrează rezultatele” ca să vezi toate punctele rămase.
+3. Apasă un marker pentru detalii și pentru „+ Înregistrează intervenție”.
+
+## Flux: Cum pun pe hartă un punct fără coordonate
+1. La „Puncte fără coordonate” apasă „Deschide fișa pentru coordonate”.
+2. În fișa beneficiarului editează punctul de lucru și pornește „Coordonate”.
+3. Lipește coordonatele copiate dintr-o hartă; după salvare, punctul apare pe hartă.
+
+## Flux: Cum țin harta pe alt monitor
+1. Apasă „⧉ Fereastră separată”.
+2. Mută fereastra pe celălalt monitor; ea se actualizează singură, iar „Deschide aplicația” te întoarce în aplicația principală.

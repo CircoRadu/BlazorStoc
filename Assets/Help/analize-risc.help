@@ -1,0 +1,27 @@
+# Analize de risc
+Ruta: /analize-risc
+Cautare: analize de risc securitate puncte de lucru reinnoire expirare valabilitate 36 luni notificare
+
+Analizele de risc la securitate ale punctelor de lucru, cu data ultimei reînnoiri și expirarea. Un punct de lucru are o singură analiză activă; notificarea de expirare pornește din data ultimei reînnoiri.
+
+## Elemente
+### Antet și filtre
+- ↻ Actualizează | buton | Reîncarcă datele.
+- Caută | câmp | Caută după beneficiar, punct de lucru, număr sau persoana care a întocmit analiza.
+- Stare | listă | Toate stările, Expirate, Expiră curând sau Valabile (analizele Off trec mereu de filtru: se ascund cu comutatorul lor).
+### Tabelul analizelor
+- Tabelul analizelor | tabel | Coloanele și acțiunile de pe rânduri sunt descrise la [[analize-risc-sectiune]]: aceeași secțiune apare și în fișa beneficiarului, dar aici arată analizele tuturor beneficiarilor (cu coloana „Beneficiar”).
+
+## Flux: Cum văd ce analize expiră
+1. Alege „Expiră curând” sau „Expirate” la filtrul de stare.
+2. Citește data de expirare și termenul rămas de pe fiecare rând.
+3. Apasă numele beneficiarului ca să deschizi fișa lui.
+Nota: pragul „expiră curând” vine din șablonul de notificări „Analize de risc”.
+
+## Flux: Cum reînnoiesc o analiză
+1. Găsește analiza (caută după număr sau punct de lucru).
+2. Apasă iconița „Reînnoiește” de pe rând și completează data ([[analize-risc-reinnoire]]).
+
+## Flux: Cum adaug o analiză de risc
+1. Apasă „+ Adaugă analiză de risc”.
+2. Alege beneficiarul și punctul de lucru și completează formularul ([[analize-risc-editor]]).

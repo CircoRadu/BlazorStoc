@@ -8,7 +8,7 @@
 
 <UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="contract-editor-title">
-    <div class="catalog-heading"><h2 id="contract-editor-title">@(Original is null ? "Adaugă contract de mentenanță" : $"Editează contractul {Original.Contract.Label}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    <div class="catalog-heading"><h2 id="contract-editor-title">@(Original is null ? "Adaugă contract de mentenanță" : $"Editează contractul {Original.Contract.Label}")</h2><span class="heading-actions"><HelpButton Topic="mentenanta-contract-editor" About="Formularul de contract" /><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></span></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     @if (errors.Count > 0)
     {

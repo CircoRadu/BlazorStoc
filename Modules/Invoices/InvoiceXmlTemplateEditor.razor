@@ -15,7 +15,7 @@
                 <button type="button" class="danger" disabled="@saving" @onclick="() => Closed.InvokeAsync()">Renunță și elimină fișierul</button>
             </section>
         }
-        <h2>@(Existing is null ? "Șablon XML nou" : "Editare șablon XML · " + Existing.Info.Name)</h2>
+        <div class="dialog-head"><h2>@(Existing is null ? "Șablon XML nou" : "Editare șablon XML · " + Existing.Info.Name)</h2><HelpButton Topic="setari-facturi-xml" About="Șablonul XML de factură" /></div>
         <p class="muted">Leagi vizual elementele șablonului de valorile din fișierul de probă: apeși „Alege” la un element, apoi apeși în arbore valoarea lui. Citirea de mai jos se actualizează la fiecare legătură.</p>
         @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
         <div class="invoice-panel">

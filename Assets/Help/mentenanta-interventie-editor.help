@@ -1,0 +1,35 @@
+# Formularul de intervenție
+Cautare: interventie formular mentenanta la cerere punct de lucru data observatii scadenta urmatoare baza fotografii
+
+Formularul pentru o intervenție nouă sau pentru editarea uneia existente. Se deschide în fișa beneficiarului (sau din hartă, cu punctul ales). Fotografiile se adaugă după înregistrare.
+
+## Elemente
+### Câmpuri
+- Felul intervenției * | selecție | „Mentenanță (din contract)” mută scadența punctului; „La cerere” este în afara ciclului și nu modifică scadențele. Dacă nu există puncte sub un contract activ, se poate înregistra doar o intervenție la cerere. La editare felul nu se mai schimbă.
+- Punct de lucru * | listă | Punctul la care s-a intervenit; la mentenanță doar punctele sub un contract activ.
+- Data efectuării * | câmp | Data intervenției, din calendar; nu poate fi în viitor. La editare, data se corectează numai la ultima intervenție de mentenanță a punctului.
+- Observații | câmp | Text liber despre lucrare.
+### Scadența următoare (la mentenanță)
+- Scadența curentă | text | Scadența planificată și ciclicitatea punctului.
+- Baza noii scadențe | selecție | Alegi de unde se numără următoarea scadență (de exemplu de la data planificată, de la data efectuării sau o dată aleasă de tine, care trebuie să fie după data efectuării).
+- Mesajul „nu modifică scadența” | text | Apare când există o intervenție de mentenanță mai recentă: cea nouă se înregistrează în istoric, dar nu mută scadența.
+### Fotografii
+- Legenda și alegerea fotografiilor | zonă | După înregistrare adaugi fotografii (JPG, PNG, WebP sau GIF); se salvează imediat; „Șterge” scoate o fotografie.
+### Butoane
+- Înregistrează intervenția / Salvează modificările | buton | Salvează intervenția.
+- Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+
+## Flux: Cum înregistrez o intervenție de mentenanță
+1. Alege „Mentenanță (din contract)”, punctul și data efectuării.
+2. Scrie observațiile.
+3. Alege baza noii scadențe.
+4. Apasă „Înregistrează intervenția”; fișa rămâne deschisă ca să adaugi fotografii.
+
+## Flux: Cum înregistrez o intervenție la cerere
+1. Alege „La cerere”, punctul de lucru și data.
+2. Scrie observațiile și apasă „Înregistrează intervenția”.
+Nota: scadențele de mentenanță nu se modifică.
+
+## Flux: Cum adaug fotografii unei intervenții
+1. După înregistrare, în secțiunea „Fotografii” scrie o legendă (opțional) și alege fotografiile.
+2. Ele apar imediat în listă; numărul lor se vede în coloana „Foto”.

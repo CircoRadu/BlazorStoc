@@ -56,3 +56,21 @@ Pasi:
 4. La Categorii deschide "Parametri obligatori" pentru o subcategorie si apasa "?" din antetul panoului.
 5. Pe fisa unui vehicul, la "Modifica data" de pe un rand de expirare, apasa "?" in fereastra deschisa; la Echipamente deschide "Restituie in depozit" si apasa "?".
 6. Pe /categorii/fereastra (fereastra separata) apasa "?" din coltul din dreapta sus.
+
+### 19.10.2026 - Topicuri: Oferte, Mentenanta (cu harta), Analize de risc, Produs, Proiecte, Notificari, Jurnal, Setari - help complet pe toate ferestrele
+
+**Ce s-a adaugat:** topicuri pentru toate ferestrele ramase: Oferte (preluare, sabloane, editor de sablon), formularul de produs, pagina produsului si editarea unei miscari, Mentenanta (scadente, registru, contracte, interventii, formularele lor, activarea contractului, harta si detaliile unui punct), Analize de risc (pagina, sectiunea, formular, reinnoire), Proiecte (pagina, situatie, echipamente, observatii si formularul), Notificari (active, rezolvate, detalii), Jurnal (recent si complet), Setari (pagina, ANAF, Notificari: sabloane si setari, Harta: motor si overlay, Facturi: generare, sabloane salvate, editare, XML, camp, coloana, salvare ca nou, Backup: backup si restaurare, NAS, verificare ora, Module, Tipuri de utilizatori si formularul lor). Iconita "?" si in antetul formularelor/dialogurilor corespunzatoare, inclusiv fereastra de creare a sablonului din Preluare factura. Toate ferestrele aplicatiei au acum ajutor (in afara confirmarilor simple).
+
+**Ce face acum:** pe orice pagina "?" deschide ajutorul ei; pe Setari ajutorul urmeaza sectiunea si subsectiunea alese (de exemplu Backup -> Backup NAS), pe Mentenanta/Notificari/Facturi urmeaza sectiunea (Scadente/Registru, Active/Rezolvate, Facturi/Intrari fara factura). Testul `help` verifica acum si ca fiecare pictograma numita intr-un topic exista in aplicatie si ca fiecare fisier cu fereastra peste pagina are buton de ajutor (sau e o confirmare/un invelis al unui formular care are).
+
+**Corectat pe drum:** eticheta "Registru interventii" din pagina Mentenanta arata text brut ("@if (registerLoaded) { 0 }") fiindca textul era lipit de `@if`; acum arata numarul de interventii.
+
+**Verificat de agent 19.10.2026** (preview 5089, baza de dezvoltare): ajutorul se deschide cu titlul corect pe fiecare sectiune si subsectiune de Setari, pe ambele sectiuni de Notificari, pe Analize de risc; suita completa (1600 PASS). Pagina Mentenanta dupa corectia etichetei se verifica la republicare.
+
+Pasi:
+
+1. Parcurge Setari: pentru fiecare sectiune si subsectiune apasa "?" si compara descrierea cu ecranul.
+2. Pe Mentenanta verifica ca eticheta "Registru interventii" arata numarul (nu text brut) si ca "?" schimba descrierea intre Scadente si Registru.
+3. Deschide fisa unui beneficiar cu contract si interventii: formularele "Adauga contract", "Inregistreaza interventie" si "Adauga analiza de risc" au "?" in antet.
+4. Pe Harta mentenantei apasa un punct: panoul de detalii are "?"; apasa si "?" din fereastra separata a hartei.
+5. Citeste cateva topicuri cap-coada (de exemplu Preluare oferta, Situatia proiectului, Backup si restaurare) si noteaza ce lipseste sau e descris gresit; actualizarea se face la rebuild.

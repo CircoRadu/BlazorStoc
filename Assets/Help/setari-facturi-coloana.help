@@ -1,0 +1,19 @@
+# Editarea unei coloane a șablonului
+Cautare: editare coloana sablon antet celula legarea de rand pozitie verticala ordine zona automata
+
+Fereastra editează o coloană a tabelului de linii: denumirea din antet, celula de antet și felul în care valorile se leagă de rânduri.
+
+## Elemente
+### Fereastra
+- Denumirea din antet | câmp | Eticheta coloanei, așa cum apare în factură.
+- Zonă automată | buton | Apare când ai modificat zona: o readuce la cea găsită de aplicație.
+- Celula de antet: de la x, până la x | câmp | Limitele orizontale ale celulei de antet.
+- Legarea de rând | listă | „După poziția pe verticală” sau „După ordine” (a k-a valoare = rândul k).
+- Șterge coloana | buton | Scoate coloana (la una desenată de tine o șterge definitiv).
+- Gata | buton | Închide fereastra.
+
+## Flux: Cum corectez o coloană
+1. Apasă „Editează coloana” de pe rândul ei.
+2. Scrie denumirea din antet și ajustează limitele celulei.
+3. Dacă valorile coloanei nu se aliniază cu rândurile, schimbă „Legarea de rând”.
+4. Apasă „Gata” și verifică rândurile citite.

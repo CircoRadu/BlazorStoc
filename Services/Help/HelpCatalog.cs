@@ -158,8 +158,8 @@ public sealed partial class HelpCatalog
         };
     }
 
-    // "De regularizat (3)" ->"de regularizat": the number of the label of a tab is not part of its name.
-    private static string CleanTab(string label) => Regex.Replace(label.Trim(), @"\s*\(\d+\)\s*$", "").Trim();
+    // "De regularizat (3)" and "Registru interventii 12" lose their number: the count of a tab label is not part of its name.
+    private static string CleanTab(string label) => Regex.Replace(label.Trim(), @"\s*\(?\d+\)?\s*$", "").Trim();
 
     /// <summary>Every word of the query must appear in the topic (title, keywords, elements, flows, texts); the title counts most.</summary>
     public IReadOnlyList<HelpTopic> Search(string query, int limit = 20)

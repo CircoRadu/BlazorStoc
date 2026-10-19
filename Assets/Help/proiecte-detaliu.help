@@ -1,0 +1,44 @@
+# Pagina proiectului
+Ruta: /proiecte/{id:int}
+Cautare: proiect pagina componente sisteme observatii situatia proiectului echipamente editeaza sterge termen
+
+Pagina unui proiect: datele lui, componentele (sistemele) și conținutul: situația proiectului, echipamentele scoase din inventar și observațiile cu fișierele lor.
+
+## Elemente
+### Antet
+- ← Numele beneficiarului | link | Revine la fișa beneficiarului ([[beneficiari-detaliu]]).
+- Numele proiectului și beneficiarul | text | Apasă beneficiarul ca să deschizi fișa lui.
+- Editează | buton | Deschide formularul proiectului ([[proiecte-editor]]).
+- Șterge proiectul | buton | Șterge proiectul; nu se poate dacă are mișcări de stoc asociate; observațiile și fișierele lui se arhivează odată cu el.
+- Mesajul de modificare externă | mesaj | Apare când alt utilizator a schimbat proiectul.
+### Observații generale
+- Observații generale | text | Textul din formularul proiectului, dacă a fost completat.
+### Componente
+- Adaugă un sistem | listă | Alegi un tip de sistem din Nomenclator care nu e încă în proiect; „Adaugă componenta” îl adaugă.
+- Arată și arhivate | comutator | Adaugă în listă componentele arhivate.
+- Situația proiectului | link | Deschide situația proiectului ([[proiecte-situatie]]).
+- Sistem | coloană | Numele componentei (cu motivul, dacă e arhivată).
+- Stare | listă | Starea componentei, pe care o poți schimba direct.
+- Predat | coloană | Cât s-a predat din necesarul componentei.
+- Scoate componenta | iconita:delete | Arhivează componenta (cere confirmare și un motiv; ce se întâmplă cu produsele deja predate se alege în fereastră); oferta și liniile ei se păstrează.
+- Reactivează componenta | iconita:reactivate | Readuce o componentă arhivată.
+### Conținutul proiectului
+- + Adaugă observație | buton | Deschide formularul de observație ([[proiecte-observatie-editor]]), dacă modulul Observații este activ.
+- Situația proiectului, Echipamente | rând | Linkuri către situație ([[proiecte-situatie]]) și către echipamentele proiectului ([[proiecte-echipamente]]).
+- Observațiile | rând | Fiecare observație, cu data, autorul și numărul de fișiere; apasă numele ca s-o deschizi ([[proiecte-observatie]]).
+
+## Flux: Cum adaug componentele unui proiect
+1. La „Adaugă un sistem” alege tipul de sistem.
+2. Apasă „Adaugă componenta”.
+3. Schimbă starea componentei din lista „Stare” pe măsură ce lucrul avansează.
+Nota: oferta, necesarul și predatul se completează din preluarea ofertei și din ieșirile de stoc.
+
+## Flux: Cum scot o componentă din proiect
+1. Apasă iconița „Scoate componenta” de pe rând.
+2. Dacă s-au predat produse pentru ea, alege în fereastră ce se întâmplă cu fiecare și scrie motivul.
+3. Confirmă; componenta se arhivează și poate fi reactivată oricând.
+
+## Flux: Cum adaug o observație la proiect
+1. Apasă „+ Adaugă observație”.
+2. Scrie denumirea și conținutul și salvează.
+3. Deschide observația ca să atașezi fișiere.

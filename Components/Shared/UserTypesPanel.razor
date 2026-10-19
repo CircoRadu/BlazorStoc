@@ -11,7 +11,7 @@
 {
     <UnsavedChangesTracker @ref="tracker" Adding="@(original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
     <section class="product-editor" aria-labelledby="user-type-editor-title">
-        <div class="catalog-heading"><h2 id="user-type-editor-title">@(original is null ? "Adaugă tip de utilizator" : $"Editează tipul „{original.Name}”")</h2><button type="button" class="refresh act-close" disabled="@saving" @onclick="CloseEditorAsync">Închide</button></div>
+        <div class="catalog-heading"><h2 id="user-type-editor-title">@(original is null ? "Adaugă tip de utilizator" : $"Editează tipul „{original.Name}”")</h2><span class="heading-actions"><HelpButton Topic="setari-tipuri-utilizatori-editor" About="Formularul tipului de utilizator" /><button type="button" class="refresh act-close" disabled="@saving" @onclick="CloseEditorAsync">Închide</button></span></div>
         <div class="catalog-body">
             @if (original is { Summary.IsSystem: true } && IsAdministratorType)
             {

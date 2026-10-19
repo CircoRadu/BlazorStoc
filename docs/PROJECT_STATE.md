@@ -91,7 +91,7 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 
 ## Probleme deschise
 
-- Help contextual (branch `feature/help`, `docs/PROPUNERE_HELP.md` cu deciziile din 19.10.2026): etapa 1 gata, necomisa (infrastructura `Services/Help`, `/ajutor/*`, `wwwroot/help.js`, `HelpButton`, 6 topicuri `Assets/Help/*.help`, grupul de teste `help`). Scrise: Preluare factura, Iesire multipla, Export consum, Inventar, Administrare (Categorii, Beneficiari, Furnizori, Facturi, Vehicule, Utilizatori, Nomenclator). Raman (lista `Pending` din `HelpChecks.cs`): Oferte, Mentenanta, Analize de risc, pagina produsului si miscarile, proiecte, Notificari, Jurnal, Setari si migrarea dialogurilor la `HelpButton`; harta de cod si regula in CLAUDE.md sunt actualizate.
+- Help contextual (branch `feature/help`, `docs/PROPUNERE_HELP.md` cu deciziile din 19.10.2026): etapa 1 gata, necomisa (infrastructura `Services/Help`, `/ajutor/*`, `wwwroot/help.js`, `HelpButton`, 6 topicuri `Assets/Help/*.help`, grupul de teste `help`). Toate ferestrele au topic (89 de fisiere in `Assets/Help`, lista `Pending` din `HelpChecks.cs` este goala); confirmarile simple sunt exceptate si migrarea dialogurilor la `HelpButton`; harta de cod si regula in CLAUDE.md sunt actualizate.
 
 - Propunere de studiu, neimplementata: selectarea liniilor ofertei la pasul 4 si stergerea unei oferte din proiect (`docs/PROPUNERE_OFERTE_SELECTIE_STERGERE.md`); asteapta deciziile din sectiunea 5.
 

@@ -1,0 +1,32 @@
+# Mentenanță · Registru intervenții
+Ruta: /mentenanta
+Tab: Registru intervenții
+Cautare: registru interventii mentenanta la cerere efectuata scadenta observatii foto perioada
+
+Toate intervențiile înregistrate la punctele de lucru, cele mai noi primele: intervenții de mentenanță (din contract) și intervenții la cerere. Intervențiile se înregistrează din fișa beneficiarului.
+
+## Elemente
+### Filtre
+- Caută | câmp | Caută după beneficiar, punct de lucru sau contract.
+- Fel | listă | Toate felurile, Mentenanță sau La cerere.
+- De la, Până la | câmp | Perioada în care s-au efectuat intervențiile.
+- Fără perioadă | buton | Șterge perioada.
+### Tabelul
+- Efectuată la | coloană | Data intervenției.
+- Fel | coloană | Mentenanță sau La cerere.
+- Beneficiar | coloană | Apasă numele ca să deschizi fișa beneficiarului.
+- Punct de lucru | coloană | Numele și adresa punctului.
+- Contract | coloană | Contractul punctului, dacă are.
+- Scadență | coloană | Pentru mentenanță: scadența planificată → noua scadență și baza ei de calcul; „Nu a modificat scadența” când există o intervenție mai recentă. La cerere: „—”.
+- Observații | coloană | Textul intervenției.
+- Foto | coloană | Câte fotografii are intervenția.
+- Paginile | butoane | Trec la pagina anterioară sau următoare.
+
+## Flux: Cum caut intervențiile unui punct
+1. Scrie în câmpul de căutare beneficiarul, punctul sau contractul.
+2. Alege felul sau perioada ca să restrângi lista.
+3. Pentru fotografii și detalii deschide fișa beneficiarului.
+
+## Flux: Cum înregistrez o intervenție
+1. Deschide fișa beneficiarului (apasă numele din registru).
+2. În secțiunea „Intervenții” apasă „+ Înregistrează intervenție” ([[mentenanta-interventie-editor]]).

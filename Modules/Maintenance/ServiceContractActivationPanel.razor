@@ -4,7 +4,7 @@
 @* Off -> On: a contract reopened after months would raise "overdue" for all its points at once, so the due dates are reviewed here first.
    The points now covered by another active contract stop the activation unless they are taken out of this contract. *@
 <section class="product-editor" aria-labelledby="contract-activation-title">
-    <div class="catalog-heading"><h2 id="contract-activation-title">Activare contract @Plan.Details.Contract.Label</h2><button type="button" class="danger" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Închide</button></div>
+    <div class="catalog-heading"><h2 id="contract-activation-title">Activare contract @Plan.Details.Contract.Label</h2><span class="heading-actions"><HelpButton Topic="mentenanta-contract-activare" About="Activarea contractului" /><button type="button" class="danger" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Închide</button></span></div>
     @if (Error is not null) { <div class="error-banner" role="alert">@Error</div> }
     @if (Plan.Details.Contract.ValidUntil is { } validUntil && validUntil < Today)
     {

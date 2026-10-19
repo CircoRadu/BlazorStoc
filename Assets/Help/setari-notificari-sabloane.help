@@ -1,0 +1,37 @@
+# Setări · Șabloane notificări
+Ruta: /setari
+Tab: Șabloane notificări
+Cautare: sabloane notificari categorie eveniment expirare zile inainte subiect text marcaje placeholder activ
+
+Definești pentru ce expirări se creează notificări, cu câte zile înainte și cu ce text. În subiect și în text poți folosi marcaje de forma <numar autovehicul>, înlocuite automat cu valorile obiectului. Fiecare categorie are tabul ei.
+
+## Elemente
+### Categoriile
+- Tab-urile de categorii | filă | Câte o categorie de notificări (de exemplu Vehicule, Mentenanță, Analize de risc, Facturi, Sistem); sub ele apare lista șabloanelor categoriei.
+- + Adaugă șablon | buton | Deschide formularul de șablon nou.
+### Formularul de șablon
+- Categorie *, Eveniment de expirare * | listă | Ce expirare urmărește șablonul.
+- Cu câte zile înainte de expirare * | câmp | Pragul de la care apare notificarea.
+- Șablon activ | comutator | Un șablon inactiv nu mai generează notificări.
+- Subiect *, Text * | câmp cu marcaje | Textul notificării; marcajele se inserează la poziția cursorului, apar colorate (cele necunoscute, în roșu) și se înlocuiesc cu valorile obiectului.
+- Butoanele de marcaje | buton | Câte un marcaj disponibil pentru eveniment; apasă ca să-l adaugi la cursor.
+- Previzualizare | text | Cum arată notificarea cu valori de probă; „Completează un text-exemplu” propune un text.
+- Salvează șablonul, Anulează | buton | Salvează sau închide formularul.
+### Lista șabloanelor
+- Eveniment | coloană | Expirarea urmărită.
+- Subiect | coloană | Titlul notificării.
+- Zile înainte | coloană | Pragul.
+- Stare | coloană | Activ sau inactiv.
+- Editează șablonul | iconita:edit | Deschide formularul.
+- Șterge șablonul | iconita:delete | Șterge șablonul.
+
+## Flux: Cum adaug un șablon de notificare
+1. Alege categoria și apasă „+ Adaugă șablon”.
+2. Alege evenimentul și numărul de zile.
+3. Scrie subiectul și textul folosind marcajele disponibile; verifică previzualizarea.
+4. Apasă „Salvează șablonul”.
+
+## Flux: Cum schimb pragul unei notificări
+1. Apasă iconița de editare de pe rândul șablonului.
+2. Schimbă „Cu câte zile înainte de expirare”.
+3. Salvează; notificările se recalculează după noul prag.

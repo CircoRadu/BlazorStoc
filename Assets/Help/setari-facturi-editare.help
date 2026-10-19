@@ -1,0 +1,27 @@
+# Setări · Editare șablon
+Ruta: /setari
+Tab: Editare șablon
+Cautare: editare sablon factura model analizeaza fisierul salveaza inlocuieste salveaza ca nou
+
+Editezi un șablon salvat: elementele lui (câmpuri, coloane, descrierea intrării în stoc), denumirea și furnizorul. Șablonul se afișează exact așa cum a fost salvat, peste factura model; analiza pornește doar la cererea ta. Editorul este același ca la „Generare șablon factură” ([[setari-facturi-generare]]).
+
+## Elemente
+### Specific editării
+- Închide editarea | buton | Revine la lista de șabloane; dacă ai modificări nesalvate ești întrebat dacă renunți.
+- Mesajul „Editezi șablonul” | text | Spune ce șablon editezi; factura afișată este modelul salvat cu el.
+- Încarcă alt PDF pentru acest șablon | zonă | Pui o altă factură a aceluiași furnizor ca model.
+- Analizează fișierul | buton | Pornește analiza și arată ce se citește cu șablonul.
+- Salvează | buton | Înlocuiește șablonul curent.
+- Salvează ca șablon nou | buton | Păstrează șablonul curent și creează altul, cu denumire nouă ([[setari-facturi-salveaza-nou]]).
+- Restul elementelor | grup | Pagina facturii, câmpurile, coloanele, descrierea intrării și datele furnizorului sunt descrise la [[setari-facturi-generare]].
+
+## Flux: Cum corectez un șablon existent
+1. Din „Șabloane salvate” apasă „Editează șablonul” pe rândul lui.
+2. Corectează elementele (câmpuri, coloane, descriere) sau furnizorul.
+3. Dacă vrei să verifici, apasă „Analizează fișierul”.
+4. Apasă „Salvează”.
+
+## Flux: Cum fac un șablon nou dintr-unul existent
+1. Deschide șablonul vechi pentru editare și modifică-l.
+2. Apasă „Salvează ca șablon nou” și scrie o denumire nouă.
+3. Șablonul vechi rămâne neschimbat.

@@ -19,7 +19,7 @@
 
 @if (Embedded)
 {
-    <div class="page-heading"><div><h2>Ieșire din stoc</h2><p class="muted">Se salvează o operație (toate liniile sau niciuna), ca în „Ieșire multiplă”.</p></div><div class="heading-actions"><button type="button" class="refresh act-close" disabled="@busy" @onclick="() => OnClosed.InvokeAsync()">Închide</button></div></div>
+    <div class="page-heading"><div><h2>Ieșire din stoc</h2><p class="muted">Se salvează o operație (toate liniile sau niciuna), ca în „Ieșire multiplă”.</p></div><div class="heading-actions"><HelpButton Topic="iesire-multipla" About="Ieșirea din stoc" /><button type="button" class="refresh act-close" disabled="@busy" @onclick="() => OnClosed.InvokeAsync()">Închide</button></div></div>
 }
 else
 {

@@ -1,0 +1,44 @@
+# Setări · Preluare date ANAF
+Ruta: /setari
+Tab: Preluare date ANAF
+Cautare: anaf configurare interogare cui conexiune cerere mapare raspuns test versiuni activeaza draft
+
+Configurezi interogarea serviciului public ANAF (registrul TVA) după CUI: conexiunea, cererea, maparea răspunsului, testarea și versiunile activate. Testele trimit cereri reale la ANAF și nu modifică datele niciunei firme. Butonul „Preia date din ANAF” din formularele de beneficiar și furnizor folosește configurația activă.
+
+## Elemente
+### Starea
+- Versiune activă | text | Versiunea folosită acum (număr, data, administratorul) sau „nicio versiune activată”.
+- Testată / Netestată | insignă | O configurație se poate salva și activa doar după un test reușit; orice modificare după test o face din nou netestată.
+### 1. Conexiune
+- Denumire integrare | câmp | Numele configurației.
+- Integrare activată | comutator | Pornește sau oprește integrarea.
+- Adresă serviciu | câmp | Adresă HTTPS, doar pe gazda aprobată.
+- Metodă HTTP | listă | Metoda cererii.
+- Timeout, Interval între cereri, Lot maxim de CUI | câmp | Limitele cererilor către ANAF.
+- Antete HTTP | listă | Antete suplimentare, fiecare cu comutator, nume și valoare; „Șterge” scoate unul, „+ Adaugă antet” adaugă altul. Autentificarea este cea publică, fără token; unele antete sunt rezervate.
+### 2. Cerere
+- Elimină spațiile din CUI, Elimină prefixul RO | comutator | Curăță CUI-ul înainte de trimitere.
+- Format dată interogare | listă | Formatul datei trimise.
+- Șablon cerere | câmp | Lista JSON a cererii, cu variabilele CUI și data interogării.
+### 3. Mapare răspuns
+- Lista găsiților, Lista negăsiților, Identificarea CUI | câmp | Unde se află în răspuns rezultatele.
+- Tabelul de mapări | tabel | Pentru fiecare câmp: denumirea, unde este folosit, calea în răspuns, tipul, dacă e obligatoriu și ce se întâmplă când ANAF nu trimite câmpul sau trimite altă valoare (cere confirmare, păstrează valoarea mea, ia valoarea din ANAF).
+- Șterge maparea | iconita:delete | Scoate o mapare.
+- + Adaugă câmp | buton | Adaugă o mapare informativă.
+### Test și versiuni
+- Testare | buton | Trimite cereri reale de test și arată valorile interpretate pe câmp.
+- Salvează ciorna | buton | Păstrează modificările fără activare.
+- Salvează și activează configurația testată | buton | Creează o versiune nouă și o activează (doar după test reușit).
+- Revino la activarea precedentă | buton | Reactivează versiunea dinainte.
+- Tabelul versiunilor | tabel | Versiunile activate: data, administratorul, cum a fost creată și comutatorul „Activă”.
+- Încarcă versiunea în editor | iconita:load | Aduce o versiune veche în editor.
+- Șterge versiunea | iconita:delete | Șterge o versiune neactivă.
+
+## Flux: Cum verific că ANAF funcționează
+1. Deschide secțiunea și apasă butonul de testare.
+2. Citește valorile interpretate pe fiecare câmp.
+3. Dacă testul reușește, „Salvează și activează configurația testată” devine disponibil.
+
+## Flux: Cum revin la o configurație veche
+1. În „Versiuni” alege versiunea dorită.
+2. Pornește comutatorul „Activă” de pe rândul ei, sau folosește „Revino la activarea precedentă”.

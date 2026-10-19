@@ -350,7 +350,7 @@ else
     <div class="delete-overlay" @onkeydown="EditKeyAsync">
         <UnsavedChangesTracker @key="editing.Id" @ref="editTracker" Snapshot="EditSnapshot" Discard="DiscardEditAsync" />
         <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-edit-title">
-            <h2 id="movement-edit-title">Editează @StockMovementRules.KindLabel(editing.Kind).ToLowerInvariant()a din @StockMovementRules.DisplayDate(editing.Date)</h2>
+            <div class="dialog-head"><h2 id="movement-edit-title">Editează @StockMovementRules.KindLabel(editing.Kind).ToLowerInvariant()a din @StockMovementRules.DisplayDate(editing.Date)</h2><HelpButton Topic="produse-miscare-editare" About="Editarea unei mișcări" /></div>
             <EditForm Model="editForm" OnSubmit="SaveEditAsync" FormName="stock-movement-edit">
                 <fieldset disabled="@editSaving">
                     <div class="editor-grid">

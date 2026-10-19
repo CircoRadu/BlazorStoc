@@ -11,7 +11,7 @@
 
 <UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="risk-analysis-editor-title">
-    <div class="catalog-heading"><h2 id="risk-analysis-editor-title">@(Original is null ? "Adaugă analiză de risc" : $"Editează analiza de risc {Original.Analysis.Number}")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    <div class="catalog-heading"><h2 id="risk-analysis-editor-title">@(Original is null ? "Adaugă analiză de risc" : $"Editează analiza de risc {Original.Analysis.Number}")</h2><span class="heading-actions"><HelpButton Topic="analize-risc-editor" About="Formularul analizei de risc" /><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></span></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     @if (errors.Count > 0)
     {

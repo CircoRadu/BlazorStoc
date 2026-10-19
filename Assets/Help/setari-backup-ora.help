@@ -1,0 +1,18 @@
+# Setări · Verificare oră
+Ruta: /setari
+Tab: Verificare oră
+Cautare: verificare ora ntp ceas server internet backup decalaj
+
+Ceasul serverului este comparat cu ora de pe internet înainte de backup și de ștergerea pachetelor vechi. Cu un ceas decalat cu peste 15 minute, backup-ul ia ora de pe internet, iar ștergerea automată se oprește.
+
+## Elemente
+### Setările
+- Compară ceasul serverului cu ora de pe internet | comutator | Pornește verificarea.
+- Server NTP 1, 2, 3 | listă | Serverele de timp (al doilea și al treilea sunt opționale); „Altul (server propriu)” permite adresa ta. Dacă două servere răspund, ele trebuie să fie de acord.
+- Salvează | buton | Salvează setările.
+- Verifică acum | buton | Compară acum ceasul și arată, pe server, dacă răspunde și cât este decalajul; „nu răspunde” sugerează verificarea firewall-ului (UDP 123).
+
+## Flux: Cum verific ceasul serverului
+1. Alege serverele NTP și apasă „Salvează”.
+2. Apasă „Verifică acum”.
+3. Citește pentru fiecare server dacă răspunde și decalajul ceasului.

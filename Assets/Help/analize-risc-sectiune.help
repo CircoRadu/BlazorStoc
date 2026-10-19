@@ -1,0 +1,33 @@
+# Analize de risc (tabel și acțiuni)
+Cautare: analize de risc tabel numar inregistrare intocmita de ultima reinnoire valabilitate expira stare istoric on off reinnoieste sterge
+
+Secțiunea „Analize de risc” din fișa beneficiarului și din pagina Analize de risc: analizele punctelor de lucru, reînnoirile și expirarea lor. Apare doar cât modulul Analize de risc funcționează.
+
+## Elemente
+### Antet
+- Arată și analizele Off | comutator | Apare când există analize oprite.
+- + Adaugă analiză de risc | buton | Deschide formularul ([[analize-risc-editor]]); doar cu dreptul necesar.
+- Puncte fără analiză activă | listă | Punctele de lucru care nu au analiză activă; apasă numele unui punct ca să adaugi analiza lui.
+### Tabelul
+- Nr. înregistrare | coloană | Numărul analizei și, dacă există, observațiile.
+- Beneficiar | coloană | Doar în pagina Analize de risc: apasă numele ca să deschizi fișa.
+- Punct de lucru | coloană | Numele și adresa punctului.
+- Întocmită de | coloană | Persoana abilitată care a întocmit-o.
+- Înregistrată | coloană | Data înregistrării.
+- Ultima reînnoire | coloană | Data ultimei reînnoiri; butonul „Istoric” desface evenimentele (înregistrare și reînnoiri), cu data, cine le-a înregistrat și observațiile.
+- Valabilitate | coloană | Câte luni este valabilă.
+- Expiră | coloană | Data de expirare și termenul rămas.
+- Stare | coloană | Valabilă, expiră curând sau expirată.
+- Comutatorul On/Off | comutator | Oprește sau pornește analiza.
+- Reînnoiește analiza | iconita:renew | Doar la analizele active: deschide formularul de reînnoire ([[analize-risc-reinnoire]]).
+- Editează analiza de risc | iconita:edit | Deschide formularul de editare.
+- Șterge analiza de risc | iconita:delete | Șterge analiza.
+- Anulează reînnoirea | iconita:undo | În istoric: anulează o reînnoire.
+
+## Flux: Cum adaug o analiză pentru un punct fără analiză
+1. Apasă numele punctului din lista „puncte fără analiză activă”.
+2. Completează formularul ([[analize-risc-editor]]) și salvează.
+
+## Flux: Cum consult istoricul unei analize
+1. Apasă „Istoric” sub data ultimei reînnoiri.
+2. Citește evenimentele, cu cine și când le-a înregistrat.

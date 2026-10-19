@@ -18,7 +18,7 @@
 @if (editing)
 {
     <section class="catalog offer-template-editor" aria-label="Editor de șablon">
-        <div class="catalog-heading"><h2>@(original is null ? "Șablon nou" : $"Modifică șablonul {original.Name}")</h2><button type="button" class="danger" disabled="@busy" @onclick="CloseEditor">Închide</button></div>
+        <div class="catalog-heading"><h2>@(original is null ? "Șablon nou" : $"Modifică șablonul {original.Name}")</h2><span class="heading-actions"><HelpButton Topic="oferte-sablon-editor" About="Editorul de șablon de ofertă" /><button type="button" class="danger" disabled="@busy" @onclick="CloseEditor">Închide</button></span></div>
         <div class="catalog-body">
         <FileDropZone Id="offer-sample" Accept=".xlsx" Disabled="busy" OnChange="SampleChosenAsync" Text="Trage aici un fișier de probă .xlsx sau alege-l (nu se păstrează)" />
         @if (workbook is not null && workbook.Sheets.Count > 1)

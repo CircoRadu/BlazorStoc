@@ -1,0 +1,22 @@
+# Setări
+Ruta: /setari
+Cautare: setari configurari administrare anaf notificari harta facturi backup module tipuri de utilizatori
+
+Configurările aplicației, rezervate administratorului; un utilizator fără acest rol ajunge doar la șabloanele de facturi (le creează și le modifică). Fiecare secțiune are propriul ajutor: apasă „?” după ce ai ales secțiunea.
+
+## Elemente
+### Secțiunile
+- Preluare date ANAF | filă | Configurarea interogării serviciului public ANAF ([[setari-anaf]]).
+- Notificări | filă | Șabloanele de notificări și setările lor ([[setari-notificari-sabloane]], [[setari-notificari-setari]]).
+- Hartă | filă | Furnizorul și aspectul hărții de mentenanță ([[setari-harta-motor]], [[setari-harta-overlay]]).
+- Facturi | filă | Șabloanele de citire a facturilor ([[setari-facturi-generare]], [[setari-facturi-sabloane]]).
+- Backup | filă | Backup, restaurare, copiere pe NAS și verificarea orei ([[setari-backup]], [[setari-backup-nas]], [[setari-backup-ora]]).
+- Module | filă | Starea modulelor aplicației și oprirea/pornirea lor ([[setari-module]]).
+- Tipuri de utilizatori | filă | Drepturile fiecărui tip de utilizator ([[setari-tipuri-utilizatori]]).
+- Subsecțiunile | filă | Unele secțiuni au subsecțiuni, afișate sub bara principală.
+
+## Flux: Cum găsesc o setare
+1. Alege secțiunea potrivită din bara de file.
+2. Dacă are subsecțiuni, alege-o pe cea dorită.
+3. Apasă „?” ca să vezi ce face fiecare element al secțiunii.
+Nota: vezi doar secțiunile la care ai drept; un utilizator obișnuit vede doar Facturi.

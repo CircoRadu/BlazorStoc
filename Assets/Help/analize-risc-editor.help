@@ -1,0 +1,24 @@
+# Formularul analizei de risc
+Cautare: analiza de risc formular numar intocmita de data inregistrarii valabilitate luni observatii punct de lucru dezactiveaza
+
+Formularul pentru o analiză de risc nouă sau pentru editarea uneia existente. Se deschide în fișa beneficiarului sau în pagina Analize de risc.
+
+## Elemente
+### Câmpuri
+- Beneficiar * | listă | Doar în pagina Analize de risc, la o analiză nouă.
+- Punct de lucru * | listă | Punctul analizat. La editare nu se mai schimbă.
+- Număr de înregistrare * | câmp | Rămâne același la reviziile analizei (folosește „Reînnoiește”); o analiză nouă are un număr nou.
+- Întocmită de * | câmp | Persoana abilitată să întocmească analize de risc la securitate.
+- Data înregistrării * | câmp | Din calendar; nu poate fi în viitor. Nu se mai modifică după ce analiza a fost reînnoită. Ultima reînnoire a unei analize noi este chiar data înregistrării.
+- Valabilitate (luni) * | câmp | Conform legii, 36 de luni; poate fi modificată oricând. Alături apare data expirării calculate.
+- Observații | câmp | Text liber.
+- Dezactivează analiza veche | comutator | Apare când punctul are deja o analiză activă: un punct poate avea o singură analiză activă, deci cea veche se dezactivează la salvare.
+### Butoane
+- Adaugă analiza / Salvează analiza | buton | Salvează.
+- Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+
+## Flux: Cum adaug o analiză de risc
+1. Alege (în pagina Analize de risc) beneficiarul și punctul de lucru.
+2. Scrie numărul de înregistrare, persoana care a întocmit-o și data înregistrării.
+3. Verifică valabilitatea (36 de luni implicit) și data de expirare afișată.
+4. Dacă punctul are deja o analiză activă, pornește „Dezactivează analiza veche” și apasă „Adaugă analiza”.

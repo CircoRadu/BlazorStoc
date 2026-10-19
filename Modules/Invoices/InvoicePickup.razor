@@ -44,7 +44,7 @@
 {
     <div class="delete-overlay template-popup-overlay">
         <section class="delete-dialog template-popup" role="dialog" aria-modal="true" aria-label="Creare șablon de factură">
-            <div class="heading-actions"><button type="button" class="refresh act-close" @onclick="CloseTemplateCreation">✕ Închide fără să creezi șablonul</button></div>
+            <div class="heading-actions"><HelpButton Topic="setari-facturi-generare" About="Crearea șablonului de factură" /><button type="button" class="refresh act-close" @onclick="CloseTemplateCreation">✕ Închide fără să creezi șablonul</button></div>
             <InvoiceTemplateWorkbench ExistingSession="session" SavedRecord="OnTemplateCreatedAsync" Closed="CloseTemplateCreation" />
         </section>
     </div>
