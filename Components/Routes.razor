@@ -7,9 +7,9 @@
         </LayoutView>
     </NotFound>
     <Found Context="routeData">
-        @if (UnavailableModule(routeData.PageType))
+        @if (UnavailableModule(routeData.PageType) is { } unavailableId)
         {
-            <LayoutView Layout="typeof(Layout.MainLayout)"><ModuleUnavailable /></LayoutView>
+            <LayoutView Layout="typeof(Layout.MainLayout)"><ModuleUnavailable ModuleId="@unavailableId" /></LayoutView>
         }
         else
         {
@@ -28,7 +28,7 @@
     [Inject] private BlazorStoc.Modules.ModuleRegistry Modules { get; set; } = default!;
 
     // A page of a module (attribute [Module]) is replaced by a notice while the module is not running; the other pages are not affected.
-    private bool UnavailableModule(Type page) =>
+    private string? UnavailableModule(Type page) =>
         page.GetCustomAttributes(typeof(BlazorStoc.Modules.ModuleAttribute), inherit: false) is [BlazorStoc.Modules.ModuleAttribute { } attribute, ..]
-        && !Modules.IsAvailable(attribute.ModuleId);
+        && !Modules.IsAvailable(attribute.ModuleId) ? attribute.ModuleId : null;
 }

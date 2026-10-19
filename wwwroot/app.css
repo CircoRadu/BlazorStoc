@@ -131,6 +131,15 @@
 .main-menu-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; max-width:1000px; }
 .main-menu-grid>a { min-height:145px; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:18px; padding:26px; background:#fff; border:1px solid var(--line); border-radius:12px; color:var(--ink); box-shadow:0 4px 18px #183b2b05; }
 .main-menu-grid>a:hover { border-color:#a9cec2; box-shadow:0 8px 24px #183b2b0c; transform:translateY(-1px); }
+/* The tile of a module that is out (stopped by the administrator, failing, not started): same place and size, grey, no link, no hover. */
+.main-menu-grid>.main-menu-off { min-height:145px; display:grid; grid-template-columns:auto 1fr; align-items:center; gap:18px; padding:26px; background:#f3f5f4; border:1px dashed #c9d3ce; border-radius:12px; color:var(--muted); cursor:not-allowed; }
+/* Confirmation of a manual stop of a module (Setari -> Module): the reason is asked before the module goes out. */
+.module-stop-confirm { margin:0 0 18px; padding:18px 24px; border:1px solid #e3b8b3; border-radius:12px; background:#fff7f6; }
+.module-stop-confirm legend { padding:0 8px; font-weight:700; color:#b3261e; }
+.module-stop-confirm p { margin:0 0 14px; }
+.main-menu-off h2 { color:var(--muted); }
+.main-menu-off .main-menu-icon { background:#e6eae8; color:#8a9791; }
+.main-menu-off .module-off-note { margin-top:8px; color:#8a5a00; font-weight:600; }
 .main-menu-grid h2 { margin:0 0 8px; font-size:18px; }
 .main-menu-grid p { margin:0; color:var(--muted); font-size:12px; line-height:1.6; }
 .main-menu-icon { width:46px; height:46px; display:grid; place-items:center; border-radius:10px; background:#eaf4f0; color:var(--green); font-size:25px; }

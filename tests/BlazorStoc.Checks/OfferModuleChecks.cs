@@ -138,7 +138,7 @@ public static class OfferModuleChecks
         var layout = File.ReadAllText(Path.Combine(root, "Components", "Layout", "MainLayout.razor"));
         check(!layout.Contains("href=\"/oferte\""), "Offers: the menu entry comes from the module's Nav, not from MainLayout");
         var dashboard = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Dashboard.razor"));
-        check(Regex.IsMatch(dashboard, @"<ModuleGate ModuleId=""oferte"" Notice=""false""><AuthorizeView Policy=""perm:oferte\.view"">"), "Offers: the tile of the main page is inside the gate of the module");
+        check(Regex.IsMatch(dashboard, @"<ModuleTile ModuleId=""oferte"" Policy=""perm:oferte\.view"""), "Offers: the tile of the main page belongs to the module (grey while it is out)");
         var situation = File.ReadAllText(Path.Combine(root, "Modules", "ProjectReports", "ProjectSituationPage.razor"));
         check(situation.Contains("catch (BlazorStoc.Modules.ModuleUnavailableException)") && situation.Contains("Modulul Oferte este oprit"),
             "Offers: the project situation says the offers module is out instead of a generic error");

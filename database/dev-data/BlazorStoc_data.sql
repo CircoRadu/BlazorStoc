@@ -228,6 +228,11 @@ REPLACE INTO `invoice_templates` (`id`, `name`, `supplier_name`, `supplier_cui`,
 /*!40000 ALTER TABLE `invoice_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `module_state` WRITE;
+/*!40000 ALTER TABLE `module_state` DISABLE KEYS */;
+/*!40000 ALTER TABLE `module_state` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `notification_settings` WRITE;
 /*!40000 ALTER TABLE `notification_settings` DISABLE KEYS */;
 /*!40000 ALTER TABLE `notification_settings` ENABLE KEYS */;
@@ -1366,6 +1371,7 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-harta.edit'),
 (1,'setari-harta.view'),
 (1,'setari-module.retry'),
+(1,'setari-module.toggle'),
 (1,'setari-module.view'),
 (1,'setari-notificari.edit'),
 (1,'setari-notificari.view'),
@@ -1392,12 +1398,32 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (2,'analize-risc.delete'),
 (2,'analize-risc.edit'),
 (2,'analize-risc.view'),
+(2,'beneficiari.add'),
+(2,'beneficiari.delete'),
+(2,'beneficiari.edit'),
+(2,'beneficiari.export'),
+(2,'beneficiari.view'),
+(2,'categorii.add'),
 (2,'categorii.delete'),
+(2,'categorii.edit'),
 (2,'categorii.view'),
+(2,'export-consum.export'),
+(2,'export-consum.view'),
+(2,'facturi.add'),
+(2,'facturi.delete'),
+(2,'facturi.edit'),
+(2,'facturi.export'),
+(2,'facturi.view'),
 (2,'furnizori.add'),
 (2,'furnizori.delete'),
 (2,'furnizori.edit'),
 (2,'furnizori.view'),
+(2,'iesire-multipla.add'),
+(2,'iesire-multipla.view'),
+(2,'inventar-preluare.add'),
+(2,'inventar-preluare.view'),
+(2,'inventar.export'),
+(2,'inventar.view'),
 (2,'mentenanta.add'),
 (2,'mentenanta.contracte'),
 (2,'mentenanta.delete'),
@@ -1412,8 +1438,14 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (2,'oferte.export'),
 (2,'oferte.sabloane'),
 (2,'oferte.view'),
+(2,'preluare-factura.add'),
+(2,'preluare-factura.view'),
 (2,'produse.add'),
+(2,'produse.delete'),
+(2,'produse.edit'),
+(2,'produse.export'),
 (2,'setari-facturi.add'),
+(2,'setari-facturi.delete'),
 (2,'setari-facturi.edit'),
 (2,'setari-facturi.view'),
 (2,'stoc.iesire'),
@@ -1433,7 +1465,7 @@ UNLOCK TABLES;
 LOCK TABLES `user_types` WRITE;
 /*!40000 ALTER TABLE `user_types` DISABLE KEYS */;
 REPLACE INTO `user_types` (`id`, `name`, `normalized_name`, `description`, `is_system`, `version`) VALUES (1,'Administrator','ADMINISTRATOR','Acces complet la toate modulele si la administrarea sistemului.',1,0),
-(2,'Utilizator','UTILIZATOR','Lucru curent in module, fara administrarea sistemului.',1,40);
+(2,'Utilizator','UTILIZATOR','Lucru curent in module, fara administrarea sistemului.',1,41);
 /*!40000 ALTER TABLE `user_types` ENABLE KEYS */;
 UNLOCK TABLES;
 

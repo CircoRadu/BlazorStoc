@@ -115,6 +115,10 @@ internal static class ServiceRegistration
     public static IServiceCollection AddModules(this IServiceCollection services, IConfiguration configuration, ModuleRegistry registry)
     {
         services.AddSingleton(registry);
+        // The modules the administrator stopped by hand (module_state) stay stopped after a restart; the switch itself is ModuleControl (Setari -> Module).
+        services.AddSingleton<IModuleStateStore, MariaModuleStateStore>();
+        services.AddHostedService<ModuleStateRestorer>();
+        services.AddScoped<ModuleControl>();
         registry.Add(new OcrModule(), services, configuration);
         registry.Add(new BackupModule(), services, configuration);
         // The order is the order of the menu entries and of the notification sources: vehicles, offers, maintenance, risk analyses (as before the modules).

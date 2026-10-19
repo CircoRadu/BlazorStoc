@@ -132,7 +132,7 @@ public static class ProjectReportsModuleChecks
 
         string Read(params string[] path) => File.ReadAllText(Path.Combine([root, .. path]));
         check(Read("Components", "Layout", "MainLayout.razor").Contains("ProjectReportsModule.ModuleId"), "Project reports: the export menu link is shown only while the module is available");
-        check(Read("Components", "Pages", "Dashboard.razor").Contains("ModuleGate ModuleId=\"situatie-proiect\""), "Project reports: the export tile of the main page is in a gate of the module");
+        check(Read("Components", "Pages", "Dashboard.razor").Contains("ModuleTile ModuleId=\"situatie-proiect\""), "Project reports: the export tile of the main page belongs to the module");
         var project = Read("Components", "Pages", "ProjectPage.razor");
         check(project.Split("ModuleGate ModuleId=\"situatie-proiect\"").Length - 1 == 2, "Project reports: the situation and equipment rows of the project page are in gates of the module");
         check(Read("Components", "Shared", "ProjectComponentsSection.razor").Contains("ModuleGate ModuleId=\"situatie-proiect\""), "Project reports: the situation link of the components section is in a gate of the module");

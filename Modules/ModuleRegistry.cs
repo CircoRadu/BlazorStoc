@@ -41,7 +41,13 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
         public DateTime SinceUtc;
         // A "Disabled" change was announced and no "Recovered" has followed: the next return to health is announced too.
         public bool Announced;
+        // Stopped by the administrator: independent of the circuit breaker, the module stays out until it is started by hand (and across restarts, see ModuleStateStore).
+        public bool ManualStop;
+        public string? StoppedBy;
     }
+
+    /// <summary>The modules that cannot be stopped by hand: the journal reads what the administrator did, so it is always there.</summary>
+    public static readonly IReadOnlySet<string> Protected = new HashSet<string>(StringComparer.Ordinal) { Journal.JournalModule.ModuleId };
 
     // ---- changes (for the journal) ----
 
@@ -200,8 +206,97 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
                 var entry = entries[id];
                 var status = Current(entry);
                 return new ModuleInfo(id, entry.Module.Name, entry.Module.Version.ToString(), status, entry.SinceUtc,
-                    status == ModuleStatus.Healthy ? null : entry.Reason, status == ModuleStatus.Healthy ? null : entry.Origin, entry.Failures);
+                    status == ModuleStatus.Healthy ? null : entry.Reason, status == ModuleStatus.Healthy ? null : entry.Origin, entry.Failures,
+                    entry.ManualStop ? entry.StoppedBy : null);
             })];
+    }
+
+    // ---- stop / start by hand (Setari -> Module) ----
+
+    /// <summary>True when the administrator can switch the module: it exists, it started (its services are registered) and it is not one of <see cref="Protected"/>.</summary>
+    public bool CanToggle(string moduleId)
+    {
+        lock (gate) return entries.TryGetValue(moduleId, out var entry) && !entry.StartupFailed && !Protected.Contains(moduleId);
+    }
+
+    public bool IsManuallyStopped(string moduleId)
+    {
+        lock (gate) return entries.TryGetValue(moduleId, out var entry) && entry.ManualStop;
+    }
+
+    /// <summary>
+    /// Takes a module out of service on the administrator's word, at once and without a restart: new calls meet the same closed door as with an open circuit (menu, pages,
+    /// dashboard tile, guarded entry points), the calls already running finish. The circuit breaker no longer counts for it until <see cref="Start"/>.
+    /// The journal entry is the caller's (it carries the administrator's name); no "system" change is raised.
+    /// </summary>
+    public ModuleToggleResult Stop(string moduleId, string reason, string user)
+    {
+        lock (gate)
+        {
+            if (!entries.TryGetValue(moduleId, out var entry)) return ModuleToggleResult.Unknown;
+            if (Protected.Contains(moduleId)) return ModuleToggleResult.Protected;
+            if (entry.StartupFailed || entry.ManualStop) return ModuleToggleResult.NoChange;
+            MarkStopped(entry, reason, user, time.GetUtcNow().UtcDateTime);
+        }
+        NotifyChanged();
+        logger?.LogWarning("Module {ModuleId} was stopped by the administrator.", moduleId);
+        return ModuleToggleResult.Done;
+    }
+
+    /// <summary>Starts again a module stopped by hand: the circuit starts from scratch (healthy, no failures counted).</summary>
+    public ModuleToggleResult Start(string moduleId)
+    {
+        lock (gate)
+        {
+            if (!entries.TryGetValue(moduleId, out var entry)) return ModuleToggleResult.Unknown;
+            if (entry.StartupFailed) return ModuleToggleResult.NeedsRestart;
+            if (!entry.ManualStop) return ModuleToggleResult.NoChange;
+            entry.ManualStop = false;
+            entry.StoppedBy = null;
+            entry.Failures = 0;
+            entry.HalfOpen = false;
+            entry.Announced = false;
+            entry.Status = ModuleStatus.Healthy;
+            entry.Reason = null;
+            entry.Origin = "";
+            entry.SinceUtc = time.GetUtcNow().UtcDateTime;
+        }
+        NotifyChanged();
+        logger?.LogInformation("Module {ModuleId} was started by the administrator.", moduleId);
+        return ModuleToggleResult.Done;
+    }
+
+    /// <summary>Applies the stops that were saved before the application was restarted (nothing is written to the journal: it was when the administrator stopped the module).</summary>
+    public int ApplyStopped(IEnumerable<StoppedModule> stopped)
+    {
+        var applied = 0;
+        lock (gate)
+        {
+            foreach (var item in stopped)
+            {
+                if (!entries.TryGetValue(item.ModuleId, out var entry) || entry.StartupFailed || entry.ManualStop || Protected.Contains(item.ModuleId)) continue;
+                MarkStopped(entry, item.Reason, item.StoppedBy, item.StoppedUtc);
+                applied++;
+            }
+        }
+        if (applied > 0)
+        {
+            NotifyChanged();
+            logger?.LogWarning("{Count} module(s) stay stopped by the administrator since before the restart.", applied);
+        }
+        return applied;
+    }
+
+    private static void MarkStopped(Entry entry, string reason, string user, DateTime atUtc)
+    {
+        entry.ManualStop = true;
+        entry.StoppedBy = user;
+        entry.Failures = 0;
+        entry.HalfOpen = false;
+        entry.Status = ModuleStatus.Disabled;
+        entry.Reason = reason;
+        entry.Origin = ModuleOrigins.Manual;
+        entry.SinceUtc = atUtc;
     }
 
     /// <summary>The status of a module now (an open circuit whose cooldown ended is Degraded). An unknown module is reported as Disabled.</summary>
@@ -262,7 +357,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
     {
         lock (gate)
         {
-            if (!entries.TryGetValue(moduleId, out var entry) || entry.StartupFailed || Current(entry) != ModuleStatus.Disabled) return false;
+            if (!entries.TryGetValue(moduleId, out var entry) || entry.StartupFailed || entry.ManualStop || Current(entry) != ModuleStatus.Disabled) return false;
             entry.OpenUntil = time.GetUtcNow();
             Current(entry);
         }
@@ -278,7 +373,8 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
         ModuleChange? change = null;
         lock (gate)
         {
-            if (!entries.TryGetValue(moduleId, out var entry) || entry.StartupFailed) return;
+            // A module stopped by hand is not counted: the calls that were already running when it was stopped may still fail, and that must not change its state.
+            if (!entries.TryGetValue(moduleId, out var entry) || entry.StartupFailed || entry.ManualStop) return;
             Current(entry);
             entry.Failures++;
             entry.Reason = exception.GetType().Name;
@@ -321,6 +417,7 @@ public sealed class ModuleRegistry(TimeProvider? clock = null)
 
     private ModuleStatus Current(Entry entry)
     {
+        if (entry.ManualStop) return ModuleStatus.Disabled;
         if (entry.Status == ModuleStatus.Disabled && !entry.StartupFailed && time.GetUtcNow() >= entry.OpenUntil)
         {
             // Cooldown over: let the next call through (half-open).

@@ -104,7 +104,7 @@ public static class InventoryModuleChecks
         check(Regex.IsMatch(layout, @"@if \(Modules\.IsAvailable\(BlazorStoc\.Modules\.Inventory\.InventoryModule\.ModuleId\)\)\s*\{\s*<AuthorizeView Policy=""perm:inventar\.view\|inventar-preluare\.view"">"),
             "Inventory: the menu section is shown only while the module works");
         var dashboard = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Dashboard.razor"));
-        check(Regex.Matches(dashboard, @"<ModuleGate ModuleId=""inventar"" Notice=""false""><AuthorizeView Policy=""perm:inventar(-preluare)?\.view"">").Count == 2, "Inventory: both tiles of the main page are inside the gate of the module");
+        check(Regex.Matches(dashboard, @"<ModuleTile ModuleId=""inventar"" Policy=""perm:inventar(-preluare)?\.view""").Count == 2, "Inventory: both tiles of the main page belong to the module (grey while it is out)");
         var corePdf = new[] { "ConsumptionNotePdfWriter.cs", "ProjectSituationPdfWriter.cs", "InventoryPdfLayout.cs" }.Where(name => File.ReadAllLines(name == "ProjectSituationPdfWriter.cs" ? Path.Combine(root, "Modules", "ProjectReports", name) : Path.Combine(root, "Services", name)).Any(line => !line.TrimStart().StartsWith("//") && line.Contains("InventoryPdfWriter"))).ToList();
         check(corePdf.Count == 0, "Inventory: the PDF writers and the layout of the core use the shared PdfFonts, not the writer of the module (" + string.Join("; ", corePdf) + ")");
     }

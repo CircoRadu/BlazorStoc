@@ -58,7 +58,7 @@ public static class Permissions
         new("setari-notificari", "Setari: Notificari", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
         new("setari-harta", "Setari: Harta", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
         new("setari-backup", "Setari: Backup", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare setari", false), new("backup", "Efectuare backup", false), new("restore", "Restaurare", false)]),
-        new("setari-module", "Setari: Module", "Setari", [new(View, "Vizualizare", false), new("retry", "Reincercare modul", false)]),
+        new("setari-module", "Setari: Module", "Setari", [new(View, "Vizualizare", false), new("retry", "Reincercare modul", false), new("toggle", "Oprire / pornire modul", false)]),
         new("utilizatori", "Utilizatori", "Administrare sistem", Crud(admin: true)),
         new("tipuri-utilizatori", "Tipuri de utilizatori", "Administrare sistem", Crud(admin: true)),
         new("nomenclator", "Nomenclator", "Administrare sistem", Crud(admin: true)),

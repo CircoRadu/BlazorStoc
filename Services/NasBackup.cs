@@ -507,9 +507,13 @@ public sealed class SystemAccess : IAccessControl
 
 /// <summary>The daily backup: once a day, at the time chosen in Settings, a backup is made (and copied to the NAS). A busy lock or a failure is retried after 15 minutes.</summary>
 public sealed class BackupScheduler(IConfiguration configuration, IDataProtectionProvider protection, IBackupOperations operations, IAuditTrail audit,
-    ILoggerFactory loggers, TimeProvider? clock = null, Func<CancellationToken, Task<ClockCheck>>? clockCheck = null) : BackgroundService
+    ILoggerFactory loggers, TimeProvider? clock = null, Func<CancellationToken, Task<ClockCheck>>? clockCheck = null,
+    BlazorStoc.Modules.ModuleRegistry? modules = null) : BackgroundService
 {
     private readonly TimeProvider time = clock ?? TimeProvider.System;
+    // The backup module is out (stopped by the administrator, taken out after failures): the whole schedule - the daily backup, the clean-up of old packages, the clock
+    // check - waits quietly; one line in the log when it pauses and one when it goes on.
+    private bool paused;
     private ClockCheck? lastClock;
     private DateTimeOffset lastClockAt = DateTimeOffset.MinValue;
     private DateTimeOffset retryAfter = DateTimeOffset.MinValue;
@@ -534,6 +538,17 @@ public sealed class BackupScheduler(IConfiguration configuration, IDataProtectio
 
     private async Task TickAsync(ILogger logger, CancellationToken token)
     {
+        if (modules is not null)
+        {
+            var available = modules.IsAvailable(BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId);
+            if (available == paused)
+            {
+                paused = !available;
+                if (paused) logger.LogWarning("The backup module is out: the scheduled backups wait until it is available again.");
+                else logger.LogInformation("The backup module is available again: the scheduled backups go on.");
+            }
+            if (paused) return;
+        }
         var serverNow = time.GetLocalNow();
         var settingsStore = new MariaBackupSettingsStore(configuration);
         // The server date can be changed on purpose (for another application): every ten minutes the clock is compared with the internet time, and while it is

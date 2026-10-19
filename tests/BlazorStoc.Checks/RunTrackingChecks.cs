@@ -64,6 +64,7 @@ public static class RunTrackingChecks
         await MarkerAsync(check);
         await ServiceAsync(check);
         await ScreensAsync(check);
+        await ModuleSwitchChecks.RunAsync(check);
         await LoginAsync(check);
         SupervisorNote(check);
         await HostResilienceAsync(check);
@@ -297,6 +298,7 @@ public static class RunTrackingChecks
         admin.Services.AddSingleton<IAccessControl>(new TestAccessControl(true, "admin.demo"));
         admin.Services.AddSingleton<IAuditTrail>(audit);
         admin.Services.AddSingleton<TimeProvider>(clock);
+        admin.Services.AddSingleton(ModuleSwitchChecks.NewControl(registry, new TestAccessControl(true, "admin.demo"), audit, clock));
         var panel = admin.Render<ModulesPanel>();
         check(panel.FindAll("tbody tr").Count == 4 && panel.Markup.Contains("Modul fine") && panel.Markup.Contains("Modul failing"), "Screen: the status screen lists every module");
         var rows = panel.FindAll("tbody tr").Select(row => row.TextContent).ToList();
@@ -350,6 +352,7 @@ public static class RunTrackingChecks
         pressedContext.Services.AddSingleton<IAccessControl>(new TestAccessControl(true, "admin.demo"));
         pressedContext.Services.AddSingleton<IAuditTrail>(new TestAuditTrail());
         pressedContext.Services.AddSingleton<TimeProvider>(clock);
+        pressedContext.Services.AddSingleton(ModuleSwitchChecks.NewControl(pressed, new TestAccessControl(true, "admin.demo"), new TestAuditTrail(), clock));
         var pressedBanner = pressedContext.Render<ModuleAlertBanner>();
         var pressedPanel = pressedContext.Render<ModulesPanel>();
         check(pressedBanner.Markup.Contains("Modul pressed"), "Screen: the banner lists the module before \"try again\" is pressed");
@@ -362,6 +365,7 @@ public static class RunTrackingChecks
         ordinary.Services.AddSingleton<IAccessControl>(new TestAccessControl(false, "operator"));
         ordinary.Services.AddSingleton<IAuditTrail>(new TestAuditTrail());
         ordinary.Services.AddSingleton<TimeProvider>(clock);
+        ordinary.Services.AddSingleton(ModuleSwitchChecks.NewControl(registry, new TestAccessControl(false, "operator"), new TestAuditTrail(), clock));
         check(ordinary.Render<ModuleAlertBanner>().FindAll(".module-alert").Count == 0, "Screen: an ordinary user never sees the administrator's banner");
         check(ordinary.Render<ModulesPanel>().FindAll("button.row-icon.renew").Count == 0, "Screen: without the permission the status screen has no \"try again\"");
 

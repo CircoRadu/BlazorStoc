@@ -26,7 +26,7 @@ public static partial class MariaExtendedChecks
             type = await repository.CreateAsync(new UserTypeInput { Name = name, Description = "Magaziner de proba", Keys = ["stoc.intrare", "furnizori.view", "nu.exista"] });
             Check(type.Keys.SetEquals(["stoc.view", "stoc.intrare", "furnizori.view"]) && !type.Summary.IsSystem && type.Summary.UserCount == 0 && type.Summary.Version == 0,
                 "A new type keeps the known keys and adds viewing to a module whose action is granted");
-            Check(await Events(AuditActions.CreateUserType) == 1 && await Events(AuditActions.GrantPermission) == 3, "Creating a type is journaled, with one event for each permission granted");
+            Check(await Events(AuditActions.CreateUserType) == 1 && await Events(AuditActions.GrantPermission) == 1, "Creating a type is journaled, with one consolidated event for all the permissions granted");
             await Rejects<UserOperationException>(() => repository.CreateAsync(new UserTypeInput { Name = name.ToUpperInvariant() }), "A second type with the same name (any case) is rejected");
             await Rejects<UserOperationException>(() => repository.CreateAsync(new UserTypeInput { Name = "x" }), "A type name needs at least two characters");
 
@@ -41,8 +41,14 @@ public static partial class MariaExtendedChecks
             var updated = await repository.UpdateAsync(type, edit);
             Check(updated.Keys.SetEquals(["stoc.view", "stoc.intrare", "beneficiari.view"]) && updated.Summary.Version == 1 && updated.Summary.UserCount == 1,
                 "Updating a type changes its keys and version");
-            Check(await Events(AuditActions.RevokePermission) == 1 && await Events(AuditActions.GrantPermission) == 4 && await Events(AuditActions.EditUserTypeDescription) == 1 &&
-                  await Events(AuditActions.RenameUserType) == 0, "Each permission granted or revoked, and the description, is a journal event of its own");
+            var grants = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc > since && item.EntityType == AuditEntities.UserType && item.Action == AuditActions.GrantPermission).ToArray();
+            var revokes = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc > since && item.EntityType == AuditEntities.UserType && item.Action == AuditActions.RevokePermission).ToArray();
+            Check(revokes.Length == 1 && grants.Length == 2 && await Events(AuditActions.EditUserTypeDescription) == 1 && await Events(AuditActions.RenameUserType) == 0,
+                "The permissions granted by one save are one journal event, those revoked another, and the description a third");
+            Check(revokes[0].Details.Contains("Număr permisiuni: 1") && revokes[0].Details.Contains("furnizori.view") &&
+                  grants.Any(item => item.Details.Contains("Număr permisiuni: 1") && item.Details.Contains("beneficiari.view")) &&
+                  grants.Any(item => item.Details.Contains("Număr permisiuni: 3") && item.Details.Contains("stoc.intrare") && item.Details.Contains("furnizori.view")),
+                "A consolidated permission event counts and names every permission it covers");
             keys = await permissions.GetKeysAsync(principal);
             Check(keys.SetEquals(updated.Keys), "A change of the type applies at once to the users of the type (no new sign-in)");
             await Rejects<UserOperationException>(() => repository.UpdateAsync(type, edit), "A stale type edit is rejected");

@@ -106,8 +106,7 @@ public sealed class MariaUserTypeRepository(IConfiguration configuration, IAcces
             await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.UserType, AuditActions.CreateUserType, created.Id.ToString(),
                 Target(created), AuditDetails.Identification(("Nume", created.Name), ("Descriere", created.Summary.Description),
                     ("Număr permisiuni", created.Keys.Count.ToString())), string.Empty, cancellationToken).ConfigureAwait(false);
-            foreach (var permission in created.Keys)
-                await RecordKeyAsync(AuditActions.GrantPermission, created, permission, string.Empty, cancellationToken).ConfigureAwait(false);
+            await RecordKeysAsync(AuditActions.GrantPermission, created, created.Keys, string.Empty, cancellationToken).ConfigureAwait(false);
             permissions?.Invalidate();
             return created;
         }
@@ -151,10 +150,8 @@ public sealed class MariaUserTypeRepository(IConfiguration configuration, IAcces
             if (!string.Equals(original.Summary.Description, updated.Summary.Description, StringComparison.Ordinal))
                 await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.UserType, updated.Id.ToString(), Target(updated),
                     [new("Descriere", original.Summary.Description, updated.Summary.Description)], reason, cancellationToken, AuditActions.EditUserTypeDescription).ConfigureAwait(false);
-            foreach (var permission in original.Keys.Except(updated.Keys))
-                await RecordKeyAsync(AuditActions.RevokePermission, updated, permission, reason, cancellationToken).ConfigureAwait(false);
-            foreach (var permission in updated.Keys.Except(original.Keys))
-                await RecordKeyAsync(AuditActions.GrantPermission, updated, permission, reason, cancellationToken).ConfigureAwait(false);
+            await RecordKeysAsync(AuditActions.RevokePermission, updated, original.Keys.Except(updated.Keys), reason, cancellationToken).ConfigureAwait(false);
+            await RecordKeysAsync(AuditActions.GrantPermission, updated, updated.Keys.Except(original.Keys), reason, cancellationToken).ConfigureAwait(false);
             permissions?.Invalidate();
             return updated;
         }
@@ -189,9 +186,14 @@ public sealed class MariaUserTypeRepository(IConfiguration configuration, IAcces
 
     private static string Target(UserTypeDetail type) => $"#{type.Id} · {type.Name}";
 
-    private Task RecordKeyAsync(string action, UserTypeDetail type, string permission, string reason, CancellationToken cancellationToken) =>
-        AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.UserType, action, type.Id.ToString(), Target(type),
-            AuditDetails.Identification(("Permisiune", PermissionLabel(permission))), reason, cancellationToken);
+    // All the permissions granted (or revoked) by one save are one journal entry, listed by key; nothing is journaled when there are none.
+    private Task RecordKeysAsync(string action, UserTypeDetail type, IEnumerable<string> keys, string reason, CancellationToken cancellationToken)
+    {
+        var changed = keys.Order(StringComparer.Ordinal).ToArray();
+        return changed.Length == 0 ? Task.CompletedTask :
+            AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.UserType, action, type.Id.ToString(), Target(type),
+                AuditDetails.Identification(("Număr permisiuni", changed.Length.ToString()), ("Permisiuni", string.Join("; ", changed.Select(PermissionLabel)))), reason, cancellationToken);
+    }
 
     // "Furnizori: Stergere" for the key furnizori.delete; the key itself when the catalog does not know it.
     public static string PermissionLabel(string key)

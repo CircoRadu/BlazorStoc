@@ -118,7 +118,7 @@ public static class SupplierModuleChecks
         var layout = File.ReadAllText(Path.Combine(root, "Components", "Layout", "MainLayout.razor"));
         check(Regex.IsMatch(layout, @"Modules\.IsAvailable\(BlazorStoc\.Modules\.Suppliers\.SuppliersModule\.ModuleId\)[\s\S]{0,200}href=""/furnizori"""), "Suppliers: the menu entries Furnizori and Facturi appear only while the module works");
         var dashboard = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Dashboard.razor"));
-        check(Regex.Matches(dashboard, @"<ModuleGate ModuleId=""@BlazorStoc\.Modules\.Suppliers\.SuppliersModule\.ModuleId"" Notice=""false"">").Count == 2, "Suppliers: the two tiles of the main page are in a gate of the module");
+        check(Regex.Matches(dashboard, @"<ModuleTile ModuleId=""@BlazorStoc\.Modules\.Suppliers\.SuppliersModule\.ModuleId""").Count == 2, "Suppliers: the two tiles of the main page belong to the module");
         var strays = Directory.GetFiles(Path.Combine(root, "Services"), "*.cs").Select(Path.GetFileName).Where(name => name is not null && (name.StartsWith("MariaSupplier", StringComparison.Ordinal) || name.StartsWith("Supplier", StringComparison.Ordinal) || name == "CachedSupplierRepository.cs")).ToList();
         check(strays.Count == 0, "Suppliers: the sources of the module are not left in Services (" + string.Join(", ", strays) + ")");
         var picker = File.ReadAllText(Path.Combine(root, "Components", "Shared", "EntryOriginPicker.razor"));

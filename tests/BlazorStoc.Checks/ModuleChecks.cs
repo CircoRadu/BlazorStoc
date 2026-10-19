@@ -38,7 +38,7 @@ public static class ModuleChecks
     private static List<string> Markers(IServiceCollection services) =>
         [.. services.Select(descriptor => descriptor.ImplementationInstance).OfType<Marker>().Select(marker => marker.Name)];
 
-    // Every tile of the main page that leads to a page of a module sits in a gate of that module: with the module out the tile is gone (only the tiles of the core stay without one).
+    // Every tile of the main page that leads to a page of a module is a ModuleTile of that module: with the module out the tile stays, grey and without a link (only the tiles of the core stay without one).
     private static void DashboardTiles(Action<bool, string> check)
     {
         var root = AppContext.BaseDirectory;
@@ -46,8 +46,8 @@ public static class ModuleChecks
         if (root is null) { check(false, "Dashboard tiles: the project folder is found"); return; }
         var core = new HashSet<string> { "/produse", "/iesiri/multipla", "/categorii", "/beneficiari", "/utilizatori", "/nomenclator", "/setari" };
         var ungated = File.ReadAllLines(Path.Combine(root, "Components", "Pages", "Dashboard.razor"))
-            .Where(line => line.Contains("main-menu-icon"))
-            .Select(line => (Href: Regex.Match(line, "<a href=\"([^\"]+)\"").Groups[1].Value, Gated: line.Contains("<ModuleGate")))
+            .Where(line => line.Contains("main-menu-icon") || line.Contains("<ModuleTile "))
+            .Select(line => (Href: Regex.Match(line, "(?:<a href|<ModuleTile [^>]*Href)=\"([^\"]+)\"").Groups[1].Value, Gated: line.Contains("<ModuleGate") || line.Contains("<ModuleTile ")))
             .Where(tile => tile.Href.Length > 0 && !core.Contains(tile.Href) && !tile.Gated)
             .Select(tile => tile.Href).ToList();
         check(ungated.Count == 0, "Modules: every module tile of the main page is inside the gate of its module (" + string.Join(", ", ungated) + ")");

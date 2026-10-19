@@ -235,6 +235,9 @@ public static class AuditActions
     public const string ModuleDisabled = "Oprire modul";
     public const string ModuleRecovered = "Revenire modul";
     public const string ModuleRetry = "Reîncercare modul";
+    // The administrator stops / starts a module by hand (Setari -> Module); recorded under his name, the stop with the reason he gave.
+    public const string ModuleManualStop = "Oprire manuală modul";
+    public const string ModuleManualStart = "Pornire manuală modul";
     // Found at the next start: the previous run of the application did not end normally (killed, crashed, the machine went down).
     public const string ApplicationUnexpectedStop = "Oprire neașteptată aplicație";
 

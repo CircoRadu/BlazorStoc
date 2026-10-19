@@ -171,7 +171,7 @@ public static class InvoiceModuleChecks
         var layout = File.ReadAllText(Path.Combine(root, "Components", "Layout", "MainLayout.razor"));
         check(Regex.IsMatch(layout, @"@if \(Modules\.IsAvailable\(BlazorStoc\.Modules\.Invoices\.InvoicesModule\.ModuleId\)\) \{\s*<AuthorizeView Policy=""perm:preluare-factura\.view"">"), "Invoices: the menu entry is shown only while the module works");
         var dashboard = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Dashboard.razor"));
-        check(dashboard.Contains("<ModuleGate ModuleId=\"preluare-factura\" Notice=\"false\"><AuthorizeView Policy=\"perm:preluare-factura.view\">"), "Invoices: the tile of the main page is inside the gate of the module");
+        check(dashboard.Contains("<ModuleTile ModuleId=\"preluare-factura\" Policy=\"perm:preluare-factura.view\""), "Invoices: the tile of the main page belongs to the module (grey while it is out)");
         var picker = File.ReadAllText(Path.Combine(root, "Components", "Shared", "EntryOriginPicker.razor"));
         check(Regex.IsMatch(picker, @"@if \(Modules\.IsAvailable\(BlazorStoc\.Modules\.Invoices\.InvoicesModule\.ModuleId\)\) \{ <a class=""refresh act-confirm origin-pdf"""), "Invoices: the \"Preia din PDF\" link of the entry form is shown only while the module works");
         var suppliers = File.ReadAllText(Path.Combine(root, "Modules", "Suppliers", "MariaSupplierRepository.cs"));

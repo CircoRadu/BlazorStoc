@@ -123,7 +123,7 @@ public static class JournalModuleChecks
             "Architecture: the journal module lives in Modules/Journal (nothing of it is left in Services or Components)");
         string Read(params string[] path) => File.ReadAllText(Path.Combine([root, .. path]));
         check(Read("Components", "Layout", "MainLayout.razor").Contains("JournalModule.ModuleId"), "Journal: the menu link is shown only while the module is available");
-        check(Read("Components", "Pages", "Dashboard.razor").Contains("ModuleGate ModuleId=\"jurnal\""), "Journal: the tile of the main page is in a gate of the module");
+        check(Read("Components", "Pages", "Dashboard.razor").Contains("ModuleTile ModuleId=\"jurnal\""), "Journal: the tile of the main page belongs to the module");
         check(!Read("Modules", "Journal", "Audit.razor").Contains("IAuditTrail") && Read("Modules", "Journal", "AuditFull.razor").Contains("IAuditReader Reader"),
             "Journal: the latest-events page only reads (IAuditReader); the complete journal reads through the reader and records its export through the journal");
     }

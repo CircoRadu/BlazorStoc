@@ -133,7 +133,7 @@ public static class NotificationModuleChecks
         var layout = File.ReadAllText(Path.Combine(root, "Components", "Layout", "MainLayout.razor"));
         check(Regex.IsMatch(layout, @"@if \(Modules\.IsAvailable\(BlazorStoc\.Modules\.Notifications\.NotificationsModule\.ModuleId\)\)\s*\{\s*<AuthorizeView Policy=""perm:notificari\.view"">"), "Notifications: the menu entry is shown only while the module works");
         var dashboard = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Dashboard.razor"));
-        check(dashboard.Contains("<ModuleGate ModuleId=\"notificari\" Notice=\"false\"><AuthorizeView Policy=\"perm:notificari.view\">"), "Notifications: the tile of the main page is inside the gate of the module");
+        check(dashboard.Contains("<ModuleTile ModuleId=\"notificari\" Policy=\"perm:notificari.view\""), "Notifications: the tile of the main page belongs to the module (grey while it is out)");
         var program = File.ReadAllText(Path.Combine(root, "Program.cs"));
         check(program.Contains("IsAvailable(BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId))\ntry") || program.Contains("IsAvailable(BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId))\r\ntry"),
             "Notifications: the starting templates are made only while the module works (the application starts without the module)");

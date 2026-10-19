@@ -4,6 +4,24 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
+### 19.10.2026 - Oprire si pornire manuala a unui modul (Setari -> Module)
+
+**Verificat de agent 19.10.2026** (instanta de test pe baza de test: oprire cu motiv, repornirea aplicatiei, pornire, modul oprit din configurare, pauza programarii backup; vezi IMPLEMENTED.md).
+
+**Ce s-a adaugat:** in Setari -> Module, coloana "Pornit" cu un comutator pe fiecare modul. Oprirea cere un motiv (obligatoriu) si arata ce nu va mai merge; pornirea se face dintr-un clic. Starea se pastreaza in baza (tabelul `module_state`, migrarea 42), deci un modul oprit ramane oprit si dupa repornirea aplicatiei, pana il pornesti tu. Permisiune noua `setari-module.toggle`, rezervata administratorului. Jurnalul de activitate nu poate fi oprit (comutatorul lui este dezactivat), iar un modul care nu a pornit sau e oprit din configurare are comutatorul dezactivat (cere repornirea aplicatiei).
+
+**Ce face acum:** modulul oprit manual iese imediat din meniu, pe pagina principala placa lui ramane la locul ei, gri, fara link si cu textul "Oprit temporar de administrator", iar paginile lui spun "Modul oprit temporar". Operatiile deja pornite se termina; apelurile noi sunt refuzate. Un modul oprit manual nu mai este numarat de protectia la erori si nu se mai reia singur dupa 30 de secunde. Programarea backup-ului asteapta cat modulul Backup este oprit. Cand il pornesti, modulul incepe de la zero (fara erori numarate). Administratorul vede in tabel cine l-a oprit, cand si de ce, iar bannerul de deasupra paginilor il include.
+
+Pasi:
+
+1. Intra ca administrator in Setari -> Module. Comutatorul Jurnalului este dezactivat (titlu: "nu poate fi oprit").
+2. Opreste un modul (de exemplu Analize de risc): se deschide confirmarea; apasa "Opreste modulul" fara motiv: apare mesajul de camp obligatoriu si nimic nu se opreste. Apasa "Renunta": comutatorul revine pe On.
+3. Opreste-l din nou cu motiv: randul arata "Oprit", "oprit de administrator (utilizatorul tau): motivul", iar sus apare bannerul. Intrarea din meniu dispare.
+4. Deschide pagina principala: placa modulului este gri, fara link, cu "Oprit temporar de administrator". Deschide direct adresa paginii modulului: apare "Modul oprit temporar".
+5. In Jurnal, filtreaza dupa actiunea "Oprire manuala modul": intrarea este pe numele tau, cu starea veche/noua si motivul.
+6. Opreste aplicatia si porneste-o din nou (`tools\supervisor.ps1`): modulul ramane oprit. Porneste-l din comutator: intrarea "Pornire manuala modul" arata cine l-a oprit, de cand, cat a durat oprirea si motivul.
+7. Cu un utilizator obisnuit: nu vede fila Module, nici bannerul; placa gri o vede doar daca are permisiunea modulului.
+
 ### 16.10.2026 - Backup, restaurare si copiere NAS intr-un proces separat
 
 **Ce s-a adaugat:** backup-ul (la cerere, programat, la preluarea de inventar), restaurarea si copierea pe NAS ruleaza intr-un proces propriu al aplicatiei; modulul "Copii de siguranta si restaurare" apare in Setari -> Module.

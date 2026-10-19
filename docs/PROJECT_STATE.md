@@ -91,6 +91,8 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 
 ## Probleme deschise
 
+- Help contextual (propunere cu deciziile utilizatorului din 19.10.2026, in implementare pe branch-ul `feature/help`): `docs/PROPUNERE_HELP.md`.
+
 - Propunere de studiu, neimplementata: selectarea liniilor ofertei la pasul 4 si stergerea unei oferte din proiect (`docs/PROPUNERE_OFERTE_SELECTIE_STERGERE.md`); asteapta deciziile din sectiunea 5.
 
 - Verificari ramase: `docs/TESTE_RAMASE.md` (cazurile N45, N47 si cele de pe pagina Facturi); drepturile contului migrator pe baza de teste.
@@ -230,3 +232,9 @@ Il stabileste utilizatorul.
 - Pagina proiectului ramane in nucleu si isi arata proiectul oricand: cu modulul oprit lista de observatii e inlocuita de o nota, butonul „Adauga observatie” dispare, iar o eroare la incarcarea observatiilor da un rand „Observatiile nu au putut fi incarcate” fara sa strice pagina.
 - Verificat: suita in memorie 1509 PASS (17 verificari noi in `ProjectObservationsModuleChecks`, grupul `modules` 241), MariaDB 2292 PASS. In browser pe baza de test (5092): modul pornit (adaugare, fisier PDF atasat, descarcare 200 application/pdf, lista pe proiect, editare cu motivare, stergere cu arhivare), defectiune reala (data corupta in `project_observations.created_utc`: dupa 3 incarcari modulul iese din functiune, pagina proiectului si stocul merg, pagina observatiei spune „Modul indisponibil”, descarcarea da 503, Jurnalul are „Oprire modul”; dupa refacerea datei si 30 s revine singur, „Revenire modul”), oprit din configurare (nota pe proiect, 503, `/observatii/{id}` „Modul indisponibil”) si stergerea unui proiect cu observatie + fisier cu modulul oprit (proiectul, observatia si fisierul in arhiva). Datele de proba sterse.
 - Din nucleu nu se mai poate izola nimic fara sa se strice altceva (stocul, utilizatorii/permisiunile, beneficiarii/proiectele, nomenclatorul).
+
+## Actualizare 19.10.2026 - oprire/pornire manuala a modulelor
+- Setari -> Module: comutator `Pornit` pe fiecare modul (permisiunea `setari-module.toggle`, doar administrator). Oprirea cere motiv, se aplica imediat fara repornire, se salveaza in `module_state` (migrarea 42) si ramane si dupa repornire (`ModuleStateRestorer`). `jurnal` nu se poate opri; un modul care nu a pornit/e oprit din configurare cere repornirea aplicatiei.
+- Jurnal: actiunile `Oprire manuala modul` / `Pornire manuala modul` pe numele administratorului (motiv, stare veche/noua, durata opririi).
+- Pagina principala: placa modulului oprit ramane, gri si fara link (`ModuleTile`, orice modul oprit, nu doar manual); pagina modulului spune `Modul oprit temporar`; programarea backup asteapta cat modulul Backup e oprit.
+- Verificat: suita completa in memorie, sectiunile MariaDB, browser pe instanta de test (vezi IMPLEMENTED.md).

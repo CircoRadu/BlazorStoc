@@ -1,6 +1,23 @@
-@* Shown instead of a page (or of a part of a page) of a module that is not running: it did not start, or its circuit breaker is open. *@
-<div class="error-banner" role="alert">
-    <strong>Modul indisponibil.</strong> Această parte a aplicației nu funcționează momentan; restul aplicației nu este afectat.
-    Reîncearcă peste câteva momente sau anunță administratorul dacă problema persistă.
-    <a class="refresh act-nav" href="/">Înapoi la pagina principală</a>
-</div>
+@using BlazorStoc.Modules
+@inject ModuleRegistry Registry
+@* Shown instead of a page (or of a part of a page) of a module that is not running: it did not start, its circuit breaker is open, or the administrator stopped it.
+   The administrator's stop is said as it is (a decision, not a fault); the reason of the stop is never shown here. *@
+@if (ModuleId is not null && Registry.IsManuallyStopped(ModuleId))
+{
+    <div class="error-banner" role="alert">
+        <strong>Modul oprit temporar.</strong> Această parte a aplicației a fost oprită de administrator; restul aplicației funcționează normal.
+        <a class="refresh act-nav" href="/">Înapoi la pagina principală</a>
+    </div>
+}
+else
+{
+    <div class="error-banner" role="alert">
+        <strong>Modul indisponibil.</strong> Această parte a aplicației nu funcționează momentan; restul aplicației nu este afectat.
+        Reîncearcă peste câteva momente sau anunță administratorul dacă problema persistă.
+        <a class="refresh act-nav" href="/">Înapoi la pagina principală</a>
+    </div>
+}
+
+@code {
+    [Parameter] public string? ModuleId { get; set; }
+}

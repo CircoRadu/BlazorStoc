@@ -4,6 +4,20 @@ Regula: jurnalul numeste exact operatia (nu "Creare"/"Editare" generic). Fiecare
 
 ## Modificari de testat
 
+### 19.10.2026 - Oprire si pornire manuala a modulelor in Jurnal
+
+**Verificat de agent 19.10.2026** (instanta de test pe baza de test: oprire cu motiv, repornirea aplicatiei, pornire, modul oprit din configurare, pauza programarii backup; vezi IMPLEMENTED.md).
+
+**Ce s-a adaugat:** doua actiuni noi, "Oprire manuala modul" si "Pornire manuala modul", scrise pe numele administratorului (nu al utilizatorului "sistem"), in filtrul de actiuni al paginii Jurnal, entitatea "Module".
+
+**Ce face acum:** la oprire, intrarea arata starea veche si noua ("Functioneaza" -> "Oprit de administrator") si motivul scris de administrator; la pornire, arata cine a oprit modulul, de cand, cat a durat oprirea si motivul opririi (motivul pornirii este generat automat). Oprirea dupa erori repetate ramane "Oprire modul" scrisa de "sistem".
+
+Pasi:
+
+1. Opreste si porneste un modul din Setari -> Module (vezi `09_Notificari_si_setari.md`).
+2. In Jurnal filtreaza dupa entitatea "Module" si actiunile "Oprire manuala modul" / "Pornire manuala modul": ambele apar pe numele tau, cu detaliile de mai sus.
+3. Verifica ca la o oprire manuala nu apare si o intrare "Oprire modul" de la "sistem".
+
 ### 19.10.2026 - Jurnalul ca modul
 
 **Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).

@@ -70,7 +70,7 @@ public sealed class ModuleUnavailableException(string moduleId)
 /// Origin is one of <see cref="ModuleOrigins"/>; Failures is the number of consecutive failures counted by the circuit breaker.
 /// </summary>
 public sealed record ModuleInfo(string Id, string Name, string Version, ModuleStatus Status, DateTime SinceUtc = default, string? Reason = null,
-    string? Origin = null, int Failures = 0);
+    string? Origin = null, int Failures = 0, string? StoppedBy = null);
 
 /// <summary>Why a module is out (shown to the administrator).</summary>
 public static class ModuleOrigins
@@ -78,6 +78,25 @@ public static class ModuleOrigins
     public const string Configuration = "oprit din configurare";
     public const string Startup = "nu a pornit";
     public const string RepeatedFailures = "erori repetate";
+    /// <summary>Stopped by the administrator (Setari -> Module); for a manual stop <see cref="ModuleInfo.Reason"/> is the reason the administrator gave.</summary>
+    public const string Manual = "oprit de administrator";
+}
+
+/// <summary>A module stopped by the administrator, as it is saved (module_state) and read back at the next start.</summary>
+public sealed record StoppedModule(string ModuleId, string Reason, string StoppedBy, DateTime StoppedUtc);
+
+/// <summary>The answer of <see cref="ModuleRegistry.Stop"/> / <see cref="ModuleRegistry.Start"/>.</summary>
+public enum ModuleToggleResult
+{
+    Done,
+    /// <summary>No such module.</summary>
+    Unknown,
+    /// <summary>The module cannot be stopped by hand (the journal: the administrator must always be able to see what was done).</summary>
+    Protected,
+    /// <summary>The module did not start or is switched off in the configuration: its services are not registered, only a restart of the application starts it.</summary>
+    NeedsRestart,
+    /// <summary>Already in the asked state.</summary>
+    NoChange
 }
 
 public enum ModuleChangeKind { Disabled, Recovered }
