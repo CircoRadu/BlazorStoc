@@ -17,7 +17,7 @@
 @if (editing is not null)
 {
     <section class="product-editor" aria-labelledby="invoice-editor-title">
-        <div class="catalog-heading"><h2 id="invoice-editor-title">Editează factura @editing.Number</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseEditor">Închide</button></div>
+        <div class="catalog-heading"><h2 id="invoice-editor-title">Editează factura @editing.Number</h2><span class="heading-actions"><HelpButton Topic="facturi-editare" About="Editarea facturii" /><button type="button" class="danger" disabled="@saving" @onclick="CloseEditor">Închide</button></span></div>
         @if (editorError is not null) { <div class="error-banner" role="alert">@editorError</div> }
         <fieldset disabled="@saving">
             <div class="editor-grid">
@@ -90,7 +90,7 @@ else
 {
     <div class="delete-overlay">
         <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-entries-title">
-            <h2 id="invoice-entries-title">Factura @shown.Number</h2>
+            <div class="dialog-head"><h2 id="invoice-entries-title">Factura @shown.Number</h2><HelpButton Topic="facturi-detaliu" About="Factura deschisă" /></div>
             <p class="delete-object"><strong>@shown.SupplierName</strong> · emisă la @StockMovementRules.DisplayDate(shown.Date)</p>
             @if (entriesLoading) { <div role="status"><div class="spinner"></div></div> }
             else if (entriesError is not null) { <div class="validation-message" role="alert">@entriesError</div> }

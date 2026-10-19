@@ -314,7 +314,7 @@ public static class PickupWizardChecks
         again.Find("#template-supplier-missing button").Click();
         check(again.FindAll(".template-popup .invoice-modal #supplier-name, .template-popup .invoice-modal input").Count > 3 && again.Markup.Contains("Adaugă furnizor", StringComparison.Ordinal),
             "Pickup template flow: the add-supplier window opened from the template is filled in (the supplier form with the name and CUI of the invoice)");
-        again.Find(".template-popup .invoice-modal .catalog-heading button").Click();
+        again.Find(".template-popup .invoice-modal .catalog-heading button.danger").Click();
         again.FindAll(".template-popup button.primary").First(button => button.TextContent.Contains("Salvează șablonul", StringComparison.Ordinal)).Click();
         check(again.Markup.Contains("Furnizorul nu este în baza de date", StringComparison.Ordinal),
             "Pickup template flow: a template cannot be saved for a supplier that is not in the database");

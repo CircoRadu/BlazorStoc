@@ -1,0 +1,41 @@
+# Formularul de furnizor
+Cautare: furnizor formular cui cod tva tara anf denumire alternativa alias duplicat
+
+Formularul pentru un furnizor nou sau pentru editarea unuia existent. Se deschide deasupra registrului sau fișei furnizorului și ca fereastră în fluxul de preluare a facturilor (CUI-ul și numele citite din factură vin completate).
+
+## Elemente
+### Identificare
+- Țara furnizorului * | listă | România (CUI verificat în ANAF) sau alt stat membru UE (cod de TVA introdus manual).
+- CUI / Cod de TVA * | câmp | La România: 2–10 cifre, opțional precedate de RO. La alt stat: începe cu codul țării (prefixul se adaugă singur dacă lipsește). Identificatorul nu poate exista de două ori; când furnizorul are facturi, intrări de stoc sau șabloane legate, țara și identificatorul nu se mai pot schimba.
+- Preia date din ANAF / Preia din nou din ANAF | buton | Doar pentru România: interoghează ANAF și completează datele. Dacă valorile diferă de cele din formular, se deschide [[beneficiari-anaf-diferente]].
+- Sursa datelor | text | Din ANAF, manual sau editat după ANAF.
+- Avertismentul de duplicat | mesaj | Apare când în registru există deja un furnizor cu același nume: CUI-ul citit din factură poate fi greșit.
+- Ține minte numele din factură | comutator | Când numele din ANAF diferă de cel din factură, păstrezi numele din factură ca denumire alternativă.
+### Date
+- Denumire * | câmp | Numele furnizorului.
+- Adresă, Număr de telefon | câmp | Date de contact.
+- Nr. Registrul Comerțului | câmp | De exemplu J40/1234/2020.
+- Cod poștal, Cod CAEN | câmp | Doar pentru România: 5–6 cifre, respectiv 3–4 cifre.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+### Denumiri alternative (doar la editare)
+- Lista | listă | Alte scrieri ale numelui pe facturi (denumire comercială, prescurtare, grafie citită constant de OCR); factura se recunoaște și după ele. Forma juridică, punctele și majusculele nu contează. „Șterge” scoate o denumire.
+- Denumire alternativă nouă | câmp | Scrii denumirea și apeși „+ Adaugă denumirea”.
+### Salvare
+- Salvează furnizorul | buton | Salvează; la editare cere confirmarea modificărilor.
+- Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+
+## Flux: Cum adaug un furnizor din România
+1. Lasă țara „România” și scrie CUI-ul.
+2. Apasă „Preia date din ANAF”; denumirea, adresa și celelalte date se completează.
+3. Verifică și apasă „Salvează furnizorul”.
+Nota: dacă ANAF nu răspunde, completezi manual; furnizorul rămâne marcat de verificat.
+
+## Flux: Cum adaug un furnizor din alt stat UE
+1. Alege țara furnizorului.
+2. Scrie codul de TVA (prefixul țării se adaugă singur) și denumirea.
+3. Apasă „Salvează furnizorul”.
+
+## Flux: Cum adaug o denumire alternativă
+1. Deschide furnizorul pentru editare.
+2. La „Denumiri alternative” scrie varianta de pe facturi și apasă „+ Adaugă denumirea”.
+3. De acum, facturile cu acea scriere sunt recunoscute ca ale furnizorului.

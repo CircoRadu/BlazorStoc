@@ -1,0 +1,59 @@
+# Preluare factură
+Ruta: /produse/preluare-factura
+Cautare: factura furnizor preluare pdf xml zip efactura intrare stoc sablon produse noi furnizor cui numar data verificat finalizeaza
+
+Preiei în stoc o factură de furnizor (PDF, XML sau ZIP e-Factura). Lucrezi în **trei pași**: **Citirea facturii**, **Potrivirea produselor** și **Confirmare**. Abia la „Finalizează preluarea” se înregistrează factura, se adaugă produsele noi în catalog și se fac intrările în stoc, legate de factură.
+
+## Elemente
+### Pasul 1 - Citirea facturii
+- Alege factura PDF, XML sau ZIP | zonă | Alegi fișierul sau îl tragi în zonă. O pagină scanată poate dura câteva secunde.
+- Șablonul facturii | bară | Spune ce șablon a citit factura (al furnizorului sau cel standard). „Alt șablon” îți permite să alegi altul. Dacă furnizorul nu are șablon, factura se citește automat, iar „Creează șablon pentru acest furnizor” deschide editorul de șabloane.
+- Tabelul citit | tabel | Rândurile găsite în factură, cu coloanele citite și pagina din care vin (la XML, observațiile). Coloana „Preia” are un marcaj rotund pe fiecare rând și „Selectează tot” în antet: rândurile nebifate nu se preiau. Rândurile cu produse deja preluate sunt marcate și au selectorul oprit.
+- Factura PDF cu pagini | imagine | Factura apare cu liniile de demarcare dintre rânduri, câmpurile din antet, capul de tabel și coloanele, ca să vezi ce a citit aplicația.
+- Adaugă linie de demarcare | buton | Pune o linie nouă între rânduri pe imaginea facturii, ca să separi rândurile citite greșit.
+- Șterge linia selectată | buton | Scoate linia de demarcare aleasă.
+- Liniile propuse automat | buton | Revine la liniile găsite de aplicație.
+- Câmpurile din antet, Capul de tabel, Coloanele | buton | Arată sau ascund câte un strat de pe imaginea facturii.
+- Renunță și elimină fișierul | buton | Șterge fișierul încărcat și te întoarce la alegerea unui altul.
+### Pasul 2 - Potrivirea produselor
+- Datele facturii | zonă | Numărul facturii, CUI-ul furnizorului și data emiterii. La PDF, fiecare are un comutator „Verificat / Neverificat”: îl pornești după ce ai comparat valoarea cu imaginea regiunii din care a fost citită. La XML datele vin din fișier și nu cer confirmare.
+- Furnizor din registru | text | Furnizorul găsit după CUI. Dacă nu există, „+ Adaugă furnizorul” deschide formularul de furnizor; „Folosește acest furnizor” apare când aplicația bănuiește un furnizor apropiat.
+- Afișează factura într-o fereastră nouă | link | Deschide factura într-o fereastră separată, pe care o poți așeza lângă tabel.
+- Produsul din catalog | coloană | Pentru fiecare rând: produsul exact găsit după cod, un produs nou pregătit (se adaugă la finalizare; „Modifică” și „Renunță”), variantele unui model sau cele mai apropiate produse din catalog, de unde alegi unul sau „Niciunul”.
+- Preia | coloană | Marcajul rotund al rândului: rândurile nebifate nu se preiau.
+### Pasul 3 - Confirmare
+- Factura și furnizorul | text | Rezumatul facturii confirmate la pasul 2.
+- 1. Produse noi | secțiune | Produsele care nu sunt în catalog; au „Data intrării” comună.
+- 2. Produse existente introduse în stoc | secțiune | Produsele găsite în catalog, cu propria „Data intrării”.
+- Descrierea intrării în stoc | câmp | Textul intrării pentru fiecare produs; îl poți modifica.
+- Componenta proiectului | alegere | Dacă produsul face parte dintr-un proiect, poți lega intrarea de componenta lui.
+- Se leagă intrarea existentă | comutator | Apare când există deja o intrare liberă a produsului: o legi de factură fără să modifici stocul, sau creezi o intrare nouă.
+- Se preia din nou | comutator | Apare când din factură s-a preluat deja produsul: alegi dacă îl preiei încă o dată.
+- Regularizare | panou | Apare când intrarea acoperă un stoc negativ al produsului.
+- Finalizează preluarea | buton | Înregistrează factura, produsele noi și intrările în stoc.
+- Preluare nouă | buton | După finalizare, o iei de la capăt cu altă factură.
+### Navigare între pași
+- ← Pasul precedent | buton | Te întoarce un pas, fără să pierzi alegerile făcute.
+- Pasul următor → | buton | Trece la pasul următor; dacă ceva lipsește, sub butoane apare ce trebuie rezolvat.
+- Pasul N din 3 | text | Pasul curent și, când e cazul, ce trebuie făcut ca să poți continua.
+
+## Flux: Cum preiau o factură
+1. La „Preluare factură” alege fișierul facturii (PDF, XML sau ZIP) sau trage-l în zonă și așteaptă citirea.
+2. Verifică în tabel rândurile citite și debifează cele care nu trebuie preluate; dacă un rând e citit greșit, corectează liniile de demarcare pe imaginea facturii. Apasă „Pasul următor →”.
+3. La pasul 2 verifică numărul, CUI-ul și data facturii (pornește comutatoarele „Verificat”) și confirmă furnizorul.
+4. Pentru fiecare rând alege produsul din catalog, pregătește un produs nou sau debifează rândul.
+5. Apasă „Pasul următor →”, alege datele intrărilor, completează descrierile și rezolvă avertismentele (intrare liberă existentă, produs deja preluat, stoc negativ).
+6. Apasă „Finalizează preluarea”. Factura și intrările în stoc sunt înregistrate; apoi poți apăsa „Preluare nouă”.
+Nota: până la „Finalizează preluarea” nu se scrie nimic în stoc; poți reveni oricând cu „← Pasul precedent”.
+
+## Flux: Cum procedez când furnizorul nu are șablon
+1. La pasul 1 observă avertismentul „Nu există niciun șablon definit pentru furnizorul acestei facturi”: factura se citește totuși automat.
+2. Verifică cu atenție rândurile și coloanele citite.
+3. Pentru facturile viitoare apasă „Creează șablon pentru acest furnizor” (sau alege un șablon existent din listă). Șabloanele se gestionează și din Setări → Facturi.
+Nota: cu un șablon salvat, următoarele facturi ale furnizorului se citesc exact după el.
+
+## Flux: Cum adaug un furnizor sau un produs nou în timpul preluării
+1. Dacă furnizorul nu este în registru, apasă „+ Adaugă furnizorul” la pasul 2; formularul are CUI-ul și numele citite din factură.
+2. Pentru un produs care nu există în catalog, la rândul lui alege să pregătești un produs nou și completează categoria, subcategoria și parametrii cerute.
+3. Produsul nou se adaugă în catalog abia la „Finalizează preluarea”.
+Nota: fără dreptul de a adăuga furnizori, cere unui administrator să îl adauge.

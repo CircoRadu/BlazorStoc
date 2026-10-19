@@ -1,0 +1,24 @@
+# Adăugarea unui produs la o factură
+Cautare: adauga produs factura manual intrare cantitate pe factura duplicat motiv stoc negativ componenta
+
+Adaugi manual o intrare în stoc, legată de factura deschisă, pentru un produs care nu a fost preluat. Un produs deja preluat din factură sau o cantitate mai mare decât cea scrisă pe factură se adaugă doar cu un motiv.
+
+## Elemente
+### Câmpuri
+- Produs * | listă | Alegi produsul (căutare după cod sau denumire).
+- Componenta proiectului | alegere | Apare când produsul face parte dintr-un proiect: poți lega intrarea de o componentă a lui.
+- Data intrării * | câmp | Data intrării în stoc; nu poate fi în viitor.
+- Cantitate * | câmp | Câte bucăți intră.
+- Cantitate pe factură | câmp | Opțional: cantitatea scrisă pe factură, ca să se poată compara.
+- Descriere * | câmp | Descrierea intrării în stoc.
+### Avertismente
+- Regularizare | panou | Apare când produsul are stoc negativ: alegi cum se acoperă.
+- Avertismentul de duplicat sau de cantitate | mesaj | Produsul a mai fost preluat din factură sau cantitatea depășește cea de pe factură; scrii „Motiv pentru intrarea nouă”, iar butonul devine „Adaugă totuși”.
+### Butoane
+- Adaugă | buton | Înregistrează intrarea.
+- Închide | buton | Închide fereastra fără modificări.
+
+## Flux: Cum adaug manual un produs la o factură
+1. Alege produsul și data intrării.
+2. Scrie cantitatea (și, dacă vrei, cantitatea de pe factură) și descrierea.
+3. Dacă apare un avertisment, scrie motivul și apasă „Adaugă totuși”; altfel apasă „Adaugă”.

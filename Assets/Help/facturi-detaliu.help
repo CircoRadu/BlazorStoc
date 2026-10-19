@@ -1,0 +1,17 @@
+# Factura deschisă
+Cautare: factura produse preluate intrari adauga produs manual
+
+Fereastra arată produsele preluate dintr-o factură. De aici poți adăuga manual un produs care a fost omis la preluare.
+
+## Elemente
+### Fereastra
+- Titlul și datele facturii | text | Numărul facturii, furnizorul și data emiterii.
+- Tabelul | tabel | Produsul (apasă-l ca să-i deschizi pagina), cantitatea intrată și data intrării. Dacă nu s-a preluat nimic, fereastra spune acest lucru.
+- Adaugă produs manual | buton | Deschide fereastra pentru un produs omis ([[facturi-produs-manual]]); doar cu dreptul necesar.
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum adaug un produs omis la preluarea unei facturi
+1. Deschide factura din registru.
+2. Apasă „Adaugă produs manual”.
+3. Completează fereastra și apasă „Adaugă”.
+Nota: produsul se adaugă ca intrare în stoc legată de factura respectivă.

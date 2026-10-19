@@ -95,7 +95,7 @@ else if (loadError is null)
 {
     <div class="delete-overlay" @onkeydown="PreviewKeyDownAsync">
         <section class="delete-dialog pdf-preview-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="pdf-preview-title">
-            <h2 id="pdf-preview-title">Situația de inventar</h2>
+            <div class="dialog-head"><h2 id="pdf-preview-title">Situația de inventar</h2><HelpButton Topic="inventar-previzualizare" About="Situația de inventar" /></div>
             <p class="muted">@previewFileName</p>
             <iframe class="pdf-preview-frame" @ref="previewFrame" title="Previzualizare situație de inventar"></iframe>
             @if (previewError is not null) { <div class="validation-message" role="alert">@previewError</div> }

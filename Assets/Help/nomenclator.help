@@ -1,0 +1,34 @@
+# Nomenclator · Tipuri de sisteme
+Ruta: /nomenclator
+Cautare: nomenclator tipuri de sisteme antiefractie tvci cctv control acces incendiu retelistica denumiri alternative activ ordine
+
+Sistemele din care sunt făcute proiectele (antiefracție, TVCI, control acces, incendiu, rețelistică…). Un tip nu se șterge: se dezactivează și nu mai apare la alegeri noi. Denumirile alternative (de exemplu „CCTV” pentru „TVCI”) ajută la recunoașterea lor în oferte.
+
+## Elemente
+### Tipul nou
+- Denumirea unui tip nou de sistem | câmp | Scrii numele tipului.
+- Adaugă tipul | buton | Adaugă tipul în listă.
+### Tabelul tipurilor
+- Ordine | coloană | Poziția tipului în listă (cea în care apar la alegeri).
+- Mută mai sus | iconita:up | Urcă tipul cu o poziție.
+- Mută mai jos | iconita:down | Coboară tipul cu o poziție.
+- Denumire | coloană | Numele tipului.
+- Redenumește | iconita:edit | Deschide câmpul de redenumire.
+- Salvează denumirea | iconita:check | Salvează noul nume.
+- Renunță | iconita:close | Renunță la redenumire.
+- Denumiri alternative | coloană | Etichetele alternative ale tipului; „×” scoate una, iar câmpul „+ denumire alternativă” cu „Adaugă” adaugă una nouă.
+- Stare | comutator | Activ sau inactiv: un tip inactiv nu mai apare la alegeri noi.
+
+## Flux: Cum adaug un tip de sistem
+1. Scrie denumirea în câmpul de sus.
+2. Apasă „Adaugă tipul”.
+3. Dacă are și alte denumiri uzuale, adaugă-le la „Denumiri alternative”.
+
+## Flux: Cum scot un tip din uz
+1. Oprește comutatorul „Activ” de pe rândul tipului.
+2. Tipul nu mai apare la alegeri noi.
+Nota: tipurile nu se șterg.
+
+## Flux: Cum ordonez tipurile
+1. Folosește săgețile din coloana „Ordine”.
+2. Ordinea aleasă este cea în care tipurile apar la alegeri.

@@ -1,0 +1,27 @@
+# Vehicule
+Ruta: /vehicule
+Cautare: vehicule autovehicule masini flota numar inmatriculare descriere adauga editeaza sterge
+
+Registrul autovehiculelor firmei, către care se pot opera ieșiri de stoc (produsele se mută în mașină). Numărul de înmatriculare identifică în mod unic fiecare vehicul.
+
+## Elemente
+### Antet
+- + Adaugă vehicul | buton | Deschide formularul de vehicul nou ([[vehicule-editor]]); doar cu dreptul necesar.
+- Reîncearcă | buton | Apare când lista nu a putut fi încărcată.
+### Registrul
+- Caută | câmp | Caută după numărul de înmatriculare sau după descriere.
+- Număr de înmatriculare | coloană | Apasă numărul ca să deschizi fișa vehiculului ([[vehicule-detaliu]]).
+- Descriere | coloană | Marca, modelul, culoarea.
+- Mișcări | coloană | Câte mișcări de stoc folosesc vehiculul; apasă numărul ca să deschizi fișa.
+- Editează vehiculul | iconita:edit | Deschide formularul de editare.
+- Șterge vehiculul | iconita:delete | Șterge vehiculul; nu se poate dacă are mișcări de stoc asociate.
+
+## Flux: Cum adaug un vehicul
+1. Apasă „+ Adaugă vehicul”.
+2. Scrie numărul de înmatriculare, descrierea și datele de expirare ale ITP-ului, asigurării și rovinietei.
+3. Apasă „Salvează vehiculul”.
+Nota: expirările generează notificări înainte de scadență.
+
+## Flux: Cum găsesc un vehicul
+1. Scrie în câmpul de căutare o parte din număr sau din descriere.
+2. Apasă numărul de înmatriculare ca să vezi fișa vehiculului și echipamentele din el.

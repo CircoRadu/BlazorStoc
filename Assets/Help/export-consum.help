@@ -1,0 +1,35 @@
+# Export consum
+Ruta: /consum
+Cautare: consum export csv predat beneficiar proiect perioada iesit returnat net raport
+
+Fereastra arată ce s-a predat beneficiarilor (ieșiri minus retururi) pe fiecare produs, pentru un proiect, un beneficiar și/sau o perioadă. Rezultatul se poate descărca și ca fișier CSV.
+
+## Elemente
+### Antet
+- ← Produse | buton | Revine la catalogul de produse.
+### Filtre
+- Beneficiar | listă | Alegi un beneficiar sau lași „Toți beneficiarii”.
+- Proiect | listă | Se activează după ce ai ales un beneficiar și cuprinde proiectele lui; „Toate proiectele” nu restrânge.
+- De la, Până la | câmp | Perioada ieșirilor, aleasă din calendar; nu poate fi în viitor. Lăsate goale, se ia tot istoricul.
+- Arată consumul | buton | Citește datele și afișează tabelul.
+- Descarcă CSV | buton | Descarcă același consum, pentru filtrele alese, într-un fișier CSV.
+### Tabelul consumului
+- Beneficiar | coloană | Beneficiarul căruia i s-au predat produsele.
+- Proiect | coloană | Proiectul, sau „—” dacă ieșirea nu a fost pe proiect.
+- Produs | coloană | Produsul predat.
+- Ieșit | coloană | Câte bucăți au ieșit către beneficiar.
+- Returnat | coloană | Câte bucăți au fost returnate.
+- Consum net | coloană | Ieșit minus returnat.
+- Totalul din subsol | text | Numărul de rânduri și consumul net total al rândurilor afișate.
+
+## Flux: Cum văd consumul unui proiect
+1. Alege beneficiarul, apoi proiectul lui.
+2. Dacă vrei doar o perioadă, alege „De la” și „Până la”.
+3. Apasă „Arată consumul” și citește tabelul.
+Nota: dacă nu apare niciun rând, nu există consum pentru filtrele alese.
+
+## Flux: Cum export consumul în CSV
+1. Alege filtrele dorite (beneficiar, proiect, perioadă).
+2. Apasă „Descarcă CSV”.
+3. Deschide fișierul în Excel sau în alt program de calcul tabelar.
+Nota: fișierul respectă filtrele din ecran la momentul apăsării.

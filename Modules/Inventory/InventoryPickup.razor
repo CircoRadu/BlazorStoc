@@ -139,7 +139,7 @@ else if (review is not null)
 {
     <div class="delete-overlay" @onkeydown="PopupKeyDownAsync">
         <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="popupDialog" aria-labelledby="pickup-popup-title">
-            <h2 id="pickup-popup-title">Confirmă modificările de stoc</h2>
+            <div class="dialog-head"><h2 id="pickup-popup-title">Confirmă modificările de stoc</h2><HelpButton Topic="inventar-preluare" About="Confirmarea modificărilor de stoc" /></div>
             <p>Următoarele modificări vor fi operate în stoc:</p>
             <div class="table-scroll">
                 <table class="save-summary">

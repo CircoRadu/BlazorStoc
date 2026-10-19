@@ -1,0 +1,20 @@
+# Editarea unei facturi
+Cautare: editare factura furnizor numar data corectie motiv
+
+Formularul de corecție a unei facturi existente (doar administrator). Se deschide deasupra registrului de facturi.
+
+## Elemente
+### Câmpuri
+- Furnizor * | listă | Furnizorul facturii; îl poți schimba dacă a fost ales greșit.
+- Număr factură * | câmp | Numărul de pe factură.
+- Data emiterii * | câmp | Data de pe factură, aleasă din calendar; nu poate fi în viitor.
+- Motivul modificării | câmp | Rezumatul modificărilor se generează sau scrii un motiv propriu.
+### Butoane
+- Salvează | buton | Salvează modificările.
+- Închide | buton | Închide formularul fără să salveze.
+
+## Flux: Cum corectez o factură
+1. În registru apasă iconița de editare de pe rândul facturii.
+2. Corectează furnizorul, numărul sau data.
+3. Verifică motivul și apasă „Salvează”.
+Nota: modificarea se înregistrează în jurnal cu valoarea veche și cea nouă.

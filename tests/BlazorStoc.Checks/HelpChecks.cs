@@ -20,10 +20,6 @@ public static class HelpChecks
     // Windows whose topic is still to be written (the order of the main menu). Take a page out when its topic exists.
     private static readonly HashSet<string> Pending = new(StringComparer.OrdinalIgnoreCase)
     {
-        "/produse/preluare-factura", "/produse/preluare-factura/factura/{}", "/iesiri/multipla", "/consum",
-        "/inventar", "/inventar/preluare",
-        "/categorii", "/categorii/fereastra", "/beneficiari", "/beneficiari/{}", "/furnizori", "/furnizori/{}", "/facturi", "/vehicule", "/vehicule/{}", "/vehicule/{}/echipamente",
-        "/utilizatori", "/utilizatori/{}", "/nomenclator",
         "/oferte", "/oferte/preluare", "/oferte/sabloane", "/mentenanta", "/mentenanta/harta", "/mentenanta/harta/fereastra", "/analize-risc",
         "/produse/{}", "/produse/{}/miscari", "/proiecte/{}", "/proiecte/{}/situatie", "/proiecte/{}/echipamente", "/proiecte/{}/observatii/{}",
         "/notificari", "/jurnal", "/jurnal/complet", "/setari"

@@ -1,0 +1,31 @@
+# Facturi · Intrări fără factură
+Ruta: /facturi
+Tab: Intrări fără factură
+Cautare: intrari fara factura achizitie fara factura atasare factura motiv furnizor vechime
+
+Intrările în stoc înregistrate cu un motiv, dar fără factură. Administratorul le leagă, câte mai multe deodată, de factura primită ulterior; stocul nu se modifică. Ceilalți utilizatori văd ce mai așteaptă o factură.
+
+## Elemente
+### Filtre
+- Motiv | listă | Toate cu motiv, un anumit motiv al intrării fără factură sau „Înregistrate fără motiv (vechi)”.
+- Furnizor | listă | Doar intrările unui furnizor.
+- Vechime | listă | Oricât sau peste 7, 14 sau 30 de zile.
+### Tabelul
+- Selectează | coloană | Doar administratorul: marcajul rotund al rândului (și clicul oriunde pe rând) alege intrarea pentru atașare.
+- Data | coloană | Data intrării.
+- Produs | coloană | Produsul; apasă-l ca să-i deschizi pagina.
+- Buc. | coloană | Cantitatea intrată.
+- Motiv | coloană | Motivul pentru care nu există factură.
+- Furnizor | coloană | Furnizorul înregistrat, dacă există.
+- Referință, Descriere, Operator | coloană | Datele intrării și cine a operat-o.
+- Atașează la factură | buton | Doar administratorul: deschide fereastra de legare a intrărilor alese de o factură ([[facturi-legare-intrari]]).
+
+## Flux: Cum leg intrările fără factură de factura primită
+1. Filtrează după furnizor și, dacă vrei, după vechime.
+2. Alege intrările care se află pe factură.
+3. Apasă „Atașează la factură” și completează fereastra: furnizorul, factura și motivarea.
+Nota: stocul nu se modifică; fiecare intrare legată apare separat în jurnal.
+
+## Flux: Cum urmăresc intrările care așteaptă factura
+1. Alege un motiv sau o vechime (de exemplu „Peste 30 de zile”).
+2. Lista arată ce intrări nu au încă factură, ca să ceri furnizorului documentele lipsă.

@@ -5,7 +5,7 @@
 @implements IDisposable
 
 <section class="product-editor subcategory-parameters" aria-labelledby="@TitleId">
-    <div class="catalog-heading"><h2 id="@TitleId">Parametri obligatori · @Group.Subcategory<span class="count-badge">@parameters.Count</span></h2><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></div>
+    <div class="catalog-heading"><h2 id="@TitleId">Parametri obligatori · @Group.Subcategory<span class="count-badge">@parameters.Count</span></h2><span class="heading-actions"><HelpButton Topic="categorii-parametri" About="Parametrii obligatori ai subcategoriei" /><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
     <p class="form-note">Un produs din această subcategorie nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru. Codul lui devine „model - valoare - valoare”, în ordinea parametrilor. Produsele deja existente rămân blocate până li se aleg valorile.</p>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }

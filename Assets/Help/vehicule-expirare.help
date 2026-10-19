@@ -1,0 +1,16 @@
+# Modificarea unei date de expirare a vehiculului
+Cautare: expirare itp asigurare rovinieta data reinnoire vehicul
+
+Fereastra schimbă o singură dată de expirare (ITP, asigurare sau rovinietă) a unui vehicul, fără să deschizi tot formularul.
+
+## Elemente
+### Fereastra
+- Titlul | text | Ce dată modifici și vehiculul (număr și descriere).
+- Data * | câmp | Noua dată de expirare, aleasă din calendar.
+- Salvează | buton | Salvează data; modificarea apare în jurnal cu valoarea veche și cea nouă.
+- Anulează | buton | Închide fereastra fără modificări.
+
+## Flux: Cum modific data de expirare a ITP-ului
+1. Din fișa vehiculului apasă butonul de modificare de pe rândul „ITP”.
+2. Alege noua dată.
+3. Apasă „Salvează”.

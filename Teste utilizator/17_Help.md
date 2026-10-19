@@ -23,3 +23,36 @@ Pasi:
 7. Verifica pe o pagina al carei ajutor nu e scris inca (de exemplu Furnizori): iconita deschide un popup "Ajutor indisponibil", fara eroare.
 8. Iesi din cont: pe pagina de autentificare apare "?" in coltul cardului si descrierea se deschide fara sa fii autentificat; pe alta pagina (ex. /ajutor/fereastra?ruta=/produse) fara cont primesti eroare 401.
 9. Ecran ingust (telefon): popup-ul incape pe latime, elementele se aseaza pe un rand, nimic nu iese din ecran (verificare doar a ta, agentul nu poate verifica ecranul real al telefonului).
+
+### 19.10.2026 - Topicuri: Preluare factura, Iesire multipla, Export consum, Inventar
+
+**Ce s-a adaugat:** topicuri de ajutor pentru Preluare factura (cu fereastra separata a facturii), Iesire multipla, Export consum, Inventar (cu previzualizarea formularului) si Preluare inventar (cu confirmarea modificarilor); iconita "?" si in antetul previzualizarii de inventar si al confirmarii din Preluare inventar.
+
+**Ce face acum:** pe fiecare din aceste pagini iconita deschide descrierea fiecarui element vizibil si fluxurile de lucru ("Cum preiau o factura", "Cum inregistrez o iesire catre un beneficiar", "Cum generez situatia de inventar" etc.). Din Inventar, linkul din flux deschide descrierea previzualizarii.
+
+**Verificat de agent 19.10.2026** (preview 5089 pe baza de dezvoltare): se deschide ajutorul corect pe /iesiri/multipla, /consum, /produse/preluare-factura, /inventar (inclusiv linkul catre previzualizare) si /inventar/preluare; testele grupului `help` si `components`.
+
+Pasi:
+
+1. Deschide fiecare pagina de mai sus si apasa "?": compara descrierea cu ce vezi pe ecran; noteaza elementele lipsa sau descrise gresit.
+2. La Preluare factura parcurge o factura reala urmand fluxul "Cum preiau o factura": pasii din ajutor trebuie sa corespunda cu ce faci.
+3. La Iesire multipla verifica fluxurile "Cum inregistrez o iesire catre un beneficiar" si "Cum mut produse intr-o masina".
+4. La Inventar genereaza o situatie si verifica ca "?" din fereastra de previzualizare deschide descrierea ei peste previzualizare.
+5. La Preluare inventar (dupa incarcarea unui formular) deschide "Trimite modificari in stoc" si verifica "?" din fereastra de confirmare.
+
+### 19.10.2026 - Topicuri: Administrare (Categorii, Beneficiari, Furnizori, Facturi, Vehicule, Utilizatori, Nomenclator)
+
+**Ce s-a adaugat:** topicuri pentru toate paginile din meniul Administrare si pentru formularele si ferestrele lor: Categorii (+ Parametri obligatori ai subcategoriei), Beneficiari (lista, fisa, formularul de beneficiar, formularul punctului de lucru, formularul de proiect, "Date diferite in ANAF"), Furnizori (lista, fisa, formularul), Facturi (cu cele doua sectiuni, editarea facturii, factura deschisa, adaugarea manuala a unui produs, legarea intrarilor), Vehicule (lista, fisa, echipamente, formularul, modificarea unei date de expirare, mutarea/restituirea), Utilizatori (lista, fisa, formularul), Nomenclator. Iconita "?" in antetul fiecarui formular/dialog dintre acestea.
+
+**Ce face acum:** pe fiecare pagina si in fiecare formular/dialog de mai sus, "?" deschide descrierea elementelor si fluxurile ("Cum adaug un beneficiar", "Cum leg intrarile fara factura de factura primita", "Cum restitui un produs din masina" etc.). Pe /facturi, sectiunea "Intrari fara factura" are propriul ajutor, distinct de cel al listei de facturi. Fereastra separata a categoriilor are acelasi ajutor ca pagina Categorii.
+
+**Verificat de agent 19.10.2026:** testele grupurilor `help` si `components` (inclusiv fixul unui test care cauta primul buton din antetul unui editor); suita completa in memoria (1597 PASS); browser pe preview 5089: ajutorul se deschide pe /facturi (ambele sectiuni), /beneficiari (pagina si formularul), /categorii, iar toate rutele noi se rezolva la topicul corect.
+
+Pasi:
+
+1. Deschide fiecare pagina din meniul Administrare si apasa "?": compara descrierea cu ecranul; noteaza elementele lipsa sau gresite.
+2. Pe /facturi apasa "?" pe sectiunea "Facturi", apoi treci pe "Intrari fara factura" si apasa din nou "?": se schimba descrierea.
+3. Deschide un formular (beneficiar, furnizor, vehicul, utilizator, proiect, punct de lucru): in antet, langa "Inchide", apare "?"; verifica ca descrierea corespunde campurilor.
+4. La Categorii deschide "Parametri obligatori" pentru o subcategorie si apasa "?" din antetul panoului.
+5. Pe fisa unui vehicul, la "Modifica data" de pe un rand de expirare, apasa "?" in fereastra deschisa; la Echipamente deschide "Restituie in depozit" si apasa "?".
+6. Pe /categorii/fereastra (fereastra separata) apasa "?" din coltul din dreapta sus.

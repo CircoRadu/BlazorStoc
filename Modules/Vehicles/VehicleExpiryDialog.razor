@@ -6,7 +6,7 @@
 
 <div class="delete-overlay" @onkeydown="KeyDownAsync">
     <section class="delete-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="vehicle-expiry-title">
-        <h2 id="vehicle-expiry-title">Modifică @Field.Label.ToLowerInvariant()</h2>
+        <div class="dialog-head"><h2 id="vehicle-expiry-title">Modifică @Field.Label.ToLowerInvariant()</h2><HelpButton Topic="vehicule-expirare" About="Modificarea unei date de expirare" /></div>
         <p class="delete-object"><strong>@Vehicle.PlateNumber · @Vehicle.Description</strong></p>
         @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
         <label for="vehicle-expiry-date">@Field.Label *<PickOnlyDate Id="vehicle-expiry-date" @bind-Value="date" Min="@MinDate" Disabled="saving" /></label>

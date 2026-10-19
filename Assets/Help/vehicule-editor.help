@@ -1,0 +1,22 @@
+# Formularul de vehicul
+Cautare: vehicul formular numar inmatriculare descriere itp asigurare rovinieta expirare
+
+Formularul pentru un vehicul nou sau pentru editarea unuia existent. Se deschide deasupra registrului sau fișei vehiculului.
+
+## Elemente
+### Câmpuri
+- Număr de înmatriculare * | câmp | În forma AA-OOO-AAA: 1–2 litere, 2–3 cifre, 3 litere (de exemplu HD-01-FDG, B-123-ABC). Nu poate exista de două ori.
+- Descriere * | câmp | Text scurt: marca, modelul și culoarea.
+- Data expirare ITP * | câmp | Data se alege din calendar.
+- Data expirare asigurare * | câmp | La fel.
+- Data expirare rovinietă * | câmp | La fel.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+### Butoane
+- Salvează vehiculul | buton | Salvează; la editare cere confirmarea modificărilor.
+- Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+
+## Flux: Cum adaug un vehicul nou
+1. Scrie numărul de înmatriculare și descrierea.
+2. Alege datele de expirare pentru ITP, asigurare și rovinietă.
+3. Apasă „Salvează vehiculul”.
+Nota: cu aceste date aplicația te anunță prin notificări înainte să expire.

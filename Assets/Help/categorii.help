@@ -1,0 +1,52 @@
+# Categorii și subcategorii
+Ruta: /categorii
+Ruta: /categorii/fereastra
+Cautare: categorii subcategorii redenumire mutare ordine meniu parametri obligatori produse catalog stergere
+
+Aici organizezi catalogul: redenumești categoriile și subcategoriile, muți subcategorii între categorii și definești parametrii obligatori ai produselor dintr-o subcategorie. Produsele asociate urmează automat modificările. Aceeași fereastră se deschide și separat (din formularul de produs al preluării de factură), fără meniul lateral.
+
+## Elemente
+### Antet
+- + Adaugă categorie | buton | Deschide formularul de categorie nouă (doar cu dreptul necesar).
+### Formularul de categorie
+- Denumire categorie * | câmp | Numele categoriei, cel mult 100 de caractere.
+- Motivul modificării | câmp | La editare: rezumatul modificărilor se generează automat sau scrii un motiv propriu.
+- Adaugă categoria / Salvează categoria | buton | Salvează; la editare cere mai întâi confirmarea modificărilor.
+- Anulează | buton | Închide formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+### Formularul de subcategorie
+- Denumire subcategorie * | câmp | Numele subcategoriei.
+- Categorie * | listă | Doar la editare: categoria în care muți subcategoria. O subcategorie nouă aparține categoriei din al cărei antet a fost deschis formularul.
+### Categoriile
+- Numele categoriei | secțiune | Fiecare categorie este o secțiune pe care o desfaci sau o strângi; vezi numărul subcategoriilor și al produselor asociate.
+- Mânerul din stânga | mâner | Doar pentru administrator: tragi categoria sau subcategoria ca să le aranjezi; ordinea de aici este ordinea din meniul lateral.
+- Adaugă subcategorie | iconita:add | Adaugă o subcategorie în categoria respectivă.
+- Editează categoria | iconita:edit | Redenumește categoria.
+- Șterge categoria | iconita:delete | Șterge categoria; se poate numai dacă nu are subcategorii și nici produse.
+### Subcategoriile
+- Subcategorie | coloană | Numele subcategoriei.
+- Produse | coloană | Câte produse are.
+- Parametri obligatori | coloană | Numărul parametrilor obligatori definiți (vezi [[categorii-parametri]]).
+- Parametri obligatori ai subcategoriei | iconita:params | Deschide parametrii obligatori ai subcategoriei.
+- Editează subcategoria | iconita:edit | Redenumește subcategoria sau o mută în altă categorie.
+- Șterge subcategoria goală | iconita:delete | Apare doar la subcategoriile fără produse.
+
+## Flux: Cum redenumesc o categorie
+1. Apasă iconița „Editează categoria” din antetul categoriei.
+2. Scrie noua denumire; motivul se completează singur cu rezumatul modificării sau îl poți scrie tu.
+3. Apasă „Salvează categoria” și confirmă modificările.
+Nota: produsele categoriei urmează noua denumire.
+
+## Flux: Cum mut o subcategorie în altă categorie
+1. Desfă categoria și apasă iconița „Editează subcategoria” de pe rând.
+2. La „Categorie” alege categoria nouă.
+3. Salvează și confirmă; produsele subcategoriei se mută odată cu ea.
+
+## Flux: Cum aranjez ordinea din meniu
+1. Doar administratorul: ia categoria de mânerul din stânga și trage-o în noua poziție.
+2. La fel pentru subcategorii, în interiorul categoriei.
+Nota: ordinea aleasă se vede imediat în meniul lateral „Categorii produse”.
+
+## Flux: Cum șterg o categorie sau subcategorie
+1. Ștergerea se poate numai dacă categoria nu are subcategorii și produse, respectiv subcategoria nu are produse.
+2. Apasă iconița de ștergere de pe rând și confirmă motivul.
+Nota: dacă iconița este dezactivată, textul ei spune de ce.
