@@ -36,6 +36,7 @@ public static class ReasonSummaryChecks
         context.Services.AddSingleton(Stub<IBeneficiaryRepository>());
         context.Services.AddSingleton(Stub<IAnafService>());
         context.Services.AddSingleton(Stub<IProjectRepository>());
+        context.Services.AddSingleton(Stub<IProjectObservationRepository>());
         context.Services.AddSingleton(Stub<IUserRepository>());
         context.Services.AddSingleton<IUserTypeRepository>(new FakeUserTypeRepository());
         context.Services.AddSingleton(Stub<IVehicleRepository>());

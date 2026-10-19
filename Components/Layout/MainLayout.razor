@@ -55,7 +55,7 @@
                     <AuthorizeView Policy="perm:preluare-factura.view"><Authorized><NavLink href="/produse/preluare-factura" Match="NavLinkMatch.Prefix">Preluare factură</NavLink></Authorized></AuthorizeView>
                     }
                     <AuthorizeView Policy="perm:iesire-multipla.view"><Authorized><NavLink href="/iesiri/multipla" Match="NavLinkMatch.Prefix">Ieșire multiplă</NavLink></Authorized></AuthorizeView>
-                    <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink></Authorized></AuthorizeView>
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.ProjectReports.ProjectReportsModule.ModuleId)) { <AuthorizeView Policy="perm:export-consum.view"><Authorized><NavLink href="/consum" Match="NavLinkMatch.Prefix">Export consum</NavLink></Authorized></AuthorizeView> }
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             @if (Modules.IsAvailable(BlazorStoc.Modules.Inventory.InventoryModule.ModuleId))
@@ -100,7 +100,7 @@
             {
             <AuthorizeView Policy="perm:notificari.view"><Authorized><NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             }
-            <AuthorizeView Policy="perm:jurnal.view"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            @if (Modules.IsAvailable(BlazorStoc.Modules.Journal.JournalModule.ModuleId)) { <AuthorizeView Policy="perm:jurnal.view"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView> }
             <AuthorizeView Policy="perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>BlazorStoc · MariaDB</small></div>

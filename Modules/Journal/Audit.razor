@@ -1,8 +1,10 @@
 ﻿@page "/jurnal"
+@namespace BlazorStoc.Components.Pages
 @attribute [Authorize(Policy = "perm:jurnal.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Journal.JournalModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
-@inject IAuditTrail AuditTrail
+@inject IAuditReader Reader
 @inject ILogger<Audit> Logger
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
@@ -126,9 +128,9 @@
         {
             var range = await RangeAsync();
             var query = new AuditQuery(values.Query, values.Entity, values.Action, values.Actor, range.From, range.To);
-            var page = await AuditTrail.QueryAsync(query, currentPage, pageSize, AuditQueryRules.RecentWindow, source.Token);
-            var removed = await AuditTrail.RemovalTimesAsync(page.Events, source.Token);
-            var totals = await AuditTrail.SummaryAsync(DateTime.UtcNow.Date, source.Token);
+            var page = await Reader.QueryAsync(query, currentPage, pageSize, AuditQueryRules.RecentWindow, source.Token);
+            var removed = await Reader.RemovalTimesAsync(page.Events, source.Token);
+            var totals = await Reader.SummaryAsync(DateTime.UtcNow.Date, source.Token);
             if (version != loadVersion) return;
             result = page; removals = removed; summary = totals;
             if (page.Page != currentPage) { currentPage = page.Page; SyncState(); }

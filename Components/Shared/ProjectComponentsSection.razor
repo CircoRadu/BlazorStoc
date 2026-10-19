@@ -18,7 +18,7 @@
                 </select></label>
             <button type="button" class="primary" disabled="@(busy || chosenType is null)" @onclick="AddAsync">Adaugă componenta</button>
             <ToggleSwitch @bind-Value="showArchived" OnText="Arată și arhivate" OffText="Doar active" AriaLabel="Arată componentele arhivate" />
-            <a class="refresh act-nav" href="@($"/proiecte/{ProjectId}/situatie")">Situația proiectului</a>
+            <ModuleGate ModuleId="situatie-proiect" Notice="false"><a class="refresh act-nav" href="@($"/proiecte/{ProjectId}/situatie")">Situația proiectului</a></ModuleGate>
         </div>
         @if (Visible.Count == 0)
         {

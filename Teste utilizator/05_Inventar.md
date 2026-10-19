@@ -6,6 +6,8 @@ Fluxul: Generare situatie inventar (PDF cu categoriile alese) -> tiparesti, comp
 
 ### 15.10.2026 - Inventarul ca modul (oprire fara efect asupra restului aplicatiei)
 
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
 **Ce s-a adaugat:** Inventarul (generarea situatiei de inventar si preluarea foii numarate) este un modul al aplicatiei, ca Analizele de risc, Vehiculele, Mentenanta si Oferte. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge.
 
 **Ce face acum:** cu modulul oprit, /inventar si /inventar/preluare arata "Modul indisponibil"; sectiunea Inventar din meniu si cele doua carduri de pe pagina principala dispar. Un refuz obisnuit (nimic selectat, produs lipsa) da mesajul de pana acum si nu opreste modulul. Notele de consum si situatia proiectului se genereaza la fel ca inainte (folosesc acelasi font PDF).
@@ -17,6 +19,8 @@ Pasi:
 3. Tot cu modulul oprit: genereaza o nota de consum (Export consum) si situatia unui proiect in PDF: se genereaza normal, cu diacritice.
 
 ### 15.10.2026 - Citirea inventarului scanat ruleaza intr-un proces separat
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
 
 **Ce s-a adaugat:** recunoasterea (OCR) fisierului scanat de la Preluare inventar ruleaza acum intr-un proces worker separat, nu in aplicatia web.
 

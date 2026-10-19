@@ -178,10 +178,37 @@ try {
     Check (@(Log-Lines $port | Where-Object { $_ -match 'still running without one' }).Count -ge 1) 'Supervisor: the log says a leftover application was stopped'
     Check ((Read-State $port).restarts -eq 0 -and (Read-State $port).status -eq 'running') 'Supervisor: after taking over the supervision is normal (no failures counted)'
     Stop-Supervisor $port
+    # 10. the stop window: after a stop the scheduled task (-Scheduled) does not start the application again for a while; a manual run or -Action start ends the window
+    $port = $BasePort + 9
+    $flag = Join-Path $stateDir "stopped-$port.flag"
+    Remove-Item $flag -Force -ErrorAction SilentlyContinue
+    $jobs += Start-Supervisor $port (Fake $port 'normal')
+    $null = Wait-Until { $s = Read-State $port; $s -and $s.childPid -gt 0 -and $s.healthLive -eq 200 } 25
+    $windowChild = [int](Read-State $port).childPid
+    Stop-Supervisor $port
+    $null = Wait-Until { $jobs[-1].State -ne 'Running' } 20
+    Check ((Test-Path $flag) -and -not (Alive $windowChild)) 'Supervisor: a stop leaves the stop window flag and ends the application'
+    $scheduled = & $supervisor -Action run -Scheduled -Port $port -AppCommand powershell.exe -AppArguments (Fake $port 'normal') | Out-String
+    Check ($scheduled -match 'Stopped on request' -and $LASTEXITCODE -eq 0 -and (Test-Path $flag)) 'Supervisor: a run started by the scheduled task inside the window ends at once and starts nothing'
+    Check (@(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match "fake-app.ps1" -and $_.CommandLine -match "-Port $port" }).Count -eq 0) 'Supervisor: no application was started inside the window'
+    $none = & $supervisor -Action start -Port ($BasePort + 9) | Out-String
+    Check (-not (Test-Path $flag) -and $none -match 'No scheduled task') 'Supervisor: -Action start ends the window (and says so when there is no scheduled task)'
+    Set-Content -Path $flag -Value ([DateTime]::UtcNow.ToString('o')) -Encoding ASCII
+    $jobs += Start-Supervisor $port (Fake $port 'normal')
+    $manual = Wait-Until { $s = Read-State $port; $s -and $s.childPid -gt 0 -and $s.healthLive -eq 200 } 25
+    Check ($manual -and -not (Test-Path $flag)) 'Supervisor: a manual run ignores the window, ends it and starts the application'
+    Stop-Supervisor $port
+    $null = Wait-Until { $jobs[-1].State -ne 'Running' } 20
+    Set-Content -Path $flag -Value ([DateTime]::UtcNow.AddMinutes(-30).ToString('o')) -Encoding ASCII
+    $jobs += Start-Job -ScriptBlock { param($script, $port, $arguments) & $script -Action run -Scheduled -Port $port -AppCommand powershell.exe -AppArguments $arguments } -ArgumentList $supervisor, $port, (Fake $port 'normal')
+    $expired = Wait-Until { $s = Read-State $port; $s -and $s.status -eq 'running' -and $s.childPid -gt 0 -and $s.healthLive -eq 200 } 25
+    Check ($expired -and -not (Test-Path $flag)) 'Supervisor: a scheduled run after the window has passed starts the application (a stop is never forever)'
+    Stop-Supervisor $port
+
 }
 finally {
     foreach ($job in $jobs) { Stop-Job $job -ErrorAction SilentlyContinue; Remove-Job $job -Force -ErrorAction SilentlyContinue }
-    foreach ($offset in 0..8) {
+    foreach ($offset in 0..9) {
         $state = Read-State ($BasePort + $offset)
         if ($state) { foreach ($id in @($state.childPid, $state.supervisorPid)) { if (Alive ([int]$id)) { & taskkill.exe /PID $id /T /F *> $null } } }
     }

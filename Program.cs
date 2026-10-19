@@ -151,11 +151,13 @@ app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, 
         var csv = ConsumptionExportRules.ToCsv(query, await reader.GetAsync(query, token));
         return Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray(), "text/csv; charset=utf-8", "consum.csv");
     }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For("export-consum.export"));
 app.MapGet("/api/proiecte/{projectId:int}/situatie.pdf", async (int projectId, IProjectSituationReader reader, IProjectSituationPdfWriter writer, CancellationToken token) =>
 {
     try { return Results.File(writer.Write(await reader.GetAsync(projectId, token), DateTime.Now), "application/pdf"); }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (OfferException) { return Results.NotFound(); }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For("beneficiari.export"));
@@ -167,6 +169,7 @@ app.MapGet("/api/proiecte/{projectId:int}/situatie.csv", async (int projectId, I
         var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(ProjectSituationRules.ToCsv(situation))).ToArray();
         return Results.File(bytes, "text/csv; charset=utf-8", $"situatie-proiect-{projectId}.csv");
     }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (OfferException) { return Results.NotFound(); }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For("beneficiari.export"));
@@ -195,12 +198,16 @@ app.MapGet("/media/products/{productId:int}", async (int productId, IProductImag
         ? Results.Redirect(ProductImageRules.PlaceholderUrl)
         : Results.File(image.Content, image.ContentType, enableRangeProcessing: true);
 }).RequireAuthorization(PermissionPolicy.For("stoc.view"));
-app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileStore files, CancellationToken token) =>
+app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IObservationFiles files, CancellationToken token) =>
 {
-    var file = await files.GetContentAsync(fileId, token);
-    return file is null
-        ? Results.NotFound()
-        : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
+    try
+    {
+        var file = await files.GetContentAsync(fileId, token);
+        return file is null
+            ? Results.NotFound()
+            : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
+    }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
 }).RequireAuthorization(PermissionPolicy.For("beneficiari.view"));
 // A page picture of the invoice under analysis (Settings -> Facturi): kept in memory, served only to the administrator who uploaded the file.
 app.MapGet("/media/invoice-analysis/{id:guid}/{page:int}", (Guid id, int page, HttpContext context, IInvoiceAnalysisStore store) =>

@@ -80,6 +80,8 @@ public static class OcrWorkerChecks
         var actualInventory = await new OutOfProcessInventoryPickupOcrService(runner, modules, tessdata).ScanAsync(new MemoryStream(inventoryPdf));
         check(OcrJson.Write(actualInventory) == OcrJson.Write(expectedInventory) && actualInventory.Rows.Count > 0, "OCR worker: the scanned inventory sheet gives the same rows as in-process");
         check(modules.StatusOf("ocr") == ModuleStatus.Healthy, "OCR worker: after real jobs the module is Healthy");
+        if (OperatingSystem.IsWindows())
+            check(runner.PeakProcessMemoryBytes is > 0 and < 4096L * 1024 * 1024, $"OCR worker: the real jobs (text PDF, scan, inventory) stay under the default 4096 MB process cap (peak {runner.PeakProcessMemoryBytes / 1048576} MB)");
 
         var document = new InvoiceDocument([new InvoicePageData(1, 595, 842, "ocr", [new InvoiceWord(1, "Total", 10.5, 20.25, 30, 8, 3, true, 0.87)], [new InvoiceRule(true, 12.5, 1, 99)], 1.5, 90)]);
         var again = OcrJson.Read<InvoiceDocument>(OcrJson.Write(document));
@@ -182,6 +184,8 @@ public static class OcrWorkerChecks
         check(seen?.Environment["DOTNET_GCHeapHardLimit"] == "40000000", "OCR worker: the worker gets a heap limit from Ocr:MaxMemoryMb (1024 MB)");
         check(seen is { RedirectStandardError: true, CreateNoWindow: true, UseShellExecute: false }, "OCR worker: the worker runs without a window and with its output read by the application");
 
+        if (OperatingSystem.IsWindows()) await ProcessMemoryAsync(check, tessdata, pdf);
+
         var running = 0;
         var most = 0;
         var gate = new object();
@@ -217,6 +221,49 @@ public static class OcrWorkerChecks
         try { await new OutOfProcessInvoicePdfReader(cancelWhileWaiting, modules, tessdata).ReadAsync(new MemoryStream(pdf), waitingCancel.Token); } catch (OperationCanceledException) { waitingCancelled = true; }
         await holder;
         check(waitingCancelled, "OCR worker: a request waiting for a free worker can be cancelled");
+    }
+
+    // ---- memory of the worker process, native libraries included (Windows Job Object) ----
+
+    private static ProcessStartInfo Allocate(int megabytes) =>
+        new("powershell.exe") { ArgumentList = { "-NoProfile", "-NonInteractive", "-Command", $"[void](New-Object byte[] ({megabytes}*1MB))" }, UseShellExecute = false, CreateNoWindow = true };
+
+    private static async Task<int> RunInJobAsync(long limitBytes, ProcessStartInfo info)
+    {
+        using var job = ProcessJob.Create(limitBytes);
+        using var process = Process.Start(info)!;
+        var attached = job?.Attach(process) == true;
+        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+        return attached ? process.ExitCode : int.MinValue;
+    }
+
+    private static async Task ProcessMemoryAsync(Action<bool, string> check, IWebHostEnvironmentTessdataPath tessdata, byte[] pdf)
+    {
+        var limited = await RunInJobAsync(200L * 1024 * 1024, Allocate(500));
+        var free = await RunInJobAsync(0, Allocate(500));
+        check(limited != 0 && limited != int.MinValue && free == 0, $"Process job: a process asking for 500 MB under a 200 MB limit fails, the same process without a limit succeeds (exit {limited} / {free})");
+
+        using (var job = ProcessJob.Create(0))
+        {
+            using var sleeper = Process.Start(Cmd("ping -n 60 127.0.0.1 > nul"))!;
+            var attached = job!.Attach(sleeper);
+            var watch = Stopwatch.StartNew();
+            job.Dispose();
+            var ended = sleeper.WaitForExit(TimeSpan.FromSeconds(10));
+            check(attached && ended && watch.Elapsed < TimeSpan.FromSeconds(8), $"Process job: closing the job ends the worker with it (kill on close, {watch.Elapsed.TotalSeconds:0.0} s)");
+        }
+
+        var modules = new ModuleRegistry(new ManualTimeProvider());
+        modules.Add(new OcrModule(), new ServiceCollection(), Settings());
+        var capped = new OcrWorkerRunner(Settings(("Ocr:MaxProcessMemoryMb", "300")), launch: _ => Allocate(900));
+        var uncapped = new OcrWorkerRunner(Settings(("Ocr:MaxProcessMemoryMb", "0")), launch: _ => Allocate(900));
+        var cappedMessage = "";
+        try { await new OutOfProcessInvoicePdfReader(capped, modules, tessdata).ReadAsync(new MemoryStream(pdf)); } catch (InvoiceAnalysisException exception) { cappedMessage = exception.Message; }
+        modules.ReportSuccess("ocr");
+        try { await new OutOfProcessInvoicePdfReader(uncapped, modules, tessdata).ReadAsync(new MemoryStream(pdf)); } catch (InvoiceAnalysisException) { }
+        check(cappedMessage == OcrRules.CrashedMessage && capped.PeakProcessMemoryBytes is > 0 and <= 320L * 1024 * 1024,
+            $"OCR worker: Ocr:MaxProcessMemoryMb caps what the worker commits (peak {capped.PeakProcessMemoryBytes / 1048576} MB under a 300 MB cap)");
+        check(uncapped.PeakProcessMemoryBytes > 800L * 1024 * 1024, $"OCR worker: Ocr:MaxProcessMemoryMb=0 sets no cap (peak {uncapped.PeakProcessMemoryBytes / 1048576} MB)");
     }
 
     // ---- registration ----

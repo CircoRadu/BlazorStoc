@@ -38,6 +38,21 @@ public static class ModuleChecks
     private static List<string> Markers(IServiceCollection services) =>
         [.. services.Select(descriptor => descriptor.ImplementationInstance).OfType<Marker>().Select(marker => marker.Name)];
 
+    // Every tile of the main page that leads to a page of a module sits in a gate of that module: with the module out the tile is gone (only the tiles of the core stay without one).
+    private static void DashboardTiles(Action<bool, string> check)
+    {
+        var root = AppContext.BaseDirectory;
+        while (root is not null && !File.Exists(Path.Combine(root, "BlazorStoc.csproj"))) root = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar));
+        if (root is null) { check(false, "Dashboard tiles: the project folder is found"); return; }
+        var core = new HashSet<string> { "/produse", "/iesiri/multipla", "/categorii", "/beneficiari", "/utilizatori", "/nomenclator", "/setari" };
+        var ungated = File.ReadAllLines(Path.Combine(root, "Components", "Pages", "Dashboard.razor"))
+            .Where(line => line.Contains("main-menu-icon"))
+            .Select(line => (Href: Regex.Match(line, "<a href=\"([^\"]+)\"").Groups[1].Value, Gated: line.Contains("<ModuleGate")))
+            .Where(tile => tile.Href.Length > 0 && !core.Contains(tile.Href) && !tile.Gated)
+            .Select(tile => tile.Href).ToList();
+        check(ungated.Count == 0, "Modules: every module tile of the main page is inside the gate of its module (" + string.Join(", ", ungated) + ")");
+    }
+
     public static async Task RunAsync(Action<bool, string> check)
     {
         Registration(check);
@@ -47,9 +62,13 @@ public static class ModuleChecks
         await WiringAsync(check);
         Gate(check);
         Architecture(check);
+        DashboardTiles(check);
         await VehicleModuleChecks.RunAsync(check);
         await MaintenanceModuleChecks.RunAsync(check);
         await OfferModuleChecks.RunAsync(check);
+        await ProjectReportsModuleChecks.RunAsync(check);
+        await JournalModuleChecks.RunAsync(check);
+        await ProjectObservationsModuleChecks.RunAsync(check);
         await InventoryModuleChecks.RunAsync(check);
         await AnafModuleChecks.RunAsync(check);
         await InvoiceModuleChecks.RunAsync(check);

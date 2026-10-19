@@ -76,6 +76,8 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
 - Spatiere: niciun element nu sta lipit de vecinul lui. Un buton sau o nota pusa sub un camp (input, select) are cel putin 10 px deasupra; elementele unui meniu sau ale unui sub-meniu au spatiu intre ele (8 px sub titlu, 5 px intre elemente); aceeasi spatiere se aplica la tot ce este nou. Regula se verifica vizual inainte de predare.
 - Teste de facturi pe tip de fisier (regula data de utilizator la 09 octombrie 2026): grupul `xml` (XML si ZIP e-Factura, secunde) si grupul `pdf` (PDF text/scanat cu OCR, minute); `invoices` le ruleaza pe amandoua. Rulezi numai grupul pe care il atinge modificarea (XML/ZIP → `xml`; PDF/OCR → `pdf`); la o modificare doar de aspect (CSS, text, aliniere) nu rulezi niciun test; suita completa ramane inainte de commit.
 
+- **Verificare completa la sfarsitul unei schimbari (regula permanenta, 19 octombrie 2026):** la finalul unei implementari se ruleaza toate verificarile necesare (suita relevanta, MariaDB, browser pe o instanta de test cu baza de test, defectiune reala, oprit din configurare, exporturi/descarcari), astfel incat sa nu ramana sectiuni „Neverificat” sau „Ramas” nici in raspuns, nici in `docs/TESTE_RAMASE.md` pentru acea schimbare. In `docs/TESTE_RAMASE.md` ramane numai ce numai utilizatorul poate face (parola unui serviciu extern, hardware, decizie de produs), cu motivul spus explicit.
+
 ## Compact Instructions
 
 Cand `/compact` este lansat fara argumente, rezumatul se scrie ca `/compact Keep: ce ai facut, ce decizii au fost luate, ce mai trebuie testat`, sub forma de bullet points concise (regula utilizatorului, 09.10.2026). Argumentele date explicit la `/compact` au prioritate.

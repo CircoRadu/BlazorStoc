@@ -4,7 +4,22 @@ Regula: jurnalul numeste exact operatia (nu "Creare"/"Editare" generic). Fiecare
 
 ## Modificari de testat
 
+### 19.10.2026 - Jurnalul ca modul
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** citirea Jurnalului (/jurnal si /jurnal/complet) este acum modulul „Jurnal de activitate” (Setari -> Module); inregistrarea operatiilor in Jurnal ramane in aplicatie.
+
+**Ce face acum:** Jurnalul functioneaza ca inainte; daca citirea lui cade (erori repetate) sau modulul e oprit din configurare, linkul din meniu si tile-ul de pe pagina principala dispar, paginile spun „Modul indisponibil”, iar restul aplicatiei merge si continua sa jurnalizeze operatiile.
+
+1. Deschide Jurnal activitate si Jurnal complet: filtrele, cautarea, paginarea functioneaza ca inainte.
+2. In Jurnal complet exporta CSV: fisierul se descarca, iar in Jurnal apare „Export jurnal” cu numarul de evenimente.
+3. In Setari -> Module „Jurnal de activitate” este „functioneaza”.
+
+
 ### 15.10.2026 - Module si oprirea aplicatiei in Jurnal
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
 
 **Ce s-a adaugat:** Jurnalul de activitate inregistreaza acum, de catre utilizatorul "sistem": "Oprire modul" (un modul scos din functiune dupa erori repetate, sau care nu a pornit / e oprit din configurare), "Revenire modul", "Reincercare modul" (cand administratorul apasa Reincearca, pe numele lui) si "Oprire neasteptata aplicatie" (la pornirea de dupa o cadere: ultima activitate, ora pornirii, procesul si cauza, cand se cunoaste). Entitatile "Module" si "Aplicatie" si cele patru actiuni apar in filtrele paginii.
 

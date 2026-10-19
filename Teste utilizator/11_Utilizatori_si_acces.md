@@ -6,6 +6,8 @@ Fluxul: administratorul creeaza conturi (Administrator / Utilizator) -> autentif
 
 ### 15.10.2026 - Mesaj la autentificare cand baza de date nu raspunde
 
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
 **Ce s-a adaugat:** cand baza de date nu raspunde (sau un backup/o restaurare o tine ocupata), pagina de autentificare spune "Baza de date nu raspunde momentan sau este in curs un backup/o restaurare. Nu este o problema a contului tau: incearca din nou peste cateva momente." in loc de "Utilizator sau parola incorecta.". Si limita de "Prea multe incercari" numara doar trimiterea parolei, nu si deschiderea paginii de login.
 
 **Ce face acum:** nimeni nu mai tasteaza degeaba parola cand baza e oprita; o parola gresita primeste in continuare mesajul obisnuit.

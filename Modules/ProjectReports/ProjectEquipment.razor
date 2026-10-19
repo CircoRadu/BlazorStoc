@@ -1,5 +1,7 @@
 ﻿@page "/proiecte/{Id:int}/echipamente"
+@namespace BlazorStoc.Components.Pages
 @attribute [Authorize(Policy = "perm:beneficiari.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.ProjectReports.ProjectReportsModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProjectRepository Repository

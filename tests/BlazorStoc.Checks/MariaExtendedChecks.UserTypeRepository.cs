@@ -62,7 +62,16 @@ public static partial class MariaExtendedChecks
             // A user moved to another type: the change is journaled by its own action; the admin type gives every key.
             var move = WebUserInput.From(user); move.TypeId = administrator; move.Reason = "Ext mutare tip";
             user = await users.UpdateAsync(user, move);
-            Check(user.Role == AccessRoles.Administrator && (await permissions.GetKeysAsync(principal)).Count == Permissions.AllKeys.Count, "A user moved to the Administrator type has the role and every key");
+            // The session of the user still carries the role it was opened with (the role of the old type) until the next sign-in: the keys reserved to the administrator
+            // (ANAF, backup, modules) are honoured only for the Administrator ROLE, so the old session gets every grantable key and a new sign-in gets all of them.
+            var movedKeys = await permissions.GetKeysAsync(principal);
+            var refreshed = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role)], "test"));
+            var refreshedKeys = await permissions.GetKeysAsync(refreshed);
+            Check(user.Role == AccessRoles.Administrator && refreshedKeys.Count == Permissions.AllKeys.Count,
+                $"A user moved to the Administrator type has the role and, at the next sign-in, every key (role {user.Role}, {refreshedKeys.Count} of {Permissions.AllKeys.Count} keys)");
+            Check(movedKeys.SetEquals(Permissions.GrantableKeys),
+                $"Until that sign-in the session keeps its old role: every grantable key but none of the administrator-only ones ({movedKeys.Count} of {Permissions.GrantableKeys.Count})");
             Check((await audit.GetEventsAsync()).Count(item => item.TimestampUtc > since && item.EntityType == AuditEntities.User && item.Action == AuditActions.ChangeUserType) == 1,
                 "Moving a user to another type is the journal action \"Schimbare tip utilizator\"");
             var back = WebUserInput.From(user); back.TypeId = type.Id; back.Reason = "Ext revenire tip";
