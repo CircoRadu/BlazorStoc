@@ -99,6 +99,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 app.MapStaticAssets().AllowAnonymous();
+app.MapHelp();
 app.MapGet("/api/furnizori/recunoastere.csv", async (ISupplierRecognitionLog log, CancellationToken token) =>
 {
     // While the suppliers module is out the log cannot be read: a clear 503, not an error page.

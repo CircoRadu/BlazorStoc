@@ -78,6 +78,10 @@ Acest proiect folosește colaborare strict secvențială între Claude și Codex
 
 - **Verificare completa la sfarsitul unei schimbari (regula permanenta, 19 octombrie 2026):** la finalul unei implementari se ruleaza toate verificarile necesare (suita relevanta, MariaDB, browser pe o instanta de test cu baza de test, defectiune reala, oprit din configurare, exporturi/descarcari), astfel incat sa nu ramana sectiuni „Neverificat” sau „Ramas” nici in raspuns, nici in `docs/TESTE_RAMASE.md` pentru acea schimbare. In `docs/TESTE_RAMASE.md` ramane numai ce numai utilizatorul poate face (parola unui serviciu extern, hardware, decizie de produs), cu motivul spus explicit.
 
+
+- **Help contextual (regula permanenta, 19 octombrie 2026, `docs/PROPUNERE_HELP.md`):** orice fereastra noua (pagina cu `@page`, tab cu continut propriu, editor sau dialog care nu e o simpla confirmare) primeste un topic `Assets/Help/<cheie>.help` cu elementele ferestrei si fluxul de operare (format in `Services/Help/HelpParser.cs`), scris in romana cu diacritice; paginile se leaga prin `Ruta:` (si `Tab:`), dialogurile prin `<HelpButton Topic="cheie" About="..." />` in antet (marcajul comun `dialog-head`). Dialogurile de confirmare simple nu au help. Un element nou sau schimbat pe o fereastra existenta se adauga/corecteaza in topicul ei, iar testul `tools\run-checks.ps1 -Group help` esueaza pentru o pagina fara topic (lista `Pending` din `HelpChecks.cs` doar scade). Continutul .help se schimba la rebuild; textele din .help au diacritice (nu sunt .md).
+
 ## Compact Instructions
 
 Cand `/compact` este lansat fara argumente, rezumatul se scrie ca `/compact Keep: ce ai facut, ce decizii au fost luate, ce mai trebuie testat`, sub forma de bullet points concise (regula utilizatorului, 09.10.2026). Argumentele date explicit la `/compact` au prioritate.
+

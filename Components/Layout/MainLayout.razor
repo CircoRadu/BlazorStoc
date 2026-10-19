@@ -105,7 +105,7 @@
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>BlazorStoc · MariaDB</small></div>
     </aside>
-    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">Sesiune autentificată</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
+    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">Sesiune autentificată</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="help-icon" data-help-open aria-haspopup="dialog" aria-label="Ajutor pentru această fereastră" title="Ajutor pentru această fereastră"></button><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
         @if (activeOperation is not null && !onRestorePage && !onWaitingPage)
         {
             <div class="error-banner" role="alert" id="maintenance-banner">

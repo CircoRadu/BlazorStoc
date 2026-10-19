@@ -1,0 +1,15 @@
+# Acces refuzat
+Ruta: /Account/AccessDenied
+Public: da
+
+Pagina apare când tipul tău de utilizator nu are dreptul să deschidă o pagină sau să facă o operație.
+
+## Elemente
+### Pagina
+- Mesajul | text | Explică faptul că tipul de utilizator nu permite pagina sau operația cerută.
+- Înapoi la pagina principală | buton | Te duce la pagina principală, unde vezi secțiunile la care ai acces.
+
+## Flux: Cum primesc acces la o pagină
+1. Notează pagina sau operația care ți-a fost refuzată.
+2. Cere administratorului să îți modifice tipul de utilizator sau să adauge dreptul necesar.
+3. După modificare, deschide din nou pagina (dreptul se reîncarcă în cel mult 30 de secunde).

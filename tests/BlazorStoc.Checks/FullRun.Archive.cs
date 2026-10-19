@@ -52,6 +52,7 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["nas"] = () => NasBackupChecks.RunAsync(Check),
             ["robustness"] = () => RobustnessChecks.RunAsync(Check),
             ["structure"] = () => { StructureChecks.Run(Check); return Task.CompletedTask; },
+            ["help"] = () => HelpChecks.RunAsync(Check),
             ["modules"] = () => ModuleChecks.RunAsync(Check),
             ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
             ["backupworker"] = () => BackupWorkerChecks.RunAsync(Check),

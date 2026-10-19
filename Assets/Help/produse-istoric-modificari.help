@@ -1,0 +1,16 @@
+# Istoricul modificărilor unei operații
+Cautare: istoric modificari miscare operatie motiv
+
+Fereastra arată toate modificările făcute asupra unei intrări sau ieșiri de stoc: cine a modificat, când, ce s-a schimbat și de ce. Se deschide din pagina produsului, cu iconița de istoric de pe rândul operației.
+
+## Elemente
+### Fereastra
+- Titlul | text | Tipul operației și data ei.
+- Lista modificărilor | listă | O intrare pe fiecare modificare, cele mai noi primele: data și ora, utilizatorul, ce s-a schimbat (valoarea veche și cea nouă) și motivul.
+- Închide | buton | Închide fereastra; Escape face același lucru.
+
+## Flux: Cum văd cine a modificat o operație
+1. În pagina produsului, pe rândul operației, apasă iconița „Istoric”.
+2. Citește lista: fiecare modificare spune cine a făcut-o, când și motivul.
+3. Apasă „Închide” ca să te întorci la pagina produsului.
+Nota: dacă nu există modificări înregistrate, fereastra spune acest lucru.

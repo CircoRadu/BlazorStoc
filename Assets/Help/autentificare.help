@@ -1,0 +1,18 @@
+# Autentificare
+Ruta: /Account/Login
+Public: da
+
+Pagina de autentificare protejează accesul la aplicație. Fără cont valid nu se deschide nicio altă pagină.
+
+## Elemente
+### Formularul
+- Utilizator | câmp | Numele contului tău.
+- Parolă | câmp | Parola contului; nu se afișează pe ecran.
+- Intră în aplicație | buton | Verifică datele și te duce la pagina cerută sau la pagina principală.
+- Mesajul roșu | text | Apare când datele sunt greșite sau când s-au făcut prea multe încercări într-un timp scurt.
+
+## Flux: Cum intru în aplicație
+1. Scrie numele de utilizator și parola.
+2. Apasă „Intră în aplicație”.
+3. Dacă ai fost trimis aici dintr-o pagină anume, după autentificare ajungi înapoi la ea.
+Nota: dacă ți-ai uitat parola, cere administratorului să ți-o reseteze; după mai multe încercări greșite autentificarea se blochează temporar.

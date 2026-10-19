@@ -119,6 +119,7 @@ public static partial class FullRun
         await ProductGroupsChecks.RunAsync(Check);
         ReasonSummaryChecks.Run(Check);
         StructureChecks.Run(Check);
+        await HelpChecks.RunAsync(Check);
         await ModuleChecks.RunAsync(Check);
         await OcrWorkerChecks.RunAsync(Check);
         await BackupWorkerChecks.RunAsync(Check);

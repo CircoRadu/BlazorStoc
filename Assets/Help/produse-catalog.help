@@ -1,0 +1,51 @@
+# Produse și stocuri
+Ruta: /produse
+Cautare: catalog produse stoc cantitate disponibilitate categorie subcategorie cautare adaugare
+
+Catalogul arată toate produsele cu stocul lor. Poți căuta, filtra după categorie și disponibilitate, deschide mișcările unui produs și adăuga produse noi. Fereastra are două secțiuni: **Catalog** și **De regularizat**.
+
+## Elemente
+### Antet
+- ← Meniu principal | buton | Revine la pagina principală.
+- Ieșire multiplă | buton | Deschide ieșirea mai multor produse deodată (doar cu dreptul necesar).
+- Administrează categorii | buton | Deschide categoriile și subcategoriile.
+- + Adaugă produs | buton | Deschide formularul de produs nou deasupra catalogului.
+- Actualizează | buton | Reîncarcă datele din bază.
+### Rezumatul selecției
+- Produse în selecție | cifră | Numărul de produse din categoria sau subcategoria aleasă (sau din tot catalogul).
+- Categorii | cifră | Câte categorii diferite sunt în selecție.
+- Fără stoc | cifră | Produse cu cantitatea zero.
+- Stoc negativ | cifră | Produse cu cantitate negativă, de verificat; se regularizează din secțiunea „De regularizat”.
+### Filtre
+- Caută produse | câmp | Caută după codul produsului sau după descriere; lista se filtrează pe măsură ce scrii.
+- Disponibilitate | listă | Orice stoc, În stoc, Fără stoc sau Stoc negativ.
+- Categorii produse | meniu | În meniul din stânga alegi o categorie sau subcategorie; catalogul arată numai produsele ei.
+### Tabelul de produse
+- Cod produs | coloană | Imaginea (apasă pentru mărire), codul produsului și descrierea. Semnele de sub nume spun dacă produsul este în editare la un alt utilizator sau dacă îi lipsesc parametri obligatorii (atunci este blocat pentru mișcări de stoc).
+- Categorie, Subcategorie | coloană | Apasă pe valoare ca să filtrezi catalogul după ea.
+- Cantitate | coloană | Stocul total; apasă antetul ca să sortezi crescător sau descrescător. Dacă produsul e și în vehicule, se arată câte sunt în depozit și câte în vehicule.
+- Disponibilitate | coloană | Insigna de stare: în stoc, fără stoc sau stoc negativ.
+- Ieșire rapidă | iconita:exit | Deschide o fereastră de ieșire pentru produsul de pe rând (doar cu dreptul necesar).
+- Mișcările produsului | iconita:view | Deschide pagina produsului cu intrările, ieșirile și istoricul lui.
+### Subsol
+- Numărul de rezultate | text | Câte produse corespund filtrelor.
+- Paginile | butoane | Catalogul are 10 produse pe pagină; săgețile trec la pagina anterioară sau următoare.
+
+## Flux: Cum caut un produs
+1. Scrie în câmpul de căutare o parte din codul sau din descrierea produsului.
+2. Dacă vrei, alege „Disponibilitate” sau o categorie din meniul din stânga ca să restrângi lista.
+3. Deschide produsul cu iconița „Mișcările produsului” (sau apasă numele lui).
+Nota: filtrele se păstrează cât timp stai pe pagină; o categorie aleasă din meniu se vede în titlul rezumatului.
+
+## Flux: Cum adaug un produs
+1. Apasă „+ Adaugă produs”; formularul apare deasupra catalogului.
+2. Completează codul produsului, alege categoria și subcategoria (obligatorii) și, dacă vrei, descrierea și imaginea.
+3. Dacă subcategoria cere parametri obligatorii, completează-i; un produs fără ei rămâne blocat pentru mișcări de stoc.
+4. Apasă butonul de salvare; produsul apare în catalog. „Anulează” închide formularul fără să salveze.
+Nota: dacă lipsește categoria potrivită, folosește „Adaugă categorie / subcategorie” din formular.
+
+## Flux: Cum fac o ieșire rapidă
+1. Pe rândul produsului apasă iconița „Ieșire rapidă”.
+2. În fereastra care se deschide completezi cantitatea și destinația ieșirii și o salvezi.
+3. Fereastra se închide și catalogul se reîncarcă cu stocul nou.
+Nota: pentru mai multe produse deodată folosește „Ieșire multiplă”; pentru intrări deschide pagina produsului.

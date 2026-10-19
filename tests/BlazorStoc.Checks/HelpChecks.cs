@@ -1,0 +1,198 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
+using BlazorStoc.Help;
+using Bunit;
+using Microsoft.AspNetCore.Components;
+
+namespace BlazorStoc.Checks;
+
+// The in-application help (docs/PROPUNERE_HELP.md): the parser, the catalog (routes, tabs, search), the HTML, and the COVERAGE: a page that has an
+// address (@page) must have a topic of its window, or be listed here with the reason. The list of pages still to be written (Pending) only shrinks:
+// a page that already has a topic must be taken out of it, and a new page that is in neither list fails the check.
+public static class HelpChecks
+{
+    // Pages that have no window of their own to describe: redirects, the error page and the waiting page of a backup.
+    private static readonly HashSet<string> Exempt = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "/Error", "/intretinere", "/miscari/{}", "/observatii/{}"
+    };
+
+    // Windows whose topic is still to be written (the order of the main menu). Take a page out when its topic exists.
+    private static readonly HashSet<string> Pending = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "/produse/preluare-factura", "/produse/preluare-factura/factura/{}", "/iesiri/multipla", "/consum",
+        "/inventar", "/inventar/preluare",
+        "/categorii", "/categorii/fereastra", "/beneficiari", "/beneficiari/{}", "/furnizori", "/furnizori/{}", "/facturi", "/vehicule", "/vehicule/{}", "/vehicule/{}/echipamente",
+        "/utilizatori", "/utilizatori/{}", "/nomenclator",
+        "/oferte", "/oferte/preluare", "/oferte/sabloane", "/mentenanta", "/mentenanta/harta", "/mentenanta/harta/fereastra", "/analize-risc",
+        "/produse/{}", "/produse/{}/miscari", "/proiecte/{}", "/proiecte/{}/situatie", "/proiecte/{}/echipamente", "/proiecte/{}/observatii/{}",
+        "/notificari", "/jurnal", "/jurnal/complet", "/setari"
+    };
+
+    private const string Sample = """
+        # Fereastra de probă
+        Ruta: /proba/{id:int}
+        Tab: Prima
+        Cautare: cuvinte extra
+
+        Rezumat cu **bold** și <script>alert(1)</script> și legătură [[proba-alta]].
+
+        ## Elemente
+        ### Zona unu
+        - Câmp | câmp | Descriere
+          pe două linii.
+        - Editare | iconita:edit | Deschide editorul.
+
+        ## Flux: Cum fac ceva
+        1. Primul pas
+        2. Al doilea pas
+        Nota: atenție.
+        """;
+
+    private const string Other = """
+        # Altă fereastră
+        Ruta: /proba/{id:int}
+
+        Altceva.
+
+        ## Elemente
+        ### Z
+        - A | câmp | b
+
+        ## Flux: F
+        1. a
+        2. b
+        """;
+
+    public static Task RunAsync(Action<bool, string> check)
+    {
+        Parser(check);
+        Catalog(check);
+        Rendering(check);
+        Coverage(check);
+        ReferencedTopics(check);
+        return Task.CompletedTask;
+    }
+
+    private static void Parser(Action<bool, string> check)
+    {
+        var parsed = HelpParser.Parse("proba-tab", Sample);
+        var topic = parsed.Topic;
+        check(topic is not null && parsed.Errors.Count == 0, "Help: a complete topic is read without errors" + (parsed.Errors.Count > 0 ? " (" + string.Join("; ", parsed.Errors) + ")" : ""));
+        if (topic is null) return;
+        check(topic.Title == "Fereastra de probă" && topic.Routes.SequenceEqual(["/proba/{id:int}"]) && topic.Tab == "Prima" && topic.Keywords == "cuvinte extra",
+            "Help: title, route, tab and keywords of the header are read");
+        check(topic.Areas.Count == 1 && topic.Areas[0].Elements.Count == 2 && topic.Areas[0].Elements[0].Text == "Descriere pe două linii.",
+            "Help: an element continues on the next indented line");
+        check(topic.Areas[0].Elements[1].Icon == "edit" && topic.Areas[0].Elements[1].Kind == "iconiță", "Help: \"iconita:edit\" is an icon element");
+        check(topic.Flows.Count == 1 && topic.Flows[0].Blocks.Count(block => block.Kind == HelpBlockKind.Step) == 2 && topic.Flows[0].Blocks.Any(block => block.Kind == HelpBlockKind.Note),
+            "Help: a flow has numbered steps and a note");
+
+        var noFlow = HelpParser.Parse("fara-flux", "# T\n\nRezumat.\n\n## Elemente\n### Z\n- A | b | c\n");
+        check(noFlow.Topic is null && noFlow.Errors.Any(error => error.Contains("flux")), "Help: a topic without a work flow is refused");
+        var badElement = HelpParser.Parse("element-prost", "# T\n\nRezumat.\n\n## Elemente\n### Z\n- doar nume\n\n## Flux: F\n1. a\n2. b\n");
+        check(badElement.Errors.Any(error => error.Contains("Nume | tip | descriere")), "Help: an element without kind and description is refused");
+        var shortFlow = HelpParser.Parse("flux-scurt", "# T\n\nRezumat.\n\n## Elemente\n### Z\n- A | b | c\n\n## Flux: F\n1. doar unul\n");
+        check(shortFlow.Errors.Any(error => error.Contains("mai putin de 2 pasi")), "Help: a flow needs at least two steps");
+        check(!HelpParser.Parse("Cheie Proasta", Sample).Errors.Count.Equals(0), "Help: a key with capitals or spaces is refused");
+    }
+
+    private static void Catalog(Action<bool, string> check)
+    {
+        var catalog = HelpCatalog.FromSources([("proba-tab", Sample), ("proba-alta", Other), ("proba-dublura", Other)]);
+        check(catalog.Errors.Any(error => error.Contains("este deja descrisa")), "Help: two topics for the same address and tab are refused");
+
+        var good = HelpCatalog.FromSources([("proba-tab", Sample.Replace("Tab: Prima", "Tab: Prima (2)")), ("proba-alta", Other)]);
+        check(good.Errors.Count == 0, "Help: a valid set of topics has no errors" + (good.Errors.Count > 0 ? " (" + string.Join("; ", good.Errors) + ")" : ""));
+        check(good.Resolve("/proba/7").Topic?.Key == "proba-alta", "Help: the page without tab gets its general topic");
+        check(good.Resolve("/Proba/7/?x=1", ["Prima (3)"]).Topic?.Key == "proba-tab", "Help: the topic of the selected tab is chosen (address and label compared without case, query and number of the label)");
+        check(good.Resolve("/proba/7", ["Alta"]).Topic?.Key == "proba-alta" && good.Resolve("/proba/7", ["Prima"]).Others.Single().Key == "proba-alta",
+            "Help: an unknown tab falls back to the general topic; the other topics of the page are offered as links");
+        check(good.Resolve("/proba/abc").Topic is null && good.Resolve("/nimic").Topic is null, "Help: a route parameter {id:int} does not accept text; an unknown address has no topic");
+        check(good.Search("legatura").Count == 1 && good.Search("fereastra proba").Count == 1 && good.Search("zzz").Count == 0, "Help: the search needs every word");
+
+        var broken = HelpCatalog.FromSources([("proba-tab", Sample)]);
+        check(broken.Errors.Any(error => error.Contains("[[proba-alta]]")), "Help: a link to a topic that does not exist is an error");
+        var picture = HelpCatalog.FromSources([("p", "# P\nRuta: /p\n\nRezumat.\n[img:lipsa.png | legenda]\n\n## Elemente\n### Z\n- A | b | c\n\n## Flux: F\n1. a\n2. b\n")]);
+        check(picture.Errors.Any(error => error.Contains("lipsa.png")), "Help: a picture that does not exist is an error");
+        check(HelpCatalog.Fold("Ieșire Țară ŞtîrbA") == "iesire tara stirba", "Help: the search ignores diacritics and case");
+    }
+
+    private static void Rendering(Action<bool, string> check)
+    {
+        var catalog = HelpCatalog.FromSources([("proba-tab", Sample), ("proba-alta", Other)]);
+        var html = HelpRenderer.Topic(catalog.Get("proba-tab")!, catalog, [catalog.Get("proba-alta")!]);
+        check(!html.Contains("<script", StringComparison.OrdinalIgnoreCase) && html.Contains("&lt;script&gt;"), "Help: the text of a file cannot bring markup (it is encoded)");
+        check(html.Contains("<strong>bold</strong>") && html.Contains("data-help-topic=\"proba-alta\""), "Help: **bold** and [[links]] are rendered");
+        check(html.Contains("<details class=\"help-flow\"") && html.Contains("help-plus") && html.Contains("Cum fac ceva"), "Help: a flow is a collapsible section with the \"+\" icon");
+        check(html.Contains("row-icon edit help-static") && html.Contains("Elementele ferestrei"), "Help: an icon element shows the real icon");
+        check(HelpRenderer.Missing("/x").Contains("Ajutor indisponibil"), "Help: a window without topic says so plainly");
+
+        using var context = new Bunit.BunitContext();
+        var button = context.Render<BlazorStoc.Components.Shared.HelpButton>(parameters => parameters.Add(p => p.Topic, "produse-istoric-modificari").Add(p => p.About, "Istoricul modific0103rilor")).Find("button.help-icon");
+        check(button.GetAttribute("data-help-topic") == "produse-istoric-modificari" && button.GetAttribute("aria-label") == "Ajutor: Istoricul modific0103rilor" && button.GetAttribute("type") == "button",
+            "Help: the help button of a dialog carries the key of its topic and a label with the name of the window");
+    }
+
+    // The topics shipped with the application.
+    private static void Coverage(Action<bool, string> check)
+    {
+        var catalog = HelpCatalog.Default;
+        check(catalog.Errors.Count == 0, "Help: the topics of the application (Assets/Help) have no errors" + (catalog.Errors.Count > 0 ? ": " + string.Join(" | ", catalog.Errors.Take(5)) : ""));
+
+        var shapes = typeof(HelpCatalog).Assembly.GetTypes()
+            .Where(type => typeof(IComponent).IsAssignableFrom(type))
+            .SelectMany(type => type.GetCustomAttributes<RouteAttribute>(false).Select(route => route.Template))
+            .Select(Shape).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(shape => shape, StringComparer.OrdinalIgnoreCase).ToList();
+        var documented = catalog.Topics.Values.SelectMany(topic => topic.Routes).Select(Shape).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // The Razor Pages outside Blazor (Login, AccessDenied) have no [Route]: their addresses are listed here.
+        var outsideBlazor = new[] { "/Account/Login", "/Account/AccessDenied" };
+
+        var missing = shapes.Where(shape => !documented.Contains(shape) && !Exempt.Contains(shape) && !Pending.Contains(shape)).ToList();
+        check(missing.Count == 0, "Help: every page with an address has a topic (or is on the list of pages still to be written)" + (missing.Count > 0 ? ": " + string.Join(", ", missing) : ""));
+        var finished = Pending.Where(shape => documented.Contains(shape)).ToList();
+        check(finished.Count == 0, "Help: a page that has its topic is taken off the list of pages still to be written" + (finished.Count > 0 ? ": " + string.Join(", ", finished) : ""));
+        var unknown = Pending.Concat(Exempt).Where(shape => !shapes.Contains(shape, StringComparer.OrdinalIgnoreCase)).ToList();
+        check(unknown.Count == 0, "Help: the lists of exempt/pending pages name only existing pages" + (unknown.Count > 0 ? ": " + string.Join(", ", unknown) : ""));
+        check(outsideBlazor.All(path => catalog.Resolve(path).Topic?.Public == true), "Help: Login and AccessDenied have public topics (readable without signing in)");
+        check(catalog.Topics.Values.Where(topic => topic.Public).All(topic => topic.Routes.All(route => outsideBlazor.Contains(route, StringComparer.OrdinalIgnoreCase))),
+            "Help: only the pages outside Blazor are public");
+    }
+
+    // A route as a shape: the names of the parameters do not matter ("/produse/{Id:int}" = "/produse/{x:int}").
+    private static string Shape(string template) => Regex.Replace(template, @"\{[^}]*\}", "{}");
+
+    // Every button of a dialog that opens a topic (HelpButton Topic="...", data-help-topic="...") points to a topic that exists; a topic with no
+    // address (a dialog or editor) is used by at least one such button or link.
+    private static void ReferencedTopics(Action<bool, string> check)
+    {
+        var root = FindRoot();
+        if (root is null) { check(true, "Help: the source files were not found next to the checks (references of the dialogs not scanned)"); return; }
+        var catalog = HelpCatalog.Default;
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var wrong = new List<string>();
+        foreach (var file in new[] { "Components", "Modules", "Pages" }.Select(folder => Path.Combine(root, folder)).Where(Directory.Exists).SelectMany(folder => Directory.EnumerateFiles(folder, "*.razor", SearchOption.AllDirectories)))
+        {
+            foreach (Match match in Regex.Matches(File.ReadAllText(file), @"<HelpButton\s[^>]*Topic=""([^""]+)"""))
+            {
+                used.Add(match.Groups[1].Value);
+                if (catalog.Get(match.Groups[1].Value) is null) wrong.Add($"{Path.GetFileName(file)} -> {match.Groups[1].Value}");
+            }
+        }
+        check(wrong.Count == 0, "Help: every help button of a dialog points to an existing topic" + (wrong.Count > 0 ? ": " + string.Join(", ", wrong) : ""));
+        var linked = catalog.Topics.Values.SelectMany(topic => topic.Summary.Select(block => block.Text)
+            .Concat(topic.Areas.SelectMany(area => area.Elements).Select(element => element.Text))
+            .Concat(topic.Flows.SelectMany(flow => flow.Blocks).Select(block => block.Text)))
+            .SelectMany(text => HelpCatalog.LinkRegex().Matches(text).Select(match => match.Groups[1].Value));
+        used.UnionWith(linked);
+        var orphans = catalog.Topics.Values.Where(topic => topic.Routes.Count == 0 && !used.Contains(topic.Key)).Select(topic => topic.Key).ToList();
+        check(orphans.Count == 0, "Help: every topic without an address (dialog, editor) is opened by a help button or a link" + (orphans.Count > 0 ? ": " + string.Join(", ", orphans) : ""));
+    }
+
+    private static string? FindRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "BlazorStoc.csproj"))) directory = directory.Parent;
+        return directory?.FullName;
+    }
+}

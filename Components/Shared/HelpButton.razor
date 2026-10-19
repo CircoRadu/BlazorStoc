@@ -1,0 +1,11 @@
+@* The help icon in the head of a dialog or editor: opens the topic "Topic" (Assets/Help/<Topic>.help) in the help window. It carries no logic of its own:
+   wwwroot/help.js listens for [data-help-topic] on the whole page, so it also works where the markup is rendered without interactivity. *@
+<button type="button" class="help-icon" data-help-topic="@Topic" aria-label="@Label" title="@Label"></button>
+
+@code {
+    [Parameter, EditorRequired] public string Topic { get; set; } = "";
+    /// <summary>What the help is about, for the label of the icon ("Istoricul modificărilor").</summary>
+    [Parameter] public string? About { get; set; }
+
+    private string Label => string.IsNullOrWhiteSpace(About) ? "Ajutor pentru această fereastră" : $"Ajutor: {About}";
+}

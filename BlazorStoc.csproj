@@ -42,6 +42,10 @@
     <Content Remove="Assets/Migrations/**" />
     <None Remove="Assets/Migrations/**" />
     <EmbeddedResource Include="Assets/Migrations/*.sql" LogicalName="BlazorStoc.Migrations.%(Filename)%(Extension)" />
+    <Content Remove="Assets/Help/**" />
+    <None Remove="Assets/Help/**" />
+    <EmbeddedResource Include="Assets/Help/*.help" LogicalName="BlazorStoc.Help.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets/Help/img/*" LogicalName="BlazorStoc.HelpImg.%(Filename)%(Extension)" />
     <Content Remove="Assets/Models/**" />
     <None Remove="Assets/Models/**" />
     <EmbeddedResource Include="Assets/Models/mnist-12.onnx" />

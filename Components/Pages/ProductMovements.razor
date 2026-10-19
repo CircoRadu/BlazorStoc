@@ -457,7 +457,7 @@ else
 {
     <div class="delete-overlay" @onkeydown="HistoryKeyAsync">
         <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="movement-history-title">
-            <h2 id="movement-history-title">Istoricul modificărilor · @StockMovementRules.KindLabel(historyFor.Kind) din @StockMovementRules.DisplayDate(historyFor.Date)</h2>
+            <div class="dialog-head"><h2 id="movement-history-title">Istoricul modificărilor · @StockMovementRules.KindLabel(historyFor.Kind) din @StockMovementRules.DisplayDate(historyFor.Date)</h2><HelpButton Topic="produse-istoric-modificari" About="Istoricul modificărilor" /></div>
             @if (historyError is not null) { <div class="error-banner" role="alert">@historyError</div> }
             else if (history.Count == 0) { <p class="muted">Nu există modificări înregistrate.</p> }
             else
