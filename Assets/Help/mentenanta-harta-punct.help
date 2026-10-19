@@ -1,5 +1,6 @@
 # Detaliile punctului de pe hartă
 Cautare: punct harta detalii contract termen ciclicitate scadenta ultima interventie aceeasi locatie
+Captura: fereastra | /mentenanta/harta | wait 2500; jsclick sel:.marker-cluster; wait 2000; jsclick sel:.mm-icon; wait 1500 | Detaliile unui punct de pe hartă
 
 Panoul se deschide când apeși un marker de pe hartă și arată starea punctului de lucru.
 

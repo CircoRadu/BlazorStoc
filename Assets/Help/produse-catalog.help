@@ -1,6 +1,7 @@
 # Produse și stocuri
 Ruta: /produse
 Cautare: catalog produse stoc cantitate disponibilitate categorie subcategorie cautare adaugare
+Captura: pagina | /produse | | Catalogul de produse
 
 Catalogul arată toate produsele cu stocul lor. Poți căuta, filtra după categorie și disponibilitate, deschide mișcările unui produs și adăuga produse noi. Fereastra are două secțiuni: **Catalog** și **De regularizat**.
 

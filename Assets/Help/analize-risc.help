@@ -1,6 +1,7 @@
 # Analize de risc
 Ruta: /analize-risc
 Cautare: analize de risc securitate puncte de lucru reinnoire expirare valabilitate 36 luni notificare
+Captura: pagina | /analize-risc |  | Analizele de risc
 
 Analizele de risc la securitate ale punctelor de lucru, cu data ultimei reînnoiri și expirarea. Un punct de lucru are o singură analiză activă; notificarea de expirare pornește din data ultimei reînnoiri.
 

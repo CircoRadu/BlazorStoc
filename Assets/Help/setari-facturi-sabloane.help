@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Șabloane salvate
 Cautare: sabloane facturi salvate furnizor cui format pdf xml activ editeaza sterge leaga furnizor detalii
+Captura: pagina | /setari | click Facturi; click Șabloane salvate; full | Șabloanele salvate
 
 Fiecare furnizor poate avea mai multe șabloane (de exemplu pentru un PDF din program și pentru unul scanat). La analiza unei facturi, aplicația propune șabloanele care se potrivesc, după CUI-ul furnizorului și după aspectul facturii.
 

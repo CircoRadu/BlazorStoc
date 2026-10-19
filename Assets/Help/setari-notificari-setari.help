@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Setări notificări
 Cautare: setari notificari stergere notificari rezolvate luni perioada
+Captura: pagina | /setari | click Notificări; click Setări notificări; full | Setările notificărilor
 
 O notificare rezolvată rămâne în lista „Rezolvate” a paginii Notificări. Cu ștergerea activată, notificările rezolvate mai vechi decât perioada aleasă se elimină din baza de date, o dată pe zi. Notificările nerezolvate nu se șterg niciodată.
 

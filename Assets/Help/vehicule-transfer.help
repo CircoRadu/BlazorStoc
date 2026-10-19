@@ -1,5 +1,6 @@
 # Mutarea sau restituirea produselor din vehicul
 Cautare: transfer restituie depozit muta alta masina cantitate vehicul
+Captura: fereastra | /vehicule | click sel:a.category-table-link; click Echipamente aflate în mașină; click sel:.row-icon.move | Mutarea produselor din vehicul
 
 Fereastra se deschide din „Materiale și echipamente” și cere ce lipsește operației: cantitatea (pentru un produs) și mașina destinație (la mutare). Operația o face pagina după ce confirmi.
 

@@ -1,6 +1,7 @@
 # Observația proiectului
 Ruta: /proiecte/{projectId:int}/observatii/{id:int}
 Cautare: observatie proiect fisiere incarca editeaza sterge continut
+Captura: pagina | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; click Acces la fatada; full | O observație a proiectului
 
 Pagina unei observații a proiectului: conținutul ei și fișierele atașate.
 

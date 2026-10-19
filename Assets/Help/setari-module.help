@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Module
 Cautare: module oprire pornire reincearca stare circuit breaker erori cauza versiune administrator
+Captura: pagina | /setari | click Module; full | Modulele
 
 Starea modulelor aplicației. Un modul oprit nu afectează restul aplicației. Un modul se oprește singur după erori repetate și se reîncearcă automat după 30 de secunde; aici poți cere reîncercarea imediat sau îl poți opri și porni manual.
 

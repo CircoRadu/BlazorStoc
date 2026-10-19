@@ -50,6 +50,7 @@ public static partial class HelpParser
         string? tab = null;
         var isPublic = false;
         var keywords = "";
+        var captures = new List<HelpCapture>();
         var summary = new List<HelpBlock>();
         var areas = new List<HelpArea>();
         var flows = new List<HelpFlow>();
@@ -124,6 +125,13 @@ public static partial class HelpParser
                     else if (property == "tab") tab = value;
                     else if (property == "public") isPublic = value.Equals("da", StringComparison.OrdinalIgnoreCase);
                     else if (property == "cautare") keywords = value;
+                    else if (property == "captura")
+                    {
+                        var fields = value.Split('|', 4, StringSplitOptions.TrimEntries);
+                        if (fields.Length < 2 || fields[0].Length == 0 || !KeyPattern.IsMatch(fields[0]) || !fields[1].StartsWith('/')) Error(number, "Captura se scrie \"Captura: id | /adresa | pasi (optional) | legenda (optional)\".");
+                        else if (captures.Any(capture => capture.Id == fields[0])) Error(number, $"captura \"{fields[0]}\" apare de doua ori.");
+                        else captures.Add(new HelpCapture(fields[0], fields[1], fields.Length > 2 ? fields[2].Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) : [], fields.Length > 3 && fields[3].Length > 0 ? fields[3] : null));
+                    }
                     else { section = "summary"; goto case "summary"; }
                     break;
 
@@ -149,7 +157,10 @@ public static partial class HelpParser
                         string? icon = null;
                         var kind = parts[1];
                         if (kind.StartsWith("iconita:", StringComparison.OrdinalIgnoreCase)) { icon = kind[8..].Trim(); kind = "iconiță"; }
-                        areaElements.Add(new HelpElement(parts[0], kind, icon, parts[2]));
+                        {
+                            var (description, selector, imageId) = SplitOptions(parts[2]);
+                            areaElements.Add(new HelpElement(parts[0], kind, icon, description, selector, imageId));
+                        }
                     }
                     else if (raw.StartsWith(' ') && areaElements.Count > 0)
                     {
@@ -181,7 +192,22 @@ public static partial class HelpParser
 
         return errors.Count > 0 || title is null
             ? new HelpParseResult(null, errors)
-            : new HelpParseResult(new HelpTopic(key, title, routes, tab, isPublic, keywords, summary, areas, flows), errors);
+            : new HelpParseResult(new HelpTopic(key, title, routes, tab, isPublic, keywords, summary, areas, flows, captures), errors);
+    }
+
+    [GeneratedRegex(@"^(.*?)\s*\|\s*(sel|img):\s*([^|]+?)\s*$")]
+    private static partial Regex OptionRegex();
+
+    // "description | sel: .css | img: id": the optional tail of an element line.
+    private static (string Text, string? Selector, string? ImageId) SplitOptions(string text)
+    {
+        string? selector = null, imageId = null;
+        while (OptionRegex().Match(text) is { Success: true } match)
+        {
+            if (match.Groups[2].Value == "sel") selector ??= match.Groups[3].Value; else imageId ??= match.Groups[3].Value;
+            text = match.Groups[1].Value;
+        }
+        return (text, selector, imageId);
     }
 
     private static HelpBlock ToBlock(string line, List<string> errors, string key, int number, bool allowStep)

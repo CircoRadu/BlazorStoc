@@ -1,5 +1,6 @@
 # Date diferite în ANAF
 Cautare: anaf diferente valori beneficiar furnizor alegere
+Captura: fereastra | /beneficiari | click Adaugă beneficiar; type #beneficiary-name=Electric Standard Prest; type #beneficiary-address=Str. Libertatii 39, Simeria; type #beneficiary-phone=0254000111; type #beneficiary-cui=RO9178894; click Preia date din ANAF; wait 6000 | Datele diferite primite de la ANAF
 
 Fereastra apare când ANAF returnează valori diferite de cele din formular. Pentru fiecare câmp alegi valoarea din ANAF sau o păstrezi pe a ta; nimic nu se salvează aici, valorile alese doar intră în formular.
 

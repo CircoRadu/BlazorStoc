@@ -1,6 +1,7 @@
 # Fișa furnizorului
 Ruta: /furnizori/{id:int}
 Cautare: furnizor fisa facturi preluate anaf date verificat editeaza
+Captura: pagina | /furnizori | click sel:a.category-table-link; full | Fișa unui furnizor
 
 Fișa unui furnizor: datele lui și facturile preluate în stoc de la el.
 

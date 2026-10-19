@@ -1,6 +1,7 @@
 # Notificări
 Ruta: /notificari
 Cautare: notificari avertizari expirari scadente itp asigurare rovinieta contract mentenanta analiza de risc factura preiau amana rezolvata
+Captura: pagina | /notificari |  | Notificările
 
 Expirările apropiate sau depășite, după șabloanele definite de administrator. O notificare rămâne în listă până este rezolvată. O notificare preluată nu mai avertizează; dacă o amâni, avertizează din nou la sfârșitul perioadei. Fereastra are două secțiuni: **Active** și **Rezolvate**.
 

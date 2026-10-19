@@ -65,6 +65,8 @@ public static class HelpChecks
         Rendering(check);
         Coverage(check);
         ReferencedTopics(check);
+        Shots(check);
+        ShippedShots(check);
         return Task.CompletedTask;
     }
 
@@ -127,6 +129,97 @@ public static class HelpChecks
         var button = context.Render<BlazorStoc.Components.Shared.HelpButton>(parameters => parameters.Add(p => p.Topic, "produse-istoric-modificari").Add(p => p.About, "Istoricul modific0103rilor")).Find("button.help-icon");
         check(button.GetAttribute("data-help-topic") == "produse-istoric-modificari" && button.GetAttribute("aria-label") == "Ajutor: Istoricul modific0103rilor" && button.GetAttribute("type") == "button",
             "Help: the help button of a dialog carries the key of its topic and a label with the name of the window");
+    }
+
+    // The screenshots (Captura:, the table of elements, the map of the places, the frame of a chosen row).
+    private const string WithShot = """
+        # Cu captură
+        Ruta: /cu
+        Captura: pagina | /cu | click Salvează; wait 300 | Pagina cu date
+        Captura: alta | /cu | | A doua
+
+        Rezumat.
+
+        ## Elemente
+        ### Zona
+        - Salvează | buton | Salvează. | sel: text:"Salvează" | img: alta
+        - Caută | câmp | Caută.
+        - Nu e pe poză | câmp | Lipsește de pe captură.
+        - Editare | iconita:edit | Edit.
+
+        ## Flux: F
+        1. a
+        2. b
+        """;
+
+    private static void Shots(Action<bool, string> check)
+    {
+        var parsed = HelpParser.Parse("cu-captura", WithShot);
+        var topic = parsed.Topic;
+        check(topic is not null && parsed.Errors.Count == 0, "Help: a topic with captures is read" + (parsed.Errors.Count > 0 ? " (" + string.Join("; ", parsed.Errors) + ")" : ""));
+        if (topic is null) return;
+        check(topic.Captures.Count == 2 && topic.Captures[0].Id == "pagina" && topic.Captures[0].Url == "/cu" && topic.Captures[0].Steps.SequenceEqual(["click Salvează", "wait 300"]) && topic.Captures[0].Caption == "Pagina cu date",
+            "Help: \"Captura: id | /adresa | pasi | legenda\" is read (steps separated by \";\")");
+        check(topic.AllElements[0].Selector == "text:\"Salvează\"" && topic.AllElements[0].ImageId == "alta" && topic.AllElements[0].Text == "Salvează." && topic.AllElements[1].Selector is null,
+            "Help: an element can say where it is (sel:) and on which capture (img:) without changing its description");
+        check(HelpParser.Parse("fara-adresa", WithShot.Replace("| /cu |", "| cu |")).Errors.Any(error => error.Contains("Captura se scrie")), "Help: a capture without an address that starts with \"/\" is refused");
+        check(HelpParser.Parse("dubla", WithShot.Replace("Captura: alta", "Captura: pagina")).Errors.Any(error => error.Contains("de doua ori")), "Help: two captures with the same id are refused");
+
+        var jpeg = new Func<byte[]>(() => [0xFF, 0xD8, 0xFF]);
+        Func<byte[]> Json(string text) => () => System.Text.Encoding.UTF8.GetBytes(text);
+        var images = new Dictionary<string, Func<byte[]>>
+        {
+            ["cu-captura.pagina.jpg"] = jpeg,
+            ["cu-captura.pagina.json"] = Json("{\"w\":1920,\"h\":1080,\"rects\":{\"1\":[[100,50,200,40]],\"3\":[[10,10,32,32],[10,60,32,32]]}}"),
+            ["cu-captura.alta.jpg"] = jpeg,
+            ["cu-captura.alta.json"] = Json("{\"w\":1920,\"h\":900,\"rects\":{\"0\":[[5,5,80,30]]}}")
+        };
+        var catalog = HelpCatalog.FromSources([("cu-captura", WithShot)], images);
+        check(catalog.Errors.Count == 0, "Help: pictures with valid maps are accepted" + (catalog.Errors.Count > 0 ? " (" + string.Join("; ", catalog.Errors) + ")" : ""));
+        var html = HelpRenderer.Topic(catalog.Get("cu-captura")!, catalog);
+        check(html.Contains("<figure class=\"help-shot\" data-shot=\"pagina\"") && html.Contains("/ajutor/imagine/cu-captura.pagina.jpg") && html.Contains("data-help-zoom"), "Help: the picture of a capture is shown in the elements section, with the zoom button");
+        check(html.Contains("<table class=\"help-table\"") && !html.Contains("<dl") && html.Contains("help-zone"), "Help: the elements are a table, grouped by zone rows (no list of definitions)");
+        check(html.Split("help-pickable").Length - 1 == 3, "Help: only the rows whose element is on a picture can be chosen (3 of 4 here)");
+        check(Regex.IsMatch(html, "data-n=\"0\"[^>]*data-help-pick data-shot=\"alta\"") && Regex.IsMatch(html, "data-n=\"1\"[^>]*data-help-pick data-shot=\"pagina\""), "Help: a row points to the picture named by img: (the first capture otherwise)");
+        check(!Regex.IsMatch(html, "data-n=\"2\"[^>]*data-help-pick"), "Help: a row whose element is not on the picture has no frame to show");
+        check(html.Contains("data-help-locate") && html.Contains("Arată pe pagină") && html.Contains("data-help-sel=\"text:&quot;Salvează&quot;\""), "Help: every row has the \"view on page\" icon, with the selector of the element");
+        check(!html.Contains("help-badge") && !html.Contains("help-number"), "Help: no numbers or badges on the picture");
+
+        var orphan = HelpCatalog.FromSources([("cu-captura", WithShot)], new Dictionary<string, Func<byte[]>> { ["cu-captura.pagina.jpg"] = jpeg, ["cu-captura.pagina.json"] = Json("{\"w\":1920,\"h\":1080,\"rects\":{\"9\":[[1,1,5,5]]}}"), ["alt-topic.x.jpg"] = jpeg });
+        check(orphan.Errors.Any(error => error.Contains("elementul 9")) && orphan.Errors.Any(error => error.Contains("alt-topic.x.jpg")), "Help: a map that names an element the topic does not have, and a picture of no topic, are errors");
+        var outside = HelpCatalog.FromSources([("cu-captura", WithShot)], new Dictionary<string, Func<byte[]>> { ["cu-captura.pagina.jpg"] = jpeg, ["cu-captura.pagina.json"] = Json("{\"w\":100,\"h\":100,\"rects\":{\"0\":[[90,90,50,50]]}}") });
+        check(outside.Errors.Any(error => error.Contains("in afara imaginii")), "Help: a box outside the picture is an error");
+        var noPicture = HelpCatalog.FromSources([("cu-captura", WithShot)]);
+        check(noPicture.Errors.Count == 0 && !HelpRenderer.Topic(noPicture.Get("cu-captura")!, noPicture).Contains("help-shot"), "Help: a capture whose picture is not generated yet shows nothing (and is not an error)");
+        check(HelpShotMap.Read("{ nu e json", out var failure) is null && failure.Length > 0, "Help: a map that is not JSON is refused");
+    }
+
+    // Topics whose window cannot be photographed with the demo data. Empty now (the ANAF differences dialog is photographed with the CUI of Electric Standard Prest Simeria, which ANAF knows).
+    // The list only shrinks: a topic that gets a "Captura:" must be taken out, a new topic without capture must be added (or get one).
+    private static readonly HashSet<string> WithoutCapture = new(StringComparer.OrdinalIgnoreCase)
+    {
+    };
+
+    // The pictures shipped with the topics (tools/help-capture.mjs): every "Captura:" has its picture and map, the maps point to real elements, the size stays small.
+    private static void ShippedShots(Action<bool, string> check)
+    {
+        var catalog = HelpCatalog.Default;
+        var missing = catalog.Topics.Values.Where(topic => topic.Captures.Count == 0 && !WithoutCapture.Contains(topic.Key)).Select(topic => topic.Key).ToList();
+        check(missing.Count == 0, "Help: every topic has a capture of its window (or is listed as not photographable)" + (missing.Count > 0 ? ": " + string.Join(", ", missing) : ""));
+        var listedButHave = WithoutCapture.Where(key => catalog.Get(key) is { Captures.Count: > 0 }).ToList();
+        check(listedButHave.Count == 0, "Help: a topic that has a capture is taken out of the \"without capture\" list" + (listedButHave.Count > 0 ? ": " + string.Join(", ", listedButHave) : ""));
+        var unknown = WithoutCapture.Where(key => catalog.Get(key) is null).ToList();
+        check(unknown.Count == 0, "Help: the \"without capture\" list names only topics that exist" + (unknown.Count > 0 ? ": " + string.Join(", ", unknown) : ""));
+
+        var notGenerated = catalog.Topics.Values.SelectMany(topic => topic.Captures.Where(capture => catalog.Shots(topic).All(shot => shot.Capture.Id != capture.Id)).Select(capture => topic.Key + "." + capture.Id)).ToList();
+        check(notGenerated.Count == 0, "Help: every capture line has its picture (run tools/help-capture.mjs)" + (notGenerated.Count > 0 ? ": " + string.Join(", ", notGenerated.Take(8)) : ""));
+        var noMap = catalog.Topics.Values.SelectMany(topic => catalog.Shots(topic).Where(shot => shot.Map is null || shot.Map.Rects.Count == 0).Select(shot => topic.Key + "." + shot.Capture.Id)).ToList();
+        check(noMap.Count == 0, "Help: every picture has a map with at least one element on it" + (noMap.Count > 0 ? ": " + string.Join(", ", noMap.Take(8)) : ""));
+        check(catalog.Errors.Count == 0, "Help: the shipped topics, pictures and maps have no errors" + (catalog.Errors.Count > 0 ? " (" + string.Join("; ", catalog.Errors.Take(5)) + ")" : ""));
+        var bytes = catalog.ImageNames.Where(name => name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)).Sum(name => (long)catalog.Image(name)!.Length);
+        check(bytes < 12L * 1024 * 1024, $"Help: the screenshots stay under 12 MB ({bytes / 1024 / 1024.0:0.0} MB)");
+        var rows = HelpRenderer.Topic(catalog.Get("produse-catalog")!, catalog);
+        check(rows.Contains("help-pickable") && rows.Contains("<figure class=\"help-shot\""), "Help: the real topic of the product catalog shows its picture and pickable rows");
     }
 
     // The topics shipped with the application.

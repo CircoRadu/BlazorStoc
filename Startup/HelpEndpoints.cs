@@ -34,8 +34,11 @@ public static class HelpEndpoints
 
         app.MapGet("/ajutor/imagine/{name}", (HttpContext context, string name) =>
         {
-            if (context.User.Identity?.IsAuthenticated != true) return Results.StatusCode(StatusCodes.Status401Unauthorized);
+            // The pictures of the public topics (Login, AccessDenied: <key>.<capture>.jpg) are readable without signing in too.
+            var publicPicture = catalog.Topics.Values.Any(topic => topic.Public && name.StartsWith(topic.Key + ".", StringComparison.OrdinalIgnoreCase));
+            if (context.User.Identity?.IsAuthenticated != true && !publicPicture) return Results.StatusCode(StatusCodes.Status401Unauthorized);
             var bytes = catalog.Image(name);
+            context.Response.Headers.CacheControl = "private, max-age=300";
             return bytes is null ? Results.NotFound() : Results.File(bytes, ContentType(name));
         }).AllowAnonymous();
     }

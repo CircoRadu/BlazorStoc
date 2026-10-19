@@ -1,6 +1,7 @@
 # Echipamentele proiectului
 Ruta: /proiecte/{id:int}/echipamente
 Cautare: echipamente proiect materiale iesiri consum net inventar miscari
+Captura: pagina | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; click sel:a[href$="/echipamente"]; full | Echipamentele unui proiect
 
 Materialele și echipamentele scoase din inventar pentru proiect, adică ieșirile de stoc asociate lui, plus consumul net pe produs.
 

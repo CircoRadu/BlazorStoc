@@ -1,5 +1,6 @@
 # Legarea intrărilor de o factură
 Cautare: atasare detasare intrari factura furnizor motivare legare
+Captura: fereastra | /facturi | click Intrări fără factură; click sel:.row-select; click Atașează la factură | Legarea intrărilor de o factură
 
 Doar administratorul: leagă intrările fără factură de o factură (câteva deodată) sau eliberează o intrare de factura la care era legată. Stocul nu se modifică; fiecare intrare este un eveniment separat în jurnal, iar motivarea este obligatorie.
 

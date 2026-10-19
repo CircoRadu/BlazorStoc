@@ -2,6 +2,7 @@
 Ruta: /oferte/preluare
 Ruta: /oferte
 Cautare: oferta deviz excel xlsx preluare sablon beneficiar proiect componenta linii produse revizie achizitie rezumat
+Captura: pagina | /oferte/preluare |  | Preluarea unei oferte
 
 Preiei un deviz-ofertă Excel (.xlsx): se citește cu un șablon, se leagă de beneficiar, proiect și componentă, iar liniile în bucăți se potrivesc cu produsele din catalog. Un număr de ofertă deja existent este o **revizie** a ofertei respective. Lucrezi în cinci pași: Fișier, Beneficiar, Proiect, Linii, Rezumat.
 

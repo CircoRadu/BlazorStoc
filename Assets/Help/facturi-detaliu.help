@@ -1,5 +1,6 @@
 # Factura deschisă
 Cautare: factura produse preluate intrari adauga produs manual
+Captura: fereastra | /facturi | click sel:button.category-table-link.link-like | Factura deschisă
 
 Fereastra arată produsele preluate dintr-o factură. De aici poți adăuga manual un produs care a fost omis la preluare.
 

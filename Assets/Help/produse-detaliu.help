@@ -2,6 +2,7 @@
 Ruta: /produse/{id:int}
 Ruta: /produse/{id:int}/miscari
 Cautare: produs miscari intrari iesiri stoc inregistreaza miscare factura intrare libera retur beneficiar proiect vehicul depozit rezervat storno istoric editeaza sterge deblocheaza
+Captura: pagina | /produse | click sel:.row-icon.view; full | Intrările și ieșirile unui produs
 
 Pagina unui produs: datele lui, unde se află bucățile, rezervările și toate mișcările de stoc. Stocul se modifică numai prin intrări și ieșiri; de aici le înregistrezi, le filtrezi, le corectezi sau le stornezi.
 

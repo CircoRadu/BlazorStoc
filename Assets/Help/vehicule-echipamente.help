@@ -1,6 +1,7 @@
 # Materiale și echipamente din vehicul
 Ruta: /vehicule/{id:int}/echipamente
 Cautare: echipamente materiale masina vehicul restituie depozit muta nivel tinta completeaza
+Captura: pagina | /vehicule | click sel:a.category-table-link; click Echipamente aflate în mașină; full | Echipamentele din vehicul
 
 Produsele aflate în mașină. Ajung aici prin ieșiri de stoc către autovehicul și se întorc în depozit sau se mută în altă mașină. În partea de jos poți defini câte bucăți ar trebui să aibă mașina din fiecare produs (nivelul țintă).
 

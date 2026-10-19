@@ -1,5 +1,6 @@
 # Detaliile unei notificări
 Cautare: notificare detalii preiau notificarea amana zile rezolvata deschide obiectul termen depasit
+Captura: fereastra | /notificari | click sel:tr.notification-row | Detaliile unei notificări
 
 Fereastra arată o notificare activă și îți permite să o preiei, s-o amâni sau s-o marchezi rezolvată.
 

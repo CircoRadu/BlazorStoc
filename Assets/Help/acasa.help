@@ -1,6 +1,7 @@
 # Pagina principală
 Ruta: /
 Cautare: meniu principal module placi sectiuni acasa cautare ajutor
+Captura: pagina | / |  | Pagina principală
 
 Pagina principală este punctul de plecare: fiecare placă deschide o secțiune a aplicației. Vezi doar plăcile pentru care ai drept de acces. Din această pagină, iconița de ajutor are și o **căutare în tot ajutorul**; în orice altă fereastră ajutorul descrie doar fereastra în care ești.
 
@@ -16,10 +17,10 @@ Pagina principală este punctul de plecare: fiecare placă deschide o secțiune 
 - Utilizatori, Nomenclator | placă | Administrarea accesului și a tipurilor de sisteme (doar dacă ai dreptul).
 - Placă gri | placă | Modulul este oprit sau indisponibil momentan; placa se actualizează singură când modulul revine.
 ### Meniul din stânga și bara de sus
-- Meniul din stânga | meniu | Aceleași secțiuni ca plăcile, grupate (Produse, Inventar, Administrare), plus Notificări (cu semn roșu când sunt avertismente), Jurnal activitate și Setări.
-- Iconița de ajutor | buton | Deschide acest ajutor pentru fereastra în care ești.
+- Meniul din stânga | meniu | Aceleași secțiuni ca plăcile, grupate (Produse, Inventar, Administrare), plus Notificări (cu semn roșu când sunt avertismente), Jurnal activitate și Setări. | sel: aside.sidebar
+- Iconița de ajutor | buton | Deschide acest ajutor pentru fereastra în care ești. | sel: .topbar .help-icon
 - Deconectare | buton | Cere confirmarea și închide sesiunea; pagina curentă nu se modifică dacă renunți.
-- Numele și rolul | text | Contul cu care ești autentificat și rolul lui (Administrator sau Utilizator).
+- Numele și rolul | text | Contul cu care ești autentificat și rolul lui (Administrator sau Utilizator). | sel: .topbar-actions > span:not(.mode-pill)
 
 ## Flux: Cum ajung la o secțiune
 1. Apasă placa secțiunii sau alege-o din meniul din stânga.

@@ -1,6 +1,7 @@
 # Mentenanță
 Ruta: /mentenanta
 Cautare: mentenanta scadente puncte de lucru contracte on off ciclicitate depasite in curand la zi harta service
+Captura: pagina | /mentenanta |  | Mentenanța
 
 Scadențele punctelor de lucru acoperite de contracte active și registrul intervențiilor. Intervențiile și contractele se gestionează din fișa beneficiarului. Fereastra are două secțiuni: **Scadențe** și **Registru intervenții**.
 

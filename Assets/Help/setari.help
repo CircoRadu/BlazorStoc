@@ -1,6 +1,7 @@
 # Setări
 Ruta: /setari
 Cautare: setari configurari administrare anaf notificari harta facturi backup module tipuri de utilizatori
+Captura: pagina | /setari |  | Setările
 
 Configurările aplicației, rezervate administratorului; un utilizator fără acest rol ajunge doar la șabloanele de facturi (le creează și le modifică). Fiecare secțiune are propriul ajutor: apasă „?” după ce ai ales secțiunea.
 

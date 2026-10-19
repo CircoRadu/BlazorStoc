@@ -1,6 +1,7 @@
 # Fișa vehiculului
 Ruta: /vehicule/{id:int}
 Cautare: vehicul fisa informatii itp asigurare rovinieta expirare modifica editeaza sterge
+Captura: pagina | /vehicule | click sel:a.category-table-link; full | Fișa unui vehicul
 
 Fișa vehiculului, secțiunea „Informații autovehicul”: numărul, descrierea și datele de expirare ale ITP-ului, asigurării și rovinietei. A doua secțiune, „Echipamente aflate în mașină”, arată produsele din vehicul ([[vehicule-echipamente]]).
 

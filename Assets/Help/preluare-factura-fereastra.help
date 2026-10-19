@@ -1,6 +1,7 @@
 # Factura preluată (fereastră separată)
 Ruta: /produse/preluare-factura/factura/{sessionId:guid}
 Cautare: factura fereastra noua comparare valori zoom marime pagini
+Captura: pagina | /produse/preluare-factura | upload factura-demo.pdf; click Pasul următor; popup Afișează factura într-o fereastră nouă | Factura în fereastra separată
 
 Fereastra arată factura pe care o preiei, într-o fereastră separată de browser, ca s-o poți așeza lângă tabelul de la pasul 2 din „Preluare factură” și să compari valorile cu imaginea ei.
 

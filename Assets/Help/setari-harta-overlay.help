@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Overlay (tipuri de pinuri)
 Cautare: overlay pinuri tipuri insigne umplere culoare simbol legenda luni fara interventie harta
+Captura: pagina | /setari | click Hartă; click Overlay (tipuri de pinuri); full | Tipurile de pinuri
 
 Cum arată pe hartă fiecare tip de pin și ce apare în legendă. Tipurile de **umplere** arată scadența punctului (un punct are întotdeauna unul); **insignele** sunt marcajele mici din colțul pinului. Tipurile predefinite își pot schimba denumirea și aspectul.
 

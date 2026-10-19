@@ -1,5 +1,6 @@
 # Activarea unui contract de mentenanță
 Cautare: activare contract off on reprogramare scadente puncte conflict alt contract activ
+Captura: fereastra | /beneficiari | click Asociatia de Proprietari; click Arată și contractele Off; click sel:tr.contract-row-off label.row-toggle | Reactivarea unui contract
 
 Când reiei un contract oprit (Off → On), scadențele lui nu s-au mutat cât a fost oprit: dacă ar rămâne în trecut, toate punctele ar apărea deodată „depășite”. Fereastra îți cere să alegi noile scadențe înainte de activare.
 

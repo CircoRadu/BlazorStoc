@@ -1,6 +1,7 @@
 # Acces refuzat
 Ruta: /Account/AccessDenied
 Public: da
+Captura: pagina | /Account/AccessDenied |  | Pagina „Acces refuzat”
 
 Pagina apare când tipul tău de utilizator nu are dreptul să deschidă o pagină sau să facă o operație.
 

@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Backup și restaurare
 Cautare: backup restaurare pachete programat automat zile ora notificare lipsa stergere pachete vechi retentie fa backup acum restaureaza baza de date nas
+Captura: pagina | /setari | click Backup; full | Backup și restaurare
 
 Aici faci și programezi copii de siguranță ale bazei de date, vezi pachetele existente, ștergi automat pachetele vechi de pe server și restaurezi baza de date. Backup-urile se fac pe server; dacă „Copiere pe NAS” este activă ([[setari-backup-nas]]), fiecare pachet nou este copiat și pe NAS.
 

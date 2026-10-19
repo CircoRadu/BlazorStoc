@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Șabloane notificări
 Cautare: sabloane notificari categorie eveniment expirare zile inainte subiect text marcaje placeholder activ
+Captura: pagina | /setari | click Notificări; full | Șabloanele de notificări
 
 Definești pentru ce expirări se creează notificări, cu câte zile înainte și cu ce text. În subiect și în text poți folosi marcaje de forma <numar autovehicul>, înlocuite automat cu valorile obiectului. Fiecare categorie are tabul ei.
 

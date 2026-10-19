@@ -2,6 +2,7 @@
 Ruta: /produse
 Tab: De regularizat
 Cautare: stoc negativ regularizare iesiri peste stoc corectie
+Captura: pagina | /produse | click De regularizat; full | Produsele de regularizat
 
 Secțiunea listează produsele cu stoc negativ după ieșiri peste stoc, începând cu cele mai vechi. De obicei înseamnă o intrare care nu a fost operată sau un stoc greșit în bază. Aici le corectezi.
 

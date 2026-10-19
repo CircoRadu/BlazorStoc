@@ -1,6 +1,7 @@
 # Jurnal activitate
 Ruta: /jurnal
 Cautare: jurnal activitate audit trasabilitate operatii operator tinta detalii motiv filtre evenimente
+Captura: pagina | /jurnal |  | Jurnalul de activitate
 
 Acțiunile operate în sistem, în ordine cronologică (cele mai recente evenimente; pentru cele mai vechi folosește „Jurnal complet”). Fiecare intrare spune cine a făcut ce, când, asupra cui, cu ce valori și de ce. Doar administratorul vede jurnalul.
 

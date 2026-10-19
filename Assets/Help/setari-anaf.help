@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Preluare date ANAF
 Cautare: anaf configurare interogare cui conexiune cerere mapare raspuns test versiuni activeaza draft
+Captura: pagina | /setari | click Preluare date ANAF; full | Preluarea datelor ANAF
 
 Configurezi interogarea serviciului public ANAF (registrul TVA) după CUI: conexiunea, cererea, maparea răspunsului, testarea și versiunile activate. Testele trimit cereri reale la ANAF și nu modifică datele niciunei firme. Butonul „Preia date din ANAF” din formularele de beneficiar și furnizor folosește configurația activă.
 

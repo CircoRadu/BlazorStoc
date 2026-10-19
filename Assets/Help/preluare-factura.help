@@ -1,6 +1,7 @@
 # Preluare factură
 Ruta: /produse/preluare-factura
 Cautare: factura furnizor preluare pdf xml zip efactura intrare stoc sablon produse noi furnizor cui numar data verificat finalizeaza
+Captura: pagina | /produse/preluare-factura |  | Preluarea unei facturi
 
 Preiei în stoc o factură de furnizor (PDF, XML sau ZIP e-Factura). Lucrezi în **trei pași**: **Citirea facturii**, **Potrivirea produselor** și **Confirmare**. Abia la „Finalizează preluarea” se înregistrează factura, se adaugă produsele noi în catalog și se fac intrările în stoc, legate de factură.
 

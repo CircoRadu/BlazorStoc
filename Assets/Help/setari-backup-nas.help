@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Backup NAS
 Cautare: nas backup copiere partajare cale cont parola testeaza conexiunea pachete lipsa
+Captura: pagina | /setari | click Backup; click Backup NAS; full | Backup NAS
 
 Fiecare backup făcut local se copiază apoi pe NAS. Pachetele de pe NAS nu se șterg niciodată din aplicație. Parola se păstrează criptat și nu se mai afișează.
 

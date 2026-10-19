@@ -1,6 +1,7 @@
 # Utilizatori
 Ruta: /utilizatori
 Cautare: utilizatori conturi autentificare tip utilizator activ inactiv administrator adauga editeaza sterge parola
+Captura: pagina | /utilizatori |  | Lista utilizatorilor
 
 Conturile care se pot autentifica în aplicație și tipul fiecărui utilizator. Drepturile fiecărui tip se definesc în Setări → Tipuri de utilizatori. Parolele nu sunt afișate și nu pot fi recuperate.
 

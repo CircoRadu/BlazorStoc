@@ -1,6 +1,7 @@
 # Situația proiectului
 Ruta: /proiecte/{id:int}/situatie
 Cautare: situatia proiectului necesar predat stoc deficit rezervat achizitie componente export pdf csv termen
+Captura: pagina | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; click sel:a[href$="/situatie"]; full | Situația unui proiect
 
 Necesarul din ultima revizie a fiecărei oferte, ce s-a predat (net de retururi), stocul și deficitul, pe componente. Prețurile nu sunt luate în calcul.
 

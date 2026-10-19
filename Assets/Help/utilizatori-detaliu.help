@@ -1,6 +1,7 @@
 # Fișa utilizatorului
 Ruta: /utilizatori/{id:int}
 Cautare: utilizator fisa cont nume afisat tip stare editeaza
+Captura: pagina | /utilizatori | click sel:a.category-table-link; full | Fișa unui utilizator
 
 Fișa unui cont: numele de autentificare, numele afișat, tipul și starea. Parola nu este afișată și nu poate fi recuperată.
 

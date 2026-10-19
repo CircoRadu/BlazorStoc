@@ -2,6 +2,7 @@
 Ruta: /notificari
 Tab: Rezolvate
 Cautare: notificari rezolvate istoric motiv rezolvata de sistem automat
+Captura: pagina | /notificari | click Rezolvate; full | Notificările rezolvate
 
 Cele mai recente notificări rezolvate. O notificare devine rezolvată când o marchezi tu sau când data obiectului se schimbă ori obiectul dispare.
 

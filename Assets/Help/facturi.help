@@ -1,6 +1,7 @@
 # Facturi
 Ruta: /facturi
 Cautare: facturi furnizor registru preluate intrari stoc numar data editeaza sterge fara intrari
+Captura: pagina | /facturi |  | Registrul de facturi
 
 Registrul facturilor de furnizor din care s-au preluat intrări în stoc. Apasă numărul unei facturi ca să vezi produsele preluate din ea. Fereastra are două secțiuni: **Facturi** și **Intrări fără factură**.
 

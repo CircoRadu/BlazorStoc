@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Verificare oră
 Cautare: verificare ora ntp ceas server internet backup decalaj
+Captura: pagina | /setari | click Backup; click Verificare oră; full | Verificarea orei
 
 Ceasul serverului este comparat cu ora de pe internet înainte de backup și de ștergerea pachetelor vechi. Cu un ceas decalat cu peste 15 minute, backup-ul ia ora de pe internet, iar ștergerea automată se oprește.
 

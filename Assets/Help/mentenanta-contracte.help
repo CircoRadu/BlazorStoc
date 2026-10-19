@@ -1,5 +1,6 @@
 # Contracte de mentenanță (fișa beneficiarului)
 Cautare: contracte mentenanta contract on off activeaza dezactiveaza expira ciclicitate puncte de lucru scadenta
+Captura: pagina | /beneficiari | click Panoramic Hotel; full | Contractele din fișa beneficiarului
 
 Secțiunea „Contracte de mentenanță” din fișa beneficiarului: contractele lui, punctele de lucru acoperite și următoarea scadență. Apare doar cât modulul Mentenanță funcționează.
 

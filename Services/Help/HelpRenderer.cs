@@ -65,18 +65,40 @@ public static partial class HelpRenderer
 
         var count = topic.Areas.Sum(area => area.Elements.Count);
         html.Append($"<section class=\"help-elements\" aria-label=\"Elementele ferestrei\"><h3>Elementele ferestrei <span class=\"count-badge\">{count}</span></h3>");
+
+        // The screenshots (when they exist): the places of the elements are in data-rects; a row of the table whose element is on a screenshot can be pressed,
+        // and wwwroot/help.js then draws a pulsing frame around the element on that picture (hidden until a row is chosen).
+        var shots = catalog.Shots(topic);
+        foreach (var shot in shots)
+        {
+            var map = shot.Map;
+            var rects = map is null ? "{}" : System.Text.Json.JsonSerializer.Serialize(map.Rects.ToDictionary(pair => pair.Key.ToString(System.Globalization.CultureInfo.InvariantCulture), pair => pair.Value));
+            var width = map?.Width ?? 1920;
+            var height = map?.Height ?? 1080;
+            var caption = shot.Capture.Caption is { Length: > 0 } text ? E(text) : "Captura ferestrei";
+            html.Append($"<figure class=\"help-shot\" data-shot=\"{E(shot.Capture.Id)}\" data-w=\"{width}\" data-h=\"{height}\" data-rects=\"{E(rects)}\"><div class=\"help-shot-scroll\"><div class=\"help-shot-inner\">")
+                .Append($"<img src=\"/ajutor/imagine/{Uri.EscapeDataString(shot.ImageName)}\" alt=\"{E(topic.Title)}: {caption}\" width=\"{width}\" height=\"{height}\" loading=\"lazy\" />")
+                .Append($"</div></div><figcaption><span>{caption}</span><button type=\"button\" class=\"refresh act-nav help-zoom\" data-help-zoom aria-pressed=\"false\">Mărește imaginea</button></figcaption></figure>");
+        }
+
+        html.Append("<table class=\"help-table\"><thead><tr><th scope=\"col\">Element</th><th scope=\"col\">Tip</th><th scope=\"col\">Descriere</th></tr></thead><tbody>");
+        var number = 0;
         foreach (var area in topic.Areas)
         {
-            html.Append($"<h4>{E(area.Name)}</h4><dl class=\"help-list\">");
+            html.Append($"<tr class=\"help-zone\"><th colspan=\"3\" scope=\"colgroup\">{E(area.Name)}</th></tr>");
             foreach (var element in area.Elements)
             {
-                html.Append("<div class=\"help-element\"><dt>");
+                var shot = shots.FirstOrDefault(item => item.Capture.Id == (element.ImageId ?? topic.Captures.FirstOrDefault()?.Id));
+                var shown = shot?.Map is { } map && map.Rects.ContainsKey(number);
+                var attributes = shown ? $" tabindex=\"0\" data-help-pick data-shot=\"{E(shot!.Capture.Id)}\"" : "";
+                html.Append($"<tr class=\"help-row{(shown ? " help-pickable" : "")}\" data-n=\"{number}\"{attributes} data-help-name=\"{E(element.Name)}\" data-help-kind=\"{E(element.Kind)}\" data-help-icon=\"{E(element.Icon)}\" data-help-sel=\"{E(element.Selector)}\"><td class=\"help-cell-name\">");
                 if (element.Icon is { Length: > 0 } icon) html.Append($"<span class=\"row-icon {E(icon)} help-static\" aria-hidden=\"true\"></span>");
-                html.Append($"<span class=\"help-name\">{E(element.Name)}</span><small class=\"help-kind\">{E(element.Kind)}</small></dt><dd>{Inline(element.Text, catalog)}</dd></div>");
+                html.Append($"<span class=\"help-name\">{E(element.Name)}</span><button type=\"button\" class=\"help-locate\" data-help-locate title=\"Arată pe pagină\" aria-label=\"Arată pe pagină: {E(element.Name)}\"></button></td>")
+                    .Append($"<td class=\"help-kind\">{E(element.Kind)}</td><td class=\"help-text\">{Inline(element.Text, catalog)}</td></tr>");
+                number++;
             }
-            html.Append("</dl>");
         }
-        html.Append("</section></article>");
+        html.Append("</tbody></table></section></article>");
         return html.ToString();
     }
 

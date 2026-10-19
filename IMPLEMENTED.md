@@ -546,3 +546,19 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 19.10.2026 14:49 - Help contextual - topicuri pe toate ferestrele ramase (Oferte, Mentenanta, Analize de risc, Produs, Proiecte, Notificari, Jurnal, Setari)
 
 - Topicuri noi in Assets/Help pentru toate paginile si formularele/dialogurile ramase; HelpButton in antetul lor. Lista Pending din HelpChecks.cs este goala: orice pagina noua fara topic esueaza testul.,HelpChecks: verifica si ca pictogramele din topicuri exista in app.css, ca eticheta de tab ignora numarul din coada ("Registru 12"), si ca fiecare fisier cu fereastra peste pagina are HelpButton sau e pe lista de exceptii (confirmari/invelisuri). HelpCatalog.CleanTab ignora numarul de la sfarsitul etichetei.,Corectat: eticheta "Registru interventii" din Mentenanta arata text brut (text lipit de @if); un test din PickupWizardChecks restrans la butonul Inchide (butonul de ajutor din antetul editorului).,Verificari: suita completa in memorie (1600 PASS), grupul components; browser pe preview 5089 (Setari cu toate sectiunile si subsectiunile, Notificari, Analize de risc).
+
+## Finalizat la 19.10.2026 16:12 - Help: capturi de ecran cu chenar pulsatil
+
+- Fiecare topic de fereastra are captura (1920x1080) in sectiunea Elementele ferestrei si tabelul elementelor; clic pe un rand = chenar pulsatil pe element (doar cat randul e ales), marire, iconita Arata pe pagina (wwwroot/help.js, help-match.js).
+- Unealta tools/help-capture.mjs (CDP, Edge) genereaza imaginile si hartile; date demo fictive: tools/help-demo-db.ps1 + tests/BlazorStoc.HelpDemo (baza blazorstoc_demo).
+- Verificari: grupul help 61 PASS; chenar, Escape, marire si Arata pe pagina verificate in browser pe 5089; 81 capturi (7,7 MB), 8 topicuri fara captura (lista WithoutCapture).
+
+## Finalizat la 19.10.2026 17:02 - Help: capturi pentru sabloanele de factura, fereastra facturii si harta
+
+- Inca 7 topicuri au captura: Generare/Editare/Camp/Coloana/Salveaza ca nou/XML (sabloane de factura), fereastra separata a facturii preluate, punctul de pe harta; acum 88 capturi (9 MB), singurul topic fara captura este Date diferite in ANAF (aplicatia cheama numai serverul real ANAF).
+- Unealta: pasi noi upload/jsclick/visit/popup, ferestrele .invoice-modal sunt recunoscute de help-match.js, captura ferestrei se ia asa cum e pe ecran; --prepare salveaza si un sablon de factura; tests/BlazorStoc.HelpDemo --files scrie PDF si XML demo.
+- Verificari: grupul help 61 PASS.
+
+## Finalizat la 19.10.2026 17:11 - Help: captura pentru Date diferite in ANAF
+
+- Fereastra ANAF are captura, facuta cu CUI-ul real RO9178894 (Electric Standard Prest Simeria, ales de utilizator; apel real catre ANAF, cere internet); toate cele 89 de topicuri au captura, lista WithoutCapture este goala.

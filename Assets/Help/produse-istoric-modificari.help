@@ -1,5 +1,6 @@
 # Istoricul modificărilor unei operații
 Cautare: istoric modificari miscare operatie motiv
+Captura: fereastra | /facturi | click Intrări fără factură; click BUTON-ALARMA-ADR; click sel:.row-icon.history | Istoricul modificărilor unei operații
 
 Fereastra arată toate modificările făcute asupra unei intrări sau ieșiri de stoc: cine a modificat, când, ce s-a schimbat și de ce. Se deschide din pagina produsului, cu iconița de istoric de pe rândul operației.
 

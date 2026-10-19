@@ -1,6 +1,7 @@
 # Inventar
 Ruta: /inventar
 Cautare: inventar situatie numarare fizica stoc categorii subcategorii pdf formular genereaza stoc zero
+Captura: pagina | /inventar |  | Inventarul
 
 Generezi situația de inventar (un formular PDF) pentru categoriile și subcategoriile pe care vrei să le numeri fizic. După numărare, formularul completat de mână se încarcă în „Preluare inventar”, ca să compari stocul real cu cel din aplicație.
 

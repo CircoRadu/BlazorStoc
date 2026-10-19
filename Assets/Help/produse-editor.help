@@ -1,5 +1,6 @@
 # Formularul de produs
 Cautare: produs formular cod model categorie subcategorie parametri descriere imagine clipboard salveaza pregateste produs nou
+Captura: formular | /produse | click Adaugă produs | Formularul de produs
 
 Formularul pentru un produs nou sau pentru editarea unuia existent. Se deschide deasupra catalogului sau ca fereastră în fluxurile de preluare (factură, ofertă), unde „Pregătește produs nou” îl pregătește fără să-l adauge în catalog (se adaugă la finalizarea preluării).
 

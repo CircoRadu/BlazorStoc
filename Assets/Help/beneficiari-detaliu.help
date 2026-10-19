@@ -1,6 +1,7 @@
 # Fișa beneficiarului
 Ruta: /beneficiari/{id:int}
 Cautare: beneficiar fisa puncte de lucru proiecte consum net contracte mentenanta analize risc adauga proiect editeaza anaf
+Captura: pagina | /beneficiari | click Panoramic Hotel; full | Fișa unui beneficiar
 
 Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, contractele și intervențiile de mentenanță, analizele de risc și proiectele. De aici adaugi proiecte și puncte de lucru.
 

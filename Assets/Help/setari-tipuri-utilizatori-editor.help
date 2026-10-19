@@ -1,5 +1,6 @@
 # Formularul tipului de utilizator
 Cautare: tip utilizator formular nume descriere copiaza drepturile acorda tot revoca tot module acces actiuni meniu
+Captura: formular | /setari | click Tipuri de utilizatori; click Adaugă tip; height 1300 | Formularul tipului de utilizator
 
 Formularul pentru un tip nou sau pentru editarea unuia existent. Tipul Administrator are întotdeauna toate drepturile și nu poate fi modificat; la un tip de sistem poți schimba drepturile, dar nu numele.
 

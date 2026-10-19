@@ -2,6 +2,7 @@
 Ruta: /categorii
 Ruta: /categorii/fereastra
 Cautare: categorii subcategorii redenumire mutare ordine meniu parametri obligatori produse catalog stergere
+Captura: pagina | /categorii |  | Categoriile și subcategoriile
 
 Aici organizezi catalogul: redenumești categoriile și subcategoriile, muți subcategorii între categorii și definești parametrii obligatori ai produselor dintr-o subcategorie. Produsele asociate urmează automat modificările. Aceeași fereastră se deschide și separat (din formularul de produs al preluării de factură), fără meniul lateral.
 

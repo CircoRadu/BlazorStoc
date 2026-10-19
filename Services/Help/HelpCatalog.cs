@@ -84,8 +84,54 @@ public sealed partial class HelpCatalog
             foreach (var link in all.SelectMany(text => LinkRegex().Matches(text).Select(match => match.Groups[1].Value)).Distinct())
                 if (!topics.ContainsKey(link)) errors.Add($"{topic.Key}.help: legatura [[{link}]] indica un subiect care nu exista.");
         }
-        return new HelpCatalog(topics, pictures, errors);
+
+        // The screenshots of the topics: <key>.<capture>.jpg with the places of the elements in <key>.<capture>.json.
+        var shotFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var shots = new Dictionary<string, HelpShot>(StringComparer.OrdinalIgnoreCase);
+        foreach (var topic in topics.Values)
+        {
+            var count = topic.AllElements.Count;
+            foreach (var element in topic.AllElements)
+                if (element.ImageId is { } wanted && topic.Captures.All(capture => capture.Id != wanted)) errors.Add($"{topic.Key}.help: elementul \"{element.Name}\" are img: {wanted}, dar topicul nu are captura aceasta.");
+            foreach (var capture in topic.Captures)
+            {
+                var picture = $"{topic.Key}.{capture.Id}.jpg";
+                var mapName = $"{topic.Key}.{capture.Id}.json";
+                var hasPicture = pictures.ContainsKey(picture);
+                var hasMap = pictures.TryGetValue(mapName, out var readMap);
+                if (hasPicture) shotFiles.Add(picture);
+                if (hasMap) shotFiles.Add(mapName);
+                if (hasMap && !hasPicture) { errors.Add($"{topic.Key}: harta {mapName} nu are imaginea {picture}."); continue; }
+                if (!hasPicture) continue;
+                HelpShotMap? map = null;
+                if (hasMap)
+                {
+                    map = HelpShotMap.Read(System.Text.Encoding.UTF8.GetString(readMap!()), out var mapError);
+                    if (map is null) errors.Add($"{topic.Key}: harta {mapName} nu poate fi citita ({mapError}).");
+                    else
+                        foreach (var (index, boxes) in map.Rects)
+                        {
+                            if (index < 0 || index >= count) errors.Add($"{topic.Key}: harta {mapName} se refera la elementul {index}, dar topicul are {count} elemente.");
+                            foreach (var box in boxes)
+                                if (box[2] <= 0 || box[3] <= 0 || box[0] < 0 || box[1] < 0 || box[0] + box[2] > map.Width + 1 || box[1] + box[3] > map.Height + 1)
+                                    errors.Add($"{topic.Key}: harta {mapName} are un dreptunghi in afara imaginii (elementul {index}).");
+                        }
+                }
+                shots[topic.Key + "." + capture.Id] = new HelpShot(capture, picture, map);
+            }
+        }
+        foreach (var name in pictures.Keys)
+            if (ShotNameRegex().IsMatch(name) && !shotFiles.Contains(name)) errors.Add($"Assets/Help/img/{name}: fisier de captura care nu apartine niciunui topic.");
+        return new HelpCatalog(topics, pictures, errors) { shotsByKey = shots };
     }
+
+    private Dictionary<string, HelpShot> shotsByKey = new(StringComparer.OrdinalIgnoreCase);
+
+    [GeneratedRegex(@"^[a-z0-9]+([.\-][a-z0-9]+)*\.[a-z0-9\-]+\.(jpg|json)$", RegexOptions.IgnoreCase)]
+    private static partial Regex ShotNameRegex();
+
+    /// <summary>The screenshots of a topic that exist (a capture without picture yet is skipped), in the order of the file.</summary>
+    public IReadOnlyList<HelpShot> Shots(HelpTopic topic) => [.. topic.Captures.Select(capture => shotsByKey.GetValueOrDefault(topic.Key + "." + capture.Id)).OfType<HelpShot>()];
 
     [GeneratedRegex(@"\[\[([a-z0-9.\-]+)(?:\|[^\]]*)?\]\]")]
     public static partial Regex LinkRegex();

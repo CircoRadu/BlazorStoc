@@ -1,6 +1,7 @@
 # Jurnal complet
 Ruta: /jurnal/complet
 Cautare: jurnal complet toate evenimentele interval export csv luna ultima tot jurnalul
+Captura: pagina | /jurnal/complet |  | Jurnalul complet
 
 Toate evenimentele din jurnal, căutate direct pe server, pe pagini. Se afișează implicit ultima lună; alege alt interval sau tot jurnalul. Nu se actualizează singur. Doar administratorul vede jurnalul.
 

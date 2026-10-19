@@ -1,6 +1,7 @@
 # Pagina proiectului
 Ruta: /proiecte/{id:int}
 Cautare: proiect pagina componente sisteme observatii situatia proiectului echipamente editeaza sterge termen
+Captura: pagina | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; full | Pagina unui proiect
 
 Pagina unui proiect: datele lui, componentele (sistemele) și conținutul: situația proiectului, echipamentele scoase din inventar și observațiile cu fișierele lor.
 

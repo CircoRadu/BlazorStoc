@@ -1,6 +1,7 @@
 # Furnizori
 Ruta: /furnizori
 Cautare: furnizori registru cui cod tva anf verificat recunoastere factura export csv adauga editeaza sterge
+Captura: pagina | /furnizori |  | Registrul de furnizori
 
 Registrul furnizorilor ale căror facturi se preiau în stoc. Un furnizor se identifică prin CUI (sau codul de TVA al unui stat UE) și nu poate apărea de două ori.
 
@@ -20,7 +21,7 @@ Registrul furnizorilor ale căror facturi se preiau în stoc. Un furnizor se ide
 - Ultimele corecții nerezolvate | listă | Ce s-a citit din factură și ce furnizor a ales utilizatorul; de aici se poate reține numele ca denumire alternativă.
 ### Registrul
 - Caută | câmp | Caută după denumire, CUI, adresă sau telefon.
-- Doar cei de verificat | comutator | Arată doar furnizorii de verificat.
+- Doar cei de verificat | comutator | Arată doar furnizorii de verificat. | sel: label:has(input[aria-label*="doar furnizorii"])
 - Furnizor | coloană | Numele; apasă-l ca să deschizi fișa furnizorului ([[furnizori-detaliu]]).
 - CUI / cod TVA | coloană | Identificatorul furnizorului.
 - Sursa datelor | coloană | ANAF, manual sau altă sursă, cu iconița ei.

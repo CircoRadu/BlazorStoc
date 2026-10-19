@@ -1,6 +1,7 @@
 # Autentificare
 Ruta: /Account/Login
 Public: da
+Captura: pagina | /Account/Login | anonymous | Fereastra de autentificare
 
 Pagina de autentificare protejează accesul la aplicație. Fără cont valid nu se deschide nicio altă pagină.
 

@@ -1,6 +1,7 @@
 # Preluare inventar
 Ruta: /inventar/preluare
 Cautare: preluare inventar formular scanat ocr diferente stoc valoare reala corectie trimite modificari confirma backup
+Captura: pagina | /inventar/preluare |  | Preluarea inventarului
 
 Încarci formularul de inventar scanat, cu valorile reale completate de mână, ca să compari stocul numărat cu cel curent. Aplicația citește valorile (OCR), arată diferențele, iar tu alegi ce modificări de stoc se operează.
 

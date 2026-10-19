@@ -1,6 +1,7 @@
 # Export consum
 Ruta: /consum
 Cautare: consum export csv predat beneficiar proiect perioada iesit returnat net raport
+Captura: pagina | /consum |  | Exportul de consum
 
 Fereastra arată ce s-a predat beneficiarilor (ieșiri minus retururi) pe fiecare produs, pentru un proiect, un beneficiar și/sau o perioadă. Rezultatul se poate descărca și ca fișier CSV.
 

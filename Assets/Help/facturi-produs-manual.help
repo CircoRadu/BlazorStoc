@@ -1,5 +1,6 @@
 # Adăugarea unui produs la o factură
 Cautare: adauga produs factura manual intrare cantitate pe factura duplicat motiv stoc negativ componenta
+Captura: fereastra | /facturi | click sel:button.category-table-link.link-like; click Adaugă produs manual | Adăugarea unui produs la o factură
 
 Adaugi manual o intrare în stoc, legată de factura deschisă, pentru un produs care nu a fost preluat. Un produs deja preluat din factură sau o cantitate mai mare decât cea scrisă pe factură se adaugă doar cu un motiv.
 

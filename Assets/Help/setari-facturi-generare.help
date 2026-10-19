@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Generare șablon factură
 Cautare: sablon factura generare analiza pdf scanat xml zip campuri coloane linii demarcare overlay salveaza furnizor cui descriere intrare stoc
+Captura: pagina | /setari | click Facturi; upload factura-demo.pdf; full | Generarea șablonului de factură
 
 Creezi un șablon pe o factură de probă: aplicația citește tabelul cu liniile și câmpurile din antet și le arată pe pagină ca un șablon interactiv. Alegi ce se folosește la import, corectezi poziția elementelor, scrii descrierea intrării în stoc și salvezi. După salvare, șablonul se aplică de îndată facturii. Același editor se deschide și din „Preluare factură”, când furnizorul nu are șablon.
 

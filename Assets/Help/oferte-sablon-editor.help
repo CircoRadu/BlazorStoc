@@ -1,5 +1,6 @@
 # Editorul de șablon de ofertă
 Cautare: sablon oferta editor fisier proba coloane antet etichete sectiuni randuri ignorate verifica pe fisier
+Captura: formular | /oferte/sabloane | click Șablon nou; height 1300 | Editorul de șablon de ofertă
 
 Aici definești un șablon: un fișier de probă (care nu se păstrează) arată foaia cu literele coloanelor, iar tu spui unde sunt câmpurile antetului, coloanele tabelului și ce secțiuni se importă.
 

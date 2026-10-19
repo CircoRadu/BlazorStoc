@@ -2,6 +2,7 @@
 Ruta: /setari
 Tab: Motor hartă
 Cautare: motor harta furnizor dale url atribuire zoom centru cheie testeaza openstreetmap
+Captura: pagina | /setari | click Hartă; full | Motorul hărții
 
 Furnizorul fundalului hărții de mentenanță: adresa dalelor, atribuirea cerută de furnizor, limitele de zoom și punctul de pornire. Browserul cere dalele direct de la furnizor; numele beneficiarilor, contractele și scadențele nu părăsesc aplicația.
 

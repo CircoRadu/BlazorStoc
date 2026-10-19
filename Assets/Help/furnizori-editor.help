@@ -1,5 +1,6 @@
 # Formularul de furnizor
 Cautare: furnizor formular cui cod tva tara anf denumire alternativa alias duplicat
+Captura: formular | /furnizori | click Adaugă furnizor | Formularul de furnizor
 
 Formularul pentru un furnizor nou sau pentru editarea unuia existent. Se deschide deasupra registrului sau fișei furnizorului și ca fereastră în fluxul de preluare a facturilor (CUI-ul și numele citite din factură vin completate).
 

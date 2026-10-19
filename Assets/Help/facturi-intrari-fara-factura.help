@@ -2,6 +2,7 @@
 Ruta: /facturi
 Tab: Intrări fără factură
 Cautare: intrari fara factura achizitie fara factura atasare factura motiv furnizor vechime
+Captura: pagina | /facturi | click Intrări fără factură; full | Intrările fără factură
 
 Intrările în stoc înregistrate cu un motiv, dar fără factură. Administratorul le leagă, câte mai multe deodată, de factura primită ulterior; stocul nu se modifică. Ceilalți utilizatori văd ce mai așteaptă o factură.
 

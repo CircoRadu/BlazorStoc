@@ -1,6 +1,7 @@
 # Șabloane de oferte
 Ruta: /oferte/sabloane
 Cautare: sabloane oferte deviz excel coloane antet sectiuni activ modifica sterge
+Captura: pagina | /oferte/sabloane |  | Șabloanele de oferte
 
 Un șablon spune unde sunt datele într-un deviz-ofertă Excel (.xlsx): antetul ofertei se citește după etichete, tabelul după etichetele coloanelor, iar secțiunile (Echipamente, Manoperă, Cheltuieli) se importă sau nu. Prețurile și TVA nu se citesc.
 

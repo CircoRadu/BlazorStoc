@@ -1,6 +1,7 @@
 # Vehicule
 Ruta: /vehicule
 Cautare: vehicule autovehicule masini flota numar inmatriculare descriere adauga editeaza sterge
+Captura: pagina | /vehicule |  | Lista vehiculelor
 
 Registrul autovehiculelor firmei, către care se pot opera ieșiri de stoc (produsele se mută în mașină). Numărul de înmatriculare identifică în mod unic fiecare vehicul.
 

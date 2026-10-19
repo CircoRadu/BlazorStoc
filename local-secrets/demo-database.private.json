@@ -1,0 +1,12 @@
+{
+    "Database":  {
+                     "Host":  "127.0.0.1",
+                     "Port":  3307,
+                     "Name":  "blazorstoc_demo",
+                     "ExpectedName":  "blazorstoc_demo",
+                     "User":  "blazorstoc_test_app",
+                     "Password":  "jdtnZ35Tby0WqxbD2nwDen9EItMdpI",
+                     "SslMode":  "Required"
+                 },
+    "Purpose":  "Baza MariaDB cu date demonstrative fictive pentru capturile din ajutor (tools\\help-capture.mjs); se reface cu tools\\help-demo-db.ps1 si tests\\BlazorStoc.HelpDemo."
+}

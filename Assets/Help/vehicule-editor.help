@@ -1,5 +1,6 @@
 # Formularul de vehicul
 Cautare: vehicul formular numar inmatriculare descriere itp asigurare rovinieta expirare
+Captura: formular | /vehicule | click Adaugă vehicul | Formularul de vehicul
 
 Formularul pentru un vehicul nou sau pentru editarea unuia existent. Se deschide deasupra registrului sau fișei vehiculului.
 

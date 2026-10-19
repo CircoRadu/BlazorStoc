@@ -1,5 +1,6 @@
 # Parametri obligatori ai unei subcategorii
 Cautare: parametri obligatori model valoare cod produs subcategorie unitate
+Captura: fereastra | /categorii | click sel:.row-icon.params | Parametrii obligatori ai unei subcategorii
 
 Un produs dintr-o subcategorie cu parametri obligatori nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru. Codul produsului devine „model - valoare - valoare”, în ordinea parametrilor. Produsele deja existente rămân blocate până li se aleg valorile.
 

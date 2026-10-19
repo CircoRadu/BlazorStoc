@@ -74,3 +74,21 @@ Pasi:
 3. Deschide fisa unui beneficiar cu contract si interventii: formularele "Adauga contract", "Inregistreaza interventie" si "Adauga analiza de risc" au "?" in antet.
 4. Pe Harta mentenantei apasa un punct: panoul de detalii are "?"; apasa si "?" din fereastra separata a hartei.
 5. Citeste cateva topicuri cap-coada (de exemplu Preluare oferta, Situatia proiectului, Backup si restaurare) si noteaza ce lipseste sau e descris gresit; actualizarea se face la rebuild.
+
+### 19.10.2026 - Help: capturi de ecran cu chenar pulsatil in "Elementele ferestrei"
+
+**Ce s-a adaugat:** in fiecare topic de help al unei ferestre apare, la "Elementele ferestrei", captura ferestrei (1920x1080, pagina intreaga) si, sub ea, tabelul elementelor (Element / Tip / Descriere). Capturile sunt facute automat de unealta `tools/help-capture.mjs` pe o baza cu date demonstrative fictive (`blazorstoc_demo`, `tests/BlazorStoc.HelpDemo`); 89 de capturi, cate una pe topic, pe toate cele 89 de topicuri.
+
+**Ce face acum:** apasa un rand din tabel: pe captura apare un chenar portocaliu care pulseaza in jurul elementului (numai cat timp randul este ales; al doilea clic pe rand, alt rand sau Escape il scot); captura ramane vizibila sub antet cand derulezi tabelul. Butonul "Mareste imaginea" arata captura la marime reala, cu derulare. Dupa numele fiecarui element este o iconita "Arata pe pagina": inchide temporar ajutorul si incadreaza elementul pe pagina reala 2-3 secunde, apoi redeschide ajutorul; daca elementul nu e vizibil acum, spune asta in rand. Fara insigne si fara numere pe imagine.
+
+**Verificat de agent 19.10.2026** (instanta 5089 pe baza demo, browser CDP): chenarul apare/dispare la clic, la al doilea clic, la alt rand si la Escape; marirea; "Arata pe pagina" (pe pagina si peste un dialog); capturile sunt generate pentru 89 de ferestre (fereastra ANAF cu CUI-ul real al firmei Electric Standard Prest Simeria, ales de utilizator), inclusiv sabloanele de factura (din PDF-ul si XML-ul demo), fereastra separata a facturii si punctul de pe harta; grupul de teste `help` (61 PASS).
+
+Pasi:
+
+1. Deschide Produse si apasa "?": sub "Elementele ferestrei" vezi captura si tabelul; apasa pe rand "Cauta produse" si apoi pe "Adauga produs": chenarul pulseaza in jurul fiecarui element, pe rand.
+2. Apasa din nou pe randul ales (chenarul dispare), apoi alege altul si apasa Escape (chenarul dispare, ajutorul ramane deschis; al doilea Escape il inchide).
+3. Apasa "Mareste imaginea", alege un rand de jos si verifica ca captura se deruleaza la element.
+4. Apasa iconita "Arata pe pagina" de langa un element: ajutorul se ascunde, elementul de pe pagina este incadrat cateva secunde, apoi ajutorul revine.
+5. Deschide ajutorul unui formular (de exemplu Beneficiari -> "Adauga beneficiar" -> "?"): captura arata formularul; fiecare topic are captura.
+6. Verifica ca imaginile nu contin date reale (firme, persoane fictive).
+

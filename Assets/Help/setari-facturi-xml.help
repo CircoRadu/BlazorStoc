@@ -1,5 +1,6 @@
 # Șablonul XML de factură
 Cautare: sablon xml factura ubl efactura cai arbore alege fisier proba linii descriere intrare stoc furnizor
+Captura: pagina | /setari | click Facturi; upload factura-demo.xml; full | Șablonul unei facturi XML
 
 Pentru facturile XML (e-Factura UBL): legi vizual elementele șablonului de valorile din fișierul de probă. Apeși „Alege” la un element, apoi apeși în arbore valoarea lui; citirea se actualizează la fiecare legătură.
 

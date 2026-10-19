@@ -1,5 +1,6 @@
 # Editarea unei facturi
 Cautare: editare factura furnizor numar data corectie motiv
+Captura: formular | /facturi | click sel:.row-icon.edit | Editarea unei facturi
 
 Formularul de corecție a unei facturi existente (doar administrator). Se deschide deasupra registrului de facturi.
 
