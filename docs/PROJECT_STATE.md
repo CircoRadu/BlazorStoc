@@ -9,6 +9,19 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (20.10.2026): backup si restaurare cu imaginile si fisierele
+
+- Orice backup contine acum si cele patru foldere de imagini/fisiere (product-images, project-files, service-photos, archive-files), nu si cheile Data Protection; restaurarea le readuce odata cu baza (fisiere pregatite, foldere schimbate, apoi baza; rollback al folderelor daca baza nu se schimba); un pachet vechi restaureaza numai baza. Detalii: `docs/HARTA_COD.md`, `docs/OPERARE_ACTUALIZARE.md`, `Teste utilizator/09`. Verificat: grupul `backupassets` 26 PASS, sectiunea MariaDB "Backup worker" si rulare reala (backup, restaurare, pachet stricat, pachet vechi) pe baza de test.
+
+## Ultimul lucru facut (20.10.2026): actualizarea aplicatiei, etapele 1-5
+
+- Plan si decizii: `docs/PROPUNERE_ACTUALIZARE.md`. Etapa 1: `AppVersion` (0.5.0), registrul `schema_migrations` (migrarea 43, `MariaSchemaLedger`, `MariaSchemaMigrator.Plan`, checksum/drift, `--migrate-schema` cod 3), configurarile ANAF/harta si jurnalul in fisier in radacina datelor (`AppDataRoot.DataFile`). Etapa 2: `tools/release.ps1` + `tools/BlazorStoc.Updater` (cheie ECDSA a masinii, pachet `.bsu` semnat, verificare); publish-ul nu mai poarta `local-secrets/` si `data/`.
+- Verificat: suita 1813 PASS, MariaDB 2597 + 29 PASS, migrarea reala pe baza BlazorStoc, un release real 0.5.0 (302 fisiere, 100 MB). Cheia de semnare a acestei masini: `%LOCALAPPDATA%/BlazorStoc-release`.
+- Etapa 3 (Updater care instaleaza: `install`, `rollback`, `status`, `trust`, `init`, rollback automat, supervizor pe `current.txt`) facuta si verificata cu procese reale; suita 1851 PASS, MariaDB 2683 PASS, supervizor 36 PASS.
+- Etapa 4 (Setari -> Actualizare: incarcare pachet, verificare de Updater, confirmare cu motiv, anunt, jurnal, revenire automata) facuta si verificata pe un server de proba real; grupul `package` 122 PASS, `help` 61 PASS. Pe server: `BlazorStoc.Updater init` ca administrator, pe contul aplicatiei, inregistreaza sarcina programata prin care aplicatia porneste Updater-ul.
+- Etapa 5 facuta si verificata: `release.ps1` produce acum si `BlazorStoc-Actualizare-<versiune>.exe` (lansator + pachet + Updater, `--repair`, `--rollback`, `--status`, `--check`, `--init`); documentatia de operare in `docs/OPERARE_ACTUALIZARE.md`; grupul `package` 169 PASS plus rulare reala a fisierului (vezi `docs/PROPUNERE_ACTUALIZARE.md`, etapa 5). Pe serverul real raman pasii utilizatorului din `Teste utilizator/09`.
+- Ramas din actualizare: nimic in cod; doar pasii utilizatorului pe serverul real (Teste utilizator/09) si, optional, semnatura Authenticode a installerului.
+
 ## Ultimul lucru facut (20.10.2026): Setari -> Baza de date
 
 - Implementat si verificat (vezi `IMPLEMENTED.md`, `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md` sectiunile 15-18): acces pe rol, stare, conexiune, conturile bazei, sesiuni, serverul bazei ca serviciu Windows `BlazorStocMariaDB` (pornire/oprire/repornire/port), portul aplicatiei cu repornire sub supervizor.

@@ -1,6 +1,6 @@
 # Formularul de utilizator
 Cautare: utilizator formular parola confirmare tip utilizator cont activ nume afisat
-Captura: formular | /utilizatori | click Adaugă utilizator | Formularul de utilizator
+Captura: formular | /setari | click Utilizatori; wait 1500; click Adaugă utilizator | Formularul de utilizator
 
 Formularul pentru un cont nou sau pentru editarea unuia existent. Se deschide deasupra listei sau fișei utilizatorului.
 

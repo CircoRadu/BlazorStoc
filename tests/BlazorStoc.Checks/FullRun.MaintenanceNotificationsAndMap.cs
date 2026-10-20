@@ -119,6 +119,9 @@ public static partial class FullRun
         await ProductGroupsChecks.RunAsync(Check);
         ReasonSummaryChecks.Run(Check);
         StructureChecks.Run(Check);
+        UpdateChecks.Run(Check);
+        await PackageChecks.RunAsync(Check);
+        await UpdateEngineChecks.RunAsync(Check);
         await HelpChecks.RunAsync(Check);
         await ModuleChecks.RunAsync(Check);
         await OcrWorkerChecks.RunAsync(Check);
@@ -126,6 +129,7 @@ public static partial class FullRun
         await RunTrackingChecks.RunAsync(Check);
         await RobustnessChecks.RunAsync(Check);
         await NasBackupChecks.RunAsync(Check);
+        await BackupAssetsChecks.RunAsync(Check);
         await DatabaseSettingsChecks.RunAsync(Check);
         BlazorStoc.Checks.OfferChecks.Run(Check);
         BlazorStoc.Checks.OfferChecks.RunSituation(Check);

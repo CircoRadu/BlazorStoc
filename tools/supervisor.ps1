@@ -37,6 +37,7 @@ param(
     [ValidateSet('run', 'status', 'stop', 'start', 'install', 'uninstall')][string]$Action = 'run',
     [int]$Port = 5087,
     [string]$AppDirectory,                 # the published application (default artifacts\notif-build, as tools\start-preview.ps1 publishes it)
+    [string]$InstallRoot,                  # a server installation (tools\BlazorStoc.Updater): the version that runs is the one in <InstallRoot>\current.txt, read at EVERY start
     [string]$ConfigPath,                   # Database__PrivateConfigPath (default local-secrets\application-connection.private.json)
     [string]$MariaRoot = 'C:\Dev\BlazorStoc-MariaDB',
     [switch]$WithMariaDb,
@@ -58,8 +59,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$stateDir = Join-Path $repo 'artifacts\supervisor'
-$logDir = Join-Path $repo 'logs'
+# On a server this script sits in <install root>\updater, so the folder above it is the installation (it has current.txt); on the development machine it is the repository.
+if (-not $InstallRoot -and (Test-Path (Join-Path $repo 'current.txt'))) { $InstallRoot = $repo }
+$stateDir = if ($InstallRoot) { Join-Path $InstallRoot 'state\supervisor' } else { Join-Path $repo 'artifacts\supervisor' }
+$logDir = if ($InstallRoot) { Join-Path $InstallRoot 'logs' } else { Join-Path $repo 'logs' }
 $statePath = Join-Path $stateDir "state-$Port.json"
 # The application writes a marker here while it runs (App__RunMarkerPath) and deletes it on a normal stop; one found at the next start is an unexpected stop, which
 # the application records in the journal of activity. The supervisor adds why ("<marker>.exit") and removes the marker when the stop was asked for.
@@ -178,6 +181,7 @@ switch ($Action) {
         $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -Action run -Scheduled -Port $Port"
         if ($WithMariaDb) { $arguments += " -WithMariaDb -MariaRoot `"$MariaRoot`"" }
         if ($AppDirectory) { $arguments += " -AppDirectory `"$AppDirectory`"" }
+        if ($InstallRoot) { $arguments += " -InstallRoot `"$InstallRoot`"" }
         if ($ConfigPath) { $arguments += " -ConfigPath `"$ConfigPath`"" }
         $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments -WorkingDirectory $repo
         # At logon, and every 5 minutes after: while the supervisor lives the task ignores the repetition (MultipleInstances IgnoreNew); if the supervisor itself was
@@ -238,8 +242,9 @@ if ($previous -and [int]$previous.childPid -gt 0) {
     }
 }
 
-if (-not $AppDirectory) { $AppDirectory = Join-Path $repo 'artifacts\notif-build' }
-if (-not $ConfigPath) { $ConfigPath = Join-Path $repo 'local-secrets\application-connection.private.json' }
+if (-not $AppDirectory -and -not $InstallRoot) { $AppDirectory = Join-Path $repo 'artifacts\notif-build' }
+# (in an installation the application finds its own configuration in the data root; nothing is imposed)
+if (-not $ConfigPath -and -not $InstallRoot) { $ConfigPath = Join-Path $repo 'local-secrets\application-connection.private.json' }
 
 $state = [ordered]@{
     status = 'running'; supervisorPid = $PID; childPid = 0; port = $Port; restarts = 0; lastReason = ''; startedUtc = ''; healthLive = 0; health = 0
@@ -275,7 +280,16 @@ function Start-Maria {
     else { Write-Log 'MariaDB start script is still running: going on without waiting for it.' }
 }
 
+# The version of an installation that runs: decided at every start, so an update (a new line in current.txt, then a restart) is all it takes to change it.
+function Resolve-InstalledApp {
+    $currentFile = Join-Path $InstallRoot 'current.txt'
+    $version = if (Test-Path $currentFile) { (Get-Content $currentFile -Raw).Trim() } else { '' }
+    if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "$currentFile does not name a version." }
+    return (Join-Path $InstallRoot "releases\$version\app")
+}
+
 function Start-App {
+    if ($InstallRoot -and -not $AppCommand) { $script:AppDirectory = Resolve-InstalledApp }
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $out = Join-Path $logDir "supervised-$Port-$stamp.out.log"
     $err = Join-Path $logDir "supervised-$Port-$stamp.err.log"
@@ -290,13 +304,15 @@ function Start-App {
         if (-not (Test-Path $dll)) { throw "$dll not found (publish first: tools\start-preview.ps1)." }
         $file = 'dotnet'
         $arguments = @("`"$dll`"")
-        $workingDirectory = $repo
-        $env:Database__PrivateConfigPath = $ConfigPath
+        $workingDirectory = if ($InstallRoot) { $AppDirectory } else { $repo }
+        if ($ConfigPath) { $env:Database__PrivateConfigPath = $ConfigPath }
         # The address is NOT imposed: the application listens on the port saved from its Settings page when there is one (and it is free), otherwise on the port proposed here.
         # Exit code 75 = "restart me" (the page restarts the application to take a new port); App__Supervisor tells the page that a restart is possible.
         Remove-Item Env:\ASPNETCORE_URLS -ErrorAction SilentlyContinue
         $env:Hosting__DefaultPort = "$Port"
         $env:App__Supervisor = 'supervisor'
+        # Setari -> Actualizare works only for an installation made by the updater: the application learns from here which one it runs from.
+        if ($InstallRoot) { $env:App__InstallRoot = $InstallRoot } else { Remove-Item Env:\App__InstallRoot -ErrorAction SilentlyContinue }
         $script:listenPort = Get-ListenPort
         $env:ASPNETCORE_WEBROOT = Join-Path $AppDirectory 'wwwroot'
         # (the note about the previous run is NOT removed here: the application that starts now reads it and reports the unexpected stop with its cause)
@@ -315,7 +331,7 @@ function Start-App {
 $recent = New-Object 'System.Collections.Generic.List[datetime]'
 $backoff = $BackoffInitialSeconds
 $exitCode = 0
-Write-Log "Supervisor started (pid $PID); application $(if ($AppCommand) { $AppCommand } else { Join-Path $AppDirectory 'BlazorStoc.dll' })."
+Write-Log "Supervisor started (pid $PID); application $(if ($AppCommand) { $AppCommand } elseif ($InstallRoot) { "of the installation $InstallRoot (current.txt)" } else { Join-Path $AppDirectory 'BlazorStoc.dll' })."
 Save-State
 
 while ($true) {

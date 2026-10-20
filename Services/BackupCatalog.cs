@@ -39,7 +39,7 @@ public static class BackupCatalog
         var match = NameShape.Match(file.FileName);
         if (!match.Success) return null;
         BackupKind? kind = null;
-        foreach (var candidate in new[] { BackupKind.PreRestore, BackupKind.Scheduled, BackupKind.Manual, BackupKind.InventoryPickup })
+        foreach (var candidate in new[] { BackupKind.PreRestore, BackupKind.PreUpdate, BackupKind.Scheduled, BackupKind.Manual, BackupKind.InventoryPickup })
             if (match.Groups["label"].Value == BackupRules.KindLabel(candidate)) { kind = candidate; break; }
         if (kind is null) return null;
         var created = DateTime.TryParseExact(match.Groups["stamp"].Value, "dd.MM.yyyy HH-mm-ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var local)

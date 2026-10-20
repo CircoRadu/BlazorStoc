@@ -13,7 +13,7 @@ Configurările aplicației, rezervate administratorului; un utilizator fără ac
 - Facturi | filă | Șabloanele de citire a facturilor ([[setari-facturi-generare]], [[setari-facturi-sabloane]]).
 - Backup | filă | Backup, restaurare, copiere pe NAS și verificarea orei ([[setari-backup]], [[setari-backup-nas]], [[setari-backup-ora]]).
 - Module | filă | Starea modulelor aplicației și oprirea/pornirea lor ([[setari-module]]).
-- Tipuri de utilizatori | filă | Drepturile fiecărui tip de utilizator ([[setari-tipuri-utilizatori]]).
+- Utilizatori | filă | Conturile utilizatorilor ([[utilizatori]]) și drepturile fiecărui tip de utilizator, în subsecțiunea „Tipuri de utilizatori” ([[setari-tipuri-utilizatori]]).
 - Bază de date | filă | Starea serverului bazei de date și conexiunea aplicației la el ([[setari-baza-stare]], [[setari-baza-conexiune]]); apare numai conturilor cu nivelul Administrator.
 - Subsecțiunile | filă | Unele secțiuni au subsecțiuni, afișate sub bara principală.
 

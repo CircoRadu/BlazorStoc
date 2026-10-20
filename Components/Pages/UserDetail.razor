@@ -12,7 +12,7 @@
 
 <PageTitle>@(user?.Username ?? "Utilizator") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<a class="nav-back" href="/utilizatori"><span>←</span> Utilizatori</a>
+<a class="nav-back" href="@UserNavigation.ListUrl"><span>←</span> Utilizatori</a>
 
 @if (loading)
 {
@@ -24,7 +24,7 @@ else if (error is not null)
 }
 else if (user is null)
 {
-    <div class="empty-state"><span class="empty-icon">♙</span><h3>Utilizatorul nu mai există</h3><p>Contul a fost șters (mutat în arhivă) sau linkul nu este valid.</p><a class="refresh act-nav" href="/utilizatori">Înapoi la utilizatori</a></div>
+    <div class="empty-state"><span class="empty-icon">♙</span><h3>Utilizatorul nu mai există</h3><p>Contul a fost șters (mutat în arhivă) sau linkul nu este valid.</p><a class="refresh act-nav" href="@UserNavigation.ListUrl">Înapoi la utilizatori</a></div>
 }
 else
 {

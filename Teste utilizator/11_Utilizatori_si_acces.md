@@ -4,6 +4,11 @@ Fluxul: administratorul creeaza conturi (Administrator / Utilizator) -> autentif
 
 ## Modificari de testat
 
+### 20.10.2026 - Utilizatorii se muta din Administrare in Setari
+
+**Ce s-a adaugat:** lista de utilizatori nu mai este in meniul Administrare; este in Setari, fila „Utilizatori”, subtab „Utilizatori” (langa subtab „Tipuri de utilizatori”). Vechiul /utilizatori redirectioneaza acolo (si cu ?edit=<id>); fisa /utilizatori/{id} ramane, iar „Inapoi” duce la lista din Setari.
+**Ce face acum:** pasi: (1) meniul Administrare nu mai are „Utilizatori”; (2) Setari -> Utilizatori arata lista, „+ Adauga utilizator” este in antetul cardului „Conturi web”; (3) /utilizatori ajunge in Setari -> Utilizatori; (4) tile-ul „Utilizatori” de pe pagina principala duce in Setari; (5) un cont fara dreptul „Utilizatori” dar cu „Tipuri de utilizatori” vede doar subtab-ul Tipuri. Rezultat: ______
+
 ### 15.10.2026 - Mesaj la autentificare cand baza de date nu raspunde
 
 **Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).

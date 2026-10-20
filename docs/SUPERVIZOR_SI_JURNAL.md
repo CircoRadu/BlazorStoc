@@ -3,7 +3,7 @@
 Scris la 08.10.2026 (Task "Robustete la erori"). Fara diacritice.
 
 ## Ce exista in aplicatie
-- **Jurnal in fisier:** `logs/blazorstoc-yyyyMMdd.log` (in directorul aplicatiei; `Logging:File:Directory` il schimba, `Logging:File:RetentionDays`, implicit 14 zile; fisierele mai vechi se sterg). Se scriu avertismentele, erorile si exceptiile necaptate, cu stack trace; utilizatorii nu vad niciodata stack trace (`DetailedErrors` ramane oprit). `logs/` este in `.gitignore`.
+- **Jurnal in fisier:** `logs/blazorstoc-yyyyMMdd.log` (din 20.10.2026 implicit in `<radacina datelor>\logs`, de ex. `C:\ProgramData\BlazorStoc\logs`, nu in folderul codului, ca sa supravietuiasca unei actualizari; `Logging:File:Directory` il schimba, `Logging:File:RetentionDays`, implicit 14 zile; fisierele mai vechi se sterg). Se scriu avertismentele, erorile si exceptiile necaptate, cu stack trace; utilizatorii nu vad niciodata stack trace (`DetailedErrors` ramane oprit). `logs/` este in `.gitignore`.
 - **Exceptii in afara oricarui try** (`AppDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`): se scriu in jurnal inainte de oprirea procesului.
 - **Sarcini lansate fara asteptare:** `Task.FireAndForget(logger, "descriere")` (`Services/Robustness.cs`) prinde si logheaza exceptia; folosit la sondajele periodice ale paginilor, bataia de inima a blocarii produsului, layout si `UnsavedChangesHost`.
 - **`ErrorBoundary`** in jurul continutului paginii (`MainLayout.razor`): o eroare dintr-o pagina arata „Eroare in aceasta pagina" cu butonul „Reincarca pagina", fara sa inchida circuitul; la schimbarea paginii bariera se reface.

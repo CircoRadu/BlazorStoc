@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 
+// Description of the release (version, schema version, migrations with their checksums) for tools\release.ps1 and the updater: printed, then the process ends; no web host, no database.
+if (args.Length == 1 && args[0] == ReleaseDescription.Argument) return ReleaseDescription.Print();
+
 // Worker mode of the OCR (Modules/Ocr): the application started with --ocr-worker <job folder> reads one file and exits; no web host, no database.
 if (args is ["--ocr-worker", var ocrJobFolder]) return await BlazorStoc.Modules.Ocr.OcrWorker.RunAsync(ocrJobFolder);
 
@@ -39,7 +42,8 @@ builder.Services
     .AddDatabaseSettings(appHosting)
     .AddChangeTracking()
     .AddHostResilience()
-    .AddRunTracking(builder.Configuration);
+    .AddRunTracking(builder.Configuration)
+    .AddApplicationUpdate(builder.Configuration);
 var app = builder.Build();
 modules.AttachLogger(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("BlazorStoc.Modules"));
 // The changes of state of the modules go to the journal of activity (the modules out since startup are announced now, nobody listened before).
@@ -122,6 +126,7 @@ app.MapGet("/health/modules", (BlazorStoc.Modules.ModuleRegistry registry) =>
     return Results.Json(new
     {
         status = all.All(item => item.Status == BlazorStoc.Modules.ModuleStatus.Healthy) ? "healthy" : "degraded",
+        app = new { version = AppVersion.Current },
         modules = all.Select(item => new { id = item.Id, name = item.Name, version = item.Version, status = item.Status.ToString().ToLowerInvariant() })
     });
 }).RequireAuthorization();
@@ -135,7 +140,7 @@ app.MapGet("/health", async (IConfiguration configuration, CancellationToken tok
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT 1";
         await command.ExecuteScalarAsync(token);
-        return Results.Json(new { status = "healthy", database = "ok" });
+        return Results.Json(new { status = "healthy", database = "ok", version = AppVersion.Current });
     }
     catch (OperationCanceledException) when (token.IsCancellationRequested) { return Results.StatusCode(499); }
     catch (Exception) { return Results.Json(new { status = "unhealthy", database = "unavailable" }, statusCode: 503); }
@@ -238,15 +243,30 @@ app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 // MariaDB mode: bring the schema up to date with the migrator account before serving requests (idempotent). Without
 // that account only a warning is logged. "--migrate-schema" applies the migrations and exits (0 = schema is current).
 var migrateOnly = args.Contains("--migrate-schema");
+// "--schema-status": prints one line "SCHEMA-STATUS {json}" (ledger version, version of the code, pending migrations, missing columns, drift) and exits; changes nothing.
+var statusOnly = args.Contains("--schema-status");
 {
     var migrator = app.Services.GetRequiredService<MariaSchemaMigrator>();
+    if (statusOnly)
+    {
+        try
+        {
+            Console.Out.WriteLine("SCHEMA-STATUS " + System.Text.Json.JsonSerializer.Serialize(await migrator.StatusAsync(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            app.Logger.LogError("The schema status could not be read ({ErrorType}): {Message}", exception.GetType().Name, exception.Message);
+            return 1;
+        }
+    }
     try
     {
-        var report = await migrator.MigrateAsync();
+        var report = await migrator.MigrateAsync(force: migrateOnly);
         if (report.MissingColumns.Count > 0)
             app.Logger.LogError("MariaDB schema is behind the application: missing {Columns}. {Hint}", string.Join(", ", report.MissingColumns),
                 report.MigratorConfigured ? "The migration ran but the columns are still missing." : "Configure Database:MigratorUser/MigratorPassword (migration-account.private.json) and restart, or run --migrate-schema.");
-        else app.Logger.LogInformation("MariaDB schema is current ({Applied} migration(s) applied now).", report.Applied.Count);
+        else app.Logger.LogInformation("BlazorStoc {Version}: MariaDB schema is current, version {Schema} ({Applied} migration(s) applied now).", AppVersion.Current, report.SchemaVersion, report.Applied.Count);
         if (report.MissingColumns.Count == 0)
         {
             await MariaBackupSettingsStore.CopyFromNasSettingsAsync(app.Configuration);
@@ -256,7 +276,8 @@ var migrateOnly = args.Contains("--migrate-schema");
             if (backfill.Created + backfill.Promoted > 0 || backfill.EmptyAddress > 0)
                 app.Logger.LogInformation("Main work points: {Created} created, {Promoted} promoted from an additional point, {Empty} beneficiary(ies) without an address.", backfill.Created, backfill.Promoted, backfill.EmptyAddress);
         }
-        if (migrateOnly) return report.MissingColumns.Count == 0 ? 0 : 1;
+        // Exit codes of --migrate-schema (also used by the updater): 0 = schema current, 1 = columns still missing, 3 = an applied migration was edited (drift).
+        if (migrateOnly) return report.MissingColumns.Count > 0 ? 1 : report.Drifted.Count > 0 ? 3 : 0;
     }
     catch (Exception exception) when (!migrateOnly)
     {

@@ -14,7 +14,7 @@ public static class HelpChecks
     // Pages that have no window of their own to describe: redirects, the error page and the waiting page of a backup.
     private static readonly HashSet<string> Exempt = new(StringComparer.OrdinalIgnoreCase)
     {
-        "/Error", "/intretinere", "/miscari/{}", "/observatii/{}"
+        "/Error", "/intretinere", "/miscari/{}", "/observatii/{}", "/utilizatori"
     };
 
     // Windows whose topic is still to be written. Empty now: every page has its topic. A new page may be listed here only for the time between adding it and writing

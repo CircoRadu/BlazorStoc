@@ -1,3 +1,4 @@
+using BlazorStoc.Startup;
 using System.Globalization;
 using System.Net;
 using System.Text;
@@ -293,7 +294,7 @@ public interface IMapConfigurationService
 public sealed class MapConfigStore(IConfiguration configuration)
 {
     public SemaphoreSlim FileGate { get; } = new(1, 1);
-    private readonly string path = Path.GetFullPath(configuration["Map:ConfigurationPath"] ?? Path.Combine("data", "map-configuration.json"));
+    private readonly string path = Path.GetFullPath(configuration["Map:ConfigurationPath"] ?? AppDataRoot.DataFile(configuration, "map-configuration.json"));
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     public async Task<MapConfiguration> ReadAsync(CancellationToken cancellationToken)

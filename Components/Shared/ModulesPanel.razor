@@ -6,6 +6,7 @@
 @inject IAccessControl Access
 @inject IAuditTrail Audit
 @inject TimeProvider Clock
+@inject IServiceProvider Services
 @* Setari -> Module (administrator only): the state of every module, since when and why it is out, "try again" for a module that was taken out after repeated
    failures (the same as waiting for the cooldown, now) and the switch that stops / starts a module by hand (with a reason, kept in the journal; a stopped module stays
    stopped after a restart of the application). A module that did not start, or is switched off in the configuration, needs a restart of the application. *@
@@ -13,6 +14,7 @@
     <div class="catalog-heading"><h2 id="modules-title">Module <span class="count-badge">@modules.Count</span></h2>
         <button type="button" class="refresh act-reload" @onclick="Reload">↻ Actualizează</button></div>
     <div class="catalog-body">
+        <p class="app-version">Versiunea aplicației <strong>@AppVersion.Current</strong> · versiunea schemei bazei de date <strong>@(schemaVersion?.ToString() ?? "necunoscută")</strong></p>
         <p class="muted">Un modul oprit nu afectează restul aplicației. Se oprește singur după erori repetate și se reîncearcă automat după 30 de secunde; aici poți cere reîncercarea imediat.
             Comutatorul „Pornit” oprește sau pornește un modul din decizia ta, imediat, fără repornirea aplicației: modulul oprit manual rămâne oprit și după repornire, până îl pornești tu,
             iar pe pagina principală secțiunea lui apare inactivă. Jurnalul de activitate nu poate fi oprit.
@@ -69,11 +71,16 @@
     private bool canRetry, canToggle, busy, disposed;
     private string? error, notice, reason = "", reasonError;
     private ModuleInfo? pending;
+    private int? schemaVersion;
 
     protected override async Task OnInitializedAsync()
     {
         canRetry = await Access.HasAsync("setari-module.retry");
         canToggle = await Access.HasAsync(ModuleControl.Permission);
+        // The version of the schema is the highest migration in the ledger; unknown while the database does not answer (the modules table is shown anyway).
+        // The configuration is asked for, not required: the version is information, the table of modules does not depend on it.
+        try { if (Services.GetService<IConfiguration>() is { } configuration) schemaVersion = await MariaSchemaLedger.CurrentVersionAsync(configuration); }
+        catch (Exception) { schemaVersion = null; }
         modules = Registry.Snapshot();
         Registry.Changed += OnChanged;
     }

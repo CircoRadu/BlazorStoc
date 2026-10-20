@@ -4,6 +4,12 @@ Regula: jurnalul numeste exact operatia (nu "Creare"/"Editare" generic). Fiecare
 
 ## Modificari de testat
 
+### 20.10.2026 - Actiuni noi de jurnal pentru actualizarea aplicatiei
+
+**Ce s-a adaugat:** opt actiuni, toate si in filtrul paginii Jurnal, entitatea „Aplicatie": Actualizare aplicatie (la confirmare, pe numele administratorului, cu motiv, versiunile si suma de control a pachetului), Anulare actualizare aplicatie, Actualizare reusita, Actualizare esuata, Actualizare refuzata, Revenire la versiunea anterioara (manuala, cu installerul), Actualizare aplicatie (installer) si Confirmare esec actualizare. Rezultatele le scrie „sistem", din istoricul Updater-ului, la pornirea aplicatiei (o singura data).
+
+**Pasi:** vezi `09_Notificari_si_setari.md` (Setari -> Actualizare); dupa o actualizare filtreaza Jurnalul dupa entitatea „Aplicatie".
+
 ### 19.10.2026 - Oprire si pornire manuala a modulelor in Jurnal
 
 **Verificat de agent 19.10.2026** (instanta de test pe baza de test: oprire cu motiv, repornirea aplicatiei, pornire, modul oprit din configurare, pauza programarii backup; vezi IMPLEMENTED.md).

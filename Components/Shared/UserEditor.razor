@@ -19,7 +19,7 @@
                 <label class="password-field" for="user-password-confirmation">@(Original is null ? "Confirmă parola *" : "Confirmă parola nouă")<InputTextLive id="user-password-confirmation" type="@PasswordType" @bind-Value="input.PasswordConfirmation" maxlength="200" autocomplete="new-password" /><small>Repetă parola pentru verificare.</small>
                     <span class="password-match @(ConfirmationMatches ? "ok" : "bad")" role="status" aria-live="polite">@ConfirmationText</span></label>
                 <label class="toggle-switch full-width" for="user-password-show"><input id="user-password-show" type="checkbox" role="switch" @bind="showPassword" /><span class="toggle-track" aria-hidden="true"></span><span>Arată parola</span></label>
-                <label for="user-type">Tip utilizator *<InputSelect id="user-type" @bind-Value="input.TypeId">@foreach (var type in types) { <option value="@type.Id">@type.Name@(type.IsSystem ? " (sistem)" : "") — @type.PermissionCount permisiuni</option> }</InputSelect><small>Drepturile fiecărui tip se definesc în Setări → Tipuri de utilizatori.</small></label>
+                <label for="user-type">Tip utilizator *<InputSelect id="user-type" @bind-Value="input.TypeId">@foreach (var type in types) { <option value="@type.Id">@type.Name@(type.IsSystem ? " (sistem)" : "") — @type.PermissionCount permisiuni</option> }</InputSelect><small>Drepturile fiecărui tip se definesc în Setări → Utilizatori → Tipuri de utilizatori.</small></label>
                 @if (Original is not null)
                 {
                     <ToggleSwitch Id="user-active" Class="full-width" @bind-Value="input.IsActive">Cont activ</ToggleSwitch>

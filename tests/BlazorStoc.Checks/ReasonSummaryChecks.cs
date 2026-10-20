@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using BlazorStoc.Components.Pages;
+using BlazorStoc.Components.Shared;
 using BlazorStoc.Services;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;

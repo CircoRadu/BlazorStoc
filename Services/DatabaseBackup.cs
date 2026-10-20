@@ -15,6 +15,8 @@ public enum BackupKind
     InventoryPickup,
     // Not produced yet (Task 3); the label already matches the TODO's naming model for when restore is built.
     PreRestore,
+    // Made by the updater before it changes the version or the schema (docs/PROPUNERE_ACTUALIZARE.md). Never deleted from the application, like PreRestore.
+    PreUpdate,
     // Made by the application at the time chosen in Settings (Backup NAS).
     Scheduled,
     // Made on request from Settings (Backup NAS).
@@ -32,7 +34,8 @@ public sealed record BackupResult(bool Success, string? PackagePath, string? Pac
 }
 
 public sealed record BackupManifest(DateTime CreatedAtUtc, string OperatorName, string OperatorRole, string Kind,
-    int TableCount, IReadOnlyDictionary<string, int> RowCounts, string SchemaVersion, string ContentSha256, string CanonicalHash, string? TimeSource = null);
+    int TableCount, IReadOnlyDictionary<string, int> RowCounts, string SchemaVersion, string ContentSha256, string CanonicalHash, string? TimeSource = null,
+    int? FileCount = null, long? FilesBytes = null, string? AssetsSha256 = null);
 
 public static class BackupRules
 {
@@ -57,6 +60,7 @@ public static class BackupRules
     {
         BackupKind.InventoryPickup => "Copie siguranta preluare inventar",
         BackupKind.PreRestore => "Copie siguranta baza de date inainte restaurare baza de date folosind backup preluare inventar",
+        BackupKind.PreUpdate => "Copie siguranta baza de date inainte actualizare aplicatie",
         BackupKind.Scheduled => "Copie siguranta programata",
         BackupKind.Manual => "Copie siguranta la cerere",
         _ => "Copie siguranta"
@@ -68,7 +72,7 @@ public static class BackupRules
         BackupStage.CheckingSpace => "Se verifica spatiul disponibil pe disc...",
         BackupStage.Exporting => "Se exporta baza de date...",
         BackupStage.Verifying => "Se verifica integritatea copiei de siguranta...",
-        BackupStage.Saving => "Se salveaza pachetul de siguranta...",
+        BackupStage.Saving => "Se salveaza pachetul de siguranta (baza de date, imaginile si fisierele)...",
         BackupStage.Done => "Copie de siguranta finalizata.",
         BackupStage.Failed => "Copia de siguranta a esuat.",
         _ => ""
@@ -122,17 +126,19 @@ public static class BackupDiskSpace
     private const long FallbackBytes = 20_000_000;
     private const double MarginFactor = 4.0;
 
-    public static long EstimateRequiredBytes(string backupDirectory)
+    // filesBytes: the images and documents that go into the package as well (the largest package on disk is a good guide once it holds them too, but the first one that does not yet).
+    public static long EstimateRequiredBytes(string backupDirectory, long filesBytes = 0)
     {
-        if (!Directory.Exists(backupDirectory)) return (long)(FallbackBytes * MarginFactor);
+        var floor = filesBytes + 2 * FallbackBytes;
+        if (!Directory.Exists(backupDirectory)) return Math.Max((long)(FallbackBytes * MarginFactor), floor);
         var largest = Directory.EnumerateFiles(backupDirectory, "*.zip")
             .Select(path => new FileInfo(path).Length).DefaultIfEmpty(FallbackBytes).Max();
-        return (long)(Math.Max(largest, FallbackBytes) * MarginFactor);
+        return Math.Max((long)(Math.Max(largest, FallbackBytes) * MarginFactor), floor);
     }
 
-    public static bool HasEnoughFreeSpace(string backupDirectory, out long availableBytes, out long requiredBytes)
+    public static bool HasEnoughFreeSpace(string backupDirectory, out long availableBytes, out long requiredBytes, long filesBytes = 0)
     {
-        requiredBytes = EstimateRequiredBytes(backupDirectory);
+        requiredBytes = EstimateRequiredBytes(backupDirectory, filesBytes);
         var root = Path.GetPathRoot(Path.GetFullPath(backupDirectory));
         availableBytes = root is null ? long.MaxValue : new DriveInfo(root).AvailableFreeSpace;
         return availableBytes >= requiredBytes;
@@ -141,7 +147,7 @@ public static class BackupDiskSpace
 
 // Subtask 3.1 (Task 3): one row of the restore page's package table.
 public sealed record BackupPackage(string FileName, BackupKind Kind, long SizeBytes, DateTime CreatedAtUtc,
-    string OperatorName, string OperatorRole, int TableCount, string TimeSource = TrustedClock.SourceVerified)
+    string OperatorName, string OperatorRole, int TableCount, string TimeSource = TrustedClock.SourceVerified, int FileCount = 0)
 {
     /// <summary>Made while the time could not be checked on the internet: the date may be wrong, so the automatic removal leaves it alone.</summary>
     public bool TimeUnverified => TimeSource == TrustedClock.SourceUnverified;
@@ -189,7 +195,7 @@ internal static class BackupPackageStore
             if (manifest is null) continue;
             var kind = Enum.TryParse<BackupKind>(manifest.Kind, out var parsedKind) ? parsedKind : BackupKind.InventoryPickup;
             packages.Add(new BackupPackage(fileName, kind, new FileInfo(path).Length, manifest.CreatedAtUtc,
-                manifest.OperatorName, manifest.OperatorRole, manifest.TableCount, manifest.TimeSource ?? TrustedClock.SourceVerified));
+                manifest.OperatorName, manifest.OperatorRole, manifest.TableCount, manifest.TimeSource ?? TrustedClock.SourceVerified, manifest.FileCount ?? 0));
         }
         return packages.OrderByDescending(package => package.CreatedAtUtc).ToList();
     }
@@ -248,9 +254,9 @@ file static class BackupManifestIo
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    public static async Task WriteAsync(string path, BackupManifest manifest, CancellationToken token)
+    public static async Task WriteAsync(ZipArchive archive, BackupManifest manifest, CancellationToken token)
     {
-        await using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        await using var stream = archive.CreateEntry("manifest.json", CompressionLevel.Optimal).Open();
         await JsonSerializer.SerializeAsync(stream, manifest, JsonOptions, token).ConfigureAwait(false);
     }
 
@@ -295,7 +301,10 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
         try
         {
             progress?.Report(new(BackupStage.CheckingSpace, BackupRules.StageMessage(BackupStage.CheckingSpace)));
-            if (!BackupDiskSpace.HasEnoughFreeSpace(backupDirectory, out _, out _))
+            // The images and documents go into the package too: they are listed now (the write freeze keeps them still) and compared with what is read into the package.
+            var assetStores = BackupAssets.Stores(configuration);
+            var assetFiles = BackupAssets.Scan(assetStores);
+            if (!BackupDiskSpace.HasEnoughFreeSpace(backupDirectory, out _, out _, assetFiles.Sum(file => file.Length)))
                 return BackupResult.Failed(BackupRules.DiskSpaceMessage);
             if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
                 return BackupResult.Failed(BackupRules.GenericFailedMessage);
@@ -331,18 +340,21 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
             var stamp = TrustedClock.Stamp(DateTime.UtcNow, clock);
             try { await new MariaBackupSettingsStore(configuration).RecordClockAsync(clock, cancellationToken).ConfigureAwait(false); }
             catch (Exception exception) when (exception is not OperationCanceledException) { logger.LogWarning("The clock check could not be recorded ({ErrorType}).", exception.GetType().Name); }
-            var manifest = new BackupManifest(stamp.Utc, operatorName, operatorRole, kind.ToString(),
-                after.Tables.Count, rowCounts, $"{after.Tables.Count} tabele (MariaDB 11.4.13)", dumpHash, after.OverallHash, stamp.Source);
 
             progress?.Report(new(BackupStage.Saving, BackupRules.StageMessage(BackupStage.Saving)));
-            var tempManifest = tempSql + ".manifest.json";
-            await BackupManifestIo.WriteAsync(tempManifest, manifest, cancellationToken).ConfigureAwait(false);
+            IReadOnlyList<BackupAssetEntry> assetEntries;
             using (var archive = ZipFile.Open(tempZip, ZipArchiveMode.Create))
             {
                 archive.CreateEntryFromFile(tempSql, "dump.sql", CompressionLevel.Optimal);
-                archive.CreateEntryFromFile(tempManifest, "manifest.json", CompressionLevel.Optimal);
+                assetEntries = await BackupAssets.AddAsync(archive, assetStores, assetFiles, cancellationToken).ConfigureAwait(false);
+                var manifest = new BackupManifest(stamp.Utc, operatorName, operatorRole, kind.ToString(),
+                    after.Tables.Count, rowCounts, $"{after.Tables.Count} tabele (MariaDB 11.4.13)", dumpHash, after.OverallHash, stamp.Source,
+                    assetEntries.Count, assetEntries.Sum(entry => entry.Size), BackupAssets.Signature(assetEntries));
+                await BackupManifestIo.WriteAsync(archive, manifest, cancellationToken).ConfigureAwait(false);
             }
-            File.Delete(tempManifest);
+            // A file that changed (or appeared) while it was read would make the package say something the folders never held.
+            if (!BackupAssets.Unchanged(assetFiles, BackupAssets.Scan(assetStores)) || assetEntries.Count != assetFiles.Count || assetEntries.Zip(assetFiles).Any(pair => pair.First.Size != pair.Second.Length))
+                return BackupResult.Failed(BackupAssetRules.FilesChangedMessage);
 
             var fileName = BackupNaming.BuildFileName(kind, stamp.Utc.ToLocalTime(), operatorRole, operatorName);
             var finalPath = BackupNaming.ResolveUniquePath(backupDirectory, fileName);
@@ -352,7 +364,7 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
             await File.WriteAllTextAsync(finalPath + ".sha256", archiveHash, cancellationToken).ConfigureAwait(false);
 
             await AuditRecorder.RecordGenerateAsync(auditTrail, access, AuditEntities.DatabaseBackup, fileName,
-                $"Pachet: {fileName}; tabele: {after.Tables.Count}; hash canonic: {after.OverallHash[..12]}" + stamp.Source switch
+                $"Pachet: {fileName}; tabele: {after.Tables.Count}; imagini si fisiere: {assetEntries.Count} ({assetEntries.Sum(entry => entry.Size) / 1048576} MB); hash canonic: {after.OverallHash[..12]}" + stamp.Source switch
                 {
                     TrustedClock.SourceInternet => $"; ora luată de pe internet (ceasul serverului era decalat cu {Math.Round(clock.Skew!.Value.TotalMinutes)} min)",
                     TrustedClock.SourceUnverified => "; ora neverificată (internetul nu a putut fi consultat)",

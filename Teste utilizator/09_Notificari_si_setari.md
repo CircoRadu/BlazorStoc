@@ -4,6 +4,83 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
+### 20.10.2026 - Backup si restaurare cu imaginile si fisierele
+
+**Verificat de agent 20.10.2026** pe baza de test, cu workerul real de backup: backup cu fisiere de proba (inclusiv un nume cu diacritice si un folder adanc), restaurare care readuce baza si fisierele exact (fisierul sters revine, cel adaugat dispare, cel modificat se schimba la loc), pachetul de siguranta de dinainte contine fisierele inlocuite, un pachet cu un fisier stricat este refuzat fara sa schimbe nimic, un pachet vechi (fara fisiere) restaureaza doar baza si lasa imaginile, baza identica dar cu fisiere diferite se restaureaza. Ramane pentru tine: pasii de mai jos in aplicatie, cu imaginile tale.
+
+**Ce s-a adaugat:** orice backup (la cerere, programat, la preluarea inventarului, pre-restaurare, pre-actualizare) contine acum, pe langa baza de date, imaginile si fisierele aplicatiei: pozele produselor, fisierele proiectelor, pozele de la interventii si arhiva fisierelor sterse. Nu intra cheile care protejeaza parolele salvate, pachetele de backup si starea de rulare. Restaurarea readuce baza de date SI fisierele din pachet.
+
+**Ce face acum:**
+- Pachetul este mai mare (creste cu imaginile) si backup-ul dureaza mai mult; verificarea de spatiu pe disc tine cont de imagini. Copierea pe NAS copiaza pachetul intreg.
+- La restaurare, fisierele din pachet le inlocuiesc pe cele de acum: ce lipseste din pachet dispare, ce lipseste de pe server revine. Inainte se face pachetul „pre-restaurare”, care contine si fisierele de acum; restaurat el, ajungi la starea de dinainte.
+- Un pachet vechi (facut inainte de aceasta schimbare) restaureaza numai baza de date; mesajul de dupa restaurare spune ca imaginile au ramas neschimbate.
+- Un pachet cu imagini sau fisiere deteriorate este refuzat inainte sa se schimbe ceva.
+
+**Pasi:**
+1. Setari -> Backup si restaurare -> „Fa backup acum”. Dimensiunea pachetului din tabel trebuie sa creasca fata de unul vechi cu cat ocupa imaginile (vezi dimensiunea folderului `assets` din folderul de date).
+2. Schimba ceva: sterge o poza de produs, adauga alta, modifica un produs.
+3. Alege pachetul facut la pasul 1, „Restaureaza baza de date”, scrie cuvantul cerut si confirma. Mesajul de reusita spune cate imagini si fisiere au fost restaurate.
+4. Verifica: poza stearsa a revenit, cea adaugata a disparut, produsul are valorile din pachet.
+5. Optional: restaureaza pachetul „pre-restaurare” de la pasul 3: revii la starea de dupa pasul 2.
+6. Pe un server nou: restaurarea unui pachet de pe NAS (doar pe NAS) aduce si imaginile; nu mai e nevoie de copierea separata a folderelor.
+
+### 20.10.2026 - Installerul de actualizare (BlazorStoc-Actualizare-<versiune>.exe)
+
+**Verificat de agent 20.10.2026** cu fisierul real facut de `release.ps1` (lansator real, dotnet, supervizor si sarcini programate reale, cont neelevat, instalare protejata, baza de test): `--init` (folderele, protectia, sarcina Updater-ului, registrul), prima instalare cu amprenta data prin `--trust` (inclusiv dupa o incercare intrerupta), actualizare cu aplicatia pornita (backup inainte de actualizare, Updater-ul din instalare inlocuit), `--rollback --restore-db` cu restaurarea reala a bazei dintr-un backup (o prima incercare, fara contul de restaurare, a lasat aplicatia oprita si a spus asta), `--repair` cand versiunea instalata era stricata si aplicatia oprita (a scos la iveala un defect, corectat: repararea aceleiasi versiuni era refuzata), `--status`, `--check`, pachet cu cheie necunoscuta (refuzat, nimic schimbat), repornire elevata de la o consola neelevata, sarcina programata inregistrata de `--init` care ruleaza Updater-ul inlocuit, iar Jurnalul a primit fiecare rezultat (Actualizare aplicatie (installer), Actualizare refuzata, Actualizare esuata, Revenire la versiunea anterioara). Ce ramane pentru tine: pasii de mai jos pe serverul tau real.
+
+**Ce s-a adaugat:** `tools\release.ps1` produce, pe langa pachetul `.bsu`, fisierul `BlazorStoc-Actualizare-<versiune>.exe` (circa 114 MB; pachetul, Updater-ul acelei versiuni si un lansator) si tipareste amprenta cheii si SHA-256 al fisierului. Documentatia de operare completa este in `docs\OPERARE_ACTUALIZARE.md`.
+
+**Ce face acum:** pe server, ca administrator, installerul face prima pregatire a instalarii (`--init`), actualizeaza (implicit), repara (`--repair`), revine la versiunea anterioara (`--rollback`, optional cu restaurarea bazei dintr-un backup de pe server) si arata starea (`--status`). Merge si cand aplicatia nu mai porneste. Dupa o actualizare reusita inlocuieste si Updater-ul de pe server cu cel din installer. Rezultatul apare in Jurnal (Actualizare aplicatie (installer), Actualizare reusita...).
+
+**Pasi (server nou):**
+1. Pe calculatorul de dezvoltare: `.\tools\release.ps1`. Noteaza amprenta si SHA-256 tiparite; copiaza `BlazorStoc-Actualizare-<versiune>.exe` pe server si compara `Get-FileHash <fisier>` cu SHA-256 tiparit.
+2. Pe server, autentificat cu contul sub care va rula aplicatia, consola **ca administrator**: `.\BlazorStoc-Actualizare-<v>.exe --init --install-root D:\BlazorStoc --port 5087` (fara `--migration-account-file` daca contul de migrare e deja in folderul de date; vezi documentatia). Verifica mesajele: "Protected: ...", "Registered as the installation of this server", "Scheduled task BlazorStocUpdater-... registered".
+3. Ruleaza comanda afisata la sfarsit pentru supervizor (`supervisor.ps1 -Action install ...`).
+4. `.\BlazorStoc-Actualizare-<v>.exe --reason "prima instalare"`. Cand cere amprenta, tasteaza primele 8 caractere ale celei tiparite de `release.ps1` (sau da `--trust "<amprenta completa>"`). Asteapta "Done: BlazorStoc <v> is installed and answering."
+5. Deschide aplicatia: versiunea din Setari -> Actualizare si in subsolul meniului este cea noua.
+
+**Pasi (actualizare cu installerul):** fara `--init`, `.\BlazorStoc-Actualizare-<v>.exe --reason "..."` (Enter la intrebare). Aplicatia se opreste cateva minute si revine pe versiunea noua; in Setari -> Actualizare apare randul din istoric cu "installer", iar in Jurnal "Actualizare aplicatie (installer)" si "Actualizare reusita" la urmatoarea pornire.
+
+**Pasi (aplicatie moarta):** `.\BlazorStoc-Actualizare-<v>.exe --status`, apoi `--repair` sau `--rollback`. Pentru restaurarea bazei dintr-un backup: copiaza pachetul de pe NAS in folderul de backup-uri al serverului (daca e doar pe NAS) si da `--rollback --restore-db "<nume pachet>"`.
+
+### 20.10.2026 - Setari -> Actualizare: actualizarea aplicatiei dintr-un pachet
+
+**Verificat de agent 20.10.2026** pe un server de proba (supervizor si sarcini programate reale, baza de test): incarcare, verificare, anulare, actualizare, refuz, revenire automata, pachet cu cheie necunoscuta, sarcina lipsa, installer manual. Ce ramane pentru tine: pasii de mai jos pe serverul tau real.
+
+**Ce s-a adaugat:** un tab nou, „Actualizare", in Setari (doar administrator). Aici alegi un pachet de actualizare (fisier .bsu, facut cu `tools\release.ps1` pe calculatorul de dezvoltare), Updater-ul il verifica, confirmi cu un motiv, utilizatorii sunt anuntati si aplicatia se actualizeaza singura. Un banner nou apare deasupra paginilor. In Jurnal apar actiuni noi (Actualizare aplicatie, Actualizare reusita, Actualizare esuata, Actualizare refuzata, Anulare actualizare aplicatie, Revenire la versiunea anterioara, Actualizare aplicatie (installer), Confirmare esec actualizare).
+
+**Ce face acum:** pachetul se incarca pe server, se verifica semnatura, cine a semnat (o cheie necunoscuta serverului nu se accepta din aplicatie), versiunea, platforma, locul pe disc si schema bazei. Dupa confirmare toti utilizatorii vad un anunt cu numaratoare (60 s), apoi aplicatia se opreste, se face backup al bazei, se trece pe versiunea noua, se aplica migrarile si se porneste. Daca versiunea noua nu raspunde in doua minute, se revine singur la cea veche (si la baza de dinainte, daca migrarile pornisera) si administratorul vede o banda rosie pana confirma.
+
+**Pasi (pe serverul real, dupa ce ai instalat prin Updater: `BlazorStoc.Updater init` rulat ca administrator, sub contul care ruleaza aplicatia):**
+1. Pe calculatorul de dezvoltare: `tools\release.ps1 -NotesFile note.txt` (note.txt = ce aduce versiunea). Copiaza fisierul .bsu pe calculatorul de pe care deschizi aplicatia.
+2. Autentifica-te ca administrator, Setari -> Actualizare: sunt aratate versiunea, versiunea anterioara si istoricul. Daca aplicatia nu ruleaza dintr-o instalare facuta de Updater, tabul spune asta si nu ofera incarcare.
+3. Alege fisierul .bsu: apare tabelul cu versiunea veche -> noua, semnatarul, schema bazei, notele si „Poate fi instalat". Un pachet mai vechi, stricat sau semnat cu o cheie necunoscuta apare ca „Nu poate fi instalat", cu motivul.
+4. Scrie un motiv si apasa „Aplica actualizarea". Verifica: apare numaratoarea si, pe orice alta pagina (si in alta sesiune), bannerul „Aplicatia se actualizeaza la versiunea X". Cat numara poti apasa „Anuleaza actualizarea": nu se opreste nimic.
+5. Lasa sa treaca: aplicatia se opreste cateva minute, apoi pagina se reincarca singura. Verifica versiunea noua in tab si in subsolul meniului, randul nou din istoric si in Jurnal „Actualizare aplicatie" (cu motivul) si „Actualizare reusita".
+6. Optional: incarca un pachet a carui versiune noua nu porneste: dupa doua minute aplicatia revine la versiunea veche, apare banda rosie, „Am luat la cunostinta" o scoate si in Jurnal apar „Actualizare esuata" si „Confirmare esec actualizare".
+7. Un utilizator care nu e administrator nu vede tabul Actualizare si nu vede bannerul de eroare, dar vede bannerul de anunt cat numara.
+
+### 20.10.2026 - Setari -> Backup: pachetele facute inainte de o actualizare a aplicatiei
+
+**Ce s-a adaugat:** un tip nou de pachet, „Pre-actualizare", pe care il face instrumentul de actualizare inainte sa schimbe versiunea aplicatiei sau schema bazei. Cardul de rezumat „Pre-restaurare" se numeste acum „Pre-restaurare si pre-actualizare" si le numara pe amandoua.
+
+**Ce face acum:** un pachet pre-actualizare apare in tabel cu insigna „Pre-actualizare", nu se poate sterge din aplicatie (ca cele pre-restaurare) si poate fi ales la „Restaureaza baza de date". Pana nu se face o actualizare reala nu exista niciun astfel de pachet; verificarea de acum este doar ca pagina arata corect.
+
+**Pasi:**
+1. Deschide Setari -> Backup si restaurare: al cincilea card de rezumat se numeste „Pre-restaurare si pre-actualizare".
+2. Cand va exista un pachet pre-actualizare (dupa o actualizare facuta cu instrumentul): verifica insigna din tabel, ca nu are iconita de stergere si ca numele incepe cu „Copie siguranta baza de date inainte actualizare aplicatie".
+
+### 20.10.2026 - Versiunea aplicatiei in Setari -> Module si in subsolul meniului
+
+**Ce s-a adaugat:** o linie deasupra tabelului din Setari -> Module cu versiunea aplicatiei (`0.5.0`) si versiunea schemei bazei de date (numarul ultimei migrari, `43`); subsolul meniului din stanga arata aceeasi versiune in loc de „0.3". `/health` raspunde acum si cu versiunea.
+
+**Ce face acum:** versiunea vine din proiect (nu mai e scrisa de mana); schema se citeste din registrul `schema_migrations`, in care sunt inscrise toate migrarile bazei.
+
+**Pasi:**
+1. Autentifica-te ca administrator, deschide Setari -> Module: deasupra tabelului apare „Versiunea aplicatiei 0.5.0 · versiunea schemei bazei de date 43".
+2. Verifica ca subsolul meniului spune „Versiunea 0.5.0".
+3. Deschide `/health` in browser: raspunsul contine `"version":"0.5.0"`.
+
 ### 20.10.2026 - Setari -> Baza de date (server, port server, port aplicatie, conturi, sesiuni)
 
 **Verificat de agent 20.10.2026** (instanta de test pe baza demo si serviciul real `BlazorStocMariaDB`: repornire server, port 3307 -> 3308 -> 3307, port ocupat de alt program, port aplicatie 5089 -> 5090 -> 5089 sub supervizor; vezi IMPLEMENTED.md).

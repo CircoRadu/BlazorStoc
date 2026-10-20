@@ -59,6 +59,7 @@ public static class Permissions
         new("setari-harta", "Setari: Harta", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
         new("setari-backup", "Setari: Backup", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare setari", false), new("backup", "Efectuare backup", false), new("restore", "Restaurare", false)]),
         new("setari-module", "Setari: Module", "Setari", [new(View, "Vizualizare", false), new("retry", "Reincercare modul", false), new("toggle", "Oprire / pornire modul", false)]),
+        new("setari-actualizare", "Setari: Actualizare aplicatie", "Setari", [new(View, "Vizualizare", false), new("apply", "Incarcare si aplicare pachet de actualizare", false)]),
         new("utilizatori", "Utilizatori", "Administrare sistem", Crud(admin: true)),
         new("tipuri-utilizatori", "Tipuri de utilizatori", "Administrare sistem", Crud(admin: true)),
         new("nomenclator", "Nomenclator", "Administrare sistem", Crud(admin: true)),
@@ -102,7 +103,7 @@ public static class Permissions
     public static bool IsKnown(string key) => AllKeys.Contains(key, StringComparer.Ordinal);
 
     // Modules reserved to the administrator: never offered to, saved for, or honoured for any other user type.
-    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module" };
+    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module", "setari-actualizare" };
 
     public static bool IsAdminOnly(string key) => AdminOnlyModules.Contains(key[..Math.Max(key.IndexOf('.'), 0)]);
 

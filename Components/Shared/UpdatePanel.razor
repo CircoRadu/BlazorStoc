@@ -1,0 +1,313 @@
+@using BlazorStoc.Services
+@using BlazorStoc.Services.Update
+@implements IDisposable
+@inject ApplicationUpdateService Updates
+@inject IAccessControl Access
+@* Setari -> Actualizare (administrator only): the version that runs, an update package taken from this computer, its verification by the updater (signature, signer, version,
+   schema), the confirmation with a reason, the notice to the users and the follow-up of the update, then the history. The application does not install anything itself: it hands
+   the package to the updater (a separate program with the rights of an administrator), which also puts the old version back by itself when the new one does not answer. *@
+<section class="catalog" aria-labelledby="update-title">
+    <div class="catalog-heading"><h2 id="update-title">Actualizare aplicație</h2>
+        <button type="button" class="refresh act-reload" @onclick="Reload">↻ Actualizează</button></div>
+    <div class="catalog-body">
+        <p class="app-version">Versiunea aplicației <strong>@overview.Running</strong>
+            @if (overview.Managed)
+            {
+                <text> · versiunea anterioară păstrată pe server <strong>@(overview.Previous ?? "niciuna")</strong> · versiuni pe disc <strong>@(overview.Installed.Count == 0 ? "-" : string.Join(", ", overview.Installed))</strong></text>
+            }
+        </p>
+        <p class="muted">Pachetul de actualizare (un fișier <code>.bsu</code>) este făcut pe calculatorul de dezvoltare, semnat, și înlocuiește aplicația întreagă, cu toate modulele ei. Datele (baza de date, fișierele, cheile) nu se ating.
+            Înainte de schimbare se face un backup al bazei de date, iar dacă versiunea nouă nu răspunde în două minute, aplicația revine singură la cea veche (și la baza de date de dinainte, dacă migrările porniseră).
+            Cât timp durează actualizarea (de obicei câteva minute) aplicația este oprită; toți utilizatorii sunt anunțați în prealabil.</p>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="notice-banner" role="status">@notice</div> }
+        @if (overview.LastError is not null) { <div class="error-banner" role="alert">@overview.LastError</div> }
+    </div>
+
+    @if (!overview.Managed)
+    {
+        <div class="catalog-body"><div class="notice-banner" role="status" id="update-not-managed">Aplicația nu rulează dintr-o instalare făcută de Updater (de exemplu este mediul de dezvoltare), deci nu se poate actualiza singură. Pe server, actualizarea se face cu installerul de actualizare, rulat ca administrator.</div></div>
+    }
+    else if (overview.UnacknowledgedFailure is { } failure)
+    {
+        <div class="catalog-body">
+            <div class="error-banner" role="alert" id="update-failure">
+                <strong>Ultima actualizare nu a reușit</strong> (@(failure.From ?? "-") → @failure.To, @UpdateJournal.Local(failure.AtUtc)): @failure.Message
+                <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="AcknowledgeAsync">Am luat la cunoștință</button>
+            </div>
+        </div>
+    }
+
+    @if (overview.Managed)
+    {
+        @if (overview.Scheduled is { } scheduled)
+        {
+            <div class="catalog-body">
+                <fieldset class="module-stop-confirm" aria-labelledby="update-running-title" id="update-scheduled">
+                    <legend id="update-running-title">Actualizare @scheduled.From → @scheduled.To</legend>
+                    @if (!scheduled.Launched)
+                    {
+                        <p>Utilizatorii au fost anunțați. Aplicația se oprește pentru actualizare în <strong>@Remaining(scheduled)</strong> s.</p>
+                        <div class="editor-actions"><button class="refresh act-close" type="button" disabled="@busy" @onclick="CancelAsync">Anulează actualizarea</button></div>
+                    }
+                    else
+                    {
+                        <p>Updater-ul lucrează: <strong>@PhaseText(overview.Status)</strong>. Aplicația se oprește și pornește singură; pagina se reîncarcă când aplicația revine.</p>
+                    }
+                </fieldset>
+            </div>
+        }
+        else if (Updates.UpdaterIsWorking())
+        {
+            <div class="catalog-body"><div class="notice-banner" role="status" id="update-working">O actualizare rulează: <strong>@PhaseText(overview.Status)</strong>.</div></div>
+        }
+        else if (canApply)
+        {
+            <div class="catalog-body">
+                <FileDropZone Id="update-package" Accept=".bsu" Disabled="@(busy || report is not null)" OnChange="PackageChosenAsync" Text="Alege pachetul de actualizare (.bsu)" />
+                @if (uploading) { <p class="muted" role="status" id="update-checking">Se încarcă pachetul și Updater-ul îl verifică (semnătură, semnatar, versiune, schema bazei de date)…</p> }
+            </div>
+            @if (report is not null)
+            {
+                <div class="table-scroll">
+                    <table class="catalog-table" id="update-report">
+                        <caption class="sr-only">Rezultatul verificării pachetului</caption>
+                        <tbody>
+                        <tr><th scope="row">Pachet</th><td>@originalName · @Megabytes(report.SizeBytes) MB@(report.Ok ? $" · {report.FileCount} fișiere" : "")</td></tr>
+                        @if (report.Ok)
+                        {
+                            <tr><th scope="row">Versiune</th><td><strong>@report.Running → @report.Version</strong>@(report.BuiltUtc is { } built ? $" · construită la {UpdateJournal.Local(built)}" : "")</td></tr>
+                            <tr><th scope="row">Semnat de</th><td><code>@Fingerprint(report.Signer)</code> · @(report.Trusted == true ? "cheie de încredere a serverului" : "cheie necunoscută serverului")</td></tr>
+                            <tr><th scope="row">Baza de date</th><td>@SchemaText(report)</td></tr>
+                            @if (report.MinFromVersion is not null) { <tr><th scope="row">Se instalează peste</th><td>versiunea @report.MinFromVersion sau mai nouă</td></tr> }
+                            @if (!string.IsNullOrWhiteSpace(report.Notes)) { <tr><th scope="row">Ce aduce</th><td class="update-notes">@report.Notes</td></tr> }
+                        }
+                        <tr><th scope="row">Verificare</th><td><span class="due-chip @(report.CanInstall ? "due-ok" : "due-overdue")" id="update-verdict">@(report.CanInstall ? "Poate fi instalat" : "Nu poate fi instalat")</span> @BlockingText(report)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                @if (report.CanInstall)
+                {
+                    <div class="catalog-body">
+                        <fieldset class="module-stop-confirm" aria-labelledby="update-confirm-title">
+                            <legend id="update-confirm-title">Aplici actualizarea la versiunea @report.Version?</legend>
+                            <p>Utilizatorii sunt anunțați și, după @((int)Updates.Notice.TotalSeconds) de secunde, aplicația se oprește pentru actualizare. Până atunci poți anula.</p>
+                            <div class="editor-grid"><ChangeReasonField Id="update-reason" @bind-Value="reason" Error="@reasonError" Disabled="busy" Hint="Scrie de ce actualizezi (de exemplu corecție de erori, funcție nouă cerută). Motivul este păstrat în jurnalul de activitate." /></div>
+                            <div class="editor-actions">
+                                <button class="danger" type="button" disabled="@busy" @onclick="ConfirmAsync">@(busy ? "Se programează…" : "Aplică actualizarea")</button>
+                                <button class="refresh act-close" type="button" disabled="@busy" @onclick="DiscardAsync">Renunță</button>
+                            </div>
+                        </fieldset>
+                    </div>
+                }
+                else
+                {
+                    <div class="catalog-body"><div class="editor-actions"><button class="refresh act-close" type="button" disabled="@busy" @onclick="DiscardAsync">Închide</button></div></div>
+                }
+            }
+        }
+        else
+        {
+            <div class="catalog-body"><p class="muted">Nu ai dreptul să încarci și să aplici pachete de actualizare.</p></div>
+        }
+    }
+
+    @if (overview.Managed)
+    {
+        <div class="catalog-body"><h3>Istoric <span class="count-badge">@overview.History.Count</span></h3></div>
+        @if (overview.History.Count == 0)
+        {
+            <div class="catalog-body"><p class="muted">Nicio actualizare făcută încă pe acest server.</p></div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="catalog-table" id="update-history">
+                    <thead><tr><th>Data</th><th>Versiune</th><th>Cum</th><th>Efectuat de</th><th>Rezultat</th><th>Motiv</th></tr></thead>
+                    <tbody>
+                    @foreach (var entry in overview.History)
+                    {
+                        <tr>
+                            <td>@UpdateJournal.Local(entry.AtUtc)</td>
+                            <td>@(entry.From ?? "-") → @(entry.To == "?" ? "-" : entry.To)</td>
+                            <td>@(entry.Via == "installer" ? "installer pe server" : "din aplicație")</td>
+                            <td>@entry.Actor</td>
+                            <td><span class="due-chip @OutcomeClass(entry)">@OutcomeText(entry)</span>@if (entry.Outcome != "Succeeded") { <text> </text><span class="muted">@entry.Message</span> }</td>
+                            <td>@entry.Reason</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private UpdateOverview overview = new(false, AppVersion.Current, null, null, [], null, [], null, null, null);
+    private PackageCheckDocument? report;
+    private string? originalName, error, notice, reasonError, reason = "";
+    private bool busy, uploading, canApply, disposed;
+    private Timer? timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canApply = await Access.HasAsync(ApplicationUpdateService.ApplyPermission);
+        overview = Updates.Overview();
+        timer = new Timer(_ => Tick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    // While an update waits or runs the page follows it every second (the countdown, the phase); otherwise it is left alone.
+    private void Tick()
+    {
+        if (disposed || busy || uploading) return;
+        _ = InvokeAsync(() =>
+        {
+            if (disposed) return;
+            var before = (overview.Scheduled?.Id, overview.Scheduled?.Launched, overview.Status?.Phase, overview.Status?.UpdatedUtc, overview.LastError);
+            if (overview.Scheduled is not null || Updates.UpdaterIsWorking()) overview = Updates.Overview();
+            else if (before.Item1 is not null || before.Item3 is { } phase && phase != "done") overview = Updates.Overview();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        timer?.Dispose();
+    }
+
+    private void Reload()
+    {
+        error = notice = null;
+        overview = Updates.Overview();
+    }
+
+    private async Task PackageChosenAsync(InputFileChangeEventArgs args)
+    {
+        error = notice = null;
+        report = null;
+        reason = "";
+        reasonError = null;
+        busy = uploading = true;
+        originalName = args.File.Name;
+        try
+        {
+            await using var stream = args.File.OpenReadStream(ApplicationUpdateService.MaximumPackageBytes);
+            report = await Updates.UploadAndCheckAsync(stream, args.File.Name);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ErrorText(exception); }
+        busy = uploading = false;
+        overview = Updates.Overview();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (report is null) return;
+        reasonError = ChangeReasonRules.ValidationError(reason);
+        if (reasonError is not null) return;
+        error = notice = null;
+        busy = true;
+        try
+        {
+            var scheduled = await Updates.ConfirmAsync(report.Id, reason);
+            notice = $"Actualizarea la versiunea {scheduled.To} este programată; utilizatorii au fost anunțați.";
+            report = null;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ErrorText(exception); }
+        busy = false;
+        overview = Updates.Overview();
+    }
+
+    private async Task CancelAsync()
+    {
+        error = notice = null;
+        busy = true;
+        try { notice = await Updates.CancelAsync() ? "Actualizarea a fost anulată; nimic nu s-a schimbat." : "Actualizarea a pornit deja și nu mai poate fi anulată."; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ErrorText(exception); }
+        busy = false;
+        overview = Updates.Overview();
+    }
+
+    private async Task DiscardAsync()
+    {
+        error = notice = null;
+        if (report is not null)
+        {
+            try { await Updates.DiscardAsync(report.Id); }
+            catch (Exception exception) when (exception is not OperationCanceledException) { error = ErrorText(exception); }
+        }
+        report = null;
+        reason = "";
+        reasonError = null;
+    }
+
+    private async Task AcknowledgeAsync()
+    {
+        error = notice = null;
+        busy = true;
+        try { await Updates.AcknowledgeAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ErrorText(exception); }
+        busy = false;
+        overview = Updates.Overview();
+    }
+
+    private static string ErrorText(Exception exception) => exception is AccessDeniedException or UpdateOperationException
+        ? exception.Message
+        : "Operația nu a putut fi făcută acum (fișiere sau baza de date nu răspund). Nimic nu s-a schimbat; încearcă din nou.";
+
+    private int Remaining(UpdateAnnouncement scheduled) => Math.Max(0, (int)Math.Ceiling((scheduled.StartsUtc - DateTime.UtcNow).TotalSeconds));
+
+    private static string Megabytes(long bytes) => (bytes / 1048576.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+
+    // The fingerprint in groups of four so it can be compared with the one release.ps1 prints on the build machine.
+    private static string Fingerprint(string? value) => string.IsNullOrEmpty(value) ? "-" : string.Join(" ", Enumerable.Range(0, Math.Min(32, value.Length) / 4).Select(index => value.Substring(index * 4, 4)));
+
+    private static string SchemaText(PackageCheckDocument check)
+    {
+        if (check.NewMigrations is null) return $"schema {check.SchemaVersion}; migrările noi nu pot fi numărate";
+        return check.NewMigrations == 0
+            ? $"schema rămâne {check.SchemaVersion}: nicio migrare nouă"
+            : $"schema {check.RunningSchemaVersion} → {check.SchemaVersion}: {check.NewMigrations} migrări noi, aplicate de contul de migrare după backup";
+    }
+
+    private static MarkupString BlockingText(PackageCheckDocument check) => (MarkupString)(check.Blocking switch
+    {
+        null => "",
+        "invalid" => "<span class=\"muted\">Pachetul nu este valid (semnătură, structură sau sume de control): " + System.Net.WebUtility.HtmlEncode(check.Detail ?? "") + "</span>",
+        "untrusted" => "<span class=\"muted\">Semnat cu o cheie pe care serverul nu o cunoaște. O cheie nouă se adaugă numai cu installerul, de un administrator Windows, după ce compară amprenta cu cea afișată la construirea pachetului.</span>",
+        _ => "<span class=\"muted\">" + System.Net.WebUtility.HtmlEncode(check.Detail ?? "") + "</span>"
+    });
+
+    private static string PhaseText(UpdateStatusDocument? status) => status?.Phase switch
+    {
+        "verifying" => "verifică pachetul",
+        "extracting" => "despachetează versiunea nouă",
+        "stopping" => "oprește aplicația",
+        "backup" => "face backup bazei de date",
+        "switching" => "trece pe versiunea nouă",
+        "migrating" => "aplică migrările bazei de date",
+        "starting" => "pornește versiunea nouă",
+        "health" => "așteaptă răspunsul versiunii noi",
+        "rolling-back" => "revine la versiunea veche",
+        null => "se pornește",
+        _ => status.Phase
+    };
+
+    private static string OutcomeText(UpdateHistoryDocument entry) => (entry.Kind, entry.Outcome) switch
+    {
+        ("rollback", "RolledBack") => "Revenire manuală",
+        (_, "Succeeded") => "Reușită",
+        (_, "RolledBack") => "Revenire automată",
+        (_, "Refused") => "Refuzată",
+        _ => "Eșuată"
+    };
+
+    private static string OutcomeClass(UpdateHistoryDocument entry) => entry.Outcome switch
+    {
+        "Succeeded" => "due-ok",
+        "RolledBack" when entry.Kind == "rollback" => "due-ok",
+        "Refused" or "RolledBack" => "due-soon",
+        _ => "due-overdue"
+    };
+}

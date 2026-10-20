@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The update tool (docs/PROPUNERE_ACTUALIZARE.md). Stage 2: keys, package, signature, verification (commands keygen, fingerprint, pack, verify).
+       Stage 3 adds the installation (swap of the version, migrations, health gate, rollback) to the same executable. It is not part of the application. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Configurations>Release</Configurations>
+    <Configuration Condition="'$(Configuration)' == '' Or '$(Configuration)' == 'Debug'">Release</Configuration>
+    <RootNamespace>BlazorStoc.Updater</RootNamespace>
+    <AssemblyName>BlazorStoc.Updater</AssemblyName>
+    <!-- Windows only by design: the signing key is protected with DPAPI and the server is a Windows machine. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.10" />
+  </ItemGroup>
+
+  <!-- The scripts of the supervisor travel with the updater ("init" copies them into the installation): the same files the development machine uses. -->
+  <ItemGroup>
+    <Content Include="../supervisor.ps1" Link="scripts/supervisor.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../data-root.ps1" Link="scripts/data-root.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../updater-task.ps1" Link="scripts/updater-task.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

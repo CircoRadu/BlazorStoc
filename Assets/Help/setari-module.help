@@ -9,6 +9,7 @@ Starea modulelor aplicației. Un modul oprit nu afectează restul aplicației. U
 ## Elemente
 ### Antet
 - Numărul din titlu | insignă | Câte module are aplicația.
+- Versiunea aplicației | text | Versiunea întregii aplicații și cea mai nouă migrare a bazei de date aplicată (schema); la o actualizare ambele se schimbă. Versiunea fiecărui modul e în tabel. | sel: .app-version
 - ↻ Actualizează | buton | Reîncarcă starea.
 ### Tabelul modulelor
 - Modul | coloană | Numele și identificatorul modulului.

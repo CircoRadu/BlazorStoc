@@ -69,7 +69,12 @@ internal static class PrivateConfiguration
                     Path.Combine(builder.Environment.ContentRootPath, "local-secrets", fileName)
                 }.FirstOrDefault(File.Exists);
         if (path is null || !File.Exists(path)) return;
-        using var file = JsonDocument.Parse(File.ReadAllText(path));
+        // A file this process may not read (on a server the file of the migrator account is kept for the administrators and the updater only) is an account that is not
+        // configured here, not a reason for the application not to start.
+        string text;
+        try { text = File.ReadAllText(path); }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException) { return; }
+        using var file = JsonDocument.Parse(text);
         if (!file.RootElement.TryGetProperty("Database", out var section)) return;
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {

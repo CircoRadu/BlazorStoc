@@ -15,7 +15,7 @@
     <article><span>Spațiu ocupat pe server</span><strong>@(loaded ? FormatSize(rows.Where(row => row.OnLocal).Sum(row => row.SizeBytes)) : "—")</strong><small>Numai pachetele locale</small><i>◆</i></article>
     <article><span>Preluare inventar</span><strong>@(loaded ? rows.Count(row => row.Kind == BackupKind.InventoryPickup).ToString() : "—")</strong><small>Pot fi șterse de pe server</small><i>◇</i></article>
     <article><span>Programate și la cerere</span><strong>@(loaded ? rows.Count(row => row.Kind is BackupKind.Scheduled or BackupKind.Manual).ToString() : "—")</strong><small>Nu pot fi șterse din aplicație</small><i class="amber">⚿</i></article>
-    <article><span>Pre-restaurare</span><strong>@(loaded ? rows.Count(row => row.Kind == BackupKind.PreRestore).ToString() : "—")</strong><small>Nu pot fi șterse din aplicație</small><i class="amber">⚿</i></article>
+    <article><span>Pre-restaurare și pre-actualizare</span><strong>@(loaded ? rows.Count(row => row.Kind is BackupKind.PreRestore or BackupKind.PreUpdate).ToString() : "—")</strong><small>Nu pot fi șterse din aplicație</small><i class="amber">⚿</i></article>
     @if (nasEnabled)
     {
         <article><span>Pe NAS</span><strong>@(nasRead ? rows.Count(row => row.OnNas).ToString() : "—")</strong><small>@(nasRead ? $"Doar pe NAS: {rows.Count(row => row.NasOnly)}" : "Se citește partajarea")</small><i>⇄</i></article>
@@ -56,7 +56,7 @@
                         <tr @key="row.FileName">
                             <td><input type="radio" name="backup-selection" aria-label="@($"Selectează {row.FileName}")" checked="@(selectedName == row.FileName)" @onchange="() => selectedName = row.FileName" /></td>
                             <td><span class="role-badge @(row.Kind == BackupKind.InventoryPickup ? "limited" : "admin")">
-                                @(row.Kind switch { BackupKind.InventoryPickup => "Preluare inventar", BackupKind.Scheduled => "Programat", BackupKind.Manual => "La cerere", _ => "Pre-restaurare" })</span></td>
+                                @(row.Kind switch { BackupKind.InventoryPickup => "Preluare inventar", BackupKind.Scheduled => "Programat", BackupKind.Manual => "La cerere", BackupKind.PreUpdate => "Pre-actualizare", _ => "Pre-restaurare" })</span></td>
                             <td>@row.FileName</td>
                             <td>@row.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture)
                                 @if (row.TimeSource == TrustedClock.SourceUnverified)
@@ -249,7 +249,7 @@
             var result = await RestoreService.RestoreAsync(package.FileName, progress, lifetime.Token);
             if (!result.Success) { restoreError = result.ErrorMessage ?? RestoreRules.GenericFailedMessage; return; }
             showRestorePopup = false; selectedName = null;
-            noticeOk = true; notice = RestoreRules.SuccessMessage;
+            noticeOk = true; notice = RestoreRules.SuccessMessage + (result.Note is { Length: > 0 } note ? " " + note : "");
             await LoadAsync();
             if (nasEnabled) await LoadNasAsync();
         }

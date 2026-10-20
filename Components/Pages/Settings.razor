@@ -1,5 +1,5 @@
 ﻿@page "/setari"
-@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|tipuri-utilizatori.view")]
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-actualizare.view|utilizatori.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject BlazorStoc.Services.IDatabaseAccountService DatabaseAccountsGate
@@ -117,10 +117,24 @@
             <ModulesPanel />
         </div>
     }
-    else if (activeTab == UserTypesTab && allowedTabs.Contains(UserTypesTab))
+    else if (activeTab == UpdateTab && allowedTabs.Contains(UpdateTab))
     {
-        <div role="tabpanel" id="panel-@UserTypesTab" aria-labelledby="tab-@UserTypesTab" class="settings-body">
-            <UserTypesPanel />
+        <div role="tabpanel" id="panel-@UpdateTab" aria-labelledby="tab-@UpdateTab" class="settings-body">
+            <UpdatePanel />
+        </div>
+    }
+    else if (activeTab == UsersTab && allowedTabs.Contains(UsersTab))
+    {
+        <div role="tabpanel" id="panel-@UsersTab" aria-labelledby="tab-@UsersTab" class="settings-body">
+            @SubtabBar(UserSubtabs, "Secțiuni utilizatori")
+            @if (userSubtab == UserTypesSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@UserTypesSubtab" aria-labelledby="subtab-@UserTypesSubtab"><UserTypesPanel /></div>
+            }
+            else
+            {
+                <div role="tabpanel" id="subpanel-@UserAccountsSubtab" aria-labelledby="subtab-@UserAccountsSubtab"><UsersPanel EditId="UserEditParameter" /></div>
+            }
         </div>
     }
 </section>
@@ -143,20 +157,32 @@
     private const string DatabaseConnectionSubtab = "conexiune";
     private static readonly (string Id, string Title)[] DatabaseSubtabs = [(DatabaseStatusSubtab, "Stare"), (DatabaseConnectionSubtab, "Conexiune")];
     private string databaseSubtab = DatabaseStatusSubtab;
-    private const string UserTypesTab = "tipuri-utilizatori";
+    // Users is one tab with two sub-tabs: the accounts and the user types (their rights). The old tab id of the types keeps working in addresses.
+    private const string UsersTab = "utilizatori";
+    private const string LegacyUserTypesTab = "tipuri-utilizatori";
+    private const string UserAccountsSubtab = "conturi";
+    private const string UserTypesSubtab = "tipuri";
+    private bool canUsers, canUserTypes;
+    private static readonly (string Id, string Title)[] UserSubtabsBoth = [(UserAccountsSubtab, "Utilizatori"), (UserTypesSubtab, "Tipuri de utilizatori")];
+    private static readonly (string Id, string Title)[] UserSubtabsAccounts = [UserSubtabsBoth[0]];
+    private static readonly (string Id, string Title)[] UserSubtabsTypes = [UserSubtabsBoth[1]];
+    // Only the sub-tabs the signed-in user has the right to (static arrays: the sub-tab bar tells them apart by reference).
+    private (string Id, string Title)[] UserSubtabs => canUsers && canUserTypes ? UserSubtabsBoth : canUsers ? UserSubtabsAccounts : UserSubtabsTypes;
+    private string userSubtab = UserAccountsSubtab;
     private const string ModulesTab = SettingsNavigation.ModulesTab;
+    private const string UpdateTab = SettingsNavigation.UpdateTab;
     // Backup is one tab with three sub-tabs: backup and restore, the NAS copy, the check of the server clock.
     private const string BackupMainSubtab = "backup-main";
     private const string NasTab = "backup-nas";
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (ModulesTab, "Module"), (UserTypesTab, "Tipuri de utilizatori"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
         [AnafTab] = "setari-anaf.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
-        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [UserTypesTab] = "tipuri-utilizatori.view"
+        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [UpdateTab] = "setari-actualizare.view"
     };
     private readonly HashSet<string> allowedTabs = [];
     private string activeTab = AnafTab;
@@ -175,6 +201,15 @@
             try { if (await Access.HasAsync(key)) allowedTabs.Add(tab); }
             catch (Exception exception) when (exception is not OperationCanceledException) { }
         }
+        // Users: the tab opens with either right; each sub-tab needs its own.
+        try
+        {
+            canUsers = await Access.HasAsync("utilizatori.view");
+            canUserTypes = await Access.HasAsync("tipuri-utilizatori.view");
+            if (canUsers || canUserTypes) allowedTabs.Add(UsersTab);
+            if (!canUsers) userSubtab = UserTypesSubtab;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { }
         // An account of the database still has the default password: the administrator sees only the connection (where the passwords are changed) until it is done.
         if (allowedTabs.Contains(DatabaseTab))
         {
@@ -251,12 +286,14 @@
     }
 
     private string CurrentSubtab((string Id, string Title)[] subtabs) =>
-        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : notificationSubtab;
+        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : subtabs == UserSubtabs ? userSubtab : notificationSubtab;
 
     // Deep links (for example from the Journal) open the named tab, sub-tab and object; later clicks on the tabs win.
     [SupplyParameterFromQuery(Name = SettingsNavigation.TabParameter)] public string? TabQuery { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.SubtabParameter)] public string? SubtabQuery { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.TemplateParameter)] public int? TemplateParameter { get; set; }
+    // A link with the id of an account (?edit=) opens the editor of that account in the Utilizatori tab.
+    [SupplyParameterFromQuery(Name = "edit")] public int? UserEditParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.PinParameter)] public int? PinParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.InvoiceTemplateParameter)] public int? InvoiceTemplateParameter { get; set; }
     // A fresh value forces a link that points at the same address as before (the banner's "Detalii" while the user moved to another tab) to be applied again.
@@ -268,10 +305,17 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}|{RefreshQuery}";
+        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}|{UserEditParameter}|{RefreshQuery}";
         if (link == appliedLink) return;
         appliedLink = link;
         if (VisibleTabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
+        // The old address of the user types (and an account to edit) opens the matching sub-tab of Utilizatori.
+        if (allowedTabs.Contains(UsersTab))
+        {
+            if (TabQuery == LegacyUserTypesTab) { activeTab = UsersTab; if (canUserTypes) userSubtab = UserTypesSubtab; }
+            if (UserSubtabs.Any(tab => tab.Id == SubtabQuery) && (TabQuery is UsersTab or LegacyUserTypesTab)) userSubtab = SubtabQuery!;
+            if (UserEditParameter is > 0 && canUsers) { activeTab = UsersTab; userSubtab = UserAccountsSubtab; }
+        }
         // The old address of the NAS tab keeps working.
         if (allowedTabs.Contains(BackupTab) && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
         if (BackupSubtabs.Any(tab => tab.Id == SubtabQuery)) { backupSubtab = SubtabQuery!; if (isAdmin && TabQuery is null or BackupTab) activeTab = BackupTab; }
@@ -346,6 +390,7 @@
         if (subtabs == MapSubtabs) mapSubtab = id;
         else if (subtabs == BackupSubtabs) backupSubtab = id;
         else if (subtabs == DatabaseSubtabs) databaseSubtab = id;
+        else if (subtabs == UserSubtabs) userSubtab = id;
         else if (subtabs == InvoiceSubtabs) { if (id != InvoiceEditSubtab && editTemplate is not null) AfterEditingClosed(() => invoiceSubtab = id); else invoiceSubtab = id; }
         else notificationSubtab = id;
     }

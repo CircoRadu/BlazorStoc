@@ -7,6 +7,9 @@
     <Configurations>Release</Configurations>
     <Configuration Condition="'$(Configuration)' == '' Or '$(Configuration)' == 'Debug'">Release</Configuration>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The version of the application as a whole (shown in Setari -> Module and in /health); tools
+elease.ps1 sets it for a release. -->
+    <Version>0.5.0</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**;keys/**;keys-test/**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -33,6 +36,12 @@
     <None Remove="tests/**" />
     <Content Remove="keys/**;keys-test/**;.env;.env.*" />
     <None Remove="keys/**;keys-test/**;.env;.env.*" />
+    <!-- The updater tool (tools/BlazorStoc.Updater) is its own project. The private files of the accounts (local-secrets), the settings and data of the developer's
+         machine (data), the logs and the dump of the database are never part of what is published: a release must not carry passwords or the data of the
+         machine it was built on (the data of an installation live in the data root, see AppDataRoot). -->
+    <Compile Remove="tools/BlazorStoc.Updater/**/*.cs;tools/BlazorStoc.Installer/**/*.cs" />
+    <Content Remove="tools/BlazorStoc.Updater/**;tools/BlazorStoc.Installer/**;local-secrets/**;data/**;logs/**;database/**" />
+    <None Remove="tools/BlazorStoc.Updater/**;tools/BlazorStoc.Installer/**;local-secrets/**;data/**;logs/**;database/**" />
     <Content Remove="Assets/Fonts/**" />
     <None Remove="Assets/Fonts/**" />
     <EmbeddedResource Include="Assets/Fonts/PTSans-Regular.ttf" />

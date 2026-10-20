@@ -5,12 +5,15 @@ namespace BlazorStoc.Services;
 
 // MariaDB schema changes. The application account (blazorstoc_dev) has no DDL rights; the dedicated account
 // blazorstoc_migrator (CREATE/ALTER/INDEX/DROP/REFERENCES on the BlazorStoc schema only, no data rights, Subtask 2.9)
-// applies them. Every statement is idempotent (ADD COLUMN IF NOT EXISTS), so no version table is needed - the
-// migrator cannot write to app_metadata - and running the list twice, or on a database that already has the
-// changes, does nothing. A change is a new file Assets/Migrations/NNN.sql (embedded in the assembly) AND an entry in
-// database/mariadb/schema-mariadb.sql (fresh installs).
+// applies them. Every statement is idempotent (ADD COLUMN IF NOT EXISTS), so running the list twice, or on a database that
+// already has the changes, does nothing. A change is a new file Assets/Migrations/NNN.sql (embedded in the assembly).
+// Since migration 43 the migrations that are part of the database are also listed in the table schema_migrations (MariaSchemaLedger,
+// written with the application account because the migrator has no data rights): it says which migrations are still to be applied, the
+// version of the schema and, through the checksum of each file, whether an applied migration was edited afterwards. A migration is
+// never edited once it was released (a change is a new migration) and has at least one "-- column:" line.
+// Checksum is the SHA-256 of the migration file with the line ends normalised to LF.
 public sealed record MariaMigration(int Version, string Description, IReadOnlyList<string> Statements,
-    IReadOnlyList<(string Table, string Column)> ExpectedColumns);
+    IReadOnlyList<(string Table, string Column)> ExpectedColumns, string Checksum = "");
 
 // The migrations are data, one file each, read in the order of their version. File format (lines before the first "-- statement" other
 // than the keys below, such as "-- note:", are explanations and are ignored):
@@ -65,16 +68,42 @@ public static class MariaSchemaMigrations
         Close();
         if (version is null || description is null || statements.Count == 0)
             throw new InvalidOperationException($"Migrarea {source} nu are versiune, descriere sau instrucțiuni.");
-        return new MariaMigration(version.Value, description, statements, columns);
+        var checksum = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n")))).ToLowerInvariant();
+        return new MariaMigration(version.Value, description, statements, columns, checksum);
     }
 }
 
-public sealed record MariaMigrationReport(bool MigratorConfigured, IReadOnlyList<string> Applied, IReadOnlyList<string> MissingColumns);
+/// <summary>Drifted: applied migrations whose file was edited since (see MariaSchemaLedger.Drift). SchemaVersion: the highest version in the ledger after the run (0 = no ledger yet).</summary>
+/// <summary>See MariaSchemaMigrator.StatusAsync. Pending: how many migrations a run would apply now; LedgerPresent: false for a database older than migration 43.</summary>
+public sealed record MariaSchemaStatus(int LedgerVersion, int CodeVersion, bool LedgerPresent, int Pending, IReadOnlyList<string> MissingColumns, IReadOnlyList<string> Drifted);
+
+public sealed record MariaMigrationReport(bool MigratorConfigured, IReadOnlyList<string> Applied, IReadOnlyList<string> MissingColumns,
+    IReadOnlyList<string>? DriftedMigrations = null, int SchemaVersion = 0)
+{
+    public IReadOnlyList<string> Drifted { get; } = DriftedMigrations ?? [];
+}
 
 public sealed class MariaSchemaMigrator(IConfiguration configuration, ILogger<MariaSchemaMigrator> logger)
 {
     public bool MigratorConfigured =>
         !string.IsNullOrWhiteSpace(configuration["Database:MigratorUser"]) && !string.IsNullOrWhiteSpace(configuration["Database:MigratorPassword"]);
+
+    /// <summary>
+    /// Database:MigrateAtStartup (default true). On a server the schema is changed only by the updater (--migrate-schema, with the migrator account kept out of the reach of the
+    /// web application): with false the application only checks the schema at startup and says what is missing.
+    /// </summary>
+    public bool MigrateAtStartup => !string.Equals(configuration["Database:MigrateAtStartup"], "false", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Where the schema stands, without changing anything (the updater asks before and after an update): the ledger version, the version of the code, what is pending and what is missing.</summary>
+    public async Task<MariaSchemaStatus> StatusAsync(CancellationToken cancellationToken = default)
+    {
+        var ledger = await MariaSchemaLedger.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+        var missing = await FindMissingColumnsAsync(cancellationToken).ConfigureAwait(false);
+        var plan = Plan(MariaSchemaMigrations.All, ledger, missing);
+        var drifted = ledger is null ? [] : MariaSchemaLedger.Drift(ledger, MariaSchemaMigrations.All);
+        return new MariaSchemaStatus(ledger?.Keys.DefaultIfEmpty(0).Max() ?? 0, MariaSchemaMigrations.All.Max(migration => migration.Version), ledger is not null,
+            plan.ToRun.Count, missing, drifted);
+    }
 
     /// <summary>Columns the code expects that the live schema does not have yet (checked with the application account).</summary>
     public async Task<IReadOnlyList<string>> FindMissingColumnsAsync(CancellationToken cancellationToken = default)
@@ -90,19 +119,41 @@ public sealed class MariaSchemaMigrator(IConfiguration configuration, ILogger<Ma
             .Select(column => $"{column.Table}.{column.Column}").Where(column => !existing.Contains(column)).ToArray();
     }
 
-    /// <summary>Applies every migration with the migrator account, then re-checks the schema with the application account.</summary>
-    public async Task<MariaMigrationReport> MigrateAsync(CancellationToken cancellationToken = default)
+    /// <summary>What a run does. ToRun: the migrations the migrator applies; ToRecord: the ones written to the ledger afterwards; Baseline: they were already part of the database.</summary>
+    internal sealed record MigrationPlan(IReadOnlyList<MariaMigration> ToRun, IReadOnlyList<MariaMigration> ToRecord, bool Baseline);
+
+    /// <summary>
+    /// Decides what a run applies. No ledger yet (a database older than migration 43) or an empty one (the first schema): every migration runs once (idempotent) and is recorded as
+    /// baseline. With a ledger only the migrations that are not in it run - unless a column is missing that no pending migration brings: then the whole list runs again, which
+    /// repairs a schema that lost something the ledger remembers (a restored older copy of the tables, a column dropped by hand). Nothing pending and nothing missing = nothing runs.
+    /// </summary>
+    internal static MigrationPlan Plan(IReadOnlyList<MariaMigration> all, IReadOnlyDictionary<int, SchemaLedgerRow>? ledger, IReadOnlyCollection<string> missingColumns)
+    {
+        var baseline = ledger is null || ledger.Count == 0;
+        var pending = baseline ? all : all.Where(migration => !ledger!.ContainsKey(migration.Version)).ToArray();
+        if (pending.Count == 0 && missingColumns.Count == 0) return new([], [], baseline);
+        var pendingColumns = pending.SelectMany(migration => migration.ExpectedColumns).Select(column => $"{column.Table}.{column.Column}")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var lost = missingColumns.Any(column => !pendingColumns.Contains(column));
+        return new(lost ? all : pending, pending, baseline);
+    }
+
+    /// <summary>Applies the migrations that are due with the migrator account, records them in the ledger, then re-checks the schema with the application account.</summary>
+    public async Task<MariaMigrationReport> MigrateAsync(bool force = false, CancellationToken cancellationToken = default)
     {
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
             throw new InvalidOperationException("Migrarea schemei este permisa numai pe baza BlazorStoc.");
-        if (!MigratorConfigured) return new(false, [], await FindMissingColumnsAsync(cancellationToken).ConfigureAwait(false));
+        if (!MigratorConfigured || (!force && !MigrateAtStartup))
+            return new(MigratorConfigured, [], await FindMissingColumnsAsync(cancellationToken).ConfigureAwait(false));
         var applied = new List<string>();
         var before = await FindMissingColumnsAsync(cancellationToken).ConfigureAwait(false);
-        if (before.Count > 0)
+        var ledger = await MariaSchemaLedger.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+        var plan = Plan(MariaSchemaMigrations.All, ledger, before);
+        if (plan.ToRun.Count > 0)
         {
             await using var connection = DatabaseConnections.CreateMigrator(configuration);
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-            foreach (var migration in MariaSchemaMigrations.All)
+            foreach (var migration in plan.ToRun)
             {
                 foreach (var statement in migration.Statements)
                 {
@@ -112,10 +163,17 @@ public sealed class MariaSchemaMigrator(IConfiguration configuration, ILogger<Ma
                 applied.Add($"{migration.Version}: {migration.Description}");
                 logger.LogInformation("MariaDB schema migration {Version} applied ({Description}).", migration.Version, migration.Description);
             }
+            // Recorded with the application account, after the migrator finished (the table is created by migration 43 itself).
+            await MariaSchemaLedger.RecordAsync(configuration, plan.ToRecord, plan.Baseline ? MariaSchemaLedger.BaselineOrigin : MariaSchemaLedger.AppliedOrigin, DateTime.UtcNow, cancellationToken)
+                .ConfigureAwait(false);
         }
+        var after = await MariaSchemaLedger.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<string> drifted = after is null ? [] : MariaSchemaLedger.Drift(after, MariaSchemaMigrations.All);
+        foreach (var item in drifted)
+            logger.LogWarning("MariaDB schema migration {Migration} was edited after it was applied (its checksum differs from the ledger).", item);
         await NormalizeBeneficiaryKeysAsync(cancellationToken).ConfigureAwait(false);
         await LinkTemplateSuppliersAsync(cancellationToken).ConfigureAwait(false);
-        return new(true, applied, await FindMissingColumnsAsync(cancellationToken).ConfigureAwait(false));
+        return new(true, applied, await FindMissingColumnsAsync(cancellationToken).ConfigureAwait(false), drifted, after?.Keys.DefaultIfEmpty(0).Max() ?? 0);
     }
 
     // Templates of a supplier already in the register are linked to it by id (migration 14 adds the column; the migrator account has no UPDATE

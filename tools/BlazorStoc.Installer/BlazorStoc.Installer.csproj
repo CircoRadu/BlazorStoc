@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The launcher of BlazorStoc-Actualizare-<version>.exe (docs/PROPUNERE_ACTUALIZARE.md, section 4). It is published self-contained as one file (no runtime needed to start it, so it can say
+       what is missing); tools/release.ps1 appends the package and the updater to the file ("BlazorStoc.Updater make-installer"). It shares the installer sources of the updater
+       (tools/BlazorStoc.Updater/Installer) and nothing else: the logic that decides whether a package may be installed is the updater's, which comes inside the payload. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Configurations>Release</Configurations>
+    <Configuration Condition="'$(Configuration)' == '' Or '$(Configuration)' == 'Debug'">Release</Configuration>
+    <RootNamespace>BlazorStoc.Installer</RootNamespace>
+    <AssemblyName>BlazorStoc.Installer</AssemblyName>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <DebugType>none</DebugType>
+    <ApplicationIcon />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../BlazorStoc.Updater/Installer/*.cs" LinkBase="Installer" />
+    <Compile Include="../BlazorStoc.Updater/Acl.cs" Link="Updater/Acl.cs" />
+    <Compile Include="../BlazorStoc.Updater/InstallLayout.cs" Link="Updater/InstallLayout.cs" />
+  </ItemGroup>
+
+</Project>

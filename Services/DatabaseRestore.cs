@@ -11,9 +11,10 @@ public enum RestoreStage { Locking, SnapshotCurrent, VerifyingPackage, Comparing
 
 public sealed record RestoreProgress(RestoreStage Stage, string Message);
 
-public sealed record RestoreResult(bool Success, string? ErrorMessage, string? PreRestorePackageFileName)
+// Note: something to tell the operator after a restoration that worked (what happened to the images and documents).
+public sealed record RestoreResult(bool Success, string? ErrorMessage, string? PreRestorePackageFileName, string? Note = null)
 {
-    public static RestoreResult Ok(string preRestorePackageFileName) => new(true, null, preRestorePackageFileName);
+    public static RestoreResult Ok(string preRestorePackageFileName, string? note = null) => new(true, null, preRestorePackageFileName, note);
     public static RestoreResult Failed(string message, string? preRestorePackageFileName = null) => new(false, message, preRestorePackageFileName);
 }
 
@@ -22,7 +23,7 @@ public static class RestoreRules
     public const string PackageNotFoundMessage = "Pachetul selectat nu a fost gasit (poate a fost sters intre timp). Actualizeaza lista si reincearca.";
     public const string HashMismatchMessage = "Pachetul de siguranta este corupt sau deteriorat (hash necorespunzator); restaurarea a fost oprita.";
     public const string StructureMismatchMessage = "Pachetul nu poate fi folosit: structura bazei de date difera de baza curenta.";
-    public const string IdenticalContentMessage = "Backupul selectat este identic cu baza de date curenta; restaurarea nu este necesara.";
+    public const string IdenticalContentMessage = "Backupul selectat este identic cu baza de date, imaginile si fisierele curente; restaurarea nu este necesara.";
     public const string ImportFailedMessage = "Importul pachetului a esuat; baza de date curenta nu a fost modificata.";
     public const string GenericFailedMessage = "Restaurarea a esuat. Baza de date curenta nu a fost modificata.";
     public const string SuccessMessage = "Restaurarea a fost finalizata cu succes.";
@@ -37,7 +38,7 @@ public static class RestoreRules
         RestoreStage.VerifyingPackage => "Se verifica integritatea pachetului selectat...",
         RestoreStage.ComparingStructure => "Se compara structura bazei de date...",
         RestoreStage.ComparingContent => "Se compara continutul bazei de date...",
-        RestoreStage.Importing => "Se importa si se comuta baza de date...",
+        RestoreStage.Importing => "Se importa si se comuta baza de date, imaginile si fisierele...",
         RestoreStage.Done => "Restaurare finalizata.",
         RestoreStage.Failed => "Restaurarea a esuat.",
         _ => ""
@@ -114,6 +115,18 @@ public sealed class MariaDatabaseRestoreService(IConfiguration configuration, IA
             if (!string.Equals(expectedArchiveHash, actualArchiveHash, StringComparison.OrdinalIgnoreCase))
                 return RestoreResult.Failed(RestoreRules.HashMismatchMessage, preRestoreFileName);
 
+            // Pas 1b - imaginile si fisierele din pachet (daca le are): lista, semnatura din manifest si fiecare fisier cu suma lui de control.
+            IReadOnlyList<BackupAssetEntry>? packageFiles = null;
+            if (manifest.AssetsSha256 is not null)
+            {
+                using var archive = ZipFile.OpenRead(packagePath);
+                packageFiles = await BackupAssets.ReadListAsync(archive, cancellationToken).ConfigureAwait(false);
+                if (packageFiles is null || packageFiles.Count != (manifest.FileCount ?? 0) || !string.Equals(BackupAssets.Signature(packageFiles), manifest.AssetsSha256, StringComparison.Ordinal)
+                    || !await BackupAssets.VerifyAsync(archive, packageFiles, cancellationToken).ConfigureAwait(false))
+                    return RestoreResult.Failed(BackupAssetRules.FilesCorruptMessage, preRestoreFileName);
+            }
+            var assetStores = BackupAssets.Stores(configuration);
+
             // Pas 2 - structura live, comparata cu setul de tabele descris in manifest (numele coloanelor/tipurilor
             // exacte ale pachetului nu sunt derivabile fara sa parseze textul SQL brut al dumpului - vezi comentariul
             // clasei; manifestul contine deja lista tabelelor/numarul de randuri asteptate la momentul backupului).
@@ -129,7 +142,9 @@ public sealed class MariaDatabaseRestoreService(IConfiguration configuration, IA
             {
                 live = await CanonicalRowHasher.ComputeAsync(connection, tables, cancellationToken).ConfigureAwait(false);
             }
-            if (string.Equals(live.OverallHash, manifest.CanonicalHash, StringComparison.Ordinal))
+            // Identical only when the files agree too: a package whose database equals the live one but whose images differ is still a restoration.
+            if (string.Equals(live.OverallHash, manifest.CanonicalHash, StringComparison.Ordinal)
+                && (packageFiles is null || string.Equals(await BackupAssets.LiveSignatureAsync(assetStores, cancellationToken).ConfigureAwait(false), manifest.AssetsSha256, StringComparison.Ordinal)))
                 return RestoreResult.Failed(RestoreRules.IdenticalContentMessage, preRestoreFileName);
 
             // Pas 4 - import intr-o schema temporara si comutare atomica prin RENAME TABLE. Necesita contul dedicat
@@ -140,14 +155,43 @@ public sealed class MariaDatabaseRestoreService(IConfiguration configuration, IA
             if (!MariaRestoreAccount.IsConfigured(configuration))
                 return RestoreResult.Failed(RestoreRules.MigratorNotConfiguredMessage, preRestoreFileName);
 
-            var swapped = await MariaSchemaSwap.ImportAndSwapAsync(configuration, packagePath, tables, cancellationToken).ConfigureAwait(false);
-            if (!swapped) return RestoreResult.Failed(RestoreRules.ImportFailedMessage, preRestoreFileName);
+            // The images and documents: taken out beside their folders first (nothing running is touched), the folders switched, then the database; if the database cannot be switched the folders come back.
+            StagedAssets? staged = null;
+            AssetSwap? filesSwap = null;
+            var databaseSwitched = false;
+            bool swapped;
+            try
+            {
+                if (packageFiles is not null)
+                {
+                    if (!BackupAssets.HasRoomFor(assetStores, manifest.FilesBytes ?? 0)) return RestoreResult.Failed(BackupAssetRules.FilesRoomMessage, preRestoreFileName);
+                    try
+                    {
+                        using var archive = ZipFile.OpenRead(packagePath);
+                        staged = await BackupAssets.StageAsync(archive, packageFiles, assetStores, cancellationToken).ConfigureAwait(false);
+                        filesSwap = AssetSwap.Apply(staged);
+                    }
+                    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+                    {
+                        logger.LogError("The images and documents of the package could not be put in place ({ErrorType}).", exception.GetType().Name);
+                        return RestoreResult.Failed(BackupAssetRules.FilesFailedMessage, preRestoreFileName);
+                    }
+                }
+                swapped = await MariaSchemaSwap.ImportAndSwapAsync(configuration, packagePath, tables, cancellationToken, () => databaseSwitched = true).ConfigureAwait(false);
+                if (!swapped) return RestoreResult.Failed(RestoreRules.ImportFailedMessage, preRestoreFileName);
+            }
+            finally
+            {
+                // Whatever ended the restoration before the database was switched leaves the folders as they were; once it is switched the new folders stay (they belong to it).
+                if (databaseSwitched) filesSwap?.Commit();
+                else { filesSwap?.Rollback(); staged?.Discard(); }
+            }
 
             await AuditRecorder.RecordRestoreAsync(auditTrail, access, AuditEntities.DatabaseBackup, packageFileName,
                 $"Pachet folosit: {packageFileName}; pachet pre-restaurare: {preRestoreFileName}", cancellationToken).ConfigureAwait(false);
 
             progress?.Report(new(RestoreStage.Done, RestoreRules.StageMessage(RestoreStage.Done)));
-            return RestoreResult.Ok(preRestoreFileName!);
+            return RestoreResult.Ok(preRestoreFileName!, packageFiles is null ? BackupAssetRules.NoFilesNote : BackupAssetRules.RestoredNote(packageFiles.Count));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -237,7 +281,7 @@ internal static class MariaSchemaSwap
     private sealed record CapturedTrigger(string Name, string SqlMode, string Statement);
 
     public static async Task<bool> ImportAndSwapAsync(IConfiguration configuration, string packagePath,
-        IReadOnlyList<string> tables, CancellationToken token)
+        IReadOnlyList<string> tables, CancellationToken token, Action? onDatabaseSwitched = null)
     {
         var liveSchema = configuration["Database:Name"] ?? "BlazorStoc";
         var stagingSchema = $"{liveSchema}_bak";
@@ -298,6 +342,7 @@ internal static class MariaSchemaSwap
                     .Concat(stagingTables.Select(table => $"`{stagingSchema}`.`{table}` TO `{liveSchema}`.`{table}`"));
                 await ExecuteAsync(connection, $"RENAME TABLE {string.Join(", ", renamePairs)}", token, 60).ConfigureAwait(false);
                 swapped = true;
+                onDatabaseSwitched?.Invoke();
                 // "_bak" is empty now (all its tables were moved to the live schema): no reason to keep it.
                 await ExecuteAsync(connection, $"DROP SCHEMA IF EXISTS `{stagingSchema}`", token).ConfigureAwait(false);
                 if (triggerCount > 0 &&

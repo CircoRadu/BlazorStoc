@@ -260,6 +260,16 @@ public static class AuditActions
     public const string ModuleManualStart = "Pornire manuală modul";
     // Found at the next start: the previous run of the application did not end normally (killed, crashed, the machine went down).
     public const string ApplicationUnexpectedStop = "Oprire neașteptată aplicație";
+    // Updating the application (Setari -> Actualizare, docs/PROPUNERE_ACTUALIZARE.md): the administrator's confirmation and his giving up, then what the updater did (written by the system from
+    // the history of the updater at the next start, also for an update made by the installer on the server) and the administrator taking note of a failed one.
+    public const string ApplicationUpdate = "Actualizare aplicație";
+    public const string ApplicationUpdateCancelled = "Anulare actualizare aplicație";
+    public const string ApplicationUpdateSucceeded = "Actualizare reușită";
+    public const string ApplicationUpdateInstaller = "Actualizare aplicație (installer)";
+    public const string ApplicationUpdateFailed = "Actualizare eșuată";
+    public const string ApplicationUpdateRefused = "Actualizare refuzată";
+    public const string ApplicationRollback = "Revenire la versiunea anterioară";
+    public const string ApplicationUpdateAcknowledged = "Confirmare eșec actualizare";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
@@ -389,6 +399,9 @@ public static class ProductNavigation
 public static class UserNavigation
 {
     public static string UserUrl(int userId) => $"/utilizatori/{userId}";
+    // The list of accounts is the "Utilizatori" tab of Settings (the old /utilizatori address redirects there).
+    public const string ListUrl = "/setari?tab=utilizatori&subtab=conturi";
+    public static string EditUrl(int userId) => $"{ListUrl}&edit={userId}";
 }
 
 public static class SettingsNavigation
@@ -422,10 +435,12 @@ public static class SettingsNavigation
         $"/setari?{TabParameter}={InvoicesTab}&{SubtabParameter}={InvoiceTemplatesSubtab}&{InvoiceTemplateParameter}={templateId}";
 
     public const string ModulesTab = "module";
+    public const string UpdateTab = "actualizare";
     public const string RefreshParameter = "reaplica";
 
     // The banner's link: the changing value makes Settings apply it even when the address is the one it already applied.
     public static string ModulesUrl() => $"/setari?{TabParameter}={ModulesTab}&{RefreshParameter}={DateTime.UtcNow.Ticks}";
+    public static string UpdateUrl() => $"/setari?{TabParameter}={UpdateTab}&{RefreshParameter}={DateTime.UtcNow.Ticks}";
 
     public static string NotificationSettingsUrl =>$"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
 }

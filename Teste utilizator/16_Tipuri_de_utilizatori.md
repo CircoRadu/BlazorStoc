@@ -4,6 +4,11 @@ Fluxul: administratorul defineste tipuri de utilizatori (nume + permisiuni pe mo
 
 ## Modificari de testat
 
+### 20.10.2026 - Tipurile de utilizatori sunt subtab al filei „Utilizatori”
+
+**Ce s-a adaugat:** fila „Tipuri de utilizatori” din Setari devine fila „Utilizatori” cu doua subtab-uri: „Utilizatori” (conturile) si „Tipuri de utilizatori” (drepturile).
+**Ce face acum:** pasi: Setari -> Utilizatori -> subtab „Tipuri de utilizatori” arata lista de tipuri ca inainte (adauga, editeaza, sterge); adresa veche /setari?tab=tipuri-utilizatori deschide acelasi subtab. Rezultat: ______
+
 ### 10.10.2026 - Tipuri de utilizatori cu permisiuni
 
 **Ce s-a adaugat:** Setari -> fila „Tipuri de utilizatori" (lista si editorul cu matrice module x actiuni), selectorul „Tip utilizator" in formularul utilizatorului, pagina „Acces refuzat", politici de acces pe fiecare pagina/endpoint, evenimente noi in jurnal (Adaugare tip utilizator, Redenumire tip utilizator, Modificare descriere tip utilizator, Acordare permisiune, Revocare permisiune, Stergere tip utilizator, Schimbare tip utilizator, Acces refuzat).

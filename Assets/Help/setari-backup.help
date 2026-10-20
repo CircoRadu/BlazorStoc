@@ -1,10 +1,10 @@
 # Setări · Backup și restaurare
 Ruta: /setari
 Tab: Backup și restaurare
-Cautare: backup restaurare pachete programat automat zile ora notificare lipsa stergere pachete vechi retentie fa backup acum restaureaza baza de date nas
+Cautare: backup restaurare pachete programat automat zile ora notificare lipsa stergere pachete vechi retentie fa backup acum restaureaza baza de date nas imagini fisiere poze documente
 Captura: pagina | /setari | click Backup; full | Backup și restaurare
 
-Aici faci și programezi copii de siguranță ale bazei de date, vezi pachetele existente, ștergi automat pachetele vechi de pe server și restaurezi baza de date. Backup-urile se fac pe server; dacă „Copiere pe NAS” este activă ([[setari-backup-nas]]), fiecare pachet nou este copiat și pe NAS.
+Aici faci și programezi copii de siguranță, vezi pachetele existente, ștergi automat pachetele vechi de pe server și restaurezi. Un pachet conține baza de date și toate imaginile și fișierele aplicației (pozele produselor, fișierele proiectelor, pozele intervențiilor și arhiva fișierelor șterse); nu conține cheile care protejează parolele salvate. Backup-urile se fac pe server; dacă „Copiere pe NAS” este activă ([[setari-backup-nas]]), fiecare pachet nou este copiat și pe NAS.
 
 ## Elemente
 ### Generare backup
@@ -18,13 +18,13 @@ Aici faci și programezi copii de siguranță ale bazei de date, vezi pachetele 
 - Se șterg pachetele mai vechi de (zile) | câmp | Pragul de păstrare, pentru toate tipurile de pachete; ultimele pachete se păstrează oricum. Pachetele de pe NAS nu se șterg niciodată din aplicație.
 - Salvează | buton | Salvează setările; dacă prin noul prag se vor șterge pachete, apare confirmarea „Ștergi N pachete vechi de pe server?”.
 ### Pachetele disponibile
-- Rezumatul | cifre | Total pachete, spațiul ocupat pe server, pachetele de inventar, programate/la cerere, pre-restaurare și cele de pe NAS.
-- Fă backup acum | buton | Creează imediat un backup pe server (și pe NAS, dacă e activ).
+- Rezumatul | cifre | Total pachete, spațiul ocupat pe server, pachetele de inventar, programate/la cerere, pre-restaurare și pre-actualizare (făcute înainte de o restaurare, respectiv de o actualizare a aplicației) și cele de pe NAS.
+- Fă backup acum | buton | Creează imediat un backup pe server (și pe NAS, dacă e activ). Pachetul crește odată cu imaginile și fișierele; backup-ul durează mai mult pe un server cu multe imagini.
 - Reîmprospătează NAS | buton | Apare când NAS-ul e activ: reia citirea partajării.
-- Restaurează baza de date | buton | Restaurează un pachet ales (cere confirmare).
+- Restaurează baza de date | buton | Restaurează un pachet ales: baza de date, imaginile și fișierele (cere confirmare). Un pachet făcut înainte ca backup-urile să includă imaginile restaurează numai baza de date și lasă imaginile de acum neschimbate; mesajul de după restaurare spune ce s-a întâmplat cu fișierele.
 - Tabelul | tabel | Tip, denumire, data, operator, dimensiune și locație (server/NAS); „ora neverificată” sau „ora de pe internet” explică data pachetului. Marcajul rotund selectează un pachet.
 - Copiază pe NAS | iconita:nas | Copiază pachetul de pe server pe NAS.
-- Șterge pachetul | iconita:delete | Doar pachetele de inventar se pot șterge manual de pe server; cele programate, la cerere și pre-restaurare nu se șterg din aplicație.
+- Șterge pachetul | iconita:delete | Doar pachetele de inventar se pot șterge manual de pe server; cele programate, la cerere, pre-restaurare și pre-actualizare nu se șterg din aplicație.
 
 ## Flux: Cum programez backup-ul zilnic
 1. Pornește „Backup programat automat” și alege ora.
@@ -37,5 +37,6 @@ Aici faci și programezi copii de siguranță ale bazei de date, vezi pachetele 
 
 ## Flux: Cum restaurez baza de date
 1. Alege pachetul din tabel și apasă „Restaurează baza de date”.
-2. Citește avertismentul și confirmă: înainte de restaurare se face un backup „pre-restaurare”, iar aplicația este temporar indisponibilă (pagina de așteptare).
+2. Citește avertismentul și confirmă: înainte de restaurare se face un backup „pre-restaurare” (baza de date și fișierele de acum), iar aplicația este temporar indisponibilă (pagina de așteptare). Imaginile și fișierele din pachet le înlocuiesc pe cele de acum: ce lipsește din pachet dispare, ce lipsește de pe server revine.
+3. Dacă ceva nu merge, restaurează pachetul „pre-restaurare” și ajungi la starea de dinainte.
 Nota: restaurarea înlocuiește datele curente; folosește-o numai când este necesar.

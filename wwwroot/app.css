@@ -137,6 +137,10 @@
 .module-stop-confirm { margin:0 0 18px; padding:18px 24px; border:1px solid #e3b8b3; border-radius:12px; background:#fff7f6; }
 .module-stop-confirm legend { padding:0 8px; font-weight:700; color:#b3261e; }
 .module-stop-confirm p { margin:0 0 14px; }
+/* Setari -> Actualizare: the notice above every page and the band of a failed update; the button beside the text keeps its distance. */
+.update-notice .refresh, #update-failure .refresh { margin-left:12px; }
+#update-failure { padding:14px 18px; }
+.update-notes { white-space:pre-line; }
 .main-menu-off h2 { color:var(--muted); }
 .main-menu-off .main-menu-icon { background:#e6eae8; color:#8a9791; }
 .main-menu-off .module-off-note { margin-top:8px; color:#8a5a00; font-weight:600; }

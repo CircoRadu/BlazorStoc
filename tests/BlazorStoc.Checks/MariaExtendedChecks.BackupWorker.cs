@@ -64,7 +64,14 @@ public static partial class MariaExtendedChecks
         Check(!refused.Success && refused.ErrorMessage == OperationLockRules.HeldMessage && modules.StatusOf("backup") == ModuleStatus.Healthy,
             "Worker: a backup asked while another operation holds the lock is refused with the message of the lock, and the module stays Healthy");
 
-        // A real backup in the worker.
+        // A real backup in the worker. Two files of the images and documents are put in place first: the package must carry them.
+        var assetStoresNow = BackupAssets.Stores(configuration);
+        var markerOne = Path.Combine(assetStoresNow[0].Root, "checks-worker-" + Guid.NewGuid().ToString("N") + ".bin");
+        var markerTwoFolder = Path.Combine(assetStoresNow[3].Root, "checks-worker-" + Guid.NewGuid().ToString("N"), "deep");
+        Directory.CreateDirectory(assetStoresNow[0].Root);
+        Directory.CreateDirectory(markerTwoFolder);
+        await File.WriteAllBytesAsync(markerOne, [1, 2, 3, 250, 251]);
+        await File.WriteAllTextAsync(Path.Combine(markerTwoFolder, "ținută.txt"), "document");
         var since = DateTime.UtcNow;
         var stages = new List<BackupStage>();
         string? activeDuringRun = null;
@@ -91,6 +98,22 @@ public static partial class MariaExtendedChecks
             "Worker: the manifest names the user the application passed on, the kind and the tables");
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(made.PackagePath!))).ToLowerInvariant();
         Check(hash == (await File.ReadAllTextAsync(made.PackagePath + ".sha256")).Trim(), "Worker: the checksum file is the SHA-256 of the package");
+        IReadOnlyList<BackupAssetEntry>? packed;
+        bool filesVerified;
+        using (var archive = ZipFile.OpenRead(made.PackagePath!))
+        {
+            packed = await BackupAssets.ReadListAsync(archive, CancellationToken.None);
+            filesVerified = packed is not null && await BackupAssets.VerifyAsync(archive, packed, CancellationToken.None);
+        }
+        var folderFiles = BackupAssets.Scan(assetStoresNow);
+        Check(manifest is { FileCount: > 1 } && manifest.FileCount == folderFiles.Count && manifest.FilesBytes == folderFiles.Sum(file => file.Length) && packed is not null && packed.Count == folderFiles.Count
+            && manifest.AssetsSha256 == BackupAssets.Signature(packed) && filesVerified && packed.Any(entry => entry.Store == "product-images" && entry.Path == Path.GetFileName(markerOne) && entry.Size == 5)
+            && packed.Any(entry => entry.Store == "archive-files" && entry.Path.EndsWith("/deep/ținută.txt", StringComparison.Ordinal)),
+            $"Worker: the package carries the images and documents of the folders (a nested file with a non-ASCII name too), listed with sizes and checksums, and the manifest holds only their count and signature ({manifest?.FileCount} / {folderFiles.Count})");
+        Check(made.PackageFileName is not null && (await backups.ListPackagesAsync()).FirstOrDefault(package => package.FileName == made.PackageFileName)?.FileCount == manifest?.FileCount,
+            "Worker: the list of packages shows how many files each one carries");
+        File.Delete(markerOne);
+        Directory.Delete(Path.GetDirectoryName(markerTwoFolder)!, recursive: true);
         Check(made.PackageFileName!.Contains("backup worker tester", StringComparison.Ordinal), "Worker: the package name carries the user");
         var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= since.AddSeconds(-2)).ToList();
         Check(events.Any(item => item.EntityType == AuditEntities.DatabaseBackup && item.Action == AuditActions.Normalize(AuditActions.Generate) && item.Target == made.PackageFileName && item.ActorUsername == "backup.worker.tester"),

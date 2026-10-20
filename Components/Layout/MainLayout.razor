@@ -73,7 +73,7 @@
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             }
-            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|utilizatori.view|nomenclator.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
+            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|nomenclator.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
                                 ToggleClass="@($"nav-item administration-parent {(administrationSection ? "active" : "")}")"
@@ -89,7 +89,7 @@
                         <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink></Authorized></AuthorizeView>
                     }
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId)) { <AuthorizeView Policy="perm:vehicule.view"><Authorized><NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink></Authorized></AuthorizeView> }
-                    <AuthorizeView Policy="perm:utilizatori.view"><Authorized><NavLink href="/utilizatori" Match="NavLinkMatch.Prefix">Utilizatori</NavLink></Authorized></AuthorizeView><AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
+                    <AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             @foreach (var module in Modules.NavItems())
@@ -101,9 +101,9 @@
             <AuthorizeView Policy="perm:notificari.view"><Authorized><NavLink class="@($"nav-item{(alertCount > 0 ? " nav-alert" : "")}")" href="/notificari" Match="NavLinkMatch.Prefix" data-notification-nav><span>✉</span> Notificări <span class="nav-triangle" data-notification-triangle role="img" aria-label="Notificări noi" hidden="@(alertCount <= 0)">⚠</span><span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
             }
             @if (Modules.IsAvailable(BlazorStoc.Modules.Journal.JournalModule.ModuleId)) { <AuthorizeView Policy="perm:jurnal.view"><Authorized><NavLink class="nav-item" href="/jurnal" Match="NavLinkMatch.Prefix"><span>≡</span> Jurnal activitate <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView> }
-            <AuthorizeView Policy="perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
+            <AuthorizeView Policy="perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-actualizare.view|utilizatori.view|tipuri-utilizatori.view"><Authorized><NavLink class="nav-item" href="/setari" Match="NavLinkMatch.Prefix"><span>☰</span> Setări <span class="nav-arrow">→</span></NavLink></Authorized></AuthorizeView>
         }
-        <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea 0.3 <p>Gestiune produse</p><small>BlazorStoc · MariaDB</small></div>
+        <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea @BlazorStoc.Services.AppVersion.Current <p>Gestiune produse</p><small>BlazorStoc · MariaDB</small></div>
     </aside>
     <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">Sesiune autentificată</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="help-icon" data-help-open aria-haspopup="dialog" aria-label="Ajutor pentru această fereastră" title="Ajutor pentru această fereastră"></button><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
         @if (activeOperation is not null && !onRestorePage && !onWaitingPage)
@@ -112,7 +112,7 @@
                 Backup/restaurare in curs (@activeOperation.OperatorName) - datele pot fi temporar indisponibile. Reveniti mai tarziu.
             </div>
         }
-        <main class="workspace"><ModuleAlertBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><SessionTracker @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />@Body</main></div>
+        <main class="workspace"><UpdateBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><ModuleAlertBanner @rendermode="@(new InteractiveServerRenderMode(prerender: false))" /><SessionTracker @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />@Body</main></div>
 </div>
 <dialog id="logout-dialog" class="delete-dialog logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description">
     <form method="post" action="/Account/Logout">
@@ -200,7 +200,6 @@
             uri.AbsolutePath.StartsWith("/furnizori", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/facturi", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/vehicule", StringComparison.OrdinalIgnoreCase) ||
-            uri.AbsolutePath.StartsWith("/utilizatori", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/nomenclator", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/proiecte", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/observatii", StringComparison.OrdinalIgnoreCase);

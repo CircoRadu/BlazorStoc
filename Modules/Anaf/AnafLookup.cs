@@ -1,3 +1,4 @@
+using BlazorStoc.Startup;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
@@ -291,14 +292,14 @@ public interface IAnafService
     bool WasTestedSuccessfully(AnafConfig config);
 }
 
-/// <summary>Single-file JSON store (data/anaf-configuration.json) plus the process-wide test/rate-limit state.</summary>
+/// <summary>Single-file JSON store (anaf-configuration.json in the data folder of the application, see AppDataRoot.DataFile) plus the process-wide test/rate-limit state.</summary>
 public sealed class AnafStore(IConfiguration configuration)
 {
     public SemaphoreSlim FileGate { get; } = new(1, 1);
     public SemaphoreSlim RateGate { get; } = new(1, 1);
     public long LastCall;
     public HashSet<string> Tested { get; } = [];
-    private readonly string path = Path.GetFullPath(configuration["Anaf:ConfigurationPath"] ?? Path.Combine("data", "anaf-configuration.json"));
+    private readonly string path = Path.GetFullPath(configuration["Anaf:ConfigurationPath"] ?? AppDataRoot.DataFile(configuration, "anaf-configuration.json"));
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     public async Task<AnafState> ReadAsync(CancellationToken cancellationToken)

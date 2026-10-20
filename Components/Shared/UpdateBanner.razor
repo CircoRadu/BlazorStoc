@@ -1,0 +1,72 @@
+@using BlazorStoc.Services.Update
+@implements IDisposable
+@inject UpdateCoordinator Coordinator
+@inject UpdateJournal Journal
+@inject IAccessControl Access
+@inject NavigationManager Navigation
+@* Above every page, for everybody: an update of the application is about to start (or runs), so what is being worked on must be saved. For the administrator also: the last update
+   failed and nobody has taken note of it yet. *@
+@if (Coordinator.Current is { } update)
+{
+    <div class="error-banner update-notice" role="alert" id="update-notice">
+        @if (!update.Launched)
+        {
+            <strong>Aplicația se actualizează la versiunea @update.To.</strong> <span>Se oprește pentru câteva minute în @Remaining(update) s: salvează ce lucrezi acum. Pagina se reîncarcă singură când aplicația revine.</span>
+        }
+        else
+        {
+            <strong>Aplicația se actualizează acum la versiunea @update.To.</strong> <span>Va fi oprită pentru câteva minute; pagina se reîncarcă singură când aplicația revine.</span>
+        }
+    </div>
+}
+else if (failure is not null)
+{
+    <div class="error-banner update-notice" role="alert" id="update-failure-notice">
+        <strong>Ultima actualizare a aplicației nu a reușit</strong> (@(failure.From ?? "-") → @failure.To): @failure.Message
+        <a class="refresh act-nav" href="@SettingsNavigation.UpdateUrl()" @onclick="OpenDetails" @onclick:preventDefault>Detalii</a>
+    </div>
+}
+
+@code {
+    private UpdateHistoryDocument? failure;
+    private bool allowed, disposed;
+    private Timer? timer;
+
+    private void OpenDetails() => Navigation.NavigateTo(SettingsNavigation.UpdateUrl());
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { allowed = await Access.HasAsync(ApplicationUpdateService.ViewPermission); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { allowed = false; }
+        failure = allowed ? Journal.UnacknowledgedFailure() : null;
+        Coordinator.Changed += OnChanged;
+        timer = new Timer(_ => Tick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    // Every second, only while a notice is shown (its countdown); the journal is not read again for that.
+    private void Tick()
+    {
+        if (disposed || Coordinator.Current is null) return;
+        _ = InvokeAsync(() => { if (!disposed) StateHasChanged(); });
+    }
+
+    private int Remaining(UpdateAnnouncement update) => Math.Max(0, (int)Math.Ceiling((update.StartsUtc - DateTime.UtcNow).TotalSeconds));
+
+    private void OnChanged()
+    {
+        if (disposed) return;
+        _ = InvokeAsync(() =>
+        {
+            if (disposed) return;
+            failure = allowed ? Journal.UnacknowledgedFailure() : null;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        Coordinator.Changed -= OnChanged;
+        timer?.Dispose();
+    }
+}

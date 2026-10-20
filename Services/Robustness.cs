@@ -71,11 +71,12 @@ internal sealed class RollingFileLoggerProvider : ILoggerProvider
 
 internal static class Robustness
 {
-    /// <summary>Adds the rolling file log (Logging:File:Directory, default "logs"; Logging:File:RetentionDays, default 14) and the process-wide handlers.</summary>
+    /// <summary>Adds the rolling file log (Logging:File:Directory, default the "logs" folder of the data root - AppDataRoot.DefaultLogFolder; Logging:File:RetentionDays, default 14) and the process-wide handlers.</summary>
     public static void AddFileLogging(this WebApplicationBuilder builder)
     {
         var configured = builder.Configuration["Logging:File:Directory"];
-        var directory = Path.IsPathRooted(configured ?? "") ? configured! : Path.Combine(builder.Environment.ContentRootPath, string.IsNullOrWhiteSpace(configured) ? "logs" : configured);
+        var directory = string.IsNullOrWhiteSpace(configured) ? Startup.AppDataRoot.DefaultLogFolder(builder.Configuration)
+            : Path.IsPathRooted(configured) ? configured : Path.Combine(builder.Environment.ContentRootPath, configured);
         var retention = int.TryParse(builder.Configuration["Logging:File:RetentionDays"], out var days) ? days : 14;
         var provider = new RollingFileLoggerProvider(directory, retention);
         builder.Logging.AddProvider(provider);

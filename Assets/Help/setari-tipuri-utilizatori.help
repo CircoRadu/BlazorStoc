@@ -2,9 +2,9 @@
 Ruta: /setari
 Tab: Tipuri de utilizatori
 Cautare: tipuri de utilizatori permisiuni drepturi administrator utilizator adauga editeaza sterge module actiuni acces
-Captura: pagina | /setari | click Tipuri de utilizatori; full | Tipurile de utilizatori
+Captura: pagina | /setari | click Utilizatori; click Tipuri de utilizatori; full | Tipurile de utilizatori
 
-Definești tipurile de utilizatori și drepturile lor: la ce module au acces și ce acțiuni pot face în fiecare. Fiecare utilizator are exact un tip. Tipul Administrator are întotdeauna toate drepturile și nu se modifică.
+Subsecțiunea „Tipuri de utilizatori” a filei Utilizatori. Definești tipurile de utilizatori și drepturile lor: la ce module au acces și ce acțiuni pot face în fiecare. Fiecare utilizator are exact un tip. Tipul Administrator are întotdeauna toate drepturile și nu se modifică.
 
 ## Elemente
 ### Antet

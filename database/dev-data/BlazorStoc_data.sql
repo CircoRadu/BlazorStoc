@@ -132,7 +132,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `backup_nas_settings` WRITE;
 /*!40000 ALTER TABLE `backup_nas_settings` DISABLE KEYS */;
-REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-10-20T07:00:25.655Z',1,'Copiate 4, deja pe NAS 14.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
+REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-10-20T11:46:17.833Z',1,'Pachetul nou a fost copiat pe NAS: Copie siguranta baza de date inainte restaurare baza de date folosind backup preluare inventar 17.10.2026 17-28-19 Administrator administrator demo.zip.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
 /*!40000 ALTER TABLE `backup_nas_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -749,6 +749,54 @@ UNLOCK TABLES;
 LOCK TABLES `risk_analysis_renewals` WRITE;
 /*!40000 ALTER TABLE `risk_analysis_renewals` DISABLE KEYS */;
 /*!40000 ALTER TABLE `risk_analysis_renewals` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `schema_migrations` WRITE;
+/*!40000 ALTER TABLE `schema_migrations` DISABLE KEYS */;
+REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`, `applied_utc`, `applied_by_version`) VALUES (1,'Beneficiari: persoana fizica / juridica, adresa, telefon, date ANAF','688dfb1a896ce1358e5d1564a29a144584dc3c1f7aee39d5fefbafe4eacc826b','baseline','2026-10-20 11:48:35','0.5.0'),
+(2,'Beneficiari: puncte de lucru suplimentare','e3b4bc9518cf31dae766b4bf5a3dc0451418443ab82ef4c7166fa6f5595662b6','baseline','2026-10-20 11:48:35','0.5.0'),
+(3,'Vehicule: date de expirare ITP, asigurare si rovinieta (vehiculele existente primesc date din anul urmator)','27f2bbcf58340ed3f5a56d2fb652d470686e4dbd6a3c39c95b87eb0bc3c8ba78','baseline','2026-10-20 11:48:35','0.5.0'),
+(4,'Notificari de expirare: sabloane si notificari (starea preluat/amanat este globala)','35965543c83641480dce8f4a621dbcb456d6b45d1e481858173626aadd3b5751','baseline','2026-10-20 11:48:35','0.5.0'),
+(5,'Notificari: stare rezolvata cu motiv si instantaneu, o singura notificare pe eveniment, un singur sablon activ pe eveniment','8809871da8e3d7cc7eb5d0ffa3fab214cb2fd9c86ebd4b9e009f3cff28334905','baseline','2026-10-20 11:48:35','0.5.0'),
+(6,'Setari notificari: curatarea periodica a notificarilor rezolvate (comutator, perioada in luni, ultima rulare)','d8d847a42003491fa621040401f9134dac160f5e563b1e50fa56d3efaa58ead3','baseline','2026-10-20 11:48:35','0.5.0'),
+(7,'Puncte de lucru extinse: punct principal real, descriere, coordonate optionale, fotografii (service_photos) si arhivarea lor','aec5460d8f2f453cf62ab0feac387637ffe73871ee06cf1f2b4c51e7404a775d','baseline','2026-10-20 11:48:35','0.5.0'),
+(8,'Contracte de mentenanta: contracte (numar, data, ciclicitate, expirare, On/Off), acoperirea punctelor de lucru cu scadenta si arhivarea contractelor','11a7dd31b677f3118e15498879804f8021d728a5aecc5ca6805dfdd41bef1273','baseline','2026-10-20 11:48:35','0.5.0'),
+(9,'Registru de interventii: interventii de mentenanta si la cerere (snapshot, scadenta inchisa si aleasa), legatura fotografiilor si arhivarea lor','d6bf1505bd56a0ed51022f8ba63632830d6965d82882946e8f923b9fcba5fe7a','baseline','2026-10-20 11:48:35','0.5.0'),
+(10,'Sabloane de facturi: sabloane (furnizor, definitie JSON) si versiunile lor salvate','006bc4c1d680f0f1a12ca370b8817736cca9485f54db5ecce394008cb4a7a737','baseline','2026-10-20 11:48:35','0.5.0'),
+(11,'Sabloane de facturi: factura PDF folosita ca model','1cd9407a27d644e927d9aca8cb98a21c3704f1db91fdfdfc7187c43b91b8f5e0','baseline','2026-10-20 11:48:35','0.5.0'),
+(12,'Sabloane de facturi: coloana active (sablon folosit la citirea facturilor)','e40a494ed477172f409d04ce6b427ed91add99e192dc511b1b7a59ee13adfd3e','baseline','2026-10-20 11:48:35','0.5.0'),
+(13,'Furnizori si facturi de furnizor: registrul de furnizori, facturile si legatura intrarilor de stoc cu factura','e1e70e99415a7271314cc5638e71c04a72024f3c0a291dd6dbb67c1a73300989','baseline','2026-10-20 11:48:35','0.5.0'),
+(14,'Sabloane de facturi: legatura cu furnizorul prin supplier_id','93bab53e2823de137211fa222bf6e28895a5c201917057538c9829c64926868b','baseline','2026-10-20 11:48:35','0.5.0'),
+(15,'Furnizori: denumiri alternative (alias-uri) pentru recunoasterea numelui de pe factura','07783f01f86534ee334b1a3b6c4ff7df2318eab2f48417fa1acc30b103296eb1','baseline','2026-10-20 11:48:35','0.5.0'),
+(16,'Furnizori: jurnal de recunoastere a furnizorului per factura preluata','0bde0d4ea3ee7ccd826175ea74381b929002d10b5f305537c0da37598e9a7850','baseline','2026-10-20 11:48:35','0.5.0'),
+(17,'Furnizori: jurnalul de recunoastere retine si schimbarea sablonului propus','657574c3b7d78789d00b3dec98663b8c86535485f4fd7ad890d09dcfa47f7a33','baseline','2026-10-20 11:48:35','0.5.0'),
+(18,'Intrari libere: motiv, furnizor, referinta; cantitati facturate pe factura','8edc0ae4a7c70f665a47f92ce12dc9e9a1777e43f154dcd29ed13e1678928123','baseline','2026-10-20 11:48:35','0.5.0'),
+(19,'Iesiri peste stoc: cauza optionala','1306d4babe334dcbca1b625a4749deef4f80648f2209f331e6cbfea6a5a9ca0c','baseline','2026-10-20 11:48:35','0.5.0'),
+(20,'Iesiri: operatia din care fac parte (operation_id)','0f4f5501d43f5ad1b67a82b54efc09e34d56ff2fb66688b13a91bdac03987241','baseline','2026-10-20 11:48:35','0.5.0'),
+(21,'Storno de operatie si retur legat de iesire','c3231ea9927836281c58c4503bdf2bd35ab1b3b5793ac1bbd897cadb97885561','baseline','2026-10-20 11:48:35','0.5.0'),
+(22,'Nomenclator: tipuri de sisteme si denumirile lor alternative','8a50ddd4c1423ff80b6915662334d8cab4c58b0e655102542ce9972e67245b44','baseline','2026-10-20 11:48:35','0.5.0'),
+(23,'Proiecte: componente (tipuri de sisteme) cu stare si arhivare','4284102106f574d92bd33a9c030f620ff6f0f4df7650c1b40d5ce2062c243f79','baseline','2026-10-20 11:48:35','0.5.0'),
+(24,'Oferte: sabloane de devize-oferta (xlsx)','a7c91bbe186e8bdf0fba83226db9c6a6591caa9a517b6179fa07bc743c3c03fd','baseline','2026-10-20 11:48:35','0.5.0'),
+(25,'Oferte preluate: oferta, liniile, potrivirile retinute si denumirile alternative ale beneficiarilor','c33d2552e9dc4721dd4358668346571b43ae11dca3d4f898b5b913aa0b5b952f','baseline','2026-10-20 11:48:35','0.5.0'),
+(26,'Iesiri legate de componente: componenta, in afara ofertei, lamurirea la scoaterea componentei','aeb6b917ca39de638b330fcce76dcc1fff5069029ed222c3356fef0e6f2cc698','baseline','2026-10-20 11:48:35','0.5.0'),
+(27,'Rezervari pe proiect: stoc liber = stoc - rezervari','ce5fdb6a23a130199cb1ffa6bbe73f994b95ba51eb389a1b8920ca2d20f4485c','baseline','2026-10-20 11:48:35','0.5.0'),
+(28,'Nivel tinta pe vehicul: completare la nivel','d455b97926a3ac9ce7eb18e2a557f30bdfb1986b40936edc57c4b4157d4b2359','baseline','2026-10-20 11:48:35','0.5.0'),
+(29,'Stoc minim pe produs si termen pe proiect','b13e0365768edf94d22f8113c2a8c8a929936fcb8386994fa9161c21f93cec81','baseline','2026-10-20 11:48:35','0.5.0'),
+(30,'Configurare backup NAS','26669b01a3798401e5ba176c3031e616a97776d6993f2c60ca36fbae9d1bfca0','baseline','2026-10-20 11:48:35','0.5.0'),
+(31,'Backup NAS: varsta maxima si ultima eroare','24a49e6f7153f1969e3094c26623bcb96ce703acee49765d31a250b3763d7259','baseline','2026-10-20 11:48:35','0.5.0'),
+(32,'Sabloane de notificare implicite: evidenta evenimentelor tratate','9deeb8b7240b7ea01b6ed8cd55a8412bec464693b069480578defdcaeccd7360','baseline','2026-10-20 11:48:35','0.5.0'),
+(33,'Setari backup: programare, vechime, pastrare','fba60943ed7188e763123543a31be9d149201d63ed6d90d2acc5539956da5144','baseline','2026-10-20 11:48:35','0.5.0'),
+(34,'Setari backup: verificare ora pe internet','4ce6c2afd2e744a139d08d24c22907a62844dd537e70dc9a0a8c4cd4a7e027bc','baseline','2026-10-20 11:48:35','0.5.0'),
+(35,'Setari backup: zilele saptamanii','4234db34ee744980ba37d70be6b93778b29af838671ccf8b54ecd52b6a9f5cb4','baseline','2026-10-20 11:48:35','0.5.0'),
+(36,'Furnizori: legatura dintre codul intern al furnizorului si produsul din catalog','7fb4a31dfcf8aba899e34820a05608399303003bfc2df0681cc4530da82a93a1','baseline','2026-10-20 11:48:35','0.5.0'),
+(37,'Produse: parametri obligatori pe subcategorie (model + valori), valorile alese pe produs','6d451fe5f0edc9f4f0cc151402791d9644380faa189f1c812424d2f455071300','baseline','2026-10-20 11:48:35','0.5.0'),
+(38,'Categorii: ordinea de afisare (sort_order)','fb85646cacbc3381f60203318cd887374258fc161f40b33dfc202aedb037caf2','baseline','2026-10-20 11:48:35','0.5.0'),
+(39,'Analize de risc: analiza unui punct de lucru (numar, intocmit de, data initiala, ultima reinnoire, valabilitate in luni), istoricul reinnoirilor si arhivarea','1ad1d0d1ac49cbfdff7bb1945944264fc0c83d0335829a2bc44b32624f3cbe3a','baseline','2026-10-20 11:48:35','0.5.0'),
+(40,'Tipuri de utilizatori cu permisiuni: tipul (nume, descriere, tip de sistem), permisiunile lui si legatura utilizatorului cu tipul','b5f93a399626c3f5ad69907bbe9c510e85a37c1fbe70e8931b9b14b0a411154b','baseline','2026-10-20 11:48:35','0.5.0'),
+(41,'Subcategorii: ordinea de afisare in categorie (sort_order)','2f5c90a0afe25517af3b70e3a0a64a3cd47eed63eb2fbf603a803d846e68775a','baseline','2026-10-20 11:48:35','0.5.0'),
+(42,'Module oprite manual de administrator (Setari -> Module): modulul, motivul, cine l-a oprit si cand','bd14f6d542b50c4f860539bc56f521ceece47a8f52e1487379091d89c9359eeb','baseline','2026-10-20 11:48:35','0.5.0'),
+(43,'Registrul migrarilor aplicate (versiune, checksum, origine): baza actualizarii aplicatiei','de255874f4b4d85a9f3969d4811eab43e837ad66c61b6c7d814fd2eca1857296','applied','2026-10-20 12:45:46','0.5.2');
+/*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `service_contract_points` WRITE;
