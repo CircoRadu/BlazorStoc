@@ -18,7 +18,16 @@ Planul de mai jos vine din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` (deciziile c
 
 Planul din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` este implementat integral (vezi `IMPLEMENTED.md`); verificarile ramase sunt in `docs/TESTE_RAMASE.md`.
 
-Nu mai sunt taskuri active.
+## Task 1: Setari -> Baza de date
+
+Propunere, decizii si stare: `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md` (sectiunile 11 si 12). Subtaskuri:
+
+- 1.1 Etapa 1: finalizare (acces pe rol Administrator + protectia ultimului administrator, rulare teste `dbsettings` si suita, sectiune MariaDB, documentatie, `tools/start-preview.ps1`, verificare in browser).
+- 1.2 Sub-tab "Ajutor" pentru baza de date.
+- 1.3 Etapa Verificare (sanatate si integritate).
+- 1.4 Etapa Aplicatie: serviciu Windows, oprire/repornire, repornire usoara a pipeline-ului.
+- 1.5 Conturi de baza de date: creare cont si schimbare parola cu credentiale administrative introduse pe loc.
+- 1.6 Pornirea/oprirea serverului MariaDB local (dupa raspunsul utilizatorului).
 
 ## Observații pentru etapa de implementare
 

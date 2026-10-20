@@ -137,3 +137,37 @@ Tab in `Settings.razor`; butoane cu `act-confirm/act-reload/act-close/act-nav`, 
 4. Acces numai pentru contul administratorului configurat (nu si pentru conturi din baza cu rol Administrator) - confirmat?
 5. Se doreste si schimbarea efectiva a parolei contului in server (4.2, optional), nu doar a celei folosite de aplicatie?
 6. Pornirea/oprirea serverului MariaDB local ramane in afara primei versiuni?
+
+## 11. Decizii confirmate de utilizator (20.10.2026) - prevaleaza asupra sectiunilor de mai sus
+
+1. Porturi: ambele (portul bazei de date si portul aplicatiei) - implementat in etapa 1.
+2. "Repornire pipeline" = repornirea usoara de la 4.4 (conexiuni, cache-uri, servicii de fundal, fara oprirea procesului): DA.
+3. Repornirea/oprirea aplicatiei: **direct serviciu Windows** (varianta B de la 4.5), nu procesul ajutator (varianta A). Implica `UseWindowsService`, scripturi de instalare/dezinstalare a serviciului si a repornirii automate la iesire, actualizarea `docs/SETUP_DEZVOLTARE.md` si a `tools/start-preview.ps1`; oprirea din pagina opreste serviciul, repornirea iese cu un cod pe care serviciul il reporneste.
+4. **Acces: rolul Administrator are acces la pagina, fara posibilitatea de a-l pierde.** Inlocuieste politica "doar administratorul configurat" (sectiunea 3, punctul 2). Consecinte de implementat:
+   - pagina si serviciile cer rolul Administrator (`IsAdministratorAsync` / `EnsureAdministratorAsync`), nu claim-ul `config_admin`; administratorul configurat din fisierul privat ramane administrator permanent (se autentifica fara SQL, deci ajunge in pagina si cand baza este cazuta);
+   - accesul nu se poate pierde: nu se poate sterge, dezactiva sau retrograda ultimul administrator din baza (regula in repository-ul de utilizatori, cu mesaj clar si test), iar contul administratorului configurat nu poate fi modificat din Utilizatori;
+   - nota adaugata in `UserEditor.razor` (spune ca pagina e rezervata administratorului configurat) trebuie inlocuita cu textul corect;
+   - in codul din etapa 1, `IsConfiguredAdministratorAsync`, `EnsureConfiguredAdministratorAsync`, `AccessRoles.ConfiguredAdministratorClaim` si claim-ul pus la login devin inutile pentru aceasta pagina (de scos sau de redenumit); verificarile din `DatabaseSettingsChecks` pentru "un administrator din baza este refuzat" se inverseaza: administratorul din baza intra, utilizatorul obisnuit nu.
+5. **Creare cont de baza de date si schimbare de parola la nevoie** (nu doar parola folosita de aplicatie): din pagina, cu credentiale administrative ale serverului MariaDB (de exemplu `root`) introduse de administrator pe loc, folosite o singura data si nepastrate nicaieri (nici in fisier, nici in jurnal, nici in log). Operatii: crearea contului aplicatiei (`blazorstoc_dev`) cu drepturile din `docs/SETUP_DEZVOLTARE.md`, tabelul de conturi, `REQUIRE SSL`; schimbarea parolei oricarui cont al aplicatiei (aplicatie, migrare, backup, restaurare); apoi actualizarea parolei folosite de aplicatie cu aceeasi secventa sigura (parola veche ramane functionala la orice esec), jurnal fara parole. Trece din etapa 4 (optionala) intr-o etapa proprie, dupa etapa 1.
+6. Pornirea/oprirea serverului MariaDB: clarificata mai jos, raspunsul este asteptat.
+7. **Sectiune de ajutor (help) pentru baza de date**: in pagina "Baza de date" un sub-tab "Ajutor" (sau panou de ajutor in fiecare sub-tab) care explica in romana, pe intelesul administratorului: ce este fiecare camp (host, port, utilizator, parola, SSL, port aplicatie, interfata), ce inseamna fiecare linie din Stare, ce verifica fiecare test, cum se face revenirea la configuratia de baza, ce se intampla la schimbare (blocare de intretinere, revenire automata), cum se creeaza contul si se schimba parola, cum se opreste/reporneste aplicatia ca serviciu, ce se face daca baza nu raspunde (pasi de depanare: serverul ruleaza? port? firewall? cont/parola? SSL?), unde sunt fisierele (suprascrierea, jurnalul aplicatiei, copiile de siguranta). Text static fara diacritice in `.md`, cu diacritice in aplicatie; actualizat la fiecare etapa.
+
+### Clarificare la punctul 6 (pornirea/oprirea serverului MariaDB)
+
+Intrebarea: pagina trebuie sa poata controla doar **aplicatia** BlazorStoc (oprire/repornire, deja stabilit) sau si **serverul MariaDB** (procesul `mariadbd`)?
+
+- Contul aplicatiei nu poate opri serverul (nu are privilegiul `SHUTDOWN`) si nu poate porni un server oprit. Deci ar fi nevoie de una din doua cai: (a) credentiale administrative introduse pe loc pentru `SHUTDOWN` (merge doar pentru oprire, nu pentru pornire), sau (b) controlul serviciului Windows al MariaDB (`sc stop/start`), posibil daca MariaDB ruleaza ca serviciu pe acelasi calculator si serviciul aplicatiei are dreptul sa-l controleze.
+- Riscuri: oprirea serverului cu aplicatia pornita face toate paginile inutilizabile pana la repornirea lui; un server pornit/oprit gresit poate corupe date daca nu se inchide curat; pe un server aflat pe alt calculator nu se poate face deloc.
+- Recomandare: **da, dar numai pentru instanta locala care ruleaza ca serviciu Windows** (cazul probabil, odata ce aplicatia devine si ea serviciu), cu confirmare dubla si refuz cat timp ruleaza backup/restaurare; pentru un server aflat pe alt calculator butoanele nu apar. Daca MariaDB local nu este serviciu, ramane in afara.
+- Raspunsul de dat: DA (doar serviciu local) sau NU (doar aplicatia).
+
+## 12. Stare implementare si preluare in sesiune locala (20.10.2026)
+
+Etapa 1 este **partial implementata** (commit `fea14a8` pe branch-ul `ccr-eafcbe49-gslqnq`, marcat WIP):
+
+- Gata si compilat (`dotnet build BlazorStoc.csproj -c Release` trece): `Services/DatabaseConnectionSettings.cs` (reguli, fisier de suprascriere cu parola protejata, sursa de configurare, `AppHosting`, `DatabaseSettingsService`), `Services/DatabaseStatus.cs` (stare baza si aplicatie, `CircuitCounter`), actiuni de jurnal + filtre (`AuditTrail.cs`, `AuditFilters.cs`), `Components/Shared/DatabaseStatusPanel.razor` si `DatabaseConnectionPanel.razor`, tab-ul "Baza de date" in `Settings.razor`, cablare in `Program.cs`, CSS in `wwwroot/app.css`.
+- Scris dar **nerulat**: `tests/BlazorStoc.Checks/DatabaseSettingsChecks.cs` (grupul `dbsettings`); `AddDatabaseOverride` trebuie sa returneze `IConfigurationBuilder` (corectat in sursa, proiectul de teste nu s-a mai compilat dupa asta).
+- Lipsesc: rularea `dbsettings` si a suitei complete (`tools\run-checks.ps1`), sectiunea MariaDB (stare, test conexiune, salvare cu aceeasi parola), documentatia (`docs/PROJECT_STATE.md`, `IMPLEMENTED.md`, `docs/TESTE_RAMASE.md`, `Teste utilizator/09_Notificari_si_setari.md`, `docs/HARTA_COD.md`), `tools/start-preview.ps1` (sa citeasca portul salvat), verificarea vizuala in browser.
+- **De refacut dupa decizia 4**: politica de acces (rolul Administrator, nu claim-ul), protectia ultimului administrator, nota din `UserEditor.razor`, testele de acces.
+- Dupa aceea, in ordine: sub-tabul Ajutor (decizia 7), etapa Verificare (sectiunea 4.3), etapa Aplicatie ca serviciu Windows + repornire usoara (deciziile 2 si 3), etapa conturi si parole in server (decizia 5), apoi decizia 6 daca se aproba.
+- Sesiunea cloud nu avea MariaDB; SDK-ul .NET 10 din apt a compilat tinta net9.0 (cu `DOTNET_ROLL_FORWARD=Major`). Testele pe MariaDB si previzualizarea se fac local.
