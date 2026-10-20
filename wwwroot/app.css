@@ -1092,3 +1092,15 @@ button.blocked { opacity: .45; cursor: default; }
 .incomplete-badge { color:#a63a32; }
 
 .uncertain-note { grid-column:1 / -1; margin:0; font-size:12px; color:#60766c; line-height:1.7; }
+
+/* Setari -> Baza de date */
+.database-status h3, .database-connection h3 { margin: 26px 0 12px; }
+.database-status h3:first-of-type, .database-connection h3:first-of-type { margin-top: 0; }
+.database-state-row { margin: 0 0 18px; }
+.database-facts th { width: 220px; text-align: left; font-size: 12px; letter-spacing: 0; font-weight: 650; color: #60766c; white-space: nowrap; background: transparent; vertical-align: top; }
+.database-facts td { overflow-wrap: anywhere; }
+.database-test-steps { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; }
+.database-test-step { padding: 10px 14px; border-radius: 7px; font-size: 12px; line-height: 1.6; border: 1px solid #bddbc9; background: #eaf5ee; color: #27684b; }
+.database-test-step.warning { border-color: #ecd9a8; background: #fbf4e6; color: #8a6a22; }
+.database-test-step.error { border-color: #eacbc0; background: #fff0eb; color: #a3332c; }
+.database-connection select:disabled { opacity: .55; }

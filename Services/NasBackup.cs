@@ -500,10 +500,12 @@ public sealed class NasCopyingBackupService(IDatabaseBackupService inner, INasBa
 public sealed class SystemAccess : IAccessControl
 {
     public Task<bool> IsAdministratorAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
+    public Task<bool> IsConfiguredAdministratorAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
     public Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
     public Task<bool> CanManageBeneficiariesAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
     public Task<string?> GetUsernameAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>("sistem");
     public Task EnsureAdministratorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task EnsureConfiguredAdministratorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task EnsureProductOperatorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task EnsureBeneficiaryOperatorAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

@@ -44,6 +44,8 @@ public static class AuditEntities
     public const string SystemType = "TipSistem";
     // Oferte -> Sabloane: the templates of offer sheets (.xlsx).
     public const string OfferTemplate = "SablonOferta";
+    // Setari -> Baza de date: the connection of the application to MariaDB and the port it listens on (administrator configured in the private file only).
+    public const string Database = "BazaDeDate";
 }
 
 public static class AuditActions
@@ -181,6 +183,11 @@ public static class AuditActions
     public const string RetentionDelete = "Ștergere automată pachet backup vechi";
     public const string FetchBackupFromNas = "Aducere pachet backup de pe NAS";
     public const string TestNasBackup = "Testare conexiune NAS";
+    public const string SetDatabaseConnection = "Modificare conexiune bază de date";
+    public const string TestDatabaseConnection = "Testare conexiune bază de date";
+    public const string RevertDatabaseConnection = "Revenire la configurația anterioară a conexiunii bazei de date";
+    public const string ResetDatabaseConnection = "Resetare conexiune bază de date la configurația de bază";
+    public const string SetAppPort = "Modificare port aplicație";
     public const string CopyBackupToNas = "Copiere backup pe NAS";
     public const string SetProjectDeadline = "Setare termen proiect";
     public const string RemoveProjectDeadline = "Eliminare termen proiect";

@@ -1,0 +1,139 @@
+@using BlazorStoc.Services
+@inject IDatabaseSettingsService Settings
+@inject ILogger<DatabaseConnectionPanel> Logger
+@implements IDisposable
+@* Setari -> Baza de date -> Conexiune: host, port, user and password of the application account, and the port the application listens on.
+   Saving needs a successful test and the password of the administrator; the connection is applied at once (no restart) and checked again, with an
+   automatic return to the previous configuration if the check fails. The password is never shown. *@
+
+<section class="catalog database-connection">
+    <div class="catalog-heading"><h2>Conexiunea la baza de date</h2><small>Doar administratorul configurat al aplicației poate modifica aceste setări.</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
+        @if (current.OverrideProblem is not null) { <div class="error-banner" role="alert">@current.OverrideProblem</div> }
+        <h3>Baza de date</h3>
+        <div class="anaf-grid">
+            <label>Host<input id="db-host" @bind="host" maxlength="253" autocomplete="off" /></label>
+            <label>Port<input id="db-port" type="number" min="1" max="65535" @bind="port" autocomplete="off" /></label>
+            <label>Baza de date<input id="db-name" value="@current.Name" readonly title="Aplicația scrie numai în baza BlazorStoc; numele nu se schimbă de aici." /></label>
+            <label>Utilizator<input id="db-user" @bind="user" maxlength="80" autocomplete="off" /></label>
+            <label>Parolă<input id="db-password" type="password" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(current.HasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <label>Mod SSL
+                <select id="db-ssl" @bind="sslMode">
+                    @foreach (var mode in DatabaseConnectionRules.SslModes) { <option value="@mode">@mode</option> }
+                </select>
+            </label>
+        </div>
+        <p class="muted"><small>Schimbarea se aplică imediat, fără repornire. Pagina schimbă ce folosește aplicația ca să se conecteze; parola contului pe serverul bazei de date se schimbă pe server. Variabilele de mediu și fișierul privat rămân neatinse: valorile de aici le suprascriu.</small></p>
+
+        <h3>Aplicația</h3>
+        <div class="anaf-grid">
+            <label>Port aplicație (gol = implicit)<input id="app-port" type="number" min="1024" max="65535" @bind="appPort" autocomplete="off" /></label>
+            <label>Interfață
+                <select id="app-interface" @bind="appBindAll" disabled="@(appPort is null)">
+                    <option value="false">Doar acest calculator (127.0.0.1)</option>
+                    <option value="true">Toate interfețele (accesibilă din rețea)</option>
+                </select>
+            </label>
+        </div>
+        <p class="muted"><small>Portul pe care ascultă aplicația se citește la pornire: se aplică la următoarea pornire a aplicației. Dacă scriptul de pornire impune adresa (ASPNETCORE_URLS, --urls), portul salvat este ignorat și pagina Stare o spune.@(current.AppPort is { } saved ? $" Port salvat acum: {saved}." : "")</small></p>
+
+        @if (testResult is { } test)
+        {
+            <h3>Rezultatul testului</h3>
+            <ul class="database-test-steps" aria-label="Rezultatul testului de conexiune">
+                @foreach (var step in test.Steps)
+                {
+                    <li class="database-test-step @step.Level.ToString().ToLowerInvariant()"><strong>@step.Name</strong> — @step.Detail</li>
+                }
+            </ul>
+        }
+
+        <h3>Confirmare</h3>
+        <div class="anaf-grid">
+            <label>Parola administratorului (pentru salvare)<input id="db-admin-password" type="password" @bind="adminPassword" maxlength="200" autocomplete="current-password" /></label>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează și aplică</button>
+            <button type="button" class="refresh act-reload" disabled="@busy" @onclick="TestAsync">Testează conexiunea</button>
+            @if (current.OverrideActive || current.AppPort is not null)
+            {
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="ResetAsync"
+                        title="Șterge suprascrierea salvată din pagină și revine la fișierul privat de configurare">Revino la configurația de bază</button>
+            }
+            @if (busy) { <span class="muted" role="status" data-operation-driver>@busyText</span> }
+        </div>
+        <p class="muted"><small>Configurația salvată din pagină se află în <code>@current.OverridePath</code> (în afara repository-ului; parola este criptată).</small></p>
+    }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, busy, noticeOk, appBindAll;
+    private string? error, notice, busyText;
+    private string host = "", user = "", sslMode = "Required", password = "", adminPassword = "";
+    private int port = 3307;
+    private int? appPort;
+    private DatabaseConnectionSettings current = new("", 0, "", "", "Required", false, null, false, false, null, "");
+    private DatabaseTestResult? testResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { Apply(await Settings.GetAsync(lifetime.Token)); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Database settings loading failed ({ErrorType}).", ex.GetType().Name); error = "Setările nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private void Apply(DatabaseConnectionSettings settings)
+    {
+        current = settings; host = settings.Host; port = settings.Port; user = settings.User; sslMode = settings.SslMode;
+        appPort = settings.AppPort; appBindAll = settings.AppBindAll; password = ""; adminPassword = "";
+    }
+
+    private DatabaseConnectionInput Input => new(host, port, user, string.IsNullOrEmpty(password) ? null : password, sslMode, appPort, appBindAll);
+
+    private async Task RunAsync(string working, Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; busyText = working; error = null; notice = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is DatabaseSettingsException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Database settings action failed ({ErrorType}).", ex.GetType().Name); error = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    private Task TestAsync() => RunAsync("Se testează conexiunea…", async () =>
+    {
+        testResult = await Settings.TestAsync(Input, lifetime.Token);
+        noticeOk = testResult.Ok;
+        notice = testResult.Ok ? "Testul a reușit: conexiunea cu aceste valori funcționează." : "Testul a eșuat; vezi detaliile de mai jos.";
+    });
+
+    private Task SaveAsync() => RunAsync("Se salvează și se verifică…", async () =>
+    {
+        var result = await Settings.SaveAsync(Input, adminPassword, lifetime.Token);
+        noticeOk = result.Success; notice = result.Message;
+        adminPassword = "";
+        // A refused save keeps what was typed (so it can be corrected); a saved one shows what is in force now.
+        if (result.Success) { testResult = null; Apply(await Settings.GetAsync(lifetime.Token)); }
+        else current = await Settings.GetAsync(lifetime.Token);
+    });
+
+    private Task ResetAsync() => RunAsync("Se revine la configurația de bază…", async () =>
+    {
+        var result = await Settings.ResetToBaseAsync(adminPassword, lifetime.Token);
+        noticeOk = result.Success; notice = result.Message;
+        testResult = null;
+        Apply(await Settings.GetAsync(lifetime.Token));
+    });
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

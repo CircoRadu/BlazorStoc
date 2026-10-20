@@ -25,7 +25,8 @@ public static class AuditFilterOptions
         (AuditEntities.ServiceContract, "Contracte mentenanță (ștergeri)"), (AuditEntities.ServiceIntervention, "Intervenții mentenanță (ștergeri)"),
         (AuditEntities.Journal, "Jurnalul (exporturi)"), (AuditEntities.MapEngine, "Furnizor hartă"), (AuditEntities.MapPinType, "Tipuri de pinuri hartă"),
         (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori"),
-        (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.OfferTemplate, "Șabloane oferte")
+        (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.OfferTemplate, "Șabloane oferte"),
+        (AuditEntities.Database, "Baza de date (conexiune, port)")
     ];
 
     public static readonly IReadOnlyList<(string Value, string Label)> Actions =
@@ -85,6 +86,9 @@ public static class AuditFilterOptions
         (AuditActions.AddProjectComponent, AuditActions.AddProjectComponent), (AuditActions.ChangeProjectComponentState, AuditActions.ChangeProjectComponentState),
         (AuditActions.ArchiveProjectComponent, AuditActions.ArchiveProjectComponent), (AuditActions.ReactivateProjectComponent, AuditActions.ReactivateProjectComponent),
         (AuditActions.SetNasBackup, AuditActions.SetNasBackup), (AuditActions.SetBackupSettings, AuditActions.SetBackupSettings),
+        (AuditActions.SetDatabaseConnection, AuditActions.SetDatabaseConnection), (AuditActions.TestDatabaseConnection, AuditActions.TestDatabaseConnection),
+        (AuditActions.RevertDatabaseConnection, AuditActions.RevertDatabaseConnection), (AuditActions.ResetDatabaseConnection, AuditActions.ResetDatabaseConnection),
+        (AuditActions.SetAppPort, AuditActions.SetAppPort),
         (AuditActions.RetentionDelete, AuditActions.RetentionDelete), (AuditActions.FetchBackupFromNas, AuditActions.FetchBackupFromNas), (AuditActions.TestNasBackup, AuditActions.TestNasBackup), (AuditActions.CopyBackupToNas, AuditActions.CopyBackupToNas), (AuditActions.SetMinStock, AuditActions.SetMinStock), (AuditActions.RemoveMinStock, AuditActions.RemoveMinStock), (AuditActions.SetProjectDeadline, AuditActions.SetProjectDeadline), (AuditActions.RemoveProjectDeadline, AuditActions.RemoveProjectDeadline),
         (AuditActions.SetVehicleTarget, AuditActions.SetVehicleTarget), (AuditActions.RemoveVehicleTarget, AuditActions.RemoveVehicleTarget),
         (AuditActions.ReserveStock, AuditActions.ReserveStock), (AuditActions.ReduceReservation, AuditActions.ReduceReservation), (AuditActions.ReleaseReservation, AuditActions.ReleaseReservation),

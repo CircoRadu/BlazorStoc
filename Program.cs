@@ -84,6 +84,11 @@ if (restorePrivateConfigPath is not null && File.Exists(restorePrivateConfigPath
             ["Database:RestorePassword"] = restoreSection.TryGetProperty("Password", out var restorePassword) ? restorePassword.GetString() : null
         });
 }
+// Setari -> Baza de date: what the configured administrator changed in the application (host, port, user, password of the database, port of the
+// application) is kept in an override file outside the repository and read LAST, so it wins over the private file and the environment.
+builder.Configuration.AddDatabaseOverride(DatabaseOverrideFile.PathFor(builder.Configuration), DatabaseOverrideFile.KeysPath(builder.Configuration));
+var appHosting = AppHosting.Resolve(builder.Configuration, AppHosting.CanBind);
+if (appHosting.AppliedUrls is not null) builder.WebHost.UseUrls(appHosting.AppliedUrls);
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
 builder.AddFileLogging();
@@ -108,6 +113,10 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IAccessControl, CurrentUserAccess>();
+// Setari -> Baza de date (administratorul configurat): setarile conexiunii, starea bazei si a aplicatiei; sesiunile deschise se numara cu un CircuitHandler.
+builder.Services.AddSingleton(appHosting);
+builder.Services.AddSingleton<CircuitCounter>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, CircuitCountHandler>();
 builder.Services.AddHttpClient(AnafService.ClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton<AnafStore>();
@@ -115,8 +124,7 @@ builder.Services.AddScoped<IAnafService, AnafService>();
 builder.Services.AddScoped<IArchiveService, ArchiveService>();
 builder.Services.AddSingleton<IAuditTrail, MariaAuditTrail>();
 // An explicit App:DataProtectionPath always wins; otherwise the dedicated local asset directory from the handoff document.
-var keysPath = builder.Configuration["App:DataProtectionPath"]
-    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "assets", "data-protection-keys");
+var keysPath = DatabaseOverrideFile.KeysPath(builder.Configuration);
 Directory.CreateDirectory(keysPath);
 builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keysPath)).SetApplicationName("BlazorStoc");
 builder.Services.AddRateLimiter(options =>
@@ -234,6 +242,12 @@ builder.Services.AddHostedService(services => new BackupScheduler(services.GetRe
 builder.Services.AddScoped<IDatabaseRestoreService>(services => new MariaDatabaseRestoreService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
         services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<IDatabaseBackupService>(),
         services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<MariaDatabaseRestoreService>>()));
+builder.Services.AddScoped<IDatabaseSettingsService>(services => new DatabaseSettingsService(services.GetRequiredService<IConfiguration>(),
+    services.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(),
+    services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<AppHostingInfo>(), services.GetRequiredService<ILogger<DatabaseSettingsService>>()));
+builder.Services.AddScoped<IDatabaseStatusService>(services => new DatabaseStatusService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
+    services.GetRequiredService<MariaSchemaMigrator>(), services.GetRequiredService<AppHostingInfo>(), services.GetRequiredService<CircuitCounter>(),
+    services.GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>(), services.GetRequiredService<IHostEnvironment>()));
 builder.Services.AddScoped<IVehicleRepository>(services => new MariaVehicleRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
 builder.Services.AddSingleton<IProductImageStore>(services => new FileProductImageStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<InProcessChangeFeed>();

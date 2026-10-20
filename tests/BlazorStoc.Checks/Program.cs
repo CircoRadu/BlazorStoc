@@ -48,6 +48,7 @@ var checkGroups = new Dictionary<string, Func<Task>>(StringComparer.OrdinalIgnor
     ["groups"] = async () => await ProductGroupsChecks.RunAsync(Check),
     ["reasons"] = () => { ReasonSummaryChecks.Run(Check); return Task.CompletedTask; },
     ["nas"] = () => NasBackupChecks.RunAsync(Check),
+    ["dbsettings"] = () => DatabaseSettingsChecks.RunAsync(Check),
     ["robustness"] = () => RobustnessChecks.RunAsync(Check)
 };
 var selectedGroups = (Environment.GetEnvironmentVariable("CHECKS_ONLY") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
@@ -2413,6 +2414,7 @@ await ProductGroupsChecks.RunAsync(Check);
 ReasonSummaryChecks.Run(Check);
 await RobustnessChecks.RunAsync(Check);
 await NasBackupChecks.RunAsync(Check);
+await DatabaseSettingsChecks.RunAsync(Check);
 BlazorStoc.Checks.OfferChecks.Run(Check);
 BlazorStoc.Checks.OfferChecks.RunSituation(Check);
 await InvoiceXmlChecks.RunAsync(Check);
@@ -2481,9 +2483,13 @@ sealed class FakeChangeSource : IChangeEventSource
     public Task PurgeAsync(long throughId, DateTime olderThanUtc, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
-sealed class TestAccessControl(bool administrator, string username, bool productOperator = true) : IAccessControl
+sealed class TestAccessControl(bool administrator, string username, bool productOperator = true, bool configuredAdministrator = false) : IAccessControl
 {
     public Task<bool> IsAdministratorAsync(CancellationToken cancellationToken = default) => Task.FromResult(administrator);
+    public Task<bool> IsConfiguredAdministratorAsync(CancellationToken cancellationToken = default) => Task.FromResult(configuredAdministrator);
+    public Task EnsureConfiguredAdministratorAsync(CancellationToken cancellationToken = default) => configuredAdministrator
+        ? Task.CompletedTask
+        : Task.FromException(new AccessDeniedException("Test access denied"));
     public Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default) => Task.FromResult(productOperator);
     public Task<bool> CanManageBeneficiariesAsync(CancellationToken cancellationToken = default) => Task.FromResult(true);
     public Task<string?> GetUsernameAsync(CancellationToken cancellationToken = default) => Task.FromResult<string?>(username);

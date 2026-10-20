@@ -1,0 +1,134 @@
+@using BlazorStoc.Services
+@inject IDatabaseStatusService Status
+@inject IBackupAlertReader Backups
+@inject ILogger<DatabaseStatusPanel> Logger
+@implements IDisposable
+@* Setari -> Baza de date -> Stare: what the database server reports about itself, the schema and the process the application runs in. Read-only;
+   refreshed every 10 seconds while the tab is shown. *@
+
+<section class="catalog database-status">
+    <div class="catalog-heading"><h2>Starea bazei de date</h2><small>@(refreshedAt is { } at ? "Actualizat la " + at.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") : "")</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (database is { } db)
+        {
+            <div class="editor-actions database-state-row">
+                <span class="stock-badge @(db.Reachable ? "positive" : db.Maintenance ? "zero" : "negative")" role="status"><span>●</span> @(db.Reachable ? "Conectat" : db.Maintenance ? "În întreținere" : "Indisponibil")</span>
+                @if (db.Reachable) { <span class="muted">răspuns în @db.LatencyMs.ToString("0.0", ro) ms</span> }
+                <button type="button" class="refresh act-reload" disabled="@busy" @onclick="RefreshAsync">Actualizează</button>
+            </div>
+            @if (!db.Reachable) { <div class="error-banner" role="alert">@db.Problem</div> }
+            <h3>Baza de date</h3>
+            <div class="table-scroll">
+                <table class="database-facts">
+                    <tbody>
+                        <tr><th scope="row">Server</th><td>@db.Host:@db.Port — baza <strong>@db.Name</strong>, cont <strong>@db.AccountUser</strong></td></tr>
+                        <tr><th scope="row">Unde rulează</th><td>@(db.RunsOnThisMachine ? "Pe acest calculator (conexiune locală)" : "Pe alt calculator" + (db.ServerHost.Length > 0 ? $" ({db.ServerHost})" : ""))</td></tr>
+                        @if (db.Reachable)
+                        {
+                            <tr><th scope="row">Versiune</th><td>@db.Version (@db.ServerOs), port raportat de server @db.ServerPort</td></tr>
+                            <tr><th scope="row">Pornit de</th><td>@DatabaseStatusText.Duration(db.UptimeSeconds)</td></tr>
+                            <tr><th scope="row">Conexiuni active</th><td>@db.ThreadsConnected</td></tr>
+                            <tr><th scope="row">Securitate</th><td>Mod SSL @db.SslMode@(db.SslCipher.Length > 0 ? ", cifru " + db.SslCipher : ", conexiune necriptată")</td></tr>
+                            <tr><th scope="row">Conținut</th><td>@db.TableCount tabele, @DatabaseStatusText.Size(db.SizeBytes)</td></tr>
+                            <tr><th scope="row">Directorul datelor</th><td>@db.DataDirectory</td></tr>
+                            <tr><th scope="row">Ora serverului</th><td>@(db.ServerTimeUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss"))</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (db.Reachable)
+            {
+                <h3>Schema</h3>
+                <div class="table-scroll">
+                    <table class="database-facts">
+                        <tbody>
+                            <tr><th scope="row">Migrări</th><td>@if (db.MissingColumns.Count == 0) { <text>La zi (nicio coloană lipsă)</text> } else { <text><strong>@db.MissingColumns.Count coloane lipsă:</strong> @string.Join(", ", db.MissingColumns.Take(8))@(db.MissingColumns.Count > 8 ? "…" : "")</text> }</td></tr>
+                            <tr><th scope="row">Cont de migrare</th><td>@Configured(db.MigratorConfigured)</td></tr>
+                            <tr><th scope="row">Cont de backup</th><td>@Configured(db.BackupAccountConfigured)@(db.BackupAccountConfigured ? "" : " (backup-ul folosește contul aplicației)")</td></tr>
+                            <tr><th scope="row">Cont de restaurare</th><td>@Configured(db.RestoreAccountConfigured)</td></tr>
+                            <tr><th scope="row">Ultimul backup</th><td>@(lastBackup is { } last ? last.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "niciunul încă")</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        @if (application is { } app)
+        {
+            <h3>Aplicația</h3>
+            <div class="table-scroll">
+                <table class="database-facts">
+                    <tbody>
+                        <tr><th scope="row">Rulează pe</th><td>@app.Machine — @app.Os</td></tr>
+                        <tr><th scope="row">Mediu</th><td>@app.Framework@(app.Environment.Length > 0 ? ", mediul " + app.Environment : "")</td></tr>
+                        <tr><th scope="row">Proces</th><td>PID @app.ProcessId, pornit la @app.StartedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") (de @DatabaseStatusText.Duration((long)(DateTime.UtcNow - app.StartedUtc).TotalSeconds)), memorie @DatabaseStatusText.Size(app.WorkingSetBytes)</td></tr>
+                        <tr><th scope="row">Adrese</th><td>@(app.Urls.Count == 0 ? "—" : string.Join(", ", app.Urls))</td></tr>
+                        <tr><th scope="row">Port salvat</th><td>@(app.ConfiguredPort?.ToString() ?? "nu a fost setat")@(app.HostingNote is null ? "" : " — " + app.HostingNote)</td></tr>
+                        <tr><th scope="row">Sesiuni deschise</th><td>@app.Sessions</td></tr>
+                        <tr><th scope="row">Directorul aplicației</th><td>@app.ContentRoot</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+    </div>
+</section>
+
+@code {
+    private static readonly System.Globalization.CultureInfo ro = System.Globalization.CultureInfo.GetCultureInfo("ro-RO");
+    private readonly CancellationTokenSource lifetime = new();
+    private Timer? timer;
+    private bool loading = true, busy, refreshing;
+    private string? error;
+    private DateTime? refreshedAt, lastBackup;
+    private DatabaseServerStatus? database;
+    private AppRuntimeStatus? application;
+
+    private static string Configured(bool configured) => configured ? "Configurat" : "Neconfigurat";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        loading = false;
+        timer = new Timer(_ => _ = InvokeAsync(async () => { if (!busy) { await LoadAsync(); StateHasChanged(); } }), null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private async Task LoadAsync()
+    {
+        if (refreshing) return;
+        refreshing = true;
+        try
+        {
+            database = await Status.ReadDatabaseAsync(lifetime.Token);
+            application = await Status.ReadApplicationAsync(lifetime.Token);
+            lastBackup = null;
+            if (database.Reachable)
+            {
+                try { lastBackup = (await Backups.GetAsync(lifetime.Token)).LastBackupUtc; }
+                catch (Exception ex) when (ex is not OperationCanceledException) { lastBackup = null; }
+            }
+            error = null;
+            refreshedAt = DateTime.UtcNow;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex)
+        {
+            Logger.LogError("Database status loading failed ({ErrorType}).", ex.GetType().Name);
+            error = "Starea nu a putut fi citită. Detaliile sunt în jurnalul aplicației.";
+        }
+        finally { refreshing = false; }
+    }
+
+    private async Task RefreshAsync()
+    {
+        busy = true;
+        try { await LoadAsync(); }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { timer?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
+}

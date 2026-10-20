@@ -78,6 +78,20 @@
             }
         </div>
     }
+    else if (isConfiguredAdmin && activeTab == DatabaseTab)
+    {
+        <div role="tabpanel" id="panel-@DatabaseTab" aria-labelledby="tab-@DatabaseTab" class="settings-body">
+            @SubtabBar(DatabaseSubtabs, "Secțiuni bază de date")
+            @if (databaseSubtab == DatabaseConnectionSubtab)
+            {
+                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab"><DatabaseConnectionPanel /></div>
+            }
+            else
+            {
+                <div role="tabpanel" id="subpanel-@DatabaseStatusSubtab" aria-labelledby="subtab-@DatabaseStatusSubtab"><DatabaseStatusPanel /></div>
+            }
+        </div>
+    }
     else if (isAdmin && activeTab == MapTab)
     {
         <div role="tabpanel" id="panel-@MapTab" aria-labelledby="tab-@MapTab" class="settings-body">
@@ -102,22 +116,29 @@
     private const string MapTab = SettingsNavigation.MapTab;
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private const string BackupTab = "backup";
+    // Only the administrator configured in the private file sees this tab (a database user with the Administrator role does not).
+    private const string DatabaseTab = "baza-de-date";
+    private const string DatabaseStatusSubtab = "stare";
+    private const string DatabaseConnectionSubtab = "conexiune";
+    private static readonly (string Id, string Title)[] DatabaseSubtabs = [(DatabaseStatusSubtab, "Stare"), (DatabaseConnectionSubtab, "Conexiune")];
+    private string databaseSubtab = DatabaseStatusSubtab;
     // Backup is one tab with three sub-tabs: backup and restore, the NAS copy, the check of the server clock.
     private const string BackupMainSubtab = "backup-main";
     private const string NasTab = "backup-nas";
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (DatabaseTab, "Bază de date")];
     private string activeTab = AnafTab;
 
     // The administrator has every tab; a user without that role only reaches the invoice templates (creating and changing them).
-    private bool isAdmin;
-    private (string Id, string Title)[] VisibleTabs => isAdmin ? Tabs : [.. Tabs.Where(tab => tab.Id == InvoicesTab)];
+    private bool isAdmin, isConfiguredAdmin;
+    private (string Id, string Title)[] VisibleTabs => isAdmin ? [.. Tabs.Where(tab => tab.Id != DatabaseTab || isConfiguredAdmin)] : [.. Tabs.Where(tab => tab.Id == InvoicesTab)];
 
     protected override async Task OnInitializedAsync()
     {
         isAdmin = await Access.IsAdministratorAsync();
+        isConfiguredAdmin = await Access.IsConfiguredAdministratorAsync();
         if (!isAdmin) activeTab = InvoicesTab;
     }
 
@@ -178,7 +199,7 @@
     }
 
     private string CurrentSubtab((string Id, string Title)[] subtabs) =>
-        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : notificationSubtab;
+        subtabs == MapSubtabs ? mapSubtab : subtabs == InvoiceSubtabs ? invoiceSubtab : subtabs == BackupSubtabs ? backupSubtab : subtabs == DatabaseSubtabs ? databaseSubtab : notificationSubtab;
 
     // Deep links (for example from the Journal) open the named tab, sub-tab and object; later clicks on the tabs win.
     [SupplyParameterFromQuery(Name = SettingsNavigation.TabParameter)] public string? TabQuery { get; set; }
@@ -200,6 +221,7 @@
         // The old address of the NAS tab keeps working.
         if (isAdmin && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
         if (BackupSubtabs.Any(tab => tab.Id == SubtabQuery)) { backupSubtab = SubtabQuery!; if (isAdmin && TabQuery is null or BackupTab) activeTab = BackupTab; }
+        if (isConfiguredAdmin && TabQuery == DatabaseTab && DatabaseSubtabs.Any(tab => tab.Id == SubtabQuery)) databaseSubtab = SubtabQuery!;
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
         if (InvoiceSubtabs.Any(tab => tab.Id == SubtabQuery)) invoiceSubtab = SubtabQuery!;
@@ -269,6 +291,7 @@
     {
         if (subtabs == MapSubtabs) mapSubtab = id;
         else if (subtabs == BackupSubtabs) backupSubtab = id;
+        else if (subtabs == DatabaseSubtabs) databaseSubtab = id;
         else if (subtabs == InvoiceSubtabs) { if (id != InvoiceEditSubtab && editTemplate is not null) AfterEditingClosed(() => invoiceSubtab = id); else invoiceSubtab = id; }
         else notificationSubtab = id;
     }

@@ -6,6 +6,9 @@ public static class AccessRoles
 {
     public const string Administrator = "Administrator";
     public const string LimitedUser = "Utilizator";
+    // Issued only at the sign-in of the administrator configured in the private file (no SQL involved). A database user can be given the
+    // Administrator role in Utilizatori, but never this claim: the pages reserved for the configured administrator check it, not the role.
+    public const string ConfiguredAdministratorClaim = "config_admin";
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         Administrator, LimitedUser
@@ -15,10 +18,12 @@ public static class AccessRoles
 public interface IAccessControl
 {
     Task<bool> IsAdministratorAsync(CancellationToken cancellationToken = default);
+    Task<bool> IsConfiguredAdministratorAsync(CancellationToken cancellationToken = default);
     Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default);
     Task<bool> CanManageBeneficiariesAsync(CancellationToken cancellationToken = default);
     Task<string?> GetUsernameAsync(CancellationToken cancellationToken = default);
     Task EnsureAdministratorAsync(CancellationToken cancellationToken = default);
+    Task EnsureConfiguredAdministratorAsync(CancellationToken cancellationToken = default);
     Task EnsureProductOperatorAsync(CancellationToken cancellationToken = default);
     Task EnsureBeneficiaryOperatorAsync(CancellationToken cancellationToken = default);
 }
@@ -31,6 +36,15 @@ public sealed class CurrentUserAccess(AuthenticationStateProvider authentication
         var state = await authenticationStateProvider.GetAuthenticationStateAsync();
         cancellationToken.ThrowIfCancellationRequested();
         return state.User.IsInRole(AccessRoles.Administrator);
+    }
+
+    public async Task<bool> IsConfiguredAdministratorAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var state = await authenticationStateProvider.GetAuthenticationStateAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+        return state.User.Identity?.IsAuthenticated == true && state.User.IsInRole(AccessRoles.Administrator) &&
+            state.User.HasClaim(AccessRoles.ConfiguredAdministratorClaim, "1");
     }
 
     public async Task<bool> CanManageProductsAsync(CancellationToken cancellationToken = default)
@@ -57,6 +71,12 @@ public sealed class CurrentUserAccess(AuthenticationStateProvider authentication
     {
         if (!await IsAdministratorAsync(cancellationToken))
             throw new AccessDeniedException("Operația este permisă numai administratorilor.");
+    }
+
+    public async Task EnsureConfiguredAdministratorAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await IsConfiguredAdministratorAsync(cancellationToken))
+            throw new AccessDeniedException("Operația este permisă numai administratorului configurat al aplicației.");
     }
 
     public async Task EnsureProductOperatorAsync(CancellationToken cancellationToken = default)

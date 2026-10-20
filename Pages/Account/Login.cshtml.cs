@@ -31,7 +31,7 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         if (!string.IsNullOrEmpty(expected) && string.Equals(Username, configuredUsername, StringComparison.Ordinal) &&
             CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? "")), SHA256.HashData(Encoding.UTF8.GetBytes(expected))))
         {
-            return await SignInAsync(configuredUsername, "Administrator configurat", AccessRoles.Administrator, null);
+            return await SignInAsync(configuredUsername, "Administrator configurat", AccessRoles.Administrator, null, configuredAdministrator: true);
         }
         // A wrong password for the configured administrator is rejected without querying SQL.
         if (string.Equals(Username, configuredUsername, StringComparison.Ordinal)) return InvalidLogin();
@@ -50,7 +50,7 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         return InvalidLogin();
     }
 
-    private async Task<IActionResult> SignInAsync(string username, string displayName, string role, int? userId)
+    private async Task<IActionResult> SignInAsync(string username, string displayName, string role, int? userId, bool configuredAdministrator = false)
     {
         var claims = new List<Claim>
         {
@@ -59,6 +59,7 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
             new(ClaimTypes.Role, role)
         };
         if (userId is not null) claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.Value.ToString()));
+        if (configuredAdministrator) claims.Add(new Claim(AccessRoles.ConfiguredAdministratorClaim, "1"));
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         await AuditRecorder.RecordSessionAsync(auditTrail, username, role, true, HttpContext.RequestAborted);
