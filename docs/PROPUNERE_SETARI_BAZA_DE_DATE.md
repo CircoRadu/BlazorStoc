@@ -149,7 +149,7 @@ Tab in `Settings.razor`; butoane cu `act-confirm/act-reload/act-close/act-nav`, 
    - nota adaugata in `UserEditor.razor` (spune ca pagina e rezervata administratorului configurat) trebuie inlocuita cu textul corect;
    - in codul din etapa 1, `IsConfiguredAdministratorAsync`, `EnsureConfiguredAdministratorAsync`, `AccessRoles.ConfiguredAdministratorClaim` si claim-ul pus la login devin inutile pentru aceasta pagina (de scos sau de redenumit); verificarile din `DatabaseSettingsChecks` pentru "un administrator din baza este refuzat" se inverseaza: administratorul din baza intra, utilizatorul obisnuit nu.
 5. **Creare cont de baza de date si schimbare de parola la nevoie** (nu doar parola folosita de aplicatie): din pagina, cu credentiale administrative ale serverului MariaDB (de exemplu `root`) introduse de administrator pe loc, folosite o singura data si nepastrate nicaieri (nici in fisier, nici in jurnal, nici in log). Operatii: crearea contului aplicatiei (`blazorstoc_dev`) cu drepturile din `docs/SETUP_DEZVOLTARE.md`, tabelul de conturi, `REQUIRE SSL`; schimbarea parolei oricarui cont al aplicatiei (aplicatie, migrare, backup, restaurare); apoi actualizarea parolei folosite de aplicatie cu aceeasi secventa sigura (parola veche ramane functionala la orice esec), jurnal fara parole. Trece din etapa 4 (optionala) intr-o etapa proprie, dupa etapa 1.
-6. Pornirea/oprirea serverului MariaDB: clarificata mai jos, raspunsul este asteptat.
+6. Pornirea/oprirea serverului MariaDB: **decis (20.10.2026)**: daca aplicatia ruleaza pe acelasi server cu baza de date, pagina permite repornirea (si oprirea/pornirea) serverului bazei si a aplicatiei; daca baza ruleaza remote, pagina permite doar oprirea/repornirea aplicatiei. Proiectarea este in sectiunea 13.
 7. **Sectiune de ajutor (help) pentru baza de date**: in pagina "Baza de date" un sub-tab "Ajutor" (sau panou de ajutor in fiecare sub-tab) care explica in romana, pe intelesul administratorului: ce este fiecare camp (host, port, utilizator, parola, SSL, port aplicatie, interfata), ce inseamna fiecare linie din Stare, ce verifica fiecare test, cum se face revenirea la configuratia de baza, ce se intampla la schimbare (blocare de intretinere, revenire automata), cum se creeaza contul si se schimba parola, cum se opreste/reporneste aplicatia ca serviciu, ce se face daca baza nu raspunde (pasi de depanare: serverul ruleaza? port? firewall? cont/parola? SSL?), unde sunt fisierele (suprascrierea, jurnalul aplicatiei, copiile de siguranta). Text static fara diacritice in `.md`, cu diacritice in aplicatie; actualizat la fiecare etapa.
 
 ### Clarificare la punctul 6 (pornirea/oprirea serverului MariaDB)
@@ -171,3 +171,73 @@ Etapa 1 este **partial implementata** (commit `fea14a8` pe branch-ul `ccr-eafcbe
 - **De refacut dupa decizia 4**: politica de acces (rolul Administrator, nu claim-ul), protectia ultimului administrator, nota din `UserEditor.razor`, testele de acces.
 - Dupa aceea, in ordine: sub-tabul Ajutor (decizia 7), etapa Verificare (sectiunea 4.3), etapa Aplicatie ca serviciu Windows + repornire usoara (deciziile 2 si 3), etapa conturi si parole in server (decizia 5), apoi decizia 6 daca se aproba.
 - Sesiunea cloud nu avea MariaDB; SDK-ul .NET 10 din apt a compilat tinta net9.0 (cu `DOTNET_ROLL_FORWARD=Major`). Testele pe MariaDB si previzualizarea se fac local.
+
+## 13. Controlul serverului bazei de date si al aplicatiei (decizia 6, 20.10.2026)
+
+### 13.1. Regula
+
+| Unde ruleaza baza fata de aplicatie | Aplicatia (serviciu Windows) | Serverul MariaDB |
+|---|---|---|
+| Pe acelasi calculator, ca serviciu Windows gasit si controlabil | Oprire, repornire | Oprire, pornire, repornire |
+| Pe acelasi calculator, dar nu ca serviciu (proces pornit manual, Docker, nume de serviciu necunoscut) | Oprire, repornire | Nu; pagina spune de ce si ce se configureaza |
+| Pe alt calculator (remote) | Oprire, repornire | Nu; doar stare si verificare. Textul spune ca repornirea se face pe acel calculator |
+
+Butoanele inexistente nu apar dezactivate fara explicatie: apare o linie care spune motivul (regula din `CLAUDE.md`: un buton dezactivat isi explica motivul).
+
+### 13.2. Cum se stabileste "pe acelasi calculator"
+
+Trei semnale, toate trebuie sa fie de acord (nu doar hostul scris in configuratie):
+1. hostul configurat este loopback, numele calculatorului sau o adresa a unei interfete locale (`NetworkInterface`);
+2. serverul raporteaza `@@hostname` egal cu `Environment.MachineName` (cand baza raspunde);
+3. exista un serviciu Windows al MariaDB (vezi mai jos) a carui comanda (`ImagePath`, citita din registru, fara drepturi speciale) porneste `mariadbd` cu `--port`/`my.ini` pe portul configurat.
+Cand baza nu raspunde, ramane semnalul 1 (+ ultimul `@@hostname` cunoscut, retinut in fisierul de suprascriere). Un tunel (`127.0.0.1` catre un server din alta parte) este prins de semnalul 2.
+
+### 13.3. Mecanismul pentru serverul MariaDB: serviciul Windows
+
+- Se foloseste `ServiceController` (pachetul `System.ServiceProcess.ServiceController`, apelat numai cand `OperatingSystem.IsWindows()`), pentru ca nu cere credentiale ale bazei (spre deosebire de `SHUTDOWN`), opreste curat (InnoDB isi inchide si scrie tot) si permite pornirea unui server oprit.
+- Numele serviciului: detectat (servicii cu `mariadb`/`mysql` in nume, verificate prin `ImagePath` si port), confirmat de administrator o singura data si salvat in fisierul de suprascriere (`Database:ServerServiceName`). Daca nu se gaseste niciun serviciu, linia din 13.1 spune cum se instaleaza (`mariadbd --install`).
+- Instanta de dezvoltare (`tools\dev-mariadb.ps1`) nu este serviciu: scriptul `tools\setup-dev-environment.ps1` primeste optiunea `-InstallService` (serviciu `BlazorStocMariaDB`) ca pagina sa functioneze identic pe dezvoltare si pe server. Un `mariadbd` pornit de aplicatie ca proces copil ar muri odata cu ea si nu se ofera.
+- Dreptul: contul sub care ruleaza serviciul aplicatiei trebuie sa poata porni/opri serviciul MariaDB. `LocalSystem` il are; pentru un cont dedicat, scriptul de instalare acorda dreptul (`sc sdset`) si pagina verifica la deschidere (`ServiceController` cere `SERVICE_START|SERVICE_STOP`) si spune clar ce lipseste.
+- Aplicatia ca serviciu (decizia 3): `UseWindowsService`, scripturi `tools\install-service.ps1` / `uninstall-service.ps1`, actiuni de recuperare (`sc failure ... restart`, `sc failureflag 1`); repornirea = `StopApplication()` cu cod de iesire diferit de zero, pe care Windows il reporneste; oprirea = `StopApplication()` cu iesire 0 (serviciul ramane oprit). Daca aplicatia nu ruleaza ca serviciu (`dotnet run`, preview), repornirea nu se ofera si oprirea cere confirmare suplimentara.
+
+### 13.4. Secvente (toate sub lacatul de intretinere, refuzate cat timp ruleaza backup sau restaurare)
+
+- **Repornire server baza**: lacat de intretinere (sesiunile deschise vad pagina de asteptare; tab-ul administratorului ramane, are `data-operation-driver`) -> serviciul MariaDB `Stop` (asteapta oprirea completa, timeout 120 s, afisat in pagina) -> `Start` -> asteapta portul si `SELECT 1` -> `ClearAllPools` -> verifica schema si tabelele -> repornire usoara a pipeline-ului (cache-uri, servicii de fundal; `ChangeEventRelay` isi reia singur interogarile dupa erori) -> eliberare lacat -> jurnal. La esec la pornire: starea serviciului si ultimele linii din jurnalul de erori al MariaDB (`@@log_error` retinut cat timp baza raspundea) afisate in pagina; lacatul se elibereaza, aplicatia ramane in starea "Indisponibil".
+- **Oprire server baza**: aceleasi garantii, confirmare cu cuvantul "OPRESTE BAZA" si numarul de sesiuni deschise; dupa oprire se elibereaza lacatul, iar aplicatia trece in starea "Baza de date indisponibila" (13.5).
+- **Pornire server baza** (cand e oprit): butonul apare in locul celui de oprire.
+- **Repornire aplicatie + server**: intai serverul bazei (cu aplicatia vie ca sa conduca operatia si sa verifice), apoi aplicatia se opreste cu cod de repornire. Ordinea inversa nu se ofera (o aplicatie oprita nu mai poate porni baza).
+- **Oprire aplicatie + server**: baza se opreste prima, apoi aplicatia cu iesire 0; dupa asta nimic din browser nu mai poate porni nimic (pornirea se face din Windows, `Servicii`); avertizare pe pagina inainte de confirmare.
+- Fiecare pas se jurnalizeaza (cand baza e oprita, intrarile se scriu in jurnalul aplicatiei si se reiau in jurnalul din baza la revenire, ca la schimbarea conexiunii).
+
+### 13.5. Starea "Baza de date indisponibila" (necesara pentru oprirea/caderea bazei)
+
+Azi, cand baza cade, paginile arata erori. Pentru oprirea controlata si pentru caderi propun:
+- un monitor de sanatate (serviciu de fundal, sondaj la 5 s cu `SELECT 1`) cu starea ultimelor minute, folosit si de pagina Stare;
+- cand baza e indisponibila mai mult de ~10 s, navigarile utilizatorilor obisnuiti merg la o pagina de asteptare "Baza de date este indisponibila" (aceeasi tehnica ca pagina de intretinere, cu revenire automata cand baza raspunde), iar administratorii pot ajunge la Setari -> Baza de date;
+- **atentie la autentificare**: conturile din baza de date nu se pot autentifica cat baza e oprita (verificarea parolei interogheaza SQL). Pot intra numai administratorul configurat (fara SQL) si sesiunile deja deschise (cookie de 8 ore, fara SQL). Deci pentru a porni baza, administratorul trebuie sa fi ramas conectat sau sa intre cu contul configurat; pagina Conexiune/Stare spune asta explicit, iar textul de ajutor (decizia 7) trebuie sa o repete.
+
+### 13.6. Securitate si reautentificare
+
+- Acces: rolul Administrator (decizia 4). Reautentificarea pentru oprire/pornire/repornire: parola contului cu care e conectat (administratorul configurat: parola din fisierul privat; cont din baza: verificare prin `IUserAuthenticator`; cand baza e oprita, doar contul configurat o poate confirma - alta coincidenta cu 13.5).
+- Limitare de rata ca la login; confirmare scrisa pentru oprire; refuz cat timp exista lacat de operatie activ; nimic din pagina nu accepta numele unui serviciu tastat liber (numai din lista detectata), ca sa nu poata fi folosita pentru a controla alte servicii.
+- `ImagePath` si numele serviciului se afiseaza (nu sunt secrete); caile si argumentele serviciului nu se modifica de aici.
+
+### 13.7. Teste
+
+- Reguli pure: matricea 13.1 pentru toate combinatiile (local/remote x serviciu gasit/lipsa x aplicatie serviciu/proces), potrivirea celor trei semnale, refuzul pe nume de serviciu necunoscut.
+- Un `IServiceControl` cu implementare falsa (pornit/oprit/timeout/refuz de drepturi) pentru secventele din 13.4, inclusiv esec la pornire si eliberarea lacatului.
+- Jurnal cu valori fara secrete; pentru `ServiceController` real: verificare manuala pe Windows (pasi in `docs/TESTE_RAMASE.md`), pentru ca mediul cloud nu are Windows.
+- Componente: butoane afisate/ascunse dupa matrice, linia cu motivul, confirmarea scrisa.
+
+### 13.8. Etape (inlocuiesc etapa 3 si punctul 1.6 din `TODO.md`)
+
+- 3a. Aplicatie ca serviciu Windows: instalare/dezinstalare, oprire/repornire din pagina, repornire usoara a pipeline-ului.
+- 3b. Monitor de sanatate si starea "Baza de date indisponibila" (13.5).
+- 3c. Controlul serverului bazei: detectare (13.2), serviciul MariaDB (13.3), secventele (13.4), optiunea `-InstallService` pentru instanta de dezvoltare.
+
+### 13.9. Intrebari ramase
+
+1. Pe server, MariaDB ruleaza deja ca serviciu Windows? Cum se numeste (de obicei `MariaDB`)?
+2. Sub ce cont va rula serviciul aplicatiei (`LocalSystem` sau un cont dedicat)? Pentru cont dedicat, scriptul acorda dreptul de control asupra serviciului MariaDB.
+3. Instanta de dezvoltare locala poate fi trecuta pe serviciu (`-InstallService`), ca pagina sa se poata testa si acolo?
+4. Pagina de asteptare "Baza de date indisponibila" pentru utilizatorii obisnuiti este acceptata (13.5)?

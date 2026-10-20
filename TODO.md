@@ -25,9 +25,9 @@ Propunere, decizii si stare: `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md` (sectiunile
 - 1.1 Etapa 1: finalizare (acces pe rol Administrator + protectia ultimului administrator, rulare teste `dbsettings` si suita, sectiune MariaDB, documentatie, `tools/start-preview.ps1`, verificare in browser).
 - 1.2 Sub-tab "Ajutor" pentru baza de date.
 - 1.3 Etapa Verificare (sanatate si integritate).
-- 1.4 Etapa Aplicatie: serviciu Windows, oprire/repornire, repornire usoara a pipeline-ului.
+- 1.4 Etapa Aplicatie (3a): serviciu Windows, oprire/repornire, repornire usoara a pipeline-ului; 3b: monitor de sanatate si starea "Baza de date indisponibila".
 - 1.5 Conturi de baza de date: creare cont si schimbare parola cu credentiale administrative introduse pe loc.
-- 1.6 Pornirea/oprirea serverului MariaDB local (dupa raspunsul utilizatorului).
+- 1.6 Controlul serverului MariaDB (3c): doar cand ruleaza pe acelasi calculator ca serviciu Windows (repornire/oprire/pornire server + aplicatie); remote = doar aplicatia. Proiectare in `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md`, sectiunea 13.
 
 ## Observații pentru etapa de implementare
 
