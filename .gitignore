@@ -23,3 +23,6 @@ data/manual-backups/
 data/database-backups/
 local-secrets/tmp-setup.sql
 logs/
+
+# Setari locale Claude Code
+.claude/

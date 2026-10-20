@@ -58,4 +58,54 @@
     });
 
     document.addEventListener('dragend', () => { from = null; clear(); });
+
+    // The subcategories of a category: the handle of a table row (span[data-subcategory-handle], draggable) is dragged over the other rows of the same
+    // category (tr[data-subcategory-index] with data-subcategory-category); the component gets MoveSubcategory(category, from, to).
+    let subFrom = null;
+    let subCategory = null;
+    const rows = () => [...document.querySelectorAll('[data-subcategory-index]')];
+    const clearRows = () => rows().forEach(row => row.classList.remove('drop-before', 'drop-after', 'dragging'));
+    const rowOf = event => {
+        const row = event.target.closest?.('[data-subcategory-index]');
+        return row && row.dataset.subcategoryCategory === subCategory ? row : null;
+    };
+
+    document.addEventListener('dragstart', event => {
+        const handle = event.target.closest?.('[data-subcategory-handle]');
+        if (!handle) return;
+        const row = handle.closest('[data-subcategory-index]');
+        subFrom = Number(row.dataset.subcategoryIndex);
+        subCategory = row.dataset.subcategoryCategory;
+        event.stopPropagation();
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', row.dataset.subcategoryName || '');
+        event.dataTransfer.setDragImage(row, 24, 16);
+        row.classList.add('dragging');
+    }, true);
+
+    document.addEventListener('dragover', event => {
+        if (subFrom === null) return;
+        const row = rowOf(event);
+        if (!row) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        rows().forEach(other => other.classList.remove('drop-before', 'drop-after'));
+        row.classList.add(after(row, event) ? 'drop-after' : 'drop-before');
+    });
+
+    document.addEventListener('drop', event => {
+        if (subFrom === null) return;
+        const row = rowOf(event);
+        if (!row) return;
+        event.preventDefault();
+        const place = Number(row.dataset.subcategoryIndex) + (after(row, event) ? 1 : 0);
+        const to = subFrom < place ? place - 1 : place;
+        const start = subFrom;
+        const category = subCategory;
+        subFrom = null; subCategory = null;
+        clearRows();
+        if (dotnet && to !== start) dotnet.invokeMethodAsync('MoveSubcategory', category, start, to).catch(() => { });
+    });
+
+    document.addEventListener('dragend', () => { subFrom = null; subCategory = null; clearRows(); });
 })();

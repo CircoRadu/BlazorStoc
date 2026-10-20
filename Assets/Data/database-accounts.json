@@ -1,0 +1,46 @@
+{
+  "host": "127.0.0.1",
+  "developmentDatabases": [ "blazorstoc_test", "blazorstoc_demo" ],
+  "accounts": [
+    {
+      "key": "app",
+      "user": "ESPGestiuneStoc_app",
+      "legacyUser": "blazorstoc_dev",
+      "configPrefix": "",
+      "purpose": "Accesul aplicației la date",
+      "defaultPassword": "ESPGestiuneStoc-App-Initial-2026",
+      "grants": [ { "database": "BlazorStoc", "privileges": [ "SELECT", "INSERT", "UPDATE", "DELETE" ] } ]
+    },
+    {
+      "key": "migrator",
+      "user": "ESPGestiuneStoc_migrator",
+      "legacyUser": "blazorstoc_migrator",
+      "configPrefix": "Migrator",
+      "purpose": "Actualizarea schemei la pornire",
+      "defaultPassword": "ESPGestiuneStoc-Migrator-Initial-2026",
+      "grants": [ { "database": "BlazorStoc", "privileges": [ "CREATE", "DROP", "REFERENCES", "INDEX", "ALTER", "CREATE VIEW", "TRIGGER" ] } ]
+    },
+    {
+      "key": "backup",
+      "user": "ESPGestiuneStoc_backup",
+      "legacyUser": "blazorstoc_backup",
+      "configPrefix": "Backup",
+      "purpose": "Copiile de siguranță",
+      "defaultPassword": "ESPGestiuneStoc-Backup-Initial-2026",
+      "grants": [ { "database": "BlazorStoc", "privileges": [ "SELECT", "SHOW VIEW", "TRIGGER", "LOCK TABLES" ] } ]
+    },
+    {
+      "key": "restore",
+      "user": "ESPGestiuneStoc_restore",
+      "legacyUser": "blazorstoc_restore",
+      "configPrefix": "Restore",
+      "purpose": "Restaurarea bazei",
+      "defaultPassword": "ESPGestiuneStoc-Restore-Initial-2026",
+      "grants": [
+        { "database": "BlazorStoc_bak", "privileges": [ "ALL PRIVILEGES" ] },
+        { "database": "BlazorStoc_old", "privileges": [ "ALL PRIVILEGES" ] },
+        { "database": "BlazorStoc", "privileges": [ "SELECT", "ALTER", "DROP", "CREATE", "INSERT", "TRIGGER" ] }
+      ]
+    }
+  ]
+}

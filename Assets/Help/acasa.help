@@ -1,0 +1,34 @@
+# Pagina principală
+Ruta: /
+Cautare: meniu principal module placi sectiuni acasa cautare ajutor
+Captura: pagina | / |  | Pagina principală
+
+Pagina principală este punctul de plecare: fiecare placă deschide o secțiune a aplicației. Vezi doar plăcile pentru care ai drept de acces. Din această pagină, iconița de ajutor are și o **căutare în tot ajutorul**; în orice altă fereastră ajutorul descrie doar fereastra în care ești.
+
+## Elemente
+### Plăcile secțiunilor
+- Produse și stocuri | placă | Deschide catalogul de produse. Poate arăta numărul produselor de regularizat (stoc negativ).
+- Preluare factură | placă | Preia în stoc o factură de furnizor (PDF, XML sau ZIP).
+- Ieșire multiplă | placă | Înregistrează ieșirile mai multor produse deodată.
+- Export consum | placă | Exportă consumul de produse pe beneficiar sau proiect.
+- Inventar și Preluare inventar | placă | Generează situația de inventar pentru numărare și compară stocul numărat cu cel din aplicație.
+- Categorii, Beneficiari, Furnizori, Facturi, Vehicule | placă | Administrarea datelor de bază. Facturi poate arăta intrările care așteaptă factura.
+- Oferte, Mentenanță, Analize de risc, Notificări, Jurnal activitate | placă | Modulele aplicației. Notificări și Analize de risc pot arăta un număr care cere atenție.
+- Utilizatori, Nomenclator | placă | Administrarea accesului și a tipurilor de sisteme (doar dacă ai dreptul).
+- Placă gri | placă | Modulul este oprit sau indisponibil momentan; placa se actualizează singură când modulul revine.
+### Meniul din stânga și bara de sus
+- Meniul din stânga | meniu | Aceleași secțiuni ca plăcile, grupate (Produse, Inventar, Administrare), plus Notificări (cu semn roșu când sunt avertismente), Jurnal activitate și Setări. | sel: aside.sidebar
+- Iconița de ajutor | buton | Deschide acest ajutor pentru fereastra în care ești. | sel: .topbar .help-icon
+- Deconectare | buton | Cere confirmarea și închide sesiunea; pagina curentă nu se modifică dacă renunți.
+- Numele și rolul | text | Contul cu care ești autentificat și rolul lui (Administrator sau Utilizator). | sel: .topbar-actions > span:not(.mode-pill)
+
+## Flux: Cum ajung la o secțiune
+1. Apasă placa secțiunii sau alege-o din meniul din stânga.
+2. Ca să te întorci, folosește butonul „← Meniu principal” din antetul paginii sau „Pagina principală” din meniu.
+Nota: dacă o secțiune nu apare, contul tău nu are dreptul de acces la ea; cere administratorului să îți modifice tipul de utilizator.
+
+## Flux: Cum caut în ajutor
+1. Apasă iconița de ajutor din bara de sus (aici, pe pagina principală).
+2. Scrie în câmpul „Caută în tot ajutorul” cel puțin două litere; rezultatele apar sub câmp.
+3. Apasă un rezultat ca să citești descrierea ferestrei respective; „Înapoi” te întoarce la lista anterioară.
+Nota: în celelalte ferestre ajutorul nu are căutare și descrie doar fereastra activă; din dialoguri, iconița de ajutor a dialogului deschide descrierea lui.

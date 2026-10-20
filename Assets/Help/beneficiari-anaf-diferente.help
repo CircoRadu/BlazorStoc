@@ -1,0 +1,21 @@
+# Date diferite în ANAF
+Cautare: anaf diferente valori beneficiar furnizor alegere
+Captura: fereastra | /beneficiari | click Adaugă beneficiar; type #beneficiary-name=Electric Standard Prest; type #beneficiary-address=Str. Libertatii 39, Simeria; type #beneficiary-phone=0254000111; type #beneficiary-cui=RO9178894; click Preia date din ANAF; wait 6000 | Datele diferite primite de la ANAF
+
+Fereastra apare când ANAF returnează valori diferite de cele din formular. Pentru fiecare câmp alegi valoarea din ANAF sau o păstrezi pe a ta; nimic nu se salvează aici, valorile alese doar intră în formular.
+
+## Elemente
+### Tabelul diferențelor
+- Câmp | coloană | Câmpul cu valori diferite (denumire, adresă etc.).
+- Valoarea ta | coloană | Ce este acum în formular.
+- Valoarea din ANAF | coloană | Ce a returnat ANAF.
+- Alegere | comutator | „A mea” (implicit) sau „Din ANAF”.
+### Butoane
+- Aplică alegerea | buton | Pune în formular valorile marcate „Din ANAF”.
+- Renunță | buton | Închide fereastra și păstrează formularul neschimbat; Escape face același lucru.
+
+## Flux: Cum aleg între datele mele și cele din ANAF
+1. Citește fiecare rând și compară cele două valori.
+2. Pornește comutatorul „Din ANAF” la câmpurile pe care vrei să le înlocuiești.
+3. Apasă „Aplică alegerea”, apoi salvează formularul.
+Nota: dacă nu pornești niciun comutator, formularul rămâne cum era.

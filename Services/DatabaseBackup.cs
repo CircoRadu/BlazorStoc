@@ -209,7 +209,7 @@ internal static class BackupPackageStore
         {
             if (manifest?.TimeSource != TrustedClock.SourceUnverified)
                 return BackupDeleteResult.Failed("Pachetele generate automat inainte de o restaurare nu pot fi sterse (cu exceptia celor cu ora neverificata).");
-            await access.EnsureAdministratorAsync(token).ConfigureAwait(false);
+            await access.EnsureAsync("setari-backup.backup", token).ConfigureAwait(false);
         }
 
         // The dialog (DeleteConfirmationDialog, subtask 3.2) already resolved the default/custom choice into a
@@ -303,18 +303,16 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
             var tables = MariaArchiveSchema.RequiredTables.ToArray();
             progress?.Report(new(BackupStage.Exporting, BackupRules.StageMessage(BackupStage.Exporting)));
             CanonicalSnapshot before, after;
-            await using (var connection = DatabaseConnections.Create(configuration))
+            await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 before = await CanonicalRowHasher.ComputeAsync(connection, tables, cancellationToken).ConfigureAwait(false);
             }
 
             tempCredentialsFile = await WriteCredentialsFileAsync(configuration, cancellationToken).ConfigureAwait(false);
             await RunMariaDumpAsync(configuration, tempCredentialsFile, tempSql, cancellationToken).ConfigureAwait(false);
 
-            await using (var connection = DatabaseConnections.Create(configuration))
+            await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
             {
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
                 after = await CanonicalRowHasher.ComputeAsync(connection, tables, cancellationToken).ConfigureAwait(false);
             }
 
@@ -393,7 +391,7 @@ public sealed class MariaDatabaseBackupService(IConfiguration configuration, IAc
     public static (string User, string? Password) DumpAccount(IConfiguration configuration) =>
         !string.IsNullOrWhiteSpace(configuration["Database:BackupUser"]) && !string.IsNullOrWhiteSpace(configuration["Database:BackupPassword"])
             ? (configuration["Database:BackupUser"]!, configuration["Database:BackupPassword"])
-            : (configuration["Database:User"] ?? "blazorstoc_dev", configuration["Database:Password"]);
+            : (configuration["Database:User"] ?? DatabaseAccounts.Find(DatabaseAccounts.ApplicationKey)!.User, configuration["Database:Password"]);
 
     private static async Task<string> WriteCredentialsFileAsync(IConfiguration configuration, CancellationToken token)
     {

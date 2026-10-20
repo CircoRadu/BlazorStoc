@@ -1,0 +1,35 @@
+# Parametri obligatori ai unei subcategorii
+Cautare: parametri obligatori model valoare cod produs subcategorie unitate
+Captura: fereastra | /categorii | click sel:.row-icon.params | Parametrii obligatori ai unei subcategorii
+
+Un produs dintr-o subcategorie cu parametri obligatori nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru. Codul produsului devine „model - valoare - valoare”, în ordinea parametrilor. Produsele deja existente rămân blocate până li se aleg valorile.
+
+## Elemente
+### Antet
+- Numărul din titlu | insignă | Câți parametri are subcategoria.
+- Închide | buton | Închide panoul.
+### Fiecare parametru
+- Numele și tipul | text | Numele parametrului, tipul (Număr sau Text liber), unitatea de măsură și câte produse îl folosesc.
+- Editează parametrul | iconita:edit | Doar administrator: redenumește parametrul; unitatea nu se mai schimbă după ce există produse.
+- Șterge parametrul | iconita:delete | Doar administrator și doar cât subcategoria nu are produse.
+- Valoare | coloană | Valorile din care se alege pentru produse (la tipul Număr se afișează cu unitatea).
+- Produse | coloană | Câte produse folosesc valoarea.
+- Editează valoarea | iconita:edit | Doar administrator.
+- Șterge valoarea | iconita:delete | Doar dacă niciun produs nu o folosește.
+- Valoare nouă | câmp | Scrii valoarea (la număr, de exemplu 2,8) și apeși „Adaugă valoarea”.
+### Parametru nou
+- Denumire parametru * | câmp | De exemplu „Lentilă”.
+- Tip * | comutatoare | Text liber (de exemplu culoare) sau Număr (de exemplu 2,8).
+- Unitate de măsură | câmp | Apare la tipul Număr, de exemplu mm.
+- Adaugă parametrul | buton | Creează parametrul.
+
+## Flux: Cum definesc un parametru obligatoriu
+1. În „Categorii și subcategorii” apasă iconița „Parametri obligatori” de pe rândul subcategoriei.
+2. La „Parametru nou” scrie denumirea, alege tipul (și unitatea, la număr) și apasă „Adaugă parametrul”.
+3. Adaugă valorile din care se va alege: scrie valoarea în câmpul parametrului și apasă „Adaugă valoarea”.
+Nota: orice utilizator poate adăuga valori și le poate șterge dacă nu sunt folosite; editarea parametrilor și a valorilor este a administratorului.
+
+## Flux: Cum deblochez produsele existente ale subcategoriei
+1. După ce adaugi parametri, produsele existente rămân blocate pentru mișcări de stoc.
+2. Deschide fiecare produs din Produse și stocuri (cu „Editează produsul”) și alege valoarea fiecărui parametru.
+3. Salvează produsul; blocajul dispare.

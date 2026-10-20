@@ -1,0 +1,238 @@
+@using BlazorStoc.Modules
+@using BlazorStoc.Services
+@implements IDisposable
+@inject ModuleRegistry Registry
+@inject ModuleControl Control
+@inject IAccessControl Access
+@inject IAuditTrail Audit
+@inject TimeProvider Clock
+@* Setari -> Module (administrator only): the state of every module, since when and why it is out, "try again" for a module that was taken out after repeated
+   failures (the same as waiting for the cooldown, now) and the switch that stops / starts a module by hand (with a reason, kept in the journal; a stopped module stays
+   stopped after a restart of the application). A module that did not start, or is switched off in the configuration, needs a restart of the application. *@
+<section class="catalog" aria-labelledby="modules-title">
+    <div class="catalog-heading"><h2 id="modules-title">Module <span class="count-badge">@modules.Count</span></h2>
+        <button type="button" class="refresh act-reload" @onclick="Reload">↻ Actualizează</button></div>
+    <div class="catalog-body">
+        <p class="muted">Un modul oprit nu afectează restul aplicației. Se oprește singur după erori repetate și se reîncearcă automat după 30 de secunde; aici poți cere reîncercarea imediat.
+            Comutatorul „Pornit” oprește sau pornește un modul din decizia ta, imediat, fără repornirea aplicației: modulul oprit manual rămâne oprit și după repornire, până îl pornești tu,
+            iar pe pagina principală secțiunea lui apare inactivă. Jurnalul de activitate nu poate fi oprit.
+            Modulele care nu au pornit sau au fost oprite intenționat din configurare (setarea <code>Modules:analize-risc:Enabled = false</code> oprește modulul „analize-risc”; identificatorul fiecărui modul este cel din paranteză, în tabel) cer repornirea aplicației.</p>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="notice-banner" role="status">@notice</div> }
+    </div>
+    @if (pending is not null)
+    {
+        <div class="catalog-body">
+            <fieldset class="module-stop-confirm" aria-labelledby="module-stop-title">
+                <legend id="module-stop-title">Oprești modulul „@pending.Name”?</legend>
+                <p>@Consequence(pending.Id) Operațiile deja începute se termină; apelurile noi sunt refuzate. Modulul poate fi pornit oricând din această pagină.</p>
+                <div class="editor-grid"><ChangeReasonField Id="module-stop-reason" @bind-Value="reason" Error="@reasonError" Disabled="busy" Hint="Scrie de ce oprești modulul (de exemplu verificări, intervenție pe rețea). Motivul este păstrat în jurnalul de activitate și apare în tabel." /></div>
+                <div class="editor-actions">
+                    <button class="danger" type="button" disabled="@busy" @onclick="ConfirmStopAsync">@(busy ? "Se oprește…" : "Oprește modulul")</button>
+                    <button class="refresh act-close" type="button" disabled="@busy" @onclick="CancelStop">Renunță</button>
+                </div>
+            </fieldset>
+        </div>
+    }
+    <div class="table-scroll">
+        <table class="catalog-table">
+            <thead><tr><th>Modul</th><th>Versiune</th><th>Stare</th><th>De când</th><th>Cauză</th><th>Erori la rând</th><th>Pornit</th><th><span class="sr-only">Operații</span></th></tr></thead>
+            <tbody>
+            @foreach (var module in modules)
+            {
+                <tr>
+                    <td><strong>@module.Name</strong> <span class="muted">(@module.Id)</span></td>
+                    <td>@module.Version</td>
+                    <td><span class="due-chip @StateClass(module.Status)">@StateText(module.Status)</span></td>
+                    <td>@(module.SinceUtc == default ? "-" : Local(module.SinceUtc))</td>
+                    <td>@CauseText(module)</td>
+                    <td>@(module.Failures == 0 ? "-" : module.Failures.ToString())</td>
+                    <td>
+                        <ToggleSwitch Compact="true" Id="@($"module-switch-{module.Id}")" Value="@IsOn(module)" ValueChanged="@(on => ToggleAsync(module, on))"
+                                      Disabled="@(!canToggle || !Registry.CanToggle(module.Id) || busy)" AriaLabel="@($"Modulul {module.Name} pornit")" Title="@SwitchTitle(module)" />
+                    </td>
+                    <td>
+                        @if (canRetry && module.Status == ModuleStatus.Disabled && module.Origin == ModuleOrigins.RepeatedFailures)
+                        {
+                            <button type="button" class="row-icon renew" aria-label="@($"Reîncearcă modulul {module.Name}")" title="@($"Reîncearcă modulul {module.Name} acum")" @onclick="() => RetryAsync(module)"></button>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private IReadOnlyList<ModuleInfo> modules = [];
+    private bool canRetry, canToggle, busy, disposed;
+    private string? error, notice, reason = "", reasonError;
+    private ModuleInfo? pending;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canRetry = await Access.HasAsync("setari-module.retry");
+        canToggle = await Access.HasAsync(ModuleControl.Permission);
+        modules = Registry.Snapshot();
+        Registry.Changed += OnChanged;
+    }
+
+    // The state changes without this screen (a circuit opens, another administrator uses the switch): the table is read again, unless a stop is being confirmed.
+    private void OnChanged()
+    {
+        if (disposed) return;
+        _ = InvokeAsync(() =>
+        {
+            if (disposed || busy) return;
+            modules = Registry.Snapshot();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        Registry.Changed -= OnChanged;
+    }
+
+    private void Reload()
+    {
+        error = notice = null;
+        modules = Registry.Snapshot();
+    }
+
+    // (the journal and the screen show the time of the machine, dd.MM.yyyy HH:mm)
+    public static string Local(DateTime utc) => DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    public static string StateText(ModuleStatus status) => status switch
+    {
+        ModuleStatus.Healthy => "Funcționează",
+        ModuleStatus.Degraded => "Cu erori",
+        _ => "Oprit"
+    };
+
+    public static string StateClass(ModuleStatus status) => status switch
+    {
+        ModuleStatus.Healthy => "due-ok",
+        ModuleStatus.Degraded => "due-soon",
+        _ => "due-overdue"
+    };
+
+    private static string CauseText(ModuleInfo module)
+    {
+        if (module.Status == ModuleStatus.Healthy) return "-";
+        if (module.Origin == ModuleOrigins.Manual) return $"{module.Origin} ({module.StoppedBy}): {module.Reason}";
+        return $"{module.Origin}{(string.IsNullOrEmpty(module.Reason) || module.Reason == "disabled-by-configuration" ? "" : $" ({module.Reason})")}";
+    }
+
+    // What the administrator warns himself about before stopping a module (the modules not listed only lose their own pages).
+    private static string Consequence(string moduleId) => moduleId switch
+    {
+        "backup" => "Backup-urile programate și cele cerute manual nu vor rula cât timp modulul este oprit.",
+        "notificari" => "Notificările de expirare nu se mai generează și pagina Notificări nu mai este disponibilă.",
+        "ocr" => "Citirea facturilor PDF scanate (OCR) nu mai este disponibilă.",
+        "anaf" => "Preluarea datelor de la ANAF nu mai este disponibilă.",
+        "preluare-factura" => "Facturile furnizorilor nu mai pot fi preluate în stoc.",
+        "furnizori" => "Registrul de furnizori și facturile lor nu mai sunt disponibile.",
+        _ => "Paginile și operațiile modulului nu mai sunt disponibile; celelalte module funcționează fără el."
+    };
+
+    // The switch shows the administrator's choice: only a module stopped by hand is off (a module out for another reason keeps its switch on, or disabled when it needs a restart).
+    private bool IsOn(ModuleInfo module) =>
+        module.Origin is not (ModuleOrigins.Manual or ModuleOrigins.Startup or ModuleOrigins.Configuration) && pending?.Id != module.Id;
+
+    private string SwitchTitle(ModuleInfo module)
+    {
+        if (!canToggle) return "Nu ai dreptul să oprești sau să pornești module.";
+        if (ModuleRegistry.Protected.Contains(module.Id)) return "Jurnalul de activitate nu poate fi oprit: acolo rămâne ce ai făcut.";
+        if (!Registry.CanToggle(module.Id)) return "Modulul nu a pornit sau este oprit din configurare: cere repornirea aplicației.";
+        return module.Origin == ModuleOrigins.Manual ? $"Pornește modulul {module.Name}" : $"Oprește modulul {module.Name}";
+    }
+
+    private async Task ToggleAsync(ModuleInfo module, bool on)
+    {
+        error = notice = null;
+        if (!on)
+        {
+            // The stop asks for a reason first; the switch shows "off" meanwhile and goes back if the stop is given up.
+            pending = module;
+            reason = "";
+            reasonError = null;
+            return;
+        }
+        busy = true;
+        try
+        {
+            var result = await Control.StartAsync(module.Id);
+            notice = result switch
+            {
+                ModuleToggleResult.Done => $"Modulul «{module.Name}» a fost pornit.",
+                ModuleToggleResult.NeedsRestart => $"Modulul «{module.Name}» nu a pornit odată cu aplicația: cere repornirea aplicației.",
+                _ => $"Modulul «{module.Name}» nu era oprit manual."
+            };
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ErrorText(exception); }
+        busy = false;
+        modules = Registry.Snapshot();
+    }
+
+    // The answers of the switch (no right, empty reason) are said as they are; a database that does not answer or a backup in progress, in words the administrator can act on.
+    private static string ErrorText(Exception exception) => exception is AccessDeniedException or ModuleOperationException
+        ? exception.Message
+        : "Starea modulului nu a putut fi salvată acum (baza de date nu răspunde sau rulează un backup). Nimic nu s-a schimbat; încearcă din nou.";
+
+    private void CancelStop()
+    {
+        pending = null;
+        reasonError = null;
+    }
+
+    private async Task ConfirmStopAsync()
+    {
+        if (pending is null) return;
+        reasonError = ModuleControl.ReasonError(reason);
+        if (reasonError is not null) return;
+        var module = pending;
+        busy = true;
+        try
+        {
+            var result = await Control.StopAsync(module.Id, reason);
+            notice = result switch
+            {
+                ModuleToggleResult.Done => $"Modulul «{module.Name}» a fost oprit și rămâne oprit până îl pornești din nou.",
+                ModuleToggleResult.Protected => $"Modulul «{module.Name}» nu poate fi oprit.",
+                _ => $"Modulul «{module.Name}» nu a putut fi oprit (nu rulează sau este deja oprit)."
+            };
+            pending = null;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            error = ErrorText(exception);
+            pending = null;
+        }
+        busy = false;
+        modules = Registry.Snapshot();
+    }
+
+    private async Task RetryAsync(ModuleInfo module)
+    {
+        error = notice = null;
+        try
+        {
+            await Access.EnsureAsync("setari-module.retry");
+            if (!Registry.Retry(module.Id))
+            {
+                notice = $"Modulul «{module.Name}» nu mai este oprit după erori repetate.";
+            }
+            else
+            {
+                await AuditRecorder.RecordActionAsync(Audit, Access, AuditEntities.Module, AuditActions.ModuleRetry, module.Id, module.Name,
+                    AuditDetails.Identification(("Stare înainte", StateText(module.Status)), ("Cauză", module.Origin ?? "-")), string.Empty, CancellationToken.None);
+                notice = $"Modulul «{module.Name}» va fi reîncercat la următoarea utilizare.";
+            }
+        }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        modules = Registry.Snapshot();
+    }
+}

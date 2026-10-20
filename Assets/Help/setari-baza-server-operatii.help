@@ -1,0 +1,32 @@
+# Serverul bazei de date: pornire, oprire și port
+Cautare: server baza de date serviciu windows porneste opreste reporneste port ascultă ocupat portul nou my.ini parola administrator oprește baza confirmare cuvant
+Captura: fereastra | /setari | click Bază de date; click Conexiune; click Oprește serverul; type #server-stop-word=OPRESTE BAZA; wait 800 | Oprește serverul bazei de date
+
+Ferestrele se deschid din cardul „Serverul bazei de date” ([[setari-baza-conexiune]]) când apeși „Pornește serverul”, „Oprește serverul”, „Repornește serverul” sau „Schimbă portul serverului”. Fiecare cere, pe lângă ce are nevoie operația, parola contului tău de administrator; nimic nu se întâmplă până nu apeși butonul ferestrei. Operațiile se jurnalizează fiecare cu numele ei exact și nu se fac cât timp rulează o copie de siguranță, o restaurare sau altă reconfigurare.
+
+## Elemente
+### Câmpurile operației
+- Scrie OPRESTE BAZA ca să confirmi | câmp | La oprire: scrie OPRESTE BAZA ca să poți apăsa „Oprește serverul”. Cât timp serverul e oprit, aplicația nu are date.
+- Portul nou al serverului | câmp | La schimbarea portului: între 1024 și 65535. Fereastra propune primul port liber de după cel curent; portul trebuie să fie liber pe acest calculator, diferit de cel curent și de portul aplicației. Sub câmp se vede portul curent și portul liber propus.
+### Confirmarea
+- Parola contului tău de administrator | câmp | Cerută la fiecare operație. Administratorul configurat introduce parola din fișierul privat, un administrator din Utilizatori introduce parola contului lui. După mai multe încercări greșite, confirmarea este refuzată un minut. Enter confirmă din acest câmp.
+- Butonul ferestrei | buton | Execută operația („Oprește serverul”, „Pornește serverul”, „Repornește serverul” sau „Schimbă portul”); la oprire este închis până scrii cuvântul de confirmare. | sel: .admin-operation-dialog button.primary
+- Renunță | buton | Închide fereastra fără să facă nimic (la fel Esc).
+
+## Flux: Cum opresc, pornesc sau repornesc serverul bazei
+1. În cardul „Serverul bazei de date” apasă butonul operației (la un server pornit apar „Repornește serverul” și „Oprește serverul”, la unul oprit „Pornește serverul”).
+2. La oprire scrie în fereastră OPRESTE BAZA.
+3. Introdu parola contului tău de administrator și apasă butonul ferestrei; serverul se oprește curat, iar la pornire se așteaptă să răspundă cu contul aplicației.
+Nota: cât timp serverul e oprit, doar administratorul configurat se poate autentifica (conturile din baza de date nu pot, pentru că parola lor se verifică în bază); rămâi conectat ca să îl poți porni din nou.
+
+## Flux: Cum schimb portul pe care ascultă serverul
+1. Apasă „Schimbă portul serverului”.
+2. Alege portul nou (cel propus este deja liber) și introdu parola contului tău de administrator.
+3. Apasă „Schimbă portul”: se salvează o copie a fișierului de configurare al serverului, se schimbă doar linia cu portul, serverul se repornește pe portul nou și aplicația se conectează singură la el.
+4. Dacă serverul nu răspunde pe portul nou, fișierul se pune la loc, serverul pornește din nou pe portul vechi și pagina spune ce a eșuat.
+Nota: scripturile și fișierele de dezvoltare care au portul vechi se actualizează cu tools\sync-dev-port.ps1 -Port N.
+
+## Flux: Ce fac dacă portul serverului este ocupat de alt program
+1. Dacă serverul e oprit și portul lui este ținut de alt program, cardul „Serverul bazei de date” spune care program (nume și PID) și propune un port liber; „Pornește serverul” rămâne închis.
+2. Apasă „Schimbă portul serverului” și alege portul propus: serverul pornește direct pe portul nou, fără oprire în plus.
+3. Alternativ, închide programul care ține portul și apasă „Pornește serverul”.

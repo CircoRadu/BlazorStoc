@@ -1,0 +1,23 @@
+# Fișa utilizatorului
+Ruta: /utilizatori/{id:int}
+Cautare: utilizator fisa cont nume afisat tip stare editeaza
+Captura: pagina | /utilizatori | click sel:a.category-table-link; full | Fișa unui utilizator
+
+Fișa unui cont: numele de autentificare, numele afișat, tipul și starea. Parola nu este afișată și nu poate fi recuperată.
+
+## Elemente
+### Antet
+- ← Utilizatori | link | Revine la lista conturilor.
+- Numele contului și numele afișat | text | Identificarea contului.
+- Editează | buton | Deschide formularul contului ([[utilizatori-editor]]); doar cu dreptul necesar.
+### Date cont
+- Nume utilizator | text | Numele de autentificare.
+- Nume afișat | text | Numele care apare în aplicație.
+- Tip utilizator | insignă | Tipul contului.
+- Stare | insignă | „Activ” sau „Inactiv”.
+
+## Flux: Cum modific un cont
+1. Apasă „Editează”.
+2. Schimbă datele, tipul sau starea contului (sau setează o parolă nouă).
+3. Salvează și confirmă modificările.
+Nota: dacă un alt utilizator modifică același cont, apare o notificare și poți reîncărca fișa.

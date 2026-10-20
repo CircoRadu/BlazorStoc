@@ -1,0 +1,43 @@
+@* A window that asks for what an operation on the database needs and, always, the password of the administrator again: opened when the operation is started, so the
+   page itself has no field for the password. The fields of the operation come as the content; the window shows the refusal of the service (a wrong password, a short
+   one) inside, keeps what was typed and closes only when the operation succeeded (the parent does that). With a help topic it has the help button; without one it is
+   only a confirmation. *@
+<div class="delete-overlay" @onkeydown="KeyDownAsync">
+    <section class="delete-dialog save-confirmation-dialog admin-operation-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-operation-title">
+        <div class="dialog-head"><h2 id="admin-operation-title">@Title</h2>@Help</div>
+        @if (Intro is not null) { <p class="muted"><small>@Intro</small></p> }
+        @ChildContent
+        <div class="anaf-grid admin-operation-password">
+            <label>Parola contului tău de administrator<input id="admin-operation-password" type="password" value="@AdminPassword" @oninput="PasswordTypedAsync" @onkeydown="PasswordKeyDownAsync" maxlength="200" autocomplete="current-password" /></label>
+        </div>
+        @if (Error is not null) { <div class="error-banner" role="alert">@Error</div> }
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@(Busy || ConfirmDisabled)" @onclick="() => Confirmed.InvokeAsync()">@ConfirmText</button>
+            <button type="button" class="refresh act-close" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Renunță</button>
+            @if (Busy) { <span class="muted" role="status" data-operation-driver>@BusyText</span> }
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Intro { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string ConfirmText { get; set; } = "Confirmă";
+    [Parameter] public bool ConfirmDisabled { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? BusyText { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string? AdminPassword { get; set; }
+    [Parameter] public EventCallback<string?> AdminPasswordChanged { get; set; }
+    /// <summary>The help button of this window (a HelpButton of the page that uses the window); without it the window is only a confirmation.</summary>
+    [Parameter] public RenderFragment? Help { get; set; }
+    [Parameter] public EventCallback Confirmed { get; set; }
+    [Parameter] public EventCallback Cancelled { get; set; }
+
+    private Task PasswordTypedAsync(ChangeEventArgs args) => AdminPasswordChanged.InvokeAsync(args.Value?.ToString());
+
+    private Task PasswordKeyDownAsync(KeyboardEventArgs args) => args.Key == "Enter" && !Busy && !ConfirmDisabled ? Confirmed.InvokeAsync() : Task.CompletedTask;
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" && !Busy ? Cancelled.InvokeAsync() : Task.CompletedTask;
+}

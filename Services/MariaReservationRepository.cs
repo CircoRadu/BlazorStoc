@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -10,7 +11,6 @@ public sealed class MariaReservationRepository(
     IAccessControl? accessControl = null,
     IAuditTrail? auditTrail = null) : IReservationRepository
 {
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     private const string Select = """
         SELECT r.id,r.project_id,p.name,r.project_component_id,t.name,r.product_id,pr.name,r.quantity
@@ -24,9 +24,8 @@ public sealed class MariaReservationRepository(
 
     public async Task<IReadOnlyList<Reservation>> GetForProjectAsync(int projectId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["stoc.view", "beneficiari.view"], cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, $"{Select} WHERE r.project_id=@project ORDER BY pr.name,r.id", ("@project", projectId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<Reservation>();
@@ -36,9 +35,8 @@ public sealed class MariaReservationRepository(
 
     public async Task<IReadOnlyList<ReservationHolder>> GetHoldersAsync(int productId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyAsync(["stoc.view", "beneficiari.view"], cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReservationSql.HoldersAsync(connection, null, productId, cancellationToken).ConfigureAwait(false);
     }
 
@@ -49,9 +47,8 @@ public sealed class MariaReservationRepository(
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new ReservationException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         string projectName, productName, componentName;
         int id;
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
             try
             {
@@ -111,9 +108,8 @@ public sealed class MariaReservationRepository(
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new ReservationException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         Reservation current;
         bool released;
-        await using (var connection = CreateConnection())
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
             try
             {
@@ -141,14 +137,7 @@ public sealed class MariaReservationRepository(
             reason, cancellationToken).ConfigureAwait(false);
     }
 
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object? Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
-        return command;
-    }
-
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
+    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureAsync("stoc.rezervare", token) ?? Task.CompletedTask;
 }
 
 // SQL shared with the exit repository (inside its transaction).

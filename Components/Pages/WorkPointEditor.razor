@@ -6,7 +6,7 @@
 
 <UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
 <section class="product-editor" aria-labelledby="work-point-editor-title">
-    <div class="catalog-heading"><h2 id="work-point-editor-title">@(Original is null ? "Adaugă punct de lucru" : IsPrimary ? "Editează punctul de lucru principal" : $"Editează punctul de lucru «{Original!.Name}»")</h2><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></div>
+    <div class="catalog-heading"><h2 id="work-point-editor-title">@(Original is null ? "Adaugă punct de lucru" : IsPrimary ? "Editează punctul de lucru principal" : $"Editează punctul de lucru «{Original!.Name}»")</h2><span class="heading-actions"><HelpButton Topic="puncte-de-lucru-editor" About="Formularul punctului de lucru" /><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></span></div>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="work-point-editor">
         <DataAnnotationsValidator />

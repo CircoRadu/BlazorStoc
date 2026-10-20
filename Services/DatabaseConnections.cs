@@ -18,7 +18,7 @@ internal static class DatabaseConnections
             // Implicit blazorstoc_dev: contul de dezvoltare cu SELECT/INSERT/UPDATE/DELETE pe instanta locala
             // reala (fara drepturi DDL); parola vine exclusiv din configuratia privata locala (Subtask 2.2), nu
             // din acest fisier.
-            UserID = configuration["Database:User"] ?? "blazorstoc_dev",
+            UserID = configuration["Database:User"] ?? DatabaseAccounts.Find(DatabaseAccounts.ApplicationKey)!.User,
             Password = configuration["Database:Password"],
             SslMode = Enum.Parse<MySqlSslMode>(configuration["Database:SslMode"] ?? "Required", true),
             CharacterSet = configuration["Database:CharSet"] ?? "utf8mb4",

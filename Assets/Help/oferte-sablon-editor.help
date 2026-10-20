@@ -1,0 +1,49 @@
+# Editorul de șablon de ofertă
+Cautare: sablon oferta editor fisier proba coloane antet etichete sectiuni randuri ignorate verifica pe fisier
+Captura: formular | /oferte/sabloane | click Șablon nou; height 1300 | Editorul de șablon de ofertă
+
+Aici definești un șablon: un fișier de probă (care nu se păstrează) arată foaia cu literele coloanelor, iar tu spui unde sunt câmpurile antetului, coloanele tabelului și ce secțiuni se importă.
+
+## Elemente
+### Fișierul de probă
+- Fișier de probă .xlsx | zonă | Alegi sau tragi un deviz de probă; nu se păstrează.
+- Foaia | listă | Apare când fișierul are mai multe foi.
+- Previzualizarea | tabel | Primele rânduri ale foii cu literele coloanelor, ca să știi ce coloană să alegi.
+### Date generale
+- Denumirea șablonului * | câmp | Numele șablonului.
+- Foaia (goală = prima) | câmp | Numele foii de citit.
+### Coloanele tabelului
+- Câmp | coloană | Denumirea, unitatea și cantitatea sunt obligatorii (marcate cu *); celelalte sunt opționale.
+- Coloana | listă | Litera coloanei din fișier (A–Z).
+- Eticheta din antet | câmp | Eticheta din antetul tabelului, așa cum apare în fișier; după ea se găsește tabelul (repetat în fiecare secțiune).
+### Antetul ofertei
+- Câmp | coloană | Numărul, titlul, categoria și beneficiarul ofertei.
+- Eticheta | câmp | Eticheta din fișier lângă valoare.
+- Valoarea este | listă | „La dreapta etichetei” sau „Sub etichetă”.
+- Scoate câmpul din șablon | iconita:delete | Elimină câmpul.
+- + Număr / + Titlu / + Categorie / + Beneficiar | buton | Adaugă un câmp scos.
+### Secțiuni
+- Secțiune | câmp | Numele secțiunii din fișier (de exemplu Echipamente, Manoperă, Cheltuieli).
+- Se importă | comutator | „Da” sau „Nu”: secțiunile neimportate nu intră în ofertă.
+- Scoate regula din șablon | iconita:delete | Elimină regula secțiunii.
+- + Secțiune | buton | Adaugă o regulă de secțiune.
+- Preia secțiunile din fișier | buton | Apare când ai încărcat un fișier: propune secțiunile găsite în el.
+- Rânduri ignorate | câmp | Începutul unei celule (separate prin virgulă): rândurile care încep așa se sar.
+### Verificare și salvare
+- Verificare pe fișier | text | După „Verifică pe fișier”: numărul, titlul, categoria și beneficiarul citite și, pe secțiune, câte linii se importă; problemele găsite apar dedesubt.
+- Verifică pe fișier | buton | Citește fișierul de probă cu șablonul curent.
+- Salvează șablonul | buton | Salvează șablonul.
+- Închide | buton | Închide editorul fără să salveze.
+
+## Flux: Cum creez un șablon dintr-un deviz
+1. Alege fișierul de probă și foaia; aplicația propune câmpurile și coloanele.
+2. Verifică în „Coloanele tabelului” că literele și etichetele corespund celor din fișier; completează ce lipsește.
+3. La „Antetul ofertei” verifică etichetele pentru număr, titlu, categorie și beneficiar și poziția valorii.
+4. La „Secțiuni” alege ce se importă (de obicei Echipamente) și, la nevoie, scrie rândurile ignorate.
+5. Apasă „Verifică pe fișier”, citește rezultatul, apoi „Salvează șablonul”.
+Nota: fișierul de probă nu se păstrează.
+
+## Flux: Cum repar un șablon care citește greșit
+1. Deschide șablonul cu „Modifică șablonul” și încarcă din nou un fișier problematic.
+2. Apasă „Verifică pe fișier” și compară cu devizul: ce lipsește sau e citit greșit.
+3. Corectează etichetele sau coloanele și verifică din nou; salvează când rezultatul este corect.

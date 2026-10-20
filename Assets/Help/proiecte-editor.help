@@ -1,0 +1,23 @@
+# Formularul de proiect
+Cautare: proiect formular denumire observatii componente sisteme beneficiar
+Captura: formular | /beneficiari | click Panoramic Hotel; click Adaugă proiect | Formularul de proiect
+
+Formularul pentru un proiect nou sau pentru editarea unuia existent. Se deschide din fișa beneficiarului sau din pagina proiectului.
+
+## Elemente
+### Câmpuri
+- Beneficiar | câmp | La un proiect nou deschis din fișa beneficiarului, beneficiarul este fix și nu se poate schimba.
+- Denumire proiect * | câmp | Numele proiectului, cel mult 200 de caractere.
+- Observații | câmp | Text liber, cel mult 4000 de caractere.
+- Componente (sisteme) | comutatoare | Doar la proiect nou: alegi sistemele proiectului (din nomenclator); se pot adăuga sau scoate și mai târziu, din pagina proiectului.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+### Butoane
+- Salvează proiectul | buton | Salvează; la editare cere mai întâi confirmarea modificărilor.
+- Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+
+## Flux: Cum creez un proiect
+1. Deschide fișa beneficiarului și apasă „+ Adaugă proiect”.
+2. Scrie denumirea și, dacă vrei, observațiile.
+3. Pornește componentele (sistemele) pe care le conține proiectul.
+4. Apasă „Salvează proiectul”.
+Nota: componentele se pot modifica și mai târziu, din pagina proiectului.

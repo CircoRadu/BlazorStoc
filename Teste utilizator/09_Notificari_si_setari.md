@@ -4,6 +4,111 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
+### 20.10.2026 - Setari -> Baza de date (server, port server, port aplicatie, conturi, sesiuni)
+
+**Verificat de agent 20.10.2026** (instanta de test pe baza demo si serviciul real `BlazorStocMariaDB`: repornire server, port 3307 -> 3308 -> 3307, port ocupat de alt program, port aplicatie 5089 -> 5090 -> 5089 sub supervizor; vezi IMPLEMENTED.md).
+
+**Ce s-a adaugat:** Setari -> Baza de date -> Conexiune are patru carduri: „Serverul bazei de date" (serviciul Windows, portul pe care asculta, Reporneste / Opreste / Porneste / Schimba portul serverului), „Conexiunea la baza de date" (portul din ea este doar cel la care se conecteaza aplicatia), „Aplicatia" (port si interfata, „Salveaza si reporneste aplicatia") si „Conturile bazei de date". Starea are iconita „Vezi sesiunile deschise" cu fereastra de detalii si inchidere de catre administrator.
+
+**Ce face acum:** portul serverului se schimba de pe pagina (copie `my.ini`, repornire pe portul nou, revenire daca nu porneste), iar aplicatia se conecteaza singura la portul nou; portul aplicatiei se schimba cu repornire reala si pagina se deschide singura pe adresa noua. Un port tinut de alt program este numit, cu un port liber propus. Toate operatiile cer parola contului tau de administrator in fereastra lor.
+
+Pasi:
+
+1. Instaleaza serviciul bazei (o singura data, PowerShell normal): `.\tools\install-mariadb-service.ps1` si accepta fereastra UAC. Deschide Setari -> Baza de date -> Conexiune: cardul „Serverul bazei de date" arata serviciul „pornit" si portul 3307.
+2. „Reporneste serverul": scrii parola ta de administrator; apare „Serverul bazei de date a fost repornit si raspunde." Jurnal: „Repornire server baza de date".
+3. „Opreste serverul": butonul ferestrei ramane inchis pana scrii OPRESTE BAZA. Dupa oprire pagina arata „oprit"; „Porneste serverul" il readuce. Ramai conectat cat e oprit (conturile din baza nu se pot autentifica fara baza).
+4. „Schimba portul serverului": alege portul propus, parola; serverul se reporneste pe el, iar „Port la care se conecteaza aplicatia" se schimba singur. Ruleaza `.\tools\sync-dev-port.ps1 -Port N` ca sa actualizezi si fisierele de dezvoltare. Revino la 3307 la fel.
+5. Port ocupat: opreste serverul, ocupa portul lui cu alt program; cardul numeste programul (nume, PID), propune un port liber si „Porneste serverul" e inchis; „Schimba portul serverului" il porneste direct pe portul nou.
+6. Cardul „Aplicatia": scrie un port liber (de exemplu 5090), „Salveaza si reporneste aplicatia", parola; pagina se deschide singura pe noua adresa (supervizorul previewului trebuie sa ruleze). Gol = revine la portul implicit.
+7. Pe un server aflat pe alt calculator cardul serverului nu are butoane si spune ce se face acolo.
+
+### 19.10.2026 - Oprire si pornire manuala a unui modul (Setari -> Module)
+
+**Verificat de agent 19.10.2026** (instanta de test pe baza de test: oprire cu motiv, repornirea aplicatiei, pornire, modul oprit din configurare, pauza programarii backup; vezi IMPLEMENTED.md).
+
+**Ce s-a adaugat:** in Setari -> Module, coloana "Pornit" cu un comutator pe fiecare modul. Oprirea cere un motiv (obligatoriu) si arata ce nu va mai merge; pornirea se face dintr-un clic. Starea se pastreaza in baza (tabelul `module_state`, migrarea 42), deci un modul oprit ramane oprit si dupa repornirea aplicatiei, pana il pornesti tu. Permisiune noua `setari-module.toggle`, rezervata administratorului. Jurnalul de activitate nu poate fi oprit (comutatorul lui este dezactivat), iar un modul care nu a pornit sau e oprit din configurare are comutatorul dezactivat (cere repornirea aplicatiei).
+
+**Ce face acum:** modulul oprit manual iese imediat din meniu, pe pagina principala placa lui ramane la locul ei, gri, fara link si cu textul "Oprit temporar de administrator", iar paginile lui spun "Modul oprit temporar". Operatiile deja pornite se termina; apelurile noi sunt refuzate. Un modul oprit manual nu mai este numarat de protectia la erori si nu se mai reia singur dupa 30 de secunde. Programarea backup-ului asteapta cat modulul Backup este oprit. Cand il pornesti, modulul incepe de la zero (fara erori numarate). Administratorul vede in tabel cine l-a oprit, cand si de ce, iar bannerul de deasupra paginilor il include.
+
+Pasi:
+
+1. Intra ca administrator in Setari -> Module. Comutatorul Jurnalului este dezactivat (titlu: "nu poate fi oprit").
+2. Opreste un modul (de exemplu Analize de risc): se deschide confirmarea; apasa "Opreste modulul" fara motiv: apare mesajul de camp obligatoriu si nimic nu se opreste. Apasa "Renunta": comutatorul revine pe On.
+3. Opreste-l din nou cu motiv: randul arata "Oprit", "oprit de administrator (utilizatorul tau): motivul", iar sus apare bannerul. Intrarea din meniu dispare.
+4. Deschide pagina principala: placa modulului este gri, fara link, cu "Oprit temporar de administrator". Deschide direct adresa paginii modulului: apare "Modul oprit temporar".
+5. In Jurnal, filtreaza dupa actiunea "Oprire manuala modul": intrarea este pe numele tau, cu starea veche/noua si motivul.
+6. Opreste aplicatia si porneste-o din nou (`tools\supervisor.ps1`): modulul ramane oprit. Porneste-l din comutator: intrarea "Pornire manuala modul" arata cine l-a oprit, de cand, cat a durat oprirea si motivul.
+7. Cu un utilizator obisnuit: nu vede fila Module, nici bannerul; placa gri o vede doar daca are permisiunea modulului.
+
+### 16.10.2026 - Backup, restaurare si copiere NAS intr-un proces separat
+
+**Ce s-a adaugat:** backup-ul (la cerere, programat, la preluarea de inventar), restaurarea si copierea pe NAS ruleaza intr-un proces propriu al aplicatiei; modulul "Copii de siguranta si restaurare" apare in Setari -> Module.
+
+**Ce face acum:** pentru tine nimic nu se schimba in fluxuri (aceleasi butoane, mesaje si etape). Diferenta: daca procesul de backup se blocheaza sau pica, aplicatia ramane in picioare, lacatul de "backup in curs" se elibereaza imediat, iar dupa 3 caderi la rand modulul iese 30 s din functiune (mesaj "Copiile de siguranta si restaurarea sunt indisponibile momentan"; tabelul de pachete din Setari -> Backup este inlocuit de nota "modul indisponibil", setarile de program raman).
+
+Pasi:
+
+1. Setari -> Backup -> "Fa backup acum": mesajul cu numele pachetului apare dupa ~15 s; pachetul este in tabel; in Jurnal "Generare CopieSiguranta" cu utilizatorul tau.
+2. Cat dureaza backup-ul, intr-un alt browser (alta sesiune) navigheaza intr-o pagina: esti dus la pagina de asteptare; dupa backup totul merge. Modulele (Notificari etc.) nu apar oprite dupa backup.
+3. Setari -> Backup -> Backup NAS (daca NAS-ul este configurat): "Testeaza conexiunea", "Fa backup acum" cu copierea Activ: pachetul apare si pe partajare, fara fisiere .partial.
+4. Restaurare dintr-un pachet vechi (pe o baza de proba): etapele apar in fereastra, apare o copie "inainte de restaurare", baza se schimba, Jurnalul are "Restaurare".
+5. Backup programat: bifeaza ziua, pune ora peste 2 minute, Salveaza; la ora aleasa apare un pachet "Programat" facut de utilizatorul "sistem".
+6. Setari -> Module: "Copii de siguranta si restaurare" este sanatos.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Backup -> "Fa backup acum" | Pachet nou, jurnal cu actiunea si utilizatorul tau | |
+| 2 | Alta sesiune, in timpul backup-ului | Pagina de asteptare, apoi normal; niciun modul oprit | |
+| 3 | Restaurare dintr-un pachet (baza de proba) | Etape, copie inainte de restaurare, jurnal "Restaurare" | |
+| 4 | Backup programat peste 2 minute | Pachet "Programat" de la "sistem" | |
+
+### 16.10.2026 - Notificarile ca modul (oprire fara efect asupra restului aplicatiei)
+
+**Ce s-a adaugat:** motorul de notificari (pagina Notificari, evaluarea sabloanelor, preluare / amanare / rezolvare, curatarea celor vechi si filele Sabloane si Setari din Setari -> Notificari) este un modul al aplicatiei. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge.
+
+**Ce face acum:** cu modulul oprit, /notificari arata "Modul indisponibil", intrarea Notificari din meniu (cu triunghiul de avertizare) si cardul de pe pagina principala dispar, iar Setari -> Notificari arata nota de modul oprit. Paginile care coloreaza scadentele (fisa beneficiarului, Mentenanta, harta, Analizele de risc) folosesc zilele implicite in loc de pragul din sablon, fara erori. Un modul oprit dupa erori repetate se reincearca singur dupa 30 de secunde, la prima pagina deschisa, sau imediat cu "Reincearca" din Setari -> Module. Notificarile deja create raman in lista cand modulul revine.
+
+Pasi:
+
+1. Cu modulul pornit (normal): Notificari, Setari -> Notificari (sabloane si setari) si triunghiul din meniu merg ca pana acum.
+2. Porneste aplicatia cu `Modules__notificari__Enabled=false`: /notificari arata "Modul indisponibil", meniul si pagina principala nu mai au Notificari, Setari -> Notificari arata nota, fisa unui beneficiar si Mentenanta se deschid normal, Setari -> Module arata Notificari "Oprit (oprit din configurare)".
+3. Tot cu modulul oprit: Jurnalul are "Oprire modul" pentru Notificari, iar notificarile existente nu s-au schimbat in baza de date; la repornirea cu modulul pornit apar neschimbate.
+
+### 17.10.2026 - NAS prin worker si pagina de asteptare la restaurare
+
+**Verificat de agent 19.10.2026** (NAS prin worker, backup cu pagina de asteptare si restaurare completa pe 5087, cu acordul utilizatorului; vezi `docs/TESTE_RAMASE.md`).
+
+**Ce s-a adaugat:** restaurarea completa prin worker a fost rulata cu succes pe baza locala (comutarea schemelor, copia dinaintea restaurarii, schema `_old`); pagina de asteptare nu se desena in timpul unui backup/restaurare (500 cu corp gol, corectat: redirectul vine inaintea autorizarii, iar permisiunile folosesc ultimele valori cunoscute cat tine lacatul). Ramase de verificat: copierea pe un NAS real prin worker si pagina de asteptare in browser.
+
+**Ce face acum:** in timpul unui backup sau al unei restaurari, o a doua sesiune care deschide o pagina vede „Backup sau restaurare in curs / Te rugam sa astepti" si revine singura la pagina ceruta; backup-ul cu NAS Activ copiaza pachetul pe partajare prin worker.
+
+Pregatire: aplicatia de pe 5087 ruleaza sub supervizor (directorul real `%LOCALAPPDATA%`), unde parola NAS nu este salvata; o introduce utilizatorul, nu agentul.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Backup -> Backup NAS: cale `\\192.168.100.50\BackupStocDepozit`, cont `EspStoc`, parola, Copiere „Activ", Salveaza | „Configurarea a fost salvata"; dupa reincarcare campul parola cere din nou parola doar la schimbare | |
+| 2 | „Testeaza conexiunea" | „Conexiunea functioneaza" (fara eroare „nu este salvata nici una") | |
+| 3 | Setari -> Backup si restaurare -> „Fa backup acum" | Mesaj cu numele pachetului si „Copierea pe NAS s-a incercat automat"; dupa „Reimprospateaza NAS" randul e „Server + NAS" | |
+| 4 | Pe partajare `\\192.168.100.50\BackupStocDepozit` | Pachetul `.zip` si `.sha256` exista, fara fisiere `.partial`; Jurnal: „Copiere backup pe NAS" fara parola in detalii | |
+| 5 | In timpul pasului 3 (15-25 s), intr-o a doua fila deschide /produse | Pagina „Backup sau restaurare in curs" cu „Te rugam sa astepti"; dupa terminare revine singura la /produse | |
+| 6 | Repeta pasul 5 in timpul unei restaurari dintr-un pachet proaspat (Setari -> Backup, selectezi, „Restaureaza baza de date", scrii confirma) | Aceeasi pagina de asteptare, apoi revenire; Jurnal „Restaurare"; nicio eroare 500 | |
+| 7 | Opreste NAS-ul sau strica parola si fa un backup | Backup-ul local reuseste, mesaj in cuvinte despre NAS; apare notificarea „Copie pe NAS lipsa" | |
+
+### 15.10.2026 - Setari -> Module (stare module, doar administrator)
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** fila "Module" in Setari (doar pentru administrator): lista modulelor cu versiune, stare (Functioneaza / Cu erori / Oprit), de cand, cauza (erori repetate cu tipul erorii, nu a pornit, oprit din configurare) si numarul de erori la rand; iconita "Reincearca" pentru un modul oprit dupa erori repetate (scrisa in Jurnal). Deasupra tuturor paginilor, administratorul vede un banner cu modulele oprite, cu link spre aceasta fila.
+
+**Ce face acum:** un modul oprit se vede imediat de catre administrator, nu doar prin `/health/modules` sau in log. "Reincearca" lasa urmatoarea utilizare sa treaca fara a astepta cele 30 de secunde. Un modul care nu a pornit sau e oprit din configurare cere repornirea aplicatiei si nu are iconita.
+
+Pasi:
+
+1. Intra ca administrator in Setari -> Module: toate modulele apar "Functioneaza".
+2. Porneste aplicatia cu `Modules__analize-risc__Enabled=false`: fila arata modulul "Oprit (oprit din configurare)" si apare bannerul de deasupra paginilor; un utilizator obisnuit nu vede nici fila, nici bannerul.
+3. La un modul oprit dupa erori repetate, apasa iconita Reincearca: apare mesajul "va fi reincercat la urmatoarea utilizare" si, in Jurnal, "Reincercare modul" pe numele tau.
+4. Cu bannerul afisat, trece pe alta fila din Setari (de exemplu Notificari) si apasa "Detalii" din banner: se deschide fila Module (si cand adresa ramasese aceeasi, ?tab=module).
+
 ### 08.10.2026 - Iconite pe randurile tabelelor si numar ca insigna pe taburi
 
 **Ce s-a adaugat:** regula „Iconite pe randurile tabelelor" (CLAUDE.md): editarea si stergerea/scoaterea de pe un rand sunt butoane doar cu iconita (creion verde, cos de gunoi rosu), peste tot (sabloane notificari, hartă, facturi, oferte, furnizori, beneficiari, vehicule, utilizatori, miscari, tipuri de sisteme, componente proiect, pachete backup). Taburile de categorii din sabloanele de notificari arata numarul in paranteze, ex. „Stoc (4)".

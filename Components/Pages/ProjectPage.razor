@@ -1,9 +1,11 @@
-@page "/proiecte/{Id:int}"
-@attribute [Authorize]
+﻿@page "/proiecte/{Id:int}"
+@attribute [Authorize(Policy = "perm:beneficiari.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProjectRepository Repository
-@inject IProjectFileStore FileStore
+@inject IProjectObservationRepository Observations
+@inject IObservationFiles FileStore
+@inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject IBeneficiaryRepository Beneficiaries
 @inject NavigationManager Navigation
 @inject IChangeFeed ChangeFeed
@@ -51,17 +53,27 @@ else if (project is not null)
 
     <section class="catalog">
         <div class="catalog-heading"><h2>Conținutul proiectului</h2><small>Creat @project.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · actualizat @project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</small></div>
-        <div class="heading-actions section-actions"><button class="primary" disabled="@addingObservation" @onclick="OpenAddObservationAsync">+ Adaugă observație</button></div>
-        @if (addingObservation)
-        {
-            <div class="section-inline-editor"><ProjectObservationEditor @key="observationEditorKey" ProjectId="Id" Original="null" Saved="ObservationSavedAsync" Closed="() => addingObservation = false" /></div>
-        }
+        <ModuleGate ModuleId="observatii-proiect" Notice="false">
+            <div class="heading-actions section-actions"><button class="primary" disabled="@addingObservation" @onclick="OpenAddObservationAsync">+ Adaugă observație</button></div>
+            @if (addingObservation)
+            {
+                <div class="section-inline-editor"><ProjectObservationEditor @key="observationEditorKey" ProjectId="Id" Original="null" Saved="ObservationSavedAsync" Closed="() => addingObservation = false" /></div>
+            }
+        </ModuleGate>
         <div class="table-scroll"><table><thead><tr><th>ELEMENT</th><th>DETALII</th></tr></thead><tbody>
-            <tr><td><a class="category-table-link" href="@($"/proiecte/{Id}/situatie")"><strong>Situația proiectului</strong></a></td><td class="muted">Necesar, predat, stoc, deficit pe componente și lista de achiziție</td></tr>
-            <tr><td><a class="category-table-link" href="@($"/proiecte/{Id}/echipamente")"><strong>Echipamente</strong></a></td><td class="muted">Materiale și echipamente scoase din inventar pentru acest proiect</td></tr>
-            @if (observationsLoading)
+            <ModuleGate ModuleId="situatie-proiect" Notice="false"><tr><td><a class="category-table-link" href="@($"/proiecte/{Id}/situatie")"><strong>Situația proiectului</strong></a></td><td class="muted">Necesar, predat, stoc, deficit pe componente și lista de achiziție</td></tr></ModuleGate>
+            <ModuleGate ModuleId="situatie-proiect" Notice="false"><tr><td><a class="category-table-link" href="@($"/proiecte/{Id}/echipamente")"><strong>Echipamente</strong></a></td><td class="muted">Materiale și echipamente scoase din inventar pentru acest proiect</td></tr></ModuleGate>
+            @if (!Modules.IsAvailable("observatii-proiect"))
+            {
+                <tr><td colspan="2" class="muted">Observațiile proiectului sunt indisponibile momentan (modul indisponibil).</td></tr>
+            }
+            else if (observationsLoading)
             {
                 <tr><td colspan="2">Se încarcă observațiile…</td></tr>
+            }
+            else if (observationsFailed)
+            {
+                <tr><td colspan="2" class="muted" role="alert">Observațiile nu au putut fi încărcate.</td></tr>
             }
             else
             {
@@ -94,7 +106,7 @@ else if (project is not null)
     private string beneficiaryName = "";
     private IReadOnlyList<ProjectObservation> observations = Array.Empty<ProjectObservation>();
     private readonly Dictionary<int, int> fileCounts = new();
-    private bool loading = true, observationsLoading, editing, addingObservation, deleting, deleteBusy;
+    private bool loading = true, observationsLoading, observationsFailed, editing, addingObservation, deleting, deleteBusy;
     private string? error, notice, remoteNotice, deleteError;
     private Guid editorKey, observationEditorKey;
     private IDisposable? changeSubscription;
@@ -179,18 +191,28 @@ else if (project is not null)
     // A quiet reload (remote change) keeps the current rows visible instead of showing the loading row.
     private async Task LoadObservationsAsync(bool quiet = false)
     {
+        if (!Modules.IsAvailable("observatii-proiect")) { observations = Array.Empty<ProjectObservation>(); fileCounts.Clear(); observationsFailed = false; return; }
         if (!quiet) observationsLoading = true;
         try
         {
-            var loaded = await Repository.GetObservationsAsync(Id, lifetime.Token);
+            var loaded = await Observations.GetObservationsAsync(Id, lifetime.Token);
             var counts = new Dictionary<int, int>();
             foreach (var observation in loaded)
                 counts[observation.Id] = (await FileStore.GetFilesAsync(observation.Id, lifetime.Token)).Count;
             observations = loaded;
             fileCounts.Clear();
             foreach (var (observationId, count) in counts) fileCounts[observationId] = count;
+            observationsFailed = false;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // The observations are a module of their own: whatever it throws (a fault, the circuit opening, access denied) leaves the project itself on the screen.
+            Logger.LogWarning("Project observations loading failed ({ErrorType}).", exception.GetType().Name);
+            observations = Array.Empty<ProjectObservation>();
+            fileCounts.Clear();
+            observationsFailed = exception is not BlazorStoc.Modules.ModuleUnavailableException;
+        }
         finally { observationsLoading = false; }
     }
 

@@ -1,7 +1,8 @@
-@page "/setari"
-@attribute [Authorize(Roles = AccessRoles.Administrator + "," + AccessRoles.LimitedUser)]
+﻿@page "/setari"
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
+@inject BlazorStoc.Services.IDatabaseAccountService DatabaseAccountsGate
 @inject UnsavedChanges Guard
 @inject IInvoiceTemplateService InvoiceTemplates
 @inject IAccessControl Access
@@ -20,6 +21,7 @@
     </div>
     @* The invoices panel stays mounted (hidden) when another tab is shown, so a template being edited keeps its changes. *@
         <div role="tabpanel" id="panel-@InvoicesTab" aria-labelledby="tab-@InvoicesTab" class="settings-body" hidden="@(activeTab != InvoicesTab)">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId">
             @SubtabBar(InvoiceSubtabs, "Secțiuni facturi")
             @* The analysis stays mounted (hidden) when the saved templates are shown, so switching sub-tabs does not lose the file being worked on. *@
             <div role="tabpanel" id="subpanel-@InvoiceAnalysisSubtab" aria-labelledby="subtab-@InvoiceAnalysisSubtab" hidden="@(invoiceSubtab != InvoiceAnalysisSubtab)">
@@ -39,16 +41,18 @@
                     <InvoiceTemplatesList @key="templatesVersion" FocusTemplateId="InvoiceTemplateParameter" OnEditWithFile="EditWithFile" />
                 </div>
             }
+            </ModuleGate>
         </div>
-    @if (isAdmin && activeTab == AnafTab)
+    @if (activeTab == AnafTab && allowedTabs.Contains(AnafTab))
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
-            <AnafConfigurator />
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId"><AnafConfigurator /></ModuleGate>
         </div>
     }
-    else if (isAdmin && activeTab == NotificationsTab)
+    else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))
     {
         <div role="tabpanel" id="panel-@NotificationsTab" aria-labelledby="tab-@NotificationsTab" class="settings-body">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId">
             @SubtabBar(NotificationSubtabs, "Secțiuni notificări")
             @if (notificationSubtab == TemplatesSubtab)
             {
@@ -58,9 +62,10 @@
             {
                 <div role="tabpanel" id="subpanel-@SettingsSubtab" aria-labelledby="subtab-@SettingsSubtab"><NotificationSettingsEditor /></div>
             }
+            </ModuleGate>
         </div>
     }
-    else if (isAdmin && activeTab == BackupTab)
+    else if (activeTab == BackupTab && allowedTabs.Contains(BackupTab))
     {
         <div role="tabpanel" id="panel-@BackupTab" aria-labelledby="tab-@BackupTab" class="settings-body">
             @SubtabBar(BackupSubtabs, "Secțiuni backup")
@@ -78,13 +83,13 @@
             }
         </div>
     }
-    else if (isConfiguredAdmin && activeTab == DatabaseTab)
+    else if (activeTab == DatabaseTab && allowedTabs.Contains(DatabaseTab))
     {
         <div role="tabpanel" id="panel-@DatabaseTab" aria-labelledby="tab-@DatabaseTab" class="settings-body">
             @SubtabBar(DatabaseSubtabs, "Secțiuni bază de date")
             @if (databaseSubtab == DatabaseConnectionSubtab)
             {
-                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab"><DatabaseConnectionPanel /></div>
+                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab"><DatabaseServerPanel Changed="ServerChanged" /><DatabaseConnectionPanel @key="@($"connection-{connectionRevision}")" /><ApplicationPanel @key="@($"application-{connectionRevision}")" /><DatabaseAccountsPanel /></div>
             }
             else
             {
@@ -92,18 +97,30 @@
             }
         </div>
     }
-    else if (isAdmin && activeTab == MapTab)
+    else if (activeTab == MapTab && allowedTabs.Contains(MapTab))
     {
         <div role="tabpanel" id="panel-@MapTab" aria-labelledby="tab-@MapTab" class="settings-body">
             @SubtabBar(MapSubtabs, "Secțiuni hartă")
             @if (mapSubtab == MapEngineSubtab)
             {
-                <div role="tabpanel" id="subpanel-@MapEngineSubtab" aria-labelledby="subtab-@MapEngineSubtab"><MapEngineEditor /></div>
+                <div role="tabpanel" id="subpanel-@MapEngineSubtab" aria-labelledby="subtab-@MapEngineSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><MapEngineEditor /></ModuleGate></div>
             }
             else
             {
-                <div role="tabpanel" id="subpanel-@MapOverlaySubtab" aria-labelledby="subtab-@MapOverlaySubtab"><MapPinTypesEditor FocusPinTypeId="PinParameter" /></div>
+                <div role="tabpanel" id="subpanel-@MapOverlaySubtab" aria-labelledby="subtab-@MapOverlaySubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><MapPinTypesEditor FocusPinTypeId="PinParameter" /></ModuleGate></div>
             }
+        </div>
+    }
+    else if (activeTab == ModulesTab && allowedTabs.Contains(ModulesTab))
+    {
+        <div role="tabpanel" id="panel-@ModulesTab" aria-labelledby="tab-@ModulesTab" class="settings-body">
+            <ModulesPanel />
+        </div>
+    }
+    else if (activeTab == UserTypesTab && allowedTabs.Contains(UserTypesTab))
+    {
+        <div role="tabpanel" id="panel-@UserTypesTab" aria-labelledby="tab-@UserTypesTab" class="settings-body">
+            <UserTypesPanel />
         </div>
     }
 </section>
@@ -111,36 +128,71 @@
 </PageBoundary>
 
 @code {
+    // The connection and the application port are read again after the server changed (a new port of the server changes the connection shown beside it).
+    private int connectionRevision;
+    private void ServerChanged() => connectionRevision++;
+
     private const string AnafTab = "anaf";
     private const string NotificationsTab = SettingsNavigation.NotificationsTab;
     private const string MapTab = SettingsNavigation.MapTab;
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private const string BackupTab = "backup";
-    // Only the administrator configured in the private file sees this tab (a database user with the Administrator role does not).
+    // The Administrator role (every administrator, also the one configured in the private file) sees this tab; it is not a key of the catalog.
     private const string DatabaseTab = "baza-de-date";
     private const string DatabaseStatusSubtab = "stare";
     private const string DatabaseConnectionSubtab = "conexiune";
     private static readonly (string Id, string Title)[] DatabaseSubtabs = [(DatabaseStatusSubtab, "Stare"), (DatabaseConnectionSubtab, "Conexiune")];
     private string databaseSubtab = DatabaseStatusSubtab;
+    private const string UserTypesTab = "tipuri-utilizatori";
+    private const string ModulesTab = SettingsNavigation.ModulesTab;
     // Backup is one tab with three sub-tabs: backup and restore, the NAS copy, the check of the server clock.
     private const string BackupMainSubtab = "backup-main";
     private const string NasTab = "backup-nas";
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (ModulesTab, "Module"), (UserTypesTab, "Tipuri de utilizatori"), (DatabaseTab, "Bază de date")];
+    // The key that opens each tab (what the user type of the signed-in user allows).
+    private static readonly Dictionary<string, string> TabKeys = new()
+    {
+        [AnafTab] = "setari-anaf.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
+        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [UserTypesTab] = "tipuri-utilizatori.view"
+    };
+    private readonly HashSet<string> allowedTabs = [];
     private string activeTab = AnafTab;
 
     // The administrator has every tab; a user without that role only reaches the invoice templates (creating and changing them).
-    private bool isAdmin, isConfiguredAdmin;
-    private (string Id, string Title)[] VisibleTabs => isAdmin ? [.. Tabs.Where(tab => tab.Id != DatabaseTab || isConfiguredAdmin)] : [.. Tabs.Where(tab => tab.Id == InvoicesTab)];
+    private bool isAdmin => allowedTabs.Any(tab => tab != InvoicesTab);
+    private (string Id, string Title)[] VisibleTabs => [.. Tabs.Where(tab => allowedTabs.Contains(tab.Id))];
 
     protected override async Task OnInitializedAsync()
     {
-        isAdmin = await Access.IsAdministratorAsync();
-        isConfiguredAdmin = await Access.IsConfiguredAdministratorAsync();
-        if (!isAdmin) activeTab = InvoicesTab;
+        // The Database tab depends only on the Administrator role (from the sign-in cookie, no database involved): it must open when the database is down,
+        // because it is where the connection is fixed. A key that cannot be read (the database does not answer) only hides its own tab.
+        if (await Access.IsAdministratorAsync()) allowedTabs.Add(DatabaseTab);
+        foreach (var (tab, key) in TabKeys)
+        {
+            try { if (await Access.HasAsync(key)) allowedTabs.Add(tab); }
+            catch (Exception exception) when (exception is not OperationCanceledException) { }
+        }
+        // An account of the database still has the default password: the administrator sees only the connection (where the passwords are changed) until it is done.
+        if (allowedTabs.Contains(DatabaseTab))
+        {
+            try
+            {
+                if (await DatabaseAccountsGate.AnyDefaultPasswordAsync())
+                {
+                    allowedTabs.Clear();
+                    allowedTabs.Add(DatabaseTab);
+                    activeTab = DatabaseTab;
+                    databaseSubtab = DatabaseConnectionSubtab;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException) { }
+        }
+        if (!allowedTabs.Contains(activeTab) && VisibleTabs.Length > 0) activeTab = VisibleTabs[0].Id;
     }
+
 
     private const string TemplatesSubtab = SettingsNavigation.TemplatesSubtab;
     private const string SettingsSubtab = SettingsNavigation.SettingsSubtab;
@@ -207,6 +259,8 @@
     [SupplyParameterFromQuery(Name = SettingsNavigation.TemplateParameter)] public int? TemplateParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.PinParameter)] public int? PinParameter { get; set; }
     [SupplyParameterFromQuery(Name = SettingsNavigation.InvoiceTemplateParameter)] public int? InvoiceTemplateParameter { get; set; }
+    // A fresh value forces a link that points at the same address as before (the banner's "Detalii" while the user moved to another tab) to be applied again.
+    [SupplyParameterFromQuery(Name = SettingsNavigation.RefreshParameter)] public string? RefreshQuery { get; set; }
     private string? appliedLink;
 
     // A link with the id of a template opens its editing (the "Editare șablon" sub-tab) at once.
@@ -214,14 +268,14 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}";
+        var link = $"{TabQuery}|{SubtabQuery}|{TemplateParameter}|{PinParameter}|{InvoiceTemplateParameter}|{InvoiceEditParameter}|{RefreshQuery}";
         if (link == appliedLink) return;
         appliedLink = link;
         if (VisibleTabs.Any(tab => tab.Id == TabQuery)) activeTab = TabQuery!;
         // The old address of the NAS tab keeps working.
-        if (isAdmin && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
+        if (allowedTabs.Contains(BackupTab) && TabQuery == NasTab) { activeTab = BackupTab; backupSubtab = NasTab; }
         if (BackupSubtabs.Any(tab => tab.Id == SubtabQuery)) { backupSubtab = SubtabQuery!; if (isAdmin && TabQuery is null or BackupTab) activeTab = BackupTab; }
-        if (isConfiguredAdmin && TabQuery == DatabaseTab && DatabaseSubtabs.Any(tab => tab.Id == SubtabQuery)) databaseSubtab = SubtabQuery!;
+        if (allowedTabs.Contains(DatabaseTab) && TabQuery == DatabaseTab && DatabaseSubtabs.Any(tab => tab.Id == SubtabQuery)) databaseSubtab = SubtabQuery!;
         if (NotificationSubtabs.Any(tab => tab.Id == SubtabQuery)) notificationSubtab = SubtabQuery!;
         if (MapSubtabs.Any(tab => tab.Id == SubtabQuery)) mapSubtab = SubtabQuery!;
         if (InvoiceSubtabs.Any(tab => tab.Id == SubtabQuery)) invoiceSubtab = SubtabQuery!;

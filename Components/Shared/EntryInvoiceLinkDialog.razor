@@ -6,7 +6,7 @@
    each entry is its own event in the journal and the reason is required. *@
 <div class="delete-overlay">
     <section class="delete-dialog movement-dialog" role="dialog" aria-modal="true" aria-labelledby="link-title">
-        <h2 id="link-title">@(Detach ? "Detașează intrarea de la factură" : Entries.Count == 1 ? "Atașează intrarea la factură" : $"Atașează {Entries.Count} intrări la factură")</h2>
+        <div class="dialog-head"><h2 id="link-title">@(Detach ? "Detașează intrarea de la factură" : Entries.Count == 1 ? "Atașează intrarea la factură" : $"Atașează {Entries.Count} intrări la factură")</h2><HelpButton Topic="facturi-legare-intrari" About="Legarea intrărilor de factură" /></div>
         <ul class="link-entries">
             @foreach (var entry in Entries)
             {

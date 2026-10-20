@@ -1,0 +1,54 @@
+# Setări · Generare șablon factură
+Ruta: /setari
+Tab: Generare șablon factură
+Cautare: sablon factura generare analiza pdf scanat xml zip campuri coloane linii demarcare overlay salveaza furnizor cui descriere intrare stoc
+Captura: pagina | /setari | click Facturi; upload factura-demo.pdf; full | Generarea șablonului de factură
+
+Creezi un șablon pe o factură de probă: aplicația citește tabelul cu liniile și câmpurile din antet și le arată pe pagină ca un șablon interactiv. Alegi ce se folosește la import, corectezi poziția elementelor, scrii descrierea intrării în stoc și salvezi. După salvare, șablonul se aplică de îndată facturii. Același editor se deschide și din „Preluare factură”, când furnizorul nu are șablon.
+
+## Elemente
+### Fișierul
+- Alege factura PDF, XML sau ZIP | zonă | PDF de cel mult 20 MB și 30 de pagini; o factură XML (e-Factura UBL) sau arhiva ZIP deschide editorul de șablon XML ([[setari-facturi-xml]]).
+- Numele fișierului și numărul de pagini | text | Fișierul încărcat și felul în care a fost citit (cu text sau scanat, OCR).
+- Analizează fișierul | buton | La editare, pornește analiza (câmpuri, tabel, șabloane potrivite) și așază șablonul pe fișier.
+- Renunță și elimină fișierul | buton | Șterge fișierul încărcat.
+- Șabloane salvate care se potrivesc | listă | Șabloane existente potrivite după CUI și aspect; „Folosește acest șablon” îl aplică, iar „Înapoi la propunerea automată” revine.
+### Pagina facturii
+- Paginile facturii | filă | Câte o filă pe pagină.
+- Anulează / Refă | buton | Anulează sau reface ultima modificare (Ctrl+Z / Ctrl+Y).
+- Adaugă câmp desenând pe pagină | buton | Desenezi un chenar în jurul unei valori din antet.
+- Adaugă celulă de antet desenând pe pagină | buton | Desenezi celula de antet a unei coloane.
+- Desenează zona unei coloane | buton | Desenezi fâșia verticală a unei coloane.
+- Elemente selectate | text | După selecția multiplă: „Șterge elementele selectate” sau „Anulează selecția”.
+- Chenarele | marcaj | Chenarele verzi sunt elemente folosite la import, cele întrerupte sunt găsite dar nefolosite, iar fâșiile verticale colorate sunt coloanele tabelului.
+### Câmpuri și coloane
+- Arată toate câmpurile găsite | comutator | Include și câmpurile fără sens recunoscut.
+- Lista câmpurilor | listă | Câmpurile grupate; fiecare are comutatorul „Folosit la import”, numele, „Editează câmpul” ([[setari-facturi-camp]]) și „Șterge câmpul”.
+- Lista coloanelor | listă | Coloanele tabelului, cu comutatorul „Folosită la import”, „Editează coloana” ([[setari-facturi-coloana]]) și „Șterge coloana”.
+- Rândurile încep la | listă | La linia numărului curent (obișnuit) sau la jumătatea distanței dintre numere.
+- Cod produs în denumire, după separatorul | câmp | Dacă denumirea este „COD ; Denumire”, textul dinaintea separatorului devine codul.
+- Antetul tabelului (limita de jos, y) | câmp | Rândurile se citesc sub această linie.
+- Citește rândurile | buton | Recitește tabelul după ce ai desenat coloanele.
+### Citirea
+- Câmpuri citite | tabel | Valoarea citită pentru fiecare câmp folosit.
+- Rânduri citite | tabel | Rândurile tabelului, cu coloanele alese și coloana „Verificare”; sub tabel, numărul rândurilor și nota despre sume.
+### Descrierea intrării în stoc
+- Descriere intrare în stoc a produsului | câmp cu etichete | Textul intrării în stoc a unui produs preluat. Apeși o etichetă ca s-o adaugi la cursor; etichetele vin din elementele active ale șablonului. Operațiile (de exemplu sumă) se scriu cu acolade.
+- Previzualizare | text | Cum arată descrierea cu valorile citite.
+### Salvare
+- Denumirea șablonului *, Furnizor *, CUI/CIF furnizor * | câmp | Cu CUI-ul se recunoaște furnizorul. Dacă furnizorul e în baza de date, șablonul se leagă de el; „+ Adaugă furnizorul” deschide formularul de furnizor, iar „Folosește acest furnizor” apare când aplicația bănuiește unul apropiat.
+- Salvează | buton | Salvează șablonul (la editare îl înlocuiește).
+- Salvează ca șablon nou | buton | La editare: păstrează șablonul curent și creează altul ([[setari-facturi-salveaza-nou]]).
+
+## Flux: Cum creez un șablon pentru un furnizor
+1. Încarcă o factură PDF a furnizorului.
+2. Verifică chenarele de pe pagină și comutatoarele „Folosit la import” ale câmpurilor și coloanelor; corectează cu „Editează” sau desenând pe pagină.
+3. Verifică rândurile citite; ajustează „Rândurile încep la” sau liniile de demarcare dacă sunt citite greșit.
+4. Scrie descrierea intrării în stoc cu etichetele potrivite.
+5. Completează denumirea șablonului și furnizorul (cu CUI) și apasă „Salvează”.
+Nota: tabelul de rânduri și câmpurile se actualizează la fiecare modificare.
+
+## Flux: Cum repar o factură citită greșit
+1. Dacă tabelul nu a fost găsit, desenează mai întâi coloana cu denumirea, apoi celelalte, și apasă „Citește rândurile”.
+2. Dacă o valoare din antet lipsește, desenează câmpul pe pagină și alege-i eticheta.
+3. Salvează șablonul; următoarele facturi ale furnizorului se citesc după el.

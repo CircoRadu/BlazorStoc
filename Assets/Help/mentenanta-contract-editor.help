@@ -1,0 +1,34 @@
+# Formularul de contract de mentenanță
+Cautare: contract mentenanta formular numar data ciclicitate valabil puncte de lucru prima interventie scadenta mutare
+Captura: formular | /beneficiari | click Panoramic Hotel; click Adaugă contract | Formularul de contract
+
+Formularul pentru un contract nou sau pentru editarea unuia existent. Se deschide în fișa beneficiarului. Contractul acoperă unul sau mai multe dintre punctele de lucru ale beneficiarului.
+
+## Elemente
+### Contractul
+- Număr / dată contract * | câmp | Se acceptă 26/23.09.2025, 26 / 23.09.2025 sau 26 din 23.09.2025; se afișează ca număr/dată.
+- Ciclicitate (luni) * | listă | Ciclicitatea globală a contractului; fiecare punct o poate înlocui cu una proprie.
+- Valabil până la | câmp | Data de expirare, opțională („Fără termen” o șterge). Nu oprește singură mentenanța.
+- Observații | câmp | Text liber.
+### Puncte de lucru din contract
+- Data primei intervenții | câmp | Scadența inițială pentru mai multe puncte deodată; „Aplică tuturor punctelor bifate” o pune pe toate.
+- Marcajul punctului | comutator | Include sau scoate punctul din contract. Dacă punctul e deja într-un alt contract activ, apare „Mută aici”: scadența și ciclicitatea lui se păstrează la mutare.
+- Punct de lucru | coloană | Numele și adresa punctului (cel principal este marcat).
+- Stare | coloană | „În acest contract” sau contractul activ în care se află deja.
+- Prima intervenție / Scadența curentă | câmp | Data primei vizite planificate pentru punct (nu data de la care se numără ciclul).
+- Ciclicitate individuală | listă | Înlocuiește ciclicitatea contractului pentru punctul respectiv.
+### Butoane
+- Salvează | buton | Salvează contractul.
+- Închide, Anulează | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+
+## Flux: Cum adaug un contract de mentenanță
+1. Scrie numărul și data contractului și alege ciclicitatea.
+2. La „Puncte de lucru din contract” include punctele acoperite.
+3. Pune data primei intervenții (pentru toate cu „Aplică tuturor” sau punct cu punct) și, dacă e cazul, o ciclicitate individuală.
+4. Salvează; scadențele apar în „Mentenanță”.
+Nota: dacă beneficiarul nu are puncte de lucru, adaugă mai întâi unul din fișa lui.
+
+## Flux: Cum mut un punct în alt contract
+1. Deschide contractul în care vrei punctul.
+2. La punctul aflat în alt contract activ pornește „Mută aici”.
+3. Salvează; punctul își păstrează scadența și ciclicitatea.

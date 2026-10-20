@@ -13,6 +13,7 @@
 [CmdletBinding()]
 param(
     [int]$Port = 5087,
+    [string]$OverridePath,
     [string]$MariaRoot = 'C:\Dev\BlazorStoc-MariaDB',
     [string]$SecretsDir,
     [string]$MariaBinDir,
@@ -29,6 +30,18 @@ if (-not (Test-Path $config)) { throw "$config not found. Run tools\setup-dev-en
 $build = Join-Path $repo 'artifacts\notif-build'
 
 $databasePort = (Get-Content $config -Raw | ConvertFrom-Json).Database.Port
+# Setari -> Baza de date writes the ports it changed to the override file (outside the repository); the preview follows them, an explicit -Port wins.
+. (Join-Path $PSScriptRoot 'data-root.ps1')
+if (-not $OverridePath) { $OverridePath = Join-Path (Get-AppDataRoot) 'database-connection.override.json' }
+$bindAll = $false
+if (Test-Path $OverridePath) {
+    try {
+        $saved = Get-Content $OverridePath -Raw | ConvertFrom-Json
+        if ($saved.port) { $databasePort = [int]$saved.port }
+        if ($saved.appPort -and -not $PSBoundParameters.ContainsKey('Port')) { $Port = [int]$saved.appPort }
+        if ($saved.appBindAll) { $bindAll = $true }
+    } catch { Write-Warning "The override file $OverridePath could not be read; the ports of the private configuration are used." }
+}
 $mariaArguments = @{ Action = 'start'; Root = $MariaRoot; Port = $databasePort }
 if ($MariaBinDir) { $mariaArguments.BinDir = $MariaBinDir }
 & (Join-Path $PSScriptRoot 'dev-mariadb.ps1') @mariaArguments
@@ -58,7 +71,7 @@ if (-not $NoPublish -or -not (Test-Path (Join-Path $build 'BlazorStoc.dll'))) {
 }
 
 $env:Database__PrivateConfigPath = $config
-$env:ASPNETCORE_URLS = "http://127.0.0.1:$Port"
+$env:ASPNETCORE_URLS = "http://$(if ($bindAll) { '0.0.0.0' } else { '127.0.0.1' }):$Port"
 $env:ASPNETCORE_WEBROOT = Join-Path $build 'wwwroot'
 # The backup and restore tools (mariadb-dump, mariadb) of the same MariaDB distribution the preview runs on; without these paths the application looks for them under
 # %LocalAppData%\BlazorStoc-MariaDB and a backup fails with "mariadb-dump nu a fost gasit".

@@ -4,6 +4,47 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 
 ## Modificari de testat
 
+### 16.10.2026 - Preluarea facturilor ca modul (oprire fara efect asupra restului aplicatiei)
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** Preluarea facturilor (pagina Preluare factura, analiza PDF/XML, sabloanele de facturi si fila Setari -> Facturi) este un modul al aplicatiei. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge: stocul, furnizorii, registrul de facturi (/facturi) si intrarile se folosesc ca pana acum.
+
+**Ce face acum:** cu modulul oprit, /produse/preluare-factura arata "Modul indisponibil"; linkul din meniul Produse, cardul de pe pagina principala si butonul "Preia din PDF" din formularul de intrare dispar; Setari -> Facturi arata nota de modul oprit; redenumirea unui furnizor merge (sabloanele lui nu se mai actualizeaza cat modulul e oprit, dar se potrivesc dupa CUI). Un fisier care nu e factura, un sablon respins sau lipsa dreptului dau mesajul obisnuit si nu opresc modulul; o cadere a recunoasterii OCR opreste doar modulul OCR, nu si pe cel de facturi. Bannerul de module oprite se actualizeaza singur si dispare imediat dupa "Reincearca".
+
+Pasi:
+
+1. Cu modulul pornit (normal): Preluare factura (PDF si XML), Setari -> Facturi (generare si sabloane salvate) se deschid si lucreaza ca pana acum.
+2. Porneste aplicatia cu `Modules__preluare-factura__Enabled=false`: Preluare factura arata "Modul indisponibil", meniul si cardul nu mai au linkul, formularul de intrare nu are "Preia din PDF", Setari -> Facturi arata nota, Setari -> Module arata Preluare factura "Oprit (oprit din configurare)".
+3. Tot cu modulul oprit: Furnizori, Facturi (registrul) si Intrari/iesiri produs se deschid; redenumeste un furnizor (merge).
+4. Banner: oprit un modul (de exemplu din configurare), apasa "Detalii" - se deschide Setari -> Module; dupa o oprire prin erori repetate, "Reincearca" scoate bannerul in mai putin de o secunda.
+5. La un PDF al carui sablon nu are descriere pentru intrare, pasul 3 propune singur "Factura <numar> · <furnizor> (preluata din PDF)" in campul "Descrierea intrarii in stoc" (poti sa o schimbi); "Finalizeaza preluarea" nu mai este refuzata pentru descriere goala. Cu un sablon care are descriere, ramane descrierea sablonului.
+
+### 15.10.2026 - Citirea facturilor PDF ruleaza intr-un proces separat
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** citirea facturilor PDF (text sau scanate, cu recitirea numerelor din tabel) ruleaza acum intr-un proces worker separat; aceeasi functie in modulul `ocr` este folosita si de Setari -> Facturi (analiza unui fisier model).
+
+**Ce face acum:** o factura PDF se citeste si se analizeaza ca inainte. Daca procesul de recunoastere cade, pagina arata mesajul "Citirea fisierului a esuat: procesul de recunoastere s-a oprit..." si poti reincerca; dupa 3 esecuri la rand, "Recunoasterea documentelor este indisponibila momentan" 30 de secunde. Facturile XML/ZIP nu folosesc OCR si nu sunt afectate.
+
+Pasi:
+
+1. Preluare factura: incarca o factura PDF cu text si una scanata: furnizorul si randurile se propun ca inainte.
+2. Setari -> Facturi: incarca un fisier model PDF: se deschide pe model ca inainte.
+3. Incarca un fisier care nu e PDF sau un PDF gol: apare mesajul obisnuit al paginii.
+
+
+### 10.10.2026 - Preluare factura si fereastra de sabloane, reorganizate in cod
+
+**Ce s-a schimbat:** nimic vizibil; codul paginii `/produse/preluare-factura` si al ferestrei de sabloane (Setari -> Facturi) a fost impartit pe fisiere, iar citirea randurilor din PDF a fost desfacuta in pasi. Verificarea este ca nimic nu s-a schimbat.
+
+**Ce faci:**
+1. Continua preluarea de la pasul 3 (confirma numarul, data si CUI-ul) si fa intrarea in stoc pe un produs TEST.
+2. Pe o factura fara sablon, marcheaza regiunile in fereastra de sabloane, salveaza sablonul si redeschide-l din Setari -> Facturi -> Sabloane salvate.
+
+**Ce trebuie sa vezi:** aceleasi randuri citite ca inainte pe aceleasi facturi (numar, CUI, data, produse), aceleasi avertizari; nicio eroare. Rezultat: ...
+
 ### 10.10.2026 - Preluare factura: produse deja preluate si selectorul de randuri la pasul 2
 
 **Ce s-a adaugat:** la pasul 1, avertizarea „deja preluat" (aceeasi ca la pasii 2 si 3) pe randurile ale caror produse au mai fost preluate de pe aceeasi factura; la pasul 2, selectorul rotund de preluare a randurilor (cu „Preia" pentru toate), aceeasi alegere ca la pasul 1.
@@ -38,7 +79,6 @@ Fluxul: Stoc -> Preluare factura -> incarci PDF/scanare -> pas 1 (tabelul si col
 |---|---|---|---|
 | 1 | Setari -> Facturi -> Sabloane salvate -> „Sablon XML nou"; alege furnizorul, „Completeaza cu caile UBL standard", incarca un XML de proba | Se vad numarul, data, furnizorul si primele 10 linii citite; denumirea si furnizorul sunt obligatorii | |
 | 2 | Salveaza; sablonul apare in lista cu sursa „Fisier XML"; deschide detaliile | Caile salvate; creionul deschide aceeasi fereastra (nu editorul PDF) | |
-| 3 | Produse -> Preluare factura -> alege o factura .xml a furnizorului | „Sablon XML detectat: ...", tabelul cu liniile, fara imaginea paginii | |
 | 4 | Aceeasi factura XML fara sablon al furnizorului | Mesaj ca s-au folosit caile UBL standard; liniile se citesc | |
 | 5 | Un fisier XML invalid sau fara linii | Mesaj clar in romana; nimic preluat | |
 | 6 | Continua pana la pasul 3 si salveaza; apoi repeta cu aceeasi factura | Intrarile apar legate de factura; a doua oara avertisment de duplicat | |

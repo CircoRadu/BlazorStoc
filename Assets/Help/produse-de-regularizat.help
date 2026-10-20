@@ -1,0 +1,28 @@
+# Produse și stocuri · De regularizat
+Ruta: /produse
+Tab: De regularizat
+Cautare: stoc negativ regularizare iesiri peste stoc corectie
+Captura: pagina | /produse | click De regularizat; full | Produsele de regularizat
+
+Secțiunea listează produsele cu stoc negativ după ieșiri peste stoc, începând cu cele mai vechi. De obicei înseamnă o intrare care nu a fost operată sau un stoc greșit în bază. Aici le corectezi.
+
+## Elemente
+### Filtre
+- Cauza | selecție | Toate, Intrare neoperată, Stoc greșit în bază sau Fără cauză: arată doar produsele cu cauza aleasă.
+- Vechime | listă | Oricât, sau cel puțin 7, 14 sau 30 de zile de când stocul este negativ.
+### Tabelul
+- Produs | coloană | Numele produsului; apasă-l ca să deschizi pagina lui.
+- Stoc | coloană | Cantitatea negativă curentă.
+- Ieșiri peste stoc | coloană | Cât s-a ieșit peste stocul disponibil.
+- De la | coloană | Data de când stocul este negativ.
+- Vechime | coloană | Câte zile au trecut de atunci.
+- Cauza | coloană | Cauza stabilită pentru neconcordanță, dacă există.
+- Regularizează | buton | Deschide fereastra de regularizare a stocului produsului.
+- Deschide produsul | link | Apare când stocul total nu este negativ (produsul e în vehicule); se corectează din ieșirile produsului.
+
+## Flux: Cum regularizez un produs cu stoc negativ
+1. Alege, dacă vrei, cauza și vechimea ca să restrângi lista.
+2. Pe rândul produsului apasă „Regularizează”.
+3. În fereastra „Regularizare stoc” alegi cum se corectează stocul (de exemplu, înregistrezi intrarea care lipsea) și apeși „Regularizează stocul acum”.
+4. Produsul dispare din listă, iar numărul din titlul secțiunii scade.
+Nota: „Renunț” închide fereastra fără nicio modificare.

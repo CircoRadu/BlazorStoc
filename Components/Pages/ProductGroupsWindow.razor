@@ -1,6 +1,6 @@
-@page "/categorii/fereastra"
+﻿@page "/categorii/fereastra"
 @layout Layout.PopoutLayout
-@attribute [Authorize]
+@attribute [Authorize(Policy = "perm:categorii.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 <PageBoundary>
 

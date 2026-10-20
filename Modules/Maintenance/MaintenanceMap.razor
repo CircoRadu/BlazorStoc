@@ -1,0 +1,10 @@
+﻿@page "/mentenanta/harta"
+@namespace BlazorStoc.Components.Pages
+@attribute [Authorize(Policy = "perm:mentenanta.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+<PageBoundary>
+
+<MaintenanceMapView />
+</PageBoundary>

@@ -281,14 +281,11 @@ public static class ProjectFileRules
     }
 }
 
-public interface IProjectRepository
+// The observations of a project (notes with attached files) belong to the project observations module (Modules/ProjectObservations); its pages read and write them through
+// this interface behind the circuit breaker. The whole project repository is also this reader/writer, so deleting a project (which archives its observations) and every
+// existing implementation stay as they are.
+public interface IProjectObservationRepository
 {
-    Task<IReadOnlyList<Project>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default);
-    Task<Project?> GetAsync(int id, CancellationToken cancellationToken = default);
-    Task<Project> CreateAsync(ProjectInput input, CancellationToken cancellationToken = default);
-    Task<Project> UpdateAsync(Project original, ProjectInput input, CancellationToken cancellationToken = default);
-    Task DeleteAsync(Project original, string reason, CancellationToken cancellationToken = default);
-
     Task<IReadOnlyList<ProjectObservation>> GetObservationsAsync(int projectId, CancellationToken cancellationToken = default);
     Task<ProjectObservation?> GetObservationAsync(int id, CancellationToken cancellationToken = default);
     Task<ProjectObservation> CreateObservationAsync(int projectId, ProjectObservationInput input, string author,
@@ -298,15 +295,29 @@ public interface IProjectRepository
     Task DeleteObservationAsync(ProjectObservation original, string reason, CancellationToken cancellationToken = default);
 }
 
+public interface IProjectRepository : IProjectObservationRepository
+{
+    Task<IReadOnlyList<Project>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default);
+    Task<Project?> GetAsync(int id, CancellationToken cancellationToken = default);
+    Task<Project> CreateAsync(ProjectInput input, CancellationToken cancellationToken = default);
+    Task<Project> UpdateAsync(Project original, ProjectInput input, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Project original, string reason, CancellationToken cancellationToken = default);
+}
+
 public sealed record ProjectFileContent(byte[] Content, string ContentType, string OriginalName);
 
-public interface IProjectFileStore
+// The files attached to the observations, read and written by the observations module behind its circuit breaker; the whole store (IProjectFileStore) stays in the core.
+public interface IObservationFiles
 {
     Task<IReadOnlyList<ProjectObservationFile>> GetFilesAsync(int observationId, CancellationToken cancellationToken = default);
     Task<ProjectFileContent?> GetContentAsync(int fileId, CancellationToken cancellationToken = default);
     Task<ProjectObservationFile> SaveAsync(int observationId, string originalName, string declaredContentType,
         byte[] content, string author, CancellationToken cancellationToken = default);
     Task DeleteAsync(int fileId, string reason, CancellationToken cancellationToken = default);
+}
+
+public interface IProjectFileStore : IObservationFiles
+{
 }
 
 public static class ProjectNavigation

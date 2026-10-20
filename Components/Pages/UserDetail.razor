@@ -1,5 +1,5 @@
-@page "/utilizatori/{Id:int}"
-@attribute [Authorize(Roles = AccessRoles.Administrator)]
+﻿@page "/utilizatori/{Id:int}"
+@attribute [Authorize(Policy = "perm:utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IUserRepository Repository
@@ -30,7 +30,7 @@ else
 {
     <div class="page-heading">
         <div><p class="eyebrow">UTILIZATOR</p><h1>@user.Username</h1><p class="muted">@user.DisplayName</p></div>
-        <div class="heading-actions"><button class="refresh act-edit" disabled="@editing" @onclick="OpenEditorAsync">Editează</button></div>
+        <div class="heading-actions">@if (canEdit) { <button class="refresh act-edit" disabled="@editing" @onclick="OpenEditorAsync">Editează</button> }</div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
@@ -41,7 +41,7 @@ else
         <dl class="movement-facts">
             <dt>Nume utilizator</dt><dd>@user.Username</dd>
             <dt>Nume afișat</dt><dd>@user.DisplayName</dd>
-            <dt>Nivel acces</dt><dd><span class="role-badge @(user.Role == AccessRoles.Administrator ? "admin" : "limited")">@user.Role</span></dd>
+            <dt>Tip utilizator</dt><dd><span class="role-badge @(user.Role == AccessRoles.Administrator ? "admin" : "limited")">@(user.TypeName.Length > 0 ? user.TypeName : user.Role)</span></dd>
             <dt>Stare</dt><dd><span class="stock-badge @(user.IsActive ? "positive" : "zero")">@(user.IsActive ? "Activ" : "Inactiv")</span></dd>
         </dl>
         <p class="muted">Parola nu este afișată și nu poate fi recuperată.</p>
@@ -53,7 +53,7 @@ else
 @code {
     [Parameter] public int Id { get; set; }
     private WebUser? user;
-    private bool loading = true, editing;
+    private bool loading = true, editing, canEdit;
     private string? error, notice;
     private Guid editorKey;
     private readonly CancellationTokenSource lifetime = new();
@@ -77,8 +77,9 @@ else
         error = null;
         try
         {
-            // The route is guarded by the administrator role; the check is repeated so the data is never read without it.
-            await Access.EnsureAdministratorAsync(lifetime.Token);
+            // The route is guarded by the permission; the check is repeated so the data is never read without it.
+            await Access.EnsureAsync(Permissions.Key("utilizatori", Permissions.View), lifetime.Token);
+            canEdit = await Access.HasAsync(Permissions.Key("utilizatori", Permissions.Edit), lifetime.Token);
             var users = await Repository.GetUsersAsync(lifetime.Token);
             user = users.FirstOrDefault(item => item.Id == Id);
         }

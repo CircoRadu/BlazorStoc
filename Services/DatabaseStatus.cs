@@ -19,27 +19,16 @@ public sealed record DatabaseServerStatus(
     IReadOnlyList<string> MissingColumns, bool MigratorConfigured, bool BackupAccountConfigured, bool RestoreAccountConfigured);
 
 public sealed record AppRuntimeStatus(string Machine, string Os, string Framework, int ProcessId, DateTime StartedUtc, string Environment,
-    IReadOnlyList<string> Urls, int? ConfiguredPort, string? HostingNote, int Sessions, long WorkingSetBytes, string ContentRoot);
-
-/// <summary>The number of open interactive sessions (Blazor circuits).</summary>
-public sealed class CircuitCounter
-{
-    private int count;
-    public int Count => Volatile.Read(ref count);
-    internal void Opened() => Interlocked.Increment(ref count);
-    internal void Closed() => Interlocked.Decrement(ref count);
-}
-
-public sealed class CircuitCountHandler(CircuitCounter counter) : CircuitHandler
-{
-    public override Task OnCircuitOpenedAsync(Circuit circuit, CancellationToken cancellationToken) { counter.Opened(); return Task.CompletedTask; }
-    public override Task OnCircuitClosedAsync(Circuit circuit, CancellationToken cancellationToken) { counter.Closed(); return Task.CompletedTask; }
-}
+    IReadOnlyList<string> Urls, int? ConfiguredPort, string? HostingNote, int Sessions, long WorkingSetBytes, string ContentRoot, int DisconnectedSessions = 0);
 
 public interface IDatabaseStatusService
 {
     Task<DatabaseServerStatus> ReadDatabaseAsync(CancellationToken cancellationToken = default);
     Task<AppRuntimeStatus> ReadApplicationAsync(CancellationToken cancellationToken = default);
+    /// <summary>The open interactive sessions with their details (user, address, browser, page); administrators only.</summary>
+    Task<IReadOnlyList<OpenSession>> ReadSessionsAsync(CancellationToken cancellationToken = default);
+    /// <summary>Closes the session of another user: its browser is signed out and its connection ends. False when the session is gone or cannot be closed from here.</summary>
+    Task<bool> CloseSessionAsync(string sessionId, string? ownSessionId, CancellationToken cancellationToken = default);
 }
 
 public static class DatabaseStatusText
@@ -63,15 +52,39 @@ public static class DatabaseStatusText
 }
 
 public sealed class DatabaseStatusService(IConfiguration configuration, IAccessControl access, MariaSchemaMigrator? migrator, AppHostingInfo hosting,
-    CircuitCounter circuits, IServer? server = null, IHostEnvironment? environment = null) : IDatabaseStatusService
+    CircuitCounter circuits, IServer? server = null, IHostEnvironment? environment = null, OpenSessionRegistry? sessions = null, IAuditTrail? audit = null) : IDatabaseStatusService
 {
+    public async Task<bool> CloseSessionAsync(string sessionId, string? ownSessionId, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (sessions is null) return false;
+        if (string.Equals(sessionId, ownSessionId, StringComparison.Ordinal)) throw new DatabaseSettingsException("Nu îți poți închide propria sesiune; folosește „Deconectare”.");
+        var target = sessions.Snapshot().FirstOrDefault(session => session.Id == sessionId);
+        if (target is null || !await sessions.RequestCloseAsync(sessionId).ConfigureAwait(false)) return false;
+        // The circuit of a page that was sent away stays in memory for a while (Blazor keeps it for a reconnection); the list and the count do not wait for that.
+        sessions.Closed(sessionId);
+        if (audit is not null)
+        {
+            var who = $"{target.UserName ?? "neautentificat"}{(target.IpAddress is null ? "" : ", adresa " + target.IpAddress)}{(target.Browser is null ? "" : ", " + target.Browser)}";
+            try { await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Application, AuditActions.CloseOpenSession, "", "Sesiune deschisă", $"Sesiunea a fost închisă de administrator ({who})", "", cancellationToken).ConfigureAwait(false); }
+            catch (Exception exception) when (exception is not OperationCanceledException) { }
+        }
+        return true;
+    }
+
+    public async Task<IReadOnlyList<OpenSession>> ReadSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        return sessions?.Snapshot() ?? [];
+    }
+
     public async Task<DatabaseServerStatus> ReadDatabaseAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureConfiguredAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
         var host = configuration["Database:Host"] ?? "127.0.0.1";
         var port = configuration.GetValue("Database:Port", 3307);
         var name = configuration["Database:Name"] ?? "BlazorStoc";
-        var user = configuration["Database:User"] ?? "blazorstoc_dev";
+        var user = configuration["Database:User"] ?? DatabaseAccounts.Find(DatabaseAccounts.ApplicationKey)!.User;
         var ssl = configuration["Database:SslMode"] ?? "Required";
         var local = DatabaseConnectionRules.IsLoopback(host) || host.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase);
         var migratorConfigured = migrator?.MigratorConfigured ?? false;
@@ -141,12 +154,12 @@ public sealed class DatabaseStatusService(IConfiguration configuration, IAccessC
 
     public async Task<AppRuntimeStatus> ReadApplicationAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureConfiguredAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
         using var process = Process.GetCurrentProcess();
         var urls = server?.Features.Get<IServerAddressesFeature>()?.Addresses.ToArray() ?? [];
         return new(Environment.MachineName, RuntimeInformation.OSDescription, RuntimeInformation.FrameworkDescription, process.Id,
-            process.StartTime.ToUniversalTime(), environment?.EnvironmentName ?? "", urls, hosting.ConfiguredPort, hosting.Note, circuits.Count,
-            process.WorkingSet64, environment?.ContentRootPath ?? "");
+            process.StartTime.ToUniversalTime(), environment?.EnvironmentName ?? "", urls, hosting.ConfiguredPort, hosting.Note, sessions is null ? circuits.Count : sessions.Snapshot().Count(session => session.Connected),
+            process.WorkingSet64, environment?.ContentRootPath ?? "", sessions?.Snapshot().Count(session => !session.Connected) ?? 0);
     }
 
     private bool Configured(string userKey, string passwordKey) =>

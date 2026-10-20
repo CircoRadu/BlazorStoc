@@ -1,0 +1,29 @@
+# Jurnal complet
+Ruta: /jurnal/complet
+Cautare: jurnal complet toate evenimentele interval export csv luna ultima tot jurnalul
+Captura: pagina | /jurnal/complet |  | Jurnalul complet
+
+Toate evenimentele din jurnal, căutate direct pe server, pe pagini. Se afișează implicit ultima lună; alege alt interval sau tot jurnalul. Nu se actualizează singur. Doar administratorul vede jurnalul.
+
+## Elemente
+### Antet
+- ← Jurnal activitate | link | Revine la jurnalul recent ([[jurnal]]).
+- ↻ Actualizează | buton | Reîncarcă lista.
+### Filtre
+- Căutare, Tip înregistrare, Operație | câmp | Ca în [[jurnal]].
+- De la, până la | câmp | Intervalul evenimentelor, ales din calendar.
+- Ultima lună, Ultimele 3 luni, Tot jurnalul | buton | Intervale gata făcute.
+- Exportă CSV | buton | Descarcă evenimentele găsite ca CSV (cel mult un număr maxim, cele mai recente; restrânge intervalul ca să le ai pe toate).
+### Tabelul
+- Coloanele și filtrele rapide | tabel | La fel ca în jurnalul recent: data, operator, operație, țintă, detalii.
+- Evenimente pe pagină | listă | Dimensiunea paginii, inclusiv „Toate”.
+
+## Flux: Cum caut un eveniment mai vechi
+1. Alege un interval („Ultimele 3 luni” sau „Tot jurnalul”).
+2. Adaugă căutarea sau filtrele de operație și tip.
+3. Navighează pe pagini.
+
+## Flux: Cum export jurnalul
+1. Alege intervalul și filtrele dorite.
+2. Apasă „Exportă CSV” și deschide fișierul în Excel.
+Nota: dacă sunt prea multe evenimente, exportul cuprinde doar cele mai recente; restrânge intervalul.

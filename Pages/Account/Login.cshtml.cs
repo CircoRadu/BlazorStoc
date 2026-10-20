@@ -18,9 +18,12 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
     public string? Error { get; private set; }
 
+    [BindProperty(SupportsGet = true)] public string? Reason { get; set; }
+
     public IActionResult OnGet()
     {
         if (User.Identity?.IsAuthenticated == true) return LocalRedirect("/");
+        if (Reason == "inchisa") Error = LoginMessages.SessionClosed;
         return Page();
     }
 
@@ -31,7 +34,7 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         if (!string.IsNullOrEmpty(expected) && string.Equals(Username, configuredUsername, StringComparison.Ordinal) &&
             CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? "")), SHA256.HashData(Encoding.UTF8.GetBytes(expected))))
         {
-            return await SignInAsync(configuredUsername, "Administrator configurat", AccessRoles.Administrator, null, configuredAdministrator: true);
+            return await SignInAsync(configuredUsername, "Administrator configurat", AccessRoles.Administrator, null);
         }
         // A wrong password for the configured administrator is rejected without querying SQL.
         if (string.Equals(Username, configuredUsername, StringComparison.Ordinal)) return InvalidLogin();
@@ -46,11 +49,13 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         catch (Exception exception)
         {
             logger.LogError("Database user authentication failed ({ErrorType}).", exception.GetType().Name);
+            // A database that does not answer (or a backup/restore that holds it) is not a wrong password: say so, so nobody keeps retyping credentials.
+            if (LoginMessages.IsDatabaseUnavailable(exception)) return InvalidLogin(LoginMessages.DatabaseUnavailable);
         }
         return InvalidLogin();
     }
 
-    private async Task<IActionResult> SignInAsync(string username, string displayName, string role, int? userId, bool configuredAdministrator = false)
+    private async Task<IActionResult> SignInAsync(string username, string displayName, string role, int? userId)
     {
         var claims = new List<Claim>
         {
@@ -59,14 +64,13 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
             new(ClaimTypes.Role, role)
         };
         if (userId is not null) claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.Value.ToString()));
-        if (configuredAdministrator) claims.Add(new Claim(AccessRoles.ConfiguredAdministratorClaim, "1"));
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         await AuditRecorder.RecordSessionAsync(auditTrail, username, role, true, HttpContext.RequestAborted);
         return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/");
     }
 
-    private IActionResult InvalidLogin(string message = "Utilizator sau parolă incorectă.")
+    private IActionResult InvalidLogin(string message = LoginMessages.WrongCredentials)
     {
         Error = message;
         return Page();

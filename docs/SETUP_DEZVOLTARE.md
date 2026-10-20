@@ -53,7 +53,7 @@ Parametri: `-MariaRoot` (implicit `C:\Dev\BlazorStoc-MariaDB`), `-Port` (implici
 6. Fisierele private (**se comit** in repository-ul privat: parolele sunt doar de dezvoltare si astfel pe calculatorul nou nu se introduc parole; daca lipsesc, se genereaza):
    - `application-connection.private.json`: conexiunea aplicatiei, utilizatorul `admin` si parola lui, caile catre `mariadb.exe`/`mariadb-dump.exe` (`Database:MariaClientExecutablePath`, `Database:MariaDumpExecutablePath`), radacina fisierelor (`Database:MariaAssetsRoot`, `App:DataProtectionPath`);
    - `migration-account.private.json`, `backup-account.private.json`, `restore-account.private.json`, `test-database.private.json`.
-7. Incarca schema de baza (`database\mariadb\schema-mariadb.sql`, 28 de tabele) si triggerele (`triggers-mariadb.sql`), apoi ruleaza `dotnet run ... --migrate-schema`, care aplica migrarile 1-10 din `Services/MariaSchemaMigrations.cs`. Rezultatul corect: **41 de tabele si 18 triggere** in `BlazorStoc` si in `blazorstoc_test` (aceleasi cifre ca pe calculatorul de dezvoltare initial).
+7. Incarca schema de baza (`database\mariadb\schema-mariadb.sql`, 28 de tabele) si triggerele (`triggers-mariadb.sql`), apoi ruleaza `dotnet run ... --migrate-schema`, care aplica migrarile 1-10 din `Assets/Migrations/*.sql` (incarcate de `Services/MariaSchemaMigrations.cs`). Rezultatul corect: **41 de tabele si 18 triggere** in `BlazorStoc` si in `blazorstoc_test` (aceleasi cifre ca pe calculatorul de dezvoltare initial).
 
 Daca fisierele private exista deja (vin din repository), scriptul creeaza conturile MariaDB cu parolele din ele (nu genereaza altele), apoi incarca datele din `databasedev-data` (vezi mai jos). Scriptul nu suprascrie fisiere private existente si nu afiseaza parole. Daca exista doar o parte din fisierele private, se opreste cu un mesaj; pentru a reface totul de la zero, sterge directorul `-MariaRoot` si fisierele `*.private.json` generate, apoi ruleaza-l din nou. O nepotrivire intre calea implicita din cod (`%LOCALAPPDATA%\BlazorStoc-MariaDB`) si calea aleasa la instalare este acoperita de cheile din `application-connection.private.json`.
 
@@ -132,3 +132,9 @@ Verificat, pe o instanta de proba (alt port, alt director, secrete separate, ste
 - Operatiile noi care modifica date se jurnalizeaza cu actiuni exacte (`AuditActions`, filtrul Audit, test).
 - Taskurile finalizate se muta din `TODO.md` la sfarsitul `IMPLEMENTED.md`; verificarile nefacute se trec in `docs/TESTE_RAMASE.md`.
 - La finalul fiecarui task ramane un preview pornit cu implementarea.
+
+## 10. Serverul bazei ca serviciu Windows si schimbarea porturilor (20.10.2026)
+
+- `tools\install-mariadb-service.ps1` instaleaza instanta de dezvoltare ca serviciu `BlazorStocMariaDB` (cere elevare singur, o singura data); `-Uninstall` il scoate. Dupa instalare pagina Setari -> Baza de date -> Conexiune poate porni, opri, reporni serverul si schimba portul lui. Supervizorul previewului (`tools\supervisor.ps1 -Action install`) se inregistreaza fara `-WithMariaDb`.
+- Dupa o schimbare de port a serverului din pagina: `tools\sync-dev-port.ps1 -Port N` (`-WhatIf` arata ce s-ar schimba) pune portul nou in `admin.private.cnf` al instantei si in `local-secrets\*.private.json`; scripturile cu parametru `-Port` (`dev-mariadb.ps1`, `supervisor.ps1 -MariaPort`) primesc portul ca argument.
+- Portul aplicatiei se alege din pagina (cardul „Aplicatia"); supervizorul il respecta si il foloseste pentru verificari. Repornirea aplicatiei din pagina functioneaza sub supervizor (cod de iesire 75).

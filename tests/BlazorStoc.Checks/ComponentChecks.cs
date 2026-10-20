@@ -2,6 +2,7 @@ using AngleSharp.Html.Dom;
 using BlazorStoc.Components.Pages;
 using BlazorStoc.Services;
 using Bunit;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BlazorStoc.Checks;
@@ -216,9 +217,37 @@ public static class ComponentChecks
         entryContext.Services.AddLogging();
         entryContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
         entryContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
+        var entryModules = new BlazorStoc.Modules.ModuleRegistry();
+        entryModules.Add(new BlazorStoc.Modules.Invoices.InvoicesModule(), new ServiceCollection(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        entryModules.Add(new BlazorStoc.Modules.Suppliers.SuppliersModule(), new ServiceCollection(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        entryContext.Services.AddSingleton(entryModules);
         var entryInput = new StockMovementInput { Kind = StockMovementKind.Entry, Date = DateOnly.FromDateTime(DateTime.Today) };
         var origin = entryContext.Render<Components.Shared.EntryOriginPicker>(parameters => parameters.Add(p => p.Model, entryInput));
         check(origin.FindAll("[role=tab]").Count == 3 && origin.Markup.Contains("Preia din PDF"), "Entry origin: three tabs and the separate button for the PDF pickup");
+        using var pickupOutContext = new BunitContext();
+        pickupOutContext.JSInterop.Mode = JSRuntimeMode.Loose;
+        pickupOutContext.Services.AddLogging();
+        pickupOutContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
+        pickupOutContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
+        var outModules = new BlazorStoc.Modules.ModuleRegistry();
+        outModules.Add(new BlazorStoc.Modules.Invoices.InvoicesModule(), new ServiceCollection(),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Modules:preluare-factura:Enabled"] = "false" }).Build());
+        outModules.Add(new BlazorStoc.Modules.Suppliers.SuppliersModule(), new ServiceCollection(), new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        pickupOutContext.Services.AddSingleton(outModules);
+        var originWithoutPickup = pickupOutContext.Render<Components.Shared.EntryOriginPicker>(parameters => parameters.Add(p => p.Model, entryInput));
+        check(originWithoutPickup.FindAll("[role=tab]").Count == 3 && !originWithoutPickup.Markup.Contains("Preia din PDF"), "Entry origin: with the invoice module out the three tabs stay and the PDF pickup button is not offered");
+        using var suppliersOutContext = new BunitContext();
+        suppliersOutContext.JSInterop.Mode = JSRuntimeMode.Loose;
+        suppliersOutContext.Services.AddLogging();
+        suppliersOutContext.Services.AddSingleton<ISupplierRepository>(memorySuppliers);
+        suppliersOutContext.Services.AddSingleton<ISupplierInvoiceRepository>(new MemorySupplierInvoiceRepository(memorySuppliers));
+        var suppliersOut = new BlazorStoc.Modules.ModuleRegistry();
+        suppliersOut.Add(new BlazorStoc.Modules.Suppliers.SuppliersModule(), new ServiceCollection(),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Modules:furnizori:Enabled"] = "false" }).Build());
+        suppliersOutContext.Services.AddSingleton(suppliersOut);
+        var originWithoutSuppliers = suppliersOutContext.Render<Components.Shared.EntryOriginPicker>(parameters => parameters.Add(p => p.Model, entryInput));
+        check(originWithoutSuppliers.FindAll("[role=tab]").Count == 1 && originWithoutSuppliers.Markup.Contains("Intrare liberă") && !originWithoutSuppliers.Markup.Contains("Factură nouă"),
+            "Entry origin: with the suppliers module out only the free entry is offered");
         check(origin.Instance.ValidationError() == "Alege motivul intrării libere.", "Entry origin: a free entry needs its reason");
         entryInput.FreeType = FreeEntryType.AwaitedInvoice;
         check(origin.Instance.ValidationError() == StockMovementRules.AwaitedSupplierRequiredMessage, "Entry origin: an awaited invoice needs its supplier");

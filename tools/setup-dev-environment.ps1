@@ -12,6 +12,10 @@
   Where the private JSON files are written. Default: <repo>\local-secrets (ignored by Git).
 .PARAMETER MariaBinDir
   Use an existing MariaDB bin directory instead of downloading the distribution.
+.PARAMETER PasswordMode
+  The passwords of the four predefined accounts (Assets\Data\database-accounts.json) when they are created for the first time: Default (the public passwords of the catalog;
+  the application then asks the administrator to change them at the first sign-in), Generate (random, written to the private files) or Prompt (typed here, hidden; an empty answer
+  generates one). A machine reachable from a network should not be left on Default.
 .EXAMPLE
   .\tools\setup-dev-environment.ps1
   .\tools\setup-dev-environment.ps1 -MariaRoot D:\Dev\BlazorStoc-MariaDB
@@ -23,7 +27,8 @@ param(
     [string]$SecretsDir,
     [string]$MariaBinDir,
     [switch]$SkipTestDatabase,
-    [switch]$SkipData
+    [switch]$SkipData,
+    [ValidateSet('Default', 'Generate', 'Prompt')][string]$PasswordMode = 'Default'
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -32,6 +37,11 @@ $MariaVersion = '11.4.13'
 $MariaZipUrl = "https://archive.mariadb.org/mariadb-$MariaVersion/winx64-packages/mariadb-$MariaVersion-winx64.zip"
 $MariaZipSha256 = 'D62986D433EEEBFDE218560B276103831604A61E929E87F1A17F5AEBD80257E2'
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+# The predefined accounts: names, default passwords and rights come from the same file the application uses.
+$catalog = Get-Content (Join-Path $repo 'Assets\Data\database-accounts.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$acct = @{}
+foreach ($entry in $catalog.accounts) { $acct[$entry.key] = $entry }
+$accountHost = if ($catalog.host) { $catalog.host } else { '127.0.0.1' }
 
 function Write-Step([string]$Text) { Write-Host "== $Text" -ForegroundColor Cyan }
 function New-Secret {
@@ -135,7 +145,20 @@ if ($existing.Count -gt 0 -and $existing.Count -lt $names.Count - $(if ($SkipTes
 }
 $generate = $existing.Count -eq 0
 if ($generate) {
-    $pw = @{ app = New-Secret; migrator = New-Secret; backup = New-Secret; restore = New-Secret; test = New-Secret; admin = New-Secret }
+    function Get-AccountPassword([string]$Key) {
+        switch ($PasswordMode) {
+            'Default' { return $acct[$Key].defaultPassword }
+            'Generate' { return New-Secret }
+            'Prompt' {
+                $secure = Read-Host "Password for $($acct[$Key].user) (empty = generate)" -AsSecureString
+                $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+                if ([string]::IsNullOrEmpty($plain)) { return New-Secret }
+                if ($plain.Length -lt 16) { throw 'A password needs at least 16 characters.' }
+                return $plain
+            }
+        }
+    }
+    $pw = @{ app = Get-AccountPassword 'app'; migrator = Get-AccountPassword 'migrator'; backup = Get-AccountPassword 'backup'; restore = Get-AccountPassword 'restore'; test = New-Secret; admin = New-Secret }
 }
 else {
     # The private files travel with the (private) repository: the accounts are created with the passwords they already hold.
@@ -144,30 +167,24 @@ else {
     if (Test-Path (Join-Path $SecretsDir $names.test)) { $pw.test = Read-Password $names.test }
     Write-Host 'Private files already exist: the database accounts are created with the passwords they hold (no new passwords).'
 }
-$sql = @"
-CREATE DATABASE IF NOT EXISTS ``BlazorStoc`` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin;
-CREATE USER IF NOT EXISTS 'blazorstoc_dev'@'127.0.0.1' IDENTIFIED BY '$($pw.app)' REQUIRE SSL;
-ALTER USER 'blazorstoc_dev'@'127.0.0.1' IDENTIFIED BY '$($pw.app)';
-GRANT SELECT, INSERT, UPDATE, DELETE ON ``BlazorStoc``.* TO 'blazorstoc_dev'@'127.0.0.1';
-CREATE USER IF NOT EXISTS 'blazorstoc_migrator'@'127.0.0.1' IDENTIFIED BY '$($pw.migrator)' REQUIRE SSL;
-ALTER USER 'blazorstoc_migrator'@'127.0.0.1' IDENTIFIED BY '$($pw.migrator)';
-GRANT CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE VIEW, TRIGGER ON ``BlazorStoc``.* TO 'blazorstoc_migrator'@'127.0.0.1';
-CREATE USER IF NOT EXISTS 'blazorstoc_backup'@'127.0.0.1' IDENTIFIED BY '$($pw.backup)' REQUIRE SSL;
-ALTER USER 'blazorstoc_backup'@'127.0.0.1' IDENTIFIED BY '$($pw.backup)';
-GRANT SELECT, SHOW VIEW, TRIGGER, LOCK TABLES ON ``BlazorStoc``.* TO 'blazorstoc_backup'@'127.0.0.1';
-CREATE USER IF NOT EXISTS 'blazorstoc_restore'@'127.0.0.1' IDENTIFIED BY '$($pw.restore)' REQUIRE SSL;
-ALTER USER 'blazorstoc_restore'@'127.0.0.1' IDENTIFIED BY '$($pw.restore)';
-GRANT ALL PRIVILEGES ON ``BlazorStoc\_bak``.* TO 'blazorstoc_restore'@'127.0.0.1';
-GRANT ALL PRIVILEGES ON ``BlazorStoc\_old``.* TO 'blazorstoc_restore'@'127.0.0.1';
-GRANT SELECT, ALTER, DROP, CREATE, INSERT, TRIGGER ON ``BlazorStoc``.* TO 'blazorstoc_restore'@'127.0.0.1';
-"@
+$sql = "CREATE DATABASE IF NOT EXISTS ``BlazorStoc`` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin;`n"
+foreach ($entry in $catalog.accounts) {
+    $identity = "'$($entry.user)'@'$accountHost'"
+    $password = $pw[$entry.key]
+    $sql += "CREATE USER IF NOT EXISTS $identity IDENTIFIED BY '$password' REQUIRE SSL;`n"
+    $sql += "ALTER USER $identity IDENTIFIED BY '$password';`n"
+    foreach ($grant in $entry.grants) {
+        $schema = $grant.database.Replace('_', '\_')   # an underscore in a schema name is escaped, so the grant is for that schema and not for a pattern
+        $sql += "GRANT $($grant.privileges -join ', ') ON ``$schema``.* TO $identity;`n"
+    }
+}
 if (-not $SkipTestDatabase -and $pw.test) {
     $sql += @"
 CREATE DATABASE IF NOT EXISTS ``blazorstoc_test`` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin;
 CREATE USER IF NOT EXISTS 'blazorstoc_test_app'@'127.0.0.1' IDENTIFIED BY '$($pw.test)' REQUIRE SSL;
 ALTER USER 'blazorstoc_test_app'@'127.0.0.1' IDENTIFIED BY '$($pw.test)';
 GRANT SELECT, INSERT, UPDATE, DELETE ON ``blazorstoc_test``.* TO 'blazorstoc_test_app'@'127.0.0.1';
-GRANT CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE VIEW, TRIGGER ON ``blazorstoc\_test``.* TO 'blazorstoc_migrator'@'127.0.0.1';
+GRANT CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE VIEW, TRIGGER ON ``blazorstoc\_test``.* TO '$($acct.migrator.user)'@'$accountHost';
 "@
 }
 Invoke-SqlText ($sql + "FLUSH PRIVILEGES;`n")
@@ -177,16 +194,16 @@ if ($generate) {
     $assets = Join-Path $MariaRoot 'assets'
     Write-Json (Join-Path $SecretsDir $names.app) ([ordered]@{
             Database       = [ordered]@{
-                Host = '127.0.0.1'; Port = $Port; Name = 'BlazorStoc'; User = 'blazorstoc_dev'; Password = $pw.app; SslMode = 'Required'
+                Host = '127.0.0.1'; Port = $Port; Name = 'BlazorStoc'; User = $acct.app.user; Password = $pw.app; SslMode = 'Required'
                 MariaDumpExecutablePath = (Join-Path $MariaBinDir 'mariadb-dump.exe'); MariaClientExecutablePath = $client; MariaAssetsRoot = $assets
             }
             App            = [ordered]@{ DataProtectionPath = (Join-Path $assets 'data-protection-keys') }
             Authentication = [ordered]@{ Username = 'admin'; Password = $pw.admin }
         })
     $account = { param($user, $password) [ordered]@{ Database = [ordered]@{ Host = '127.0.0.1'; Port = $Port; Name = 'BlazorStoc'; User = $user; Password = $password; SslMode = 'Required' } } }
-    Write-Json (Join-Path $SecretsDir $names.migrator) (& $account 'blazorstoc_migrator' $pw.migrator)
-    Write-Json (Join-Path $SecretsDir $names.backup) ([ordered]@{ Database = [ordered]@{ User = 'blazorstoc_backup'; Password = $pw.backup } })
-    Write-Json (Join-Path $SecretsDir $names.restore) ([ordered]@{ Database = [ordered]@{ User = 'blazorstoc_restore'; Password = $pw.restore } })
+    Write-Json (Join-Path $SecretsDir $names.migrator) (& $account $acct.migrator.user $pw.migrator)
+    Write-Json (Join-Path $SecretsDir $names.backup) ([ordered]@{ Database = [ordered]@{ User = $acct.backup.user; Password = $pw.backup } })
+    Write-Json (Join-Path $SecretsDir $names.restore) ([ordered]@{ Database = [ordered]@{ User = $acct.restore.user; Password = $pw.restore } })
     if (-not $SkipTestDatabase) {
         Write-Json (Join-Path $SecretsDir $names.test) ([ordered]@{
                 Database = [ordered]@{ Host = '127.0.0.1'; Port = $Port; Name = 'blazorstoc_test'; ExpectedName = 'blazorstoc_test'; User = 'blazorstoc_test_app'; Password = $pw.test; SslMode = 'Required' }
@@ -240,7 +257,7 @@ if (-not $SkipData -and (Test-Path $assetsSource)) {
     $appConfig = Join-Path $SecretsDir $names.app
     $assetsRoot = $null
     if (Test-Path $appConfig) { $assetsRoot = (Get-Content $appConfig -Raw -Encoding UTF8 | ConvertFrom-Json).Database.MariaAssetsRoot }
-    if (-not $assetsRoot) { $assetsRoot = Join-Path $env:LOCALAPPDATA 'BlazorStoc-MariaDB\assets' }
+    if (-not $assetsRoot) { . (Join-Path $PSScriptRoot 'data-root.ps1'); $assetsRoot = Join-Path (Get-AppDataRoot) 'assets' }
     Write-Step "Files of the development data -> $assetsRoot"
     foreach ($file in Get-ChildItem $assetsSource -Recurse -File) {
         $target = Join-Path $assetsRoot $file.FullName.Substring($assetsSource.Length).TrimStart('\')

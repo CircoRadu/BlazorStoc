@@ -58,8 +58,8 @@ internal static class InvoiceFixtures
 
     public static GeneratedInvoice Make(InvoiceSpec spec, IReadOnlyList<FixtureRow>? rows = null)
     {
-        // Registers the embedded PT Sans with PdfSharp (the same resolver as the inventory report).
-        typeof(InventoryPdfWriter).GetMethod("EnsureFontResolver", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!.Invoke(null, null);
+        // Registers the embedded PT Sans with PdfSharp (the same resolver as every PDF writer of the application).
+        PdfFonts.EnsureResolver();
         rows ??= MakeRows(spec.Rows);
         var totalNet = rows.Sum(row => row.Value);
         var vat = Math.Round(totalNet * 0.21m, 2);

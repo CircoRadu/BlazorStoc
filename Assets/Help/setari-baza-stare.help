@@ -1,0 +1,49 @@
+# Setări · Bază de date · Stare
+Ruta: /setari
+Tab: Stare
+Cautare: baza de date stare conectat server versiune mariadb conexiuni activ schema migrari cont migrare backup restaurare aplicatia port sesiuni proces adrese actualizeaza
+Captura: pagina | /setari | click Bază de date; click Stare; full | Starea bazei de date
+
+Aici vezi ce spune serverul bazei de date despre el, dacă schema este la zi și unde rulează aplicația. Pagina nu schimbă nimic și se reîmprospătează singură la câteva secunde. Este rezervată conturilor cu nivelul Administrator; pentru a schimba conexiunea folosește [[setari-baza-conexiune]].
+
+## Elemente
+### Starea conexiunii
+- Conectat / Indisponibil / În întreținere | insignă | „Conectat” înseamnă că aplicația a deschis o conexiune și a primit răspuns; numărul de lângă este timpul de răspuns. „În întreținere” apare cât timp se face o copie de siguranță, o restaurare sau o schimbare de conexiune, iar datele sunt temporar blocate. „Indisponibil” are dedesubt mesajul motivului.
+- Actualizează | buton | Reîmprospătează pe loc toate datele de pe pagină.
+### Baza de date
+- Server | rând | Adresa și portul la care se conectează aplicația, baza și contul folosit.
+- Unde rulează | rând | „Pe acest calculator” înseamnă că baza rulează lângă aplicație; altfel este pe alt calculator.
+- Versiune | rând | Versiunea serverului și portul pe care îl raportează el însuși.
+- Pornit de | rând | De cât timp rulează serverul fără repornire.
+- Conexiuni active | rând | Câte conexiuni are deschise serverul în acest moment, inclusiv ale aplicației.
+- Securitate | rând | Modul SSL cerut și cifrul folosit; un server de pe alt calculator trebuie să folosească o conexiune criptată.
+- Conținut | rând | Numărul de tabele și dimensiunea lor.
+- Directorul datelor | rând | Folderul de pe server în care sunt fișierele bazei.
+- Ora serverului | rând | Ora serverului, în ora locală a aplicației.
+### Schema
+- Migrări | rând | „La zi” înseamnă că toate coloanele cerute de această versiune a aplicației există; altfel sunt listate cele care lipsesc.
+- Cont de migrare | rând | „Configurat” înseamnă că există contul separat cu care se actualizează schema la pornire.
+- Cont de backup | rând | Contul separat folosit doar la copiile de siguranță.
+- Cont de restaurare | rând | Contul separat folosit doar la restaurarea bazei.
+- Ultimul backup | rând | Data ultimului pachet de backup găsit.
+### Aplicația
+- Rulează pe | rând | Calculatorul și sistemul de operare pe care rulează aplicația.
+- Mediu | rând | Versiunea .NET și mediul în care rulează (Production sau Development).
+- Proces | rând | Numărul procesului, momentul pornirii și memoria folosită.
+- Adrese | rând | Adresele pe care ascultă aplicația acum.
+- Port salvat | rând | Portul ales din [[setari-baza-conexiune]]; se aplică la următoarea pornire a aplicației. Dacă scriptul de pornire impune adresa, portul salvat este ignorat și rândul spune asta.
+- Sesiuni deschise | rând | Câte sesiuni interactive sunt conectate acum; sesiunile a căror conexiune s-a întrerupt și așteaptă să se reia (o filă închisă, o rețea căzută) apar separat, „încă N deconectate”, până expiră. Iconița de lângă număr deschide lista lor ([[setari-baza-sesiuni]]).
+- Vezi sesiunile deschise | iconita:view | Deschide fereastra cu sesiunile: utilizator, rol, adresa IP, browser, ora conectării și pagina curentă.
+- Directorul aplicației | rând | Folderul din care rulează aplicația.
+
+## Flux: Cum verific dacă baza de date funcționează
+1. Deschide Setări → Bază de date → Stare.
+2. Caută insigna „Conectat” și timpul de răspuns de lângă ea.
+3. La „Schema” verifică să scrie „La zi”; la „Ultimul backup” verifică data.
+4. Dacă apare „Indisponibil”, citește mesajul de sub insignă și continuă cu pașii din fluxul de mai jos.
+
+## Flux: Ce fac dacă baza nu răspunde
+1. Verifică dacă serverul bazei de date rulează pe calculatorul pe care ar trebui să fie.
+2. Verifică în [[setari-baza-conexiune]] hostul, portul, contul și modul SSL, apoi apasă „Testează conexiunea”; mesajul spune la ce pas a eșuat.
+3. Verifică dacă un firewall sau rețeaua blochează portul.
+Nota: conturile din Utilizatori se verifică în baza de date, deci nu se pot autentifica cât timp baza este oprită; pot intra doar administratorul configurat în fișierul privat și sesiunile deja deschise.

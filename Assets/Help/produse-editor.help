@@ -1,0 +1,39 @@
+# Formularul de produs
+Cautare: produs formular cod model categorie subcategorie parametri descriere imagine clipboard salveaza pregateste produs nou
+Captura: formular | /produse | click Adaugă produs | Formularul de produs
+
+Formularul pentru un produs nou sau pentru editarea unuia existent. Se deschide deasupra catalogului sau ca fereastră în fluxurile de preluare (factură, ofertă), unde „Pregătește produs nou” îl pregătește fără să-l adauge în catalog (se adaugă la finalizarea preluării).
+
+## Elemente
+### Identificare
+- Cod produs / Model * | câmp | Codul stabilit de producător. Dacă subcategoria are parametri obligatori, aici scrii modelul (fără variantă), iar codul se compune din model și valorile alese. Aplicația te avertizează dacă a găsit caractere care se confundă ușor cu litere sau cifre.
+- Categorie *, Subcategorie * | listă | Doar combinații existente. „Adaugă categorie / subcategorie” (la produs nou) deschide pagina de categorii într-o fereastră separată; „Gata, înapoi la produs” o închide.
+- Parametrii obligatori | listă | Pentru fiecare parametru alegi o valoare; „Adaugă valoarea” adaugă o valoare nouă în listă. Sub ei vezi „Codul produsului rezultat”.
+- Descriere | câmp | Text liber, cel mult 1000 de caractere.
+### Imagine
+- Imagine produs | zonă | Alegi sau tragi o imagine JPG, PNG, WebP sau GIF, de cel mult 5 MB.
+- Preia imaginea din clipboard | buton | Lipește imaginea copiată (Ctrl + V în zonă).
+- Caută imaginea pe internet | link | Deschide o fereastră cu rezultatele căutării după codul produsului; copiezi imaginea și o lipești în zonă.
+- Fără imagine | text | Produsul folosește imaginea generică „No img available”.
+### Stoc și salvare
+- Nota de stoc | text | La produs nou: stoc 0; la editare: stocul curent (în depozit și în vehicule). Stocul nu se editează aici, ci prin intrări și ieșiri.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+- Salvează produsul / Pregătește produsul | buton | Salvează (la editare cere confirmarea modificărilor) sau pregătește produsul pentru preluare.
+- Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+
+## Flux: Cum adaug un produs nou
+1. Scrie codul (sau modelul), alege categoria și subcategoria.
+2. Dacă subcategoria are parametri, alege o valoare pentru fiecare.
+3. Completează descrierea și, dacă vrei, imaginea.
+4. Apasă „Salvează produsul”; produsul se creează cu stoc 0.
+
+## Flux: Cum adaug imaginea unui produs
+1. Apasă „Caută imaginea pe internet” și deschide pagina potrivită.
+2. Copiază imaginea (clic dreapta → Copiază imaginea).
+3. Revino în formular și lipește-o în zona de imagine cu Ctrl + V (sau cu „Preia imaginea din clipboard”).
+Nota: fără imagine, produsul folosește imaginea generică.
+
+## Flux: Cum pregătesc un produs în timpul unei preluări
+1. În preluarea facturii sau a ofertei alege „produs nou” pentru rândul respectiv.
+2. Completează formularul și apasă „Pregătește produsul”.
+3. Produsul se adaugă efectiv în catalog abia la finalizarea preluării, împreună cu intrarea în stoc.

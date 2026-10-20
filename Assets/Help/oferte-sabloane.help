@@ -1,0 +1,28 @@
+# Șabloane de oferte
+Ruta: /oferte/sabloane
+Cautare: sabloane oferte deviz excel coloane antet sectiuni activ modifica sterge
+Captura: pagina | /oferte/sabloane |  | Șabloanele de oferte
+
+Un șablon spune unde sunt datele într-un deviz-ofertă Excel (.xlsx): antetul ofertei se citește după etichete, tabelul după etichetele coloanelor, iar secțiunile (Echipamente, Manoperă, Cheltuieli) se importă sau nu. Prețurile și TVA nu se citesc.
+
+## Elemente
+### Antet
+- Preluare ofertă | link | Revine la preluarea ofertelor ([[oferte-preluare]]).
+- + Șablon nou | buton | Deschide editorul pentru un șablon nou ([[oferte-sablon-editor]]).
+### Șabloane salvate
+- Denumire | coloană | Numele șablonului.
+- Foaia | coloană | Foaia din fișier pe care o citește.
+- Coloane | coloană | Rezumatul coloanelor configurate.
+- Secțiuni importate | coloană | Secțiunile care se importă.
+- Activ | comutator | Un șablon inactiv nu mai este propus la preluare.
+- Modifică șablonul | iconita:edit | Deschide editorul șablonului.
+- Șterge șablonul | iconita:delete | Doar administratorul; șablonul se șterge definitiv, ofertele deja preluate nu se schimbă (se cere confirmarea și se înregistrează în jurnal).
+
+## Flux: Cum creez un șablon
+1. Apasă „+ Șablon nou”.
+2. Încarcă un fișier de probă; aplicația propune automat câmpurile, iar tu le completezi sau le corectezi ([[oferte-sablon-editor]]).
+3. Apasă „Verifică pe fișier” ca să vezi ce se citește, apoi „Salvează șablonul”.
+
+## Flux: Cum scot un șablon din uz fără să-l șterg
+1. Oprește comutatorul „Activ” de pe rândul lui.
+2. Șablonul nu mai apare la preluarea ofertelor; îl poți reactiva oricând.

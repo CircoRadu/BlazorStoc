@@ -1,0 +1,58 @@
+# Preluare ofertă
+Ruta: /oferte/preluare
+Ruta: /oferte
+Cautare: oferta deviz excel xlsx preluare sablon beneficiar proiect componenta linii produse revizie achizitie rezumat
+Captura: pagina | /oferte/preluare |  | Preluarea unei oferte
+
+Preiei un deviz-ofertă Excel (.xlsx): se citește cu un șablon, se leagă de beneficiar, proiect și componentă, iar liniile în bucăți se potrivesc cu produsele din catalog. Un număr de ofertă deja existent este o **revizie** a ofertei respective. Lucrezi în cinci pași: Fișier, Beneficiar, Proiect, Linii, Rezumat.
+
+## Elemente
+### Antet și pași
+- Șabloane de oferte | link | Deschide lista șabloanelor ([[oferte-sabloane]]).
+- Pașii 1–5 | filă | Fișier, Beneficiar, Proiect, Linii, Rezumat: poți reveni la un pas deja parcurs; pașii următori se deschid pe rând.
+### Pasul 1 - Fișierul ofertei
+- Fișierul .xlsx | zonă | Alegi devizul sau îl tragi în zonă (cel mult 8 MB).
+- Șablon | listă | Șablonul cu care se citește fișierul. Dacă nu există niciun șablon activ, ți se oferă linkul de creare; dacă etichetele fișierului nu se potrivesc cu niciun șablon activ, apare un avertisment.
+- Număr ofertă *, Titlu, Categoria (sistem), Beneficiar din ofertă | câmp | Citite din fișier după șablon; le poți corecta.
+- Lista secțiunilor | listă | Fiecare secțiune a fișierului, câte linii are și dacă se importă; o secțiune necunoscută nu se importă.
+- Mesajul de revizie | mesaj | Când numărul ofertei există deja, spune că aceasta va fi revizia următoare.
+### Pasul 2 - Beneficiarul
+- Beneficiari asemănători | selecție | Beneficiarii din catalog apropiați de denumirea din ofertă, cu procentul de asemănare.
+- Alt beneficiar | listă | Alegi alt beneficiar (căutare în listă).
+- + Beneficiar nou | buton | Deschide formularul de beneficiar nou ([[beneficiari-editor]]).
+- Reține denumirea din ofertă | comutator | Păstrează denumirea din ofertă ca denumire alternativă, ca la ofertele viitoare beneficiarul să fie recunoscut singur.
+### Pasul 3 - Proiectul și componenta
+- Proiect | selecție | Un proiect existent al beneficiarului sau „Proiect nou”; la proiect nou scrii denumirea (implicit titlul ofertei).
+- Componenta (tipul de sistem) | listă | Tipul de sistem al categoriei ofertei, din Nomenclator; poate rămâne „fără componentă”.
+### Pasul 4 - Liniile ofertei
+- Denumire din ofertă | coloană | Denumirea liniei, secțiunea și unitatea de măsură.
+- Cant. | coloană | Cantitatea din ofertă.
+- Produs din catalog | listă | Produsul legat de linie. Fără produs, linia rămâne „de achiziționat”. Etichetele spun dacă legătura este reținută din oferte anterioare sau propusă automat (de verificat).
+- Produsele propuse | buton | Alte produse apropiate, cu procentul de asemănare; apeși unul ca să-l alegi.
+- Produs nou | buton | Deschide formularul de produs nou ([[produse-editor]]), cu denumirea din ofertă.
+- În afara stocului | text | Metrajele și orele nu au produs; nu intră în stoc.
+### Pasul 5 - Rezumat
+- Rezumatul | listă | Oferta, beneficiarul, proiectul și componenta, plus câte linii sunt legate de produse, de achiziționat sau în afara stocului.
+- Diferențele față de revizia anterioară | text | La o revizie: câte linii s-au adăugat, scos sau și-au schimbat cantitatea. Ieșirile deja făcute pe proiect nu se leagă automat de oferta nouă.
+- Preia oferta | buton | Înregistrează oferta în proiect.
+- Preia altă ofertă | link | După preluare, o iei de la capăt.
+### Navigare
+- Înapoi, Pasul următor | buton | Trec între pași.
+
+## Flux: Cum preiau o ofertă
+1. La pasul 1 alege fișierul .xlsx, verifică șablonul și corectează numărul, titlul și categoria; apasă „Pasul următor”.
+2. La pasul 2 alege beneficiarul (unul propus sau altul din listă, sau creează unul nou).
+3. La pasul 3 alege proiectul (sau proiect nou) și componenta.
+4. La pasul 4 leagă fiecare linie în bucăți de un produs din catalog sau lasă-o „de achiziționat”.
+5. La pasul 5 verifică rezumatul și apasă „Preia oferta”.
+Nota: după preluare vezi linkul către proiect și câte linii sunt legate, de achiziționat sau în afara stocului.
+
+## Flux: Cum preiau o revizie a unei oferte
+1. Alege fișierul cu același număr de ofertă ca o ofertă existentă.
+2. Pasul 1 spune „revizia N+1”; parcurge pașii obișnuiți.
+3. La rezumat citești diferențele față de revizia anterioară (adăugate, scoase, cantitate schimbată).
+
+## Flux: Cum procedez când lipsește șablonul
+1. La pasul 1 apare avertismentul că nu există șablon activ sau că fișierul nu se potrivește.
+2. Apasă linkul „Creează un șablon” și creează șablonul pornind de la acest fișier ([[oferte-sablon-editor]]).
+3. Revino la „Preluare ofertă” și reia preluarea.

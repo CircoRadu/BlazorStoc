@@ -20,14 +20,10 @@ Planul din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` este implementat integral (v
 
 ## Task 1: Setari -> Baza de date
 
-Propunere, decizii si stare: `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md` (sectiunile 11-14; toate deciziile sunt confirmate, fara intrebari deschise). Subtaskuri in ordinea implementarii:
+Propunere, decizii si stare: `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md` (sectiunile 11-18; toate deciziile sunt confirmate, fara intrebari deschise; implementat pana la sectiunea 18). Subtaskuri ramase, in ordinea implementarii:
 
-- 1.1 Etapa 1: finalizare (acces pe rol Administrator + protectia ultimului administrator, rulare teste `dbsettings` si suita, sectiune MariaDB, documentatie, `tools/start-preview.ps1`, verificare in browser).
-- 1.2 Sub-tab "Ajutor" pentru baza de date.
-- 1.3 Etapa Verificare (sanatate si integritate).
-- 1.4 Etapa Aplicatie (3a): serviciu Windows, oprire/repornire, repornire usoara a pipeline-ului; 3b: monitor de sanatate si starea "Baza de date indisponibila".
-- 1.5 Conturi de baza de date: creare cont si schimbare parola cu credentiale administrative introduse pe loc.
-- 1.6 Controlul serverului MariaDB (3c): doar cand ruleaza pe acelasi calculator ca serviciu Windows (repornire/oprire/pornire server + aplicatie); remote = doar aplicatia. Proiectare in `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md`, sectiunea 13.
+- 1.1 Etapa Verificare (sanatate si integritate).
+- 1.2 Aplicatia ca serviciu Windows (3a): `UseWindowsService`, scripturi de instalare/dezinstalare (`LocalSystem`), actiuni de recuperare, oprire din pagina; monitor de sanatate si starea "Baza de date indisponibila" cu pagina de asteptare pentru utilizatori (3b). Repornirea aplicatiei din pagina functioneaza deja sub supervizor (cod 75).
 
 ## Observații pentru etapa de implementare
 

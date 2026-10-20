@@ -105,6 +105,27 @@ public sealed class FileOperationLockService(string lockFilePath, IAuditTrail? a
         }
     }
 
+    // The lock of a worker process that was killed (time limit, cancellation): the application removes it at once instead of leaving everybody on the waiting
+    // page until the lease runs out. Only the lock written by that very process is removed.
+    internal static bool ReleaseIfOwnedBy(string path, int processId)
+    {
+        try
+        {
+            if (!File.Exists(path)) return false;
+            LockFile? existing;
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                existing = JsonSerializer.Deserialize<LockFile>(stream, JsonOptions);
+            if (existing is null || existing.ProcessId != processId) return false;
+            File.Delete(path);
+            MaintenanceGate.Invalidate();
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     private async Task RenewAsync(LockFile entry, CancellationToken cancellationToken)
     {
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);

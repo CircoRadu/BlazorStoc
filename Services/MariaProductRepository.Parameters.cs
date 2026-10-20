@@ -1,4 +1,5 @@
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 

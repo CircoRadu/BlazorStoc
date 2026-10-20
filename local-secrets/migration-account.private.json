@@ -1,9 +1,9 @@
-﻿{
+{
     "Database":  {
                      "Host":  "127.0.0.1",
                      "Port":  3307,
                      "Name":  "BlazorStoc",
-                     "User":  "blazorstoc_migrator",
+                     "User":  "ESPGestiuneStoc_migrator",
                      "Password":  "kG4KWR74dKJ5FWDdvXXXwuJYFqME7c",
                      "SslMode":  "Required"
                  },

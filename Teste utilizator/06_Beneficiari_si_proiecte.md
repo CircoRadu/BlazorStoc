@@ -4,6 +4,30 @@ Fluxul: Administrare -> Beneficiari (PF sau PJ cu preluare ANAF) -> pagina benef
 
 ## Modificari de testat
 
+### 19.10.2026 - Observatiile proiectului ca modul
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Modulul Observatii proiect”).
+
+**Ce s-a adaugat:** observatiile unui proiect (note cu fisiere atasate) sunt acum modulul „Observatii proiect” (Setari -> Module).
+
+**Ce face acum:** functioneaza ca inainte; daca modulul iese din functiune (erori repetate sau oprit din configurare), pe pagina proiectului dispar butonul „Adauga observatie” si lista, apare nota „Observatiile proiectului sunt indisponibile momentan”, pagina unei observatii spune „Modul indisponibil”, iar descarcarea unui fisier atasat da eroare 503. Proiectul, componentele si stergerea proiectului (care arhiveaza observatiile si fisierele) merg in continuare.
+
+1. Deschide un proiect, apasa „+ Adauga observatie”, completeaza denumirea si salveaza; pe pagina observatiei adauga un PDF si descarca-l.
+2. Editeaza observatia (motivarea generata se confirma), apoi sterge-o; pe proiect lista nu o mai arata.
+3. In Setari -> Module („Observatii proiect”) starea este „functioneaza”.
+
+### 19.10.2026 - Situatia proiectului si export consum ca modul
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** situatia proiectului, echipamentele proiectului si exportul de consum sunt acum modulul „Situatia proiectului si export consum” (Setari -> Module).
+
+**Ce face acum:** functioneaza ca inainte; daca modulul iese din functiune (erori repetate sau oprit din configurare), dispar meniul „Export consum”, tile-ul de pe pagina principala si randurile „Situatia proiectului”/„Echipamente” de pe pagina proiectului, paginile lor spun „Modul indisponibil”, iar restul aplicatiei (produse, proiecte, componente) merge.
+
+1. Deschide un proiect cu oferta: randurile „Situatia proiectului” si „Echipamente” sunt acolo, situatia se deschide, Export PDF/CSV functioneaza.
+2. Din meniul Stoc deschide „Export consum”, alege o perioada si apasa „Arata consumul”; exporta CSV.
+3. In Setari -> Module („Situatia proiectului si export consum”) starea este „functioneaza”.
+
 ### 08.10.2026 - Termen pe proiect
 
 **Ce s-a adaugat:** pe pagina „Situatia proiectului" campul „Termen proiect" cu butonul „Setează termenul" (migrarea 29, tabelul `project_deadlines`).

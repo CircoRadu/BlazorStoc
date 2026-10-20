@@ -1,0 +1,19 @@
+# Reînnoirea unei analize de risc
+Cautare: reinnoire analiza de risc revizie data noua expirare observatii
+Captura: fereastra | /analize-risc | click sel:.row-icon.renew | Reînnoirea unei analize
+
+Reînnoirea este o revizie a aceleiași analize (același număr de înregistrare): mută data ultimei reînnoiri și, odată cu ea, expirarea.
+
+## Elemente
+### Formular
+- Rezumatul | text | Beneficiarul, punctul, ultima reînnoire și expirarea curentă.
+- Data reînnoirii * | câmp | Din calendar; trebuie să fie după ultima reînnoire și nu poate fi în viitor. Se propune data de azi când este posibil. Alături vezi noua expirare calculată.
+- Observații | câmp | Text liber.
+- Înregistrează reînnoirea | buton | Salvează reînnoirea.
+- Anulează, Închide | buton | Închid formularul fără modificări.
+
+## Flux: Cum reînnoiesc o analiză
+1. Pe rândul analizei apasă iconița „Reînnoiește”.
+2. Verifică data reînnoirii și noua expirare.
+3. Apasă „Înregistrează reînnoirea”.
+Nota: dacă ai înregistrat o reînnoire din greșeală, o poți anula din istoricul analizei.

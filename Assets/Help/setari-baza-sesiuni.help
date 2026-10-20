@@ -1,0 +1,31 @@
+# Sesiuni deschise
+Cautare: sesiuni deschise utilizatori conectati adresa ip browser pagina curenta stare baza de date
+Captura: fereastra | /setari | click Bază de date; click Stare; click Vezi sesiunile deschise; wait 1500 | Sesiuni deschise
+
+Fereastra arată sesiunile interactive ale aplicației din acest moment: cine este conectat, de la ce adresă, cu ce browser, de când și pe ce pagină. Din ea poți închide sesiunea altui utilizator; în rest este o listă de citit. O vezi doar cu rolul Administrator, din [[setari-baza-stare]], cu iconița de lângă „Sesiuni deschise”.
+
+## Elemente
+### Lista sesiunilor
+- Sesiuni deschise | număr | Câte sesiuni sunt în listă. Pagina Stare numără doar pe cele conectate și arată separat pe cele deconectate; o sesiune închisă de tine dispare imediat din listă și din număr.
+- Utilizator | coloană | Numele contului și, lângă el, numele afișat. „neautentificat” înseamnă o sesiune care nu s-a autentificat încă. Insigna „sesiunea ta” o marchează pe a ta, iar „deconectată” una a cărei conexiune s-a întrerupt și care așteaptă să se reia.
+- Rol | coloană | Nivelul de acces al contului (Administrator sau Utilizator).
+- Adresa IP | coloană | Adresa de la care se conectează sesiunea. Apare după ce pagina sesiunii o raportează; până atunci este „—”.
+- Browser | coloană | Browserul și sistemul de operare, într-o formă scurtă (de exemplu „Edge · Windows”).
+- Conectat de la | coloană | Data și ora la care s-a deschis sesiunea.
+- Pagina curentă | coloană | Adresa paginii pe care se află acum utilizatorul, fără parametri.
+- Închide sesiunea | iconita:close | Închide sesiunea de pe rând: browserul utilizatorului este deconectat și trebuie să se autentifice din nou. Se cere o confirmare. La sesiunea ta iconița este dezactivată (folosește „Deconectare”).
+### Butoanele ferestrei
+- Actualizează | buton | Citește din nou lista; fereastra se actualizează singură la câteva secunde cât este deschisă.
+- Închide | buton | Închide fereastra (la fel Esc).
+
+## Flux: Cum închid sesiunea unui utilizator
+1. Deschide lista de sesiuni și găsește rândul utilizatorului (după nume, adresă IP și pagină).
+2. Apasă iconița „Închide sesiunea” de pe rând.
+3. Citește confirmarea și apasă „Închide sesiunea”; utilizatorul este deconectat din browserul respectiv, iar acțiunea se scrie în Jurnal activități.
+Nota: utilizatorul se poate autentifica imediat din nou; închiderea nu îi blochează contul (pentru asta dezactivezi contul din Utilizatori). Ce nu a salvat în acel moment se pierde.
+
+## Flux: Cum văd cine este conectat
+1. Deschide Setări → Bază de date → Stare.
+2. La „Aplicația”, apasă iconița de lângă „Sesiuni deschise”.
+3. Citește lista; apasă „Închide” când ai terminat.
+Nota: sesiunile vechi dispar din listă când se închid; lista se golește la repornirea aplicației.

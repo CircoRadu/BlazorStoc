@@ -6,7 +6,7 @@
   match -Show (for the checks of the task at hand) and the path of the log. The log is read only when something fails.
 .EXAMPLE
   .\tools\run-checks.ps1                                   # whole in-memory suite
-  .\tools\run-checks.ps1 -Group suppliers                  # CHECKS_ONLY=suppliers (groups: suppliers, pickup, groups, reasons, components, invoices = pdf + xml, ui; comma separated)
+  .\tools\run-checks.ps1 -Group suppliers                  # CHECKS_ONLY=suppliers (groups: suppliers, pickup, groups, reasons, structure, components, invoices = pdf + xml, ui; comma separated)
   .	oolsun-checks.ps1 -Group xml                        # XML and ZIP invoices only (seconds); -Group pdf = PDF/OCR invoices only (minutes)
   .\tools\run-checks.ps1 -Mode components                  # every group but invoices (= -Group ui)
   .\tools\run-checks.ps1 -Mode invoices                    # = -Group invoices

@@ -40,10 +40,10 @@ public static class DatabaseConnectionRules
     public const string PortMessage = "Portul bazei de date trebuie să fie între 1 și 65535.";
     public const string UserMessage = "Introdu utilizatorul bazei de date (cel mult 80 de caractere).";
     public const string PasswordMessage = "Parola poate avea cel mult 200 de caractere.";
-    public const string SslMessage = "Pentru un server aflat pe alt calculator, conexiunea trebuie să fie securizată (Required, VerifyCA sau VerifyFull).";
+    public const string SslMessage = "Pentru un server aflat pe alt calculator, conexiunea trebuie să fie securizată: alege unul dintre primele trei moduri SSL din listă.";
     public const string SslUnknownMessage = "Modul SSL nu este recunoscut.";
     public const string AppPortMessage = "Portul aplicației trebuie să fie între 1024 și 65535.";
-    public const string AdminPasswordMessage = "Parola administratorului nu este corectă.";
+    public const string AdminPasswordMessage = "Parola contului de administrator nu este corectă.";
     public const string AdminPasswordRequiredMessage = "Introdu parola administratorului pentru confirmare.";
     public const string TooManyAttemptsMessage = "Prea multe parole greșite. Așteaptă un minut și încearcă din nou.";
     public const string DatabaseNotAllowedMessage = "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.";
@@ -100,7 +100,8 @@ public static class DatabaseConnectionRules
         MySqlException { Number: 1130 } => "Serverul nu acceptă conexiuni de la acest calculator pentru acest cont.",
         MySqlException ex when ex.Message.Contains("SSL", StringComparison.OrdinalIgnoreCase) || ex.Message.Contains("TLS", StringComparison.OrdinalIgnoreCase)
             => "Conexiunea securizată (SSL) nu a putut fi stabilită. Verifică modul SSL și certificatul serverului.",
-        MySqlException { InnerException: SocketException } or SocketException => $"Serverul nu răspunde la {host}:{port}. Verifică hostul, portul și dacă serverul rulează.",
+        // 1042: no server answered at that address (MySqlConnector reports a refused connection or an unknown host this way).
+        MySqlException { Number: 1042 } or MySqlException { InnerException: SocketException } or SocketException => $"Serverul nu răspunde la {host}:{port}. Verifică hostul, portul și dacă serverul rulează.",
         MySqlException ex when ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase) => $"Serverul de la {host}:{port} nu a răspuns în 10 secunde.",
         TimeoutException => $"Serverul de la {host}:{port} nu a răspuns în 10 secunde.",
         MySqlException ex => $"Conexiunea a eșuat (cod {ex.Number}).",
@@ -134,7 +135,12 @@ internal static class AdminPasswordGate
 }
 
 /// <summary>The override file: what the administrator changed, on top of the private configuration.</summary>
-public sealed record DatabaseOverrideData(string? Host, int? Port, string? User, string? SslMode, string? PasswordProtected, int? AppPort, bool? AppBindAll);
+public sealed record DatabaseOverrideData(string? Host, int? Port, string? User, string? SslMode, string? PasswordProtected, int? AppPort, bool? AppBindAll,
+    IReadOnlyDictionary<string, AccountOverride>? Accounts = null);
+
+/// <summary>What was saved for one predefined account (Services/DatabaseAccounts.cs): its name when it is not the catalog one, its password (protected), a new password
+/// written before the server is changed (so a stop in the middle loses nothing) and when the password was last changed.</summary>
+public sealed record AccountOverride(string? User = null, string? PasswordProtected = null, string? PendingPasswordProtected = null, DateTime? ChangedUtc = null);
 
 public static class DatabaseOverrideFile
 {
@@ -145,11 +151,9 @@ public static class DatabaseOverrideFile
     public static string PathFor(IConfiguration configuration) =>
         configuration["Database:OverridePath"] is { Length: > 0 } configured
             ? configured
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "database-connection.override.json");
+            : BlazorStoc.Startup.AppDataRoot.Combine(configuration, "database-connection.override.json");
 
-    public static string KeysPath(IConfiguration configuration) =>
-        configuration["App:DataProtectionPath"]
-        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "assets", "data-protection-keys");
+    public static string KeysPath(IConfiguration configuration) => BlazorStoc.Startup.DataProtectionKeys.PathFor(configuration);
 
     public static byte[]? ReadRaw(string path)
     {
@@ -218,6 +222,24 @@ public sealed class DatabaseOverrideConfigurationSource(string path, IDataProtec
                     if (password is not null) data["Database:Password"] = password;
                     data["Database:OverrideActive"] = "true";
                 }
+                foreach (var (key, account) in file.Accounts ?? new Dictionary<string, AccountOverride>())
+                {
+                    var definition = DatabaseAccounts.Find(key);
+                    if (definition is null) continue;
+                    try
+                    {
+                        var accountPassword = account.PasswordProtected is null ? null : protector.Unprotect(account.PasswordProtected);
+                        var pending = account.PendingPasswordProtected is null ? null : protector.Unprotect(account.PendingPasswordProtected);
+                        if (account.User is not null && DatabaseAccounts.IsSafeUserName(account.User)) data[definition.UserKey] = account.User;
+                        if (accountPassword is not null) data[definition.PasswordKey] = accountPassword;
+                        if (pending is not null) data[$"Database:Accounts:{definition.Key}:PendingPassword"] = pending;
+                        if (account.ChangedUtc is not null) data[$"Database:Accounts:{definition.Key}:ChangedUtc"] = account.ChangedUtc.Value.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    catch (CryptographicException)
+                    {
+                        data["Database:OverrideProblem"] = "Parola salvată nu mai poate fi citită (cheile de protecție s-au schimbat). Introdu din nou parola.";
+                    }
+                }
                 if (file.AppPort is not null) data["Hosting:AppPort"] = file.AppPort.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (file.AppBindAll is not null) data["Hosting:AppBindAll"] = file.AppBindAll.Value ? "true" : "false";
             }
@@ -253,11 +275,17 @@ public static class AppHosting
     {
         var port = configuration.GetValue<int?>("Hosting:AppPort");
         var bindAll = configuration.GetValue("Hosting:AppBindAll", false);
-        if (port is null) return new(null, bindAll, null, null);
+        // The port a start script proposes (Hosting:DefaultPort, set by tools\supervisor.ps1 and tools\start-preview.ps1 instead of imposing the address): used when no port was saved from
+        // the page, or when the saved one is taken. A script that does impose the address (ASPNETCORE_URLS, --urls) still wins, as before.
+        var defaultPort = configuration.GetValue<int?>("Hosting:DefaultPort");
         if (!string.IsNullOrWhiteSpace(configuration["urls"]))
-            return new(port, bindAll, null, "Portul salvat nu se aplică: adresele sunt impuse la pornire (variabila ASPNETCORE_URLS, --urls sau scriptul de pornire).");
+            return port is null ? new(null, bindAll, null, null)
+                : new(port, bindAll, null, "Portul salvat nu se aplică: adresele sunt impuse la pornire (variabila ASPNETCORE_URLS, --urls sau scriptul de pornire).");
+        var fallback = defaultPort is { } proposed ? $"http://127.0.0.1:{proposed}" : null;
+        if (port is null) return new(null, bindAll, fallback, null);
         if (!canBind(port.Value))
-            return new(port, bindAll, null, $"Portul salvat ({port}) este ocupat; aplicația folosește adresa implicită.");
+            return new(port, bindAll, fallback, fallback is null ? $"Portul salvat ({port}) este ocupat; aplicația folosește adresa implicită."
+                : $"Portul salvat ({port}) este ocupat; aplicația folosește portul {defaultPort}.");
         return new(port, bindAll, $"http://{(bindAll ? "0.0.0.0" : "127.0.0.1")}:{port}", null);
     }
 
@@ -280,10 +308,12 @@ public interface IDatabaseSettingsService
     Task<DatabaseTestResult> TestAsync(DatabaseConnectionInput input, CancellationToken cancellationToken = default);
     Task<DatabaseSaveResult> SaveAsync(DatabaseConnectionInput input, string administratorPassword, CancellationToken cancellationToken = default);
     Task<DatabaseSaveResult> ResetToBaseAsync(string administratorPassword, CancellationToken cancellationToken = default);
+    /// <summary>After the server answers on a new port (Services/DatabaseServer.cs): the connection of the application follows it. The confirmation and the journal entry are those of the caller.</summary>
+    Task ApplyServerPortAsync(int port, CancellationToken cancellationToken = default);
 }
 
 public sealed class DatabaseSettingsService(IConfiguration configuration, IDataProtectionProvider protection, IAccessControl access, IAuditTrail audit,
-    IOperationLockService locks, AppHostingInfo hosting, ILogger<DatabaseSettingsService> logger, Func<int, bool>? canBind = null) : IDatabaseSettingsService
+    IOperationLockService locks, AppHostingInfo hosting, ILogger<DatabaseSettingsService> logger, Func<int, bool>? canBind = null, IUserAuthenticator? authenticator = null) : IDatabaseSettingsService
 {
     // The tables whose absence means the connection points at something that is not this application's database.
     private static readonly string[] KeyTables = ["products", "stock_movements", "web_users", "audit_events"];
@@ -293,20 +323,20 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
 
     public async Task<DatabaseConnectionSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureConfiguredAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
         return Current();
     }
 
     private DatabaseConnectionSettings Current() => new(
         configuration["Database:Host"] ?? "127.0.0.1", configuration.GetValue("Database:Port", 3307), configuration["Database:Name"] ?? "BlazorStoc",
-        configuration["Database:User"] ?? "blazorstoc_dev", configuration["Database:SslMode"] ?? "Required",
+        configuration["Database:User"] ?? DatabaseAccounts.Find(DatabaseAccounts.ApplicationKey)!.User, configuration["Database:SslMode"] ?? "Required",
         !string.IsNullOrEmpty(configuration["Database:Password"]),
         configuration.GetValue<int?>("Hosting:AppPort"), configuration.GetValue("Hosting:AppBindAll", false),
         configuration.GetValue("Database:OverrideActive", false), configuration["Database:OverrideProblem"], OverridePath);
 
     public async Task<DatabaseTestResult> TestAsync(DatabaseConnectionInput input, CancellationToken cancellationToken = default)
     {
-        await access.EnsureConfiguredAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
         if (DatabaseConnectionRules.Validate(input) is { } problem) throw new DatabaseSettingsException(problem);
         var result = await ProbeAsync(input, cancellationToken).ConfigureAwait(false);
         var target = $"{input.Host.Trim()}:{input.Port}";
@@ -369,7 +399,7 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
 
     public async Task<DatabaseSaveResult> SaveAsync(DatabaseConnectionInput input, string administratorPassword, CancellationToken cancellationToken = default)
     {
-        await access.EnsureConfiguredAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
         await ConfirmAdministratorAsync(administratorPassword, cancellationToken).ConfigureAwait(false);
         if (DatabaseConnectionRules.Validate(input) is { } problem) throw new DatabaseSettingsException(problem);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new DatabaseSettingsException(DatabaseConnectionRules.DatabaseNotAllowedMessage);
@@ -401,7 +431,9 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
             databaseChanged ? host : previous?.Host, databaseChanged ? input.Port : previous?.Port, databaseChanged ? user : previous?.User,
             databaseChanged ? input.SslMode : previous?.SslMode,
             passwordTyped ? protector.Protect(input.Password!) : previous?.PasswordProtected,
-            input.AppPort, input.AppPort is null ? null : input.AppBindAll);
+            input.AppPort, input.AppPort is null ? null : input.AppBindAll,
+            // What the page of the accounts saved stays; a password or a name typed here for the application account replaces what was saved for it there.
+            databaseChanged ? WithoutApplicationAccount(previous?.Accounts, passwordTyped, !string.Equals(user, current.User, StringComparison.Ordinal)) : previous?.Accounts);
 
         IOperationLockHandle? handle = null;
         IDisposable? owner = null;
@@ -466,9 +498,18 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
         return new(true, message, RestartNeeded: hostingChanged);
     }
 
+    public async Task ApplyServerPortAsync(int port, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        var path = OverridePath;
+        var previous = DatabaseOverrideFile.Read(path) ?? new DatabaseOverrideData(null, null, null, null, null, null, null);
+        DatabaseOverrideFile.Write(path, previous with { Port = port });
+        ReloadConfiguration();
+    }
+
     public async Task<DatabaseSaveResult> ResetToBaseAsync(string administratorPassword, CancellationToken cancellationToken = default)
     {
-        await access.EnsureConfiguredAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
         await ConfirmAdministratorAsync(administratorPassword, cancellationToken).ConfigureAwait(false);
         var path = OverridePath;
         var previousFile = DatabaseOverrideFile.ReadRaw(path);
@@ -482,7 +523,10 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
         {
             try
             {
-                DatabaseOverrideFile.Restore(path, null);
+                // The passwords saved for the accounts are not connection settings: they stay (the server has them), only the rest goes back to the base file.
+                var kept = DatabaseOverrideFile.Read(path)?.Accounts;
+                if (kept is { Count: > 0 }) DatabaseOverrideFile.Write(path, new DatabaseOverrideData(null, null, null, null, null, null, null, kept));
+                else DatabaseOverrideFile.Restore(path, null);
                 ReloadConfiguration();
                 failure = await VerifyCurrentAsync(cancellationToken).ConfigureAwait(false);
                 if (failure is not null) { DatabaseOverrideFile.Restore(path, previousFile); ReloadConfiguration(); }
@@ -499,20 +543,18 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
         return new(true, "S-a revenit la configurația din fișierul de bază. Portul aplicației se aplică la următoarea pornire.", RestartNeeded: current.AppPort != after.AppPort);
     }
 
+    private static IReadOnlyDictionary<string, AccountOverride>? WithoutApplicationAccount(IReadOnlyDictionary<string, AccountOverride>? accounts, bool passwordTyped, bool userChanged)
+    {
+        if (accounts is null || (!passwordTyped && !userChanged) || !accounts.TryGetValue(DatabaseAccounts.ApplicationKey, out var application)) return accounts;
+        var copy = new Dictionary<string, AccountOverride>(accounts, StringComparer.OrdinalIgnoreCase);
+        copy[DatabaseAccounts.ApplicationKey] = application with { User = userChanged ? null : application.User, PasswordProtected = passwordTyped ? null : application.PasswordProtected, PendingPasswordProtected = null };
+        return copy;
+    }
+
     private static string Interface(bool all) => all ? "toate interfețele" : "doar acest calculator";
 
-    private async Task ConfirmAdministratorAsync(string typed, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrEmpty(typed)) throw new DatabaseSettingsException(DatabaseConnectionRules.AdminPasswordRequiredMessage);
-        var user = await access.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "";
-        if (AdminPasswordGate.IsBlocked(user)) throw new DatabaseSettingsException(DatabaseConnectionRules.TooManyAttemptsMessage);
-        if (!DatabaseConnectionRules.PasswordMatches(configuration, typed))
-        {
-            AdminPasswordGate.Failed(user);
-            throw new DatabaseSettingsException(DatabaseConnectionRules.AdminPasswordMessage);
-        }
-        AdminPasswordGate.Succeeded(user);
-    }
+    private Task ConfirmAdministratorAsync(string typed, CancellationToken cancellationToken) =>
+        new AdministratorReconfirmation(configuration, access, authenticator, logger).ConfirmAsync(typed, cancellationToken);
 
     // The configuration is re-read (the new file) and the pools of the old connection string are closed, so the next query uses the new one.
     private void ReloadConfiguration()

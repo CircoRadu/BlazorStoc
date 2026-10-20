@@ -1,0 +1,40 @@
+# Materiale și echipamente din vehicul
+Ruta: /vehicule/{id:int}/echipamente
+Cautare: echipamente materiale masina vehicul restituie depozit muta nivel tinta completeaza
+Captura: pagina | /vehicule | click sel:a.category-table-link; click Echipamente aflate în mașină; full | Echipamentele din vehicul
+
+Produsele aflate în mașină. Ajung aici prin ieșiri de stoc către autovehicul și se întorc în depozit sau se mută în altă mașină. În partea de jos poți defini câte bucăți ar trebui să aibă mașina din fiecare produs (nivelul țintă).
+
+## Elemente
+### Antet
+- ← Numărul vehiculului | link | Revine la fișa vehiculului ([[vehicule-detaliu]]).
+- Restituie tot în depozit | buton | Întoarce toate produsele din mașină în depozit.
+- Mută tot în altă mașină | buton | Mută toate produsele în altă mașină.
+### Tabelul de produse
+- Cod produs | coloană | Produsul; apasă-l ca să-i deschizi pagina.
+- Cantitate | coloană | Câte bucăți sunt în mașină.
+- Restituie în depozit | iconita:return | Întoarce în depozit o cantitate din produsul de pe rând.
+- Mută în altă mașină | iconita:move | Mută o cantitate din produs în altă mașină.
+- Totalul din subsol | text | Numărul de repere și numărul total de bucăți.
+### Nivel țintă
+- Produs | listă | Alegi produsul pentru care stabilești nivelul.
+- Nivelul | câmp | Câte bucăți ar trebui să aibă mașina din produs; „Setează nivelul” îl salvează.
+- Tabelul nivelurilor | tabel | Nivelul țintă, cât este în mașină și cât lipsește.
+- Elimină nivelul țintă | iconita:delete | Scoate nivelul produsului.
+- Completează la nivel | link | Deschide „Ieșire multiplă” cu produsele care lipsesc, pregătite din depozit; o verifici și o salvezi tu.
+
+## Flux: Cum restitui un produs din mașină în depozit
+1. Pe rândul produsului apasă iconița „Restituie în depozit”.
+2. În fereastra care se deschide scrie cantitatea ([[vehicule-transfer]]).
+3. Apasă „Restituie în depozit”.
+
+## Flux: Cum mut un produs în altă mașină
+1. Pe rândul produsului apasă iconița „Mută în altă mașină”.
+2. Scrie cantitatea și alege mașina destinație.
+3. Apasă „Mută”.
+Nota: pentru toate produsele deodată folosește butoanele din antet.
+
+## Flux: Cum completez mașina la nivelul țintă
+1. La „Nivel țintă” alege produsul, scrie nivelul dorit și apasă „Setează nivelul”.
+2. Când un produs lipsește din mașină, apasă „Completează la nivel”.
+3. În „Ieșire multiplă” verifici liniile pregătite și salvezi operația.

@@ -1,0 +1,21 @@
+# Editarea unui câmp al șablonului
+Cautare: editare camp sablon eticheta tip valoare folosit la import pozitie x y latime inaltime
+Captura: fereastra | /setari | click Facturi; upload factura-demo.pdf; jsclick Editează câmpul | Editarea unui câmp al șablonului
+
+Fereastra editează un câmp din antetul facturii: eticheta lui, tipul valorii, dacă se folosește la import și poziția pe pagină.
+
+## Elemente
+### Fereastra
+- Etichetă * | câmp | Numele câmpului; alegi ce înseamnă sau scrii una proprie. O etichetă deja folosită de alt câmp este semnalată, cu o propunere de etichetă liberă.
+- Tip de valoare | listă | Text, Număr sau Dată.
+- Folosit la import | comutator | Dacă valoarea se preia din factură.
+- X, Y, Lățime, Înălțime | câmp | Poziția și dimensiunea chenarului pe pagină.
+- Valoare citită | text | Ce se citește acum din chenar.
+- Șterge câmpul | buton | Scoate câmpul (la unul desenat de tine îl șterge definitiv).
+- Gata | buton | Închide fereastra.
+
+## Flux: Cum corectez un câmp citit greșit
+1. Apasă „Editează câmpul” de pe rândul lui.
+2. Alege eticheta potrivită și tipul valorii.
+3. Dacă chenarul e pe altă valoare, ajustează poziția (X, Y, lățime, înălțime) sau mută-l pe pagină.
+4. Apasă „Gata”.

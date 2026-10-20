@@ -1,0 +1,28 @@
+# Inventar
+Ruta: /inventar
+Cautare: inventar situatie numarare fizica stoc categorii subcategorii pdf formular genereaza stoc zero
+Captura: pagina | /inventar |  | Inventarul
+
+Generezi situația de inventar (un formular PDF) pentru categoriile și subcategoriile pe care vrei să le numeri fizic. După numărare, formularul completat de mână se încarcă în „Preluare inventar”, ca să compari stocul real cu cel din aplicație.
+
+## Elemente
+### Antet
+- Generează situația de inventar | buton | Creează formularul PDF pentru selecția făcută și îl arată într-o fereastră de previzualizare. Este oprit cât timp nu ai selectat nimic; titlul butonului spune de ce.
+- Reîncearcă | buton | Apare când structura catalogului nu a putut fi încărcată.
+### Selecția
+- Selectează toate categoriile | comutator | Pornește sau oprește toate categoriile deodată; stă pe poziția de mijloc când selecția e parțială.
+- Elimină din situația de inventar produsele cu stoc 0 | comutator | Produsele fără stoc nu mai apar în formular.
+- Categoria | secțiune | Fiecare categorie este o secțiune pe care o desfaci sau o strângi. Marcajul rotund din antetul ei selectează toate subcategoriile; sub nume vezi numărul de subcategorii, de produse asociate și câte sunt selectate.
+- Subcategoria | rând | Marcajul rotund de pe rând selectează subcategoria (poți apăsa oriunde pe rând); coloana „Produse” arată câte produse are.
+
+## Flux: Cum generez situația de inventar
+1. Alege categoriile sau subcategoriile de numărat (sau „Selectează toate categoriile”).
+2. Dacă nu vrei produsele fără stoc, pornește „Elimină din situația de inventar produsele cu stoc 0”.
+3. Apasă „Generează situația de inventar”; se deschide previzualizarea formularului ([[inventar-previzualizare]]).
+4. Imprimă sau salvează formularul și numără fizic stocul, scriind de mână valorile reale.
+Nota: fișierul generat nu se păstrează pe server; îl salvezi sau îl imprimi din previzualizare.
+
+## Flux: Cum aleg rapid ce să numărăm
+1. Desfă o categorie apăsând pe numele ei.
+2. Marchează subcategoriile dorite, sau marcajul categoriei ca să le iei pe toate.
+3. Verifică în antetul categoriei numărul de subcategorii selectate.

@@ -108,6 +108,14 @@ public static class InvoiceChecks
         check(InvoiceProductDescription.ColumnLabels(vatDraft).Any(item => item.Label == "Taxa verde" && item.Column?.Id == "vat2") &&
               !InvoiceProductDescription.ColumnLabels(vatDraft).Any(item => item.Label == InvoiceVocabulary.ColumnTitle(InvoiceColumnMeanings.VatRate)),
             "Invoice templates: a used column is offered under the name it has in the template, not under the title of its meaning in a general vocabulary");
+        // The plain description of an entry when the template says nothing: the confirmed number (or the read one), the supplier, the origin; never empty, never over the limit.
+        check(InvoiceProductDescription.PlainEntry("111094321", "OCR-999", "TELESYSTEM S.R.L.", "preluată din PDF", 500) == "Factura 111094321 · TELESYSTEM S.R.L. (preluată din PDF)",
+            "Invoice description: without a template description the entry gets \"Factura <număr> · <furnizor> (preluată din PDF)\" with the number the user confirmed");
+        check(InvoiceProductDescription.PlainEntry("  ", "B_IDFV26 748519", "General Security S.R.L", "preluată din XML", 500) == "Factura B_IDFV26 748519 · General Security S.R.L (preluată din XML)" &&
+              InvoiceProductDescription.PlainEntry("", "", "", "preluată din PDF", 500) == "Factura (preluată din PDF)",
+            "Invoice description: the number read from the file is used when none is confirmed, and a missing supplier or number leaves no gaps (the text is never empty)");
+        check(InvoiceProductDescription.PlainEntry("1", "", new string('x', 600), "preluată din PDF", 120).Length == 120,
+            "Invoice description: the plain text never exceeds the limit of the description of an entry");
         // Taking a column off the template takes its marks out of the description.
         vatDraft.ProductDescription = "<Taxa verde> si <Denumire> <Taxa verde>";
         check(InvoiceProductDescription.RemoveMark(vatDraft.ProductDescription, "Taxa verde") == "si <Denumire>", "Invoice templates: removing a label's marks from the description leaves the rest of the text");

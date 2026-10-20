@@ -26,8 +26,7 @@ public sealed class MariaBackupAlertReader(IConfiguration configuration) : IBack
             ? Directory.EnumerateFiles(directory, "*.zip").Where(file => !Path.GetFileName(file).StartsWith(".tmp-", StringComparison.Ordinal))
                 .Select(file => (DateTime?)File.GetLastWriteTimeUtc(file)).OrderByDescending(time => time).FirstOrDefault()
             : null;
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         // Without any backup yet the clock starts at the first recorded event (a stable date, not "today", which would move every day).
         await using var first = new MySqlCommand("SELECT MIN(timestamp_utc) FROM audit_events", connection);
         var firstText = await first.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;

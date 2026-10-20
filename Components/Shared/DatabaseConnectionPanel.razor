@@ -2,12 +2,13 @@
 @inject IDatabaseSettingsService Settings
 @inject ILogger<DatabaseConnectionPanel> Logger
 @implements IDisposable
-@* Setari -> Baza de date -> Conexiune: host, port, user and password of the application account, and the port the application listens on.
+@* Setari -> Baza de date -> Conexiune: host, port, user and password of the application account (what the application connects with; the port the server listens on and the
+   port of the application have their own cards: DatabaseServerPanel, ApplicationPanel).
    Saving needs a successful test and the password of the administrator; the connection is applied at once (no restart) and checked again, with an
    automatic return to the previous configuration if the check fails. The password is never shown. *@
 
 <section class="catalog database-connection">
-    <div class="catalog-heading"><h2>Conexiunea la baza de date</h2><small>Doar administratorul configurat al aplicației poate modifica aceste setări.</small></div>
+    <div class="catalog-heading"><h2>Conexiunea la baza de date</h2><small>Doar conturile cu nivelul „Administrator” pot modifica aceste setări.</small></div>
     <div class="catalog-body">
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
     else
@@ -18,7 +19,7 @@
         <h3>Baza de date</h3>
         <div class="anaf-grid">
             <label>Host<input id="db-host" @bind="host" maxlength="253" autocomplete="off" /></label>
-            <label>Port<input id="db-port" type="number" min="1" max="65535" @bind="port" autocomplete="off" /></label>
+            <label>Port la care se conectează<input id="db-port" type="number" min="1" max="65535" @bind="port" autocomplete="off" /></label>
             <label>Baza de date<input id="db-name" value="@current.Name" readonly title="Aplicația scrie numai în baza BlazorStoc; numele nu se schimbă de aici." /></label>
             <label>Utilizator<input id="db-user" @bind="user" maxlength="80" autocomplete="off" /></label>
             <label>Parolă<input id="db-password" type="password" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(current.HasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
@@ -28,19 +29,7 @@
                 </select>
             </label>
         </div>
-        <p class="muted"><small>Schimbarea se aplică imediat, fără repornire. Pagina schimbă ce folosește aplicația ca să se conecteze; parola contului pe serverul bazei de date se schimbă pe server. Variabilele de mediu și fișierul privat rămân neatinse: valorile de aici le suprascriu.</small></p>
-
-        <h3>Aplicația</h3>
-        <div class="anaf-grid">
-            <label>Port aplicație (gol = implicit)<input id="app-port" type="number" min="1024" max="65535" @bind="appPort" autocomplete="off" /></label>
-            <label>Interfață
-                <select id="app-interface" @bind="appBindAll" disabled="@(appPort is null)">
-                    <option value="false">Doar acest calculator (127.0.0.1)</option>
-                    <option value="true">Toate interfețele (accesibilă din rețea)</option>
-                </select>
-            </label>
-        </div>
-        <p class="muted"><small>Portul pe care ascultă aplicația se citește la pornire: se aplică la următoarea pornire a aplicației. Dacă scriptul de pornire impune adresa (ASPNETCORE_URLS, --urls), portul salvat este ignorat și pagina Stare o spune.@(current.AppPort is { } saved ? $" Port salvat acum: {saved}." : "")</small></p>
+        <p class="muted"><small>Aici se schimbă doar unde și cu ce cont se conectează aplicația, nu serverul: portul pe care ascultă serverul se schimbă în „Serverul bazei de date” de mai sus, iar portul aplicației în „Aplicația”. Schimbarea se aplică imediat, fără repornire. Variabilele de mediu și fișierul privat rămân neatinse: valorile de aici le suprascriu.</small></p>
 
         @if (testResult is { } test)
         {
@@ -53,16 +42,12 @@
             </ul>
         }
 
-        <h3>Confirmare</h3>
-        <div class="anaf-grid">
-            <label>Parola administratorului (pentru salvare)<input id="db-admin-password" type="password" @bind="adminPassword" maxlength="200" autocomplete="current-password" /></label>
-        </div>
         <div class="editor-actions">
-            <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează și aplică</button>
+            <button type="button" class="primary" disabled="@busy" @onclick="AskSave">Salvează și aplică</button>
             <button type="button" class="refresh act-reload" disabled="@busy" @onclick="TestAsync">Testează conexiunea</button>
             @if (current.OverrideActive || current.AppPort is not null)
             {
-                <button type="button" class="refresh act-close" disabled="@busy" @onclick="ResetAsync"
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="AskReset"
                         title="Șterge suprascrierea salvată din pagină și revine la fișierul privat de configurare">Revino la configurația de bază</button>
             }
             @if (busy) { <span class="muted" role="status" data-operation-driver>@busyText</span> }
@@ -71,16 +56,51 @@
     }
     </div>
 </section>
+@if (confirm != Confirm.None)
+{
+    <AdminOperationDialog Title="@(confirm == Confirm.Save ? "Confirmă salvarea conexiunii" : "Confirmă revenirea la configurația de bază")"
+                          Intro="@(confirm == Confirm.Save ? "Valorile se testează, apoi se aplică imediat; dacă verificarea de după aplicare eșuează, se revine singură la conexiunea veche." : "Valorile salvate din pagină se șterg și se folosește din nou fișierul privat de configurare.")"
+                          ConfirmText="@(confirm == Confirm.Save ? "Salvează și aplică" : "Revino la configurația de bază")" Busy="busy" BusyText="@busyText" Error="@dialogError"
+                          @bind-AdminPassword="adminPassword" Confirmed="ConfirmedAsync" Cancelled="CancelConfirm" />
+}
 
 @code {
     private readonly CancellationTokenSource lifetime = new();
-    private bool loading = true, busy, noticeOk, appBindAll;
+    private bool loading = true, busy, noticeOk;
     private string? error, notice, busyText;
     private string host = "", user = "", sslMode = "Required", password = "", adminPassword = "";
     private int port = 3307;
-    private int? appPort;
     private DatabaseConnectionSettings current = new("", 0, "", "", "Required", false, null, false, false, null, "");
     private DatabaseTestResult? testResult;
+    private enum Confirm { None, Save, ResetBase }
+    private Confirm confirm;
+    private string? dialogError;
+
+    // Saving and going back to the base configuration ask for the password of the administrator in a window, when the operation is started; what is wrong with the typed values
+    // is said before the window opens, what the service refuses (a wrong password) inside it.
+    private void AskSave()
+    {
+        if (busy) return;
+        if (DatabaseConnectionRules.Validate(Input) is { } problem) { error = problem; notice = null; return; }
+        error = null; notice = null; adminPassword = ""; dialogError = null; confirm = Confirm.Save;
+    }
+
+    private void AskReset()
+    {
+        if (busy) return;
+        error = null; notice = null; adminPassword = ""; dialogError = null; confirm = Confirm.ResetBase;
+    }
+
+    private void CancelConfirm() { confirm = Confirm.None; adminPassword = ""; dialogError = null; }
+
+    private async Task ConfirmedAsync()
+    {
+        var kind = confirm;
+        dialogError = null;
+        await (kind == Confirm.Save ? SaveAsync() : ResetAsync());
+        if (error is not null) { dialogError = error; error = null; }
+        else CancelConfirm();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -94,10 +114,10 @@
     private void Apply(DatabaseConnectionSettings settings)
     {
         current = settings; host = settings.Host; port = settings.Port; user = settings.User; sslMode = settings.SslMode;
-        appPort = settings.AppPort; appBindAll = settings.AppBindAll; password = ""; adminPassword = "";
+        password = ""; adminPassword = "";
     }
 
-    private DatabaseConnectionInput Input => new(host, port, user, string.IsNullOrEmpty(password) ? null : password, sslMode, appPort, appBindAll);
+    private DatabaseConnectionInput Input => new(host, port, user, string.IsNullOrEmpty(password) ? null : password, sslMode, current.AppPort, current.AppBindAll);
 
     private async Task RunAsync(string working, Func<Task> action)
     {

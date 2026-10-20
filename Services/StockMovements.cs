@@ -480,62 +480,9 @@ public static class StockMovementRules
     {
         var errors = new List<string>();
         var description = TextNormalization.ForStorage(input.Description ?? string.Empty);
-        if (input.Date is not { } date || date < EarliestDate) errors.Add("Alege o dată validă pentru mișcare.");
-        else if (date > (today ?? Today)) errors.Add(FutureDateMessage);
-        if (input.Quantity is not { } quantity || quantity < 1) errors.Add("Introdu o cantitate întreagă mai mare decât zero.");
-        else if (quantity > MaxQuantity) errors.Add($"Cantitatea poate fi cel mult {MaxQuantity:N0}.");
-        if (description.Length == 0) errors.Add(DescriptionRequiredMessage);
-        else if (description.Length > MaxDescriptionLength) errors.Add($"Descrierea poate avea cel mult {MaxDescriptionLength} de caractere.");
-        var beneficiaryId = input.BeneficiaryId;
-        var projectId = input.ProjectId;
-        var destination = input.Destination;
-        var vehicleId = input.VehicleId;
-        var sourceVehicleId = input.SourceVehicleId;
-        if (kind == StockMovementKind.Entry)
-        {
-            if (beneficiaryId is not null || projectId is not null)
-                errors.Add("Beneficiarul și proiectul se pot alege numai la ieșire.");
-            if (destination is not null || vehicleId is not null || sourceVehicleId is not null)
-                errors.Add("Destinația și sursa se pot alege numai la ieșire.");
-            if (input.InvoiceId is <= 0) errors.Add("Factura aleasă nu este validă.");
-            if (input.InvoiceId is not null && (input.FreeType is not null || input.FreeSupplierId is not null))
-                errors.Add("O intrare cu factură nu are tip de intrare liberă.");
-            if (input.FreeType is { } freeType && !Enum.IsDefined(freeType)) errors.Add("Alege motivul intrării libere.");
-            else if (input.FreeType == FreeEntryType.AwaitedInvoice && input.FreeSupplierId is null) errors.Add(AwaitedSupplierRequiredMessage);
-            if (input.FreeSupplierId is <= 0) errors.Add("Furnizorul ales nu este valid.");
-            if (input.FreeSupplierId is not null && input.FreeType is null && input.InvoiceId is null) errors.Add("Alege motivul intrării libere.");
-            if (input.InvoiceQuantity is < 1 or > MaxQuantity) errors.Add("Cantitatea de pe factură trebuie să fie între 1 și " + MaxQuantity.ToString("N0", CultureInfo.InvariantCulture) + ".");
-        }
-        else
-        {
-            if (input.InvoiceId is not null) errors.Add("Factura se poate alege numai la intrare.");
-            if (input.FreeType is not null || input.FreeSupplierId is not null)
-                errors.Add("Motivul intrării libere se poate alege numai la intrare.");
-            if (destination is not { } chosen || !Enum.IsDefined(chosen)) errors.Add(DestinationRequiredMessage);
-            else if (chosen == ExitDestination.Beneficiary)
-            {
-                if (beneficiaryId is null or <= 0) errors.Add("Alege un beneficiar din listă.");
-                if (projectId is not null && beneficiaryId is null) errors.Add("Alege beneficiarul înainte de proiect.");
-                if (projectId is <= 0) errors.Add("Alege un proiect din listă sau debifează opțiunea proiect.");
-                if (vehicleId is not null) errors.Add("Vehiculul se poate alege numai pentru ieșirile spre autovehicul.");
-            }
-            else if (chosen == ExitDestination.Vehicle)
-            {
-                if (vehicleId is null or <= 0) errors.Add("Alege vehiculul spre care se face ieșirea.");
-                if (beneficiaryId is not null || projectId is not null)
-                    errors.Add("Beneficiarul și proiectul se pot alege numai pentru ieșirile spre beneficiar.");
-                if (sourceVehicleId is not null && !allowVehicleTransfer) errors.Add(TransferBetweenVehiclesMessage);
-            }
-            else if (chosen == ExitDestination.WarehouseReturn)
-            {
-                if (sourceVehicleId is null or <= 0) errors.Add("Restituirea în depozit cere mașina din care se scot produsele.");
-                if (beneficiaryId is not null || projectId is not null || vehicleId is not null)
-                    errors.Add("Restituirea în depozit nu are beneficiar, proiect sau vehicul destinație.");
-            }
-            else if (beneficiaryId is not null || projectId is not null || vehicleId is not null)
-                errors.Add("Vânzarea generică și corecția de stoc nu au beneficiar, proiect sau vehicul.");
-            if (sourceVehicleId is <= 0) errors.Add("Alege mașina din care se scoate produsul sau alege depozitul.");
-        }
+        CheckDateQuantityAndDescription(input, description, today, errors);
+        if (kind == StockMovementKind.Entry) CheckEntry(input, errors);
+        else CheckExit(input, allowVehicleTransfer, errors);
         var reference = TextNormalization.ForStorage(input.Reference ?? string.Empty);
         if (reference.Length > MaxReferenceLength) errors.Add($"Referința poate avea cel mult {MaxReferenceLength} de caractere.");
         var reason = ChangeReasonRules.Normalize(input.Reason);
@@ -543,12 +490,82 @@ public static class StockMovementRules
         if (duplicateReason.Length > 0 && ChangeReasonRules.ValidationError(duplicateReason) is { } duplicateError) errors.Add(duplicateError);
         if (isEdit && ChangeReasonRules.ValidationError(reason) is { } reasonError) errors.Add(reasonError);
         if (errors.Count > 0) throw new StockMovementOperationException(string.Join(" ", errors));
+        return Cleaned(input, kind, description, reference, reason, duplicateReason);
+    }
+
+    private static void CheckDateQuantityAndDescription(StockMovementInput input, string description, DateOnly? today, List<string> errors)
+    {
+        if (input.Date is not { } date || date < EarliestDate) errors.Add("Alege o dată validă pentru mișcare.");
+        else if (date > (today ?? Today)) errors.Add(FutureDateMessage);
+        if (input.Quantity is not { } quantity || quantity < 1) errors.Add("Introdu o cantitate întreagă mai mare decât zero.");
+        else if (quantity > MaxQuantity) errors.Add($"Cantitatea poate fi cel mult {MaxQuantity:N0}.");
+        if (description.Length == 0) errors.Add(DescriptionRequiredMessage);
+        else if (description.Length > MaxDescriptionLength) errors.Add($"Descrierea poate avea cel mult {MaxDescriptionLength} de caractere.");
+    }
+
+    // An entry has no beneficiary, project, destination or vehicle; its invoice or its free-entry reason and supplier are checked together.
+    private static void CheckEntry(StockMovementInput input, List<string> errors)
+    {
+        if (input.BeneficiaryId is not null || input.ProjectId is not null)
+            errors.Add("Beneficiarul și proiectul se pot alege numai la ieșire.");
+        if (input.Destination is not null || input.VehicleId is not null || input.SourceVehicleId is not null)
+            errors.Add("Destinația și sursa se pot alege numai la ieșire.");
+        if (input.InvoiceId is <= 0) errors.Add("Factura aleasă nu este validă.");
+        if (input.InvoiceId is not null && (input.FreeType is not null || input.FreeSupplierId is not null))
+            errors.Add("O intrare cu factură nu are tip de intrare liberă.");
+        if (input.FreeType is { } freeType && !Enum.IsDefined(freeType)) errors.Add("Alege motivul intrării libere.");
+        else if (input.FreeType == FreeEntryType.AwaitedInvoice && input.FreeSupplierId is null) errors.Add(AwaitedSupplierRequiredMessage);
+        if (input.FreeSupplierId is <= 0) errors.Add("Furnizorul ales nu este valid.");
+        if (input.FreeSupplierId is not null && input.FreeType is null && input.InvoiceId is null) errors.Add("Alege motivul intrării libere.");
+        if (input.InvoiceQuantity is < 1 or > MaxQuantity) errors.Add("Cantitatea de pe factură trebuie să fie între 1 și " + MaxQuantity.ToString("N0", CultureInfo.InvariantCulture) + ".");
+    }
+
+    // An exit has no invoice or free-entry reason; what else it needs depends on where it goes.
+    private static void CheckExit(StockMovementInput input, bool allowVehicleTransfer, List<string> errors)
+    {
+        var beneficiaryId = input.BeneficiaryId;
+        var projectId = input.ProjectId;
+        var vehicleId = input.VehicleId;
+        var sourceVehicleId = input.SourceVehicleId;
+        if (input.InvoiceId is not null) errors.Add("Factura se poate alege numai la intrare.");
+        if (input.FreeType is not null || input.FreeSupplierId is not null)
+            errors.Add("Motivul intrării libere se poate alege numai la intrare.");
+        if (input.Destination is not { } chosen || !Enum.IsDefined(chosen)) errors.Add(DestinationRequiredMessage);
+        else if (chosen == ExitDestination.Beneficiary)
+        {
+            if (beneficiaryId is null or <= 0) errors.Add("Alege un beneficiar din listă.");
+            if (projectId is not null && beneficiaryId is null) errors.Add("Alege beneficiarul înainte de proiect.");
+            if (projectId is <= 0) errors.Add("Alege un proiect din listă sau debifează opțiunea proiect.");
+            if (vehicleId is not null) errors.Add("Vehiculul se poate alege numai pentru ieșirile spre autovehicul.");
+        }
+        else if (chosen == ExitDestination.Vehicle)
+        {
+            if (vehicleId is null or <= 0) errors.Add("Alege vehiculul spre care se face ieșirea.");
+            if (beneficiaryId is not null || projectId is not null)
+                errors.Add("Beneficiarul și proiectul se pot alege numai pentru ieșirile spre beneficiar.");
+            if (sourceVehicleId is not null && !allowVehicleTransfer) errors.Add(TransferBetweenVehiclesMessage);
+        }
+        else if (chosen == ExitDestination.WarehouseReturn)
+        {
+            if (sourceVehicleId is null or <= 0) errors.Add("Restituirea în depozit cere mașina din care se scot produsele.");
+            if (beneficiaryId is not null || projectId is not null || vehicleId is not null)
+                errors.Add("Restituirea în depozit nu are beneficiar, proiect sau vehicul destinație.");
+        }
+        else if (beneficiaryId is not null || projectId is not null || vehicleId is not null)
+            errors.Add("Vânzarea generică și corecția de stoc nu au beneficiar, proiect sau vehicul.");
+        if (sourceVehicleId is <= 0) errors.Add("Alege mașina din care se scoate produsul sau alege depozitul.");
+    }
+
+    // The input as it is kept once it passed: what does not belong to the kind of movement is dropped.
+    private static StockMovementInput Cleaned(StockMovementInput input, StockMovementKind kind, string description, string reference, string reason, string duplicateReason)
+    {
+        var projectId = input.ProjectId;
         return new StockMovementInput
         {
             Kind = kind, Date = input.Date, Quantity = input.Quantity, Description = description,
-            BeneficiaryId = beneficiaryId, ProjectId = projectId, Reason = reason,
-            Destination = kind == StockMovementKind.Exit ? destination : null,
-            VehicleId = vehicleId, SourceVehicleId = sourceVehicleId, InvoiceId = kind == StockMovementKind.Entry ? input.InvoiceId : null,
+            BeneficiaryId = input.BeneficiaryId, ProjectId = projectId, Reason = reason,
+            Destination = kind == StockMovementKind.Exit ? input.Destination : null,
+            VehicleId = input.VehicleId, SourceVehicleId = input.SourceVehicleId, InvoiceId = kind == StockMovementKind.Entry ? input.InvoiceId : null,
             FreeType = kind == StockMovementKind.Entry && input.InvoiceId is null ? input.FreeType : null,
             FreeSupplierId = kind == StockMovementKind.Entry && input.InvoiceId is null ? input.FreeSupplierId : null,
             Reference = (kind == StockMovementKind.Exit || input.InvoiceId is null) && reference.Length > 0 ? reference : null,
@@ -565,7 +582,6 @@ public static class StockMovementRules
             DuplicateReason = duplicateReason
         };
     }
-
     public static void CheckCurrent(StockMovement? current, StockMovement original)
     {
         if (current is null || current.Version != original.Version) throw new StockMovementOperationException(StaleMessage);

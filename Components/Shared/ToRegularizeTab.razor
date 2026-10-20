@@ -61,7 +61,7 @@
 {
     <div class="delete-overlay">
         <section class="delete-dialog" role="dialog" aria-modal="true" aria-label="Regularizare stoc">
-            <h2>Regularizare stoc</h2>
+            <div class="dialog-head"><h2>Regularizare stoc</h2><HelpButton Topic="produse-de-regularizat" About="Regularizarea stocului" /></div>
             <p class="delete-object"><strong>@regularizing.ProductName</strong></p>
             <NegativeStockPanel Resolution="resolution" Stock="regularizing.Stock" Disabled="busy" Changed="() => dialogError = null" />
             @if (dialogError is not null) { <div class="error-banner" role="alert">@dialogError</div> }

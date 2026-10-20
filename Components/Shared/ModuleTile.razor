@@ -1,0 +1,55 @@
+@using BlazorStoc.Modules
+@implements IDisposable
+@inject ModuleRegistry Modules
+@* A tile of the main page that belongs to a module. While the module runs it is the usual link; while it is out (stopped by the administrator, taken out after repeated
+   failures, not started) the tile stays where it is, grey and without a link, and says why in two words, so nobody wonders where the section went.
+   The tile follows the state of the module (ModuleRegistry.Changed) without a reload. It is shown only to a user holding Policy, as before. *@
+<AuthorizeView Policy="@Policy">
+    <Authorized>
+        @if (Modules.IsAvailable(ModuleId))
+        {
+            <a href="@Href" class="@AnchorClass" @attributes="Attributes"><span class="main-menu-icon">@Icon</span><div><h2>@Title@TitleExtra</h2><p>@Description@Extra</p></div><span class="main-menu-arrow">→</span></a>
+        }
+        else
+        {
+            <div class="main-menu-off" role="group" aria-disabled="true" aria-label="@($"{Title} - {Note}")" data-module-off="@ModuleId">
+                <span class="main-menu-icon">@Icon</span>
+                <div><h2>@Title</h2><p>@Description</p><p class="module-off-note">@Note</p></div>
+            </div>
+        }
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [Parameter, EditorRequired] public string ModuleId { get; set; } = "";
+    [Parameter, EditorRequired] public string Policy { get; set; } = "";
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+    [Parameter, EditorRequired] public string Icon { get; set; } = "";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Description { get; set; } = "";
+    [Parameter] public string? AnchorClass { get; set; }
+    /// <summary>Added after the title inside the heading (the warning triangle of the notifications).</summary>
+    [Parameter] public RenderFragment? TitleExtra { get; set; }
+    /// <summary>Added after the description (a count that needs attention); not shown while the module is out.</summary>
+    [Parameter] public RenderFragment? Extra { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Attributes { get; set; }
+
+    private bool disposed;
+
+    private string Note => Modules.IsManuallyStopped(ModuleId) ? "Oprit temporar de administrator" : "Indisponibil momentan";
+
+    protected override void OnInitialized() => Modules.Changed += OnChanged;
+
+    // Called from whichever thread changed the module: the tile is redrawn on its own context.
+    private void OnChanged()
+    {
+        if (disposed) return;
+        _ = InvokeAsync(() => { if (!disposed) StateHasChanged(); });
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        Modules.Changed -= OnChanged;
+    }
+}

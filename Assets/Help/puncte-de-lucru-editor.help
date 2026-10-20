@@ -1,0 +1,25 @@
+# Formularul punctului de lucru
+Cautare: punct de lucru formular adresa telefon persoana contact coordonate fotografii
+Captura: formular | /beneficiari | click Panoramic Hotel; click Adaugă punct de lucru | Formularul punctului de lucru
+
+Formularul pentru un punct de lucru al unui beneficiar. Se deschide din fișa beneficiarului. Fotografiile se adaugă după salvarea punctului.
+
+## Elemente
+### Câmpuri
+- Nume * | câmp | Numele punctului de lucru.
+- Adresă | câmp | Obligatorie la punctele obișnuite; două puncte ale aceluiași beneficiar nu pot avea aceeași adresă. La punctul principal se modifică din editarea beneficiarului.
+- Număr de telefon | câmp | Telefonul punctului; la punctul principal se modifică din editarea beneficiarului.
+- Persoană de contact | câmp | Cine poate fi contactat la punct.
+- Descriere | câmp | Text liber despre punct (acces, echipamente, particularități).
+- Coordonate | comutator | Pornit, apare câmpul „Latitudine, longitudine”, unde poți lipi coordonatele copiate dintr-o hartă (de exemplu 45.7489, 21.2087).
+- Salvează punctul de lucru | buton | Salvează datele; fișa rămâne deschisă pentru fotografii.
+### Fotografii
+- Legendă pentru fotografiile alese | câmp | Text opțional pus pe fotografiile pe care le încarci acum.
+- Alege fotografii | zonă | Alegi sau tragi fotografii JPG, PNG, WebP sau GIF (cel mult 10 MB fiecare și un număr maxim pe punct); se salvează imediat, fără să apeși „Salvează punctul de lucru”.
+- Lista fotografiilor | listă | Miniatura (apasă pentru mărire), numele fișierului, legenda, cine și când a încărcat-o, și „Șterge”.
+
+## Flux: Cum adaug un punct de lucru cu fotografii
+1. Completează numele și adresa și apasă „Salvează punctul de lucru”.
+2. După salvare, secțiunea „Fotografii” devine activă; scrie o legendă (opțional) și alege fotografiile.
+3. Fotografiile apar în listă imediat; „Șterge” scoate una.
+Nota: numărul fotografiilor se vede în coloana „Foto” din fișa beneficiarului.

@@ -2,6 +2,7 @@
 @inject IDatabaseStatusService Status
 @inject IBackupAlertReader Backups
 @inject ILogger<DatabaseStatusPanel> Logger
+@inject CircuitHolder Circuit
 @implements IDisposable
 @* Setari -> Baza de date -> Stare: what the database server reports about itself, the schema and the process the application runs in. Read-only;
    refreshed every 10 seconds while the tab is shown. *@
@@ -67,7 +68,7 @@
                         <tr><th scope="row">Proces</th><td>PID @app.ProcessId, pornit la @app.StartedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") (de @DatabaseStatusText.Duration((long)(DateTime.UtcNow - app.StartedUtc).TotalSeconds)), memorie @DatabaseStatusText.Size(app.WorkingSetBytes)</td></tr>
                         <tr><th scope="row">Adrese</th><td>@(app.Urls.Count == 0 ? "—" : string.Join(", ", app.Urls))</td></tr>
                         <tr><th scope="row">Port salvat</th><td>@(app.ConfiguredPort?.ToString() ?? "nu a fost setat")@(app.HostingNote is null ? "" : " — " + app.HostingNote)</td></tr>
-                        <tr><th scope="row">Sesiuni deschise</th><td>@app.Sessions</td></tr>
+                        <tr><th scope="row">Sesiuni deschise</th><td>@app.Sessions@if (app.DisconnectedSessions > 0) { <small class="muted"> (încă @app.DisconnectedSessions deconectate, în așteptarea reconectării)</small> }<button type="button" class="row-icon view" aria-label="Vezi sesiunile deschise" title="Vezi sesiunile deschise" @onclick="OpenSessionsAsync"></button></td></tr>
                         <tr><th scope="row">Directorul aplicației</th><td>@app.ContentRoot</td></tr>
                     </tbody>
                 </table>
@@ -76,6 +77,10 @@
     }
     </div>
 </section>
+@if (showSessions)
+{
+    <OpenSessionsDialog Sessions="sessions" CurrentId="@Circuit.Id" Refresh="RefreshSessionsAsync" Closed="CloseSessions" CloseSession="CloseSessionAsync" Message="@sessionsMessage" MessageIsError="sessionsMessageIsError" />
+}
 
 @code {
     private static readonly System.Globalization.CultureInfo ro = System.Globalization.CultureInfo.GetCultureInfo("ro-RO");
@@ -86,6 +91,45 @@
     private DateTime? refreshedAt, lastBackup;
     private DatabaseServerStatus? database;
     private AppRuntimeStatus? application;
+    private bool showSessions;
+    private IReadOnlyList<OpenSession> sessions = [];
+
+    private string? sessionsMessage;
+    private bool sessionsMessageIsError;
+
+    private async Task CloseSessionAsync(string id)
+    {
+        var target = sessions.FirstOrDefault(session => session.Id == id);
+        try
+        {
+            var closed = await Status.CloseSessionAsync(id, Circuit.Id, lifetime.Token);
+            sessionsMessage = closed ? $"Sesiunea lui {target?.UserName ?? "utilizatorului"} a fost închisă." : "Sesiunea nu a putut fi închisă din listă (s-a închis deja sau pagina ei nu a raportat încă).";
+            sessionsMessageIsError = !closed;
+        }
+        catch (Exception exception) when (exception is DatabaseSettingsException or AccessDeniedException)
+        {
+            sessionsMessage = exception.Message;
+            sessionsMessageIsError = true;
+        }
+        await Task.Delay(300);
+        await RefreshSessionsAsync();
+        await LoadAsync();   // the count on the page too, not only the list
+    }
+
+    private async Task OpenSessionsAsync()
+    {
+        sessionsMessage = null;
+        await RefreshSessionsAsync();
+        showSessions = true;
+    }
+
+    private async Task RefreshSessionsAsync()
+    {
+        try { sessions = await Status.ReadSessionsAsync(lifetime.Token); error = null; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+    }
+
+    private void CloseSessions() { showSessions = false; sessionsMessage = null; }
 
     private static string Configured(bool configured) => configured ? "Configurat" : "Neconfigurat";
 
@@ -104,6 +148,7 @@
         {
             database = await Status.ReadDatabaseAsync(lifetime.Token);
             application = await Status.ReadApplicationAsync(lifetime.Token);
+            if (showSessions) sessions = await Status.ReadSessionsAsync(lifetime.Token);
             lastBackup = null;
             if (database.Reachable)
             {

@@ -1,0 +1,24 @@
+# Detaliile punctului de pe hartă
+Cautare: punct harta detalii contract termen ciclicitate scadenta ultima interventie aceeasi locatie
+Captura: fereastra | /mentenanta/harta | wait 2500; jsclick sel:.marker-cluster; wait 2000; jsclick sel:.mm-icon; wait 1500 | Detaliile unui punct de pe hartă
+
+Panoul se deschide când apeși un marker de pe hartă și arată starea punctului de lucru.
+
+## Elemente
+### Panoul
+- Numele punctului | titlu | Punctul de lucru ales; „×” închide panoul.
+- Beneficiarul | link | Apasă ca să deschizi fișa beneficiarului.
+- Adresa și coordonatele | text | Unde se află punctul.
+- Contract | text | Contractul și starea lui (On sau Off).
+- Termen contract | text | Data de expirare și dacă a expirat sau expiră în curând.
+- Ciclicitate | text | La câte luni se repetă intervenția punctului.
+- Următoarea scadență | text | Data și starea (depășită, în curând, la zi).
+- Ultima intervenție de mentenanță | text | Data ei, sau „nicio intervenție”.
+- Fișa beneficiarului | link | Deschide fișa beneficiarului.
+- + Înregistrează intervenție | link | Deschide formularul de intervenție pentru punctul respectiv.
+- Alte puncte la aceeași locație | listă | Alte puncte cu aceleași coordonate; apeși unul ca să-i vezi detaliile.
+
+## Flux: Cum înregistrez o intervenție direct de pe hartă
+1. Apasă markerul punctului.
+2. Apasă „+ Înregistrează intervenție”.
+3. Completează formularul din fișa beneficiarului ([[mentenanta-interventie-editor]]).

@@ -1,0 +1,39 @@
+# Utilizatori
+Ruta: /utilizatori
+Cautare: utilizatori conturi autentificare tip utilizator activ inactiv administrator adauga editeaza sterge parola
+Captura: pagina | /utilizatori |  | Lista utilizatorilor
+
+Conturile care se pot autentifica în aplicație și tipul fiecărui utilizator. Drepturile fiecărui tip se definesc în Setări → Tipuri de utilizatori. Parolele nu sunt afișate și nu pot fi recuperate.
+
+## Elemente
+### Antet
+- + Adaugă utilizator | buton | Deschide formularul de cont nou ([[utilizatori-editor]]); doar cu dreptul necesar.
+- Reîncearcă | buton | Apare când lista nu a putut fi încărcată.
+### Rezumat
+- Total utilizatori | cifră | Conturile configurate.
+- Administratori activi | cifră | Conturile active cu acces complet.
+- Utilizatori | cifră | Conturile de alt tip decât Administrator.
+- Conturi inactive | cifră | Conturile cu autentificarea blocată.
+### Conturile web
+- Utilizator | coloană | Numele de autentificare; apasă-l ca să deschizi fișa contului ([[utilizatori-detaliu]]).
+- Nume afișat | coloană | Numele care apare în aplicație.
+- Tip utilizator | coloană | Tipul contului (Administrator, Utilizator sau un tip definit de administrator).
+- Stare | coloană | „Activ” sau „Inactiv”.
+- Editează utilizatorul | iconita:edit | Deschide formularul de editare.
+- Șterge utilizatorul | iconita:delete | Contul nu se va mai putea autentifica; pentru o suspendare temporară folosește editarea și oprește „Cont activ”.
+
+## Flux: Cum adaug un utilizator
+1. Apasă „+ Adaugă utilizator”.
+2. Scrie numele de utilizator, numele afișat și parola (de două ori) și alege tipul de utilizator.
+3. Apasă „Salvează utilizatorul”.
+Nota: nu se poate dezactiva sau retrograda ultimul administrator activ.
+
+## Flux: Cum suspend temporar un cont
+1. Apasă iconița de editare de pe rândul contului.
+2. Oprește comutatorul „Cont activ”.
+3. Salvează și confirmă; contul nu se mai poate autentifica până îl reactivezi.
+
+## Flux: Cum schimb tipul unui utilizator
+1. Apasă iconița de editare de pe rând.
+2. La „Tip utilizator” alege tipul nou.
+3. Salvează; dreptul nou se aplică în cel mult 30 de secunde.

@@ -1,0 +1,90 @@
+@using BlazorStoc.Services
+@* Setari -> Baza de date -> Stare -> "Vezi sesiunile deschise": the open sessions with their details. Nothing is changed here; the list is given by the page and refreshed
+   on request. *@
+<div class="delete-overlay" @onkeydown="KeyDownAsync">
+    <section class="delete-dialog save-confirmation-dialog open-sessions-dialog" role="dialog" aria-modal="true" aria-labelledby="open-sessions-title">
+        <div class="dialog-head"><h2 id="open-sessions-title">Sesiuni deschise <span class="count-badge">@Sessions.Count</span></h2><HelpButton Topic="setari-baza-sesiuni" About="Sesiunile deschise" /></div>
+        <p class="muted"><small>Sesiunile interactive ale aplicației în acest moment. Adresa și browserul apar după ce pagina sesiunii le raportează; o sesiune fără utilizator nu s-a autentificat.</small></p>
+        @if (Sessions.Count == 0)
+        {
+            <div class="empty-state" role="status"><h3>Nicio sesiune deschisă</h3></div>
+        }
+        else
+        {
+            <div class="table-scroll">
+                <table class="save-summary open-sessions-table">
+                    <caption class="sr-only">Sesiuni deschise</caption>
+                    <thead><tr><th scope="col">Utilizator</th><th scope="col">Rol</th><th scope="col">Adresa IP</th><th scope="col">Browser</th><th scope="col">Conectat de la</th><th scope="col">Pagina curentă</th><th scope="col">Acțiuni</th></tr></thead>
+                    <tbody>
+                        @foreach (var session in Sessions)
+                        {
+                            <tr class="@(session.Id == CurrentId ? "own-session" : "")">
+                                <th scope="row">
+                                    @(session.UserName ?? "neautentificat")
+                                    @if (!string.IsNullOrEmpty(session.DisplayName) && session.DisplayName != session.UserName) { <small class="muted"> · @session.DisplayName</small> }
+                                    @if (session.Id == CurrentId) { <span class="stock-badge positive">sesiunea ta</span> }
+                                    @if (!session.Connected) { <span class="stock-badge zero">deconectată</span> }
+                                </th>
+                                <td>@(session.Role ?? "—")</td>
+                                <td>@(session.IpAddress ?? "—")</td>
+                                <td>@(session.Browser ?? "—")</td>
+                                <td>@session.StartedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                                <td>@(session.Page ?? "—")</td>
+                                <td>
+                                    @if (session.Id == CurrentId)
+                                    {
+                                        <button type="button" class="row-icon close" disabled aria-label="@($"Închide sesiunea lui {Name(session)}")" title="Nu îți poți închide propria sesiune; folosește „Deconectare”."></button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="row-icon close" aria-label="@($"Închide sesiunea lui {Name(session)}")" title="@($"Închide sesiunea lui {Name(session)}")" @onclick="() => confirming = session"></button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (Message is not null) { <div class="@(MessageIsError ? "error-banner" : "success-banner")" role="@(MessageIsError ? "alert" : "status")">@Message</div> }
+        @if (confirming is { } target)
+        {
+            <div class="confirm-bar" role="alertdialog" aria-label="Confirmare închidere sesiune">
+                <p>Închizi sesiunea lui <strong>@Name(target)</strong>@(target.IpAddress is null ? "" : $" ({target.IpAddress})")? Utilizatorul este deconectat din browserul respectiv și trebuie să se autentifice din nou; ce nu a salvat se pierde.</p>
+                <div class="editor-actions">
+                    <button type="button" class="danger" @onclick="CloseConfirmedAsync">Închide sesiunea</button>
+                    <button type="button" class="refresh act-close" @onclick="() => confirming = null">Renunță</button>
+                </div>
+            </div>
+        }
+        <div class="editor-actions">
+            <button type="button" class="refresh act-reload" @onclick="() => Refresh.InvokeAsync()">Actualizează</button>
+            <button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<OpenSession> Sessions { get; set; } = [];
+    /// <summary>The circuit of the administrator who looks at the list, marked as "sesiunea ta".</summary>
+    [Parameter] public string? CurrentId { get; set; }
+    [Parameter] public EventCallback Refresh { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    /// <summary>The administrator confirmed closing the session with this identifier.</summary>
+    [Parameter] public EventCallback<string> CloseSession { get; set; }
+    /// <summary>The outcome of the last closing, shown above the buttons.</summary>
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public bool MessageIsError { get; set; }
+    private OpenSession? confirming;
+
+    private static string Name(OpenSession session) => session.UserName ?? "o sesiune neautentificată";
+
+    private async Task CloseConfirmedAsync()
+    {
+        if (confirming is not { } target) return;
+        confirming = null;
+        await CloseSession.InvokeAsync(target.Id);
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? Closed.InvokeAsync() : Task.CompletedTask;
+}
