@@ -18,7 +18,7 @@
                 </select></label>
             <button type="button" class="primary" disabled="@(busy || chosenType is null)" @onclick="AddAsync">Adaugă componenta</button>
             <ToggleSwitch @bind-Value="showArchived" OnText="Arată și arhivate" OffText="Doar active" AriaLabel="Arată componentele arhivate" />
-            <a class="refresh act-nav" href="@($"/proiecte/{ProjectId}/situatie")">Situația proiectului</a>
+            <ModuleGate ModuleId="situatie-proiect" Notice="false"><a class="refresh act-nav" href="@($"/proiecte/{ProjectId}/situatie")">Situația proiectului</a></ModuleGate>
         </div>
         @if (Visible.Count == 0)
         {
@@ -38,7 +38,7 @@
                     </td>
                     <td class="muted">@Delivered(component)</td>
                     <td>
-                        @if (component.Archived) { <button type="button" class="row-action edit" disabled="@busy" @onclick="() => ReactivateAsync(component)">Reactivează</button> }
+                        @if (component.Archived) { <button type="button" class="row-icon reactivate" disabled="@busy" aria-label="@($"Reactivează componenta {component.SystemTypeName}")" title="@($"Reactivează componenta {component.SystemTypeName}")" @onclick="() => ReactivateAsync(component)"></button> }
                         else { <button type="button" class="row-icon delete" disabled="@busy" aria-label="@($"Scoate componenta {component.SystemTypeName}")" @onclick="() => StartArchive(component)" title="@($"Scoate componenta {component.SystemTypeName}")"></button> }
                     </td>
                 </tr>
@@ -207,7 +207,9 @@
         try { Replace(await Repository.ArchiveAsync(archiving!, archiveReason, lifetime.Token)); }
         catch (ProjectComponentHasExitsException blocked) { pendingExits = blocked.Exits; actions.Clear(); targets.Clear(); throw; }
         archiving = null;
-        situation = await Services.GetRequiredService<IProjectSituationReader>().GetAsync(ProjectId, lifetime.Token);
+        // The situation is a convenience: while the offers module is out the column stays empty (the component was archived all the same).
+        try { situation = await Services.GetRequiredService<IProjectSituationReader>().GetAsync(ProjectId, lifetime.Token); }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { situation = null; }
     }, "Componenta a fost scoasă (arhivată).");
 
     public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }

@@ -1,0 +1,67 @@
+# Intrări și ieșiri ale produsului
+Ruta: /produse/{id:int}
+Ruta: /produse/{id:int}/miscari
+Cautare: produs miscari intrari iesiri stoc inregistreaza miscare factura intrare libera retur beneficiar proiect vehicul depozit rezervat storno istoric editeaza sterge deblocheaza
+Captura: pagina | /produse | click sel:.row-icon.view; full | Intrările și ieșirile unui produs
+
+Pagina unui produs: datele lui, unde se află bucățile, rezervările și toate mișcările de stoc. Stocul se modifică numai prin intrări și ieșiri; de aici le înregistrezi, le filtrezi, le corectezi sau le stornezi.
+
+## Elemente
+### Antet
+- ← Produse și stocuri | link | Revine la catalog, cu filtrele pe care le aveai.
+- Mesajul de blocare | mesaj | „🔒 în editare de ...” când alt utilizator editează produsul; administratorul poate apăsa „Deblochează (administrator)”.
+- Mesajul de modificare externă | mesaj | Apare când altcineva a schimbat produsul; „Reîncarcă” aduce datele noi.
+### Produsul
+- Categorie, Subcategorie, Cod | text | Datele produsului.
+- Imaginea | buton | Apasă pentru mărire.
+- Editează | link | Deschide editarea produsului în catalog ([[produse-editor]]); dezactivat cât produsul e în editare la altcineva.
+- Șterge produs | link | Șterge produsul; se poate numai cu stoc zero și fără mișcări.
+### Rezervări și locație
+- Rezervat | text | Câte bucăți sunt rezervate de proiecte și care este stocul liber.
+- Unde sunt bucățile | secțiune | Cât este în depozit, în fiecare vehicul și în livrări.
+- Sugestiile de rezervare | listă | Apar după o intrare: proiecte care au nevoie de produs și pot fi acoperite din stocul liber; „Rezervă N buc.” face rezervarea.
+### Înregistrează o mișcare
+- Data mișcării * | câmp | Din calendar; nu poate fi în viitor.
+- Intrare, Ieșire | selecție | Tipul mișcării (în funcție de drepturile tale).
+- Proveniența intrării | selecție | „Intrare liberă” (cu motivul intrării libere și o referință opțională, eventual legată de o ieșire returnată), „Factură existentă” sau „Factură nouă (manual)”; la factură alegi factura și, opțional, cantitatea de pe factură.
+- Destinația ieșirii | selecție | Beneficiar (cu proiect opțional), Autovehicul, Vânzare generică sau Corecție stoc; sursa este depozitul sau o mașină.
+- Componenta proiectului | alegere | Dacă mișcarea e pentru un proiect, o legi de o componentă a lui.
+- Descriere * | câmp | Descrierea mișcării (se propune una).
+- Referință | câmp | Aviz, bon sau număr de predare.
+- Cantitate * | câmp | Numărul de bucăți.
+- Adaugă | buton | Înregistrează mișcarea.
+- Panoul de stoc negativ | panou | Dacă stocul este negativ: „Trec stocul pe 0” sau „Cantitate reală în depozit”, ca să se regularizeze înaintea intrării; „Regularizează stocul acum” face corecția.
+- Avertismentele | mesaj | Ieșire peste stocul din depozit sau din mașină, ieșire repetată (cere motiv), rezervări ale altor proiecte, intrare duplicat pe factură; „Adaugă totuși” continuă, „Renunț” anulează.
+### Tabelul mișcărilor
+- Căutarea | câmp | După descriere, factură, furnizor, beneficiar, proiect sau vehicul.
+- Tip mișcare, Proveniența intrărilor, Destinația ieșirilor, Vehicul | listă | Filtre; „Șterge filtrele” le anulează, iar fiecare filtru activ apare ca etichetă cu „×”.
+- Data | coloană | Sortează crescător sau descrescător; apasă o dată dintr-un rând ca să filtrezi după ea.
+- Intrare/ieșire | coloană | Tipul; „[*]” înseamnă că mișcarea a fost modificată.
+- Număr bucăți, Descriere | coloană | Cantitatea și descrierea (cu „stornat” și retururile).
+- Furnizor / factură, Beneficiar / proiect, Vehicul | coloană | Legăturile mișcării; lupa de lângă ele filtrează după valoarea respectivă.
+- Editează mișcarea | iconita:edit | Deschide editarea ([[produse-miscare-editare]]).
+- Șterge mișcarea | iconita:delete | Șterge mișcarea.
+- Stornează operația | iconita:void | Stornează operația din care face parte mișcarea; cere confirmare și un motiv, iar mișcarea apare marcată „stornat”.
+- Istoric | iconita:history | Deschide istoricul modificărilor mișcării ([[produse-istoric-modificari]]).
+- Paginile | butoane | Trec la pagina anterioară sau următoare.
+
+## Flux: Cum înregistrez o intrare cu factură
+1. În „Înregistrează o mișcare” alege „Intrare”, data și „Factură existentă” (sau „Factură nouă (manual)”).
+2. Alege factura, scrie cantitatea și descrierea.
+3. Apasă „Adaugă”; dacă apare un avertisment, citește-l și alege „Adaugă totuși” sau „Renunț”.
+Nota: pentru mai multe produse deodată folosește „Preluare factură” din meniu.
+
+## Flux: Cum înregistrez o ieșire
+1. Alege „Ieșire”, data și destinația (beneficiar și, dacă e cazul, proiect; vehicul; vânzare sau corecție).
+2. Alege sursa (depozit sau mașină), cantitatea și descrierea.
+3. Apasă „Adaugă”. Dacă depășește stocul, mișcarea se înregistrează marcată „peste stoc”, iar produsul apare în „De regularizat”.
+
+## Flux: Cum regularizez un stoc negativ de pe pagina produsului
+1. Când stocul este negativ apare panoul de regularizare deasupra formularului.
+2. Alege „Trec stocul pe 0” sau scrie cantitatea reală din depozit.
+3. Apasă „Regularizează stocul acum”.
+
+## Flux: Cum corectez sau anulez o mișcare
+1. Pentru o corecție apasă iconița de editare de pe rând și schimbă data, cantitatea sau descrierea.
+2. Pentru o operație multiplă folosește „Stornează operația”.
+3. Ca să vezi cine a modificat o mișcare, apasă „Istoric”.

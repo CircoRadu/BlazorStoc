@@ -1,6 +1,7 @@
 using System.Data;
 using System.Globalization;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -11,13 +12,11 @@ public sealed class MariaSystemTypeRepository(
     IAccessControl? accessControl = null,
     IAuditTrail? auditTrail = null) : ISystemTypeRepository
 {
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<SystemType>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ReadAllAsync(connection, null, cancellationToken).ConfigureAwait(false);
     }
 
@@ -175,8 +174,7 @@ public sealed class MariaSystemTypeRepository(
 
     private async Task<SystemType> GetAsync(int id, CancellationToken token)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
         return (await ReadAllAsync(connection, null, token).ConfigureAwait(false)).FirstOrDefault(type => type.Id == id)
                ?? throw new SystemTypeOperationException(SystemTypeRules.StaleMessage);
     }
@@ -190,7 +188,7 @@ public sealed class MariaSystemTypeRepository(
     }
 
     private static async Task UpdateAsync(MySqlConnection connection, MySqlTransaction transaction, SystemType type, string assignments, CancellationToken token,
-        params (string Name, object Value)[] parameters)
+        params (string Name, object? Value)[] parameters)
     {
         var all = parameters.Concat([("@id", (object)type.Id), ("@version", (object)type.Version), ("@now", (object)MariaTimeText.Format(DateTime.UtcNow))]).ToArray();
         await using var update = Command(connection, transaction,
@@ -198,38 +196,10 @@ public sealed class MariaSystemTypeRepository(
         if (await update.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1) throw new SystemTypeOperationException(SystemTypeRules.StaleMessage);
     }
 
-    private async Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token)
-    {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new SystemTypeOperationException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (MySqlException exception) when (exception.Number == 1062)
-        {
-            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw new SystemTypeOperationException(SystemTypeRules.DuplicateMessage);
-        }
-        catch
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            throw;
-        }
-    }
-
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
-
+    private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token) =>
+        MariaDb.WriteAsync(configuration, action, message => new SystemTypeOperationException(message),
+            exception => exception.Number == 1062 ? new SystemTypeOperationException(SystemTypeRules.DuplicateMessage) : null, token,
+            "Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
     private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureProductOperatorAsync(token) ?? Task.CompletedTask;
     private Task EnsureAdministratorAsync(CancellationToken token) => accessControl?.EnsureAdministratorAsync(token) ?? Task.CompletedTask;
 }

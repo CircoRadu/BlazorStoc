@@ -12,8 +12,20 @@ Scris la 08.10.2026 (Task "Robustete la erori"). Fara diacritice.
 ## Repornirea automata (supervizor)
 Aplicatia nu se reporneste singura: o instanta oprita de o exceptie ramane oprita. Reteta depinde de locul instalarii.
 
-### Windows (cel curent)
-Task Scheduler, o sarcina la pornirea sistemului care ruleaza `dotnet BlazorStoc.dll` cu variabilele din `tools\start-preview.ps1`, cu „Repornire la esec: la 1 minut, de 3 ori" (Setari → „Daca sarcina esueaza, reporneste la fiecare"). Alternativa mai curata: NSSM (`nssm install BlazorStoc dotnet C:\...\BlazorStoc.dll`, `nssm set BlazorStoc AppExit Default Restart`, `AppRestartDelay 5000`).
+### Windows (cel curent): `tools\supervisor.ps1` (15.10.2026)
+Un supervizor scris in PowerShell (nu un serviciu Windows), care porneste aplicatia publicata si o tine in picioare:
+- aplicatia se opreste (exceptie, memorie, proces omorat): repornire dupa o pauza care se dubleaza (2 s, 4 s ... maximum 60 s) si revine la 2 s dupa ce aplicatia a mers 5 minute;
+- aplicatia e vie dar `/health/live` nu raspunde de 3 ori la rand (dupa 60 s de la pornire): se omoara tot arborele de procese si se reporneste;
+- `/health` da 503 (baza nu raspunde): doar se noteaza in jurnal, FARA repornire (aplicatia merge si fara baza si o regaseste singura);
+- mai mult de 10 caderi in 10 minute: supervizorul renunta (stare `gave-up`, cod de iesire 2) in loc sa reporneasca la nesfarsit;
+- `-WithMariaDb`: baza locala de dezvoltare (`tools\dev-mariadb.ps1`) este repornita cand portul ei nu mai raspunde (la fiecare verificare, nu doar la pornire).
+
+Comenzi (din `BlazorStoc\`): `.\tools\supervisor.ps1 -Action run -Port 5087 -WithMariaDb` (porneste si supravegheaza), `-Action status`, `-Action stop` (opreste aplicatia si supervizorul), `-Action install` / `-Action uninstall` (sarcina programata pe utilizator, la autentificare, cu repornirea supervizorului la esec: de 3 ori la 1 minut; `install` NU se ruleaza fara acordul utilizatorului, este o configuratie persistenta).
+Fisiere: `logs\supervisor-yyyyMMdd.log` (ce a facut supervizorul), `logs\supervised-<port>-<ora>.out.log`/`.err.log` (iesirea fiecarei porniri a aplicatiei, ultimele 20), `artifacts\supervisor\state-<port>.json`, `stop-<port>.flag`.
+Teste: `tools\test-supervisor.ps1` (aplicatie falsa `tests\supervisor\fake-app.ps1` care cade, se blocheaza, pierde baza sau iese imediat; 23 de verificari, circa 3 minute).
+
+Ce a descoperit verificarea pe aplicatia reala (de retinut): (1) la repornirea unui proces omorat in timpul unui backup, blocajul de mentenanta ramane pana expira concesiunea lui (2 minute); pornirea aplicatiei cadea cu `MaintenanceInProgressException` si supervizorul intra in bucla de repornire; acum pornirea o tolereaza (`Program.cs`, pazit in `StructureChecks`); (2) `Start-Process -Wait` in PowerShell 5.1 asteapta si procesele descendente: baza pornita astfel bloca bucla supervizorului; acum se asteapta doar scriptul, cu limita de 90 s (test cu un script care lasa un proces in urma).
+Alternativa mai curata ramane NSSM sau un serviciu Windows adevarat (`nssm install BlazorStoc dotnet C:\...\BlazorStoc.dll`), cand aplicatia ajunge pe un server.
 
 ### Linux (systemd)
 ```
@@ -53,3 +65,14 @@ Orice monitor extern (sau `curl -f http://127.0.0.1:5087/health`) poate folosi `
 
 ## De verificat
 Vezi `docs/TESTE_RAMASE.md` (pornire cu baza oprita, test de cadere cu repornire, eliberarea blocarilor).
+
+Supervizorul omorat (verificat 15.10.2026): aplicatia ramane orfana, iar RestartCount al sarcinii programate nu il reporneste. De aceea un supervizor nou opreste intai aplicatia ramasa de la rularea anterioara (pid si ora de pornire din state-<port>.json), si -Action install adauga un declansator repetat la 5 minute pe langa cel de la autentificare (un supervizor viu face repetarea inofensiva, unul mort este inlocuit).
+
+### Marcajul de rulare si Jurnalul (15.10.2026)
+Supervizorul seteaza `App__RunMarkerPath` (`artifacts\supervisor\run-<port>.json`): aplicatia scrie acolo un marcaj la pornire, il reimprospateaza la 30 s si il sterge la oprirea normala. Un marcaj gasit la pornirea urmatoare inseamna ca rularea anterioara a fost oprita fara avertisment (omorata, cazuta, masina oprita) si aplicatia scrie in Jurnalul de activitate "Oprire neasteptata aplicatie". Supervizorul adauga langa marcaj `run-<port>.json.exit` (codul de iesire si motivul: `exited with code -1`, `not answering ...`, supervizorul anterior mort) si sterge marcajul cand oprirea a fost ceruta (`-Action stop`), ca o oprire dorita sa nu apara ca o cadere. Modulele oprite sau reveniti apar si ele in Jurnal; ecranul lor este Setari -> Module.
+
+### Serviciile de fundal (16.10.2026)
+Daca un serviciu de fundal (planificatorul de backup, releul evenimentelor de schimbare, marcajul de rulare) arunca o eroare necaptata, doar el se opreste: `AddHostResilience` (`Startup/HostResilience.cs`) seteaza `BackgroundServiceExceptionBehavior.Ignore`, deci aplicatia continua sa serveasca paginile si modulele, iar eroarea ramane in log. Implicit .NET ar fi oprit tot host-ul, iar supervizorul l-ar fi repornit in bucla.
+
+### Backup, restaurare si NAS in proces separat (16.10.2026)
+Backup-ul, restaurarea si copierea pe NAS ruleaza in `BlazorStoc.dll --backup-worker` (modulul `backup`). Un worker care moare, se blocheaza sau depaseste limita de timp (`Backup:TimeoutSeconds`, `RestoreTimeoutSeconds`, `NasTimeoutSeconds`) este oprit cu tot arborele lui de procese, lacatul `operation.lock.json` luat de el este sters pe loc (nu se mai asteapta cele 2 minute ale contractului), iar fisierele temporare lasate (pachet pe jumatate scris, fisierul cu parola contului de dump, folderul despachetat al restaurarii) sunt sterse. Trei astfel de caderi la rand scot modulul 30 s (Jurnalul are "Oprire modul" / "Revenire modul"; Setari -> Module arata cauza si "Reincearca"); aplicatia si supervizorul nu sunt atinse. Un worker ramas cand aplicatia este omorata isi termina backup-ul sau copierea anulandu-le (stdin se inchide), dar isi termina restaurarea.

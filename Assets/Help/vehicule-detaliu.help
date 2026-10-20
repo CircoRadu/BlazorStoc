@@ -1,0 +1,30 @@
+# Fișa vehiculului
+Ruta: /vehicule/{id:int}
+Cautare: vehicul fisa informatii itp asigurare rovinieta expirare modifica editeaza sterge
+Captura: pagina | /vehicule | click sel:a.category-table-link; full | Fișa unui vehicul
+
+Fișa vehiculului, secțiunea „Informații autovehicul”: numărul, descrierea și datele de expirare ale ITP-ului, asigurării și rovinietei. A doua secțiune, „Echipamente aflate în mașină”, arată produsele din vehicul ([[vehicule-echipamente]]).
+
+## Elemente
+### Antet
+- ← Vehicule | link | Revine la registrul vehiculelor.
+- Numărul și descrierea | text | Identificarea vehiculului.
+- Editează | buton | Deschide formularul vehiculului ([[vehicule-editor]]).
+- Șterge vehiculul | buton | Șterge vehiculul; nu se poate dacă are mișcări de stoc asociate.
+### Secțiuni
+- Informații autovehicul, Echipamente aflate în mașină | filă | Cele două secțiuni ale fișei; fiecare are adresa ei, deci butonul „înapoi” al browserului merge între ele.
+### Informații
+- Număr de înmatriculare, Descriere | rând | Datele vehiculului.
+- ITP, Asigurare, Rovinietă | rând | Data expirării, afișată cu starea: „Valabil”, „Expiră în N zile” (în următoarele 30 de zile) sau „Expirat”.
+- Modifică data | iconita:edit | Deschide fereastra de modificare a unei date de expirare ([[vehicule-expirare]]); doar cu dreptul necesar.
+
+## Flux: Cum reînnoiesc ITP-ul, asigurarea sau rovinieta
+1. Pe rândul expirării apasă butonul de modificare.
+2. Alege noua dată din calendar.
+3. Apasă „Salvează”.
+Nota: modificarea apare în jurnal cu data veche și cea nouă.
+
+## Flux: Cum corectez datele vehiculului
+1. Apasă „Editează”.
+2. Modifică numărul, descrierea sau datele.
+3. Salvează și confirmă modificările.

@@ -1,0 +1,123 @@
+@using BlazorStoc.Services
+@namespace BlazorStoc.Components.Pages
+@inject IVehicleRepository Repository
+@inject ILogger<VehicleEditor> Logger
+@implements IDisposable
+
+<UnsavedChangesTracker @ref="tracker" Adding="@(Original is null)" Snapshot="CurrentSnapshot" Discard="DiscardAsync" />
+<section class="product-editor" aria-labelledby="vehicle-editor-title">
+    <div class="catalog-heading"><h2 id="vehicle-editor-title">@(Original is null ? "Adaugă vehicul" : $"Editează vehiculul {Original.PlateNumber}")</h2><span class="heading-actions"><HelpButton Topic="vehicule-editor" About="Formularul de vehicul" /><button type="button" class="danger" disabled="@saving" @onclick="CloseAsync">Închide</button></span></div>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    <EditForm Model="input" OnValidSubmit="SaveAsync" FormName="vehicle-editor">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <fieldset disabled="@saving">
+            <div class="editor-grid">
+                <label for="vehicle-plate">Număr de înmatriculare *<InputText id="vehicle-plate" @bind-Value="input.PlateNumber" @bind-Value:after="NormalizePlate" maxlength="12" autocomplete="off" placeholder="HD-01-FDG" /><small>Forma AA-OOO-AAA: 1–2 litere, 2–3 cifre, 3 litere (HD-01-FDG, HD-233-VDG, B-123-ABC).</small><ValidationMessage For="() => input.PlateNumber" /></label>
+                <label for="vehicle-description">Descriere *<InputText id="vehicle-description" @bind-Value="input.Description" maxlength="100" autocomplete="off" placeholder="Dacia Dokker albă" /><small>Text scurt, de exemplu marca, modelul și culoarea.</small><ValidationMessage For="() => input.Description" /></label>
+                <label for="vehicle-itp">Data expirare ITP *<PickOnlyDate Id="vehicle-itp" @bind-Value="input.ItpExpiry" Min="@MinDate" /><ValidationMessage For="() => input.ItpExpiry" /></label>
+                <label for="vehicle-insurance">Data expirare asigurare *<PickOnlyDate Id="vehicle-insurance" @bind-Value="input.InsuranceExpiry" Min="@MinDate" /><ValidationMessage For="() => input.InsuranceExpiry" /></label>
+                <label for="vehicle-rovinieta">Data expirare rovinietă *<PickOnlyDate Id="vehicle-rovinieta" @bind-Value="input.RovinietaExpiry" Min="@MinDate" /><ValidationMessage For="() => input.RovinietaExpiry" /></label>
+                @if (Original is not null)
+                {
+                    <ChangeReasonField Id="vehicle-change-reason" @bind-Value="customReason" AutoText="@AutoSummary" @bind-UseAuto="reasonAuto" Error="@reasonError" Disabled="saving" />
+                }
+            </div>
+            <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează vehiculul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+        </fieldset>
+    </EditForm>
+</section>
+@if (pendingChanges is not null && Original is not null)
+{
+    <SaveConfirmationDialog Title="Salvezi modificările vehiculului?" ObjectLabel="@Original.PlateNumber" Changes="pendingChanges"
+                            Reason="@input.Reason" Confirmed="ConfirmSaveAsync" Cancelled="CancelConfirmation" />
+}
+
+@code {
+    [Parameter] public Vehicle? Original { get; set; }
+    [Parameter] public EventCallback<Vehicle> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    // Expiry dates have no upper limit (they lie in the future); only the calendar's lower bound is set.
+    private static readonly string MinDate = StockMovementRules.StorageDate(StockMovementRules.EarliestDate);
+    private UnsavedChangesTracker? tracker;
+    private string CurrentSnapshot() => FormSnapshot.Of(input);
+    // "Părăsește editarea": the leave warning closes the form without saving.
+    private Task DiscardAsync() => Closed.InvokeAsync();
+    private VehicleInput input = new();
+    // The reason of an edit: the summary of the changes made in the form (one on each line, following the form) or a text the user writes.
+    private bool reasonAuto = true;
+    private string customReason = "";
+    private string AutoSummary => Original is null ? "" : ChangeReasonSummary.Build(VehicleRules.Changes(Original,
+        Original with { PlateNumber = input.PlateNumber, Description = input.Description, ItpExpiry = input.ItpExpiry ?? Original.ItpExpiry,
+                        InsuranceExpiry = input.InsuranceExpiry ?? Original.InsuranceExpiry, RovinietaExpiry = input.RovinietaExpiry ?? Original.RovinietaExpiry }));
+    private bool saving;
+    private IReadOnlyList<AuditChange>? pendingChanges;
+    private string? error, reasonError;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override Task OnInitializedAsync()
+    {
+        input = Original is null ? new() : VehicleInput.From(Original);
+        return Task.CompletedTask;
+    }
+
+    // The mask is completed for the user: upper case and hyphens are inserted when the typed value is valid.
+    private void NormalizePlate()
+    {
+        if (VehiclePlate.TryNormalize(input.PlateNumber, out var plate)) input.PlateNumber = plate;
+    }
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : tracker is null ? Closed.InvokeAsync() : tracker.RunAfterConfirmAsync(() => Closed.InvokeAsync());
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        if (Original is not null) input.Reason = ChangeReasonSummary.Chosen(reasonAuto, AutoSummary, customReason);
+        reasonError = Original is null ? null : ChangeReasonSummary.ValidationError(reasonAuto, AutoSummary, customReason);
+        if (reasonError is not null) return;
+        if (Original is not null)
+        {
+            // Saving over existing data needs an explicit confirmation of the changed fields.
+            error = null;
+            try
+            {
+                var value = input.Validated(true);
+                pendingChanges = SaveSummary.Changed(VehicleRules.Changes(Original,
+                    Original with { PlateNumber = value.PlateNumber, Description = value.Description, ItpExpiry = value.ItpExpiry,
+                                    InsuranceExpiry = value.InsuranceExpiry, RovinietaExpiry = value.RovinietaExpiry }));
+            }
+            catch (VehicleOperationException exception) { error = exception.Message; }
+            return;
+        }
+        await PersistAsync();
+    }
+
+    private Task ConfirmSaveAsync() { pendingChanges = null; return PersistAsync(); }
+    private Task CancelConfirmation() { pendingChanges = null; return Task.CompletedTask; }
+
+    private async Task PersistAsync()
+    {
+        if (saving) return;
+        saving = true;
+        error = null;
+        Vehicle? saved = null;
+        try
+        {
+            saved = Original is null
+                ? await Repository.CreateAsync(input, lifetime.Token)
+                : await Repository.UpdateAsync(Original, input, lifetime.Token);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (VehicleOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Vehicle saving failed ({ErrorType}).", exception.GetType().Name);
+            error = "Vehiculul nu a putut fi salvat. Datele formularului au fost păstrate; actualizează lista înainte să reîncerci.";
+        }
+        finally { saving = false; }
+        if (saved is not null) { tracker?.Rebase(); await Saved.InvokeAsync(saved); }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

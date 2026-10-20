@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -14,21 +15,18 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
     private readonly string rootPath = MariaAssetPaths.ServicePhotos(configuration);
     private readonly string archivePath = MariaAssetPaths.ArchiveFiles(configuration);
 
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<ServicePhoto>> GetForWorkPointAsync(int workPointId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ServicePhotoArchive.ReadAsync(connection, null, "work_point_id=@id", cancellationToken, ("@id", workPointId)).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyDictionary<int, int>> CountsForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT p.work_point_id, COUNT(*) FROM service_photos p JOIN beneficiary_work_points w ON w.id=p.work_point_id
             WHERE w.beneficiary_id=@id GROUP BY p.work_point_id
@@ -42,8 +40,7 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
 
     public async Task<ServicePhotoContent?> GetContentAsync(int photoId, CancellationToken cancellationToken = default)
     {
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         var photo = (await ServicePhotoArchive.ReadAsync(connection, null, "id=@id", cancellationToken, ("@id", photoId)).ConfigureAwait(false)).FirstOrDefault();
         if (photo is null) return null;
         var path = Resolve(photo.StoredName);
@@ -52,17 +49,15 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
 
     public async Task<IReadOnlyList<ServicePhoto>> GetForInterventionAsync(int interventionId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         return await ServicePhotoArchive.ReadAsync(connection, null, "intervention_id=@id", cancellationToken, ("@id", interventionId)).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyDictionary<int, int>> CountsForInterventionsAsync(int beneficiaryId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT p.intervention_id, COUNT(*) FROM service_photos p JOIN service_interventions i ON i.id=p.intervention_id
             WHERE i.beneficiary_id=@id GROUP BY p.intervention_id
@@ -83,7 +78,7 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
     // A photo belongs to exactly one work point or one intervention (the table has a CHECK); the rest of the handling is the same.
     private async Task<ServicePhoto> AddAsync(bool onIntervention, int ownerId, string originalName, byte[] content, string caption, CancellationToken cancellationToken)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.edit", cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
             throw new WorkPointOperationException("Modificările sunt permise numai în baza BlazorStoc.");
         var contentType = ServicePhotoRules.DetectContentType(content);
@@ -100,8 +95,7 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
             await File.WriteAllBytesAsync(destination, content, cancellationToken).ConfigureAwait(false);
             try
             {
-                await using var connection = CreateConnection();
-                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+                await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
                 await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
                 ServicePhoto saved; string pointName; int beneficiaryId;
                 try
@@ -163,11 +157,10 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
 
     public async Task DeleteAsync(int photoId, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.edit", cancellationToken).ConfigureAwait(false);
         ServicePhoto? photo; string pointName;
-        await using (var lookupConnection = CreateConnection())
+        await using (var lookupConnection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await lookupConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
             photo = (await ServicePhotoArchive.ReadAsync(lookupConnection, null, "id=@id", cancellationToken, ("@id", photoId)).ConfigureAwait(false)).FirstOrDefault();
             if (photo is null) throw new WorkPointOperationException("Fotografia a fost eliminată deja. Actualizează pagina.");
             await using var name = new MySqlCommand(photo.InterventionId is null
@@ -182,8 +175,7 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
             try
             {
                 prepared = await ServicePhotoArchive.PrepareAsync(rootPath, archivePath, [photo], operation, token).ConfigureAwait(false);
-                await using var connection = CreateConnection();
-                await connection.OpenAsync(token).ConfigureAwait(false);
+                await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
                 await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
                 try
                 {
@@ -219,7 +211,6 @@ public sealed class MariaServicePhotoStore(IConfiguration configuration, IAccess
         return path;
     }
 
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }
 
 // Shared by the photo store and the repositories that delete work points or beneficiaries (they archive the photos of what they delete).

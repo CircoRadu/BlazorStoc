@@ -133,7 +133,7 @@ public static class ProductGroupsChecks
         var parametersPage = context.Render<ProductGroups>();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".category-management-list"), TimeSpan.FromSeconds(5));
         var firstSubcategory = parametersPage.FindAll("tbody button").First(button => (button.GetAttribute("aria-label") ?? "").StartsWith("Parametri obligatori"));
-        check(firstSubcategory.TextContent.Contains("Parametri") && parametersPage.FindAll(".subcategory-parameters").Count == 0, "Categories page: each subcategory has a button for its required parameters and the panel is closed");
+        check(firstSubcategory.ClassList.Contains("params") && parametersPage.FindAll(".subcategory-parameters").Count == 0, "Categories page: each subcategory has an icon for its required parameters and the panel is closed");
         firstSubcategory.Click();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".subcategory-parameters"), TimeSpan.FromSeconds(5));
         parametersPage.Find("#new-parameter-name").Input("Lentila");

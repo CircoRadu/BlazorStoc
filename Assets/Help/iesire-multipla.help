@@ -1,0 +1,49 @@
+# Ieșire multiplă
+Ruta: /iesiri/multipla
+Cautare: iesire iesiri stoc mai multe produse destinatie beneficiar proiect vehicul bon consum depozit masina vanzare corectie
+Captura: pagina | /iesiri/multipla |  | Ieșirea multiplă
+
+Înregistrezi, într-o singură operație, ieșirea mai multor produse către aceeași destinație. Operația se salvează **întreagă sau deloc**; înainte de salvare vezi un sumar cu toate avertismentele liniilor (ieșire peste stoc, produse rezervate de alte proiecte, ieșire repetată).
+
+## Elemente
+### Antet
+- ← Produse | buton | Revine la catalogul de produse.
+- Mesajul verde de după salvare | text | Confirmă operația și oferă linkul „Deschide bonul de consum (PDF)”, care se deschide în vizualizatorul de PDF al browserului.
+### Datele operației
+- Data ieșirii * | câmp | Data ieșirii, aleasă din calendar; nu poate fi în viitor.
+- Referință comună | câmp | Avizul, bonul sau numărul de predare, același pentru toate liniile (opțional).
+- Destinația ieșirii * | selecție | Beneficiar, Autovehicul, Vânzare generică sau Corecție stoc.
+- Beneficiar | listă | Apare la destinația Beneficiar: alegi beneficiarul din listă (căutare în ea). „+ Adaugă beneficiar” deschide formularul de beneficiar nou, dacă ai dreptul.
+- Proiect | comutator | La destinația Beneficiar, pornit îți permite să alegi și proiectul beneficiarului; „+ Adaugă proiect” creează unul nou. Când ai ales proiectul, fiecare linie poate fi legată de o componentă a proiectului (sau marcată ca în afara ofertei).
+- Autovehicul | listă | Apare la destinația Autovehicul: produsul se mută în vehicul, iar stocul total nu se schimbă.
+- Descriere comună | câmp | Descrierea folosită la liniile care nu au una proprie.
+### Tabelul de produse
+- # | coloană | Numărul liniei.
+- Produs | listă | Alegi produsul (căutare după nume sau cod). Sub el vezi stocul din depozit și cel din mașini; un stoc negativ este semnalat.
+- Cantitate | câmp | Câte bucăți ies; minimum 1.
+- Sursa | listă | Depozit sau o mașină care are produsul (cu cantitatea din ea).
+- Descriere | câmp | Descriere proprie a liniei (opțional).
+- Scoate linia | iconita:delete | Șterge linia din operație; o singură linie rămasă nu se poate scoate.
+- + Adaugă produs | buton | Adaugă o linie nouă (cel mult 50 de linii într-o operație).
+- Verifică și salvează | buton | Verifică liniile și arată sumarul de dinainte de salvare.
+### Sumarul de dinainte de salvare
+- Depășește stocul | avertisment | Linia iese peste stocul disponibil: stocul devine negativ, iar produsul apare în „De regularizat”. Poți alege cauza (necunoscută, intrare neoperată sau stoc greșit în bază).
+- Rezervări ale altor proiecte | avertisment | Ieșirea ia bucăți rezervate de alte proiecte; alegi ce se întâmplă cu rezervările.
+- Ieșire repetată | avertisment | Aceeași ieșire a mai fost înregistrată azi; trebuie să scrii un motiv.
+- Salvează operația | buton | Înregistrează toate liniile deodată.
+- Modific | buton | Te întoarce la formular, fără nicio modificare în stoc.
+
+## Flux: Cum înregistrez o ieșire către un beneficiar
+1. Alege data ieșirii și, dacă există, scrie referința (aviz, bon).
+2. La „Destinația ieșirii” alege „Beneficiar”, apoi beneficiarul; pornește „Proiect” dacă ieșirea e pentru un proiect anume.
+3. Pe prima linie alege produsul și cantitatea; sursa rămâne „Depozit” sau alegi o mașină care are produsul.
+4. Cu „+ Adaugă produs” adaugi celelalte produse.
+5. Apasă „Verifică și salvează” și citește sumarul: pentru fiecare avertisment alege ce ți se cere (cauza, rezervările, motivul ieșirii repetate).
+6. Apasă „Salvează operația”. Se afișează confirmarea și linkul către bonul de consum în PDF.
+Nota: dacă ceva nu e corect, „Modific” te întoarce la formular și nu s-a salvat nimic.
+
+## Flux: Cum mut produse într-o mașină
+1. La „Destinația ieșirii” alege „Autovehicul” și apoi vehiculul.
+2. Adaugă produsele și cantitățile, cu sursa „Depozit”.
+3. Verifică și salvează: produsele trec în mașină, iar stocul total nu se schimbă.
+Nota: transferul dintr-o mașină în alta se face din pagina vehiculului.

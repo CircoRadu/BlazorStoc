@@ -51,7 +51,7 @@ internal static class MariaAssetPaths
 {
     private static string AssetsRoot(IConfiguration configuration) =>
         configuration["Database:MariaAssetsRoot"]
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "assets");
+            ?? BlazorStoc.Startup.AppDataRoot.Combine(configuration, "assets");
 
     public static string ProductImages(IConfiguration configuration) => Path.GetFullPath(
         configuration["Database:MariaProductImagesPath"] ?? Path.Combine(AssetsRoot(configuration), "product-images"));
@@ -72,19 +72,18 @@ internal static class MariaAssetPaths
     public static string DatabaseBackups(IConfiguration configuration) => Path.GetFullPath(
         configuration["Database:MariaBackupFilesPath"] ?? Path.Combine(AssetsRoot(configuration), "database-backups"));
 
+    // The lock file shared by every backup / restore (in the application and in the worker processes), next to the packages.
+    public static string OperationLock(IConfiguration configuration) => Path.Combine(DatabaseBackups(configuration), "operation.lock.json");
+
     // Distribution installed next to this asset root (docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md section 3); the
     // "mariadb-dump" executable used to export the live database (Subtask 2.2) ships in its bin/ folder.
     public static string MariaDumpExecutable(IConfiguration configuration) =>
-        configuration["Database:MariaDumpExecutablePath"] ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB",
-            "mariadb-11.4.13-winx64", "bin", "mariadb-dump.exe");
+        configuration["Database:MariaDumpExecutablePath"] ?? BlazorStoc.Startup.AppDataRoot.Combine(configuration, "mariadb-11.4.13-winx64", "bin", "mariadb-dump.exe");
 
     // Subtask 3.4 (Task 3): the "mariadb" CLI client (same bin/ folder as mariadb-dump.exe above) used to import a
     // package's dump.sql into the temporary restore schema by piping the file into its standard input.
     public static string MariaClientExecutable(IConfiguration configuration) =>
-        configuration["Database:MariaClientExecutablePath"] ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB",
-            "mariadb-11.4.13-winx64", "bin", "mariadb.exe");
+        configuration["Database:MariaClientExecutablePath"] ?? BlazorStoc.Startup.AppDataRoot.Combine(configuration, "mariadb-11.4.13-winx64", "bin", "mariadb.exe");
 }
 
 // Subtask 2.11 (Task 2): every write-capable Maria* repository refuses to write unless the configured database

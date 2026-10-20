@@ -1,0 +1,40 @@
+# Facturi
+Ruta: /facturi
+Cautare: facturi furnizor registru preluate intrari stoc numar data editeaza sterge fara intrari
+Captura: pagina | /facturi |  | Registrul de facturi
+
+Registrul facturilor de furnizor din care s-au preluat intrări în stoc. Apasă numărul unei facturi ca să vezi produsele preluate din ea. Fereastra are două secțiuni: **Facturi** și **Intrări fără factură**.
+
+## Elemente
+### Rezumat
+- Total facturi | cifră | Facturile preluate în stoc.
+- Luna aceasta | cifră | Câte au fost preluate în luna curentă.
+- Furnizori | cifră | Câți furnizori au cel puțin o factură.
+- Fără intrări | cifră | Facturile fără nicio intrare în stoc legată.
+### Filtre
+- Caută | câmp | După numărul facturii sau după furnizor.
+- Furnizor | listă | Alegi un furnizor sau „Toți furnizorii”.
+- De la, până la | câmp | Perioada de emitere a facturilor.
+- Doar fără intrări | comutator | Arată doar facturile fără intrări în stoc.
+### Tabelul facturilor
+- Nr. factură | coloană | Apasă numărul ca să vezi produsele preluate ([[facturi-detaliu]]).
+- Furnizor | coloană | Apasă numele ca să deschizi fișa furnizorului.
+- Data emiterii | coloană | Data de pe factură.
+- Intrări în stoc | coloană | Câte intrări s-au preluat din factură.
+- Preluată de, La data | coloană | Cine a preluat factura și când.
+- Editează factura | iconita:edit | Doar administratorul: corectează numărul, data și furnizorul ([[facturi-editare]]).
+- Șterge factura | iconita:delete | Doar administratorul și doar dacă factura nu are intrări în stoc.
+
+## Flux: Cum văd ce s-a preluat dintr-o factură
+1. Caută factura după număr sau furnizor.
+2. Apasă numărul facturii.
+3. În fereastra care se deschide vezi produsele, cantitățile și data intrărilor.
+
+## Flux: Cum corectez numărul, data sau furnizorul unei facturi
+1. Doar administratorul: apasă iconița de editare de pe rândul facturii.
+2. Schimbă datele; motivul se completează cu rezumatul modificărilor sau îl scrii tu.
+3. Apasă „Salvează”.
+
+## Flux: Cum găsesc facturile fără intrări
+1. Pornește comutatorul „Doar fără intrări”.
+2. Verifică fiecare factură; o factură fără intrări poate fi ștearsă de administrator.

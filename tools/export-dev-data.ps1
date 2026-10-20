@@ -34,7 +34,8 @@ if ($LASTEXITCODE -ne 0) { throw 'mariadb-dump failed.' }
 Write-Host "Data exported to $file (audit_events and change_events left out)."
 
 # The files the data refers to (not the backups): archive files, photos, Data Protection keys.
-$assetsRoot = Join-Path $env:LOCALAPPDATA 'BlazorStoc-MariaDB\assets'
+. (Join-Path $PSScriptRoot 'data-root.ps1')
+$assetsRoot = Join-Path (Get-AppDataRoot) 'assets'
 $config = Join-Path $repo 'local-secrets\application-connection.private.json'
 if (Test-Path $config) {
     $configured = (Get-Content $config -Raw -Encoding UTF8 | ConvertFrom-Json).Database.MariaAssetsRoot
@@ -42,7 +43,7 @@ if (Test-Path $config) {
 }
 $assetsTarget = Join-Path $target 'assets'
 if (Test-Path $assetsRoot) {
-    robocopy $assetsRoot $assetsTarget /MIR /XD database-backups /NFL /NDL /NJH /NJS /NP | Out-Null
+    robocopy $assetsRoot $assetsTarget /MIR /XD database-backups run-state /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw 'robocopy failed.' }
     $global:LASTEXITCODE = 0
     Write-Host "Files copied from $assetsRoot to $assetsTarget."

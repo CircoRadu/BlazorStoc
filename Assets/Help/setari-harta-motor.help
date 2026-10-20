@@ -1,0 +1,27 @@
+# Setări · Motor hartă
+Ruta: /setari
+Tab: Motor hartă
+Cautare: motor harta furnizor dale url atribuire zoom centru cheie testeaza openstreetmap
+Captura: pagina | /setari | click Hartă; full | Motorul hărții
+
+Furnizorul fundalului hărții de mentenanță: adresa dalelor, atribuirea cerută de furnizor, limitele de zoom și punctul de pornire. Browserul cere dalele direct de la furnizor; numele beneficiarilor, contractele și scadențele nu părăsesc aplicația.
+
+## Elemente
+### Furnizorul
+- Starea setărilor | text | „Setări salvate din această pagină” sau „Se folosesc valorile din configurația aplicației”.
+- Adresa dalelor * | câmp | Adresă https cu {z}, {x}, {y} (opțional {s}, {r} și {key}); de exemplu https://tile.openstreetmap.org/{z}/{x}/{y}.png.
+- Text atribuire *, Adresa atribuirii | câmp | Atribuirea cerută de furnizor, afișată pe hartă.
+- Zoom minim, Zoom maxim, Zoom de pornire | câmp | Limitele de apropiere ale hărții.
+- Latitudine centru, Longitudine centru | câmp | Punctul în care pornește harta.
+- Cheie furnizor | câmp | Opțională: se pune în adresă acolo unde scrie {key}; nu se afișează și nu apare în jurnal. „Șterge cheia salvată” o elimină.
+### Butoane
+- Testează furnizorul | buton | Verifică dacă dalele se încarcă.
+- Salvează setările | buton | Salvează.
+- Renunță la modificări | buton | Revine la valorile salvate.
+- Revino la valorile din configurația aplicației | buton | Apare când există setări salvate: le șterge.
+
+## Flux: Cum schimb furnizorul hărții
+1. Completează adresa dalelor și atribuirea.
+2. Apasă „Testează furnizorul”.
+3. Dacă testul reușește, apasă „Salvează setările”.
+Nota: modificările se văd pe hartă după reîncărcare.

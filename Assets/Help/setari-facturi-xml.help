@@ -1,0 +1,28 @@
+# Șablonul XML de factură
+Cautare: sablon xml factura ubl efactura cai arbore alege fisier proba linii descriere intrare stoc furnizor
+Captura: pagina | /setari | click Facturi; upload factura-demo.xml; full | Șablonul unei facturi XML
+
+Pentru facturile XML (e-Factura UBL): legi vizual elementele șablonului de valorile din fișierul de probă. Apeși „Alege” la un element, apoi apeși în arbore valoarea lui; citirea se actualizează la fiecare legătură.
+
+## Elemente
+### Fișierul de probă
+- Fișier XML sau ZIP de probă | zonă | Alegi un fișier XML sau o arhivă ZIP; citirea lui apare dedesubt, cu primele 10 linii.
+- Renunță și elimină fișierul | buton | Șterge fișierul încărcat.
+### Legarea elementelor
+- Completează cu căile UBL standard | buton | Pune căile obișnuite ale e-Facturii.
+- Elementele șablonului | listă | Număr factură *, Data facturii *, Denumirea și CUI-ul furnizorului, Moneda, Totalul, Elementul unei linii *, Codul intern, Denumirea produsului, Cantitatea *, Unitatea, Prețul unitar, Valoarea liniei; (* = obligatorii).
+- Alege / Schimbă / Scoate | buton | Alegi valoarea în arbore, o schimbi sau scoți legătura.
+- Caută în fișier | câmp | Caută în arborele fișierului; săgețile desfac sau strâng ramurile.
+- Căile | câmp | Calea fiecărei valori: nume de elemente separate prin „/”, cu „@atribut” la sfârșit pentru un atribut; prefixul (cbc:ID) se ignoră.
+### Citirea și salvarea
+- Citit din fișier | tabel | Câmpurile și liniile citite cu șablonul curent.
+- Descriere intrare în stoc a produsului | câmp cu etichete | Textul intrării în stoc, cu etichete la cursor; previzualizarea arată rezultatul.
+- Denumirea șablonului *, Furnizor * | câmp | Numele și furnizorul (căutare); „+ Adaugă furnizorul” deschide formularul de furnizor.
+- Salvează șablonul | buton | Salvează.
+- Renunță | buton | Închide fără salvare.
+
+## Flux: Cum creez un șablon XML
+1. Încarcă un fișier XML sau ZIP de probă.
+2. Apasă „Completează cu căile UBL standard” sau leagă fiecare element: „Alege” și apoi valoarea din arbore.
+3. Verifică citirea (câmpuri și linii) și scrie descrierea intrării în stoc.
+4. Alege furnizorul, scrie denumirea și apasă „Salvează șablonul”.

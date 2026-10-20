@@ -1,0 +1,142 @@
+@using BlazorStoc.Services
+@inject IDatabaseSettingsService Settings
+@inject IDatabaseServerService Server
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+@inject ILogger<ApplicationPanel> Logger
+@implements IAsyncDisposable
+@* Setari -> Baza de date -> Conexiune -> Aplicatia: the port the application listens on (and the interface) and its restart. The address people type in the browser is this computer
+   and this port, so it is chosen here, independently of the port of the database server. A new port is saved and the application is restarted (when something brings it back:
+   the supervisor of the preview or the Windows service); the page then waits for the new address and opens it. *@
+
+<section class="catalog application-hosting">
+    <div class="catalog-heading"><h2>Aplicația</h2><small>Adresa la care intri în aplicație din browser: calculatorul acesta și portul ales aici.</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
+        <p class="muted"><small>Adresa curentă: <strong>@Navigation.BaseUri</strong>. @(restartSupported ? "Un port nou se aplică repornind aplicația din această pagină." : "Această instanță nu rulează sub un supervizor sau serviciu care o repornește: un port nou se aplică la următoarea pornire.")</small></p>
+        <div class="anaf-grid">
+            <label>Port aplicație (gol = implicit)<input id="app-port" type="number" min="1024" max="65535" @bind="appPort" autocomplete="off" /></label>
+            <label>Interfață
+                <select id="app-interface" @bind="appBindAll" disabled="@(appPort is null)">
+                    <option value="false">Doar acest calculator (127.0.0.1)</option>
+                    <option value="true">Toate interfețele (accesibilă din rețea)</option>
+                </select>
+            </label>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@busy" @onclick="() => Ask(Mode.SaveAndRestart)">@(restartSupported ? "Salvează și repornește aplicația" : "Salvează portul")</button>
+            @if (restartSupported)
+            {
+                <button type="button" class="refresh act-reload" disabled="@busy" @onclick="() => Ask(Mode.Restart)">Repornește aplicația</button>
+            }
+        </div>
+    }
+    </div>
+</section>
+@if (mode != Mode.None)
+{
+    <AdminOperationDialog Title="@(mode == Mode.Restart ? "Repornește aplicația" : restartSupported ? "Salvează portul și repornește aplicația" : "Salvează portul aplicației")"
+                          Intro="@(mode == Mode.Restart ? "Aplicația se oprește și pornește din nou; sesiunile deschise se reîncarcă singure." : restartSupported ? $"Portul se salvează și aplicația repornește; pagina se deschide singură pe {NewAddress}." : "Portul se salvează și se aplică la următoarea pornire a aplicației.")"
+                          ConfirmText="@(mode == Mode.Restart ? "Repornește" : restartSupported ? "Salvează și repornește" : "Salvează portul")" Busy="busy" BusyText="@busyText" Error="@dialogError"
+                          @bind-AdminPassword="adminPassword" Confirmed="ConfirmAsync" Cancelled="Cancel" />
+}
+
+@code {
+    private enum Mode { None, SaveAndRestart, Restart }
+    private readonly CancellationTokenSource lifetime = new();
+    private IJSObjectReference? module;
+    private bool loading = true, busy, noticeOk, appBindAll, restartSupported;
+    private string? error, notice, busyText, dialogError;
+    private string adminPassword = "";
+    private int? appPort;
+    private Mode mode;
+    private DatabaseConnectionSettings current = new("", 0, "", "", "Required", false, null, false, false, null, "");
+
+    private string NewAddress
+    {
+        get
+        {
+            var uri = new Uri(Navigation.BaseUri);
+            // Without a saved port the application listens on the port its start script proposes (Hosting:DefaultPort), otherwise it stays where it is.
+            var port = appPort ?? Configuration.GetValue<int?>("Hosting:DefaultPort") ?? (uri.IsDefaultPort ? (uri.Scheme == "https" ? 443 : 80) : uri.Port);
+            return $"{uri.Scheme}://{uri.Host}:{port}/";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Apply(await Settings.GetAsync(lifetime.Token));
+            restartSupported = (await Server.GetStateAsync(lifetime.Token)).ApplicationRestartSupported;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Application hosting settings loading failed ({ErrorType}).", ex.GetType().Name); error = "Setările nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private void Apply(DatabaseConnectionSettings settings)
+    {
+        current = settings; appPort = settings.AppPort; appBindAll = settings.AppBindAll; adminPassword = "";
+    }
+
+    private void Ask(Mode requested)
+    {
+        if (busy) return;
+        if (requested == Mode.SaveAndRestart && appPort is { } port && (port < 1024 || port > 65535)) { error = DatabaseConnectionRules.AppPortMessage; notice = null; return; }
+        error = null; notice = null; adminPassword = ""; dialogError = null; mode = requested;
+    }
+
+    private void Cancel() { mode = Mode.None; adminPassword = ""; dialogError = null; }
+
+    private async Task ConfirmAsync()
+    {
+        if (busy) return;
+        busy = true; dialogError = null;
+        // The password typed once serves both calls (the save and the restart); reading the settings again clears the field of the window, so it is kept here.
+        var kind = mode;
+        var password = adminPassword;
+        try
+        {
+            if (kind == Mode.SaveAndRestart)
+            {
+                // Only the hosting changes: the values of the database connection go back unchanged, so the service sees nothing else to save.
+                busyText = "Se salvează portul…";
+                var result = await Settings.SaveAsync(new(current.Host, current.Port, current.User, null, current.SslMode, appPort, appBindAll), password, lifetime.Token);
+                if (!result.Success) { dialogError = result.Message; return; }
+                Apply(await Settings.GetAsync(lifetime.Token));
+                if (!restartSupported) { noticeOk = true; notice = "Portul a fost salvat; se aplică la următoarea pornire a aplicației."; Cancel(); return; }
+                busyText = "Se repornește aplicația…";
+                await RestartAsync(password);
+            }
+            else await RestartAsync(password);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is DatabaseSettingsException or AccessDeniedException) { dialogError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Application hosting action failed ({ErrorType}).", ex.GetType().Name); dialogError = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    private async Task RestartAsync(string password)
+    {
+        var result = await Server.RestartApplicationAsync(password, lifetime.Token);
+        if (!result.Success) { dialogError = result.Message; return; }
+        noticeOk = true; notice = result.Message + $" Adresa nouă: {NewAddress}";
+        Cancel();
+        module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./app-restart.js");
+        var path = new Uri(Navigation.Uri).PathAndQuery;
+        await module.InvokeVoidAsync("waitAndOpen", NewAddress, path);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel(); lifetime.Dispose();
+        if (module is not null) { try { await module.DisposeAsync(); } catch (Exception ex) when (ex is JSDisconnectedException or OperationCanceledException) { } }
+    }
+}

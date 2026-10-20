@@ -1,0 +1,16 @@
+# Salvarea ca șablon nou
+Cautare: salveaza ca sablon nou denumire sablon copie
+Captura: fereastra | /setari | click Facturi; click Șabloane salvate; click sel:.row-icon.edit; wait 2500; click Salvează ca șablon nou | Salvarea ca șablon nou
+
+La editarea unui șablon, „Salvează ca șablon nou” păstrează șablonul curent neschimbat și creează un alt șablon, cu denumirea aleasă aici.
+
+## Elemente
+### Fereastra
+- Denumirea noului șablon * | câmp | Numele noului șablon.
+- Salvează șablonul nou | buton | Creează șablonul.
+- Anulează | buton | Închide fereastra fără să creeze nimic.
+
+## Flux: Cum creez un șablon nou dintr-unul existent
+1. Modifică șablonul în editor.
+2. Apasă „Salvează ca șablon nou”.
+3. Scrie denumirea și apasă „Salvează șablonul nou”.

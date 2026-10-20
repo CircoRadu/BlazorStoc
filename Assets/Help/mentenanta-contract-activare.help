@@ -1,0 +1,23 @@
+# Activarea unui contract de mentenanță
+Cautare: activare contract off on reprogramare scadente puncte conflict alt contract activ
+Captura: fereastra | /beneficiari | click Asociatia de Proprietari; click Arată și contractele Off; click sel:tr.contract-row-off label.row-toggle | Reactivarea unui contract
+
+Când reiei un contract oprit (Off → On), scadențele lui nu s-au mutat cât a fost oprit: dacă ar rămâne în trecut, toate punctele ar apărea deodată „depășite”. Fereastra îți cere să alegi noile scadențe înainte de activare.
+
+## Elemente
+### Fereastra
+- Mesajul de expirare | mesaj | Apare dacă contractul a expirat: îl poți activa oricum, dar prelungește data de expirare din „Editează”.
+- Puncte în alt contract activ | listă | Punctele care sunt acum acoperite de alt contract activ; activarea cere să le scoți din contractul reactivat.
+- Scoate aceste puncte din contractul reactivat | comutator | Confirmă scoaterea punctelor aflate în conflict.
+- Reprogramează toate punctele la | câmp | O singură dată pentru toate punctele; „Aplică tuturor” o completează pe fiecare rând.
+- Punct de lucru | coloană | Numele și adresa punctului.
+- Scadența curentă | coloană | Scadența veche; „din trecut” o semnalează.
+- Noua scadență | câmp | Data următoarei intervenții a punctului; la punctele scoase scrie „Se scoate din contract”.
+- Activează contractul | buton | Pornește contractul cu scadențele alese.
+- Anulează, Închide | buton | Închid fereastra fără activare.
+
+## Flux: Cum reactivez un contract oprit
+1. Pornește comutatorul On/Off de pe rândul contractului.
+2. Alege pentru fiecare punct noua scadență (sau pune aceeași dată tuturor cu „Aplică tuturor”).
+3. Dacă apar puncte aflate în alt contract activ, pornește „Scoate aceste puncte din contractul reactivat”.
+4. Apasă „Activează contractul”.

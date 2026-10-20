@@ -1,0 +1,94 @@
+# Setări · Bază de date · Conexiune
+Ruta: /setari
+Tab: Conexiune
+Cautare: baza de date conexiune server serviciu porneste opreste reporneste port server ocupat host port utilizator parola ssl port aplicatie interfata reporneste aplicatia testeaza salveaza revino configuratia de baza suprascriere conturi conturile bazei parole schimba parola resetare exporta importa configurarea fraza parola implicita drepturi
+Captura: pagina | /setari | click Bază de date; click Conexiune; click Testează conexiunea; wait 2500; click Verifică conturile; wait 3000; full | Conexiunea la baza de date
+
+Aici ai patru lucruri separate. „Serverul bazei de date” este serviciul Windows al bazei de pe acest calculator: îl pornești, oprești, repornești și îi schimbi portul pe care ascultă. „Baza de date” este conexiunea aplicației la server (host, port, cont, parolă, SSL); schimbă doar unde se conectează aplicația, nu serverul. „Aplicația” este portul la care intri în aplicație din browser. „Conturile bazei de date” verifică și schimbă parolele celor patru conturi fixe ale aplicației. Valorile salvate din pagină se păstrează într-un fișier în afara repository-ului, au prioritate față de fișierul privat de configurare, iar parola este criptată. Este rezervată conturilor cu nivelul Administrator.
+
+## Elemente
+### Serverul bazei de date
+- Serviciu Windows | informație | Numele serviciului bazei de pe acest calculator (implicit BlazorStocMariaDB, instalat cu tools\install-mariadb-service.ps1) și starea lui: pornit, oprit sau se schimbă. | sel: .database-server-facts
+- Port pe care ascultă serverul | informație | Portul din fișierul de configurare al serverului (my.ini); acolo se schimbă cu „Schimbă portul serverului”.
+- Port la care se conectează aplicația | informație | Portul din conexiunea aplicației, cu „răspunde” sau „nu răspunde”, ca să vezi dacă serverul se află acolo.
+- Repornește serverul | buton | Oprește curat serverul și îl pornește din nou; apare cât timp serverul este pornit. Fereastra: [[setari-baza-server-operatii]].
+- Oprește serverul | buton | Oprește serverul; cere să scrii OPRESTE BAZA. Cât timp e oprit, aplicația nu are date.
+- Pornește serverul | buton | Apare cât timp serverul este oprit; este închis dacă portul lui este ținut de alt program (cardul spune care).
+- Schimbă portul serverului | buton | Schimbă portul pe care ascultă serverul și îl repornește pe portul nou; aplicația se conectează singură la el.
+- Actualizează starea | buton | Citește din nou starea serviciului și a portului.
+- Motivul când nu se poate | text | Dacă serverul este pe alt calculator, nu există serviciul sau serviciul nu este serverul pe care îl folosește aplicația, cardul nu are butoane și spune de ce și ce faci în loc.
+### Baza de date
+- Host | câmp | Numele sau adresa calculatorului pe care rulează baza (de exemplu 127.0.0.1 pentru același calculator), fără spații.
+- Port la care se conectează | câmp | Portul la care se conectează aplicația, între 1 și 65535. Schimbă doar conexiunea aplicației; portul pe care ascultă serverul se schimbă din cardul „Serverul bazei de date”, iar după aceea acest port se actualizează singur.
+- Baza de date | câmp | Numele bazei; aplicația scrie numai în baza ei, deci numele nu se schimbă de aici.
+- Utilizator | câmp | Contul cu care se conectează aplicația; are doar drepturile de citire și scriere ale datelor.
+- Parolă | câmp | Parola contului bazei. Lăsat gol, rămâne parola salvată; nu apare nicăieri în pagină sau în jurnal.
+- Mod SSL | listă | Required criptează conexiunea; VerifyCA și VerifyFull verifică și certificatul serverului; Preferred și None nu garantează criptarea. Pentru un server de pe alt calculator se cere cel puțin criptarea.
+### Aplicația
+- Adresa curentă | text | Adresa la care ești conectat acum (calculatorul și portul aplicației). | sel: .application-hosting
+- Port aplicație (gol = implicit) | câmp | Portul la care intri în aplicație din browser, între 1024 și 65535. Se alege independent de portul serverului bazei de date.
+- Interfață | listă | „Doar acest calculator” sau „Toate interfețele” (aplicația devine accesibilă din rețea).
+- Salvează și repornește aplicația | buton | Salvează portul și interfața și repornește aplicația; pagina așteaptă să răspundă pe adresa nouă și se deschide singură acolo. Dacă instanța nu rulează sub un supervizor sau serviciu care o repornește, butonul este „Salvează portul” și portul se aplică la următoarea pornire.
+- Repornește aplicația | buton | Repornește aplicația fără să schimbe portul; apare numai când o repornire este posibilă.
+### Rezultatul testului
+- Rezultatul testului | listă | Conectare (host, port, cont și parolă acceptate), Server (versiunea), Schema aplicației (există tabelele aplicației, deci hostul nu arată spre alt server) și Drepturile contului. Un pas cu avertisment nu oprește salvarea; unul cu eroare o oprește.
+### Butoanele conexiunii
+- Fereastra de confirmare | fereastră | Se deschide când apeși „Salvează și aplică” sau „Revino la configurația de bază” și cere parola contului tău de administrator: administratorul configurat introduce parola din fișierul privat, un administrator din Utilizatori introduce parola contului lui. Dacă parola este greșită, mesajul apare în fereastră și poți încerca din nou; după mai multe încercări greșite, confirmarea este refuzată un minut. | sel: .admin-operation-dialog
+- Salvează și aplică | buton | Testează valorile, apoi le aplică imediat, fără repornire; dacă ceva nu merge după aplicare, se revine automat la conexiunea veche. Schimbarea este jurnalizată cu valorile vechi și noi, fără parole.
+- Testează conexiunea | buton | Verifică valorile din formular fără să salveze nimic și fără să atingă conexiunea în uz; este jurnalizat.
+- Revino la configurația de bază | buton | Șterge valorile salvate din pagină și folosește din nou fișierul privat de configurare.
+
+### Conturile bazei de date
+- Tabelul conturilor | tabel | Cele patru conturi fixe: accesul aplicației la date, actualizarea schemei, copiile de siguranță și restaurarea. Fiecare rând arată dacă este conectat (conexiunea de probă a reușit sau a eșuat), dacă are exact drepturile din catalog (cele lipsă sau în plus sunt listate), dacă folosește încă parola implicită și când s-a schimbat ultima dată parola. | sel: .database-accounts-table
+- Schimbă parola contului | iconita:edit | Deschide formularul pentru contul de pe rând: parola nouă (cel puțin 16 caractere), repetarea ei, „Generează parola” și „Arată parola”.
+- Verifică conturile | buton | Încearcă conectarea fiecărui cont și compară drepturile lui cu catalogul; se jurnalizează.
+- Schimbă toate parolele | buton | Schimbă parolele tuturor conturilor, generate automat sau alese de tine; un cont care eșuează nu strică celelalte.
+- Resetează conturile | buton | Recreează conturile lipsă, repune exact drepturile din catalog și pune parole noi (generate sau cele implicite). Cere contul care administrează serverul, aflat în folderul de date.
+- Exportă configurarea | buton | Descarcă un fișier criptat cu o frază-parolă, cu serverul, cele patru conturi și parolele lor și, la alegere, contul de administrare al serverului. Nu rămâne nimic din el pe server.
+- Importă configurarea | buton | Pune înapoi parolele dintr-un fișier exportat (de exemplu după ce s-a pierdut fișierul de configurare local); fiecare cont se verifică înainte să fie preluat.
+- Ferestrele operațiilor | fereastră | „Schimbă parola”, „Schimbă toate parolele”, „Resetează conturile”, „Exportă configurarea” și „Importă configurarea” deschid fiecare o fereastră cu ce are nevoie operația (parola nouă, fraza-parolă, fișierul) și cu parola contului tău de administrator; vezi [[setari-baza-conturi-operatii]]. Parolele și frazele-parolă cerute de două ori arată imediat dacă cele două coincid.
+- Rezultatul ultimei operații | listă | Ce s-a întâmplat cu fiecare cont la ultima operație. Apare după prima operație, deci nu este în poza de mai sus. | sel: .database-accounts .database-test-steps
+
+## Flux: Cum schimb serverul bazei de date
+1. Completează hostul, portul, utilizatorul și, dacă s-a schimbat, parola.
+2. Apasă „Testează conexiunea” și așteaptă să nu apară pași cu eroare.
+3. Apasă „Salvează și aplică” și introdu parola contului tău de administrator în fereastra care se deschide.
+4. Aplicația intră scurt în întreținere (sesiunile deschise văd pagina de așteptare), apoi lucrează cu noua conexiune.
+Nota: dacă noua conexiune nu funcționează după aplicare, aplicația revine singură la cea veche și spune asta.
+
+## Flux: Cum schimb portul aplicației
+1. În cardul „Aplicația” completează „Port aplicație” și alege interfața.
+2. Apasă „Salvează și repornește aplicația” și introdu parola contului tău de administrator în fereastra care se deschide.
+3. Aplicația repornește pe portul nou; pagina așteaptă să răspundă și se deschide singură pe adresa nouă.
+Nota: dacă pornirea impune adresa (ASPNETCORE_URLS, --urls), portul salvat este ignorat; [[setari-baza-stare]] spune asta la „Port salvat”. Dacă portul ales este ocupat la pornire, aplicația folosește portul implicit și spune asta.
+
+## Flux: Cum schimb portul pe care ascultă baza de date
+1. În cardul „Serverul bazei de date” apasă „Schimbă portul serverului”.
+2. Alege portul nou și introdu parola contului tău de administrator; serverul se repornește pe portul nou și conexiunea aplicației se actualizează singură.
+3. Dacă ceva nu merge, se revine la portul vechi. Detalii și cazul portului ocupat: [[setari-baza-server-operatii]].
+
+## Flux: Cum revin la configurația de bază
+1. Apasă „Revino la configurația de bază”.
+2. Introdu parola contului tău de administrator în fereastra care se deschide: valorile salvate din pagină se șterg și se folosește din nou fișierul privat.
+
+## Flux: Cum schimb parolele conturilor bazei
+1. Pentru un singur cont apasă iconița de editare de pe rândul lui; în fereastra care se deschide completează parola nouă de două ori (sau „Generează parola”), introdu parola contului tău de administrator și apasă „Schimbă parola”.
+2. Pentru toate conturile apasă „Schimbă toate parolele”, alege în fereastră „Parole generate” sau tastează-le, introdu parola ta de administrator și apasă „Schimbă parolele”.
+3. Verifică în tabel că fiecare cont este „conectat”, are „exact cele din catalog” și nu mai folosește parola implicită.
+4. Apasă „Exportă configurarea” și păstrează fișierul într-un loc sigur.
+Nota: schimbarea nu cere contul care administrează serverul: fiecare cont își schimbă singur parola. Nu se poate face cât timp rulează o copie de siguranță sau o restaurare.
+
+## Flux: Ce fac la prima pornire (parole implicite)
+1. La prima pornire aplicația folosește parolele implicite, publice, ale conturilor.
+2. Cât timp un cont le folosește încă, administratorul este dus aici și celelalte pagini îi sunt blocate.
+3. Schimbă parolele ca mai sus; după ce toate conturile au parole proprii, aplicația se deblochează.
+
+## Flux: Cum recuperez accesul dacă am pierdut parolele
+1. Dacă ai un fișier exportat: „Importă configurarea”, alege fișierul în fereastră, introdu fraza-parolă și parola ta de administrator și apasă „Importă”.
+2. Dacă nu ai: „Resetează conturile” (are nevoie de contul care administrează serverul, aflat în folderul de date), alege în fereastră parole generate sau implicite, introdu parola ta de administrator și apasă „Resetează conturile”.
+3. Apoi verifică conturile și exportă din nou configurarea.
+
+## Flux: Cum exportez configurarea pentru administrator
+1. Apasă „Exportă configurarea”.
+2. În fereastră alege o frază-parolă de cel puțin 12 caractere și repetă-o (pagina spune imediat dacă cele două coincid), decide dacă incluzi contul de administrare al serverului și introdu parola contului tău de administrator.
+3. Apasă „Exportă și descarcă”; păstrează fișierul într-un loc sigur, nu pe serverul bazei.

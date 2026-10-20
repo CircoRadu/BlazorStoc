@@ -1,0 +1,16 @@
+# Detaliile unei notificări rezolvate
+Cautare: notificare rezolvata detalii motiv rezolvata de
+Captura: fereastra | /notificari | click Rezolvate; click sel:tr.notification-row | Detaliile unei notificări rezolvate
+
+Fereastra arată o notificare rezolvată: textul ei, scadența și cine a rezolvat-o, când și de ce.
+
+## Elemente
+### Fereastra
+- Titlul și textul | text | Subiectul, sursa și mesajul notificării.
+- Scadența și rezolvarea | text | Data de expirare, momentul rezolvării și utilizatorul (sau „sistem (automat)”).
+- Motiv | text | De ce a fost rezolvată.
+- Închide | buton | Închide fereastra.
+
+## Flux: Cum văd cum a fost rezolvată o notificare
+1. În „Rezolvate” apasă rândul notificării.
+2. Citește motivul și cine a rezolvat-o.

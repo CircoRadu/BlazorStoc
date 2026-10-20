@@ -4,6 +4,16 @@ Fluxul: deschizi un produs -> pagina de miscari -> adaugi intrare sau iesire -> 
 
 ## Modificari de testat
 
+### 10.10.2026 - Pagina de miscari a produsului, reorganizata in cod
+
+**Ce s-a schimbat:** nimic vizibil; codul paginii `/produse/{id}/miscari` a fost impartit pe fisiere. Verificarea este ca totul se comporta ca inainte.
+
+**Ce faci:**
+1. Adauga o iesire (tabul Iesire) pe un produs TEST si sterge-o.
+2. Foloseste cautarea, listele de provenienta si de destinatie si filtrul pe zi, apoi schimba pagina tabelului.
+
+**Ce trebuie sa vezi:** aceleasi ecrane si mesaje ca inainte; nicio eroare in pagina. Rezultat: ...
+
 ### 07.10.2026 - Rezervari la iesire si intrare legata de oferta
 
 **Ce s-a adaugat:** la iesire, avertisment (fara blocare) cand ar lua bucati rezervate de alte proiecte, cu alegerea continua / scade rezervarea; la intrare, selectorul "Pentru oferta" si propunerile de rezervare dupa salvare; pe pagina produsului, "Rezervat ... stoc liber". Pasii sunt in 06_Beneficiari_si_proiecte.md.

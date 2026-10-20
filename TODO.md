@@ -18,7 +18,12 @@ Planul de mai jos vine din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` (deciziile c
 
 Planul din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` este implementat integral (vezi `IMPLEMENTED.md`); verificarile ramase sunt in `docs/TESTE_RAMASE.md`.
 
-Nu mai sunt taskuri active.
+## Task 1: Setari -> Baza de date
+
+Propunere, decizii si stare: `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md` (sectiunile 11-18; toate deciziile sunt confirmate, fara intrebari deschise; implementat pana la sectiunea 18). Subtaskuri ramase, in ordinea implementarii:
+
+- 1.1 Etapa Verificare (sanatate si integritate).
+- 1.2 Aplicatia ca serviciu Windows (3a): `UseWindowsService`, scripturi de instalare/dezinstalare (`LocalSystem`), actiuni de recuperare, oprire din pagina; monitor de sanatate si starea "Baza de date indisponibila" cu pagina de asteptare pentru utilizatori (3b). Repornirea aplicatiei din pagina functioneaza deja sub supervizor (cod 75).
 
 ## Observații pentru etapa de implementare
 

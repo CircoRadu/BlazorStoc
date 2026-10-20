@@ -1,0 +1,21 @@
+# Setări · Setări notificări
+Ruta: /setari
+Tab: Setări notificări
+Cautare: setari notificari stergere notificari rezolvate luni perioada
+Captura: pagina | /setari | click Notificări; click Setări notificări; full | Setările notificărilor
+
+O notificare rezolvată rămâne în lista „Rezolvate” a paginii Notificări. Cu ștergerea activată, notificările rezolvate mai vechi decât perioada aleasă se elimină din baza de date, o dată pe zi. Notificările nerezolvate nu se șterg niciodată.
+
+## Elemente
+### Ștergerea notificărilor rezolvate
+- Șterge notificările rezolvate mai vechi de | comutator | Pornește sau oprește ștergerea automată.
+- Perioada, în luni | câmp | Cât timp se păstrează notificările rezolvate (între limitele afișate).
+- Stare actuală | text | Ce este setat acum.
+- Salvează setările | buton | Salvează.
+- Renunță la modificări | buton | Revine la valorile salvate.
+
+## Flux: Cum activez curățarea notificărilor vechi
+1. Pornește comutatorul de ștergere.
+2. Alege perioada în luni.
+3. Apasă „Salvează setările”.
+Nota: ștergerea rulează o dată pe zi și nu atinge notificările nerezolvate.

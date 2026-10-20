@@ -1,1 +1,6 @@
-{ "Database": { "User": "blazorstoc_restore", "Password": "test" } }
+{
+    "Database":  {
+                     "User":  "ESPGestiuneStoc_restore",
+                     "Password":  "test"
+                 }
+}

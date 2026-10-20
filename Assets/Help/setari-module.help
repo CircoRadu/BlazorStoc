@@ -1,0 +1,33 @@
+# Setări · Module
+Ruta: /setari
+Tab: Module
+Cautare: module oprire pornire reincearca stare circuit breaker erori cauza versiune administrator
+Captura: pagina | /setari | click Module; full | Modulele
+
+Starea modulelor aplicației. Un modul oprit nu afectează restul aplicației. Un modul se oprește singur după erori repetate și se reîncearcă automat după 30 de secunde; aici poți cere reîncercarea imediat sau îl poți opri și porni manual.
+
+## Elemente
+### Antet
+- Numărul din titlu | insignă | Câte module are aplicația.
+- ↻ Actualizează | buton | Reîncarcă starea.
+### Tabelul modulelor
+- Modul | coloană | Numele și identificatorul modulului.
+- Versiune | coloană | Versiunea lui.
+- Stare | coloană | Funcționează, oprit (automat, de administrator sau din configurare), cu cauza.
+- De când | coloană | Momentul ultimei schimbări de stare.
+- Cauză | coloană | De ce a fost oprit.
+- Erori la rând | coloană | Câte erori consecutive a avut.
+- Pornit | comutator | Oprește sau pornește modulul; la oprire se cere confirmarea și un motiv, iar jurnalul nu se poate opri.
+- Reîncearcă modulul | iconita:renew | Repornește imediat un modul oprit automat.
+### Confirmarea opririi
+- Oprești modulul? | fereastră | Spune ce consecințe are (operațiile începute se termină, apelurile noi sunt refuzate); „Oprește modulul” confirmă, „Renunț” anulează.
+
+## Flux: Cum opresc temporar un modul
+1. Oprește comutatorul „Pornit” de pe rândul modulului.
+2. Citește consecințele, scrie motivul și apasă „Oprește modulul”.
+3. Pagina principală arată placa modulului ca „Modul oprit temporar”.
+
+## Flux: Cum reiau un modul oprit
+1. Pornește comutatorul de pe rândul lui.
+2. La un modul oprit automat după erori poți apăsa și „Reîncearcă modulul”.
+Nota: un modul oprit din configurare cere repornirea aplicației.

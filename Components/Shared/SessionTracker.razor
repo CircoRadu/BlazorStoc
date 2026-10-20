@@ -1,0 +1,89 @@
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using BlazorStoc.Services
+@implements IAsyncDisposable
+@inject OpenSessionRegistry Registry
+@inject CircuitHolder Holder
+@inject AuthenticationStateProvider Authentication
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IDatabaseAccountService DatabaseAccounts
+@inject IAccessControl Access
+@* No markup: tells the registry of the open sessions (Setari -> Baza de date -> Stare) who is signed in on this circuit, on which page, and, once, from which address
+   and browser (the page reports them itself, see Startup/SessionEndpoints.cs). Placed in the layout as an interactive island, so every page of the application has it. *@
+
+@code {
+    private IJSObjectReference? module;
+    private bool identified;
+    private IDisposable? locationGuard;
+
+    // Moving inside the application (no new request reaches the server): while an account of the database still has its default password, an administrator is kept on the
+    // settings (Startup/DefaultPasswordGate.cs does the same for a page that is loaded).
+    private async ValueTask GuardNavigationAsync(Microsoft.AspNetCore.Components.Routing.LocationChangingContext context)
+    {
+        var path = new Uri(context.TargetLocation, UriKind.RelativeOrAbsolute).IsAbsoluteUri ? new Uri(context.TargetLocation).AbsolutePath : context.TargetLocation.Split('?', '#')[0];
+        if (BlazorStoc.Startup.DefaultPasswordGate.IsAllowedPath(path)) return;
+        try
+        {
+            if (!await Access.IsAdministratorAsync() || !await DatabaseAccounts.AnyDefaultPasswordAsync()) return;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { return; }
+        context.PreventNavigation();
+        Navigation.NavigateTo(BlazorStoc.Startup.DefaultPasswordGate.TargetUrl);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        locationGuard = Navigation.RegisterLocationChangingHandler(GuardNavigationAsync);
+        await IdentifyAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!identified) await IdentifyAsync();
+        if (!firstRender || Holder.Id is null) return;
+        try
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./session-ping.js");
+            await module.InvokeVoidAsync("report", Holder.Id);
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+
+    private async Task IdentifyAsync()
+    {
+        if (Holder.Id is not { } id) return;
+        var user = (await Authentication.GetAuthenticationStateAsync()).User;
+        if (user.Identity?.IsAuthenticated != true) return;
+        Registry.Identify(id, user.Identity.Name, user.FindFirstValue(ClaimTypes.GivenName), user.FindFirstValue(ClaimTypes.Role), PagePath());
+        // An administrator can close this session from Setari -> Baza de date -> Stare: the browser is sent to the address that signs it out.
+        Registry.RegisterCloser(id, token => InvokeAsync(() => Navigation.NavigateTo($"/Account/SessionClosed?t={token}", forceLoad: true)));
+        identified = true;
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        if (Holder.Id is { } id) Registry.SetPage(id, PagePath());
+    }
+
+    // The path only: the query string can carry identifiers that the list of sessions has no use for.
+    private string PagePath()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var end = relative.IndexOfAny(['?', '#']);
+        return "/" + (end >= 0 ? relative[..end] : relative);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        locationGuard?.Dispose();
+        if (Holder.Id is { } id) Registry.UnregisterCloser(id);
+        if (module is not null)
+        {
+            try { await module.DisposeAsync(); }
+            catch (Exception exception) when (exception is JSDisconnectedException or JSException or TaskCanceledException) { }
+        }
+    }
+}

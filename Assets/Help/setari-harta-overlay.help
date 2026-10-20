@@ -1,0 +1,30 @@
+# Setări · Overlay (tipuri de pinuri)
+Ruta: /setari
+Tab: Overlay (tipuri de pinuri)
+Cautare: overlay pinuri tipuri insigne umplere culoare simbol legenda luni fara interventie harta
+Captura: pagina | /setari | click Hartă; click Overlay (tipuri de pinuri); full | Tipurile de pinuri
+
+Cum arată pe hartă fiecare tip de pin și ce apare în legendă. Tipurile de **umplere** arată scadența punctului (un punct are întotdeauna unul); **insignele** sunt marcajele mici din colțul pinului. Tipurile predefinite își pot schimba denumirea și aspectul.
+
+## Elemente
+### Formular
+- Denumire (legendă) * | câmp | Numele din legendă.
+- Culoare * | câmp | Culoarea pinului sau a insignei.
+- Simbol | câmp | Cel mult 2 caractere.
+- Ordine în legendă | câmp | Poziția în legendă.
+- Luni fără intervenție de mentenanță | câmp | La insigne: apare pe punctele unui contract pornit (On) la care ultima intervenție de mentenanță este mai veche decât numărul de luni, sau nu există.
+- Activ | opțiune | Dacă apare pe hartă și în legendă.
+- Salvează tipul de pin, Anulează | buton | Salvează sau închide formularul.
+- + Adaugă insignă proprie | buton | Deschide formularul pentru o insignă nouă.
+### Tabelul tipurilor
+- Pin | coloană | Previzualizarea.
+- Denumire | coloană | Numele, culoarea și dacă e predefinit sau propriu.
+- Tip · când apare | coloană | Umplere sau insignă și regula de apariție.
+- Ordine, Stare | coloană | Poziția și starea.
+- Editează tipul | iconita:edit | Deschide formularul.
+- Șterge tipul | iconita:delete | Doar la tipurile proprii.
+
+## Flux: Cum adaug o insignă proprie pe hartă
+1. Apasă „+ Adaugă insignă proprie”.
+2. Scrie denumirea, alege culoarea și simbolul.
+3. Stabilește regula (de exemplu numărul de luni fără intervenție) și salvează.

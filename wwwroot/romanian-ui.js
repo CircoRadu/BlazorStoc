@@ -53,10 +53,10 @@
     // ---- 2. Blazor reconnection dialog -----------------------------------------------------------------------------
     const translate = (text) => {
         const value = text.trim();
-        if (value === "Rejoining the server...") return "Reconectare la server…";
+        if (value === "Rejoining the server...") return "Reconectare la server…<br>Dacă aplicația se repornește singură, pagina se reîncarcă automat când este gata.";
         if (value === "Retry") return "Reîncearcă";
         if (/^Failed to rejoin\.\s*(<br\s*\/?>)?\s*Please retry or reload the page\.$/i.test(value))
-            return "Reconectarea a eșuat.<br>Reîncearcă sau reîncarcă pagina.";
+            return "Reconectarea a eșuat.<br>Reîncearcă sau reîncarcă pagina; dacă aplicația se repornește singură, pagina se reîncarcă automat când este gata.";
         const retry = /^Rejoin failed\.\.\. trying again in (\d+) (second|seconds)$/.exec(value);
         if (retry) return retry[1] === "1" ? "Reconectarea a eșuat… se reîncearcă într-o secundă" : `Reconectarea a eșuat… se reîncearcă în ${retry[1]} secunde`;
         return null;

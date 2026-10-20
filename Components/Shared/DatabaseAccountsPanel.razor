@@ -1,0 +1,338 @@
+@using BlazorStoc.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject IDatabaseAccountService Accounts
+@inject IJSRuntime JS
+@inject ILogger<DatabaseAccountsPanel> Logger
+@implements IAsyncDisposable
+@* Setari -> Baza de date -> Conexiune -> Conturile bazei de date: the predefined accounts of the application (Services/DatabaseAccounts.cs). The page checks that each one connects
+   and has exactly its rights, changes their passwords (each account changes its own), puts them back with the account that administers the server and keeps a file for the
+   administrator (export / import). Every operation that changes something opens a window (AdminOperationDialog) with what it needs and the password of the administrator;
+   passwords are never shown after they are typed, and a password or a pass phrase that is asked twice says at once whether the two coincide. *@
+
+<section class="catalog database-accounts">
+    <div class="catalog-heading"><h2>Conturile bazei de date</h2><small>Cele patru conturi fixe ale aplicației; aici se schimbă doar parolele lor.</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
+        @if (states.Any(state => state.UsesDefaultPassword))
+        {
+            <div class="error-banner" role="alert">Cel puțin un cont folosește încă parola implicită, care este publică. Până când le schimbi, administratorii nu pot folosi celelalte pagini ale aplicației: apasă „Schimbă toate parolele” (parole generate) sau schimbă fiecare cont din tabel.</div>
+        }
+        <div class="table-scroll">
+            <table class="database-accounts-table">
+                <caption class="sr-only">Conturile bazei de date</caption>
+                <thead><tr><th scope="col">Cont</th><th scope="col">Conectare</th><th scope="col">Drepturi</th><th scope="col">Parola implicită</th><th scope="col">Ultima schimbare</th><th scope="col">Acțiuni</th></tr></thead>
+                <tbody>
+                    @foreach (var state in states)
+                    {
+                        <tr>
+                            <th scope="row">@state.Purpose<br /><small class="muted">@state.User@(state.NameDiffers ? $" (numele fix este {state.CatalogUser})" : "")</small></th>
+                            <td>
+                                @if (!state.Configured) { <span class="stock-badge negative">neconfigurat</span> }
+                                else if (state.Connects) { <span class="stock-badge positive">conectat</span> }
+                                else { <span class="stock-badge negative">conexiune eșuată</span> }
+                                @if (state.Problem is not null && !state.Connects) { <br /><small class="muted">@state.Problem</small> }
+                            </td>
+                            <td>
+                                @if (!state.Connects) { <span class="muted">—</span> }
+                                else if (state.RightsMatch) { <span class="stock-badge positive">exact cele din catalog</span> }
+                                else
+                                {
+                                    @if (state.MissingRights.Count > 0) { <span class="stock-badge negative">lipsesc</span> <small>@string.Join(", ", state.MissingRights)</small> }
+                                    @if (state.ExtraRights.Count > 0) { <span class="stock-badge zero">în plus</span> <small>@string.Join(", ", state.ExtraRights)</small> }
+                                }
+                            </td>
+                            <td>@if (state.UsesDefaultPassword) { <span class="stock-badge negative">da</span> } else if (state.Configured) { <span class="stock-badge positive">nu</span> } else { <span class="muted">—</span> }</td>
+                            <td>@(state.ChangedUtc is { } at ? at.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—")</td>
+                            <td><button type="button" class="row-icon edit" disabled="@busy" aria-label="@($"Schimbă parola contului {state.User}")" title="@($"Schimbă parola contului {state.User}")" @onclick="() => StartChange(state.Key)"></button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (results.Count > 0)
+        {
+            <h3>Rezultatul ultimei operații</h3>
+            <ul class="database-test-steps" aria-label="Rezultatul ultimei operații asupra conturilor">
+                @foreach (var change in results)
+                {
+                    <li class="database-test-step @(change.Success ? "ok" : "error")"><strong>@change.User</strong> — @change.Message</li>
+                }
+            </ul>
+            @if (results.All(change => change.Success) && lastWasChange)
+            {
+                <p class="muted"><small>Parolele s-au schimbat: exportă acum configurarea și păstreaz-o într-un loc sigur (butonul „Exportă configurarea”).</small></p>
+            }
+        }
+
+        <div class="editor-actions database-accounts-actions">
+            <button type="button" class="refresh act-reload" disabled="@busy" @onclick="VerifyAsync">Verifică conturile</button>
+            <button type="button" class="primary" disabled="@busy" @onclick="() => StartMode(Mode.ChangeAll)">Schimbă toate parolele</button>
+            <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => StartMode(Mode.Reset)">Resetează conturile</button>
+            <button type="button" class="refresh act-export" disabled="@busy" @onclick="() => StartMode(Mode.Export)">Exportă configurarea</button>
+            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => StartMode(Mode.Import)">Importă configurarea</button>
+            @if (busy && mode == Mode.None) { <span class="muted" role="status" data-operation-driver>@busyText</span> }
+        </div>
+        <p class="muted"><small>Un cont își schimbă singur parola (conexiunea se face cu parola curentă), deci schimbarea nu cere contul de administrare al serverului; acela se folosește numai la resetare și la export. Parolele se păstrează criptat, în fișierul de configurare al aplicației, în afara repository-ului.</small></p>
+    }
+    </div>
+</section>
+
+@if (mode != Mode.None)
+{
+    <AdminOperationDialog Title="@DialogTitle" Intro="@DialogIntro" ConfirmText="@ConfirmText" ConfirmDisabled="@ConfirmDisabled" Busy="busy" BusyText="@busyText" Error="@dialogError"
+                          @bind-AdminPassword="adminPassword" Confirmed="ConfirmAsync" Cancelled="CancelMode">
+        <Help><HelpButton Topic="setari-baza-conturi-operatii" About="Operațiile asupra conturilor bazei" /></Help>
+        <ChildContent>
+        @switch (mode)
+        {
+            case Mode.Change:
+                <div class="anaf-grid">
+                    <label>Parola nouă (cel puțin 16 caractere)<input id="accounts-new-password" type="@PasswordType" value="@newPassword" @oninput="e => newPassword = e.Value?.ToString()" maxlength="100" autocomplete="new-password" /></label>
+                    <label>Repetă parola nouă<input id="accounts-new-password-2" type="@PasswordType" value="@newPassword2" @oninput="e => newPassword2 = e.Value?.ToString()" maxlength="100" autocomplete="new-password" />
+                        <span class="password-match @(Matches(newPassword, newPassword2) ? "ok" : "bad")" role="status" aria-live="polite">@MatchText(newPassword, newPassword2, "Parolele")</span></label>
+                </div>
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-nav" disabled="@busy" @onclick="GenerateOne">Generează parola</button>
+                    <ToggleSwitch Id="accounts-show-password" Class="full-width" @bind-Value="showPassword">Arată parola</ToggleSwitch>
+                </div>
+                break;
+            case Mode.ChangeAll:
+                <ToggleSwitch Id="accounts-generate-all" Class="full-width" @bind-Value="generateAll" OnText="Parole generate" OffText="Parole alese de mine">Parolele conturilor</ToggleSwitch>
+                @if (!generateAll)
+                {
+                    <div class="anaf-grid">
+                        @foreach (var state in states)
+                        {
+                            var key = state.Key;
+                            <label>@state.Purpose (cel puțin 16 caractere)<input type="@PasswordType" value="@typedPasswords.GetValueOrDefault(key)" @oninput="e => typedPasswords[key] = e.Value?.ToString() ?? string.Empty" maxlength="100" autocomplete="new-password" /></label>
+                            <label>Repetă parola<input type="@PasswordType" value="@typedRepeats.GetValueOrDefault(key)" @oninput="e => typedRepeats[key] = e.Value?.ToString() ?? string.Empty" maxlength="100" autocomplete="new-password" />
+                                <span class="password-match @(Matches(typedPasswords.GetValueOrDefault(key), typedRepeats.GetValueOrDefault(key)) ? "ok" : "bad")" role="status" aria-live="polite">@MatchText(typedPasswords.GetValueOrDefault(key), typedRepeats.GetValueOrDefault(key), "Parolele")</span></label>
+                        }
+                    </div>
+                    <ToggleSwitch Id="accounts-show-all" Class="full-width" @bind-Value="showPassword">Arată parolele</ToggleSwitch>
+                }
+                else { <p class="muted"><small>Fiecare cont primește o parolă generată de 24 de caractere; nu o vezi, se păstrează criptat. Exportă apoi configurarea ca să o ai la îndemână.</small></p> }
+                break;
+            case Mode.Reset:
+                @if (!Accounts.HasAdministrationAccount)
+                {
+                    <div class="error-banner" role="alert">Resetarea are nevoie de contul care administrează serverul bazei (fișierul admin.private.cnf din folderul de date). Importă o configurare exportată cu acest cont sau pune fișierul în folderul de date.</div>
+                }
+                <ToggleSwitch Id="accounts-reset-defaults" Class="full-width" @bind-Value="resetDefaults" OnText="Parole implicite (publice)" OffText="Parole generate">Parolele de după resetare</ToggleSwitch>
+                @if (resetDefaults) { <p class="muted"><small>Cu parolele implicite aplicația te cere imediat să le schimbi și blochează celelalte pagini până atunci.</small></p> }
+                break;
+            case Mode.Export:
+                <div class="anaf-grid">
+                    <label>Fraza-parolă (cel puțin 12 caractere)<input id="accounts-passphrase" type="@PasswordType" value="@passphrase" @oninput="e => passphrase = e.Value?.ToString()" maxlength="200" autocomplete="new-password" /></label>
+                    <label>Repetă fraza-parolă<input id="accounts-passphrase-2" type="@PasswordType" value="@passphrase2" @oninput="e => passphrase2 = e.Value?.ToString()" maxlength="200" autocomplete="new-password" />
+                        <span class="password-match @(Matches(passphrase, passphrase2) ? "ok" : "bad")" role="status" aria-live="polite">@MatchText(passphrase, passphrase2, "Frazele-parolă")</span></label>
+                </div>
+                <ToggleSwitch Id="accounts-include-admin" Class="full-width" @bind-Value="includeAdministration">Include contul de administrare al serverului</ToggleSwitch>
+                <ToggleSwitch Id="accounts-show-passphrase" Class="full-width" @bind-Value="showPassword">Arată fraza-parolă</ToggleSwitch>
+                break;
+            case Mode.Import:
+                <div class="anaf-grid">
+                    <label>Fișierul de configurare (.bsconfig)<InputFile id="accounts-import-file" accept=".bsconfig" OnChange="ImportFileSelectedAsync" /></label>
+                    <label>Fraza-parolă a fișierului<input id="accounts-import-passphrase" type="@PasswordType" value="@passphrase" @oninput="e => passphrase = e.Value?.ToString()" maxlength="200" autocomplete="off" /></label>
+                </div>
+                @if (importName is not null) { <p class="muted"><small>Fișier ales: @importName</small></p> }
+                <ToggleSwitch Id="accounts-show-import" Class="full-width" @bind-Value="showPassword">Arată fraza-parolă</ToggleSwitch>
+                break;
+        }
+        </ChildContent>
+    </AdminOperationDialog>
+}
+
+@code {
+    private enum Mode { None, Change, ChangeAll, Reset, Export, Import }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<DatabaseAccountState> states = [];
+    private IReadOnlyList<DatabaseAccountChange> results = [];
+    private bool loading = true, busy, noticeOk, lastWasChange, showPassword, generateAll = true, resetDefaults, includeAdministration = true;
+    private string? error, notice, busyText, dialogError, adminPassword, changeKey, newPassword, newPassword2, passphrase, passphrase2, importName;
+    private byte[]? importBytes;
+    private Mode mode = Mode.None;
+    private readonly Dictionary<string, string> typedPasswords = [];
+    private readonly Dictionary<string, string> typedRepeats = [];
+    private IJSObjectReference? downloads;
+
+    private string PasswordType => showPassword ? "text" : "password";
+
+    private string DialogTitle => mode switch
+    {
+        Mode.Change => $"Schimbă parola contului {states.FirstOrDefault(state => state.Key == changeKey)?.User}",
+        Mode.ChangeAll => "Schimbă toate parolele",
+        Mode.Reset => "Resetează conturile",
+        Mode.Export => "Exportă configurarea",
+        Mode.Import => "Importă configurarea",
+        _ => ""
+    };
+
+    private string? DialogIntro => mode switch
+    {
+        Mode.Reset => "Conturile lipsă se recreează, drepturile se pun exact cum sunt în catalog, parolele se schimbă și conexiunea fiecărui cont se verifică. Folosește resetarea când parolele s-au pierdut sau un cont a fost modificat pe server.",
+        Mode.Export => "Fișierul conține serverul, cele patru conturi cu parolele lor și, dacă îl incluzi, contul care administrează serverul. Este criptat cu fraza-parolă de mai jos (nu se poate citi fără ea) și nu rămâne pe server: se descarcă o singură dată. Păstrează-l într-un loc sigur.",
+        Mode.Import => "Pune înapoi parolele conturilor dintr-un fișier exportat de pagina aceasta (de exemplu după ce s-a pierdut fișierul de configurare local). Fiecare cont se verifică înainte să fie preluat; hostul și portul nu se schimbă.",
+        _ => null
+    };
+
+    private string ConfirmText => mode switch
+    {
+        Mode.Change => "Schimbă parola", Mode.ChangeAll => "Schimbă parolele", Mode.Reset => "Resetează conturile", Mode.Export => "Exportă și descarcă", Mode.Import => "Importă", _ => "Confirmă"
+    };
+
+    // The confirmation is possible only while what is typed twice coincides and nothing needed is empty; the service checks the rest (length, the password of the administrator).
+    private bool ConfirmDisabled => mode switch
+    {
+        Mode.Change => string.IsNullOrEmpty(newPassword) || !Matches(newPassword, newPassword2),
+        Mode.ChangeAll => !generateAll && states.Any(state => string.IsNullOrEmpty(typedPasswords.GetValueOrDefault(state.Key)) || !Matches(typedPasswords.GetValueOrDefault(state.Key), typedRepeats.GetValueOrDefault(state.Key))),
+        Mode.Reset => !Accounts.HasAdministrationAccount,
+        Mode.Export => string.IsNullOrEmpty(passphrase) || !Matches(passphrase, passphrase2),
+        Mode.Import => importBytes is null || string.IsNullOrEmpty(passphrase),
+        _ => true
+    };
+
+    private static bool Matches(string? first, string? second) => !string.IsNullOrEmpty(second) && string.Equals(first, second, StringComparison.Ordinal);
+
+    // Said while the second one is typed: nothing before it, then whether the two coincide.
+    private static string MatchText(string? first, string? second, string what) =>
+        string.IsNullOrEmpty(second) ? "" : Matches(first, second) ? $"{what} coincid." : $"{what} nu coincid.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        includeAdministration = Accounts.HasAdministrationAccount;
+        await LoadAsync();
+        loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        try { states = await Accounts.GetStatesAsync(lifetime.Token); }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogWarning("The accounts of the database could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Conturile nu au putut fi citite acum.";
+        }
+    }
+
+    private void StartChange(string key) { Reset(); changeKey = key; mode = Mode.Change; }
+    private void StartMode(Mode next) { Reset(); mode = next; if (next == Mode.Export) includeAdministration = Accounts.HasAdministrationAccount; }
+    private void CancelMode() { Reset(); }
+
+    private void Reset()
+    {
+        mode = Mode.None; changeKey = null; newPassword = newPassword2 = passphrase = passphrase2 = adminPassword = null; showPassword = false; generateAll = true; resetDefaults = false;
+        typedPasswords.Clear(); typedRepeats.Clear(); importBytes = null; importName = null; error = null; dialogError = null;
+    }
+
+    private void GenerateOne() { newPassword = newPassword2 = DatabaseAccounts.GeneratePassword(); showPassword = true; }
+
+    // One operation at a time. A refusal of the service (wrong confirmation, short password, busy server) is shown inside the window, which stays open with what was typed; the
+    // window closes when the operation went through.
+    private async Task RunAsync(string text, Func<Task<bool>> operation)
+    {
+        if (busy) return;
+        busy = true; busyText = text; notice = null; error = null; dialogError = null;
+        var closeWindow = false;
+        try { closeWindow = await operation(); }
+        catch (Exception exception) when (exception is DatabaseSettingsException or AccessDeniedException) { Report(exception.Message); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError("An operation on the accounts of the database failed ({ErrorType}).", exception.GetType().Name);
+            Report("Operația nu a putut fi dusă la capăt. Verifică starea conturilor și încearcă din nou.");
+        }
+        finally { busy = false; }
+        if (closeWindow) Reset();
+
+        void Report(string message) { if (mode == Mode.None) error = message; else dialogError = message; }
+    }
+
+    private void Show(DatabaseAccountsResult result, bool wasChange)
+    {
+        states = result.States;
+        results = result.Changes;
+        lastWasChange = wasChange;
+        notice = result.Message;
+        noticeOk = result.Success;
+    }
+
+    private Task VerifyAsync() => RunAsync("Se verifică conturile…", async () => { Show(await Accounts.VerifyAsync(lifetime.Token), false); return true; });
+
+    private Task ConfirmAsync() => mode switch
+    {
+        Mode.Change => ChangeOneAsync(), Mode.ChangeAll => ChangeAllAsync(), Mode.Reset => ResetAsync(), Mode.Export => ExportAsync(), Mode.Import => ImportAsync(), _ => Task.CompletedTask
+    };
+
+    private Task ChangeOneAsync() => RunAsync("Se schimbă parola…", async () =>
+    {
+        var result = await Accounts.ChangePasswordsAsync(new Dictionary<string, string> { [changeKey!] = newPassword ?? "" }, adminPassword ?? "", lifetime.Token);
+        Show(result, true);
+        return true;
+    });
+
+    private Task ChangeAllAsync() => RunAsync("Se schimbă parolele…", async () =>
+    {
+        var passwords = states.ToDictionary(state => state.Key, state => generateAll ? DatabaseAccounts.GeneratePassword() : typedPasswords.GetValueOrDefault(state.Key) ?? "");
+        var result = await Accounts.ChangePasswordsAsync(passwords, adminPassword ?? "", lifetime.Token);
+        Show(result, true);
+        return true;
+    });
+
+    private Task ResetAsync() => RunAsync("Se resetează conturile…", async () =>
+    {
+        var result = await Accounts.ResetAsync(null, resetDefaults, adminPassword ?? "", lifetime.Token);
+        Show(result, !resetDefaults);
+        return true;
+    });
+
+    private Task ExportAsync() => RunAsync("Se pregătește fișierul…", async () =>
+    {
+        var export = await Accounts.ExportAsync(passphrase ?? "", includeAdministration, adminPassword ?? "", lifetime.Token);
+        downloads ??= await JS.InvokeAsync<IJSObjectReference>("import", "./file-download.js");
+        using var stream = new MemoryStream(export.Content);
+        using var reference = new DotNetStreamReference(stream);
+        await downloads.InvokeVoidAsync("downloadBinary", export.FileName, reference, "application/octet-stream");
+        notice = $"Fișierul {export.FileName} a fost descărcat{(export.IncludesAdministration ? " (cu contul de administrare)" : "")}. Păstrează-l într-un loc sigur; pe server nu a rămas nimic din el.";
+        noticeOk = true;
+        results = [];
+        return true;
+    });
+
+    private async Task ImportFileSelectedAsync(InputFileChangeEventArgs args)
+    {
+        importBytes = null; importName = null;
+        var file = args.File;
+        if (file.Size > 64 * 1024) { dialogError = "Fișierul este prea mare pentru un fișier de configurare."; return; }
+        await using var stream = file.OpenReadStream(64 * 1024, lifetime.Token);
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory, lifetime.Token);
+        importBytes = memory.ToArray();
+        importName = file.Name;
+        dialogError = null;
+    }
+
+    private Task ImportAsync() => RunAsync("Se importă configurarea…", async () =>
+    {
+        var result = await Accounts.ImportAsync(importBytes ?? [], passphrase ?? "", adminPassword ?? "", lifetime.Token);
+        Show(result, false);
+        return true;
+    });
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (downloads is not null)
+        {
+            try { await downloads.DisposeAsync(); }
+            catch (Exception exception) when (exception is JSDisconnectedException or JSException or TaskCanceledException) { }
+        }
+        lifetime.Dispose();
+    }
+}

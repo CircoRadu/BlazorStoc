@@ -1,0 +1,45 @@
+# Preluare inventar
+Ruta: /inventar/preluare
+Cautare: preluare inventar formular scanat ocr diferente stoc valoare reala corectie trimite modificari confirma backup
+Captura: pagina | /inventar/preluare |  | Preluarea inventarului
+
+Încarci formularul de inventar scanat, cu valorile reale completate de mână, ca să compari stocul numărat cu cel curent. Aplicația citește valorile (OCR), arată diferențele, iar tu alegi ce modificări de stoc se operează.
+
+## Elemente
+### Antet
+- Preia inventar | buton | Alege fișierul PDF scanat din calculator.
+- Redeschide formularul PDF | buton | Apare după încărcare: redeschide formularul într-o fereastră separată, ca să compari valorile citite cu originalul. Dacă browserul blochează ferestrele pop-up, permite-le pentru acest site.
+### Încărcarea
+- Alege formularul PDF | zonă | Alegi fișierul sau îl tragi în zonă. Citirea unui formular cu multe pagini poate dura câteva secunde.
+- Nicio diferență de stoc | mesaj | Toate valorile citite corespund stocului curent.
+### Tabelul diferențelor
+- Selectează toate produsele | comutator | Selectează sau deselectează toate liniile cu diferențe.
+- Categoria și subcategoria | titlu | Liniile sunt grupate pe categorie și subcategorie, ca în formular.
+- Selectează | coloană | Marcajul rotund al rândului (și clicul oriunde pe rând): liniile nebifate nu se trimit.
+- Nr. crt. | coloană | Numărul liniei din formular.
+- Cod produs | coloană | Produsul; „⚠ de verificat” înseamnă că citirea OCR este nesigură.
+- Stoc curent | coloană | Stocul din aplicație.
+- Valoare reală | câmp | Valoarea citită din formular; o poți corecta chiar în câmp.
+- Diferență | coloană | Cât lipsește sau cât este în plus față de stocul curent.
+- Trimite modificări în stoc | buton | Deschide confirmarea modificărilor selectate.
+### Produse negăsite în catalog
+- Cod citit | coloană | Codul citit din formular care nu corespunde niciunui produs curent (produs șters sau redenumit); pentru aceste rânduri nu se trimite nicio modificare.
+- Valoare reală citită | coloană | Valoarea citită pentru codul respectiv.
+### Confirmarea modificărilor
+- Lista modificărilor | tabel | Categorie / subcategorie, număr, cod produs și modificarea de stoc pentru fiecare linie selectată.
+- Confirmă | buton | Face mai întâi o copie de siguranță verificată a bazei de date, apoi operează modificările: un plus devine intrare, un minus devine ieșire cu destinația „Corecție stoc”.
+- Anulează | buton | Închide confirmarea fără nicio modificare; Escape face același lucru.
+
+## Flux: Cum preiau un inventar numărat
+1. Scanează formularul completat de mână (PDF) și apasă „Preia inventar” sau trage fișierul în zonă.
+2. Așteaptă citirea; verifică tabelul de diferențe, mai ales liniile marcate „⚠ de verificat”, și corectează valorile reale citite greșit.
+3. Debifează liniile pe care nu vrei să le operezi (sau folosește „Selectează toate produsele”).
+4. Apasă „Trimite modificări în stoc”, citește lista și apasă „Confirmă”.
+5. Aștepți copia de siguranță și operarea; la final stocul reflectă numărătoarea.
+Nota: dacă backup-ul eșuează, nu se modifică nimic în stoc.
+
+## Flux: Cum procedez cu produsele negăsite în catalog
+1. Citește secțiunea „Produse negăsite în catalog” de sub tabel.
+2. Verifică în formularul PDF (butonul „Redeschide formularul PDF”) ce produs era; poate a fost șters sau redenumit după generarea situației.
+3. Corectează produsul în catalog dacă e nevoie și generează din nou situația.
+Nota: pentru aceste rânduri nu se trimite nicio modificare de stoc.

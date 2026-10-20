@@ -1,0 +1,23 @@
+@using BlazorStoc.Modules
+@inject ModuleRegistry Modules
+@* Renders the content only while the module is available. A part of a page that belongs to another module (for example the risk analyses on the
+   file of a beneficiary) is put in a gate, so a failing module leaves the rest of the page working. With Notice, the unavailable module is announced. *@
+@if (Modules.IsAvailable(ModuleId))
+{
+    <ErrorBoundary>
+        <ChildContent>@ChildContent</ChildContent>
+        <ErrorContent>
+            <div class="error-banner" role="alert">Această secțiune nu a putut fi afișată.</div>
+        </ErrorContent>
+    </ErrorBoundary>
+}
+else if (Notice)
+{
+    <div class="error-banner" role="alert">Secțiunea nu este disponibilă momentan (modul indisponibil).</div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string ModuleId { get; set; } = "";
+    [Parameter] public bool Notice { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -121,6 +121,9 @@ public static class PickupWizardChecks
         SupplierTestServices.ConfirmHeader(cut);
         Click("Pasul următor");
         cut.WaitForAssertion(() => cut.Find("textarea"), TimeSpan.FromSeconds(10));
+        var proposedDescription = cut.Find("textarea").GetAttribute("value") ?? cut.Find("textarea").TextContent;
+        check(proposedDescription.Trim().Length > 0 && proposedDescription.StartsWith("Factura ") && proposedDescription.Contains("(preluată din PDF)") || proposedDescription.Trim().Length > 0 && !proposedDescription.Contains("Descriere scrisa"),
+            "Pickup wizard: step 3 proposes a description for the entry (the template's, or \"Factura <număr> · <furnizor> (preluată din PDF)\" when it has none), so the entry is not refused for an empty description (\"" + proposedDescription + "\")");
         cut.Find("textarea").Input("Descriere scrisa de utilizator");
         Click("Pasul precedent");
         WaitStep2();
@@ -225,10 +228,10 @@ public static class PickupWizardChecks
         context.Services.AddSupplierFakes();
         var cut = context.Render<BlazorStoc.Components.Shared.InvoiceTemplatesList>();
         cut.WaitForAssertion(() => cut.Find("#invoice-template-1"), TimeSpan.FromSeconds(10));
-        var before = cut.FindAll("#invoice-template-1 button").Any(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal));
-        cut.FindAll("#invoice-template-1 button").First(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal)).Click();
+        var before = cut.FindAll("#invoice-template-1 button").Any(button => (button.GetAttribute("title") ?? "").Contains("Leagă șablonul de un furnizor", StringComparison.Ordinal));
+        cut.FindAll("#invoice-template-1 button").First(button => (button.GetAttribute("title") ?? "").Contains("Leagă șablonul de un furnizor", StringComparison.Ordinal)).Click();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("a fost legat de furnizorul", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
-        check(before && !cut.FindAll("#invoice-template-1 button").Any(button => button.TextContent.Contains("Leagă de furnizor", StringComparison.Ordinal)) && cut.Markup.Contains("Furnizor Test SRL", StringComparison.Ordinal),
+        check(before && !cut.FindAll("#invoice-template-1 button").Any(button => (button.GetAttribute("title") ?? "").Contains("Leagă șablonul de un furnizor", StringComparison.Ordinal)) && cut.Markup.Contains("Furnizor Test SRL", StringComparison.Ordinal),
             "Templates list: the \"Leagă de furnizor\" button links an unlinked template to the supplier of the register (the button then disappears, the supplier's own name is shown)");
     }
     // A file whose supplier has no template: the pickup warns, offers to create the template in a window over the page (on the file already read)
@@ -311,7 +314,7 @@ public static class PickupWizardChecks
         again.Find("#template-supplier-missing button").Click();
         check(again.FindAll(".template-popup .invoice-modal #supplier-name, .template-popup .invoice-modal input").Count > 3 && again.Markup.Contains("Adaugă furnizor", StringComparison.Ordinal),
             "Pickup template flow: the add-supplier window opened from the template is filled in (the supplier form with the name and CUI of the invoice)");
-        again.Find(".template-popup .invoice-modal .catalog-heading button").Click();
+        again.Find(".template-popup .invoice-modal .catalog-heading button.danger").Click();
         again.FindAll(".template-popup button.primary").First(button => button.TextContent.Contains("Salvează șablonul", StringComparison.Ordinal)).Click();
         check(again.Markup.Contains("Furnizorul nu este în baza de date", StringComparison.Ordinal),
             "Pickup template flow: a template cannot be saved for a supplier that is not in the database");
@@ -328,6 +331,11 @@ public static class PickupWizardChecks
             settingsContext.JSInterop.Mode = JSRuntimeMode.Loose;
             settingsContext.Services.AddLogging();
             settingsContext.Services.AddSingleton<IAccessControl>(rights);
+            settingsContext.Services.AddSingleton<IDatabaseAccountService>(new DatabaseSettingsChecks.FakeAccounts(false));
+            // The invoice tab sits inside the gate of the invoice module, which works.
+            var settingsModules = new BlazorStoc.Modules.ModuleRegistry();
+            settingsModules.Add(new BlazorStoc.Modules.Invoices.InvoicesModule(), new ServiceCollection(), new ConfigurationBuilder().Build());
+            settingsContext.Services.AddSingleton(settingsModules);
             settingsContext.Services.AddSingleton<IInvoiceAnalysisStore>(new InvoiceAnalysisStore(TimeProvider.System));
             settingsContext.Services.AddScoped<IInvoiceAnalysisService>(provider => new InvoiceAnalysisService(new InvoicePdfReader(new TestTessdata()), provider.GetRequiredService<IInvoiceAnalysisStore>(), rights));
             var withTemplate = new MemoryTemplates();

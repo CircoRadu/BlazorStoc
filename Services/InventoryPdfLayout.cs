@@ -23,9 +23,9 @@ public static class InventoryPdfLayout
 
     public static InventoryTableColumns ComputeColumns(double pageWidthPoints)
     {
-        InventoryPdfWriter.EnsureFontResolver();
+        PdfFonts.EnsureResolver();
         using var gfx = XGraphics.CreateMeasureContext(new XSize(2000, 2000), XGraphicsUnit.Point, XPageDirection.Downwards);
-        var font = new XFont(InventoryPdfWriter.FamilyName, 12, XFontStyleEx.Regular);
+        var font = new XFont(PdfFonts.FamilyName, 12, XFontStyleEx.Regular);
         var contentWidth = pageWidthPoints - 2 * PageMargin;
         var numberColumnWidth = Math.Max(gfx.MeasureString(NumberHeader, font).Width, gfx.MeasureString("0000", font).Width) + 16;
         var stockColumnWidth = Math.Max(contentWidth * 0.18, gfx.MeasureString("-000000", font).Width + 16);

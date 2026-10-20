@@ -1,0 +1,29 @@
+# Fișa furnizorului
+Ruta: /furnizori/{id:int}
+Cautare: furnizor fisa facturi preluate anaf date verificat editeaza
+Captura: pagina | /furnizori | click sel:a.category-table-link; full | Fișa unui furnizor
+
+Fișa unui furnizor: datele lui și facturile preluate în stoc de la el.
+
+## Elemente
+### Antet
+- ← Furnizori | link | Revine la registrul furnizorilor.
+- Numele și datele furnizorului | text | Țara, CUI sau codul de TVA, adresa, telefonul și, când există, Reg. Com., cod poștal și CAEN.
+- Sursa datelor | insignă | ANAF, manual etc.; la datele din ANAF se arată și data ultimei citiri.
+- Editează | buton | Deschide formularul furnizorului ([[furnizori-editor]]).
+### Facturi preluate
+- Nr. factură | coloană | Numărul facturii.
+- Data emiterii | coloană | Data de pe factură.
+- Intrări în stoc | coloană | Câte intrări în stoc s-au preluat din ea.
+- Preluată de, La data | coloană | Cine a preluat factura și când.
+
+## Flux: Cum corectez datele unui furnizor
+1. Apasă „Editează”.
+2. Modifică datele sau apasă „Preia din nou din ANAF”.
+3. Salvează și confirmă modificările.
+
+## Flux: Cum văd ce s-a preluat de la un furnizor
+1. Deschide fișa furnizorului.
+2. În „Facturi preluate” vezi fiecare factură și numărul de intrări în stoc.
+3. Ca să vezi produsele unei facturi, deschide-o din Facturi ([[facturi]]).
+Nota: facturile apar aici după „Preluare factură” din Produse.

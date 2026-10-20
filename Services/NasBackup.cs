@@ -122,14 +122,13 @@ public sealed class MariaNasBackupStore(IConfiguration configuration, IDataProte
 
     public async Task<NasBackupSettings> GetAsync(CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         return (await ReadAsync(cancellationToken).ConfigureAwait(false)).Settings;
     }
 
     internal async Task<(NasBackupSettings Settings, string? Password)> ReadAsync(CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT unc_path,username,password_protected,copy_enabled,last_attempt_utc,last_ok,last_message FROM backup_nas_settings WHERE id=1
             """, connection);
@@ -156,16 +155,15 @@ public sealed class MariaNasBackupStore(IConfiguration configuration, IDataProte
 
     public async Task SaveAsync(NasBackupInput input, CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         if (NasBackupRules.Validate(input) is { } error) throw new NasBackupException(error);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new NasBackupException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         var old = (await ReadAsync(cancellationToken).ConfigureAwait(false)).Settings;
         var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
         var path = NasBackupRules.NormalizePath(input.Path);
         var passwordChanged = !string.IsNullOrEmpty(input.Password);
-        await using (var connection = DatabaseConnections.Create(configuration))
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using var command = new MySqlCommand("""
                 INSERT INTO backup_nas_settings (id,unc_path,username,password_protected,copy_enabled,updated_by,updated_utc)
                 VALUES (1,@path,@user,@pass,@copy,@by,@now)
@@ -194,8 +192,7 @@ public sealed class MariaNasBackupStore(IConfiguration configuration, IDataProte
 
     internal async Task RecordResultAsync(bool ok, string message, CancellationToken cancellationToken)
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("UPDATE backup_nas_settings SET last_attempt_utc=@now,last_ok=@ok,last_message=@message WHERE id=1", connection);
         command.Parameters.AddWithValue("@now", MariaTimeText.Format(DateTime.UtcNow));
         command.Parameters.AddWithValue("@ok", ok);
@@ -258,7 +255,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
 
     public async Task<NasCopyResult> TestAsync(NasBackupInput input, CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         if ((NasBackupRules.PathError(input.Path) ?? NasBackupRules.UserError(input.UserName)) is { } error) return new(false, 0, 0, 0, error);
         var password = string.IsNullOrEmpty(input.Password) ? (await store.ReadAsync(cancellationToken).ConfigureAwait(false)).Password : input.Password;
         if (string.IsNullOrEmpty(password)) return new(false, 0, 0, 0, "Introdu parola contului (nu este salvată nici una).");
@@ -294,7 +291,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
 
     public async Task<NasCopyResult> CopyMissingAsync(CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         return await CopyCoreAsync(null, cancellationToken).ConfigureAwait(false);
     }
 
@@ -302,7 +299,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
 
     public async Task<NasShareListing> ListShareAsync(CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         var (settings, _) = await store.ReadAsync(cancellationToken).ConfigureAwait(false);
         if (!settings.CopyEnabled) return new(false, "Copierea pe NAS este oprită.", []);
         var credentials = await store.CredentialsAsync(cancellationToken).ConfigureAwait(false);
@@ -333,7 +330,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
 
     public async Task<NasCopyResult> FetchAsync(string fileName, CancellationToken cancellationToken = default)
     {
-        if (access is not null) await access.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        if (access is not null) await access.EnsureAsync("setari-backup.edit", cancellationToken).ConfigureAwait(false);
         if (fileName.Length == 0 || fileName != Path.GetFileName(fileName) || !fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || fileName.StartsWith("."))
             return new(false, 0, 0, 1, "Pachet invalid.");
         var credentials = await store.CredentialsAsync(cancellationToken).ConfigureAwait(false);
@@ -509,10 +506,14 @@ public sealed class SystemAccess : IAccessControl
 }
 
 /// <summary>The daily backup: once a day, at the time chosen in Settings, a backup is made (and copied to the NAS). A busy lock or a failure is retried after 15 minutes.</summary>
-public sealed class BackupScheduler(IConfiguration configuration, IDataProtectionProvider protection, IOperationLockService locks, IAuditTrail audit,
-    ILoggerFactory loggers, TimeProvider? clock = null, Func<CancellationToken, Task<ClockCheck>>? clockCheck = null) : BackgroundService
+public sealed class BackupScheduler(IConfiguration configuration, IDataProtectionProvider protection, IBackupOperations operations, IAuditTrail audit,
+    ILoggerFactory loggers, TimeProvider? clock = null, Func<CancellationToken, Task<ClockCheck>>? clockCheck = null,
+    BlazorStoc.Modules.ModuleRegistry? modules = null) : BackgroundService
 {
     private readonly TimeProvider time = clock ?? TimeProvider.System;
+    // The backup module is out (stopped by the administrator, taken out after failures): the whole schedule - the daily backup, the clean-up of old packages, the clock
+    // check - waits quietly; one line in the log when it pauses and one when it goes on.
+    private bool paused;
     private ClockCheck? lastClock;
     private DateTimeOffset lastClockAt = DateTimeOffset.MinValue;
     private DateTimeOffset retryAfter = DateTimeOffset.MinValue;
@@ -537,6 +538,17 @@ public sealed class BackupScheduler(IConfiguration configuration, IDataProtectio
 
     private async Task TickAsync(ILogger logger, CancellationToken token)
     {
+        if (modules is not null)
+        {
+            var available = modules.IsAvailable(BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId);
+            if (available == paused)
+            {
+                paused = !available;
+                if (paused) logger.LogWarning("The backup module is out: the scheduled backups wait until it is available again.");
+                else logger.LogInformation("The backup module is available again: the scheduled backups go on.");
+            }
+            if (paused) return;
+        }
         var serverNow = time.GetLocalNow();
         var settingsStore = new MariaBackupSettingsStore(configuration);
         // The server date can be changed on purpose (for another application): every ten minutes the clock is compared with the internet time, and while it is
@@ -552,7 +564,7 @@ public sealed class BackupScheduler(IConfiguration configuration, IDataProtectio
         var now = lastClock is { Trusted: false, Skew: { } skew, ReferenceUtc: not null } ? (serverNow - skew).ToLocalTime() : serverNow;
         var today = now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         var system = new SystemAccess();
-        var copier = new NasBackupCopier(configuration, protection, system, audit, loggers.CreateLogger<NasBackupCopier>());
+        var copier = operations.Copier(system);
         // The old packages are removed once a day, independently of the daily backup (a backup that failed must not stop the clean-up).
         if (retentionDate != today && now >= retentionRetryAfter)
         {
@@ -568,9 +580,7 @@ public sealed class BackupScheduler(IConfiguration configuration, IDataProtectio
         if (now < retryAfter) return;
         var (settings, last) = await settingsStore.ReadAsync(token).ConfigureAwait(false);
         if (!settings.ScheduleEnabled || last == today || !BackupScheduleDays.Includes(settings.ScheduleDays, now.DayOfWeek) || !NasBackupRules.TryParseTime(settings.ScheduleTime, out var at) || TimeOnly.FromDateTime(now.DateTime) < at) return;
-        IDatabaseBackupService service = new NasCopyingBackupService(
-            new MariaDatabaseBackupService(configuration, system, locks, audit, loggers.CreateLogger<MariaDatabaseBackupService>()), copier, loggers.CreateLogger<NasCopyingBackupService>());
-        var result = await service.CreateBackupAsync(BackupKind.Scheduled, null, token).ConfigureAwait(false);
+        var result = await operations.Backups(system).CreateBackupAsync(BackupKind.Scheduled, null, token).ConfigureAwait(false);
         if (result.Success) { await settingsStore.MarkScheduledAsync(today, token).ConfigureAwait(false); logger.LogInformation("Scheduled backup made: {File}", result.PackageFileName); }
         else
         {

@@ -1,4 +1,5 @@
-@page "/iesiri/multipla"
+﻿@page "/iesiri/multipla"
+@attribute [Authorize(Policy = "perm:iesire-multipla.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProductRepository Products
@@ -7,6 +8,7 @@
 @inject IProjectRepository ProjectsRepository
 @inject IVehicleRepository VehiclesRepository
 @inject IVehicleTargetRepository VehicleTargets
+@inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject IAccessControl Access
 @inject ILogger<ExitOperation> Logger
 @implements IDisposable
@@ -17,7 +19,7 @@
 
 @if (Embedded)
 {
-    <div class="page-heading"><div><h2>Ieșire din stoc</h2><p class="muted">Se salvează o operație (toate liniile sau niciuna), ca în „Ieșire multiplă”.</p></div><div class="heading-actions"><button type="button" class="refresh act-close" disabled="@busy" @onclick="() => OnClosed.InvokeAsync()">Închide</button></div></div>
+    <div class="page-heading"><div><h2>Ieșire din stoc</h2><p class="muted">Se salvează o operație (toate liniile sau niciuna), ca în „Ieșire multiplă”.</p></div><div class="heading-actions"><HelpButton Topic="iesire-multipla" About="Ieșirea din stoc" /><button type="button" class="refresh act-close" disabled="@busy" @onclick="() => OnClosed.InvokeAsync()">Închide</button></div></div>
 }
 else
 {
@@ -88,7 +90,7 @@ else
                         </select>
                     </td>
                     <td><input type="text" aria-label="@($"Descriere, linia {index + 1}")" @bind="line.Description" maxlength="@StockMovementRules.MaxDescriptionLength" /></td>
-                    <td><button type="button" class="danger" aria-label="@($"Scoate linia {index + 1}")" disabled="@(lines.Count == 1)" @onclick="() => RemoveLine(position)" title="@($"Scoate linia {index + 1}")">×</button></td>
+                    <td><button type="button" class="row-icon delete" aria-label="@($"Scoate linia {index + 1}")" disabled="@(lines.Count == 1)" @onclick="() => RemoveLine(position)" title="@($"Scoate linia {index + 1}")"></button></td>
                 </tr>
             }
             </tbody></table></div>
@@ -188,7 +190,7 @@ else
         lines = [new Line { Key = nextKey++ }];
         try
         {
-            canManage = await Access.CanManageProductsAsync(lifetime.Token);
+            canManage = await Access.HasModuleWriteAsync("iesire-multipla", lifetime.Token);
             if (canManage) await LoadAsync();
             if (canManage && InitialProductId is { } initial) await ProductChangedAsync(lines[0], initial);
             if (canManage && !Embedded && FillVehicleId is { } fillVehicle) await FillVehicleAsync(fillVehicle);
@@ -220,7 +222,7 @@ else
         var productsTask = Products.GetProductsAsync(lifetime.Token);
         var vehicleQuantities = Movements.GetQuantitiesInVehiclesAsync(lifetime.Token);
         var beneficiariesTask = Beneficiaries.GetBeneficiariesAsync(lifetime.Token);
-        var vehiclesTask = VehiclesRepository.GetVehiclesAsync(lifetime.Token);
+        var vehiclesTask = Modules.TryRunAsync(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId, () => VehiclesRepository.GetVehiclesAsync(lifetime.Token), (IReadOnlyList<Vehicle>)[]);
         await Task.WhenAll(productsTask, vehicleQuantities, beneficiariesTask, vehiclesTask);
         products = (await productsTask).OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
         inVehicles = await vehicleQuantities;

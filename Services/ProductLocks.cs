@@ -69,7 +69,7 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
 
     public async Task<LockAttempt> RenewAsync(int productId, string sessionId, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureModuleAsync("produse", cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
         var expiry = now.AddSeconds(ProductLockRules.LeaseSeconds);
@@ -82,7 +82,7 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
 
     public async Task<LockAttempt> AcquireAsync(int productId, string sessionId, CancellationToken cancellationToken = default)
     {
-        if (accessControl is not null) await accessControl.EnsureProductOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureModuleAsync("produse", cancellationToken).ConfigureAwait(false);
         var owner = accessControl is null ? "sistem" : await accessControl.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "necunoscut";
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var now = DateTime.UtcNow;
@@ -155,12 +155,7 @@ public sealed class MariaProductLockRepository(IConfiguration configuration, IAc
         return held;
     }
 
-    private async Task<MySqlConnection> OpenAsync(CancellationToken token)
-    {
-        var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        return connection;
-    }
+    private Task<MySqlConnection> OpenAsync(CancellationToken token) => MariaDb.OpenAsync(configuration, token);
 
     private static async Task<int> ExecuteAsync(MySqlConnection connection, string sql, CancellationToken token,
         params (string Name, object Value)[] parameters)

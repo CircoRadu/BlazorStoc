@@ -1,0 +1,29 @@
+# Observația proiectului
+Ruta: /proiecte/{projectId:int}/observatii/{id:int}
+Cautare: observatie proiect fisiere incarca editeaza sterge continut
+Captura: pagina | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; click Acces la fatada; full | O observație a proiectului
+
+Pagina unei observații a proiectului: conținutul ei și fișierele atașate.
+
+## Elemente
+### Antet
+- ← Numele proiectului | link | Revine la pagina proiectului ([[proiecte-detaliu]]).
+- Denumirea, data și autorul | text | Identificarea observației.
+- Editează | buton | Deschide formularul observației ([[proiecte-observatie-editor]]).
+- Șterge observația | buton | Șterge observația împreună cu fișierele ei (cere confirmare).
+### Conținut și fișiere
+- Conținut | text | Textul observației.
+- Zona de fișiere | zonă | Alegi sau tragi fișiere (cel mult 20 MB fiecare și un număr maxim pe observație).
+- Fișier | coloană | Numele fișierului; apasă-l ca să-l deschizi.
+- Tip, Dimensiune | coloană | Tipul și mărimea fișierului.
+- Elimină fișierul | iconita:delete | Scoate fișierul din observație.
+
+## Flux: Cum atașez fișiere unei observații
+1. Trage fișierele în zona de fișiere sau apasă-o ca să le alegi.
+2. Așteaptă încărcarea; ele apar în tabel.
+3. Apasă numele unui fișier ca să-l deschizi.
+
+## Flux: Cum corectez o observație
+1. Apasă „Editează”.
+2. Schimbă denumirea sau conținutul.
+3. Salvează și confirmă modificările.

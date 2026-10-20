@@ -4,6 +4,33 @@ Fluxul: Administrare -> Furnizori (registru dupa CUI) -> facturile se inregistre
 
 ## Modificari de testat
 
+### 16.10.2026 - Furnizorii si facturile de furnizor ca modul
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** registrul de furnizori, fisa furnizorului si registrul facturilor (/facturi) sunt modulul "Furnizori si facturi de furnizor" (Setari -> Module).
+
+**Ce face acum:** in mod normal nimic nu se schimba. Daca modulul iese din functiune, intrarile Furnizori si Facturi dispar din meniu si de pe pagina principala, paginile lor arata "Modul indisponibil", intrarile de stoc se pot face doar ca "intrare libera", iar preluarea unei facturi spune ca furnizorii sunt indisponibili; stocul, produsele si restul aplicatiei merg, iar istoricul intrarilor arata in continuare factura si furnizorul.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Furnizori, Facturi, fisa unui furnizor, adaugare furnizor | Ca pana acum | |
+| 2 | Aplicatia pornita cu `Modules__furnizori__Enabled=false` | Meniul si pagina principala fara Furnizori / Facturi; /furnizori si /facturi: "Modul indisponibil"; Produse, miscari, Jurnal merg; intrare noua: doar "Intrare libera"; Preluare factura: mesaj si incarcare dezactivata; Jurnalul are "Oprire modul" | |
+
+### 15.10.2026 - ANAF ca modul (cautarea firmelor dupa CUI)
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** interogarea ANAF (date firme dupa CUI) si configuratorul ei (Setari -> ANAF) sunt un modul. Daca ANAF nu raspunde de mai multe ori la rand, modulul se opreste scurt (30 s) si cautarile urmatoare raspund imediat ca "ANAF indisponibil", fara sa astepte de fiecare data timeout-ul; apoi se reincearca singur.
+
+**Ce face acum:** in editorul de furnizor si de beneficiar, "Preia date din ANAF" cu ANAF cazut spune ca ANAF nu raspunde si ca datele se pot introduce manual (furnizorul ramane marcat pentru verificare), cu modulul oprit din configurare mesajul este "Modulul ANAF este oprit momentan"; un CUI negasit sau invalid da mesajele de pana acum si nu opreste modulul. Setari -> ANAF arata nota de modul oprit cat timp modulul e oprit.
+
+Pasi:
+
+1. Cu modulul pornit (normal): Setari -> ANAF si "Preia date din ANAF" in editorul de furnizor merg ca pana acum.
+2. Porneste aplicatia cu `Modules__anaf__Enabled=false`: Setari -> ANAF arata nota de modul oprit; in editorul de furnizor, "Preia date din ANAF" spune "Modulul ANAF este oprit momentan" si furnizorul se poate salva manual; Setari -> Module arata ANAF "Oprit (oprit din configurare)".
+3. Cu ANAF nereachabil (fara internet): dupa trei cautari esuate, urmatoarea raspunde imediat "ANAF nu raspunde si interogarile sunt oprite pentru scurt timp"; dupa 30 s se reincearca.
+
 ### 07.10.2026 - Preluarea facturii: intrare legata de oferta si propuneri de rezervare
 
 **Ce s-a adaugat:** in pasul 3 al preluarii facturii (PDF) si in dialogul "Adauga produs la factura", fiecare produs din catalog care apare in oferta unui proiect are selectorul **Pentru oferta** (propunere automata cand e intr-o singura componenta; se poate lasa nelegat). Dupa finalizarea preluarii apar propunerile **"Rezerva N buc. pentru proiectul X"** pentru produsele facturii al caror necesar e acoperit de stocul liber, dar nerezervat; nimic nu se rezerva fara clic. Pasi: 1) preia o factura cu un produs aflat intr-o oferta de proiect; in pasul 3 alege/lasa propunerea la "Pentru oferta"; 2) finalizeaza: in Situatia proiectului, linia are "Intrat pt. oferta"; 3) daca stocul liber acopera necesarul, apare propunerea de rezervare dupa finalizare. (Produsele noi din factura nu au inca oferta, deci nu au selectorul.)
@@ -18,7 +45,6 @@ Fluxul: Administrare -> Furnizori (registru dupa CUI) -> facturile se inregistre
 
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
 |---|---|---|---|
-| 1 | Furnizori: lista, cautare, filtrul "Doar cei de verificat" | Se restrange corect | |
 | 2 | Furnizor nou cu CUI real, ANAF activ | Formularul se completeaza; sursa "Date preluate din ANAF"; modifici adresa -> "Preluate din ANAF, editate manual" | |
 | 3 | ANAF oprit sau dezactivat din Setari | Se salveaza ca "Introdus manual (ANAF indisponibil)" | |
 | 4 | CUI valid dar necunoscut ANAF | "CUI negasit", se accepta manual cu avertizare | |
@@ -38,7 +64,6 @@ Fluxul: Administrare -> Furnizori (registru dupa CUI) -> facturile se inregistre
 |---|---|---|---|
 | 1 | Deschide /facturi din meniu Administrare si de pe pagina principala | Casete de rezumat, tabel (numar, furnizor cu link, data, intrari, preluata de) | |
 | 2 | Filtre: text, furnizor, interval de date, "doar fara intrari" | Rezultate corecte | |
-| 3 | Apasa numarul facturii (buton) | Se deschide fereastra cu produsele preluate; numele produsului duce la /produse/{id}/miscari | |
 | 4 | Administrator: corecteaza numarul, data, furnizorul (cu motiv) | Jurnal: "Modificare numar factura", "Modificare data factura", "Mutare factura la alt furnizor" | |
 | 5 | Numar deja existent la acelasi furnizor | Mesaj de duplicat | |
 | 6 | Sterge o factura fara intrari; incearca la una cu intrari | Prima dispare (si din pagina furnizorului); a doua are butonul dezactivat cu explicatie | |

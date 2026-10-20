@@ -1,0 +1,50 @@
+# Fișa beneficiarului
+Ruta: /beneficiari/{id:int}
+Cautare: beneficiar fisa puncte de lucru proiecte consum net contracte mentenanta analize risc adauga proiect editeaza anaf
+Captura: pagina | /beneficiari | click Panoramic Hotel; full | Fișa unui beneficiar
+
+Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, contractele și intervențiile de mentenanță, analizele de risc și proiectele. De aici adaugi proiecte și puncte de lucru.
+
+## Elemente
+### Antet
+- ← Beneficiari | link | Revine la registrul beneficiarilor.
+- Numele și datele beneficiarului | text | Persoană fizică sau CUI, adresa, telefonul, iar la persoanele juridice Reg. Com., cod poștal și CAEN.
+- Date preluate din ANAF / Date introduse manual | insignă | Spune de unde vin datele persoanei juridice.
+- Editează | buton | Deschide formularul beneficiarului ([[beneficiari-editor]]).
+- + Adaugă proiect | buton | Deschide formularul de proiect nou pentru acest beneficiar ([[proiecte-editor]]).
+### Puncte de lucru
+- + Adaugă punct de lucru | buton | Deschide formularul de punct de lucru ([[puncte-de-lucru-editor]]).
+- Nume | coloană | Numele punctului; „Principal” marchează punctul creat odată cu beneficiarul.
+- Adresă, Telefon, Persoană de contact, Descriere | coloană | Datele punctului de lucru.
+- Coordonate | coloană | Latitudinea și longitudinea, dacă au fost introduse.
+- Foto | coloană | Câte fotografii are punctul.
+- Mentenanță | coloană | Contractul de mentenanță activ și următoarea scadență, sau „Contract Off”.
+- Analiză de risc | coloană | Starea analizei de risc a punctului.
+- Editează punctul de lucru | iconita:edit | Deschide formularul punctului.
+- Șterge punctul de lucru | iconita:delete | Șterge punctul; punctul principal nu se șterge, iar adresa și telefonul lui se modifică din editarea beneficiarului.
+### Consum net
+- Consum net | tabel | Pe produs: ieșirile către acest beneficiar, retururile legate de ele și consumul net. Apare doar dacă ai dreptul să vezi mișcările de stoc și există ceva de arătat. Apasă produsul ca să-i deschizi pagina.
+### Alte secțiuni de pe fișă
+- Contracte de mentenanță și Intervenții | secțiuni | Din modulul Mentenanță: contractele beneficiarului ([[mentenanta-contracte]]) și registrul intervențiilor pe punctele de lucru ([[mentenanta-interventii]]). Apar doar cât modulul funcționează.
+- Analize de risc | secțiune | Din modulul Analize de risc: analizele punctelor de lucru, reînnoirile și expirarea lor ([[analize-risc-sectiune]]).
+### Proiecte
+- Caută după denumire | câmp | Filtrează proiectele beneficiarului.
+- Proiect | coloană | Apasă numele ca să deschizi pagina proiectului.
+- Ultima modificare | coloană | Data și ora ultimei modificări a proiectului.
+- Paginile | butoane | Trec la pagina anterioară sau următoare a listei de proiecte.
+
+## Flux: Cum adaug un proiect pentru un beneficiar
+1. Apasă „+ Adaugă proiect”.
+2. Scrie denumirea proiectului, observațiile și alege componentele (sistemele) proiectului.
+3. Apasă „Salvează proiectul”; apoi îl găsești în lista „Proiecte” a fișei.
+
+## Flux: Cum adaug un punct de lucru
+1. Apasă „+ Adaugă punct de lucru”.
+2. Completează numele și adresa (două puncte ale aceluiași beneficiar nu pot avea aceeași adresă) și, dacă vrei, persoana de contact, descrierea și coordonatele.
+3. Salvează; fișa rămâne deschisă ca să poți adăuga imediat fotografii.
+
+## Flux: Cum corectez datele beneficiarului
+1. Apasă „Editează”.
+2. Schimbă datele; la o persoană juridică poți reîmprospăta datele cu „Preia date din ANAF”.
+3. Salvează și confirmă modificările.
+Nota: adresa și telefonul punctului principal de lucru se modifică numai prin editarea beneficiarului.

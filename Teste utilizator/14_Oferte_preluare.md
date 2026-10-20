@@ -4,6 +4,20 @@ Asistent in 5 pasi, ca la „Preluare factura", dar se recunoaste un **beneficia
 
 ## Modificari de testat
 
+### 15.10.2026 - Oferte ca modul (oprire fara efect asupra restului aplicatiei)
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** Oferte (preluarea devizelor Excel si sabloanele lor) este un modul al aplicatiei, ca Analizele de risc, Vehiculele si Mentenanta. Daca se opreste (din configurare sau dupa erori repetate), restul aplicatiei merge. Componentele proiectelor, rezervarile si iesirile raman la stoc.
+
+**Ce face acum:** cu modulul oprit, /oferte si /oferte/sabloane arata "Modul indisponibil"; intrarea Oferte dispare din meniu si de pe pagina principala; pagina "Situatia proiectului" spune "Modulul Oferte este oprit momentan: situatia proiectului se calculeaza din oferte si nu poate fi afisata" (nu arata numere fara oferte); fisa beneficiarului si lista de componente ale proiectului se deschid fara erori. O oferta respinsa (proiect inexistent, linii lipsa), un sablon respins sau un fisier care nu e xlsx dau mesajul obisnuit si nu opresc modulul.
+
+Pasi:
+
+1. Cu modulul pornit (normal): Oferte -> preluare ofertei, Oferte -> Sabloane si Situatia unui proiect se deschid ca pana acum.
+2. Porneste aplicatia cu `Modules__oferte__Enabled=false`: /oferte arata "Modul indisponibil", meniul si pagina principala nu mai au Oferte, Setari -> Module arata Oferte "Oprit (oprit din configurare)".
+3. Tot cu modulul oprit: deschide Situatia unui proiect (/proiecte/<id>/situatie): apare mesajul despre modulul Oferte oprit; fisa beneficiarului se deschide normal.
+
 ### 07.10.2026 - Preluarea unei oferte
 
 **Ce s-a adaugat:** pagina `Preluare oferta` (`OfferPickup.razor`, meniu Oferte si card pe pagina principala) cu cei 5 pasi: (1) fisierul + sablonul ales automat dupa etichete, antetul citit (numar, titlu, categorie, beneficiar) editabil si avertizare daca oferta exista deja; (2) beneficiarul: recunoscut dupa denumiri alternative din oferte anterioare sau propus dupa asemanare (forme juridice ignorate; la persoane fizice se arata si CUI-ul), cautare in toti beneficiarii, „+ Beneficiar nou” (formularul existent, intr-o fereastra, precompletat cu numele din oferta) si optiunea de a retine numele din oferta ca denumire alternativa; (3) proiectul (existent sau nou cu titlul ofertei) si componenta (categoria ofertei -> tip de sistem prin Nomenclator, inclusiv denumiri alternative; componenta se adauga la proiect sau se reactiveaza); (4) liniile: potrivire cu catalogul pe tot textul denumirii (codurile de model cantaresc mai mult), legaturi retinute din oferte anterioare, propuneri cu procent, cautare in catalog, „Produs nou” (formularul existent de produs), „de achizitionat” implicit, „in afara stocului” pentru metraje/ore; (5) rezumat cu diferentele fata de revizia anterioara. Tabele noi (migrarea 25): `offers`, `offer_lines`, `offer_line_matches`, `beneficiary_aliases`. Jurnal exact (la proiect): „Preluare oferta”, „Revizie oferta”, „Legare linie oferta de produs” (cate una pe linie legata), „Adaugare denumire alternativa beneficiar”.

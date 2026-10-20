@@ -1,0 +1,149 @@
+@using BlazorStoc.Services
+@inject IDatabaseServerService Server
+@inject ILogger<DatabaseServerPanel> Logger
+@implements IDisposable
+@* Setari -> Baza de date -> Conexiune -> Serverul bazei de date: the Windows service of the database of this installation, when it is on this computer: its state, start, stop,
+   restart and the port it listens on. Every operation opens a window with what it needs and the password of the administrator; when the server cannot be controlled from
+   here (another computer, no service, another server than the service's) the page says why instead of showing buttons that do nothing. A port taken by another program is
+   named with the program, and a free port is proposed. *@
+
+<section class="catalog database-server">
+    <div class="catalog-heading"><h2>Serverul bazei de date</h2><small>Serviciul Windows al bazei de pe acest calculator: pornire, oprire și portul pe care ascultă.</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else if (state is { } server)
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
+        @if (server.PortProblem is not null) { <div class="error-banner" role="alert">@server.PortProblem</div> }
+        <dl class="database-server-facts">
+            <div><dt>Serviciu Windows</dt><dd>@server.ServiceName @if (server.Service != ServerServiceStatus.NotFound) { <span class="stock-badge @(server.Service == ServerServiceStatus.Running ? "positive" : "negative")">@DatabaseServerRules.StateText(server.Service)</span> }</dd></div>
+            <div><dt>Port pe care ascultă serverul</dt><dd>@(server.IniPort?.ToString() ?? "necunoscut")</dd></div>
+            <div><dt>Port la care se conectează aplicația</dt><dd>@server.ConnectionPort <span class="stock-badge @(server.Reachable ? "positive" : "negative")">@(server.Reachable ? "răspunde" : "nu răspunde")</span></dd></div>
+        </dl>
+        @if (!server.CanControl) { <p class="muted"><small>@server.Reason</small></p> }
+        else
+        {
+            <div class="editor-actions">
+                @if (server.Service == ServerServiceStatus.Running)
+                {
+                    <button type="button" class="refresh act-reload" disabled="@busy" @onclick="() => Ask(Mode.Restart)">Repornește serverul</button>
+                    <button type="button" class="danger" disabled="@busy" @onclick="() => Ask(Mode.Stop)">Oprește serverul</button>
+                }
+                else if (server.Service == ServerServiceStatus.Stopped)
+                {
+                    <button type="button" class="primary" disabled="@(busy || server.Occupant is not null)" title="@(server.Occupant is { } occupant ? $"Portul este ocupat de {occupant}; schimbă portul serverului." : "")" @onclick="() => Ask(Mode.Start)">Pornește serverul</button>
+                }
+                <button type="button" class="refresh act-edit" disabled="@busy" @onclick="() => Ask(Mode.Port)">Schimbă portul serverului</button>
+                <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadAsync">Actualizează starea</button>
+            </div>
+            <p class="muted"><small>Cât timp serverul e oprit, aplicația nu are date și doar administratorul configurat se poate autentifica; rămâi conectat ca să îl poți porni din nou.</small></p>
+        }
+    }
+    </div>
+</section>
+@if (mode != Mode.None && state is { } active)
+{
+    <AdminOperationDialog Title="@DialogTitle" Intro="@DialogIntro" ConfirmText="@ConfirmText" ConfirmDisabled="@ConfirmDisabled" Busy="busy" BusyText="@busyText" Error="@dialogError"
+                          @bind-AdminPassword="adminPassword" Confirmed="ConfirmAsync" Cancelled="Cancel">
+        <Help><HelpButton Topic="setari-baza-server-operatii" About="Operațiile asupra serverului bazei de date" /></Help>
+        <ChildContent>
+        @switch (mode)
+        {
+            case Mode.Stop:
+                <div class="anaf-grid">
+                    <label>Scrie @DatabaseServerRules.StopWord ca să confirmi<input id="server-stop-word" value="@stopWord" @oninput="e => stopWord = e.Value?.ToString()" maxlength="40" autocomplete="off" /></label>
+                </div>
+                break;
+            case Mode.Port:
+                <div class="anaf-grid">
+                    <label>Portul nou al serverului (@DatabaseServerRules.MinimumPort–@DatabaseServerRules.MaximumPort)<input id="server-new-port" type="number" min="@DatabaseServerRules.MinimumPort" max="@DatabaseServerRules.MaximumPort" @bind="newPort" autocomplete="off" /></label>
+                </div>
+                <p class="muted"><small>Port curent: @active.IniPort. @(active.SuggestedPort is { } free ? $"Port liber propus: {free}." : "")</small></p>
+                break;
+        }
+        </ChildContent>
+    </AdminOperationDialog>
+}
+
+@code {
+    private enum Mode { None, Stop, Start, Restart, Port }
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, busy, noticeOk;
+    private string? error, notice, busyText, dialogError, stopWord;
+    private string adminPassword = "";
+    private int? newPort;
+    private Mode mode;
+    private DatabaseServerState? state;
+
+    /// <summary>Raised after an operation changed the server or its port, so the connection shown next to it is read again.</summary>
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private string DialogTitle => mode switch
+    {
+        Mode.Stop => "Oprește serverul bazei de date",
+        Mode.Start => "Pornește serverul bazei de date",
+        Mode.Restart => "Repornește serverul bazei de date",
+        _ => "Schimbă portul serverului bazei de date",
+    };
+
+    private string DialogIntro => mode switch
+    {
+        Mode.Stop => "Serverul se oprește curat; cât timp e oprit, aplicația nu are date. Se refuză cât timp rulează o copie de siguranță sau o restaurare.",
+        Mode.Start => "Serviciul pornește și se așteaptă ca serverul să răspundă cu contul aplicației.",
+        Mode.Restart => "Serverul se oprește curat și pornește din nou; sesiunile deschise așteaptă cât durează.",
+        _ => "Se schimbă portul din fișierul de configurare al serverului (cu o copie de siguranță) și serverul se repornește pe portul nou. Dacă nu pornește, se revine la portul vechi; dacă pornește, aplicația se conectează singură la el.",
+    };
+
+    private string ConfirmText => mode switch { Mode.Stop => "Oprește serverul", Mode.Start => "Pornește serverul", Mode.Restart => "Repornește serverul", _ => "Schimbă portul" };
+
+    private bool ConfirmDisabled => mode == Mode.Stop ? !string.Equals(stopWord?.Trim(), DatabaseServerRules.StopWord, StringComparison.Ordinal)
+        : mode == Mode.Port && (newPort is null || newPort < DatabaseServerRules.MinimumPort || newPort > DatabaseServerRules.MaximumPort);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try { state = await Server.GetStateAsync(lifetime.Token); error = null; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Database server state loading failed ({ErrorType}).", ex.GetType().Name); error = "Starea serverului nu a putut fi citită."; }
+        finally { loading = false; }
+    }
+
+    private void Ask(Mode requested)
+    {
+        if (busy) return;
+        error = null; notice = null; adminPassword = ""; dialogError = null; stopWord = ""; mode = requested;
+        newPort = requested == Mode.Port ? state?.SuggestedPort ?? (state?.IniPort is { } port ? port + 1 : null) : null;
+    }
+
+    private void Cancel() { mode = Mode.None; adminPassword = ""; dialogError = null; stopWord = ""; }
+
+    private async Task ConfirmAsync()
+    {
+        if (busy || ConfirmDisabled) return;
+        busy = true; dialogError = null;
+        busyText = mode switch { Mode.Stop => "Se oprește serverul…", Mode.Start => "Se pornește serverul…", Mode.Restart => "Se repornește serverul…", _ => "Se schimbă portul și se repornește serverul…" };
+        try
+        {
+            var result = mode switch
+            {
+                Mode.Stop => await Server.StopAsync(adminPassword, lifetime.Token),
+                Mode.Start => await Server.StartAsync(adminPassword, lifetime.Token),
+                Mode.Restart => await Server.RestartAsync(adminPassword, lifetime.Token),
+                _ => await Server.ChangePortAsync(newPort ?? 0, adminPassword, lifetime.Token),
+            };
+            noticeOk = result.Success; notice = result.Message;
+            Cancel();
+            await LoadAsync();
+            await Changed.InvokeAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is DatabaseSettingsException or AccessDeniedException) { dialogError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Database server action failed ({ErrorType}).", ex.GetType().Name); dialogError = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

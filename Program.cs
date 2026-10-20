@@ -1,268 +1,61 @@
 ﻿using BlazorStoc.Components;
 using BlazorStoc.Services;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.DataProtection;
+using BlazorStoc.Startup;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using System.Globalization;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Localization;
+
+// Worker mode of the OCR (Modules/Ocr): the application started with --ocr-worker <job folder> reads one file and exits; no web host, no database.
+if (args is ["--ocr-worker", var ocrJobFolder]) return await BlazorStoc.Modules.Ocr.OcrWorker.RunAsync(ocrJobFolder);
+
+// Worker mode of the backup (Modules/Backup): the application started with --backup-worker [its own arguments] does one backup, restoration or NAS operation and exits;
+// it talks over the standard streams and reads the same configuration (and so the same database and folders) as the application.
+if (args is [BlazorStoc.Modules.Backup.BackupWorkerRules.Argument, ..var backupWorkerArguments]) return await BlazorStoc.Modules.Backup.BackupWorker.RunAsync(backupWorkerArguments);
 
 var builder = WebApplication.CreateBuilder(args);
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
-// Subtask 2.2 (Task 2): parola contului MariaDB local (blazorstoc_dev) nu se pune niciodata in appsettings.json
-// sau in Git. Se citeste, optional, dintr-un fisier JSON local, in afara repository-ului, cu forma
-// { "Database": { "Host": "...", "Port": ..., "User": "...", "Password": "...", "SslMode": "..." } } —
-// aceleasi chei ca sectiunea "Database" din appsettings.json, suprascriindu-le. Calea implicita este cea din
-// docs/CLAUDE_CONECTARE_MARIADB_LOCALA.md (application-connection.private.json); poate fi schimbata prin
-// Database:PrivateConfigPath (variabila de mediu Database__PrivateConfigPath) fara sa schimbe mecanismul.
-// Fisierul e optional daca parolele sunt date prin variabile de mediu.
-// Follow-up Task 2 (28.09.2026, dupa comutarea 2.13): acelasi fisier poate contine si o sectiune
-// "Authentication": { "Username": "...", "Password": "..." }, incarcata generic de acelasi AddJsonFile
-// (nu e nevoie de cod separat) — asta permite pornirea reala (fara nicio parola in
-// appsettings.json sau in argumente de proces, in loc de variabile de mediu setate manual.
-var mariaPrivateConfigPath = builder.Configuration["Database:PrivateConfigPath"]
-    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "application-connection.private.json");
-builder.Configuration.AddJsonFile(mariaPrivateConfigPath, optional: true, reloadOnChange: false);
-// Schema-migration account (blazorstoc_migrator). Its private file has the same shape as the application one
-// ({ "Database": { "User", "Password" } }) but must NOT override the application account, so it is mapped explicitly to
-// Database:MigratorUser / Database:MigratorPassword. Default: next to the application file; the project's
-// local-secrets folder is the fallback. Optional: without it the schema is only checked, never changed.
-var migratorPrivateConfigPath = builder.Configuration["Database:MigratorPrivateConfigPath"] is { Length: > 0 } configuredMigratorPath
-    ? configuredMigratorPath
-    : new[]
-        {
-            Path.Combine(Path.GetDirectoryName(mariaPrivateConfigPath) ?? "", "migration-account.private.json"),
-            Path.Combine(builder.Environment.ContentRootPath, "local-secrets", "migration-account.private.json")
-        }.FirstOrDefault(File.Exists);
-if (migratorPrivateConfigPath is not null && File.Exists(migratorPrivateConfigPath))
-{
-    using var migratorFile = System.Text.Json.JsonDocument.Parse(File.ReadAllText(migratorPrivateConfigPath));
-    if (migratorFile.RootElement.TryGetProperty("Database", out var migratorSection))
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Database:MigratorUser"] = migratorSection.TryGetProperty("User", out var migratorUser) ? migratorUser.GetString() : null,
-            ["Database:MigratorPassword"] = migratorSection.TryGetProperty("Password", out var migratorPassword) ? migratorPassword.GetString() : null
-        });
-}
-// Backup account (blazorstoc_backup: SELECT, SHOW VIEW, TRIGGER, LOCK TABLES on the BlazorStoc schema, used only by
-// mariadb-dump). Same shape and lookup as the migrator file; mapped to Database:BackupUser / Database:BackupPassword
-// so it never replaces the application account. Optional: without it the dump runs as the application account.
-var backupPrivateConfigPath = builder.Configuration["Database:BackupPrivateConfigPath"] is { Length: > 0 } configuredBackupPath
-    ? configuredBackupPath
-    : new[]
-        {
-            Path.Combine(Path.GetDirectoryName(mariaPrivateConfigPath) ?? "", "backup-account.private.json"),
-            Path.Combine(builder.Environment.ContentRootPath, "local-secrets", "backup-account.private.json")
-        }.FirstOrDefault(File.Exists);
-if (backupPrivateConfigPath is not null && File.Exists(backupPrivateConfigPath))
-{
-    using var backupFile = System.Text.Json.JsonDocument.Parse(File.ReadAllText(backupPrivateConfigPath));
-    if (backupFile.RootElement.TryGetProperty("Database", out var backupSection))
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Database:BackupUser"] = backupSection.TryGetProperty("User", out var backupUser) ? backupUser.GetString() : null,
-            ["Database:BackupPassword"] = backupSection.TryGetProperty("Password", out var backupPassword) ? backupPassword.GetString() : null
-        });
-}
-// Restore account (blazorstoc_restore: schema swap for the database restoration). Same lookup, mapped to
-// Database:RestoreUser / Database:RestorePassword; without it the real restoration stops before changing anything.
-var restorePrivateConfigPath = builder.Configuration["Database:RestorePrivateConfigPath"] is { Length: > 0 } configuredRestorePath
-    ? configuredRestorePath
-    : new[]
-        {
-            Path.Combine(Path.GetDirectoryName(mariaPrivateConfigPath) ?? "", "restore-account.private.json"),
-            Path.Combine(builder.Environment.ContentRootPath, "local-secrets", "restore-account.private.json")
-        }.FirstOrDefault(File.Exists);
-if (restorePrivateConfigPath is not null && File.Exists(restorePrivateConfigPath))
-{
-    using var restoreFile = System.Text.Json.JsonDocument.Parse(File.ReadAllText(restorePrivateConfigPath));
-    if (restoreFile.RootElement.TryGetProperty("Database", out var restoreSection))
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Database:RestoreUser"] = restoreSection.TryGetProperty("User", out var restoreUser) ? restoreUser.GetString() : null,
-            ["Database:RestorePassword"] = restoreSection.TryGetProperty("Password", out var restorePassword) ? restorePassword.GetString() : null
-        });
-}
+// The passwords of the MariaDB accounts come from private files outside the repository (see Startup/PrivateConfiguration).
+// What the administrator saved in Setari -> Baza de date (an override file outside the repository) is read last and wins; the worker processes use the same order.
+builder.AddEffectiveConfiguration();
+var appHosting = AppHosting.Resolve(builder.Configuration, AppHosting.CanBind);
+if (appHosting.AppliedUrls is not null) builder.WebHost.UseUrls(appHosting.AppliedUrls);
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(options => options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
 builder.AddFileLogging();
 if (string.IsNullOrWhiteSpace(builder.Configuration["Database:Password"]) ||
     (builder.Configuration["Authentication:Password"]?.Length ?? 0) < 12)
     throw new InvalidOperationException("Configurați Database__Password și Authentication__Password (minimum 12 caractere) pentru conexiunea MariaDB.");
-builder.Services.AddSingleton<MariaSchemaMigrator>();
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-builder.Services.AddRazorPages();
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(options =>
-{
-    options.LoginPath = "/Account/Login";
-    options.Cookie.Name = "BlazorStoc.Session";
-    options.Cookie.HttpOnly = true;
-    options.Cookie.SameSite = SameSiteMode.Lax;
-    options.ExpireTimeSpan = TimeSpan.FromHours(8);
-    options.SlidingExpiration = false;
-});
-builder.Services.AddAuthorization(options =>
-{
-    options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
-});
-builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddScoped<IAccessControl, CurrentUserAccess>();
-builder.Services.AddHttpClient(AnafService.ClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-builder.Services.AddSingleton<AnafStore>();
-builder.Services.AddScoped<IAnafService, AnafService>();
-builder.Services.AddScoped<IArchiveService, ArchiveService>();
-builder.Services.AddSingleton<IAuditTrail, MariaAuditTrail>();
-// An explicit App:DataProtectionPath always wins; otherwise the dedicated local asset directory from the handoff document.
-var keysPath = builder.Configuration["App:DataProtectionPath"]
-    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlazorStoc-MariaDB", "assets", "data-protection-keys");
-Directory.CreateDirectory(keysPath);
-builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(keysPath)).SetApplicationName("BlazorStoc");
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = 429;
-    options.OnRejected = async (context, token) =>
-    {
-        context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
-        await context.HttpContext.Response.WriteAsync("Prea multe încercări. Așteaptă un minut și încearcă din nou.", token);
-    };
-    options.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(
-        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
-});
-builder.Services.AddScoped<IUserRepository>(services => new MariaUserRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
-builder.Services.AddScoped<IUserAuthenticator>(services => (IUserAuthenticator)services.GetRequiredService<IUserRepository>());
-builder.Services.AddScoped<IProductRepository>(services => new MariaProductRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
-        services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>(),
-        services.GetRequiredService<IProductImageStore>()));
-builder.Services.AddScoped<IProductParameterRepository>(services => new MariaProductParameterRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IStockMovementRepository>(services => new MariaStockMovementRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
-        services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
-builder.Services.AddScoped<IWorkPointRepository>(services => new MariaWorkPointRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IServicePhotoStore>(services => new MariaServicePhotoStore(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IServiceContractRepository>(services => new MariaServiceContractRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IServiceInterventionRepository>(services => new MariaServiceInterventionRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), timeProvider: services.GetRequiredService<TimeProvider>()));
-builder.Services.AddScoped<IBeneficiaryRepository>(services => new MariaBeneficiaryRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
-builder.Services.AddScoped<ISupplierRepository>(services => new CachedSupplierRepository(new MariaSupplierRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IInvoiceTemplateService>())));
-builder.Services.AddScoped<ISupplierProductCodes>(services => new MariaSupplierProductCodes(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<ISupplierRecognitionLog>(services => new MariaSupplierRecognitionLog(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>()));
-builder.Services.AddScoped<ISupplierInvoiceRepository>(services => new MariaSupplierInvoiceRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<IExpiryNotificationRepository>(services => new MariaExpiryNotificationRepository(services.GetRequiredService<IConfiguration>()));
-builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Itp, ExpirySourceKeys.VehicleItp, "ITP"));
-builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Insurance, ExpirySourceKeys.VehicleInsurance, "Asigurare"));
-builder.Services.AddScoped<IExpirySource>(services => new VehicleExpirySource(services.GetRequiredService<IVehicleRepository>(), VehicleExpiryKind.Rovinieta, ExpirySourceKeys.VehicleRovinieta, "Rovinietă"));
-builder.Services.Configure<MapOptions>(builder.Configuration.GetSection(MapOptions.SectionName));
-builder.Services.AddSingleton<MapConfigStore>();
-builder.Services.AddScoped<IMapConfigurationService, MapConfigurationService>();
-builder.Services.AddScoped<IMaintenanceNotificationReader, MariaMaintenanceNotificationReader>();
-builder.Services.AddScoped<IExpirySource>(services => new MaintenanceDueSource(services.GetRequiredService<IMaintenanceNotificationReader>()));
-builder.Services.AddScoped<IExpirySource>(services => new ContractExpirySource(services.GetRequiredService<IMaintenanceNotificationReader>()));
-builder.Services.AddScoped<IAwaitedEntryReader>(services => new MariaAwaitedEntryReader(services.GetRequiredService<IConfiguration>()));
-builder.Services.AddScoped<IExpirySource>(services => new AwaitedInvoiceSource(services.GetRequiredService<IAwaitedEntryReader>()));
-builder.Services.AddSingleton<IConsumptionNotePdfWriter, ConsumptionNotePdfWriter>();
-builder.Services.AddSingleton<IProjectSituationPdfWriter, ProjectSituationPdfWriter>();
-builder.Services.AddScoped<IReservationRepository>(services => new MariaReservationRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IProductPlacementReader>(services => new MariaProductPlacementReader(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>()));
-builder.Services.AddScoped<IVehicleTargetRepository>(services => new MariaVehicleTargetRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IProjectSituationReader>(services => new MariaProjectSituationReader(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IProjectRepository>(),
-    services.GetRequiredService<IProjectComponentRepository>(), services.GetRequiredService<IOfferRepository>(), services.GetRequiredService<IStockMovementRepository>(),
-    services.GetRequiredService<IProductRepository>(), services.GetRequiredService<IReservationRepository>(), services.GetRequiredService<IAccessControl>()));
-builder.Services.AddScoped<IOfferRepository>(services => new MariaOfferRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IProjectRepository>(),
-    services.GetRequiredService<IProjectComponentRepository>(), services.GetRequiredService<IBeneficiaryRepository>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IOfferTemplateRepository>(services => new MariaOfferTemplateRepository(services.GetRequiredService<IConfiguration>(),
-    services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IProjectComponentRepository>(services => new MariaProjectComponentRepository(services.GetRequiredService<IConfiguration>(),
-    services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IStockMovementRepository>()));
-builder.Services.AddScoped<ISystemTypeRepository>(services => new MariaSystemTypeRepository(services.GetRequiredService<IConfiguration>(),
-    services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IOverStockReader>(services => new MariaOverStockReader(services.GetRequiredService<IConfiguration>()));
-builder.Services.AddScoped<IExpirySource>(services => new OverStockSource(services.GetRequiredService<IOverStockReader>()));
-builder.Services.AddScoped<IProductMinStockRepository>(services => new MariaProductMinStockRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IProjectDeadlineRepository>(services => new MariaProjectDeadlineRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IConsumptionReader>(services => new MariaConsumptionReader(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>()));
-builder.Services.AddScoped<IStockAlertReader>(services => new MariaStockAlertReader(services.GetRequiredService<IConfiguration>()));
-builder.Services.AddScoped<IExpirySource>(services => new MinStockSource(services.GetRequiredService<IStockAlertReader>()));
-builder.Services.AddScoped<IExpirySource>(services => new StaleReservationSource(services.GetRequiredService<IStockAlertReader>()));
-builder.Services.AddScoped<IExpirySource>(services => new ProjectDeficitSource(services.GetRequiredService<IStockAlertReader>(), services.GetRequiredService<IProjectSituationReader>()));
-builder.Services.AddScoped<IBackupAlertReader>(services => new MariaBackupAlertReader(services.GetRequiredService<IConfiguration>()));
-builder.Services.AddScoped<IExpirySource>(services => new BackupMissingSource(services.GetRequiredService<IBackupAlertReader>()));
-builder.Services.AddScoped<IExpirySource>(services => new NasCopyMissingSource(services.GetRequiredService<IBackupAlertReader>()));
-builder.Services.AddScoped<IExpirySource>(services => new ClockSkewSource(services.GetRequiredService<IBackupAlertReader>()));
-builder.Services.AddScoped<IExpiryNotificationService, ExpiryNotificationService>();
-builder.Services.AddScoped<IInventoryReportBuilder, InventoryReportBuilder>();
-builder.Services.AddSingleton<IInventoryPdfWriter, InventoryPdfWriter>();
-builder.Services.AddSingleton<IWebHostEnvironmentTessdataPath, TessdataPath>();
-builder.Services.AddSingleton<IInventoryPickupOcrService, InventoryPickupOcrService>();
-builder.Services.AddSingleton<IInvoicePdfReader, InvoicePdfReader>();
-builder.Services.AddSingleton<IInvoiceAnalysisStore, InvoiceAnalysisStore>();
-builder.Services.AddScoped<IInvoiceAnalysisService, InvoiceAnalysisService>();
-builder.Services.AddSingleton<InvoiceLabSettings>();
-builder.Services.AddScoped<IInvoiceTemplateStore>(services => new MariaInvoiceTemplateStore(services.GetRequiredService<IConfiguration>()));
-builder.Services.AddScoped<IInvoiceTemplateService, InvoiceTemplateService>();
-builder.Services.AddScoped<IInventoryPickupBuilder, InventoryPickupBuilder>();
-builder.Services.AddScoped<IInventoryPickupApplier, InventoryPickupApplier>();
-// One shared lock file in the MariaDB backup directory; singleton because the lock and its heartbeat must be the same instance across the whole app, not
-// re-created per request.
-var operationLockPath = Path.Combine( MariaAssetPaths.DatabaseBackups(builder.Configuration), "operation.lock.json");
-builder.Services.AddSingleton<IOperationLockService>(services => new FileOperationLockService(operationLockPath,
-    services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<FileOperationLockService>>()));
-// While that lock is held, every session but the one holding it is refused at the data-access layer and redirected to
-// the waiting page (MaintenanceGate, MaintenanceSupport).
-MaintenanceGate.Configure(operationLockPath);
-builder.Services.AddScoped<IDatabaseBackupService>(services => new NasCopyingBackupService(new MariaDatabaseBackupService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
-        services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<IAuditTrail>(),
-        services.GetRequiredService<ILogger<MariaDatabaseBackupService>>()),
-    services.GetRequiredService<INasBackupCopier>(), services.GetRequiredService<ILogger<NasCopyingBackupService>>()));
-// Backup NAS: a package made by the application is copied to the share afterwards; settings and copier for the Settings tab; the daily backup.
-builder.Services.AddScoped<INasBackupSettingsRepository>(services => new MariaNasBackupStore(services.GetRequiredService<IConfiguration>(),
-    services.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<IBackupSettingsRepository>(services => new MariaBackupSettingsStore(services.GetRequiredService<IConfiguration>(),
-    services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()));
-builder.Services.AddScoped<INasBackupCopier>(services => new NasBackupCopier(services.GetRequiredService<IConfiguration>(),
-    services.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(),
-    services.GetRequiredService<ILogger<NasBackupCopier>>()));
-builder.Services.AddScoped<IBackupRetentionService>(services => new BackupRetentionService(services.GetRequiredService<IConfiguration>(),
-    services.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(),
-    services.GetRequiredService<INasBackupCopier>(), services.GetRequiredService<ILogger<BackupRetentionService>>()));
-builder.Services.AddHostedService(services => new BackupScheduler(services.GetRequiredService<IConfiguration>(),
-    services.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(), services.GetRequiredService<IOperationLockService>(),
-    services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILoggerFactory>()));
-// Subtask 3.3/3.4 (Task 3): shares the same lock and backup service as above (the pre-restore snapshot in Pas 0
-// goes through IDatabaseBackupService.CreateBackupAsync, passing the restore's own already-held lock handle).
-builder.Services.AddScoped<IDatabaseRestoreService>(services => new MariaDatabaseRestoreService(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(),
-        services.GetRequiredService<IOperationLockService>(), services.GetRequiredService<IDatabaseBackupService>(),
-        services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<ILogger<MariaDatabaseRestoreService>>()));
-builder.Services.AddScoped<IVehicleRepository>(services => new MariaVehicleRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(), services.GetRequiredService<IArchiveService>()));
-builder.Services.AddSingleton<IProductImageStore>(services => new FileProductImageStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>()));
-builder.Services.AddSingleton<InProcessChangeFeed>();
-builder.Services.AddSingleton<IChangeFeed>(services => services.GetRequiredService<InProcessChangeFeed>());
-builder.Services.AddSingleton<IChangeEventSource>(services => new MariaChangeEventSource(services.GetRequiredService<IConfiguration>()));
-builder.Services.AddHostedService(services => new ChangeEventRelay(services.GetRequiredService<IChangeEventSource>(),
-    services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ILogger<ChangeEventRelay>>(),
-    services.GetRequiredService<IConfiguration>()));
-builder.Services.AddSignalR();
-builder.Services.AddHostedService<SignalRChangeBroadcaster>();
-builder.Services.AddScoped<ChangeOrigin>();
-builder.Services.AddScoped<UnsavedChanges>();
-builder.Services.AddScoped<ExitFormDraft>();
-builder.Services.AddScoped<ListNavigationContext>();
-builder.Services.AddScoped<IProductLockRepository>(services => new ChangeNotifyingProductLockRepository( new MariaProductLockRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>()),
-    services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
-builder.Services.AddScoped<IProjectFileStore>(services => new ChangeNotifyingProjectFileStore( new MariaProjectFileStore(services.GetRequiredService<IWebHostEnvironment>(), services.GetRequiredService<IConfiguration>(),
-        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IAuditTrail>()),
-    services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
-builder.Services.AddScoped<IProjectRepository>(services => new ChangeNotifyingProjectRepository( new MariaProjectRepository(services.GetRequiredService<IConfiguration>(), services.GetRequiredService<IWebHostEnvironment>(),
-        services.GetRequiredService<IAccessControl>(), services.GetRequiredService<IAuditTrail>(),
-        services.GetRequiredService<IArchiveService>(), services.GetRequiredService<IProjectFileStore>()),
-    services.GetRequiredService<IChangeFeed>(), services.GetRequiredService<ChangeOrigin>()));
+var modules = new BlazorStoc.Modules.ModuleRegistry();
+builder.Services
+    .AddWebAndSecurity(builder.Configuration)
+    .AddCoreServices()
+    .AddModules(builder.Configuration, modules)
+    .AddUserServices()
+    .AddStockServices()
+    .AddProjectServices()
+    .AddMaintenanceServices(builder.Configuration)
+    .AddNotificationServices(modules)
+    .AddBackupServices(builder.Configuration)
+    .AddDatabaseSettings(appHosting)
+    .AddChangeTracking()
+    .AddHostResilience()
+    .AddRunTracking(builder.Configuration);
 var app = builder.Build();
+modules.AttachLogger(app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("BlazorStoc.Modules"));
+// The changes of state of the modules go to the journal of activity (the modules out since startup are announced now, nobody listened before).
+app.Services.GetRequiredService<BlazorStoc.Startup.ModuleJournal>().Start();
+if (BlazorStoc.Startup.AppDataRoot.UsesLegacyFolder(app.Configuration))
+    app.Logger.LogWarning("The data are still in the per-user folder {Legacy}; run tools\\migrate-data-root.ps1 to move them to {Machine} (the same folder for every user and for the Windows service).",
+        BlazorStoc.Startup.AppDataRoot.LegacyUserFolder, BlazorStoc.Startup.AppDataRoot.MachineFolder);
 // A database that does not answer at startup does not stop the application: /health reports 503 and the pages show their own error until it is back.
 // A database that answers but lacks the expected tables is still fatal (InvalidOperationException).
 try { await MariaArchiveSchema.InitializeAsync(app.Configuration); }
-catch (MySqlConnector.MySqlException exception) { app.Logger.LogError("MariaDB did not answer at startup ({ErrorType}); the application starts without it.", exception.GetType().Name); }
-// Each notification event without a template gets its starting template once (see DefaultNotificationTemplates).
+// A backup/restore in progress (also the lock a killed process left behind, until its lease of two minutes runs out) is the same: the application starts and the
+// pages show the waiting page; stopping here would put a supervisor in a restart loop.
+catch (Exception exception) when (exception is MySqlConnector.MySqlException or MaintenanceInProgressException)
+{ app.Logger.LogError("MariaDB did not answer at startup or a backup/restore holds it ({ErrorType}); the application starts without it.", exception.GetType().Name); }
+// Each notification event without a template gets its starting template once (see DefaultNotificationTemplates), while the notifications module works.
+if (app.Services.GetRequiredService<BlazorStoc.Modules.ModuleRegistry>().IsAvailable(BlazorStoc.Modules.Notifications.NotificationsModule.ModuleId))
 try
 {
     using var seedScope = app.Services.CreateScope();
@@ -270,7 +63,7 @@ try
         seedScope.ServiceProvider.GetServices<IExpirySource>(), seedScope.ServiceProvider.GetService<IAuditTrail>(), app.Logger);
     if (made > 0) app.Logger.LogInformation("{Count} default notification templates were created.", made);
 }
-catch (Exception exception) when (exception is MySqlConnector.MySqlException or InvalidOperationException)
+catch (Exception exception) when (exception is MySqlConnector.MySqlException or InvalidOperationException or MaintenanceInProgressException)
 { app.Logger.LogWarning("The default notification templates were not created ({ErrorType}).", exception.GetType().Name); }
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/Error", createScopeForErrors: true);
 // Romanian culture for every request and circuit: framework texts and number formats follow it (Task 1).
@@ -298,10 +91,8 @@ app.UseStatusCodePages(async context =>
 app.UseStaticFiles();
 app.UseRouting();
 app.UseRateLimiter();
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseAntiforgery();
-// A page navigation made while a backup/restore is running goes to the waiting page instead of a half-loaded page.
+// A page navigation made while a backup/restore is running goes to the waiting page instead of a half-loaded page. It must come BEFORE the
+// authorization: the permission policies read the user's permissions from the database, which throws while the operation lock is held (500 instead of the page).
 app.Use(async (context, next) =>
 {
     if (MaintenanceSupport.ShouldRedirect(context.Request, MaintenanceGate.Active))
@@ -311,17 +102,36 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseDefaultPasswordGate();
+app.UseAntiforgery();
 app.MapStaticAssets().AllowAnonymous();
+app.MapHelp();
+app.MapSessionPing();
 app.MapGet("/api/furnizori/recunoastere.csv", async (ISupplierRecognitionLog log, CancellationToken token) =>
-    Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await log.ExportCsvAsync(token))).ToArray(), "text/csv; charset=utf-8", "recunoastere-furnizori.csv")).RequireAuthorization();
+{
+    // While the suppliers module is out the log cannot be read: a clear 503, not an error page.
+    try { return Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(await log.ExportCsvAsync(token))).ToArray(), "text/csv; charset=utf-8", "recunoastere-furnizori.csv"); }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+}).RequireAuthorization(PermissionPolicy.For("furnizori.view"));
+// The state of every module (no details: the reasons are in the log). For logged-in users and the supervisor of the modules.
+app.MapGet("/health/modules", (BlazorStoc.Modules.ModuleRegistry registry) =>
+{
+    var all = registry.Snapshot();
+    return Results.Json(new
+    {
+        status = all.All(item => item.Status == BlazorStoc.Modules.ModuleStatus.Healthy) ? "healthy" : "degraded",
+        modules = all.Select(item => new { id = item.Id, name = item.Name, version = item.Version, status = item.Status.ToString().ToLowerInvariant() })
+    });
+}).RequireAuthorization();
 app.MapGet("/health/live", () => Results.Text("healthy")).AllowAnonymous();
 // For monitoring and the supervisor: 200 when the process and the database answer, 503 when the database does not (no details are given).
 app.MapGet("/health", async (IConfiguration configuration, CancellationToken token) =>
 {
     try
     {
-        await using var connection = DatabaseConnections.Create(configuration);
-        await connection.OpenAsync(token);
+        await using var connection = await MariaDb.OpenAsync(configuration, token);
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT 1";
         await command.ExecuteScalarAsync(token);
@@ -341,7 +151,7 @@ app.MapGet("/api/iesiri/{operationId:int}/bon.pdf", async (int operationId, ISto
         return operation is null ? Results.NotFound() : Results.File(writer.Write(operation, DateTime.Now), "application/pdf");
     }
     catch (AccessDeniedException) { return Results.Forbid(); }
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
 // Situatia proiectului: PDF and CSV exports (the same calculation as the page).
 app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, string? pana, IConsumptionReader reader, CancellationToken token) =>
 {
@@ -351,14 +161,16 @@ app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, 
         var csv = ConsumptionExportRules.ToCsv(query, await reader.GetAsync(query, token));
         return Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(csv)).ToArray(), "text/csv; charset=utf-8", "consum.csv");
     }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (AccessDeniedException) { return Results.Forbid(); }
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("export-consum.export"));
 app.MapGet("/api/proiecte/{projectId:int}/situatie.pdf", async (int projectId, IProjectSituationReader reader, IProjectSituationPdfWriter writer, CancellationToken token) =>
 {
     try { return Results.File(writer.Write(await reader.GetAsync(projectId, token), DateTime.Now), "application/pdf"); }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (OfferException) { return Results.NotFound(); }
     catch (AccessDeniedException) { return Results.Forbid(); }
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("beneficiari.export"));
 app.MapGet("/api/proiecte/{projectId:int}/situatie.csv", async (int projectId, IProjectSituationReader reader, CancellationToken token) =>
 {
     try
@@ -367,9 +179,10 @@ app.MapGet("/api/proiecte/{projectId:int}/situatie.csv", async (int projectId, I
         var bytes = System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(ProjectSituationRules.ToCsv(situation))).ToArray();
         return Results.File(bytes, "text/csv; charset=utf-8", $"situatie-proiect-{projectId}.csv");
     }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
     catch (OfferException) { return Results.NotFound(); }
     catch (AccessDeniedException) { return Results.Forbid(); }
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("beneficiari.export"));
 app.MapGet("/api/maintenance", (HttpContext context) =>
 {
     context.Response.Headers.CacheControl = "no-store";
@@ -394,28 +207,31 @@ app.MapGet("/media/products/{productId:int}", async (int productId, IProductImag
     return image is null
         ? Results.Redirect(ProductImageRules.PlaceholderUrl)
         : Results.File(image.Content, image.ContentType, enableRangeProcessing: true);
-}).RequireAuthorization();
-app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IProjectFileStore files, CancellationToken token) =>
+}).RequireAuthorization(PermissionPolicy.For("stoc.view"));
+app.MapGet("/media/project-files/{fileId:int}", async (int fileId, IObservationFiles files, CancellationToken token) =>
 {
-    var file = await files.GetContentAsync(fileId, token);
-    return file is null
-        ? Results.NotFound()
-        : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
-}).RequireAuthorization();
+    try
+    {
+        var file = await files.GetContentAsync(fileId, token);
+        return file is null
+            ? Results.NotFound()
+            : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
+    }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+}).RequireAuthorization(PermissionPolicy.For("beneficiari.view"));
 // A page picture of the invoice under analysis (Settings -> Facturi): kept in memory, served only to the administrator who uploaded the file.
 app.MapGet("/media/invoice-analysis/{id:guid}/{page:int}", (Guid id, int page, HttpContext context, IInvoiceAnalysisStore store) =>
 {
-    if (!context.User.IsInRole(AccessRoles.Administrator) && !context.User.IsInRole(AccessRoles.LimitedUser)) return Results.Forbid();
     var session = store.Get(id, context.User.Identity?.Name ?? "necunoscut");
     if (session is null || page < 1 || page > session.Previews.Count) return Results.NotFound();
     context.Response.Headers.CacheControl = "no-store";
     return Results.File(session.Previews[page - 1], "image/png");
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("preluare-factura.view", "setari-facturi.view"));
 app.MapGet("/media/service-photos/{photoId:int}", async (int photoId, IServicePhotoStore photos, CancellationToken token) =>
 {
     var photo = await photos.GetContentAsync(photoId, token);
     return photo is null ? Results.NotFound() : Results.File(photo.Content, photo.ContentType, photo.OriginalName, enableRangeProcessing: true);
-}).RequireAuthorization();
+}).RequireAuthorization(PermissionPolicy.For("mentenanta.view"));
 app.MapHub<ChangesHub>(ChangesHub.Path);
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
@@ -435,6 +251,7 @@ var migrateOnly = args.Contains("--migrate-schema");
         {
             await MariaBackupSettingsStore.CopyFromNasSettingsAsync(app.Configuration);
             // The main work point of the beneficiaries that existed before migration 7 (idempotent: creates only what is missing).
+            await UserTypeSeeder.EnsureAsync(app.Configuration);
             var backfill = await WorkPointBackfill.EnsurePrimariesAsync(app.Configuration);
             if (backfill.Created + backfill.Promoted > 0 || backfill.EmptyAddress > 0)
                 app.Logger.LogInformation("Main work points: {Created} created, {Promoted} promoted from an additional point, {Empty} beneficiary(ies) without an address.", backfill.Created, backfill.Promoted, backfill.EmptyAddress);

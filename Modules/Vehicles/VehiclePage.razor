@@ -1,0 +1,186 @@
+﻿@page "/vehicule/{Id:int}"
+@namespace BlazorStoc.Components.Pages
+@attribute [Authorize(Policy = "perm:vehicule.view")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Services
+@inject IAccessControl Access
+@inject IVehicleRepository Repository
+@inject NavigationManager Navigation
+@inject IChangeFeed ChangeFeed
+@inject ChangeOrigin Origin
+@inject ILogger<VehiclePage> Logger
+@implements IDisposable
+<PageBoundary>
+
+<PageTitle>@(vehicle?.PlateNumber ?? "Vehicul") · BlazorStoc</PageTitle>
+<UnsavedChangesHost />
+
+@if (loading)
+{
+    <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă vehiculul</h3></div>
+}
+else if (error is not null)
+{
+    <a class="nav-back" href="/vehicule"><span>←</span> Vehicule</a>
+    <div class="error-banner" role="alert">@error <button class="primary" @onclick="LoadAsync">Reîncearcă</button></div>
+}
+else if (vehicle is not null)
+{
+    <a class="nav-back" href="/vehicule"><span>←</span> Vehicule</a>
+    <div class="page-heading">
+        <div><p class="eyebrow">VEHICUL</p><h1>@vehicle.PlateNumber</h1><p class="muted">@vehicle.Description</p></div>
+        <div class="heading-actions">
+            <button class="primary" disabled="@editing" @onclick="OpenEdit">Editează</button>
+            <button class="danger" disabled="@editing" @onclick="RequestDelete">Șterge vehiculul</button>
+        </div>
+    </div>
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
+
+    @if (editing)
+    {
+        <VehicleEditor @key="editorKey" Original="vehicle" Saved="VehicleSavedAsync" Closed="CloseEditor" />
+    }
+
+    <section class="catalog settings-panel">
+        <VehicleTabs VehicleId="Id" Active="@VehicleTabs.InfoTab" />
+        <div role="tabpanel" aria-labelledby="vehicle-tab-info" class="vehicle-info">
+            <div class="table-scroll"><table><thead><tr><th>INFORMAȚIE</th><th>VALOARE</th><th>STARE</th></tr></thead><tbody>
+                <tr><td>Număr de înmatriculare</td><td><span class="role-badge limited">@vehicle.PlateNumber</span></td><td></td></tr>
+                <tr><td>Descriere</td><td><strong>@vehicle.Description</strong></td><td></td></tr>
+                @foreach (var (field, date) in Expiries(vehicle))
+                {
+                    <tr><td>@field.Label</td><td><strong>@VehicleRules.DisplayExpiry(date)</strong> @if (permEdit) { <button class="row-icon edit" aria-label="Modifică @field.Label.ToLowerInvariant()" disabled="@(editing || editingExpiry is not null)" @onclick="() => editingExpiry = field" title="Modifică @field.Label.ToLowerInvariant()"></button> }</td><td>@ExpiryBadge(date)</td></tr>
+                }
+            </tbody></table></div>
+        </div>
+    </section>
+}
+
+@if (editingExpiry is not null && vehicle is not null)
+{
+    <VehicleExpiryDialog @key="editingExpiry.Kind" Vehicle="vehicle" Field="editingExpiry" Saved="ExpirySavedAsync" Cancelled="CloseExpiryDialog" />
+}
+
+@if (deleting && vehicle is not null)
+{
+    <DeleteConfirmationDialog Title="Ștergi vehiculul?" Subject="Vehiculul"
+                              ObjectLabel="@($"{vehicle.PlateNumber} · {vehicle.Description}")"
+                              Description="Vehiculele care au mișcări de stoc asociate nu pot fi șterse."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteVehicleAsync"
+                              Cancelled="CancelDelete" />
+}
+
+</PageBoundary>
+
+@code {
+    private bool permAdd, permEdit, permDelete;
+    private async Task LoadPermissionsAsync()
+    {
+        permAdd = await Access.HasAsync("vehicule.add");
+        permEdit = await Access.HasAsync("vehicule.edit");
+        permDelete = await Access.HasAsync("vehicule.delete");
+    }
+    [Parameter] public int Id { get; set; }
+    private Vehicle? vehicle;
+    private bool loading = true, editing, deleting, deleteBusy;
+    private string? error, notice, deleteError;
+    private Guid editorKey;
+    private LiveRefresh? live;
+    private readonly CancellationTokenSource lifetime = new();
+
+    private VehicleExpiryField? editingExpiry;
+
+    private static IEnumerable<(VehicleExpiryField Field, DateOnly? Date)> Expiries(Vehicle value) =>
+    [
+        (new(VehicleExpiryKind.Itp, "Data expirare ITP"), value.ItpExpiry),
+        (new(VehicleExpiryKind.Insurance, "Data expirare asigurare"), value.InsuranceExpiry),
+        (new(VehicleExpiryKind.Rovinieta, "Data expirare rovinietă"), value.RovinietaExpiry)
+    ];
+
+    private Task CloseExpiryDialog() { editingExpiry = null; return Task.CompletedTask; }
+    private Task ExpirySavedAsync(Vehicle updated) { vehicle = updated; editingExpiry = null; notice = "Data de expirare a fost actualizată."; return Task.CompletedTask; }
+
+    // Expired dates and dates within a month are flagged; the check uses the server's local day.
+    private static RenderFragment ExpiryBadge(DateOnly? date) => builder =>
+    {
+        if (date is not { } value) return;
+        var days = value.DayNumber - DateOnly.FromDateTime(DateTime.Now).DayNumber;
+        var (css, text) = days < 0 ? ("negative", "Expirat") : days <= 30 ? ("zero", days == 0 ? "Expiră astăzi" : $"Expiră în {days} zile") : ("positive", "Valabil");
+        builder.OpenElement(0, "span"); builder.AddAttribute(1, "class", "stock-badge " + css); builder.AddContent(2, text); builder.CloseElement();
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPermissionsAsync();
+        // Vehicle changes have no change events; the periodic fallback keeps the page current.
+        // An open form or dialog is never replaced.
+        live = new LiveRefresh(ChangeFeed, Origin.Id, change => change.EntityType == AuditEntities.Vehicle,
+            () => InvokeAsync(async () => { if (!loading) { await RefreshAsync(); StateHasChanged(); } }),
+            () => editing || deleting || editingExpiry is not null, () => InvokeAsync(StateHasChanged), fallbackInterval: TimeSpan.FromSeconds(15));
+        await LoadAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (vehicle is not null && vehicle.Id != Id) await LoadAsync();
+    }
+
+    private Task ReloadLiveAsync() => live?.ReloadPendingAsync() ?? Task.CompletedTask;
+
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try
+        {
+            vehicle = await Repository.GetAsync(Id, lifetime.Token);
+            if (vehicle is null) { error = "Vehiculul solicitat nu mai există."; return; }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Vehicle page loading failed ({ErrorType}).", exception.GetType().Name); error = "Vehiculul nu a putut fi încărcat."; }
+        finally { loading = false; }
+    }
+
+    // A quiet refresh keeps the page on screen; a vehicle removed by another session is reported instead.
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            var current = await Repository.GetAsync(Id, lifetime.Token);
+            if (current is null) { vehicle = null; error = "Vehiculul solicitat nu mai există."; return; }
+            vehicle = current;
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { Logger.LogWarning("Vehicle refresh failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private void OpenEdit() { editing = true; editorKey = Guid.NewGuid(); notice = null; }
+    private Task CloseEditor() { editing = false; return Task.CompletedTask; }
+    private Task VehicleSavedAsync(Vehicle updated) { vehicle = updated; editing = false; notice = "Vehiculul a fost actualizat."; return Task.CompletedTask; }
+    private void RequestDelete() { deleting = true; deleteError = null; notice = null; }
+    private Task CancelDelete() { deleting = false; deleteError = null; return Task.CompletedTask; }
+
+    private async Task DeleteVehicleAsync(string reason)
+    {
+        if (deleteBusy || vehicle is null) return;
+        deleteBusy = true; deleteError = null;
+        try
+        {
+            await Repository.DeleteAsync(vehicle, reason, lifetime.Token);
+            Navigation.NavigateTo("/vehicule");
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (VehicleOperationException exception) { deleteError = exception.Message; }
+        catch (AccessDeniedException exception) { deleteError = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Vehicle deletion failed ({ErrorType}).", exception.GetType().Name);
+            deleteError = "Vehiculul nu a putut fi șters. Actualizează pagina și reîncearcă.";
+        }
+        finally { deleteBusy = false; }
+    }
+
+    public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -1,5 +1,5 @@
-@page "/utilizatori"
-@attribute [Authorize(Roles = AccessRoles.Administrator)]
+﻿@page "/utilizatori"
+@attribute [Authorize(Policy = "perm:utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject UnsavedChanges Guard
@@ -14,8 +14,8 @@
 
 <PageTitle>Utilizatori · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<div class="page-heading"><div><p class="eyebrow">ADMINISTRARE ACCES</p><h1>Utilizatori</h1><p class="muted">Gestionează persoanele care se pot autentifica și nivelul lor de acces.</p></div>@if (authorized) { <div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă utilizator</button></div> }</div>
-@if (!authorized && !loading) { <div class="error-banner" role="alert">Nu ai drepturi de administrator. Conturile cu acces limitat pot consulta numai catalogul.</div> }
+<div class="page-heading"><div><p class="eyebrow">ADMINISTRARE ACCES</p><h1>Utilizatori</h1><p class="muted">Gestionează persoanele care se pot autentifica și tipul lor de utilizator (drepturile se definesc în Setări → Tipuri de utilizatori).</p></div>@if (authorized && canAdd) { <div class="heading-actions"><button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă utilizator</button></div> }</div>
+@if (!authorized && !loading) { <div class="error-banner" role="alert">Nu ai dreptul să vezi utilizatorii.</div> }
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
@@ -26,7 +26,7 @@
     <section class="metrics users-metrics" aria-label="Rezumat utilizatori">
         <article><span>Total utilizatori</span><strong>@(loaded ? users.Count.ToString() : "—")</strong><small>Conturi configurate</small><i>♙</i></article>
         <article><span>Administratori activi</span><strong>@(loaded ? users.Count(user => user.IsActive && user.Role == AccessRoles.Administrator).ToString() : "—")</strong><small>Acces complet</small><i>◆</i></article>
-        <article><span>Utilizatori</span><strong>@(loaded ? users.Count(user => user.Role == AccessRoles.LimitedUser).ToString() : "—")</strong><small>Gestiune produse</small><i>◇</i></article>
+        <article><span>Utilizatori</span><strong>@(loaded ? users.Count(user => user.Role == AccessRoles.LimitedUser).ToString() : "—")</strong><small>Alte tipuri decât Administrator</small><i>◇</i></article>
         <article><span>Conturi inactive</span><strong>@(loaded ? users.Count(user => !user.IsActive).ToString() : "—")</strong><small>Autentificare blocată</small><i class="amber">○</i></article>
     </section>
     <section class="catalog">
@@ -35,10 +35,10 @@
         else if (users.Count == 0) { <div class="empty-state"><span class="empty-icon">♙</span><h3>Nu există utilizatori web</h3><p>Adaugă primul cont. Administratorul configurat în mediu poate fi folosit pentru inițializare.</p></div> }
         else
         {
-            <div class="table-scroll"><table><thead><tr><th>UTILIZATOR</th><th>NUME AFIȘAT</th><th>NIVEL ACCES</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+            <div class="table-scroll"><table><thead><tr><th>UTILIZATOR</th><th>NUME AFIȘAT</th><th>TIP UTILIZATOR</th><th>STARE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
             @foreach (var user in users)
             {
-                <tr @key="user.Id"><td><a class="category-table-link" href="@UserNavigation.UserUrl(user.Id)"><strong>@user.Username</strong></a><small class="user-id">#@user.Id</small></td><td>@user.DisplayName</td><td><span class="role-badge @(user.Role == AccessRoles.Administrator ? "admin" : "limited")">@user.Role</span></td><td><span class="stock-badge @(user.IsActive ? "positive" : "zero")">@(user.IsActive ? "Activ" : "Inactiv")</span></td><td><div class="row-buttons"><button class="row-icon edit" aria-label="Editează @user.Username" @onclick="() => OpenEditorAsync(user)" title="Editează @user.Username"></button><button class="row-icon delete" aria-label="Șterge @user.Username" @onclick="() => RequestDeleteAsync(user)" title="Șterge @user.Username"></button></div></td></tr>
+                <tr @key="user.Id"><td><a class="category-table-link" href="@UserNavigation.UserUrl(user.Id)"><strong>@user.Username</strong></a><small class="user-id">#@user.Id</small></td><td>@user.DisplayName</td><td><span class="role-badge @(user.Role == AccessRoles.Administrator ? "admin" : "limited")">@(user.TypeName.Length > 0 ? user.TypeName : user.Role)</span></td><td><span class="stock-badge @(user.IsActive ? "positive" : "zero")">@(user.IsActive ? "Activ" : "Inactiv")</span></td><td><div class="row-buttons">@if (canEdit) { <button class="row-icon edit" aria-label="Editează @user.Username" @onclick="() => OpenEditorAsync(user)" title="Editează @user.Username"></button> }@if (canDelete) { <button class="row-icon delete" aria-label="Șterge @user.Username" @onclick="() => RequestDeleteAsync(user)" title="Șterge @user.Username"></button> }</div></td></tr>
             }
             </tbody></table></div>
         }
@@ -60,7 +60,7 @@
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
     private IReadOnlyList<WebUser> users = Array.Empty<WebUser>();
     private WebUser? editingUser, deleting;
-    private bool loading, syncing, loaded, authorized, editing, deleteBusy;
+    private bool loading, syncing, loaded, authorized, editing, deleteBusy, canAdd, canEdit, canDelete;
     private string? error, notice, deleteError;
     private Guid editorKey;
     private readonly CancellationTokenSource lifetime = new();
@@ -97,7 +97,10 @@
         error = null;
         try
         {
-            authorized = await Access.IsAdministratorAsync(lifetime.Token);
+            authorized = await Access.HasAsync(Permissions.Key("utilizatori", Permissions.View), lifetime.Token);
+            canAdd = await Access.HasAsync(Permissions.Key("utilizatori", Permissions.Add), lifetime.Token);
+            canEdit = await Access.HasAsync(Permissions.Key("utilizatori", Permissions.Edit), lifetime.Token);
+            canDelete = await Access.HasAsync(Permissions.Key("utilizatori", Permissions.Delete), lifetime.Token);
             users = authorized ? await Repository.GetUsersAsync(lifetime.Token) : Array.Empty<WebUser>();
             loaded = authorized;
         }

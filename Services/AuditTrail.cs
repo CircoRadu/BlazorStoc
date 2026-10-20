@@ -27,6 +27,9 @@ public static class AuditEntities
     // Only the deletion of a maintenance contract is recorded under this type (it is archived); the other operations on contracts
     // are recorded under the beneficiary the contract belongs to.
     public const string ServiceContract = "ContractMentenanta";
+    // Only the deletion of a risk analysis is recorded under this type (it is archived); the other operations on analyses
+    // are recorded under the beneficiary the analysis belongs to.
+    public const string RiskAnalysis = "AnalizaRisc";
     // Only the deletion of an intervention (either kind) is recorded under this type (it is archived); the other operations on
     // interventions are recorded under the beneficiary they belong to.
     public const string ServiceIntervention = "InterventieMentenanta";
@@ -44,6 +47,13 @@ public static class AuditEntities
     public const string SystemType = "TipSistem";
     // Oferte -> Sabloane: the templates of offer sheets (.xlsx).
     public const string OfferTemplate = "SablonOferta";
+    // Setari -> Baza de date: the connection of the application to MariaDB and the port it listens on (administrator configured in the private file only).
+    public const string Database = "BazaDeDate";
+    // Setari -> Tipuri de utilizatori: the user types (named sets of permissions) the administrator defines.
+    public const string UserType = "TipUtilizator";
+    // Modules (Modules/) and the application itself: written by the system (a module taken out or back, an unexpected stop of the application).
+    public const string Module = "Modul";
+    public const string Application = "Aplicatie";
 }
 
 public static class AuditActions
@@ -105,6 +115,14 @@ public static class AuditActions
     public const string EditMaintenanceCycle = "Modificare ciclicitate mentenanță";
     public const string RescheduleMaintenance = "Reprogramare intervenție mentenanță";
     public const string MoveContractPoint = "Mutare punct de lucru în alt contract";
+    // Risk analyses of work points: each kind of change is named exactly. Deleting one is the archived "Ștergere".
+    public const string CreateRiskAnalysis = "Adăugare analiză de risc";
+    public const string EditRiskAnalysis = "Modificare analiză de risc";
+    public const string EditRiskAnalysisValidity = "Modificare valabilitate analiză de risc";
+    public const string RenewRiskAnalysis = "Reînnoire analiză de risc";
+    public const string UndoRiskAnalysisRenewal = "Anulare reînnoire analiză de risc";
+    public const string ActivateRiskAnalysis = "Activare analiză de risc";
+    public const string DeactivateRiskAnalysis = "Dezactivare analiză de risc";
     // Interventions (register): each kind of change is named exactly. Deleting one is the archived "Ștergere".
     public const string RecordMaintenance = "Înregistrare intervenție mentenanță";
     public const string EditMaintenanceIntervention = "Modificare intervenție mentenanță";
@@ -181,6 +199,24 @@ public static class AuditActions
     public const string RetentionDelete = "Ștergere automată pachet backup vechi";
     public const string FetchBackupFromNas = "Aducere pachet backup de pe NAS";
     public const string TestNasBackup = "Testare conexiune NAS";
+    public const string SetDatabaseConnection = "Modificare conexiune bază de date";
+    public const string TestDatabaseConnection = "Testare conexiune bază de date";
+    public const string RevertDatabaseConnection = "Revenire la configurația anterioară a conexiunii bazei de date";
+    public const string ResetDatabaseConnection = "Resetare conexiune bază de date la configurația de bază";
+    public const string SetAppPort = "Modificare port aplicație";
+    // Setari -> Baza de date -> Conexiune: the server of the database (Windows service) and the application itself.
+    public const string StopDatabaseServer = "Oprire server bază de date";
+    public const string StartDatabaseServer = "Pornire server bază de date";
+    public const string RestartDatabaseServer = "Repornire server bază de date";
+    public const string ChangeDatabaseServerPort = "Modificare port server bază de date";
+    public const string RestartApplication = "Repornire aplicație";
+    // Setari -> Baza de date -> Conexiune -> Conturile bazei: the passwords of the predefined accounts (never written in a journal entry, only that and when they changed).
+    public const string ChangeDatabaseAccountPassword = "Schimbare parolă cont bază de date";
+    public const string VerifyDatabaseAccounts = "Verificare conturi bază de date";
+    public const string ResetDatabaseAccounts = "Resetare conturi bază de date";
+    public const string CloseOpenSession = "Închidere sesiune deschisă";
+    public const string ExportDatabaseConfiguration = "Export configurare bază de date";
+    public const string ImportDatabaseConfiguration = "Import configurare bază de date";
     public const string CopyBackupToNas = "Copiere backup pe NAS";
     public const string SetProjectDeadline = "Setare termen proiect";
     public const string RemoveProjectDeadline = "Eliminare termen proiect";
@@ -194,6 +230,16 @@ public static class AuditActions
     public const string ComponentExitLeft = "Rămas la beneficiar la scoaterea componentei";
     public const string ComponentExitMoved = "Mutare ieșire pe altă componentă";
     public const string ComponentExitConsumed = "Consumat la scoaterea componentei";
+    // User types (Setari -> Tipuri de utilizatori): each operation names exactly what happened; a permission granted or revoked is one event per key.
+    public const string CreateUserType = "Adăugare tip utilizator";
+    public const string RenameUserType = "Redenumire tip utilizator";
+    public const string EditUserTypeDescription = "Modificare descriere tip utilizator";
+    public const string GrantPermission = "Acordare permisiune";
+    public const string RevokePermission = "Revocare permisiune";
+    public const string DeleteUserType = "Ștergere tip utilizator";
+    public const string ChangeUserType = "Schimbare tip utilizator";
+    public const string AccessDenied = "Acces refuzat";
+    public const string ReorderSubcategories = "Reordonare subcategorii";
     public const string AddSystemType = "Adăugare tip de sistem";
     public const string RenameSystemType = "Modificare denumire tip de sistem";
     public const string ActivateSystemType = "Activare tip de sistem";
@@ -205,6 +251,15 @@ public static class AuditActions
     public const string ActivateAnafVersion = "Activare versiune configurație ANAF";
     public const string VoidExitOperation = "Stornare operație de ieșire";
     public const string ReturnFromBeneficiary = "Retur de la beneficiar";
+    // The system records when a module is taken out of service after repeated failures and when it comes back; the administrator's "try again" is recorded under his name.
+    public const string ModuleDisabled = "Oprire modul";
+    public const string ModuleRecovered = "Revenire modul";
+    public const string ModuleRetry = "Reîncercare modul";
+    // The administrator stops / starts a module by hand (Setari -> Module); recorded under his name, the stop with the reason he gave.
+    public const string ModuleManualStop = "Oprire manuală modul";
+    public const string ModuleManualStart = "Pornire manuală modul";
+    // Found at the next start: the previous run of the application did not end normally (killed, crashed, the machine went down).
+    public const string ApplicationUnexpectedStop = "Oprire neașteptată aplicație";
 
     // Operations that remove their object: earlier events about it stop linking to its page.
     public static bool IsDeletion(string? action) => action is Delete or DeleteInvoiceTemplate;
@@ -217,6 +272,7 @@ public static class AuditActions
             or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto
             or CreateServiceContract or EditServiceContract or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
+            or CreateRiskAnalysis or EditRiskAnalysis or EditRiskAnalysisValidity or RenewRiskAnalysis or UndoRiskAnalysisRenewal or ActivateRiskAnalysis or DeactivateRiskAnalysis
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
@@ -365,7 +421,13 @@ public static class SettingsNavigation
     public static string InvoiceTemplateUrl(int templateId) =>
         $"/setari?{TabParameter}={InvoicesTab}&{SubtabParameter}={InvoiceTemplatesSubtab}&{InvoiceTemplateParameter}={templateId}";
 
-    public static string NotificationSettingsUrl => $"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
+    public const string ModulesTab = "module";
+    public const string RefreshParameter = "reaplica";
+
+    // The banner's link: the changing value makes Settings apply it even when the address is the one it already applied.
+    public static string ModulesUrl() => $"/setari?{TabParameter}={ModulesTab}&{RefreshParameter}={DateTime.UtcNow.Ticks}";
+
+    public static string NotificationSettingsUrl =>$"/setari?{TabParameter}={NotificationsTab}&{SubtabParameter}={SettingsSubtab}";
 }
 
 // Filters of the journal, applied on the server. Dates are UTC instants: From included, To excluded (the caller converts the local
@@ -382,9 +444,9 @@ public sealed record AuditPage(IReadOnlyList<AuditEvent> Events, int Total, int 
 
 public sealed record AuditSummary(int Total, int Today, int Actors, int Products);
 
-public interface IAuditTrail
+// What the journal pages read (the activity journal module). IAuditTrail is the whole journal: the writing every part of the application does, plus this reading.
+public interface IAuditReader
 {
-    Task RecordAsync(AuditWrite entry, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AuditEvent>> GetEventsAsync(CancellationToken cancellationToken = default);
 
     // Filtering, search and paging on the server. window: only the latest N events of the journal are considered (null = all of it).
@@ -395,6 +457,11 @@ public interface IAuditTrail
     // The latest recorded deletion of each object that the given events are about (the events after it keep their links, see
     // AuditNavigation.TargetUrl); the deletions may be older than the page or outside the window.
     Task<IReadOnlyDictionary<string, DateTime>> RemovalTimesAsync(IEnumerable<AuditEvent> events, CancellationToken cancellationToken = default);
+}
+
+public interface IAuditTrail : IAuditReader
+{
+    Task RecordAsync(AuditWrite entry, CancellationToken cancellationToken = default);
 }
 
 public static class AuditQueryRules

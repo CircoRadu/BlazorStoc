@@ -1,0 +1,22 @@
+# Factura preluată (fereastră separată)
+Ruta: /produse/preluare-factura/factura/{sessionId:guid}
+Cautare: factura fereastra noua comparare valori zoom marime pagini
+Captura: pagina | /produse/preluare-factura | upload factura-demo.pdf; click Pasul următor; popup Afișează factura într-o fereastră nouă | Factura în fereastra separată
+
+Fereastra arată factura pe care o preiei, într-o fereastră separată de browser, ca s-o poți așeza lângă tabelul de la pasul 2 din „Preluare factură” și să compari valorile cu imaginea ei.
+
+## Elemente
+### Antet
+- Numele fișierului | text | Fișierul facturii aflate în preluare.
+- Numărul de pagini | text | Câte pagini are factura.
+- Mărime | listă | Potrivit în fereastră, 150%, 200% sau 300%: mărește imaginea ca să citești cifrele mici.
+### Pagini
+- Imaginile paginilor | imagine | Fiecare pagină a facturii, una sub alta; derulezi în fereastră ca să le parcurgi.
+- Factura nu mai este disponibilă | mesaj | Apare când fișierul nu mai este în memorie (se păstrează cel mult 30 de minute fără activitate); închide fereastra și reia preluarea.
+
+## Flux: Cum compar factura cu tabelul de preluare
+1. În „Preluare factură”, la pasul 2, apasă „Afișează factura într-o fereastră nouă”.
+2. Mută fereastra lângă fereastra principală.
+3. Mărește imaginea cu „Mărime” și compară valorile din factură cu cele din tabel.
+4. Corectează în tabel ce nu se potrivește; închide fereastra facturii când ai terminat.
+Nota: fereastra nu modifică nimic; este doar o vizualizare a facturii.

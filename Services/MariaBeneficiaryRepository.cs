@@ -1,5 +1,6 @@
 using System.Data;
 using MySqlConnector;
+using static BlazorStoc.Services.MariaDb;
 
 namespace BlazorStoc.Services;
 
@@ -12,13 +13,11 @@ public sealed class MariaBeneficiaryRepository(
     IArchiveService? archiveService = null) : IBeneficiaryRepository
 {
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
-    private MySqlConnection CreateConnection() => DatabaseConnections.Create(configuration);
 
     public async Task<IReadOnlyList<Beneficiary>> GetBeneficiariesAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT id, name, cui, version, kind, address, phone, registry_number, postal_code, caen_code, anaf_verified FROM beneficiaries ORDER BY name, id
             """, connection);
@@ -30,7 +29,7 @@ public sealed class MariaBeneficiaryRepository(
 
     public async Task<Beneficiary> CreateAsync(BeneficiaryInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.add", cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
         var beneficiary = await WriteAsync(async (connection, transaction) =>
         {
@@ -53,7 +52,7 @@ public sealed class MariaBeneficiaryRepository(
 
     public async Task<Beneficiary> UpdateAsync(Beneficiary original, BeneficiaryInput input, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated(true);
         var beneficiary = await WriteAsync(async (connection, transaction) =>
         {
@@ -84,16 +83,15 @@ public sealed class MariaBeneficiaryRepository(
 
     public async Task DeleteAsync(Beneficiary original, string reason, CancellationToken cancellationToken = default)
     {
-        await EnsureOperatorAsync(cancellationToken).ConfigureAwait(false);
+        if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.delete", cancellationToken).ConfigureAwait(false);
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError) throw new BeneficiaryOperationException(reasonError);
         // The work points of the beneficiary and their photos are archived with it (rows as relations, photo files moved to the
         // archive directory); read before the archive operation starts and re-checked inside the transaction.
         var workPoints = new List<WorkPoint>();
         IReadOnlyList<ServicePhoto> photos;
-        await using (var readConnection = CreateConnection())
+        await using (var readConnection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
-            await readConnection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using (var command = Command(readConnection, null,
                 $"SELECT {MariaWorkPointRepository.Columns} FROM beneficiary_work_points WHERE beneficiary_id=@id ORDER BY id", ("@id", original.Id)))
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
@@ -102,6 +100,8 @@ public sealed class MariaBeneficiaryRepository(
                 "work_point_id IN (SELECT id FROM beneficiary_work_points WHERE beneficiary_id=@id)", cancellationToken, ("@id", original.Id)).ConfigureAwait(false);
             if (await MariaServiceContractRepository.CountForBeneficiaryAsync(readConnection, null, original.Id, cancellationToken).ConfigureAwait(false) is var contracts and > 0)
                 throw ServiceContractRules.BeneficiaryHasContracts(contracts);
+            if (await MariaRiskAnalysisRepository.CountForBeneficiaryAsync(readConnection, null, original.Id, cancellationToken).ConfigureAwait(false) is var analyses and > 0)
+                throw RiskAnalysisRules.BeneficiaryHasAnalyses(analyses);
             if (await MariaServiceInterventionRepository.CountAsync(readConnection, null, "beneficiary_id", original.Id, cancellationToken).ConfigureAwait(false) is var interventions and > 0)
                 throw ServiceInterventionRules.BeneficiaryHasInterventions(interventions);
         }
@@ -123,6 +123,8 @@ public sealed class MariaBeneficiaryRepository(
                         BeneficiaryRules.CheckNoLiveProjects(Convert.ToInt32(await projects.ExecuteScalarAsync(token).ConfigureAwait(false)));
                     if (await MariaServiceContractRepository.CountForBeneficiaryAsync(connection, transaction, original.Id, token).ConfigureAwait(false) is var contractCount and > 0)
                         throw ServiceContractRules.BeneficiaryHasContracts(contractCount);
+                    if (await MariaRiskAnalysisRepository.CountForBeneficiaryAsync(connection, transaction, original.Id, token).ConfigureAwait(false) is var analysisCount and > 0)
+                        throw RiskAnalysisRules.BeneficiaryHasAnalyses(analysisCount);
                     if (await MariaServiceInterventionRepository.CountAsync(connection, transaction, "beneficiary_id", original.Id, token).ConfigureAwait(false) is var interventionCount and > 0)
                         throw ServiceInterventionRules.BeneficiaryHasInterventions(interventionCount);
                     var currentPhotos = await ServicePhotoArchive.ReadAsync(connection, transaction,
@@ -179,30 +181,9 @@ public sealed class MariaBeneficiaryRepository(
 
     private Task<T> WriteAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
         BeneficiaryInput? savedValue = null, int? savedId = null) =>
-        MariaTransactions.RetryOnDeadlockAsync(() => WriteOnceAsync(action, token, savedValue, savedId), token);
-
-    private async Task<T> WriteOnceAsync<T>(Func<MySqlConnection, MySqlTransaction, Task<T>> action, CancellationToken token,
-        BeneficiaryInput? savedValue, int? savedId)
-    {
-        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration))
-            throw new BeneficiaryOperationException("Modificările sunt permise numai în baza BlazorStoc.");
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(token).ConfigureAwait(false);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, token).ConfigureAwait(false);
-        try
-        {
-            var result = await action(connection, transaction).ConfigureAwait(false);
-            await transaction.CommitAsync(token).ConfigureAwait(false);
-            return result;
-        }
-        catch (Exception exception)
-        {
-            if (transaction.Connection is not null) await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            if (savedValue is not null && exception is MySqlException { Number: 1062 })
-                throw await ConcurrentDuplicateAsync(savedValue, savedId, token).ConfigureAwait(false);
-            throw;
-        }
-    }
+        MariaDb.WriteAsync(configuration, action, message => new BeneficiaryOperationException(message), async (exception, cancellation) =>
+            savedValue is not null && exception.Number == 1062 ? await ConcurrentDuplicateAsync(savedValue, savedId, cancellation).ConfigureAwait(false) : null,
+            token);
 
     private static async Task<Beneficiary?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
@@ -220,7 +201,7 @@ public sealed class MariaBeneficiaryRepository(
     private static Beneficiary Build(int id, BeneficiaryInput value, long version) => new(id, value.Name, value.Cui, version,
         value.Kind, value.Address, value.Phone, value.RegistryNumber, value.PostalCode, value.CaenCode, value.AnafVerified);
 
-    private static (string, object)[] Fields(BeneficiaryInput value) =>
+    private static (string, object?)[] Fields(BeneficiaryInput value) =>
     [
         ("@name", value.Name), ("@normalizedName", TextNormalization.UniquenessKey(value.Name)), ("@cui", value.Cui),
         ("@normalizedCui", BeneficiaryRules.IdentityKey(value)), ("@kind", value.Kind), ("@address", value.Address),
@@ -256,8 +237,7 @@ public sealed class MariaBeneficiaryRepository(
     {
         try
         {
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(token).ConfigureAwait(false);
+            await using var connection = await MariaDb.OpenAsync(configuration, token).ConfigureAwait(false);
             await using (var cui = Command(connection, null, """
                 SELECT name FROM beneficiaries
                 WHERE normalized_cui=@normalized AND (@id IS NULL OR id<>@id) LIMIT 1
@@ -283,12 +263,4 @@ public sealed class MariaBeneficiaryRepository(
         }
     }
 
-    private static MySqlCommand Command(MySqlConnection connection, MySqlTransaction? transaction, string sql, params (string Name, object Value)[] parameters)
-    {
-        var command = new MySqlCommand(sql, connection, transaction);
-        foreach (var (name, value) in parameters) command.Parameters.AddWithValue(name, value);
-        return command;
-    }
-
-    private Task EnsureOperatorAsync(CancellationToken token) => accessControl?.EnsureBeneficiaryOperatorAsync(token) ?? Task.CompletedTask;
 }

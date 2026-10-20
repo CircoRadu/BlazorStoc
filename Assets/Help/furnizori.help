@@ -1,0 +1,45 @@
+# Furnizori
+Ruta: /furnizori
+Cautare: furnizori registru cui cod tva anf verificat recunoastere factura export csv adauga editeaza sterge
+Captura: pagina | /furnizori |  | Registrul de furnizori
+
+Registrul furnizorilor ale căror facturi se preiau în stoc. Un furnizor se identifică prin CUI (sau codul de TVA al unui stat UE) și nu poate apărea de două ori.
+
+## Elemente
+### Antet
+- + Adaugă furnizor | buton | Deschide formularul de furnizor nou ([[furnizori-editor]]); doar cu dreptul necesar.
+- Reîncearcă | buton | Apare când lista nu a putut fi încărcată.
+### Rezumat
+- Total furnizori | cifră | Câți furnizori are registrul.
+- Date din ANAF | cifră | Furnizorii cu date preluate din ANAF și nemodificate.
+- De verificat | cifră | Furnizorii introduși manual sau editați după ANAF.
+- Alte state UE | cifră | Furnizorii identificați prin cod de TVA.
+### Recunoașterea furnizorului la preluarea facturilor
+- Secțiunea colapsabilă | secțiune | Apare când există recunoașteri: arată câte facturi au fost recunoscute și câte au fost corectate de utilizator.
+- Exportă jurnalul (CSV) | link | Descarcă jurnalul recunoașterilor.
+- Tabelul pe metode | tabel | Pe metodă și încredere: facturi, corectate, rata corecțiilor (⚠ peste 5% la „încredere mare”) și șabloanele schimbate.
+- Ultimele corecții nerezolvate | listă | Ce s-a citit din factură și ce furnizor a ales utilizatorul; de aici se poate reține numele ca denumire alternativă.
+### Registrul
+- Caută | câmp | Caută după denumire, CUI, adresă sau telefon.
+- Doar cei de verificat | comutator | Arată doar furnizorii de verificat. | sel: label:has(input[aria-label*="doar furnizorii"])
+- Furnizor | coloană | Numele; apasă-l ca să deschizi fișa furnizorului ([[furnizori-detaliu]]).
+- CUI / cod TVA | coloană | Identificatorul furnizorului.
+- Sursa datelor | coloană | ANAF, manual sau altă sursă, cu iconița ei.
+- Adresă, Telefon | coloană | Datele de contact.
+- Facturi | coloană | Numărul de facturi și de intrări în stoc legate de furnizor.
+- Editează furnizorul | iconita:edit | Deschide formularul de editare.
+- Șterge furnizorul | iconita:delete | Doar administratorul și doar dacă furnizorul nu are facturi, intrări de stoc sau șabloane legate.
+
+## Flux: Cum adaug un furnizor
+1. Apasă „+ Adaugă furnizor”.
+2. Pentru un furnizor din România scrie CUI-ul și apasă „Preia date din ANAF”; pentru alt stat UE alege țara și scrie codul de TVA.
+3. Verifică datele și apasă „Salvează furnizorul”.
+Nota: detaliile formularului sunt în [[furnizori-editor]].
+
+## Flux: Cum găsesc furnizorii de verificat
+1. Pornește comutatorul „Doar cei de verificat”.
+2. Deschide fiecare furnizor și verifică-i datele; „Preia din nou din ANAF” le actualizează.
+
+## Flux: Cum văd facturile unui furnizor
+1. Apasă numele furnizorului din registru.
+2. În fișa lui, secțiunea „Facturi preluate” listează facturile, cu numărul de intrări în stoc.

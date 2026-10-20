@@ -2,7 +2,8 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BlazorStoc.Services;
 
-public sealed record WebUser(int Id, string Username, string DisplayName, string Role, bool IsActive, long Version);
+// Role stays "Administrator" or "Utilizator" (Administrator exactly when the type is the system type of that name); the rights come from the type.
+public sealed record WebUser(int Id, string Username, string DisplayName, string Role, bool IsActive, long Version, long? TypeId = null, string TypeName = "");
 public sealed record AuthenticatedWebUser(int Id, string Username, string DisplayName, string Role);
 public enum AuthenticationStatus { Success, InvalidCredentials, Inactive }
 public sealed record AuthenticationResult(AuthenticationStatus Status, AuthenticatedWebUser? User = null);
@@ -20,6 +21,9 @@ public sealed class WebUserInput
 
     [Required(ErrorMessage = "Selectează nivelul de acces.")]
     public string Role { get; set; } = AccessRoles.LimitedUser;
+
+    // The user type (Setari -> Tipuri de utilizatori). When empty the system type of Role is used.
+    public long? TypeId { get; set; }
 
     public bool IsActive { get; set; } = true;
 
@@ -46,6 +50,7 @@ public sealed class WebUserInput
             Username = TextNormalization.ForObjectNameOrCode(Username),
             DisplayName = TextNormalization.ForObjectNameOrCode(DisplayName),
             Role = TextNormalization.ForStorage(Role),
+            TypeId = TypeId,
             IsActive = IsActive,
             Password = Password ?? "",
             Reason = ChangeReasonRules.Normalize(Reason)
@@ -69,6 +74,7 @@ public sealed class WebUserInput
         Username = user.Username,
         DisplayName = user.DisplayName,
         Role = user.Role,
+        TypeId = user.TypeId,
         IsActive = user.IsActive
     };
 }

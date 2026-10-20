@@ -1,0 +1,58 @@
+@using BlazorStoc.Modules
+@implements IDisposable
+@inject ModuleRegistry Registry
+@inject IAccessControl Access
+@inject NavigationManager Navigation
+@* Above every page, for the administrator only (Setari -> Module): a module that is out of service. Ordinary users see the notice of the page that needs the module. *@
+@if (outModules.Count > 0)
+{
+    <div class="error-banner module-alert" role="alert">
+        <strong>@(outModules.Count == 1 ? "Un modul este oprit:" : "Module oprite:")</strong>
+        @string.Join(", ", outModules.Select(module => $"{module.Name} ({module.Origin})"))
+        <a class="refresh act-nav" href="@SettingsNavigation.ModulesUrl()" @onclick="OpenDetails" @onclick:preventDefault>Detalii</a>
+    </div>
+}
+
+@code {
+    // The cooldown of a module that was taken out ends without any event, so the banner also looks again from time to time.
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(10);
+
+    private IReadOnlyList<ModuleInfo> outModules = [];
+    private bool allowed;
+    private bool disposed;
+    private Timer? timer;
+
+    // The address changes at every click, so the Settings page opens the Modules tab even when it is already on that address.
+    private void OpenDetails() => Navigation.NavigateTo(SettingsNavigation.ModulesUrl());
+
+    protected override async Task OnInitializedAsync()
+    {
+        allowed = await Access.HasAsync("setari-module.view");
+        if (!allowed) return;
+        Load();
+        Registry.Changed += OnChanged;
+        timer = new Timer(_ => OnChanged(), null, RefreshInterval, RefreshInterval);
+    }
+
+    private void Load() => outModules = [.. Registry.Snapshot().Where(module => module.Status == ModuleStatus.Disabled)];
+
+    // Called from whichever thread reported the change: the screen is updated on its own context, and only when something differs.
+    private void OnChanged()
+    {
+        if (disposed) return;
+        _ = InvokeAsync(() =>
+        {
+            if (disposed) return;
+            var before = outModules.Select(module => (module.Id, module.Origin)).ToList();
+            Load();
+            if (!before.SequenceEqual(outModules.Select(module => (module.Id, module.Origin)))) StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        Registry.Changed -= OnChanged;
+        timer?.Dispose();
+    }
+}

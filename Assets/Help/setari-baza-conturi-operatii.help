@@ -1,0 +1,35 @@
+# Operații asupra conturilor bazei de date
+Cautare: conturi baza de date schimba parola resetare exporta importa configurarea fraza parola frazele coincid parola administrator fereastra confirmare
+Captura: fereastra | /setari | click Bază de date; click Conexiune; click Exportă configurarea; type #accounts-passphrase=o fraza lunga si secreta; type #accounts-passphrase-2=o fraza lunga si secreta; wait 800 | Exportă configurarea
+
+Fereastra se deschide din „Conturile bazei de date” ([[setari-baza-conexiune]]) când începi o operație care schimbă ceva: schimbarea parolei unui cont, a tuturor parolelor, resetarea conturilor, exportul și importul configurării. Are câmpurile operației și, mereu, parola contului tău de administrator; nimic nu se întâmplă până nu apeși butonul ferestrei. Dacă serviciul refuză (parolă greșită, parolă prea scurtă, o copie de siguranță în curs), mesajul apare în fereastră, cu ce ai tastat păstrat, și poți corecta și încerca din nou.
+
+## Elemente
+### Câmpurile operației
+- Parola nouă | câmp | La schimbarea parolei unui cont: cel puțin 16 caractere.
+- Repetă parola nouă | câmp | Se tastează a doua oară; sub el apare imediat „Parolele coincid.” sau „Parolele nu coincid.”, iar butonul ferestrei rămâne închis cât timp nu coincid.
+- Generează parola | buton | Pune în ambele câmpuri o parolă generată de 24 de caractere și o arată, ca s-o poți vedea o dată.
+- Arată parola | comutator | Arată sau ascunde ce ai tastat în câmpurile ferestrei.
+- Parolele conturilor | comutator | La „Schimbă toate parolele”: „Parole generate” (fiecare cont primește una, nu o vezi) sau „Parole alese de mine” (apar câte două câmpuri pentru fiecare cont, cu verificarea coincidenței).
+- Parolele de după resetare | comutator | La „Resetează conturile”: „Parole generate” sau „Parole implicite (publice)”; cu cele implicite, aplicația te cere imediat să le schimbi.
+- Fraza-parolă | câmp | La export: cel puțin 12 caractere; criptează fișierul exportat, care nu se poate citi fără ea.
+- Repetă fraza-parolă | câmp | Se tastează a doua oară; sub el apare imediat „Frazele-parolă coincid.” sau „Frazele-parolă nu coincid.”, iar exportul rămâne închis cât timp nu coincid.
+- Include contul de administrare al serverului | comutator | La export: pune în fișier și contul care administrează serverul (implicit pornit).
+- Fișierul de configurare | câmp | La import: fișierul .bsconfig exportat de pagina aceasta.
+- Fraza-parolă a fișierului | câmp | La import: fraza cu care a fost criptat fișierul.
+### Confirmarea
+- Parola contului tău de administrator | câmp | Cerută la fiecare operație. Administratorul configurat introduce parola din fișierul privat, un administrator din Utilizatori introduce parola contului lui. După mai multe încercări greșite, confirmarea este refuzată un minut. Enter confirmă din acest câmp.
+- Butonul ferestrei | buton | Execută operația (de exemplu „Exportă și descarcă”); este închis cât timp ce ai tastat de două ori nu coincide sau lipsește ceva. | sel: .admin-operation-dialog button.primary
+- Renunță | buton | Închide fereastra fără să facă nimic (la fel Esc).
+
+## Flux: Cum exportez configurarea cu fraza-parolă
+1. În „Conturile bazei de date” apasă „Exportă configurarea”.
+2. Tastează fraza-parolă, apoi repetă-o: sub al doilea câmp apare „Frazele-parolă coincid.” când sunt la fel.
+3. Alege dacă incluzi contul de administrare al serverului și introdu parola contului tău de administrator.
+4. Apasă „Exportă și descarcă”; fișierul se descarcă o singură dată și nu rămâne pe server.
+Nota: fără fraza-parolă fișierul nu se poate citi; păstrează-o separat de fișier.
+
+## Flux: Cum schimb parola unui cont
+1. Apasă iconița de editare de pe rândul contului.
+2. Tastează parola nouă și repetă-o, sau apasă „Generează parola”.
+3. Introdu parola contului tău de administrator și apasă „Schimbă parola”.

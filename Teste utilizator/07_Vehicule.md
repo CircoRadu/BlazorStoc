@@ -4,17 +4,28 @@ Fluxul: Administrare -> Vehicule -> pagina vehiculului (taburi: date, expirari I
 
 ## Modificari de testat
 
+### 15.10.2026 - Vehiculele ca modul (oprire fara efect asupra stocului)
+
+**Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).
+
+**Ce s-a adaugat:** Vehiculele sunt un modul al aplicatiei, ca Analizele de risc: daca se opresc (din configurare sau dupa erori repetate), restul aplicatiei merge. Pagina Vehicule, fisa vehiculului si echipamentele arata "Modul indisponibil"; intrarea Vehicule dispare din meniul Administrare; administratorul vede modulul oprit in Setari -> Module si in banner.
+
+**Ce face acum:** Iesire multipla si miscarile unui produs se deschid si cu modulul oprit; la destinatia "Autovehicul" apare nota "Modulul Vehicule este oprit momentan: iesirile catre vehicule nu sunt disponibile", fara lista de vehicule. Notificarile de ITP, asigurare si rovinieta deja create raman in lista (nu se inchid din greseala).
+
+Pasi:
+
+1. Cu modulul pornit (normal): Vehicule -> lista, fisa unui vehicul, "Echipamente aflate in masina" se deschid ca pana acum; Iesire multipla -> Autovehicul arata lista vehiculelor.
+2. Porneste aplicatia cu `Modules__vehicule__Enabled=false`: /vehicule arata "Modul indisponibil", meniul Administrare nu mai are Vehicule, Setari -> Module arata Vehicule "Oprit (oprit din configurare)".
+3. Tot cu modulul oprit: Iesire multipla si pagina de miscari a unui produs se deschid; la destinatia Autovehicul apare nota despre modulul oprit; Notificari se deschide si pastreaza notificarile existente.
+
 ### 08.10.2026 - Nivel tinta pe vehicul si „Completeaza la nivel"
 
 **Ce s-a adaugat:** pe pagina „Materiale si echipamente" a unei masini, sectiunea „Nivel tinta": pentru fiecare produs se seteaza cate bucati ar trebui sa aiba masina, plus butonul „Completeaza la nivel" (migrarea 28, tabelul `vehicle_target_levels`).
 
 **Ce face acum:** tabelul arata nivelul tinta, cate bucati are masina si cate lipsesc. „Completeaza la nivel" deschide „Iesire multipla" cu destinatia masina si cate o linie pentru fiecare produs care lipseste (cantitatea lipsa), descrierea „Completare la nivel"; tu verifici si salvezi (aceleasi reguli ca la orice iesire: peste stoc, rezervari, bon PDF). Nivelul nu schimba stocul singur.
 
-1. Deschide o masina, tabul „Materiale si echipamente": in „Nivel tinta" alege un produs, scrie nivelul si apasa „Setează nivelul"; apare in tabel.
-2. Schimba nivelul aceluiasi produs: valoarea se inlocuieste (nu apare un al doilea rand).
-3. Daca masina are mai putine bucati decat nivelul, coloana „Lipseste" arata diferenta si apare „Completeaza la nivel".
-4. Apasa „Completeaza la nivel": se deschide iesirea multipla cu masina si liniile pregatite; salveaza-o, apoi revino pe pagina masinii: „Lipseste" este 0 si butonul dispare.
-5. Elimina un nivel cu ×. In Jurnal apar „Setare nivel tinta vehicul" si „Eliminare nivel tinta vehicul", cu valoarea veche si noua.
+1. Schimba nivelul aceluiasi produs: valoarea se inlocuieste (nu apare un al doilea rand).
+2. Apasa „Completeaza la nivel": se deschide iesirea multipla cu masina si liniile pregatite; salveaza-o, apoi revino pe pagina masinii: „Lipseste" este 0 si butonul dispare.
 
 **Detalii:**
 

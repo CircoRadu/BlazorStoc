@@ -1,0 +1,29 @@
+# Contracte de mentenanță (fișa beneficiarului)
+Cautare: contracte mentenanta contract on off activeaza dezactiveaza expira ciclicitate puncte de lucru scadenta
+Captura: pagina | /beneficiari | click Panoramic Hotel; full | Contractele din fișa beneficiarului
+
+Secțiunea „Contracte de mentenanță” din fișa beneficiarului: contractele lui, punctele de lucru acoperite și următoarea scadență. Apare doar cât modulul Mentenanță funcționează.
+
+## Elemente
+### Antet
+- Arată și contractele Off | comutator | Apare când există contracte oprite.
+- + Adaugă contract | buton | Deschide formularul de contract nou ([[mentenanta-contract-editor]]); doar cu dreptul necesar.
+### Tabelul contractelor
+- Contract | coloană | Numărul și data contractului, plus observațiile.
+- Expiră | coloană | Data de expirare, cu „Expirat” când a trecut; „fără termen” dacă nu are.
+- Stare | coloană | „On” (activ) sau „Off” (oprit).
+- Ciclicitate | coloană | La câte luni se repetă intervenția.
+- Puncte | buton | Numărul punctelor acoperite; apasă ca să desfaci lista lor, cu ciclicitatea, scadența și starea fiecăruia.
+- Următoarea scadență | coloană | Cea mai apropiată scadență a punctelor contractului (doar la contractele active).
+- Comutatorul On/Off | comutator | Oprește sau pornește contractul; la pornire se deschide [[mentenanta-contract-activare]].
+- Editează contractul | iconita:edit | Deschide formularul contractului.
+- Șterge contractul | iconita:delete | Contractul se arhivează împreună cu punctele acoperite; pentru o simplă oprire folosește comutatorul.
+
+## Flux: Cum adaug un contract de mentenanță
+1. Apasă „+ Adaugă contract”.
+2. Completează formularul și alege punctele de lucru acoperite ([[mentenanta-contract-editor]]).
+3. Salvează; scadențele apar în „Mentenanță”.
+
+## Flux: Cum opresc și reiau un contract
+1. Oprește comutatorul On/Off de pe rândul contractului: scadențele lui nu mai generează avertismente.
+2. Ca să-l reiei, pornește comutatorul și stabilește noile scadențe în fereastra de activare ([[mentenanta-contract-activare]]).

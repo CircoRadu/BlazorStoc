@@ -1,0 +1,142 @@
+<#
+.SYNOPSIS
+  Installs (or removes) the development MariaDB as the Windows service BlazorStocMariaDB.
+.DESCRIPTION
+  The service has its own name (not "MariaDB", which could clash with another installation) and runs mariadbd with the my.ini of the development instance
+  (C:\Dev\BlazorStoc-MariaDB), so the port is the one written in that file. It starts with the computer and restarts itself after a failure.
+  The service runs as the virtual account "NT SERVICE\<name>" (no password, no profile) that gets Modify rights on the folder of the instance only.
+  The user given in -ControlUser (default: the user who started this script) gets the right to start and stop THIS service only, so that the
+  application started from that user's session can start, stop and restart the server from Setari -> Baza de date. A service of the application that runs
+  as LocalSystem does not need this.
+
+  The script needs an administrator: when it is not elevated it asks Windows for elevation itself (one prompt) and runs again.
+  A server already running as a hidden process (tools\dev-mariadb.ps1) is stopped cleanly first, then the service is started on the same port.
+  Nothing in the data folder is changed. -Uninstall stops and removes the service (the data stays; tools\dev-mariadb.ps1 works again).
+.EXAMPLE
+  .\tools\install-mariadb-service.ps1
+  .\tools\install-mariadb-service.ps1 -ServiceName BlazorStocMariaDB -ControlUser Alex
+  .\tools\install-mariadb-service.ps1 -Uninstall
+#>
+[CmdletBinding()]
+param(
+    [string]$ServiceName = 'BlazorStocMariaDB',
+    [string]$Root = 'C:\Dev\BlazorStoc-MariaDB',
+    [string]$ControlUser,
+    [int]$SupervisorPort = 5087,
+    [switch]$Uninstall
+)
+$ErrorActionPreference = 'Stop'
+
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not $ControlUser) { $ControlUser = $identity.Name }
+$isAdmin = ([Security.Principal.WindowsPrincipal]$identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Output 'Administrator rights are needed: asking Windows for elevation (accept the prompt).'
+    $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-NoExit', '-File', "`"$PSCommandPath`"", '-ServiceName', $ServiceName, '-Root', "`"$Root`"", '-ControlUser', "`"$ControlUser`"")
+    if ($Uninstall) { $argList += '-Uninstall' }
+    Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList $argList -Verb RunAs
+    return
+}
+
+function Write-Step([string]$Message) { Write-Output ('[{0}] {1}' -f $ServiceName, $Message) }
+
+$runtime = Get-ChildItem -Path $Root -Directory -Filter 'mariadb-*' | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName 'bin' }
+if (-not $runtime) { throw "No MariaDB distribution (mariadb-*) under $Root." }
+$server = Join-Path $runtime 'mariadbd.exe'
+$admin = Join-Path $runtime 'mariadb-admin.exe'
+$myIni = Join-Path $Root 'my.ini'
+$adminCnf = Join-Path $Root 'admin.private.cnf'
+foreach ($path in $server, $myIni) { if (-not (Test-Path $path)) { throw "Missing: $path" } }
+
+$ini = Get-Content $myIni -Raw
+$port = if ($ini -match '(?m)^\s*port\s*=\s*(\d+)') { [int]$Matches[1] } else { 3306 }
+
+# Windows PowerShell 5.1 turns the stderr text of a native command into a terminating error under "Stop": a failed ping (server down) is an answer here, not an error.
+function Invoke-Admin([string[]]$Arguments) {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $admin "--defaults-file=$adminCnf" @Arguments 2>&1 | Out-Null; return $LASTEXITCODE }
+    finally { $ErrorActionPreference = $previous }
+}
+
+function Test-Database {
+    if (-not (Test-Path $adminCnf)) { return $false }
+    return (Invoke-Admin @('--connect-timeout=2', 'ping')) -eq 0
+}
+
+function Wait-Database([bool]$Up, [int]$Seconds) {
+    for ($i = 0; $i -lt ($Seconds * 2); $i++) {
+        if ((Test-Database) -eq $Up) { return $true }
+        Start-Sleep -Milliseconds 500
+    }
+    return $false
+}
+
+$existing = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+
+if ($Uninstall) {
+    if ($existing) {
+        if ($existing.Status -ne 'Stopped') { Stop-Service -Name $ServiceName -Force; $existing.WaitForStatus('Stopped', '00:02:00') }
+        & sc.exe delete $ServiceName | Out-Null
+        Write-Step 'service removed (the data folder is untouched).'
+    }
+    else { Write-Step 'the service does not exist.' }
+    return
+}
+
+if ($existing) { throw "The service $ServiceName already exists (status $($existing.Status)). Run with -Uninstall first if it has to be created again." }
+
+# The supervisor of the preview (tools\supervisor.ps1 -WithMariaDb) starts a hidden server again as soon as the port stops answering, and that server would keep
+# the data files locked ("ibdata1 must be writable") against the service: it is asked to stop first (a stop window); register it again WITHOUT -WithMariaDb afterwards.
+$supervisor = Join-Path $PSScriptRoot 'supervisor.ps1'
+if (Test-Path $supervisor) { try { & $supervisor -Action stop -Port $SupervisorPort *> $null; Write-Step "supervisor $SupervisorPort stopped" } catch { Write-Step "supervisor not stopped: $($_.Exception.Message)" } }
+
+# A server running as a hidden process holds the port: it is stopped cleanly (the service takes the same port afterwards).
+if (Test-Database) {
+    Write-Step "a server answers on port $port : stopping it cleanly"
+    if ((Invoke-Admin @('shutdown')) -ne 0) { throw 'The running server could not be stopped; close it (tools\dev-mariadb.ps1 -Action stop) and run this script again.' }
+    if (-not (Wait-Database $false 60)) { throw 'The running server did not stop in 60 seconds.' }
+}
+else {
+    $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($listener) {
+        $owner = (Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue).ProcessName
+        throw "Port $port is taken by '$owner' (PID $($listener.OwningProcess)), not by this MariaDB. Free it or change port= in $myIni first."
+    }
+}
+
+Write-Step 'registering the service'
+& $server --install $ServiceName "--defaults-file=$myIni"
+if ($LASTEXITCODE -ne 0) { throw 'mariadbd --install failed.' }
+
+# Virtual account without password; it needs Modify rights on the folder of the instance (data, logs, pid) and nothing else.
+$account = "NT SERVICE\$ServiceName"
+& sc.exe config $ServiceName obj= $account start= auto | Out-Null
+& sc.exe description $ServiceName 'MariaDB server of BlazorStoc (own service name, own my.ini and port).' | Out-Null
+& sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
+& sc.exe failureflag $ServiceName 1 | Out-Null
+& icacls.exe $Root /grant "${account}:(OI)(CI)M" /T /C | Out-Null
+Write-Step "rights: $account has Modify on $Root"
+
+# The control user may only start/stop/query THIS service: one allowed entry added to the DACL of the service (query, start, stop, pause, read; no delete, no change of rights).
+$sid = ([Security.Principal.NTAccount]$ControlUser).Translate([Security.Principal.SecurityIdentifier]).Value
+$sddl = (& sc.exe sdshow $ServiceName | Where-Object { $_ -match '^D:' } | Select-Object -First 1).Trim()
+if ($sddl -notmatch [regex]::Escape($sid)) {
+    $entry = "(A;;CCLCSWRPWPDTLOCRRC;;;$sid)"
+    $new = if ($sddl -match '^(D:.*?)(S:.*)$') { $Matches[1] + $entry + $Matches[2] } else { $sddl + $entry }
+    & sc.exe sdset $ServiceName $new | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'sc sdset failed: the control right was not granted.' }
+    Write-Step "rights: $ControlUser may start and stop this service only"
+}
+
+Write-Step 'starting the service'
+Start-Service -Name $ServiceName
+(Get-Service -Name $ServiceName).WaitForStatus('Running', '00:02:00')
+if (-not (Wait-Database $true 60)) {
+    throw "The service is running but the server does not answer on port $port. Read $(Join-Path $Root 'server-error.log')."
+}
+Write-Step "ready: the server answers on port $port and starts with the computer."
+Write-Output ''
+Write-Output "Status : Get-Service $ServiceName"
+Write-Output "Stop   : Stop-Service $ServiceName   (no administrator needed for $ControlUser)"
+Write-Output "Remove : .\tools\install-mariadb-service.ps1 -Uninstall"

@@ -1,0 +1,484 @@
+@using System.Globalization
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Services
+@using BlazorStoc.Components.Pages
+@inject IInvoiceAnalysisService Analysis
+@inject IInvoiceTemplateService Templates
+@inject ISupplierRepository Suppliers
+@inject IJSRuntime JS
+@inject ILogger<InvoiceTemplateWorkbench> Logger
+@implements IAsyncDisposable
+
+@if (xmlSample is null)
+{
+<h2>@(IsEditMode ? "Editare șablon" : "Generare șablon factură")</h2>
+@if (IsEditMode)
+{
+    <div class="heading-actions"><button type="button" class="refresh act-close" disabled="@saving" title="Închide editarea șablonului și revino la lista de șabloane" @onclick="RequestCloseAsync">✕ Închide editarea</button></div>
+    <p class="muted">Editezi elementele șablonului (câmpuri, coloane, descrierea intrării în stoc, denumirea și furnizorul). Fișierul model se afișează fără să fie analizat; analiza pornește doar din butonul „Analizează fișierul”. Dacă părăsești pagina fără să salvezi, ești avertizat.</p>
+}
+@if (Embedded)
+{
+<p class="muted">Șablonul se face pe factura pe care ai încărcat-o la preluare: verifică ce se folosește și ce înseamnă fiecare element, apoi salvează. După salvare, șablonul se aplică de îndată facturii.</p>
+}
+else if (!IsEditMode)
+{
+<p class="muted">Încarcă o factură PDF (din program de facturare, din e-Factura sau scanată). Aplicația citește tabelul cu liniile facturii și câmpurile din antet și le arată pe pagină ca un șablon interactiv: alegi ce se folosește la importul facturii și ce înseamnă fiecare element. Fișierul se păstrează în memorie cât timp lucrezi aici; când salvezi șablonul, factura se salvează împreună cu el (model), ca să o ai din nou la editarea șablonului. Șablonul se leagă de furnizor: denumirea și CUI/CIF-ul vânzătorului sunt obligatorii.</p>
+}
+}
+
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+@if (xmlSample is not null)
+{
+    <InvoiceXmlTemplateEditor @key="xmlSampleKey" Sample="xmlSample" SampleName="@xmlSampleName" Saved="XmlTemplateSavedAsync" Closed="CloseXmlSample" />
+}
+else if (session is null || draft is null)
+{
+    @if (Embedded)
+    {
+        <div class="invoice-busy" role="status"><div class="spinner"></div><p class="muted">Se încarcă factura în editor…</p></div>
+    }
+    else
+    {
+    <section class="invoice-upload">
+        @if (EditTemplateName is not null)
+        {
+            <div class="demo-banner" role="status"><span aria-hidden="true">✎</span><div>Șablonul <strong>@EditTemplateName</strong> nu are o factură model salvată: încarcă o factură PDF a aceluiași furnizor. Elementele șablonului rămân la pozițiile salvate (fișierul nu este analizat decât dacă apeși „Analizează fișierul”), iar modificările se salvează în șablon (fișierul devine modelul).</div></div>
+        }
+        <FileDropZone Id="invoice-file" Accept=".pdf,application/pdf,.xml,text/xml,application/xml,.zip,application/zip,application/x-zip-compressed" Text="Alege factura PDF, XML sau ZIP" OnChange="OnFileAsync" Disabled="busy" />
+        @if (busy) { <div class="invoice-busy" role="status"><div class="spinner"></div><p class="muted">@(IsEditMode ? "Se deschide fișierul pentru șablon… (o pagină scanată poate dura câteva secunde)" : "Se analizează fișierul… (o pagină scanată poate dura câteva secunde)")</p></div> }
+        <p class="form-note">Sunt acceptate fișiere PDF de cel mult 20 MB și 30 de pagini. O factură XML (e-Factura UBL) sau arhiva ZIP descărcată din e-Factura (se caută în ea factura, nu semnătura) deschide editorul șablonului XML, cu fișierul ca probă.</p>
+    </section>
+}
+}
+else
+{
+    @if (IsEditMode) { <UnsavedChangesTracker @ref="tracker" Snapshot="CurrentSnapshot" Discard="CloseEditingAsync" /> }
+    var pageData = CurrentPageData;
+    <section class="invoice-head" aria-label="Fișierul analizat">
+        <div><strong>@session.FileName</strong> <span class="muted">· @session.Document.Pages.Count @(session.Document.Pages.Count == 1 ? "pagină" : "pagini") · citit @SourceText</span></div>
+        <div class="heading-actions">
+            @if (!analyzed)
+            {
+                <button type="button" class="refresh act-reload" disabled="@(busy || saving)" title="Analizează fișierul (câmpuri, tabel, șabloane potrivite) și așază șablonul pe el" @onclick="AnalyzeFileAsync">@(busy ? "Se analizează…" : "Analizează fișierul")</button>
+            }
+            <button type="button" class="danger" disabled="@saving" @onclick="DiscardAsync">@(Embedded ? "Renunță la crearea șablonului" : "Renunță și elimină fișierul")</button>
+        </div>
+    </section>
+    @if (existing is not null)
+    {
+        <section class="invoice-replace" aria-label="Factura model a șablonului">
+            <div><strong>Editezi șablonul „@existing.Info.Name”</strong> <span class="muted">· @SupplierLabel(existing.Info). Factura de mai sus este modelul salvat cu șablonul.</span></div>
+            <div class="muted">Dacă structura facturii s-a modificat, încarcă un PDF nou: elementele șablonului rămân la pozițiile salvate, iar „Analizează fișierul” le așază pe noul PDF; le corectezi și salvezi (noul PDF devine modelul).</div>
+            <FileDropZone Id="invoice-file-replace" Accept=".pdf,application/pdf" Text="Încarcă alt PDF pentru acest șablon" OnChange="OnFileAsync" Disabled="busy || saving" />
+        </section>
+    }
+    @if (CuiMismatch is { } mismatch) { <div class="invoice-warning" role="status">⚠ @mismatch</div> }
+    @foreach (var warning in session.Analysis.Warnings) { <div class="invoice-warning" role="status">⚠ @warning</div> }
+
+    @if (suggestions.Count > 0)
+    {
+        <section class="invoice-suggestions" aria-label="Șabloane salvate potrivite">
+            <strong>Șabloane salvate care se potrivesc cu fișierul</strong>
+            <ul>
+                @foreach (var suggestion in suggestions)
+                {
+                    var active = existing?.Info.Id == suggestion.Template.Info.Id;
+                    <li>
+                        <span><strong>@suggestion.Template.Info.Name</strong> <span class="muted">· @SupplierLabel(suggestion.Template.Info)</span>
+                            @if (suggestion.Match.SupplierMatch) { <span class="notification-state done">furnizor recunoscut</span> }
+                            <span class="notification-state">potrivire @((int)Math.Round(suggestion.Match.Score * 100))%</span></span>
+                        <button type="button" class="refresh act-confirm" disabled="@(active || saving)" @onclick="() => UseTemplate(suggestion.Template)">@(active ? "În editare" : "Folosește acest șablon")</button>
+                    </li>
+                }
+            </ul>
+            @if (existing is not null) { <button type="button" class="refresh act-nav" disabled="@saving" @onclick="UseAutomaticProposal">Înapoi la propunerea automată</button> }
+        </section>
+    }
+
+    <div class="invoice-layout">
+        <div class="invoice-pages">
+            @if (session.Document.Pages.Count > 1)
+            {
+                <div class="invoice-page-tabs" role="tablist" aria-label="Paginile facturii">
+                    @foreach (var page in session.Document.Pages)
+                    {
+                        var number = page.Number;
+                        <button type="button" role="tab" class="invoice-page-tab @(number == currentPage ? "active" : "")" aria-selected="@(number == currentPage ? "true" : "false")" @onclick="() => currentPage = number">Pagina @number</button>
+                    }
+                </div>
+            }
+            <div class="invoice-draw-tools">
+                <button type="button" class="refresh act-edit" disabled="@(undoStack.Count == 0)" title="@(undoStack.Count > 0 ? "Anulează: " + undoStack[^1].Name + " (Ctrl+Z)" : "Nimic de anulat")" aria-label="Anulează ultima acțiune" @onclick="Undo">↶ Anulează</button>
+                <button type="button" class="refresh act-edit" disabled="@(redoStack.Count == 0)" title="@(redoStack.Count > 0 ? "Refă: " + redoStack[^1].Name + " (Ctrl+Y)" : "Nimic de refăcut")" aria-label="Refă acțiunea anulată" @onclick="Redo">↷ Refă</button>
+                <button type="button" class="refresh act-confirm @(drawMode == "field" ? "active" : "")" aria-pressed="@(drawMode == "field" ? "true" : "false")" @onclick="@(() => ToggleDraw("field"))">▭ Adaugă câmp desenând pe pagină</button>
+                <button type="button" class="refresh act-confirm @(drawMode == "column" ? "active" : "")" aria-pressed="@(drawMode == "column" ? "true" : "false")" @onclick="@(() => ToggleDraw("column"))">▯ Adaugă celulă de antet desenând pe pagină</button>
+                <button type="button" class="refresh act-edit @(drawMode == "zone" ? "active" : "")" aria-pressed="@(drawMode == "zone" ? "true" : "false")" @onclick="@(() => ToggleDraw("zone"))">▮ Desenează zona unei coloane</button>
+                @if (drawMode.Length > 0) { <span class="muted">Trage cu mausul pe pagină@(drawMode == "column" ? " (celula din capul de tabel: lățimea ei devine lățimea coloanei)" : drawMode == "zone" ? " (sub celula coloanei: contează doar înălțimea, unde începe și unde se termină valorile)" : "").</span> }
+                @if (drawMode.Length == 0 && multiIds.Count == 0) { <span class="muted">Trage pe pagină, într-un loc liber, ca să selectezi mai multe elemente.</span> }
+                @if (multiIds.Count > 0)
+                {
+                    <span class="invoice-multi-bar"><strong>@multiIds.Count elemente selectate</strong>
+                        <button type="button" class="danger" @onclick="DeleteMulti">Șterge elementele selectate</button>
+                        <button type="button" class="refresh act-close" @onclick="ClearMulti">Anulează selecția</button></span>
+                }
+            </div>
+            <div class="invoice-page-wrap" style="aspect-ratio: @F(pageData.Width) / @F(pageData.Height)">
+                <img src="@ImageUrl(pageData.Number)" alt="Pagina @pageData.Number a facturii" draggable="false" />
+                <svg class="invoice-overlay @(drawMode.Length > 0 ? "drawing" : "")" viewBox="0 0 @F(pageData.Width) @F(pageData.Height)" preserveAspectRatio="none"
+                     data-invoice-draw="@drawMode" data-invoice-owner="@ownerId" data-invoice-page="@pageData.Number" role="group" aria-label="Elementele șablonului pe pagina @pageData.Number">
+                    @if (draft.HasTable && draft.HeaderPage == pageData.Number)
+                    {
+                        <rect class="invoice-header-band @(selectedKind == 'H' ? "selected" : "")" x="@F(TableLeft)" y="@F(draft.HeaderTop)" width="@F(TableRight - TableLeft)" height="@F(Math.Max(1, draft.HeaderBottom - draft.HeaderTop))"
+                              @onclick="() => Select('H', HeaderBandId)" @onclick:stopPropagation="true"><title>Capul de tabel: apasă ca să-l editezi (celulele lui sunt coloanele tabelului)</title></rect>
+                        @foreach (var column in draft.Columns)
+                        {
+                            var cellId = column.Id;
+                            var (cellTop, cellBottom) = CellExtent(column);
+                            <rect class="invoice-hcell @(column.ZoneDrawn ? "" : "no-zone") @(selectedKind == 'h' && selectedId == cellId ? "selected" : "")" style="--col: @ColumnColor(column)" x="@F(column.Left)" y="@F(cellTop)" width="@F(Math.Max(1, column.Right - column.Left))" height="@F(Math.Max(1, cellBottom - cellTop))"
+                                  @onclick="() => Select('h', cellId)" @onclick:stopPropagation="true"><title>@HeaderCellTitle(column)</title></rect>
+                        }
+                    }
+                    @if (draft.HasTable)
+                    {
+                        var (bodyTop, bodyBottom) = BodyExtent(pageData.Number);
+                        @foreach (var column in draft.Columns)
+                        {
+                            var id = column.Id;
+                            if (!column.ZoneDrawn) { continue; }
+                            if (ColumnExtent(column, pageData.Number, bodyTop, bodyBottom) is not { } zone) { continue; }
+                            <rect class="invoice-column @ColumnClass(column)" style="--col: @ColumnColor(column)" x="@F(column.Left)" y="@F(zone.Top)" width="@F(Math.Max(1, column.Right - column.Left))" height="@F(Math.Max(1, zone.Bottom - zone.Top))"
+                                  @onclick="() => Select('c', id)" @onclick:stopPropagation="true"><title>@ColumnTitle(column)</title></rect>
+                        }
+                    }
+                    @foreach (var field in draft.Fields.Where(field => field.Page == pageData.Number && IsShown(field)))
+                    {
+                        var id = field.Id;
+                        <rect class="invoice-field @FieldClass(field)" x="@F(field.X - 0.6)" y="@F(field.Y - 0.6)" width="@F(field.Width + 1.2)" height="@F(field.Height + 1.2)"
+                              @onclick="() => Select('f', id)" @onclick:stopPropagation="true"><title>@FieldTitle(field)</title></rect>
+                    }
+                    @if (drawMode.Length == 0 && EditBoxOn(pageData.Number) is { } edit)
+                    {
+                        // The selected element: drag it to move it, drag a handle to resize it (invoice-template.js), its label is shown above it
+                        // and the cross removes it.
+                        var size = pageData.Width / 110;
+                        var font = pageData.Width / 72;
+                        var badgeWidth = Math.Min(pageData.Width - 4, edit.Label.Length * font * 0.5 + font * 0.7);
+                        var badgeX = Math.Clamp(edit.X, 2, Math.Max(2, pageData.Width - badgeWidth - 2));
+                        var badgeY = edit.Y - font * 1.9 >= 1 ? edit.Y - font * 1.9 - size * 0.4 : edit.Y + edit.H + size * 0.8;
+                        <g class="invoice-edit" data-invoice-kind="@edit.Kind" data-invoice-id="@edit.Id" data-invoice-page="@pageData.Number"
+                           data-x="@F(edit.X)" data-y="@F(edit.Y)" data-w="@F(edit.W)" data-h="@F(edit.H)">
+                            <rect class="invoice-adjust-outline" x="@F(edit.X)" y="@F(edit.Y)" width="@F(Math.Max(1, edit.W))" height="@F(Math.Max(1, edit.H))" />
+                            <rect class="invoice-handle move" data-invoice-handle="move" x="@F(edit.X)" y="@F(edit.Y)" width="@F(Math.Max(1, edit.W))" height="@F(Math.Max(1, edit.H))"><title>Trage pentru a muta elementul</title></rect>
+                            @foreach (var (name, hx, hy) in HandlesOf(edit))
+                            {
+                                <rect class="invoice-handle @name" data-invoice-handle="@name" x="@F(hx - size / 2)" y="@F(hy - size / 2)" width="@F(size)" height="@F(size)"><title>Trage pentru a redimensiona</title></rect>
+                            }
+                            <g class="invoice-badge" role="button" tabindex="0" aria-label="Editează elementul" @onclick="() => OpenEdit(edit.Kind, edit.Id)" @onclick:stopPropagation="true"><title>Apasă pe etichetă ca să editezi</title>
+                                <rect x="@F(badgeX)" y="@F(badgeY)" width="@F(badgeWidth)" height="@F(font * 1.4)" rx="@F(font * 0.25)" />
+                                <text x="@F(badgeX + font * 0.35)" y="@F(badgeY + font * 1.03)" font-size="@F(font)">@edit.Label</text>
+                            </g>
+                            @if (edit.Kind != 'H')
+                            {
+                                // The cross sits right after the end of the label above the element (invoice-template.js moves it to the real end of the label),
+                                // away from the resize handles on the edges of the element.
+                                var crossR = font * 0.62;
+                                var deleteX = badgeX + badgeWidth + crossR * 1.6;
+                                var deleteY = badgeY + font * 0.7;
+                            <g class="invoice-delete" role="button" tabindex="0" aria-label="Șterge elementul din șablon" @onclick="DeleteSelected" @onclick:stopPropagation="true">
+                                <title>@(edit.Kind is 'h' or 'c' ? "Șterge coloana: celula de antet și zona ei (nu este necesară)" : "Șterge elementul (nu este necesar)")</title>
+                                <circle cx="@F(deleteX)" cy="@F(deleteY)" r="@F(crossR)" />
+                                <text x="@F(deleteX)" y="@F(deleteY + font * 0.32)" font-size="@F(font * 1.0)" text-anchor="middle">×</text>
+                            </g>
+                            }
+                        </g>
+                    }
+                    <rect id="invoice-draw-rect" class="invoice-draw-rect" visibility="hidden" />
+                </svg>
+            </div>
+            <p class="form-note">Chenarele verzi sunt elemente folosite la import, cele întrerupte sunt găsite dar nefolosite, fâșiile verticale colorate sunt coloanele tabelului (fiecare coloană are culoarea ei, ca să se vadă unde se suprapun). Apasă un element ca să-l selectezi, apoi trage-l ca să-l muți, trage mânerele ca să-l redimensionezi, apasă eticheta maro ca să-l editezi și apasă × sau tasta Delete ca să-l ștergi (Ctrl+Z anulează); detaliile se modifică și în panoul de mai jos.</p>
+        </div>
+
+        <div class="invoice-panel">
+            <details class="invoice-section">
+                <summary>Câmpuri din antet <span>@draft.Fields.Count(field => field.Use) folosite din @draft.Fields.Count</span></summary>
+                <ToggleSwitch Class="invoice-weak-toggle" @bind-Value="showAllFields">Arată toate câmpurile găsite (și cele fără sens recunoscut)</ToggleSwitch>
+                @foreach (var group in FieldGroups.Where(group => draft.Fields.Any(field => IsShown(field) && FieldGroupOf(field) == group.Key)))
+                {
+                <div class="invoice-group" role="group" aria-label="@group.Title">
+                <h4 class="invoice-group-title">@group.Title <span>@draft.Fields.Count(field => IsShown(field) && FieldGroupOf(field) == group.Key)</span></h4>
+                <div class="invoice-list" role="list">
+                    @foreach (var field in draft.Fields.Where(field => IsShown(field) && FieldGroupOf(field) == group.Key).OrderBy(field => field.Page).ThenBy(field => field.Y).ThenBy(field => field.X))
+                    {
+                        var id = field.Id;
+                        var selected = selectedKind == 'f' && selectedId == id;
+                        <div class="invoice-item @(selected ? "selected" : "")" role="listitem" id="invoice-item-f-@id">
+                            <div class="invoice-item-row">
+                                <ToggleSwitch Compact Value="@field.Use" ValueChanged="@(value => SetFieldUse(field, value))" AriaLabel="@("Folosit la import: " + FieldTitle(field))" />
+                                <button type="button" class="invoice-item-title" @onclick="() => Select('f', id)">
+                                    <strong>@(field.Name.Length > 0 ? field.Name : "(fără denumire)")</strong>
+                                    <span class="muted">@ShortValue(field.Value)</span>
+                                </button>
+                                <button type="button" class="invoice-icon-btn" title="Editează câmpul" aria-label="Editează câmpul" @onclick="() => OpenEdit('f', id)">✎</button>
+                                <button type="button" class="invoice-icon-btn danger" title="Șterge câmpul (nu este necesar)" aria-label="Șterge câmpul" @onclick="() => RemoveField(field)">🗑</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+                </div>
+                }
+                @if (!draft.Fields.Any(IsShown)) { <p class="muted">Nu s-a găsit niciun câmp recunoscut. Adaugă câmpuri desenând pe pagină.</p> }
+            </details>
+
+            <details class="invoice-section">
+                <summary>Coloane folosite din tabel <span>@draft.Columns.Count(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore) folosite din @draft.Columns.Count</span></summary>
+                @if (draft.Columns.Count == 0) { <p class="muted">Nu s-a găsit tabelul cu liniile facturii. Adaugă coloanele desenând pe pagină (mai întâi coloana cu denumirea, apoi celelalte) și apasă „Citește rândurile” după ce ai stabilit antetul.</p> }
+                <div class="invoice-list" role="list">
+                    @foreach (var column in draft.Columns.OrderBy(column => column.Left))
+                    {
+                        var id = column.Id;
+                        var selected = selectedKind is 'c' or 'h' && selectedId == id;
+                        <div class="invoice-item @(selected ? "selected" : "")" role="listitem" id="invoice-item-c-@id">
+                            <div class="invoice-item-row">
+                                <ToggleSwitch Compact Value="@column.Use" ValueChanged="@(value => SetColumnUse(column, value))" AriaLabel="@("Folosită la import: " + ColumnTitle(column))" />
+                                <button type="button" class="invoice-item-title" @onclick="() => Select('c', id)">
+                                    <strong>@(column.Label.Length > 0 ? column.Label : "(coloană fără denumire)")</strong>
+                                </button>
+                                @if (!column.ZoneDrawn) { <span class="problem-text" title="Fără zonă desenată șablonul nu se poate salva">zona nu e desenată</span> }
+                                <button type="button" class="invoice-icon-btn" title="Editează coloana" aria-label="Editează coloana" @onclick="() => OpenEdit('c', id)">✎</button>
+                                <button type="button" class="invoice-icon-btn danger" title="Șterge coloana (nu este necesară)" aria-label="Șterge coloana" @onclick="() => RemoveColumn(column)">🗑</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+                @if (draft.Columns.Count > 0)
+                {
+                    <div class="editor-grid invoice-table-options">
+                        <label>Rândurile încep la
+                            <select value="@draft.RowSplit" @onchange="args => { draft.RowSplit = args.Value?.ToString() ?? InvoiceRowSplit.Top; Refresh(); }">
+                                <option value="@InvoiceRowSplit.Top" selected="@(draft.RowSplit == InvoiceRowSplit.Top)">linia numărului curent (obișnuit)</option>
+                                <option value="@InvoiceRowSplit.Mid" selected="@(draft.RowSplit == InvoiceRowSplit.Mid)">jumătatea distanței dintre numere (număr centrat pe verticală)</option>
+                            </select></label>
+                        <label>Cod produs în denumire, după separatorul
+                            <input value="@draft.NameCodeSeparator" @onchange="args => { draft.NameCodeSeparator = args.Value?.ToString() ?? string.Empty; Refresh(); }" maxlength="5" placeholder="de exemplu ;" autocomplete="off" />
+                            <small>Dacă denumirea e de forma „COD ; Denumire”, textul dinaintea separatorului devine codul produsului.</small></label>
+                        <label>Antetul tabelului (limita de jos, y)
+                            <input type="number" step="0.5" value="@F(draft.HeaderBottom)" @onchange="args => MoveHeader(args.Value)" />
+                            <small>Rândurile se citesc sub această linie.</small></label>
+                    </div>
+                }
+            </details>
+
+            <details class="invoice-section">
+                <summary>Previzualizare: ce se citește cu acest șablon</summary>
+                @if (preview is null && IsEditMode && !analyzed) { <p class="muted">Șablonul este afișat așa cum a fost salvat, peste fișierul model. Ce se citește cu el apare după ce apeși „Analizează fișierul”.</p> }
+                else if (preview is null) { <p class="muted">Se calculează…</p> }
+                else
+                {
+                    @foreach (var warning in preview.Warnings) { <div class="invoice-warning" role="status">⚠ @warning</div> }
+                    @if (preview.Fields.Count > 0)
+                    {
+                        <div class="table-scroll"><table class="invoice-preview-fields"><thead><tr><th>CÂMP</th><th>VALOARE CITITĂ</th></tr></thead><tbody>
+                        @foreach (var group in FieldGroups)
+                        {
+                        var groupFields = preview.Fields.Where(field => PreviewGroupOf(field.Meaning) == group.Key).ToList();
+                        if (groupFields.Count == 0) { continue; }
+                        <tr class="invoice-group-row"><th colspan="2">@group.Title</th></tr>
+                        @foreach (var field in groupFields)
+                        {
+                            <tr><td>@(field.Name.Length > 0 ? field.Name : "(fără denumire)")</td>
+                                <td>@if (field.Found) { @InvoiceTemplateEngine.Display(field.Value, field.Kind, decimalHint) } else { <span class="muted">— (nimic în regiune)</span> }</td></tr>
+                        }
+                        }
+                        </tbody></table></div>
+                    }
+                    @if (PreviewColumns.Count > 0)
+                    {
+                        <div class="table-scroll"><table class="invoice-preview-rows"><thead><tr><th>#</th>
+                            @foreach (var column in PreviewColumns) { <th>@column.Label.ToUpperInvariant()</th> }
+                            <th>VERIFICARE</th></tr></thead><tbody>
+                        @foreach (var row in preview.Rows)
+                        {
+                            <tr class="@(row.Flags.Count > 0 ? "invoice-row-flag" : null)"><td>@(row.Number?.ToString(CultureInfo.InvariantCulture) ?? "·")</td>
+                                @foreach (var column in PreviewColumns) { <td class="@(IsNumericMeaning(column.Meaning) ? "number" : null)">@(row.Cells.GetValueOrDefault(column.Id, ""))</td> }
+                                <td>@if (row.Flags.Count == 0) { <span class="notification-state done">în regulă</span> } else { <span class="notification-state alert" title="@string.Join("; ", row.Flags)">@string.Join("; ", row.Flags)</span> }</td></tr>
+                        }
+                        </tbody></table></div>
+                        <p class="form-note">@preview.Rows.Count @(preview.Rows.Count == 1 ? "rând citit" : "rânduri citite"). @SumNote</p>
+                    }
+                    else if (draft.Columns.Count > 0) { <p class="muted">Nu există coloane folosite la import.</p> }
+                }
+            </details>
+
+            <details class="invoice-section">
+                <summary>Șablon descriere intrare în stoc a produsului</summary>
+                <p class="form-note">Scrie textul cu care se descrie intrarea în stoc a unui produs preluat din factură. Apasă o etichetă ca să o adaugi la poziția cursorului din text (apare colorată, ca <code>&lt;etichetă&gt;</code> și se înlocuiește cu valoarea ei). Sunt disponibile etichetele active în șablon; Etichetele din rândul „Coloane folosite din tabel” sunt valorile coloanelor tabelului (au culoarea coloanei de pe pagină) și se citesc rând cu rând la importul efectiv al facturii; Operațiile aritmetice ADUNARE{}, SCADERE{}, ÎNMULȚIRE{} (scrisă INMULTIRE{}) și IMPARTIRE{} calculează cu valorile etichetelor dintre acolade (simbolul operației se pune singur între etichete; împărțirea primește exact două). La apăsarea unei etichete sau operații se pun spații înainte și după ea (nu înăuntrul unei operații); spațiile de la începutul și sfârșitul descrierii se șterg în previzualizare și la salvare. Un șablon nou pornește cu un text propus, pe care îl poți modifica.</p>
+                <label class="invoice-description-field" for="invoice-product-description">Descriere intrare în stoc a produsului
+                    <MarkedTextField @ref="descriptionField" Id="invoice-product-description" Multiline="true" Rows="3" MaxLength="@InvoiceProductDescription.MaxLength" Value="@draft.ProductDescription"
+                                     ValueChanged="SetProductDescription" Known="IsKnownDescriptionMark" Operations="true" ColorOf="MarkColor" OperationColor="@OperationColor" /></label>
+                <div class="placeholder-list" aria-label="Etichete din antet">
+                    <span class="muted small">Câmpuri din antet:</span>
+                    @foreach (var (label, description) in InvoiceProductDescription.FieldLabels(draft))
+                    {
+                        <button type="button" class="placeholder-chip" title="@description" @onclick="() => AppendLabel(label)">&lt;@label&gt;</button>
+                    }
+                </div>
+                <div class="placeholder-list" aria-label="Coloane folosite din tabel">
+                    <span class="muted small">Coloane folosite din tabel (valoarea lor, în culoarea coloanei de pe pagină):</span>
+                    @foreach (var (label, description, column) in InvoiceProductDescription.ColumnLabels(draft))
+                    {
+                        <button type="button" class="placeholder-chip column-chip" style="@ChipStyle(column)" title="@description" @onclick="() => AppendLabel(label)">&lt;@label&gt;</button>
+                    }
+                </div>
+                <div class="placeholder-list" aria-label="Operații aritmetice">
+                    <span class="muted small">Operații aritmetice:</span>
+                    @foreach (var operation in InvoiceProductDescription.Operations)
+                    {
+                        var name = operation.Name;
+                        <button type="button" class="placeholder-chip operation-chip" style="@OperationChipStyle" title="@(operation.Title): apasă, apoi adaugă între acolade etichetele operației; simbolul „@(operation.Symbol)” se pune singur între ele (de exemplu @(name)&#123;&lt;Preț unitar&gt; @(operation.Symbol) &lt;Cota TVA&gt;&#125;)" @onclick="() => InsertOperation(name)">@(name)&#123;&#125;</button>
+                    }
+                </div>
+                @if (draft.ProductDescription.Trim().Length > 0)
+                {
+                    <div class="notification-preview" aria-live="polite">
+                        <strong>Previzualizare descriere intrare în stoc a produsului</strong>
+                        <p class="notification-body">@InvoiceProductDescription.RenderSample(draft, preview)</p>
+                    </div>
+                }
+            </details>
+
+            <details class="invoice-section">
+                <summary>Salvare</summary>
+                @if (existing is not null) { <p class="form-note">Editezi șablonul <strong>@existing.Info.Name</strong>. „Salvează” îl înlocuiește; „Salvează ca șablon nou” păstrează șablonul curent și cere o denumire nouă.</p> }
+                <div class="editor-grid">
+                    <label>Denumirea șablonului *<input id="invoice-template-name" @bind="templateName" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxNameLength" autocomplete="off" /></label>
+                    <label>Furnizor (vânzător) *<input @bind="supplierName" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxSupplierNameLength" autocomplete="off" /></label>
+                    <label>CUI/CIF furnizor *<input @bind="supplierCui" @bind:event="oninput" maxlength="20" autocomplete="off" />
+                        <small>@(InvoiceValues.NormalizeCui(supplierCui).Length == 0 ? "CUI/CIF-ul este obligatoriu: cu el se recunoaște furnizorul." : "CUI reținut: " + InvoiceValues.NormalizeCui(supplierCui))</small></label>
+                </div>
+                @if (RegistrySupplier is { } registered)
+                {
+                    <p class="form-note" id="template-supplier-registry">Furnizor din baza de date: <strong>@registered.Name</strong> (CUI @registered.Cui). Șablonul se leagă de el și poartă numele din baza de date; dacă numele furnizorului se schimbă acolo, se schimbă și în șablon.</p>
+                }
+                else if (registryLoaded)
+                {
+                    <div class="invoice-warning" role="status" id="template-supplier-missing">⚠ Furnizorul nu este în baza de date@(supplierName.Trim().Length > 0 ? " (" + supplierName.Trim() + ")" : ""). Adaugă-l: șablonul se leagă de furnizor, iar numele lui este cel returnat de ANAF sau cel introdus manual.
+                        <button type="button" class="refresh act-confirm" @onclick="OpenAddSupplier">+ Adaugă furnizorul</button>
+                        @if (similarSupplier is { } nearSupplier) { <span id="template-similar-supplier"> Sau probabil <strong>@nearSupplier.Name</strong>: <button type="button" class="refresh act-confirm" @onclick="UseSimilarSupplier">Folosește acest furnizor</button></span> }</div>
+                }
+                @foreach (var problem in problems) { <div class="validation-message" role="alert">@problem</div> }
+                <div class="editor-actions">
+                    @if (existing is not null)
+                    {
+                        <button type="button" class="primary" disabled="@saving" @onclick="() => SaveAsync(asNew: false)">@(saving ? "Se salvează…" : "Salvează")</button>
+                        <button type="button" class="refresh act-confirm" disabled="@saving" @onclick="OpenSaveAsNew">Salvează ca șablon nou</button>
+                    }
+                    else { <button type="button" class="primary" disabled="@saving" @onclick="() => SaveAsync(asNew: false)">@(saving ? "Se salvează…" : "Salvează șablonul")</button> }
+                </div>
+                @* The same messages under the buttons: on a scrolled page the ones at the top are out of sight and the user would not know why the saving does not work. *@
+                @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+                @foreach (var problem in problems) { <div class="validation-message" role="alert">@problem</div> }
+                @if (RegistrySupplier is null && registryLoaded) { <div class="invoice-warning" role="status">⚠ Furnizorul nu este în baza de date@(supplierName.Trim().Length > 0 ? " (" + supplierName.Trim() + ")" : ""): adaugă-l sau alege-l din listă, șablonul se leagă de furnizor.</div> }
+            </details>
+        </div>
+    </div>
+    @if (addingSupplier)
+    {
+        <div class="invoice-modal-backdrop">
+            <div class="invoice-modal wide" role="dialog" aria-modal="true" aria-label="Adaugă furnizor">
+                <SupplierEditor @key="addSupplierKey" InitialCui="@supplierCui" InitialName="@supplierName" Saved="SupplierAddedAsync" Closed="CloseAddSupplier" />
+            </div>
+        </div>
+    }
+    @if (popupOpen && PopupField() is { } pf)
+    {
+        <div class="invoice-modal-backdrop" @onmousedown="() => downOnBackdrop = true" @onclick="BackdropClickField">
+            <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare câmp" @onclick:stopPropagation="true" @onmousedown:stopPropagation="true" @onmousedown="() => downOnBackdrop = false">
+                <div class="dialog-head"><h4>Editare câmp @(InvoiceTemplateDraft.EffectiveLabel(pf) is { Length: > 0 } effectiveLabel ? "· etichetă: " + effectiveLabel : "")</h4><HelpButton Topic="setari-facturi-camp" About="Editarea unui câmp al șablonului" /></div>
+                <div class="editor-grid">
+                    <label>Etichetă *<input value="@pf.Name" @onchange="args => RenameField(pf, args.Value?.ToString() ?? string.Empty)" maxlength="120" autocomplete="off" /></label>
+                    @if (InvoiceTemplateDraft.EffectiveLabel(pf).Length == 0)
+                    {
+                        <p class="invoice-warning full-width" role="alert">Câmpul are nevoie de o etichetă: alege ce înseamnă sau scrie una proprie.</p>
+                    }
+                    else if (draft!.SameLabelAs(pf).ToList() is { Count: > 0 } same)
+                    {
+                        <div class="invoice-warning full-width" role="alert">
+                            <strong>Eticheta „@InvoiceTemplateDraft.EffectiveLabel(pf)” este deja folosită</strong> de @(same.Count == 1 ? "alt câmp" : $"alte {same.Count} câmpuri") (valoare: @string.Join(", ", same.Select(item => ShortValue(item.Value)))); @(same.Count == 1 ? "este evidențiat" : "sunt evidențiate") pe pagină cu roșu.
+                            <div class="invoice-warning-actions">
+                                <button type="button" class="refresh act-confirm" @onclick="() => UseFreeLabel(pf)">Folosește „@draft.FreeLabelFor(pf)”</button>
+                                <span class="muted">sau scrie o altă etichetă mai sus.</span>
+                            </div>
+                        </div>
+                    }
+                    <label>Tip de valoare
+                        <select value="@pf.Kind" @onchange="args => { pf.Kind = args.Value?.ToString() ?? pf.Kind; Refresh(); }">
+                            <option value="text" selected="@(pf.Kind == "text")">Text</option><option value="number" selected="@(pf.Kind == "number")">Număr</option><option value="date" selected="@(pf.Kind == "date")">Dată</option>
+                        </select></label>
+                    <ToggleSwitch Value="@pf.Use" ValueChanged="@(value => SetFieldUse(pf, value))">Folosit la import</ToggleSwitch>
+                    <details class="full-width"><summary>Poziția regiunii (puncte PDF)</summary>
+                        <div class="invoice-coords">
+                            <label>X<input type="number" step="0.5" value="@F(pf.X)" @onchange="args => MoveField(pf, x: args.Value)" /></label>
+                            <label>Y<input type="number" step="0.5" value="@F(pf.Y)" @onchange="args => MoveField(pf, y: args.Value)" /></label>
+                            <label>Lățime<input type="number" step="0.5" min="1" value="@F(pf.Width)" @onchange="args => MoveField(pf, width: args.Value)" /></label>
+                            <label>Înălțime<input type="number" step="0.5" min="1" value="@F(pf.Height)" @onchange="args => MoveField(pf, height: args.Value)" /></label>
+                        </div></details>
+                    <p class="muted full-width">Valoare citită: @ShortValue(pf.Value)</p>
+                </div>
+                <div class="invoice-modal-actions">
+                    <button type="button" class="danger" @onclick="() => RemoveField(pf)">@(pf.Manual ? "Șterge câmpul desenat" : "Șterge câmpul (nu este necesar)")</button>
+                    <button type="button" class="primary" disabled="@(InvoiceTemplateDraft.EffectiveLabel(pf).Length == 0 || LabelTaken(pf))" @onclick="ClosePopup">Gata</button>
+                </div>
+            </div>
+        </div>
+    }
+    else if (popupOpen && PopupColumn() is { } pc)
+    {
+        <div class="invoice-modal-backdrop" @onmousedown="() => downOnBackdrop = true" @onclick="BackdropClickColumn">
+            <div class="invoice-modal" role="dialog" aria-modal="true" aria-label="Editare coloană" @onclick:stopPropagation="true" @onmousedown:stopPropagation="true" @onmousedown="() => downOnBackdrop = false">
+                <div class="dialog-head"><h4>Editare coloană @(pc.Label.Length > 0 ? "· " + pc.Label : "")</h4><HelpButton Topic="setari-facturi-coloana" About="Editarea unei coloane a șablonului" /></div>
+                <div class="editor-grid">
+                    <label>Denumirea din antet<input value="@pc.Label" @onchange="args => RenameColumn(pc, args.Value?.ToString() ?? string.Empty)" maxlength="120" autocomplete="off" /></label>
+                    <div class="full-width zone-note">
+                        <span class="muted small">Zona de date a coloanei (trage marginea de sus sau de jos a coloanei pe pagină): @ZoneText(pc)</span>
+                        @if (pc.Top > 0 || pc.Bottom > 0) { <button type="button" class="secondary" @onclick="() => ResetZone(pc)">Zonă automată</button> }
+                    </div>
+                    <details class="full-width"><summary>Poziție și citire (avansat)</summary>
+                        <div class="invoice-coords">
+                            <label>Celula de antet: de la x<input type="number" step="0.5" value="@F(pc.Left)" @onchange="args => MoveColumn(pc, left: args.Value)" /></label>
+                            <label>Celula de antet: până la x<input type="number" step="0.5" value="@F(pc.Right)" @onchange="args => MoveColumn(pc, right: args.Value)" /></label>
+                            <label>Legarea de rând
+                                <select value="@pc.RowMapping" @onchange="args => { pc.RowMapping = args.Value?.ToString() ?? InvoiceRowMapping.Band; Refresh(); }">
+                                    <option value="@InvoiceRowMapping.Band" selected="@(pc.RowMapping == InvoiceRowMapping.Band)">După poziția pe verticală</option>
+                                    <option value="@InvoiceRowMapping.Sequence" selected="@(pc.RowMapping == InvoiceRowMapping.Sequence)">După ordine (a k-a valoare = rândul k)</option>
+                                </select></label>
+                        </div></details>
+                </div>
+                <div class="invoice-modal-actions">
+                    <button type="button" class="danger" @onclick="() => RemoveColumn(pc)">@(pc.Manual ? "Șterge coloana desenată" : "Șterge coloana (nu este necesară)")</button>
+                    <button type="button" class="primary" @onclick="ClosePopup">Gata</button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@if (showSaveAs)
+{
+    <div class="delete-overlay" @onkeydown="SaveAsKeyDown">
+        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="save-as-title">
+            <div class="dialog-head"><h2 id="save-as-title">Salvează ca șablon nou</h2><HelpButton Topic="setari-facturi-salveaza-nou" About="Salvarea ca șablon nou" /></div>
+            <p>Șablonul <strong>@existing?.Info.Name</strong> rămâne neschimbat. Alege denumirea noului șablon.</p>
+            <label for="save-as-name">Denumirea noului șablon *
+                <input id="save-as-name" @bind="saveAsName" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxNameLength" autocomplete="off" autofocus /></label>
+            @if (saveAsError.Length > 0) { <div class="validation-message" role="alert">@saveAsError</div> }
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@saving" @onclick="ConfirmSaveAsNewAsync">Salvează șablonul nou</button>
+                <button type="button" class="danger" @onclick="CloseSaveAs">Anulează</button>
+            </div>
+        </section>
+    </div>
+}
+

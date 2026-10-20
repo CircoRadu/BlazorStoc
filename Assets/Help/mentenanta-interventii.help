@@ -1,0 +1,30 @@
+# Intervenții (fișa beneficiarului)
+Cautare: interventii mentenanta la cerere inregistreaza editeaza sterge fotografii scadenta punct de lucru
+Captura: pagina | /beneficiari | click Panoramic Hotel; full | Intervențiile din fișa beneficiarului
+
+Secțiunea „Intervenții” din fișa beneficiarului: lucrările făcute la punctele lui de lucru. O intervenție de mentenanță mută scadența punctului; una la cerere nu.
+
+## Elemente
+### Antet
+- Fel | listă | Toate, Mentenanță sau La cerere.
+- + Înregistrează intervenție | buton | Deschide formularul de intervenție ([[mentenanta-interventie-editor]]); doar cu dreptul necesar.
+### Tabelul
+- Efectuată la | coloană | Data intervenției.
+- Fel | coloană | Mentenanță sau La cerere.
+- Punct de lucru | coloană | Numele și adresa punctului.
+- Contract | coloană | Contractul punctului, dacă are.
+- Scadență | coloană | Pentru mentenanță: scadența planificată → noua scadență și baza ei; „Nu a modificat scadența” dacă există o intervenție mai recentă.
+- Observații | coloană | Textul intervenției.
+- Foto | coloană | Câte fotografii are.
+- Editează intervenția | iconita:edit | Deschide formularul de editare.
+- Șterge intervenția | iconita:delete | Șterge intervenția; dacă ea a mutat scadența, se cere confirmarea.
+
+## Flux: Cum înregistrez o intervenție de mentenanță
+1. Apasă „+ Înregistrează intervenție” și alege felul „Mentenanță”.
+2. Alege punctul de lucru (doar cele sub un contract activ), data și observațiile.
+3. Alege de unde se numără următoarea scadență și salvează ([[mentenanta-interventie-editor]]).
+
+## Flux: Cum înregistrez o intervenție la cerere
+1. Apasă „+ Înregistrează intervenție” și alege „La cerere”.
+2. Alege punctul, data și scrie observațiile.
+3. Salvează: scadențele nu se modifică.
