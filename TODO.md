@@ -20,7 +20,7 @@ Planul din `docs/PROPUNERE_CONTRACTE_MENTENANTA.md` este implementat integral (v
 
 ## Task 1: Setari -> Baza de date
 
-Propunere, decizii si stare: `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md` (sectiunile 11 si 12). Subtaskuri:
+Propunere, decizii si stare: `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md` (sectiunile 11-14; toate deciziile sunt confirmate, fara intrebari deschise). Subtaskuri in ordinea implementarii:
 
 - 1.1 Etapa 1: finalizare (acces pe rol Administrator + protectia ultimului administrator, rulare teste `dbsettings` si suita, sectiune MariaDB, documentatie, `tools/start-preview.ps1`, verificare in browser).
 - 1.2 Sub-tab "Ajutor" pentru baza de date.

@@ -235,9 +235,18 @@ Azi, cand baza cade, paginile arata erori. Pentru oprirea controlata si pentru c
 - 3b. Monitor de sanatate si starea "Baza de date indisponibila" (13.5).
 - 3c. Controlul serverului bazei: detectare (13.2), serviciul MariaDB (13.3), secventele (13.4), optiunea `-InstallService` pentru instanta de dezvoltare.
 
-### 13.9. Intrebari ramase
+### 13.9. Intrebari (raspunsuri in sectiunea 14)
 
 1. Pe server, MariaDB ruleaza deja ca serviciu Windows? Cum se numeste (de obicei `MariaDB`)?
 2. Sub ce cont va rula serviciul aplicatiei (`LocalSystem` sau un cont dedicat)? Pentru cont dedicat, scriptul acorda dreptul de control asupra serviciului MariaDB.
 3. Instanta de dezvoltare locala poate fi trecuta pe serviciu (`-InstallService`), ca pagina sa se poata testa si acolo?
 4. Pagina de asteptare "Baza de date indisponibila" pentru utilizatorii obisnuiti este acceptata (13.5)?
+
+## 14. Raspunsuri la intrebarile din 13.9 (utilizator, 20.10.2026)
+
+1. MariaDB ruleaza ca **serviciu Windows** pe server. Numele exact al serviciului nu a fost dat: se detecteaza si se confirma in pagina (13.3); implicit se cauta `MariaDB`.
+2. Serviciul aplicatiei ruleaza sub **LocalSystem** (are dreptul sa porneasca/opreasca serviciul MariaDB; scriptul de instalare nu mai trebuie sa acorde drepturi speciale pentru acest caz).
+3. Instanta de dezvoltare locala **poate fi trecuta pe serviciu**: `tools\setup-dev-environment.ps1 -InstallService` (serviciu `BlazorStocMariaDB`), `tools\dev-mariadb.ps1` ramane pentru cine nu o foloseste.
+4. Pagina de asteptare "Baza de date indisponibila" pentru utilizatorii obisnuiti este **acceptata** (13.5).
+
+Toate deciziile 1-7 (sectiunea 11) si 13-14 sunt acum confirmate; nu mai exista intrebari deschise. Implementarea continua dupa ordinea din sectiunea 12 (inceput: finalizarea etapei 1 cu accesul pe rol Administrator), apoi Ajutor (decizia 7), Verificare, 3a, 3b, 3c si conturile/parolele din server (decizia 5).

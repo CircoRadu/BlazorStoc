@@ -11,7 +11,7 @@ Actualizat: 10.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 
 ## In lucru (20.10.2026): Setari -> Baza de date
 
-- Etapa 1 partial implementata, WIP pe branch-ul `ccr-eafcbe49-gslqnq` (commit `fea14a8`); propunerea, deciziile confirmate (sectiunea 11) si ce a ramas (sectiunea 12) sunt in `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md`. Preluare: citeste sectiunile 11 si 12 inainte de a continua.
+- Etapa 1 partial implementata, WIP pe branch-ul `ccr-eafcbe49-gslqnq` (commit `fea14a8`); propunerea, deciziile confirmate (sectiunile 11, 13, 14) si ce a ramas (sectiunea 12) sunt in `docs/PROPUNERE_SETARI_BAZA_DE_DATE.md`. Preluare: citeste sectiunile 11-14 inainte de a continua.
 - Decizie noua care schimba codul deja scris: acces pentru rolul Administrator, fara posibilitatea de a-l pierde (nu doar administratorul configurat).
 
 ## Ultimul lucru facut (10.10.2026, catalog si preluare factura)
