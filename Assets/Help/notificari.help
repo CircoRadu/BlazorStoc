@@ -14,9 +14,9 @@ Expirările apropiate sau depășite, după șabloanele definite de administrato
 - Stare | coloană | „Avertizare” sau „Preluată/Amânată”, după ce ai făcut cu ea.
 - Titlu | coloană | Titlul notificării, din șablon.
 - Obiect | coloană | Vehiculul, contractul, analiza sau factura la care se referă.
-- Scadență / Expiră la | coloană | Data de expirare.
-- Depășit cu (zile) / zile rămase | coloană | Cât a trecut sau cât a rămas.
-- Rândul | rând | Apasă un rând (sau Enter) ca să deschizi detaliile ([[notificari-detaliu]]); rândurile necitite sunt evidențiate.
+- Scadență / Expiră la | coloană | Data de expirare. | sel: table.notification-table th:nth-child(4)
+- Depășit cu (zile) / zile rămase | coloană | Cât a trecut sau cât a rămas. | sel: table.notification-table th.number
+- Rândul | rând | Apasă un rând (sau Enter) ca să deschizi detaliile ([[notificari-detaliu]]); rândurile necitite sunt evidențiate. | sel: tr.notification-row
 
 ## Flux: Cum rezolv o notificare
 1. Apasă rândul notificării ca să-i vezi detaliile.

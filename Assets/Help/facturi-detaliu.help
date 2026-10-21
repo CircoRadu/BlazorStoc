@@ -6,8 +6,8 @@ Fereastra arată produsele preluate dintr-o factură. De aici poți adăuga manu
 
 ## Elemente
 ### Fereastra
-- Titlul și datele facturii | text | Numărul facturii, furnizorul și data emiterii.
-- Tabelul | tabel | Produsul (apasă-l ca să-i deschizi pagina), cantitatea intrată și data intrării. Dacă nu s-a preluat nimic, fereastra spune acest lucru.
+- Titlul și datele facturii | text | Numărul facturii, furnizorul și data emiterii. | sel: .dialog-head h2, p.delete-object
+- Tabelul | tabel | Produsul (apasă-l ca să-i deschizi pagina), cantitatea intrată și data intrării. Dacă nu s-a preluat nimic, fereastra spune acest lucru. | sel: .table-scroll
 - Adaugă produs manual | buton | Deschide fereastra pentru un produs omis ([[facturi-produs-manual]]); doar cu dreptul necesar.
 - Închide | buton | Închide fereastra.
 

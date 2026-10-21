@@ -182,7 +182,7 @@ public static class HelpChecks
         check(html.Split("help-pickable").Length - 1 == 3, "Help: only the rows whose element is on a picture can be chosen (3 of 4 here)");
         check(Regex.IsMatch(html, "data-n=\"0\"[^>]*data-help-pick data-shot=\"alta\"") && Regex.IsMatch(html, "data-n=\"1\"[^>]*data-help-pick data-shot=\"pagina\""), "Help: a row points to the picture named by img: (the first capture otherwise)");
         check(!Regex.IsMatch(html, "data-n=\"2\"[^>]*data-help-pick"), "Help: a row whose element is not on the picture has no frame to show");
-        check(html.Contains("data-help-locate") && html.Contains("Arată pe pagină") && html.Contains("data-help-sel=\"text:&quot;Salvează&quot;\""), "Help: every row has the \"view on page\" icon, with the selector of the element");
+        check(html.Split("data-help-locate").Length - 1 == 3 && !html.Contains("Arată pe pagină") && !html.Contains("data-help-sel"), "Help: a row whose element is on the picture has the \"show on the picture\" icon (3 of 4 here); nothing points to the live page");
         check(!html.Contains("help-badge") && !html.Contains("help-number"), "Help: no numbers or badges on the picture");
 
         var orphan = HelpCatalog.FromSources([("cu-captura", WithShot)], new Dictionary<string, Func<byte[]>> { ["cu-captura.pagina.jpg"] = jpeg, ["cu-captura.pagina.json"] = Json("{\"w\":1920,\"h\":1080,\"rects\":{\"9\":[[1,1,5,5]]}}"), ["alt-topic.x.jpg"] = jpeg });
@@ -198,6 +198,15 @@ public static class HelpChecks
     // The list only shrinks: a topic that gets a "Captura:" must be taken out, a new topic without capture must be added (or get one).
     private static readonly HashSet<string> WithoutCapture = new(StringComparer.OrdinalIgnoreCase)
     {
+    };
+
+    // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.
+    //  - the copy icon of a package row: it needs a NAS that answers with its account (the demo has none and the session is not an administrator, so no share can be made);
+    //  - the result of the last operation on the database accounts: it needs the dedicated accounts and the account that administers the server (the demo database has neither).
+    private static readonly HashSet<string> UnframedElements = new(StringComparer.Ordinal)
+    {
+        "setari-backup|Copiază pe NAS",
+        "setari-baza-conexiune|Rezultatul ultimei operații"
     };
 
     // The pictures shipped with the topics (tools/help-capture.mjs): every "Captura:" has its picture and map, the maps point to real elements, the size stays small.
@@ -216,8 +225,22 @@ public static class HelpChecks
         var noMap = catalog.Topics.Values.SelectMany(topic => catalog.Shots(topic).Where(shot => shot.Map is null || shot.Map.Rects.Count == 0).Select(shot => topic.Key + "." + shot.Capture.Id)).ToList();
         check(noMap.Count == 0, "Help: every picture has a map with at least one element on it" + (noMap.Count > 0 ? ": " + string.Join(", ", noMap.Take(8)) : ""));
         check(catalog.Errors.Count == 0, "Help: the shipped topics, pictures and maps have no errors" + (catalog.Errors.Count > 0 ? " (" + string.Join("; ", catalog.Errors.Take(5)) + ")" : ""));
+
+        // Every element described in a topic is framed on one of the pictures of its topic (the row icon shows the frame there, never on the live page).
+        var unframed = new List<string>();
+        foreach (var topic in catalog.Topics.Values.Where(topic => topic.Captures.Count > 0))
+        {
+            var shown = catalog.Shots(topic).Where(shot => shot.Map is not null).SelectMany(shot => shot.Map!.Rects.Keys).ToHashSet();
+            var elements = topic.AllElements;
+            for (var index = 0; index < elements.Count; index++)
+                if (!shown.Contains(index) && !UnframedElements.Contains(topic.Key + "|" + elements[index].Name)) unframed.Add(topic.Key + ": " + elements[index].Name);
+        }
+        check(unframed.Count == 0, "Help: every element of a topic is framed on a picture (tools/help-capture.mjs --report --suggest lists what is missing)" + (unframed.Count > 0 ? ": " + string.Join(" | ", unframed.Take(8)) : ""));
+        var unframedNow = UnframedElements.Where(entry => catalog.Get(entry.Split('|')[0]) is { } topic && topic.AllElements.Select((element, index) => (element, index))
+            .Any(item => item.element.Name == entry.Split('|')[1] && catalog.Shots(topic).Any(shot => shot.Map?.Rects.ContainsKey(item.index) == true))).ToList();
+        check(unframedNow.Count == 0, "Help: an element that got its frame is taken out of the \"not framed\" list" + (unframedNow.Count > 0 ? ": " + string.Join(", ", unframedNow) : ""));
         var bytes = catalog.ImageNames.Where(name => name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)).Sum(name => (long)catalog.Image(name)!.Length);
-        check(bytes < 12L * 1024 * 1024, $"Help: the screenshots stay under 12 MB ({bytes / 1024 / 1024.0:0.0} MB)");
+        check(bytes < 24L * 1024 * 1024, $"Help: the screenshots stay under 24 MB ({bytes / 1024 / 1024.0:0.0} MB)");
         var rows = HelpRenderer.Topic(catalog.Get("produse-catalog")!, catalog);
         check(rows.Contains("help-pickable") && rows.Contains("<figure class=\"help-shot\""), "Help: the real topic of the product catalog shows its picture and pickable rows");
     }

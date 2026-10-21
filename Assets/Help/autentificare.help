@@ -2,6 +2,7 @@
 Ruta: /Account/Login
 Public: da
 Captura: pagina | /Account/Login | anonymous | Fereastra de autentificare
+Captura: eroare | /Account/Login | anonymous; type #Username=nume.gresit; type #Password=parola-gresita-123; click Intră în aplicație; wait 1500 | Datele greșite la autentificare
 
 Pagina de autentificare protejează accesul la aplicație. Fără cont valid nu se deschide nicio altă pagină.
 
@@ -10,7 +11,7 @@ Pagina de autentificare protejează accesul la aplicație. Fără cont valid nu 
 - Utilizator | câmp | Numele contului tău.
 - Parolă | câmp | Parola contului; nu se afișează pe ecran.
 - Intră în aplicație | buton | Verifică datele și te duce la pagina cerută sau la pagina principală.
-- Mesajul roșu | text | Apare când datele sunt greșite sau când s-au făcut prea multe încercări într-un timp scurt.
+- Mesajul roșu | text | Apare când datele sunt greșite sau când s-au făcut prea multe încercări într-un timp scurt. | img: eroare | sel: p.error-text
 
 ## Flux: Cum intru în aplicație
 1. Scrie numele de utilizator și parola.

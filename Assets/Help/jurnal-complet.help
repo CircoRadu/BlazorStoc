@@ -1,7 +1,8 @@
 # Jurnal complet
 Ruta: /jurnal/complet
 Cautare: jurnal complet toate evenimentele interval export csv luna ultima tot jurnalul
-Captura: pagina | /jurnal/complet |  | Jurnalul complet
+Captura: pagina | /jurnal/complet | select .audit-page-size select = 25; wait 900; full | Jurnalul complet
+Captura: jos | /jurnal/complet | select .audit-page-size select = 25; wait 1200; scroll .audit-page-size | Dimensiunea paginii jurnalului
 
 Toate evenimentele din jurnal, căutate direct pe server, pe pagini. Se afișează implicit ultima lună; alege alt interval sau tot jurnalul. Nu se actualizează singur. Doar administratorul vede jurnalul.
 
@@ -15,8 +16,8 @@ Toate evenimentele din jurnal, căutate direct pe server, pe pagini. Se afișeaz
 - Ultima lună, Ultimele 3 luni, Tot jurnalul | buton | Intervale gata făcute.
 - Exportă CSV | buton | Descarcă evenimentele găsite ca CSV (cel mult un număr maxim, cele mai recente; restrânge intervalul ca să le ai pe toate).
 ### Tabelul
-- Coloanele și filtrele rapide | tabel | La fel ca în jurnalul recent: data, operator, operație, țintă, detalii.
-- Evenimente pe pagină | listă | Dimensiunea paginii, inclusiv „Toate”.
+- Coloanele și filtrele rapide | tabel | La fel ca în jurnalul recent: data, operator, operație, țintă, detalii. | sel: table
+- Evenimente pe pagină | listă | Dimensiunea paginii, inclusiv „Toate”. | img: jos | sel: .audit-page-size
 
 ## Flux: Cum caut un eveniment mai vechi
 1. Alege un interval („Ultimele 3 luni” sau „Tot jurnalul”).

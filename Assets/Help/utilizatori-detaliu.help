@@ -8,7 +8,7 @@ Fișa unui cont: numele de autentificare, numele afișat, tipul și starea. Paro
 ## Elemente
 ### Antet
 - ← Utilizatori | link | Revine la lista conturilor.
-- Numele contului și numele afișat | text | Identificarea contului.
+- Numele contului și numele afișat | text | Identificarea contului. | sel: .page-heading
 - Editează | buton | Deschide formularul contului ([[utilizatori-editor]]); doar cu dreptul necesar.
 ### Date cont
 - Nume utilizator | text | Numele de autentificare.

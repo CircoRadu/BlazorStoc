@@ -6,8 +6,8 @@ Fereastra arată toate modificările făcute asupra unei intrări sau ieșiri de
 
 ## Elemente
 ### Fereastra
-- Titlul | text | Tipul operației și data ei.
-- Lista modificărilor | listă | O intrare pe fiecare modificare, cele mai noi primele: data și ora, utilizatorul, ce s-a schimbat (valoarea veche și cea nouă) și motivul.
+- Titlul | text | Tipul operației și data ei. | sel: .dialog-head h2
+- Lista modificărilor | listă | O intrare pe fiecare modificare, cele mai noi primele: data și ora, utilizatorul, ce s-a schimbat (valoarea veche și cea nouă) și motivul. | sel: ol.movement-history-list
 - Închide | buton | Închide fereastra; Escape face același lucru.
 
 ## Flux: Cum văd cine a modificat o operație

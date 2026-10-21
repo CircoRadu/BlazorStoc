@@ -3,6 +3,8 @@ Ruta: /setari
 Tab: Conexiune
 Cautare: baza de date conexiune server serviciu porneste opreste reporneste port server ocupat host port utilizator parola ssl port aplicatie interfata reporneste aplicatia testeaza salveaza revino configuratia de baza suprascriere conturi conturile bazei parole schimba parola resetare exporta importa configurarea fraza parola implicita drepturi
 Captura: pagina | /setari | click Bază de date; click Conexiune; click Testează conexiunea; wait 2500; click Verifică conturile; wait 3000; full | Conexiunea la baza de date
+Captura: repornire | /setari | click Bază de date; click Conexiune; wait 1500; click Repornește aplicația; wait 900 | Confirmarea repornirii aplicației
+Captura: motiv | http://127.0.0.1:5090/setari | click Bază de date; wait 1500; click Conexiune; wait 1500; full | Serverul bazei de date nu poate fi controlat
 
 Aici ai patru lucruri separate. „Serverul bazei de date” este serviciul Windows al bazei de pe acest calculator: îl pornești, oprești, repornești și îi schimbi portul pe care ascultă. „Baza de date” este conexiunea aplicației la server (host, port, cont, parolă, SSL); schimbă doar unde se conectează aplicația, nu serverul. „Aplicația” este portul la care intri în aplicație din browser. „Conturile bazei de date” verifică și schimbă parolele celor patru conturi fixe ale aplicației. Valorile salvate din pagină se păstrează într-un fișier în afara repository-ului, au prioritate față de fișierul privat de configurare, iar parola este criptată. Este rezervată conturilor cu nivelul Administrator.
 
@@ -16,7 +18,7 @@ Aici ai patru lucruri separate. „Serverul bazei de date” este serviciul Wind
 - Pornește serverul | buton | Apare cât timp serverul este oprit; este închis dacă portul lui este ținut de alt program (cardul spune care).
 - Schimbă portul serverului | buton | Schimbă portul pe care ascultă serverul și îl repornește pe portul nou; aplicația se conectează singură la el.
 - Actualizează starea | buton | Citește din nou starea serviciului și a portului.
-- Motivul când nu se poate | text | Dacă serverul este pe alt calculator, nu există serviciul sau serviciul nu este serverul pe care îl folosește aplicația, cardul nu are butoane și spune de ce și ce faci în loc.
+- Motivul când nu se poate | text | Dacă serverul este pe alt calculator, nu există serviciul sau serviciul nu este serverul pe care îl folosește aplicația, cardul nu are butoane și spune de ce și ce faci în loc. | img: motiv | sel: .database-server p.muted small
 ### Baza de date
 - Host | câmp | Numele sau adresa calculatorului pe care rulează baza (de exemplu 127.0.0.1 pentru același calculator), fără spații.
 - Port la care se conectează | câmp | Portul la care se conectează aplicația, între 1 și 65535. Schimbă doar conexiunea aplicației; portul pe care ascultă serverul se schimbă din cardul „Serverul bazei de date”, iar după aceea acest port se actualizează singur.
@@ -33,7 +35,7 @@ Aici ai patru lucruri separate. „Serverul bazei de date” este serviciul Wind
 ### Rezultatul testului
 - Rezultatul testului | listă | Conectare (host, port, cont și parolă acceptate), Server (versiunea), Schema aplicației (există tabelele aplicației, deci hostul nu arată spre alt server) și Drepturile contului. Un pas cu avertisment nu oprește salvarea; unul cu eroare o oprește.
 ### Butoanele conexiunii
-- Fereastra de confirmare | fereastră | Se deschide când apeși „Salvează și aplică” sau „Revino la configurația de bază” și cere parola contului tău de administrator: administratorul configurat introduce parola din fișierul privat, un administrator din Utilizatori introduce parola contului lui. Dacă parola este greșită, mesajul apare în fereastră și poți încerca din nou; după mai multe încercări greșite, confirmarea este refuzată un minut. | sel: .admin-operation-dialog
+- Fereastra de confirmare | fereastră | Se deschide când apeși „Salvează și aplică” sau „Revino la configurația de bază” și cere parola contului tău de administrator: administratorul configurat introduce parola din fișierul privat, un administrator din Utilizatori introduce parola contului lui. Dacă parola este greșită, mesajul apare în fereastră și poți încerca din nou; după mai multe încercări greșite, confirmarea este refuzată un minut. | img: repornire | sel: page:.delete-dialog
 - Salvează și aplică | buton | Testează valorile, apoi le aplică imediat, fără repornire; dacă ceva nu merge după aplicare, se revine automat la conexiunea veche. Schimbarea este jurnalizată cu valorile vechi și noi, fără parole.
 - Testează conexiunea | buton | Verifică valorile din formular fără să salveze nimic și fără să atingă conexiunea în uz; este jurnalizat.
 - Revino la configurația de bază | buton | Șterge valorile salvate din pagină și folosește din nou fișierul privat de configurare.
@@ -46,8 +48,8 @@ Aici ai patru lucruri separate. „Serverul bazei de date” este serviciul Wind
 - Resetează conturile | buton | Recreează conturile lipsă, repune exact drepturile din catalog și pune parole noi (generate sau cele implicite). Cere contul care administrează serverul, aflat în folderul de date.
 - Exportă configurarea | buton | Descarcă un fișier criptat cu o frază-parolă, cu serverul, cele patru conturi și parolele lor și, la alegere, contul de administrare al serverului. Nu rămâne nimic din el pe server.
 - Importă configurarea | buton | Pune înapoi parolele dintr-un fișier exportat (de exemplu după ce s-a pierdut fișierul de configurare local); fiecare cont se verifică înainte să fie preluat.
-- Ferestrele operațiilor | fereastră | „Schimbă parola”, „Schimbă toate parolele”, „Resetează conturile”, „Exportă configurarea” și „Importă configurarea” deschid fiecare o fereastră cu ce are nevoie operația (parola nouă, fraza-parolă, fișierul) și cu parola contului tău de administrator; vezi [[setari-baza-conturi-operatii]]. Parolele și frazele-parolă cerute de două ori arată imediat dacă cele două coincid.
-- Rezultatul ultimei operații | listă | Ce s-a întâmplat cu fiecare cont la ultima operație. Apare după prima operație, deci nu este în poza de mai sus. | sel: .database-accounts .database-test-steps
+- Ferestrele operațiilor | fereastră | „Schimbă parola”, „Schimbă toate parolele”, „Resetează conturile”, „Exportă configurarea” și „Importă configurarea” deschid fiecare o fereastră cu ce are nevoie operația (parola nouă, fraza-parolă, fișierul) și cu parola contului tău de administrator; vezi [[setari-baza-conturi-operatii]]. Parolele și frazele-parolă cerute de două ori arată imediat dacă cele două coincid. | sel: .database-accounts-actions
+- Rezultatul ultimei operații | listă | Ce s-a întâmplat cu fiecare cont la ultima operație. Apare după prima operație, deci nu este în poza de mai sus. | sel: .database-accounts .database-test-steps | img: pagina
 
 ## Flux: Cum schimb serverul bazei de date
 1. Completează hostul, portul, utilizatorul și, dacă s-a schimbat, parola.

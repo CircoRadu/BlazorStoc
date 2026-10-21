@@ -1,6 +1,6 @@
 # Formularul analizei de risc
 Cautare: analiza de risc formular numar intocmita de data inregistrarii valabilitate luni observatii punct de lucru dezactiveaza
-Captura: formular | /analize-risc | click Adaugă analiză de risc; height 1300 | Formularul analizei de risc
+Captura: formular | /analize-risc | click Adaugă analiză de risc; click sel:input.searchable-select-input; type input.searchable-select-input=Clinica; wait 500; click sel:ul.searchable-select-list li; wait 500; select .editor-grid select = Clinica Eroilor; wait 800; height 1300 | Formularul analizei de risc
 
 Formularul pentru o analiză de risc nouă sau pentru editarea uneia existente. Se deschide în fișa beneficiarului sau în pagina Analize de risc.
 

@@ -43,6 +43,53 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 **Pasi (aplicatie moarta):** `.\BlazorStoc-Actualizare-<v>.exe --status`, apoi `--repair` sau `--rollback`. Pentru restaurarea bazei dintr-un backup: copiaza pachetul de pe NAS in folderul de backup-uri al serverului (daca e doar pe NAS) si da `--rollback --restore-db "<nume pachet>"`.
 
+### 21.10.2026 - Acces din retea si dezinstalare
+
+**Verificat de agent 21.10.2026** (instalare reala intr-un folder de proba, consola ridicata): `/health` 200 si pe adresa din retea a calculatorului (192.168.100.20), aplicatia asculta pe 0.0.0.0, regula de firewall `BlazorStoc (port 5095)` (intrare, permite, doar subreteaua locala, toate profilurile); `--uninstall --remove-data --backup-to`: pachetul de restaurare a fost facut si salvat (dump.sql, assets.json, manifest.json), apoi s-au sters folderul instalarii, folderul de date, sarcina, regula de firewall, intrarea din registru, iar porturile s-au inchis; serviciul bazei (serviciu de proba `BlazorStocMariaDBTest`): oprit si sters, folderul pastrat cand se pastreaza datele (si refolosit de o instalare noua), sters cand se sterg datele. Fereastra de dezinstalare condusa automat (capturi, casete active/inactive). Dezinstalarea unui server real pe care l-ai folosit de la inceput (serviciul `BlazorStocMariaDB` real) nu a fost facuta de agent.
+
+**Ce s-a adaugat:** aplicatia este accesibila implicit din reteaua locala (nu doar de pe server); installerul are `--uninstall` (si butonul „Dezinstaleaza…” in fereastra): doar aplicatia (baza de date si fisierele raman) sau stergere totala cu pierderea datelor, cu pachet de restaurare optional salvat inainte.
+
+**Pasi:**
+1. Dupa instalare, de pe alt calculator din retea deschide `http://<adresa serverului>:<port>/` (nu https) si autentifica-te.
+2. Pe server, dublu clic pe installer -> „Dezinstaleaza…” -> „Sterge doar aplicatia”. Rezultat: aplicatia dispare (sarcina, regula de firewall, serviciul bazei), dar `<install-root>\mariadb` si folderul de date raman; rulat din nou installerul, instaleaza peste ele (conturile private se refac, datele raman).
+3. „Dezinstaleaza…” -> „Stergere totala”, cu „Creeaza un pachet de restaurare” bifat si un folder in afara instalarii: dupa confirmari apare fisierul `.zip` in acel folder si tot ce tine de aplicatie dispare. Fara pachet, fereastra cere o a doua confirmare.
+4. Instaleaza din nou, copiaza pachetul in `<folder de date>\assets\database-backups` si restaureaza-l din pagina de backup a aplicatiei: datele revin.
+
+### 21.10.2026 - Installer cu fereastra (GUI)
+
+**Verificat de agent 21.10.2026:** fereastra a fost condusa automat (UI Automation) pe fisierul real: toate paginile cu capturi, verificarea live a parolelor, butoane active/inactive, si o instalare COMPLETA reala printr-o fereastra elevata, intr-un folder de proba (porturi 5093/3417, fara serviciu Windows si fara sarcina Updater-ului): dependente verificate, baza MariaDB, supervizor, versiunea 0.5.0 (migrarile 1-43, /health 200), contul `boss.admin` facut, autentificare reala cu parola tastata in fereastra reusita si cu una gresita refuzata; apoi sarcina, procesele si folderul de proba au fost sterse. Proba a scos la iveala un defect corectat: supervizorul pornit de sarcina programata nu primea variabilele din `--env` (de exemplu `App__DataRoot`), deci aplicatia nu-si gasea fisierele de configurare; acum `init` le scrie in `scripts\environment.json`, citit de supervizor.
+
+**Ce s-a adaugat:** dublu clic pe installer deschide o fereastra in romana (pagini: folder si setari avansate, cont de administrator cu verificarea live a parolelor, rezumat, progres cu jurnal). **Ce face acum:** acelasi lucru ca varianta din consola, fara a tasta comenzi.
+
+**Pasi:**
+1. Pe un server curat, dublu clic pe `BlazorStoc-Actualizare-<v>.exe`; accepta fereastra Windows de administrator.
+2. Pagina 1: lasa folderul sau alege altul (gol); „Setari avansate” arata porturile 5087 si 3307 si optiunea bazei de date existente. „Continua”.
+3. Pagina 2: scrie utilizatorul, parola, apoi parola repetata gresit (apare `Parolele nu coincid inca`, „Continua” inactiv), apoi corect (apare `Parolele coincid`, „Continua” activ).
+4. Pagina 3: citeste rezumatul, „Instaleaza”. Urmareste jurnalul; la final „Instalarea s-a incheiat”, apoi „Deschide aplicatia” si autentifica-te cu utilizatorul si parola alese.
+5. Pe un server care are instalarea: dublu clic propune „Actualizeaza” cu versiunea veche si cea noua.
+
+### 21.10.2026 - Installerul aduce si instaleaza dependentele (.NET, Visual C++)
+
+**Ce s-a adaugat:** installerul (circa 177 MB) contine installerele Microsoft pentru runtime-ul .NET 9, ASP.NET Core 9 si Visual C++ x64. **Ce face acum:** pe un server unde lipsesc, le instaleaza singur, silentios si fara repornire, dupa ce verifica semnatura Microsoft; ce exista deja nu se reinstaleaza.
+
+**Pasi:** pe un server curat (fara .NET) ruleaza installerul din consola administrator. Rezultat asteptat: mesaje `Installing dotnet-runtime-9.0.x-win-x64.exe ...`, `aspnetcore-runtime ...`, `vc_redist.x64.exe ...`, `The prerequisites are installed.`, apoi instalarea merge mai departe; `dotnet --list-runtimes` arata Microsoft.NETCore.App 9 si Microsoft.AspNetCore.App 9. Pe un server care le are deja nu apare niciun mesaj de instalare.
+
+### 21.10.2026 - Installerul instaleaza tot si alege porturile libere
+
+**Verificat de agent 21.10.2026:** testele automate ale installerului (porturi ocupate mutate pe urmatoarele libere, porturi pastrate la a doua rulare, `--init` cu prima versiune intr-o singura comanda, oprire cand baza nu se poate face, `--no-database`) si o rulare reala a `init` pe acest calculator (5087 si 5088 erau ocupate: a ales 5089; MariaDB real din `C:\Dev` ca proces ascuns pe un port liber, 4 conturi, 28 de tabele, migrarile 1-43 aplicate cu contul de migrare, a doua rulare a pastrat porturile si conturile). Serviciul Windows verificat tot de agent 21.10.2026, cu un serviciu de proba `BlazorStocMariaDBTest` (consola ridicata prin UAC, port 3417, sters la final; serviciul `BlazorStocMariaDB` al calculatorului nu a fost atins): creat de `provision-database.ps1`, pornit, tip Automatic, cont `NT SERVICE\BlazorStocMariaDBTest`, repornire dupa esec configurata; din consola NEridicata contul care a rulat scriptul a oprit si a pornit serviciul, dar nu l-a putut sterge; fisierele private au drept de citire doar pentru acel cont, SYSTEM si Administrators, cu portul ales scris in ele. Ramas: pornirea dupa repornirea PC-ului.md`.
+
+**Ce s-a adaugat:** `--init` nu mai pregateste doar folderele. Alege porturile libere pentru aplicatie (implicit 5087) si pentru baza de date (implicit 3307) si le scrie in `updater\settings.json`; face serverul MariaDB (descarcat cu SHA-256 verificat, sau `--maria-zip` / `--maria-bin`) ca serviciu Windows `BlazorStocMariaDB`, conturile cu parole generate, schema, fisierele private; inregistreaza supervizorul si instaleaza prima versiune. Optiuni noi: `--db-port`, `--maria-bin`, `--maria-zip`, `--no-database`, `--no-service`, `--no-supervisor`, `--no-install`. Pe un server fara instalare nu mai este nevoie de `--init`: o rulare simpla (sau dublu clic) face tot, in `C:\BlazorStoc`.
+
+**Ce face acum:** pe un server nou, o singura comanda ca administrator instaleaza tot; porturile ocupate sunt inlocuite cu urmatoarele libere si afisate in consola.
+
+**Pasi (server nou):**
+1. `.\BlazorStoc-Actualizare-<v>.exe` intr-o consola administrator (nu tastezi amprenta: la prima instalare cheia pachetului din fisier devine de incredere si installerul spune "First installation: the signer ... is trusted from now on"), pe un server fara nicio instalare (fara `--init`: installerul isi da seama singur si instaleaza in `C:\BlazorStoc`; cu `--install-root D:\BlazorStoc` pentru alt folder gol). Rezultat asteptat: mesaje "Application port: ..." si "Database port: ...", "[database] ready: MariaDB answers on 127.0.0.1:<port>", "Done: BlazorStoc <v> is installed and answering".
+2. Daca 5087 sau 3307 sunt ocupate (de exemplu porneste inainte `python -m http.server 5087`), mesajul spune portul liber ales; acelasi port este in `updater\settings.json`, in `Database.Port` din `application-connection.private.json` si in sarcina `BlazorStocSupervisor-<port>`.
+3. `Get-Service BlazorStocMariaDB` este Running, tip Automatic; dupa repornirea calculatorului baza si aplicatia pornesc singure.
+4. La inceput installerul cere contul de administrator al aplicatiei: **User name**, **Password** (apar `*`), **Repeat the password**. Tasteaza parola repetata gresit si observa ca linia arata `[the passwords do not match yet]`, apoi corecteaz-o (Backspace) si apare `[the passwords match]`; cu parole diferite la Enter te intreaba din nou. Dupa instalarea versiunii vezi `Administrator account "<utilizator>" made in the users of the application`.
+5. Deschide aplicatia si autentifica-te cu acel utilizator si acea parola. Trebuie sa ai toate meniurile (Setari, Utilizatori etc.); in Utilizatori contul apare cu rolul Administrator, iar in Jurnal este "Creare cont administrator la instalare" (actor: sistem). Contul `admin` din configurare (parola generata, neafisata; comanda care o citeste o tipareste scriptul bazei) ramane doar ultima solutie.
+6. Rulat din nou pe acelasi server cu acelasi nume de utilizator, installerul spune ca utilizatorul exista deja si ca parola tastata nu s-a aplicat.
+
 ### 20.10.2026 - Setari -> Actualizare: actualizarea aplicatiei dintr-un pachet
 
 **Verificat de agent 20.10.2026** pe un server de proba (supervizor si sarcini programate reale, baza de test): incarcare, verificare, anulare, actualizare, refuz, revenire automata, pachet cu cheie necunoscuta, sarcina lipsa, installer manual. Ce ramane pentru tine: pasii de mai jos pe serverul tau real.

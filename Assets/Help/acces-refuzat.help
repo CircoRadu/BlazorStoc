@@ -7,7 +7,7 @@ Pagina apare când tipul tău de utilizator nu are dreptul să deschidă o pagin
 
 ## Elemente
 ### Pagina
-- Mesajul | text | Explică faptul că tipul de utilizator nu permite pagina sau operația cerută.
+- Mesajul | text | Explică faptul că tipul de utilizator nu permite pagina sau operația cerută. | sel: p.muted
 - Înapoi la pagina principală | buton | Te duce la pagina principală, unde vezi secțiunile la care ai acces.
 
 ## Flux: Cum primesc acces la o pagină

@@ -1,6 +1,7 @@
 # Formularul de proiect
 Cautare: proiect formular denumire observatii componente sisteme beneficiar
-Captura: formular | /beneficiari | click Panoramic Hotel; click Adaugă proiect | Formularul de proiect
+Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click Adaugă proiect | Formularul de proiect
+Captura: editare | /beneficiari | click Panoramic Hotel; wait 3000; click Supraveghere video si control acces; wait 5000; click Editează; wait 1500; type section.product-editor input=Supraveghere video si control acces – hotel, etapa 2; wait 800; height 1300 | Editarea unui proiect
 
 Formularul pentru un proiect nou sau pentru editarea unuia existent. Se deschide din fișa beneficiarului sau din pagina proiectului.
 
@@ -10,7 +11,7 @@ Formularul pentru un proiect nou sau pentru editarea unuia existent. Se deschide
 - Denumire proiect * | câmp | Numele proiectului, cel mult 200 de caractere.
 - Observații | câmp | Text liber, cel mult 4000 de caractere.
 - Componente (sisteme) | comutatoare | Doar la proiect nou: alegi sistemele proiectului (din nomenclator); se pot adăuga sau scoate și mai târziu, din pagina proiectului.
-- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
 ### Butoane
 - Salvează proiectul | buton | Salvează; la editare cere mai întâi confirmarea modificărilor.
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.

@@ -29,8 +29,8 @@ Catalogul arată toate produsele cu stocul lor. Poți căuta, filtra după categ
 - Ieșire rapidă | iconita:exit | Deschide o fereastră de ieșire pentru produsul de pe rând (doar cu dreptul necesar).
 - Mișcările produsului | iconita:view | Deschide pagina produsului cu intrările, ieșirile și istoricul lui.
 ### Subsol
-- Numărul de rezultate | text | Câte produse corespund filtrelor.
-- Paginile | butoane | Catalogul are 10 produse pe pagină; săgețile trec la pagina anterioară sau următoare.
+- Numărul de rezultate | text | Câte produse corespund filtrelor. | sel: .table-footer > span:first-child
+- Paginile | butoane | Catalogul are 10 produse pe pagină; săgețile trec la pagina anterioară sau următoare. | sel: .pagination
 
 ## Flux: Cum caut un produs
 1. Scrie în câmpul de căutare o parte din codul sau din descrierea produsului.

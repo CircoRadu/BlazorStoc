@@ -1,26 +1,28 @@
 # Formularul de furnizor
 Cautare: furnizor formular cui cod tva tara anf denumire alternativa alias duplicat
 Captura: formular | /furnizori | click Adaugă furnizor | Formularul de furnizor
+Captura: editare | /furnizori | click sel:.row-icon.edit; wait 1000; type #supplier-name=Alfa Securitate Distribuție Plus SRL; wait 600; height 1450 | Editarea unui furnizor existent
+Captura: din-factura | /produse/preluare-factura | sql UPDATE suppliers SET name='ELECTRIC STANDARD PREST SRL' WHERE id=550; upload factura-demo.pdf; wait 9000; click Pasul următor; wait 3000; type #pickup-supplier-cui=RO9178894; key Tab; wait 2500; click + Adaugă furnizorul; wait 1500; click Preia date din ANAF; wait 6000; full; then; sql UPDATE suppliers SET name='Nordic Electronic Trade SRL' WHERE id=550 | Furnizor adăugat din factură, cu numele citit din ANAF
 
 Formularul pentru un furnizor nou sau pentru editarea unuia existent. Se deschide deasupra registrului sau fișei furnizorului și ca fereastră în fluxul de preluare a facturilor (CUI-ul și numele citite din factură vin completate).
 
 ## Elemente
 ### Identificare
 - Țara furnizorului * | listă | România (CUI verificat în ANAF) sau alt stat membru UE (cod de TVA introdus manual).
-- CUI / Cod de TVA * | câmp | La România: 2–10 cifre, opțional precedate de RO. La alt stat: începe cu codul țării (prefixul se adaugă singur dacă lipsește). Identificatorul nu poate exista de două ori; când furnizorul are facturi, intrări de stoc sau șabloane legate, țara și identificatorul nu se mai pot schimba.
+- CUI / Cod de TVA * | câmp | La România: 2–10 cifre, opțional precedate de RO. La alt stat: începe cu codul țării (prefixul se adaugă singur dacă lipsește). Identificatorul nu poate exista de două ori; când furnizorul are facturi, intrări de stoc sau șabloane legate, țara și identificatorul nu se mai pot schimba. | sel: .beneficiary-cui-row
 - Preia date din ANAF / Preia din nou din ANAF | buton | Doar pentru România: interoghează ANAF și completează datele. Dacă valorile diferă de cele din formular, se deschide [[beneficiari-anaf-diferente]].
-- Sursa datelor | text | Din ANAF, manual sau editat după ANAF.
-- Avertismentul de duplicat | mesaj | Apare când în registru există deja un furnizor cu același nume: CUI-ul citit din factură poate fi greșit.
-- Ține minte numele din factură | comutator | Când numele din ANAF diferă de cel din factură, păstrezi numele din factură ca denumire alternativă.
+- Sursa datelor | text | Din ANAF, manual sau editat după ANAF. | sel: .anaf-source-cell
+- Avertismentul de duplicat | mesaj | Apare când în registru există deja un furnizor cu același nume: CUI-ul citit din factură poate fi greșit. | img: din-factura | sel: #supplier-duplicate-name
+- Ține minte numele din factură | comutator | Când numele din ANAF diferă de cel din factură, păstrezi numele din factură ca denumire alternativă. | img: din-factura | sel: #supplier-read-name
 ### Date
 - Denumire * | câmp | Numele furnizorului.
 - Adresă, Număr de telefon | câmp | Date de contact.
 - Nr. Registrul Comerțului | câmp | De exemplu J40/1234/2020.
 - Cod poștal, Cod CAEN | câmp | Doar pentru România: 5–6 cifre, respectiv 3–4 cifre.
-- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
 ### Denumiri alternative (doar la editare)
-- Lista | listă | Alte scrieri ale numelui pe facturi (denumire comercială, prescurtare, grafie citită constant de OCR); factura se recunoaște și după ele. Forma juridică, punctele și majusculele nu contează. „Șterge” scoate o denumire.
-- Denumire alternativă nouă | câmp | Scrii denumirea și apeși „+ Adaugă denumirea”.
+- Lista | listă | Alte scrieri ale numelui pe facturi (denumire comercială, prescurtare, grafie citită constant de OCR); factura se recunoaște și după ele. Forma juridică, punctele și majusculele nu contează. „Șterge” scoate o denumire. | img: editare | sel: .supplier-aliases
+- Denumire alternativă nouă | câmp | Scrii denumirea și apeși „+ Adaugă denumirea”. | img: editare | sel: .supplier-aliases input
 ### Salvare
 - Salvează furnizorul | buton | Salvează; la editare cere confirmarea modificărilor.
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.

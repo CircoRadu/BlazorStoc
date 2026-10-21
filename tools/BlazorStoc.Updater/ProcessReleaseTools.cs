@@ -121,6 +121,15 @@ public sealed class ProcessReleaseTools(InstallLayout layout, UpdaterSettings se
         return (process.ExitCode, await output.ConfigureAwait(false), await error.ConfigureAwait(false));
     }
 
+    /// <summary>Makes the administrator account with the installed application (BlazorStoc.dll --create-administrator, the details as one JSON line on its input). Returns the exit code of the application (0 made, 4 exists, 5 not valid) and its line.</summary>
+    public async Task<(int Code, string Message)> CreateAdministratorAsync(string appFolder, string username, string displayName, string password, CancellationToken cancellationToken)
+    {
+        var request = JsonSerializer.Serialize(new { username, displayName, password });
+        var (code, output, error) = await RunAsync(appFolder, ["--create-administrator"], withMigrator: false, request, TimeSpan.FromMinutes(3), cancellationToken).ConfigureAwait(false);
+        var line = output.Split('\n').Select(row => row.Trim()).FirstOrDefault(row => row.StartsWith("ADMIN-", StringComparison.Ordinal));
+        return (code, line ?? (code == 0 ? "The administrator account was made." : $"The administrator account was not made: {Tail(error.Length > 0 ? error : output)}"));
+    }
+
     private static string SettingsDataRoot() => UpdaterSettings.DataRoot();
 
     private static string Tail(string text)

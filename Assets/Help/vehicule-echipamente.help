@@ -2,12 +2,13 @@
 Ruta: /vehicule/{id:int}/echipamente
 Cautare: echipamente materiale masina vehicul restituie depozit muta nivel tinta completeaza
 Captura: pagina | /vehicule | click sel:a.category-table-link; click Echipamente aflate în mașină; full | Echipamentele din vehicul
+Captura: nivel | /vehicule | click sel:a.category-table-link; wait 1500; click Echipamente aflate în mașină; wait 4000; click sel:input.searchable-select-input; wait 500; click sel:ul.searchable-select-list li; wait 800; type .vehicle-targets input[type=number]=3; wait 300; click Setează nivelul; wait 1500; full; then; sql DELETE FROM vehicle_target_levels | Nivelul țintă
 
 Produsele aflate în mașină. Ajung aici prin ieșiri de stoc către autovehicul și se întorc în depozit sau se mută în altă mașină. În partea de jos poți defini câte bucăți ar trebui să aibă mașina din fiecare produs (nivelul țintă).
 
 ## Elemente
 ### Antet
-- ← Numărul vehiculului | link | Revine la fișa vehiculului ([[vehicule-detaliu]]).
+- ← Numărul vehiculului | link | Revine la fișa vehiculului ([[vehicule-detaliu]]). | sel: a.nav-back
 - Restituie tot în depozit | buton | Întoarce toate produsele din mașină în depozit.
 - Mută tot în altă mașină | buton | Mută toate produsele în altă mașină.
 ### Tabelul de produse
@@ -15,13 +16,13 @@ Produsele aflate în mașină. Ajung aici prin ieșiri de stoc către autovehicu
 - Cantitate | coloană | Câte bucăți sunt în mașină.
 - Restituie în depozit | iconita:return | Întoarce în depozit o cantitate din produsul de pe rând.
 - Mută în altă mașină | iconita:move | Mută o cantitate din produs în altă mașină.
-- Totalul din subsol | text | Numărul de repere și numărul total de bucăți.
+- Totalul din subsol | text | Numărul de repere și numărul total de bucăți. | sel: .table-footer
 ### Nivel țintă
-- Produs | listă | Alegi produsul pentru care stabilești nivelul.
-- Nivelul | câmp | Câte bucăți ar trebui să aibă mașina din produs; „Setează nivelul” îl salvează.
-- Tabelul nivelurilor | tabel | Nivelul țintă, cât este în mașină și cât lipsește.
-- Elimină nivelul țintă | iconita:delete | Scoate nivelul produsului.
-- Completează la nivel | link | Deschide „Ieșire multiplă” cu produsele care lipsesc, pregătite din depozit; o verifici și o salvezi tu.
+- Produs | listă | Alegi produsul pentru care stabilești nivelul. | img: nivel
+- Nivelul | câmp | Câte bucăți ar trebui să aibă mașina din produs; „Setează nivelul” îl salvează. | img: nivel
+- Tabelul nivelurilor | tabel | Nivelul țintă, cât este în mașină și cât lipsește. | img: nivel | sel: .vehicle-targets table
+- Elimină nivelul țintă | iconita:delete | Scoate nivelul produsului. | img: nivel
+- Completează la nivel | link | Deschide „Ieșire multiplă” cu produsele care lipsesc, pregătite din depozit; o verifici și o salvezi tu. | img: nivel
 
 ## Flux: Cum restitui un produs din mașină în depozit
 1. Pe rândul produsului apasă iconița „Restituie în depozit”.

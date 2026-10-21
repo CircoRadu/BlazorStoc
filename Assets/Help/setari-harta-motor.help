@@ -3,12 +3,13 @@ Ruta: /setari
 Tab: Motor hartă
 Cautare: motor harta furnizor dale url atribuire zoom centru cheie testeaza openstreetmap
 Captura: pagina | /setari | click Hartă; full | Motorul hărții
+Captura: salvate | /setari | click Hartă; wait 1000; type #map-start-zoom=7; key Tab; wait 500; click Salvează setările; wait 1000; click sel:.delete-dialog button.primary; wait 2500; full; then; click Revino la valorile din configurația aplicației; wait 1000; click sel:.delete-dialog button.primary; wait 2000 | Setări salvate: apare revenirea la valorile aplicației
 
 Furnizorul fundalului hărții de mentenanță: adresa dalelor, atribuirea cerută de furnizor, limitele de zoom și punctul de pornire. Browserul cere dalele direct de la furnizor; numele beneficiarilor, contractele și scadențele nu părăsesc aplicația.
 
 ## Elemente
 ### Furnizorul
-- Starea setărilor | text | „Setări salvate din această pagină” sau „Se folosesc valorile din configurația aplicației”.
+- Starea setărilor | text | „Setări salvate din această pagină” sau „Se folosesc valorile din configurația aplicației”. | sel: text:"Se folosesc valorile"
 - Adresa dalelor * | câmp | Adresă https cu {z}, {x}, {y} (opțional {s}, {r} și {key}); de exemplu https://tile.openstreetmap.org/{z}/{x}/{y}.png.
 - Text atribuire *, Adresa atribuirii | câmp | Atribuirea cerută de furnizor, afișată pe hartă.
 - Zoom minim, Zoom maxim, Zoom de pornire | câmp | Limitele de apropiere ale hărții.
@@ -18,7 +19,7 @@ Furnizorul fundalului hărții de mentenanță: adresa dalelor, atribuirea cerut
 - Testează furnizorul | buton | Verifică dacă dalele se încarcă.
 - Salvează setările | buton | Salvează.
 - Renunță la modificări | buton | Revine la valorile salvate.
-- Revino la valorile din configurația aplicației | buton | Apare când există setări salvate: le șterge.
+- Revino la valorile din configurația aplicației | buton | Apare când există setări salvate: le șterge. | img: salvate
 
 ## Flux: Cum schimb furnizorul hărții
 1. Completează adresa dalelor și atribuirea.

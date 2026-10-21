@@ -1,6 +1,6 @@
 # Formularul de contract de mentenanță
 Cautare: contract mentenanta formular numar data ciclicitate valabil puncte de lucru prima interventie scadenta mutare
-Captura: formular | /beneficiari | click Panoramic Hotel; click Adaugă contract | Formularul de contract
+Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click Adaugă contract; wait 900; height 2150 | Formularul de contract
 
 Formularul pentru un contract nou sau pentru editarea unuia existent. Se deschide în fișa beneficiarului. Contractul acoperă unul sau mai multe dintre punctele de lucru ale beneficiarului.
 
@@ -12,13 +12,13 @@ Formularul pentru un contract nou sau pentru editarea unuia existent. Se deschid
 - Observații | câmp | Text liber.
 ### Puncte de lucru din contract
 - Data primei intervenții | câmp | Scadența inițială pentru mai multe puncte deodată; „Aplică tuturor punctelor bifate” o pune pe toate.
-- Marcajul punctului | comutator | Include sau scoate punctul din contract. Dacă punctul e deja într-un alt contract activ, apare „Mută aici”: scadența și ciclicitatea lui se păstrează la mutare.
+- Marcajul punctului | comutator | Include sau scoate punctul din contract. Dacă punctul e deja într-un alt contract activ, apare „Mută aici”: scadența și ciclicitatea lui se păstrează la mutare. | sel: table .row-toggle
 - Punct de lucru | coloană | Numele și adresa punctului (cel principal este marcat).
 - Stare | coloană | „În acest contract” sau contractul activ în care se află deja.
 - Prima intervenție / Scadența curentă | câmp | Data primei vizite planificate pentru punct (nu data de la care se numără ciclul).
 - Ciclicitate individuală | listă | Înlocuiește ciclicitatea contractului pentru punctul respectiv.
 ### Butoane
-- Salvează | buton | Salvează contractul.
+- Salvează | buton | Salvează contractul. | sel: .editor-actions button.primary
 - Închide, Anulează | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
 
 ## Flux: Cum adaug un contract de mentenanță

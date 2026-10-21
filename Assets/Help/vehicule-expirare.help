@@ -6,8 +6,8 @@ Fereastra schimbă o singură dată de expirare (ITP, asigurare sau rovinietă) 
 
 ## Elemente
 ### Fereastra
-- Titlul | text | Ce dată modifici și vehiculul (număr și descriere).
-- Data * | câmp | Noua dată de expirare, aleasă din calendar.
+- Titlul | text | Ce dată modifici și vehiculul (număr și descriere). | sel: .dialog-head h2
+- Data * | câmp | Noua dată de expirare, aleasă din calendar. | sel: .delete-dialog label
 - Salvează | buton | Salvează data; modificarea apare în jurnal cu valoarea veche și cea nouă.
 - Anulează | buton | Închide fereastra fără modificări.
 

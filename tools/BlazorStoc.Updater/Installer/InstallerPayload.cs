@@ -21,6 +21,7 @@ public sealed class InstallerPayload : IDisposable
     public const string PackageEntry = "package.bsu";
     public const string InfoEntry = "installer.json";
     public const string UpdaterPrefix = "updater/";
+    public const string PrerequisitesPrefix = "prerequisites/";
     private const int TrailerBytes = 8 + 16;
 
     private readonly FileStream file;
@@ -38,6 +39,9 @@ public sealed class InstallerPayload : IDisposable
     /// <summary>The names of the files of the updater inside the payload (without the prefix).</summary>
     public IReadOnlyList<string> UpdaterFiles => [.. archive.Entries.Where(entry => entry.FullName.StartsWith(UpdaterPrefix, StringComparison.Ordinal) && entry.Name.Length > 0).Select(entry => entry.FullName[UpdaterPrefix.Length..])];
 
+    /// <summary>The installers of what the application needs and a server may lack (the .NET runtimes, the Visual C++ runtime), by file name.</summary>
+    public IReadOnlyList<string> PrerequisiteFiles => [.. archive.Entries.Where(entry => entry.FullName.StartsWith(PrerequisitesPrefix, StringComparison.Ordinal) && entry.Name.Length > 0).Select(entry => entry.FullName[PrerequisitesPrefix.Length..]).OrderBy(name => name, StringComparer.Ordinal)];
+
     public void Dispose()
     {
         archive.Dispose();
@@ -47,7 +51,7 @@ public sealed class InstallerPayload : IDisposable
     // ---- making the installer (on the build machine) ----
 
     /// <summary>Copies the launcher to <paramref name="outputExe"/> and appends the payload; returns the SHA-256 of the finished file.</summary>
-    public static async Task<string> BuildAsync(string launcherExe, string outputExe, string packagePath, string updaterFolder, DateTime builtUtc, string version, CancellationToken cancellationToken = default)
+    public static async Task<string> BuildAsync(string launcherExe, string outputExe, string packagePath, string updaterFolder, DateTime builtUtc, string version, CancellationToken cancellationToken = default, string? prerequisitesFolder = null)
     {
         if (!File.Exists(launcherExe)) throw new ArgumentException($"The launcher {launcherExe} does not exist.");
         if (!File.Exists(packagePath)) throw new ArgumentException($"The package {packagePath} does not exist.");
@@ -72,6 +76,10 @@ public sealed class InstallerPayload : IDisposable
                     if (relative.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase)) continue;
                     zip.CreateEntryFromFile(path, UpdaterPrefix + relative, CompressionLevel.Optimal);
                 }
+                // The installers of the prerequisites are Microsoft's own, already compressed: stored as they are.
+                if (prerequisitesFolder is not null)
+                    foreach (var path in Directory.EnumerateFiles(prerequisitesFolder, "*.exe", SearchOption.TopDirectoryOnly).OrderBy(path => path, StringComparer.Ordinal))
+                        zip.CreateEntryFromFile(path, PrerequisitesPrefix + Path.GetFileName(path), CompressionLevel.NoCompression);
             }
             File.Copy(launcherExe, outputExe, overwrite: true);
             await using (var output = new FileStream(outputExe, FileMode.Append, FileAccess.Write, FileShare.None))
@@ -133,13 +141,18 @@ public sealed class InstallerPayload : IDisposable
     }
 
     /// <summary>Writes the files of the updater into <paramref name="destination"/>; a name that would leave the folder is refused.</summary>
-    public async Task ExtractUpdaterAsync(string destination, CancellationToken cancellationToken = default)
+    public Task ExtractUpdaterAsync(string destination, CancellationToken cancellationToken = default) => ExtractAsync(UpdaterPrefix, destination, cancellationToken);
+
+    /// <summary>Writes the installers of the prerequisites into <paramref name="destination"/> (file names as in <see cref="PrerequisiteFiles"/>).</summary>
+    public Task ExtractPrerequisitesAsync(string destination, CancellationToken cancellationToken = default) => ExtractAsync(PrerequisitesPrefix, destination, cancellationToken);
+
+    private async Task ExtractAsync(string prefix, string destination, CancellationToken cancellationToken)
     {
         var root = Path.GetFullPath(destination).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
         Directory.CreateDirectory(root);
-        foreach (var entry in archive.Entries.Where(entry => entry.FullName.StartsWith(UpdaterPrefix, StringComparison.Ordinal) && entry.Name.Length > 0))
+        foreach (var entry in archive.Entries.Where(entry => entry.FullName.StartsWith(prefix, StringComparison.Ordinal) && entry.Name.Length > 0))
         {
-            var relative = entry.FullName[UpdaterPrefix.Length..];
+            var relative = entry.FullName[prefix.Length..];
             if (relative.Contains('\\') || relative.Split('/').Any(part => part is "" or "." or ".." || part.Contains(':'))) throw new InvalidDataException($"The installer holds a file with an unsafe name: {entry.FullName}.");
             var target = Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
             if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException($"The installer holds a file with an unsafe name: {entry.FullName}.");

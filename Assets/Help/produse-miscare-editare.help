@@ -1,6 +1,6 @@
 # Editarea unei mișcări de stoc
 Cautare: editare miscare intrare iesire data cantitate descriere motiv
-Captura: fereastra | /produse | click sel:.row-icon.view; click sel:.row-icon.edit | Editarea unei mișcări de stoc
+Captura: fereastra | /produse | type .search-box input=CIT-RFID; wait 1000; click sel:.row-icon.view; wait 1500; click sel:.row-icon.edit; wait 1500 | Editarea unei mișcări de stoc
 
 Fereastra corectează o mișcare existentă (intrare sau ieșire). Destinația și sursa unei ieșiri nu se schimbă aici; data, cantitatea și descrierea pot fi corectate, iar motivul modificării rămâne în istoric.
 
@@ -9,8 +9,8 @@ Fereastra corectează o mișcare existentă (intrare sau ieșire). Destinația �
 - Data mișcării * | câmp | Din calendar; nu poate fi în viitor.
 - Cantitate * | câmp | Numărul de bucăți.
 - Descriere | câmp | Descrierea mișcării.
-- Destinația ieșirii | selecție | La ieșiri către beneficiar poți corecta beneficiarul și proiectul; la ieșirile către vehicul, destinația și sursa nu se schimbă (mesajul explică).
-- Motivul modificării | câmp | Rezumatul modificărilor se generează sau scrii un motiv propriu; apare în istoricul mișcării.
+- Destinația ieșirii | selecție | La ieșiri către beneficiar poți corecta beneficiarul și proiectul; la ieșirile către vehicul, destinația și sursa nu se schimbă (mesajul explică). | sel: fieldset.destination-group, .exit-picker
+- Motivul modificării | câmp | Rezumatul modificărilor se generează sau scrii un motiv propriu; apare în istoricul mișcării. | sel: fieldset.change-reason-field
 - Salvează | buton | Salvează modificările.
 - Anulează | buton | Închide fereastra fără modificări; Escape face același lucru.
 

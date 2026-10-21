@@ -289,6 +289,16 @@ var statusOnly = args.Contains("--schema-status");
         return 1;
     }
 }
+// "--create-administrator": the installer makes the first administrator account (details on the standard input) after the schema is current, then exits.
+if (args.Contains("--create-administrator"))
+{
+    try { return await BlazorStoc.Services.AdministratorBootstrap.RunAsync(app.Services, app.Configuration, Console.In, Console.Out); }
+    catch (Exception exception)
+    {
+        app.Logger.LogError("The administrator account was not made ({ErrorType}): {Message}", exception.GetType().Name, exception.Message);
+        return BlazorStoc.Services.AdministratorBootstrap.Failed;
+    }
+}
 app.Run();
 return 0;
 public partial class Program { }

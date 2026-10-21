@@ -91,9 +91,9 @@ public static partial class HelpRenderer
                 var shot = shots.FirstOrDefault(item => item.Capture.Id == (element.ImageId ?? topic.Captures.FirstOrDefault()?.Id));
                 var shown = shot?.Map is { } map && map.Rects.ContainsKey(number);
                 var attributes = shown ? $" tabindex=\"0\" data-help-pick data-shot=\"{E(shot!.Capture.Id)}\"" : "";
-                html.Append($"<tr class=\"help-row{(shown ? " help-pickable" : "")}\" data-n=\"{number}\"{attributes} data-help-name=\"{E(element.Name)}\" data-help-kind=\"{E(element.Kind)}\" data-help-icon=\"{E(element.Icon)}\" data-help-sel=\"{E(element.Selector)}\"><td class=\"help-cell-name\">");
+                html.Append($"<tr class=\"help-row{(shown ? " help-pickable" : "")}\" data-n=\"{number}\"{attributes}><td class=\"help-cell-name\">");
                 if (element.Icon is { Length: > 0 } icon) html.Append($"<span class=\"row-icon {E(icon)} help-static\" aria-hidden=\"true\"></span>");
-                html.Append($"<span class=\"help-name\">{E(element.Name)}</span><button type=\"button\" class=\"help-locate\" data-help-locate title=\"Arată pe pagină\" aria-label=\"Arată pe pagină: {E(element.Name)}\"></button></td>")
+                html.Append($"<span class=\"help-name\">{E(element.Name)}</span>{(shown ? $"<button type=\"button\" class=\"help-locate\" data-help-locate title=\"Arată elementul pe imagine\" aria-label=\"Arată pe imagine: {E(element.Name)}\"></button>" : "")}</td>")
                     .Append($"<td class=\"help-kind\">{E(element.Kind)}</td><td class=\"help-text\">{Inline(element.Text, catalog)}</td></tr>");
                 number++;
             }

@@ -238,6 +238,8 @@ public static class AuditActions
     public const string RevokePermission = "Revocare permisiune";
     public const string DeleteUserType = "Ștergere tip utilizator";
     public const string ChangeUserType = "Schimbare tip utilizator";
+    // The first administrator account, made by the installer (BlazorStoc.dll --create-administrator), recorded as made by the system.
+    public const string CreateInstallerAdministrator = "Creare cont administrator la instalare";
     public const string AccessDenied = "Acces refuzat";
     public const string ReorderSubcategories = "Reordonare subcategorii";
     public const string AddSystemType = "Adăugare tip de sistem";
@@ -292,7 +294,7 @@ public static class AuditActions
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
-            or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion;
+            or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;

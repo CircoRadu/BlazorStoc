@@ -6,8 +6,8 @@ Fereastra arată formularul PDF generat pentru selecția făcută. Din ea îl im
 
 ## Elemente
 ### Fereastra
-- Numele fișierului | text | Numele sub care se salvează formularul.
-- Formularul | cadru | Previzualizarea PDF-ului generat.
+- Numele fișierului | text | Numele sub care se salvează formularul. | sel: .pdf-preview-dialog > p.muted
+- Formularul | cadru | Previzualizarea PDF-ului generat. | sel: iframe.pdf-preview-frame
 - Imprimă | buton | Deschide imprimarea formularului.
 - Salvează | buton | Salvează formularul PDF pe calculator.
 - Închide | buton | Închide fereastra; Escape face același lucru. Formularul nu se păstrează pe server.

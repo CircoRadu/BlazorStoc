@@ -8,7 +8,7 @@ Fișa vehiculului, secțiunea „Informații autovehicul”: numărul, descriere
 ## Elemente
 ### Antet
 - ← Vehicule | link | Revine la registrul vehiculelor.
-- Numărul și descrierea | text | Identificarea vehiculului.
+- Numărul și descrierea | text | Identificarea vehiculului. | sel: .page-heading
 - Editează | buton | Deschide formularul vehiculului ([[vehicule-editor]]).
 - Șterge vehiculul | buton | Șterge vehiculul; nu se poate dacă are mișcări de stoc asociate.
 ### Secțiuni

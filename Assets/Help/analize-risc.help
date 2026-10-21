@@ -11,7 +11,7 @@ Analizele de risc la securitate ale punctelor de lucru, cu data ultimei reînnoi
 - Caută | câmp | Caută după beneficiar, punct de lucru, număr sau persoana care a întocmit analiza.
 - Stare | listă | Toate stările, Expirate, Expiră curând sau Valabile (analizele Off trec mereu de filtru: se ascund cu comutatorul lor).
 ### Tabelul analizelor
-- Tabelul analizelor | tabel | Coloanele și acțiunile de pe rânduri sunt descrise la [[analize-risc-sectiune]]: aceeași secțiune apare și în fișa beneficiarului, dar aici arată analizele tuturor beneficiarilor (cu coloana „Beneficiar”).
+- Tabelul analizelor | tabel | Coloanele și acțiunile de pe rânduri sunt descrise la [[analize-risc-sectiune]]: aceeași secțiune apare și în fișa beneficiarului, dar aici arată analizele tuturor beneficiarilor (cu coloana „Beneficiar”). | sel: .table-scroll
 
 ## Flux: Cum văd ce analize expiră
 1. Alege „Expiră curând” sau „Expirate” la filtrul de stare.

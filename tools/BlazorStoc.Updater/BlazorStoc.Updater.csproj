@@ -24,6 +24,13 @@
     <Content Include="../supervisor.ps1" Link="scripts/supervisor.ps1" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../data-root.ps1" Link="scripts/data-root.ps1" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../updater-task.ps1" Link="scripts/updater-task.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The first installation also makes the database server: its script and what it loads (the account catalog the application itself uses, the base schema and the triggers). -->
+    <Content Include="../provision-database.ps1" Link="scripts/provision-database.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../uninstall-database.ps1" Link="scripts/uninstall-database.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../firewall.ps1" Link="scripts/firewall.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../Assets/Data/database-accounts.json" Link="scripts/database-accounts.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/mariadb/schema-mariadb.sql" Link="scripts/schema-mariadb.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/mariadb/triggers-mariadb.sql" Link="scripts/triggers-mariadb.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

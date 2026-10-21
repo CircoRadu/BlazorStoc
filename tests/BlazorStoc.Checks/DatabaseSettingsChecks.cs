@@ -549,6 +549,16 @@ public static class DatabaseSettingsChecks
             check(entry is { EntityType: AuditEntities.Database, Action: AuditActions.SetAppPort, ActorUsername: "admin" } && entry.Details.Contains("5099") && entry.Details.Contains("toate interfețele"),
                 "Database settings: the port change is journaled with the old and the new value");
 
+            // The port the application already listens on is not "busy" for itself (a server whose start script set the port can still choose the interface); another busy port stays refused.
+            var listening = new DatabaseSettingsService(configuration, protection, new TestAccessControl(true, "admin"), audit, new NoLocks(), new AppHostingInfo(null, true, "http://0.0.0.0:5098", null),
+                NullLogger<DatabaseSettingsService>.Instance, _ => false);
+            check((await listening.SaveAsync(Input(port: 1, user: "u", appPort: 5098, all: true), "administrator-password")).Success,
+                "Database settings: the port the application already listens on can be saved even though it is taken (by the application itself)");
+            check(await Throws<DatabaseSettingsException>(() => listening.SaveAsync(Input(port: 1, user: "u", appPort: 5097, all: true), "administrator-password"), "ocupat"),
+                "Database settings: another taken port is still refused");
+            await admin.SaveAsync(Input(port: 1, user: "u", appPort: 5099, all: true), "administrator-password");
+            audit.Entries.Clear();
+
             // The unreachable server: the test says so, and a save with a changed connection is refused with nothing written.
             var test = await admin.TestAsync(Input(port: 1));
             check(!test.Ok && test.Steps[0] is { Name: "Conectare", Level: DatabaseStepLevel.Error } && !test.Steps[0].Detail.Contains("pw-base"),

@@ -1,15 +1,16 @@
 # Detaliile unei notificări
 Cautare: notificare detalii preiau notificarea amana zile rezolvata deschide obiectul termen depasit
 Captura: fereastra | /notificari | click sel:tr.notification-row | Detaliile unei notificări
+Captura: termen | /notificari | click sel:tr.notification-row[aria-label*='mentenan']; wait 1200 | Notificare cu termen viitor
 
 Fereastra arată o notificare activă și îți permite să o preiei, s-o amâni sau s-o marchezi rezolvată.
 
 ## Elemente
 ### Fereastra
-- Titlul și textul | text | Subiectul și mesajul notificării, cu categoria, evenimentul și obiectul.
-- Termenul | text | Data de expirare, zilele rămase (sau cu câte zile a fost depășit) și starea notificării.
-- Amintește-mi peste (zile) | câmp | Doar la avertizări: câte zile amâni; limita este numărul de zile rămase minus 2. Dacă expirarea e prea aproape, amânarea nu mai este posibilă.
-- Amână | buton | Notificarea reapare după perioada aleasă.
+- Titlul și textul | text | Subiectul și mesajul notificării, cu categoria, evenimentul și obiectul. | sel: .dialog-head h2, p.notification-body
+- Termenul | text | Data de expirare, zilele rămase (sau cu câte zile a fost depășit) și starea notificării. | img: termen | sel: p.muted.small
+- Amintește-mi peste (zile) | câmp | Doar la avertizări: câte zile amâni; limita este numărul de zile rămase minus 2. Dacă expirarea e prea aproape, amânarea nu mai este posibilă. | img: termen | sel: .notification-snooze
+- Amână | buton | Notificarea reapare după perioada aleasă. | img: termen
 - Preiau notificarea | buton | Marchezi că ai preluat problema: notificarea nu mai avertizează.
 - Marchează ca rezolvată | buton | Cere confirmare („Da, rezolvată” / „Renunț”) și mută notificarea în „Rezolvate”.
 - Deschide obiectul | link | Duce la obiectul la care se referă notificarea.

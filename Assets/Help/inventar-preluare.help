@@ -2,33 +2,36 @@
 Ruta: /inventar/preluare
 Cautare: preluare inventar formular scanat ocr diferente stoc valoare reala corectie trimite modificari confirma backup
 Captura: pagina | /inventar/preluare |  | Preluarea inventarului
+Captura: diferente | /inventar/preluare | upload inventar-completat.pdf; wait 20000; full | Diferențele de stoc citite din formular
+Captura: fara-diferente | /inventar/preluare | upload inventar-fara-diferente.pdf; wait 20000 | Formular fără diferențe
+Captura: confirmare | /inventar/preluare | upload inventar-completat.pdf; wait 20000; jsclick sel:button.row-select[aria-label*='CIT-BIO']; wait 600; jsclick sel:button.row-select[aria-label*='ACUM']; wait 600; jsclick Trimite modificări în stoc; wait 1500 | Confirmarea modificărilor de stoc
 
 Încarci formularul de inventar scanat, cu valorile reale completate de mână, ca să compari stocul numărat cu cel curent. Aplicația citește valorile (OCR), arată diferențele, iar tu alegi ce modificări de stoc se operează.
 
 ## Elemente
 ### Antet
 - Preia inventar | buton | Alege fișierul PDF scanat din calculator.
-- Redeschide formularul PDF | buton | Apare după încărcare: redeschide formularul într-o fereastră separată, ca să compari valorile citite cu originalul. Dacă browserul blochează ferestrele pop-up, permite-le pentru acest site.
+- Redeschide formularul PDF | buton | Apare după încărcare: redeschide formularul într-o fereastră separată, ca să compari valorile citite cu originalul. Dacă browserul blochează ferestrele pop-up, permite-le pentru acest site. | img: diferente
 ### Încărcarea
 - Alege formularul PDF | zonă | Alegi fișierul sau îl tragi în zonă. Citirea unui formular cu multe pagini poate dura câteva secunde.
-- Nicio diferență de stoc | mesaj | Toate valorile citite corespund stocului curent.
+- Nicio diferență de stoc | mesaj | Toate valorile citite corespund stocului curent. | img: fara-diferente
 ### Tabelul diferențelor
-- Selectează toate produsele | comutator | Selectează sau deselectează toate liniile cu diferențe.
-- Categoria și subcategoria | titlu | Liniile sunt grupate pe categorie și subcategorie, ca în formular.
-- Selectează | coloană | Marcajul rotund al rândului (și clicul oriunde pe rând): liniile nebifate nu se trimit.
-- Nr. crt. | coloană | Numărul liniei din formular.
-- Cod produs | coloană | Produsul; „⚠ de verificat” înseamnă că citirea OCR este nesigură.
-- Stoc curent | coloană | Stocul din aplicație.
-- Valoare reală | câmp | Valoarea citită din formular; o poți corecta chiar în câmp.
-- Diferență | coloană | Cât lipsește sau cât este în plus față de stocul curent.
-- Trimite modificări în stoc | buton | Deschide confirmarea modificărilor selectate.
+- Selectează toate produsele | comutator | Selectează sau deselectează toate liniile cu diferențe. | img: diferente
+- Categoria și subcategoria | titlu | Liniile sunt grupate pe categorie și subcategorie, ca în formular. | img: diferente | sel: .category-title, .inventory-category-card h4
+- Selectează | coloană | Marcajul rotund al rândului (și clicul oriunde pe rând): liniile nebifate nu se trimit. | img: diferente | sel: button.row-select
+- Nr. crt. | coloană | Numărul liniei din formular. | img: diferente | sel: th.pickup-number, th:nth-child(2)
+- Cod produs | coloană | Produsul; „⚠ de verificat” înseamnă că citirea OCR este nesigură. | img: diferente
+- Stoc curent | coloană | Stocul din aplicație. | img: diferente
+- Valoare reală | câmp | Valoarea citită din formular; o poți corecta chiar în câmp. | img: diferente
+- Diferență | coloană | Cât lipsește sau cât este în plus față de stocul curent. | img: diferente
+- Trimite modificări în stoc | buton | Deschide confirmarea modificărilor selectate. | img: diferente
 ### Produse negăsite în catalog
-- Cod citit | coloană | Codul citit din formular care nu corespunde niciunui produs curent (produs șters sau redenumit); pentru aceste rânduri nu se trimite nicio modificare.
-- Valoare reală citită | coloană | Valoarea citită pentru codul respectiv.
+- Cod citit | coloană | Codul citit din formular care nu corespunde niciunui produs curent (produs șters sau redenumit); pentru aceste rânduri nu se trimite nicio modificare. | img: diferente
+- Valoare reală citită | coloană | Valoarea citită pentru codul respectiv. | img: diferente
 ### Confirmarea modificărilor
-- Lista modificărilor | tabel | Categorie / subcategorie, număr, cod produs și modificarea de stoc pentru fiecare linie selectată.
-- Confirmă | buton | Face mai întâi o copie de siguranță verificată a bazei de date, apoi operează modificările: un plus devine intrare, un minus devine ieșire cu destinația „Corecție stoc”.
-- Anulează | buton | Închide confirmarea fără nicio modificare; Escape face același lucru.
+- Lista modificărilor | tabel | Categorie / subcategorie, număr, cod produs și modificarea de stoc pentru fiecare linie selectată. | img: confirmare | sel: table.save-summary
+- Confirmă | buton | Face mai întâi o copie de siguranță verificată a bazei de date, apoi operează modificările: un plus devine intrare, un minus devine ieșire cu destinația „Corecție stoc”. | img: confirmare
+- Anulează | buton | Închide confirmarea fără nicio modificare; Escape face același lucru. | img: confirmare
 
 ## Flux: Cum preiau un inventar numărat
 1. Scanează formularul completat de mână (PDF) și apasă „Preia inventar” sau trage fișierul în zonă.

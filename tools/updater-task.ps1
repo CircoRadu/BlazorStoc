@@ -22,7 +22,8 @@ switch ($Action) {
         if (-not $InstallRoot -or -not $Dotnet -or -not $UpdaterDll) { throw 'register needs -InstallRoot, -Dotnet and -UpdaterDll.' }
         $command = "& '$Dotnet' '$UpdaterDll' run-requests --install-root '$InstallRoot'"
         $arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"$command`""
-        $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments -WorkingDirectory $InstallRoot
+        if ([Environment]::OSVersion.Version.Build -ge 17763) { $taskAction = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument "--headless powershell.exe $arguments" -WorkingDirectory $InstallRoot }
+        else { $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments -WorkingDirectory $InstallRoot }
         $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Highest
         $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 3) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
         Register-ScheduledTask -TaskName $TaskName -Action $taskAction -Principal $principal -Settings $settings `

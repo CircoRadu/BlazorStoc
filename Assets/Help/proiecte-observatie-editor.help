@@ -1,6 +1,7 @@
 # Formularul de observație
 Cautare: observatie formular denumire continut proiect
-Captura: formular | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; click Adaugă observație | Formularul de observație
+Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click Supraveghere video si control acces; wait 5000; click Adaugă observație | Formularul de observație
+Captura: editare | /beneficiari | click Panoramic Hotel; wait 3000; click Supraveghere video si control acces; wait 5000; click Acces la fatada; wait 5000; click Editează; wait 1500; type section.product-editor textarea=Acces la fatada, actualizat dupa vizita; wait 800; height 1300 | Editarea unei observații
 
 Formularul pentru o observație nouă sau pentru editarea uneia existente. Se deschide în pagina proiectului sau în pagina observației.
 
@@ -8,9 +9,9 @@ Formularul pentru o observație nouă sau pentru editarea uneia existente. Se de
 ### Câmpuri
 - Denumire observație * | câmp | Titlul observației, cel mult 200 de caractere.
 - Conținut | câmp | Textul observației, cel mult 8000 de caractere.
-- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
 ### Butoane
-- Salvează observația | buton | Salvează; la editare cere confirmarea modificărilor.
+- Salvează observația | buton | Salvează; la editare cere confirmarea modificărilor. | img: editare
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
 
 ## Flux: Cum adaug o observație

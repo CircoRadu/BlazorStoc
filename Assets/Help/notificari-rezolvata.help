@@ -6,7 +6,7 @@ Fereastra arată o notificare rezolvată: textul ei, scadența și cine a rezolv
 
 ## Elemente
 ### Fereastra
-- Titlul și textul | text | Subiectul, sursa și mesajul notificării.
+- Titlul și textul | text | Subiectul, sursa și mesajul notificării. | sel: .dialog-head h2, p.notification-body
 - Scadența și rezolvarea | text | Data de expirare, momentul rezolvării și utilizatorul (sau „sistem (automat)”).
 - Motiv | text | De ce a fost rezolvată.
 - Închide | buton | Închide fereastra.

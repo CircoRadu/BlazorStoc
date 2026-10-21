@@ -1,19 +1,19 @@
 # Situația proiectului
 Ruta: /proiecte/{id:int}/situatie
 Cautare: situatia proiectului necesar predat stoc deficit rezervat achizitie componente export pdf csv termen
-Captura: pagina | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; click sel:a[href$="/situatie"]; full | Situația unui proiect
+Captura: pagina | /beneficiari | click Clinica Medicala; wait 3000; click sel:a.category-table-link[href*="/proiecte/"]; wait 5000; click sel:a[href$="/situatie"]; wait 6000; full | Situația unui proiect
 
 Necesarul din ultima revizie a fiecărei oferte, ce s-a predat (net de retururi), stocul și deficitul, pe componente. Prețurile nu sunt luate în calcul.
 
 ## Elemente
 ### Antet
-- ← Numele proiectului | link | Revine la pagina proiectului ([[proiecte-detaliu]]).
+- ← Numele proiectului | link | Revine la pagina proiectului ([[proiecte-detaliu]]). | sel: a.nav-back
 - Actualizează | buton | Recalculează situația.
 - Export PDF, Export CSV | link | Descarcă situația ca PDF (lista de achiziție) sau CSV.
 - Termen proiect | câmp | Data-țintă a proiectului; „Setează termenul” o salvează, „×” o elimină.
 - Proiectul nu are încă o ofertă | mesaj | Apare când nu există ofertă; preia una din „Preluare ofertă” ([[oferte-preluare]]).
 ### Pe fiecare componentă
-- Titlul componentei | text | Numele și „predat X din Y” (bucăți).
+- Titlul componentei | text | Numele și „predat X din Y” (bucăți). | sel: text:"Detecție incendiu"
 - Rezervă cât se poate pentru componentă | buton | Rezervă din stocul liber cât acoperă necesarul componentei (doar cu dreptul necesar).
 - Secțiune, Denumire | coloană | Secțiunea ofertei și linia; „de achiziționat” marchează linia fără produs din catalog.
 - Necesar | coloană | Cantitatea din ofertă, cu unitatea de măsură.
@@ -26,8 +26,8 @@ Necesarul din ultima revizie a fiecărei oferte, ce s-a predat (net de retururi)
 - Rezervă cât se poate | iconita:reserve | Rezervă pentru linia respectivă.
 ### Rezervările proiectului
 - Produs de rezervat, Componenta, Cantitate, Rezervă | câmp | Rezervi manual un produs pentru proiect (rezervarea scade stocul liber, nu schimbă stocul).
-- Tabelul rezervărilor | tabel | Produsul, componenta, cantitatea rezervată.
-- Scade rezervarea | iconita:reduce | Scazi cantitatea rezervată, cu un motiv scurt; „Renunță” închide.
+- Tabelul rezervărilor | tabel | Produsul, componenta, cantitatea rezervată. | sel: .table-scroll:has(.row-icon.reduce)
+- Scade rezervarea | iconita:reduce | Scazi cantitatea rezervată, cu un motiv scurt; „Renunță” închide. | sel: .row-icon.reduce
 
 ## Flux: Cum văd ce lipsește pentru un proiect
 1. Deschide „Situația proiectului” din pagina proiectului.

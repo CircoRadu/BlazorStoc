@@ -2,37 +2,43 @@
 Ruta: /produse/preluare-factura
 Cautare: factura furnizor preluare pdf xml zip efactura intrare stoc sablon produse noi furnizor cui numar data verificat finalizeaza
 Captura: pagina | /produse/preluare-factura |  | Preluarea unei facturi
+Captura: citita | /produse/preluare-factura | upload factura-demo.pdf; wait 9000; full | Pasul 1: factura citită
+Captura: potrivire | /produse/preluare-factura | upload factura-demo.pdf; wait 9000; click Pasul următor; wait 3000; full | Pasul 2: potrivirea produselor
+Captura: confirmare | /produse/preluare-factura | upload factura-demo.pdf; wait 9000; click Pasul următor; wait 3000; click sel:label.row-toggle.off; wait 800; click sel:label.row-toggle.off; wait 800; click Pasul următor; wait 3000; full | Pasul 3: confirmarea
+Captura: regularizare | /produse/preluare-factura | sql UPDATE products SET quantity=-3 WHERE name='SURSA-12V-5A'; upload factura-demo.pdf; wait 9000; click Pasul următor; wait 3000; click sel:label.row-toggle.off; wait 800; click sel:label.row-toggle.off; wait 800; click Pasul următor; wait 3000; full; then; sql UPDATE products SET quantity=31 WHERE name='SURSA-12V-5A' | Pasul 3: stoc negativ de regularizat
+Captura: finalizata | /produse/preluare-factura | upload factura-demo.pdf; wait 9000; click sel:section.catalog tbody tr:last-child .row-select; wait 400; click Pasul următor; wait 3000; click sel:label.row-toggle.off; wait 800; click sel:label.row-toggle.off; wait 800; click Pasul următor; wait 3000; click sel:article.pickup-entry label.row-toggle.on; wait 500; click Finalizează preluarea; wait 6000; full; then; sql DELETE FROM supplier_recognitions WHERE invoice_id IN (SELECT id FROM supplier_invoices WHERE number='ASD 7001'); sql UPDATE products p JOIN stock_movements m ON m.product_id=p.id SET p.quantity=p.quantity-m.quantity WHERE m.invoice_id IN (SELECT id FROM supplier_invoices WHERE number='ASD 7001'); sql DELETE FROM stock_movements WHERE invoice_id IN (SELECT id FROM supplier_invoices WHERE number='ASD 7001'); sql DELETE FROM supplier_invoices WHERE number='ASD 7001' | După finalizare
+Captura: repetata | /produse/preluare-factura | upload factura-demo.pdf; wait 9000; click sel:section.catalog tbody tr:last-child .row-select; wait 400; click Pasul următor; wait 3000; click sel:label.row-toggle.off; wait 800; click sel:label.row-toggle.off; wait 800; click Pasul următor; wait 3000; click sel:article.pickup-entry label.row-toggle.on; wait 500; click Finalizează preluarea; wait 6000; reload; wait 3000; upload factura-demo.pdf; wait 9000; click Pasul următor; wait 3000; click sel:table.pickup-match tbody tr:nth-child(1) .row-select; wait 500; click sel:label.row-toggle.off; wait 800; click sel:label.row-toggle.off; wait 800; click Pasul următor; wait 3000; full; then; sql DELETE FROM supplier_recognitions WHERE invoice_id IN (SELECT id FROM supplier_invoices WHERE number='ASD 7001'); sql UPDATE products p JOIN stock_movements m ON m.product_id=p.id SET p.quantity=p.quantity-m.quantity WHERE m.invoice_id IN (SELECT id FROM supplier_invoices WHERE number='ASD 7001'); sql DELETE FROM stock_movements WHERE invoice_id IN (SELECT id FROM supplier_invoices WHERE number='ASD 7001'); sql DELETE FROM supplier_invoices WHERE number='ASD 7001' | A doua preluare a aceleiași facturi
 
 Preiei în stoc o factură de furnizor (PDF, XML sau ZIP e-Factura). Lucrezi în **trei pași**: **Citirea facturii**, **Potrivirea produselor** și **Confirmare**. Abia la „Finalizează preluarea” se înregistrează factura, se adaugă produsele noi în catalog și se fac intrările în stoc, legate de factură.
 
 ## Elemente
 ### Pasul 1 - Citirea facturii
-- Alege factura PDF, XML sau ZIP | zonă | Alegi fișierul sau îl tragi în zonă. O pagină scanată poate dura câteva secunde.
-- Șablonul facturii | bară | Spune ce șablon a citit factura (al furnizorului sau cel standard). „Alt șablon” îți permite să alegi altul. Dacă furnizorul nu are șablon, factura se citește automat, iar „Creează șablon pentru acest furnizor” deschide editorul de șabloane.
-- Tabelul citit | tabel | Rândurile găsite în factură, cu coloanele citite și pagina din care vin (la XML, observațiile). Coloana „Preia” are un marcaj rotund pe fiecare rând și „Selectează tot” în antet: rândurile nebifate nu se preiau. Rândurile cu produse deja preluate sunt marcate și au selectorul oprit.
-- Factura PDF cu pagini | imagine | Factura apare cu liniile de demarcare dintre rânduri, câmpurile din antet, capul de tabel și coloanele, ca să vezi ce a citit aplicația.
-- Adaugă linie de demarcare | buton | Pune o linie nouă între rânduri pe imaginea facturii, ca să separi rândurile citite greșit.
-- Șterge linia selectată | buton | Scoate linia de demarcare aleasă.
-- Liniile propuse automat | buton | Revine la liniile găsite de aplicație.
-- Câmpurile din antet, Capul de tabel, Coloanele | buton | Arată sau ascund câte un strat de pe imaginea facturii.
-- Renunță și elimină fișierul | buton | Șterge fișierul încărcat și te întoarce la alegerea unui altul.
+- Alege factura PDF, XML sau ZIP | zonă | Alegi fișierul sau îl tragi în zonă. O pagină scanată poate dura câteva secunde. | img: pagina
+- Șablonul facturii | bară | Spune ce șablon a citit factura (al furnizorului sau cel standard). „Alt șablon” îți permite să alegi altul. Dacă furnizorul nu are șablon, factura se citește automat, iar „Creează șablon pentru acest furnizor” deschide editorul de șabloane. | sel: .invoice-suggestions | img: citita
+- Tabelul citit | tabel | Rândurile găsite în factură, cu coloanele citite și pagina din care vin (la XML, observațiile). Coloana „Preia” are un marcaj rotund pe fiecare rând și „Selectează tot” în antet: rândurile nebifate nu se preiau. Rândurile cu produse deja preluate sunt marcate și au selectorul oprit. | sel: section.catalog | img: citita
+- Factura PDF cu pagini | imagine | Factura apare cu liniile de demarcare dintre rânduri, câmpurile din antet, capul de tabel și coloanele, ca să vezi ce a citit aplicația. | sel: .invoice-pages | img: citita
+- Adaugă linie de demarcare | buton | Pune o linie nouă între rânduri pe imaginea facturii, ca să separi rândurile citite greșit. | sel: .invoice-draw-tools button:nth-child(1) | img: citita
+- Șterge linia selectată | buton | Scoate linia de demarcare aleasă. | sel: .invoice-draw-tools button.danger | img: citita
+- Liniile propuse automat | buton | Revine la liniile găsite de aplicație. | sel: .invoice-draw-tools button:nth-child(3) | img: citita
+- Câmpurile din antet, Capul de tabel, Coloanele | buton | Arată sau ascund câte un strat de pe imaginea facturii. | img: citita
+- Renunță și elimină fișierul | buton | Șterge fișierul încărcat și te întoarce la alegerea unui altul. | sel: .invoice-head button.danger | img: citita
 ### Pasul 2 - Potrivirea produselor
-- Datele facturii | zonă | Numărul facturii, CUI-ul furnizorului și data emiterii. La PDF, fiecare are un comutator „Verificat / Neverificat”: îl pornești după ce ai comparat valoarea cu imaginea regiunii din care a fost citită. La XML datele vin din fișier și nu cer confirmare.
-- Furnizor din registru | text | Furnizorul găsit după CUI. Dacă nu există, „+ Adaugă furnizorul” deschide formularul de furnizor; „Folosește acest furnizor” apare când aplicația bănuiește un furnizor apropiat.
-- Afișează factura într-o fereastră nouă | link | Deschide factura într-o fereastră separată, pe care o poți așeza lângă tabel.
-- Produsul din catalog | coloană | Pentru fiecare rând: produsul exact găsit după cod, un produs nou pregătit (se adaugă la finalizare; „Modifică” și „Renunță”), variantele unui model sau cele mai apropiate produse din catalog, de unde alegi unul sau „Niciunul”.
-- Preia | coloană | Marcajul rotund al rândului: rândurile nebifate nu se preiau.
+- Datele facturii | zonă | Numărul facturii, CUI-ul furnizorului și data emiterii. La PDF, fiecare are un comutator „Verificat / Neverificat”: îl pornești după ce ai comparat valoarea cu imaginea regiunii din care a fost citită. La XML datele vin din fișier și nu cer confirmare. | sel: section.pickup-invoice-head | img: potrivire
+- Furnizor din registru | text | Furnizorul găsit după CUI. Dacă nu există, „+ Adaugă furnizorul” deschide formularul de furnizor; „Folosește acest furnizor” apare când aplicația bănuiește un furnizor apropiat. | sel: page:.pickup-invoice-head .verify-field small | img: potrivire
+- Afișează factura într-o fereastră nouă | link | Deschide factura într-o fereastră separată, pe care o poți așeza lângă tabel. | sel: a.button-link | img: potrivire
+- Produsul din catalog | coloană | Pentru fiecare rând: produsul exact găsit după cod, un produs nou pregătit (se adaugă la finalizare; „Modifică” și „Renunță”), variantele unui model sau cele mai apropiate produse din catalog, de unde alegi unul sau „Niciunul”. | sel: th:last-child | img: potrivire
+- Preia | coloană | Marcajul rotund al rândului: rândurile nebifate nu se preiau. | sel: .row-select-all | img: potrivire
 ### Pasul 3 - Confirmare
-- Factura și furnizorul | text | Rezumatul facturii confirmate la pasul 2.
-- 1. Produse noi | secțiune | Produsele care nu sunt în catalog; au „Data intrării” comună.
-- 2. Produse existente introduse în stoc | secțiune | Produsele găsite în catalog, cu propria „Data intrării”.
-- Descrierea intrării în stoc | câmp | Textul intrării pentru fiecare produs; îl poți modifica.
-- Componenta proiectului | alegere | Dacă produsul face parte dintr-un proiect, poți lega intrarea de componenta lui.
-- Se leagă intrarea existentă | comutator | Apare când există deja o intrare liberă a produsului: o legi de factură fără să modifici stocul, sau creezi o intrare nouă.
-- Se preia din nou | comutator | Apare când din factură s-a preluat deja produsul: alegi dacă îl preiei încă o dată.
-- Regularizare | panou | Apare când intrarea acoperă un stoc negativ al produsului.
-- Finalizează preluarea | buton | Înregistrează factura, produsele noi și intrările în stoc.
-- Preluare nouă | buton | După finalizare, o iei de la capăt cu altă factură.
+- Factura și furnizorul | text | Rezumatul facturii confirmate la pasul 2. | img: confirmare | sel: h3
+- 1. Produse noi | secțiune | Produsele care nu sunt în catalog; au „Data intrării” comună. | img: confirmare | sel: h3:nth-of-type(2)
+- 2. Produse existente introduse în stoc | secțiune | Produsele găsite în catalog, cu propria „Data intrării”. | img: confirmare | sel: h3:nth-of-type(3)
+- Descrierea intrării în stoc | câmp | Textul intrării pentru fiecare produs; îl poți modifica. | img: confirmare | sel: article.pickup-entry label.full-width
+- Componenta proiectului | alegere | Dacă produsul face parte dintr-un proiect, poți lega intrarea de componenta lui. | img: confirmare | sel: .entry-component-choice
+- Se leagă intrarea existentă | comutator | Apare când există deja o intrare liberă a produsului: o legi de factură fără să modifici stocul, sau creezi o intrare nouă. | img: confirmare | sel: article.pickup-entry label.row-toggle
+- Se preia din nou | comutator | Apare când din factură s-a preluat deja produsul: alegi dacă îl preiei încă o dată. | img: repetata | sel: page:.invoice-warning label.row-toggle
+- Regularizare | panou | Apare când intrarea acoperă un stoc negativ al produsului. | img: regularizare | sel: .negative-stock-panel
+- Finalizează preluarea | buton | Înregistrează factura, produsele noi și intrările în stoc. | img: confirmare | sel: .editor-actions button.primary
+- Preluare nouă | buton | După finalizare, o iei de la capăt cu altă factură. | img: finalizata
 ### Navigare între pași
 - ← Pasul precedent | buton | Te întoarce un pas, fără să pierzi alegerile făcute.
 - Pasul următor → | buton | Trece la pasul următor; dacă ceva lipsește, sub butoane apare ce trebuie rezolvat.

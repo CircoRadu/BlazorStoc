@@ -9,7 +9,7 @@ Configurezi interogarea serviciului public ANAF (registrul TVA) după CUI: conex
 ## Elemente
 ### Starea
 - Versiune activă | text | Versiunea folosită acum (număr, data, administratorul) sau „nicio versiune activată”.
-- Testată / Netestată | insignă | O configurație se poate salva și activa doar după un test reușit; orice modificare după test o face din nou netestată.
+- Testată / Netestată | insignă | O configurație se poate salva și activa doar după un test reușit; orice modificare după test o face din nou netestată. | sel: .anaf-badge
 ### 1. Conexiune
 - Denumire integrare | câmp | Numele configurației.
 - Integrare activată | comutator | Pornește sau oprește integrarea.
@@ -23,7 +23,7 @@ Configurezi interogarea serviciului public ANAF (registrul TVA) după CUI: conex
 - Șablon cerere | câmp | Lista JSON a cererii, cu variabilele CUI și data interogării.
 ### 3. Mapare răspuns
 - Lista găsiților, Lista negăsiților, Identificarea CUI | câmp | Unde se află în răspuns rezultatele.
-- Tabelul de mapări | tabel | Pentru fiecare câmp: denumirea, unde este folosit, calea în răspuns, tipul, dacă e obligatoriu și ce se întâmplă când ANAF nu trimite câmpul sau trimite altă valoare (cere confirmare, păstrează valoarea mea, ia valoarea din ANAF).
+- Tabelul de mapări | tabel | Pentru fiecare câmp: denumirea, unde este folosit, calea în răspuns, tipul, dacă e obligatoriu și ce se întâmplă când ANAF nu trimite câmpul sau trimite altă valoare (cere confirmare, păstrează valoarea mea, ia valoarea din ANAF). | sel: table.anaf-mappings
 - Șterge maparea | iconita:delete | Scoate o mapare.
 - + Adaugă câmp | buton | Adaugă o mapare informativă.
 ### Test și versiuni
@@ -31,7 +31,7 @@ Configurezi interogarea serviciului public ANAF (registrul TVA) după CUI: conex
 - Salvează ciorna | buton | Păstrează modificările fără activare.
 - Salvează și activează configurația testată | buton | Creează o versiune nouă și o activează (doar după test reușit).
 - Revino la activarea precedentă | buton | Reactivează versiunea dinainte.
-- Tabelul versiunilor | tabel | Versiunile activate: data, administratorul, cum a fost creată și comutatorul „Activă”.
+- Tabelul versiunilor | tabel | Versiunile activate: data, administratorul, cum a fost creată și comutatorul „Activă”. | sel: fieldset.anaf-section:last-of-type table.settings-result
 - Încarcă versiunea în editor | iconita:load | Aduce o versiune veche în editor.
 - Șterge versiunea | iconita:delete | Șterge o versiune neactivă.
 

@@ -2,13 +2,14 @@
 Ruta: /beneficiari
 Cautare: beneficiari persoane fizice juridice cui registru adauga editeaza sterge cautare
 Captura: pagina | /beneficiari |  | Lista beneficiarilor
+Captura: eroare | /beneficiari | sql RENAME TABLE beneficiaries TO beneficiaries_x; reload; wait 800; then; sql RENAME TABLE beneficiaries_x TO beneficiaries; wait 1500 | Lista care nu a putut fi încărcată
 
 Registrul beneficiarilor: persoanele fizice și juridice către care se operează ieșiri de stoc și pentru care ai proiecte. CUI-ul (persoană juridică) sau numele complet (persoană fizică) identifică în mod unic fiecare beneficiar.
 
 ## Elemente
 ### Antet
 - + Adaugă beneficiar | buton | Deschide formularul de beneficiar nou ([[beneficiari-editor]]); doar cu dreptul necesar.
-- Reîncearcă | buton | Apare când lista nu a putut fi încărcată.
+- Reîncearcă | buton | Apare când lista nu a putut fi încărcată. | img: eroare
 ### Rezumat
 - Total beneficiari | cifră | Câți beneficiari are registrul.
 - Persoane juridice | cifră | Beneficiarii identificați prin CUI.

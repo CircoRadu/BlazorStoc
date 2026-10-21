@@ -3,6 +3,10 @@ Ruta: /categorii
 Ruta: /categorii/fereastra
 Cautare: categorii subcategorii redenumire mutare ordine meniu parametri obligatori produse catalog stergere
 Captura: pagina | /categorii |  | Categoriile și subcategoriile
+Captura: categorie | /categorii | click + Adaugă categorie; wait 800 | Formularul unei categorii noi
+Captura: editare | /categorii | click sel:.category-management-card > .heading-actions .row-icon.edit; wait 900; type label.full-width input=Supraveghere video si alarme; wait 800; height 1300 | Editarea unei categorii
+Captura: subcategorie | /categorii | click sel:.category-management-card > .heading-actions .row-icon.add; wait 900 | Subcategorie nouă
+Captura: mutare | /categorii | click sel:.category-management-card summary; wait 800; click sel:td.row-actions .row-icon.edit; wait 900; height 1300 | Editarea sau mutarea unei subcategorii
 
 Aici organizezi catalogul: redenumești categoriile și subcategoriile, muți subcategorii între categorii și definești parametrii obligatori ai produselor dintr-o subcategorie. Produsele asociate urmează automat modificările. Aceeași fereastră se deschide și separat (din formularul de produs al preluării de factură), fără meniul lateral.
 
@@ -10,16 +14,16 @@ Aici organizezi catalogul: redenumești categoriile și subcategoriile, muți su
 ### Antet
 - + Adaugă categorie | buton | Deschide formularul de categorie nouă (doar cu dreptul necesar).
 ### Formularul de categorie
-- Denumire categorie * | câmp | Numele categoriei, cel mult 100 de caractere.
-- Motivul modificării | câmp | La editare: rezumatul modificărilor se generează automat sau scrii un motiv propriu.
-- Adaugă categoria / Salvează categoria | buton | Salvează; la editare cere mai întâi confirmarea modificărilor.
-- Anulează | buton | Închide formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
+- Denumire categorie * | câmp | Numele categoriei, cel mult 100 de caractere. | img: categorie
+- Motivul modificării | câmp | La editare: rezumatul modificărilor se generează automat sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
+- Adaugă categoria / Salvează categoria | buton | Salvează; la editare cere mai întâi confirmarea modificărilor. | img: categorie
+- Anulează | buton | Închide formularul; dacă ai modificat ceva, ești întrebat dacă renunți. | img: categorie
 ### Formularul de subcategorie
-- Denumire subcategorie * | câmp | Numele subcategoriei.
-- Categorie * | listă | Doar la editare: categoria în care muți subcategoria. O subcategorie nouă aparține categoriei din al cărei antet a fost deschis formularul.
+- Denumire subcategorie * | câmp | Numele subcategoriei. | img: subcategorie
+- Categorie * | listă | Doar la editare: categoria în care muți subcategoria. O subcategorie nouă aparține categoriei din al cărei antet a fost deschis formularul. | img: mutare
 ### Categoriile
-- Numele categoriei | secțiune | Fiecare categorie este o secțiune pe care o desfaci sau o strângi; vezi numărul subcategoriilor și al produselor asociate.
-- Mânerul din stânga | mâner | Doar pentru administrator: tragi categoria sau subcategoria ca să le aranjezi; ordinea de aici este ordinea din meniul lateral.
+- Numele categoriei | secțiune | Fiecare categorie este o secțiune pe care o desfaci sau o strângi; vezi numărul subcategoriilor și al produselor asociate. | sel: .category-management-card summary .category-title
+- Mânerul din stânga | mâner | Doar pentru administrator: tragi categoria sau subcategoria ca să le aranjezi; ordinea de aici este ordinea din meniul lateral. | sel: .category-drag-item .row-icon.drag
 - Adaugă subcategorie | iconita:add | Adaugă o subcategorie în categoria respectivă.
 - Editează categoria | iconita:edit | Redenumește categoria.
 - Șterge categoria | iconita:delete | Șterge categoria; se poate numai dacă nu are subcategorii și nici produse.

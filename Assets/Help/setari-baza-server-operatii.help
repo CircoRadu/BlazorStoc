@@ -1,13 +1,14 @@
 # Serverul bazei de date: pornire, oprire și port
 Cautare: server baza de date serviciu windows porneste opreste reporneste port ascultă ocupat portul nou my.ini parola administrator oprește baza confirmare cuvant
 Captura: fereastra | /setari | click Bază de date; click Conexiune; click Oprește serverul; type #server-stop-word=OPRESTE BAZA; wait 800 | Oprește serverul bazei de date
+Captura: port | /setari | click Bază de date; click Conexiune; click Schimbă portul serverului; wait 1000 | Schimbarea portului serverului bazei de date
 
 Ferestrele se deschid din cardul „Serverul bazei de date” ([[setari-baza-conexiune]]) când apeși „Pornește serverul”, „Oprește serverul”, „Repornește serverul” sau „Schimbă portul serverului”. Fiecare cere, pe lângă ce are nevoie operația, parola contului tău de administrator; nimic nu se întâmplă până nu apeși butonul ferestrei. Operațiile se jurnalizează fiecare cu numele ei exact și nu se fac cât timp rulează o copie de siguranță, o restaurare sau altă reconfigurare.
 
 ## Elemente
 ### Câmpurile operației
 - Scrie OPRESTE BAZA ca să confirmi | câmp | La oprire: scrie OPRESTE BAZA ca să poți apăsa „Oprește serverul”. Cât timp serverul e oprit, aplicația nu are date.
-- Portul nou al serverului | câmp | La schimbarea portului: între 1024 și 65535. Fereastra propune primul port liber de după cel curent; portul trebuie să fie liber pe acest calculator, diferit de cel curent și de portul aplicației. Sub câmp se vede portul curent și portul liber propus.
+- Portul nou al serverului | câmp | La schimbarea portului: între 1024 și 65535. Fereastra propune primul port liber de după cel curent; portul trebuie să fie liber pe acest calculator, diferit de cel curent și de portul aplicației. Sub câmp se vede portul curent și portul liber propus. | img: port
 ### Confirmarea
 - Parola contului tău de administrator | câmp | Cerută la fiecare operație. Administratorul configurat introduce parola din fișierul privat, un administrator din Utilizatori introduce parola contului lui. După mai multe încercări greșite, confirmarea este refuzată un minut. Enter confirmă din acest câmp.
 - Butonul ferestrei | buton | Execută operația („Oprește serverul”, „Pornește serverul”, „Repornește serverul” sau „Schimbă portul”); la oprire este închis până scrii cuvântul de confirmare. | sel: .admin-operation-dialog button.primary

@@ -3,21 +3,22 @@ Ruta: /setari
 Tab: Șabloane notificări
 Cautare: sabloane notificari categorie eveniment expirare zile inainte subiect text marcaje placeholder activ
 Captura: pagina | /setari | click Notificări; full | Șabloanele de notificări
+Captura: formular | /setari | click Notificări; wait 1200; click + Adaugă șablon; wait 1200; height 1500 | Formularul unui șablon de notificare
 
 Definești pentru ce expirări se creează notificări, cu câte zile înainte și cu ce text. În subiect și în text poți folosi marcaje de forma <numar autovehicul>, înlocuite automat cu valorile obiectului. Fiecare categorie are tabul ei.
 
 ## Elemente
 ### Categoriile
-- Tab-urile de categorii | filă | Câte o categorie de notificări (de exemplu Vehicule, Mentenanță, Analize de risc, Facturi, Sistem); sub ele apare lista șabloanelor categoriei.
+- Tab-urile de categorii | filă | Câte o categorie de notificări (de exemplu Vehicule, Mentenanță, Analize de risc, Facturi, Sistem); sub ele apare lista șabloanelor categoriei. | sel: .settings-subtab
 - + Adaugă șablon | buton | Deschide formularul de șablon nou.
 ### Formularul de șablon
 - Categorie *, Eveniment de expirare * | listă | Ce expirare urmărește șablonul.
-- Cu câte zile înainte de expirare * | câmp | Pragul de la care apare notificarea.
-- Șablon activ | comutator | Un șablon inactiv nu mai generează notificări.
+- Cu câte zile înainte de expirare * | câmp | Pragul de la care apare notificarea. | img: formular
+- Șablon activ | comutator | Un șablon inactiv nu mai generează notificări. | img: formular
 - Subiect *, Text * | câmp cu marcaje | Textul notificării; marcajele se inserează la poziția cursorului, apar colorate (cele necunoscute, în roșu) și se înlocuiesc cu valorile obiectului.
-- Butoanele de marcaje | buton | Câte un marcaj disponibil pentru eveniment; apasă ca să-l adaugi la cursor.
-- Previzualizare | text | Cum arată notificarea cu valori de probă; „Completează un text-exemplu” propune un text.
-- Salvează șablonul, Anulează | buton | Salvează sau închide formularul.
+- Butoanele de marcaje | buton | Câte un marcaj disponibil pentru eveniment; apasă ca să-l adaugi la cursor. | img: formular | sel: .placeholder-chip
+- Previzualizare | text | Cum arată notificarea cu valori de probă; „Completează un text-exemplu” propune un text. | img: formular
+- Salvează șablonul, Anulează | buton | Salvează sau închide formularul. | img: formular
 ### Lista șabloanelor
 - Eveniment | coloană | Expirarea urmărită.
 - Subiect | coloană | Titlul notificării.

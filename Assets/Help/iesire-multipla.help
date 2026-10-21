@@ -2,13 +2,17 @@
 Ruta: /iesiri/multipla
 Cautare: iesire iesiri stoc mai multe produse destinatie beneficiar proiect vehicul bon consum depozit masina vanzare corectie
 Captura: pagina | /iesiri/multipla |  | Ieșirea multiplă
+Captura: sumar | /iesiri/multipla | click sel:.relation-row input.searchable-select-input; wait 400; click sel:.relation-row ul.searchable-select-list li; wait 700; click sel:#op-product-0; wait 400; click sel:#op-product-0-list li; wait 800; type table.operation-lines tbody tr:nth-child(1) td.number input=500; type table.operation-lines tbody tr:nth-child(1) td:nth-child(5) input=Predare echipamente HELP; wait 500; click Verifică și salvează; wait 1500; height 1300 | Sumarul de dinainte de salvare
+Captura: salvat | /iesiri/multipla | sql UPDATE products p JOIN stock_movements m ON m.product_id = p.id SET p.quantity = p.quantity + m.quantity WHERE m.description = 'Predare echipamente HELP'; sql DELETE FROM stock_movements WHERE description = 'Predare echipamente HELP'; reload; click sel:.relation-row input.searchable-select-input; wait 400; click sel:.relation-row ul.searchable-select-list li; wait 700; click sel:#op-product-0; wait 400; click sel:#op-product-0-list li; wait 800; type table.operation-lines tbody tr:nth-child(1) td.number input=1; type table.operation-lines tbody tr:nth-child(1) td:nth-child(5) input=Predare echipamente HELP; wait 500; click Verifică și salvează; wait 2000 | După salvarea operației
+Captura: repetat | /iesiri/multipla | click sel:.relation-row input.searchable-select-input; wait 400; click sel:.relation-row ul.searchable-select-list li; wait 700; click sel:#op-product-0; wait 400; click sel:#op-product-0-list li; wait 800; type table.operation-lines tbody tr:nth-child(1) td.number input=1; type table.operation-lines tbody tr:nth-child(1) td:nth-child(5) input=Predare echipamente HELP; wait 500; click Verifică și salvează; wait 1500; height 1300; then; sql UPDATE products p JOIN stock_movements m ON m.product_id = p.id SET p.quantity = p.quantity + m.quantity WHERE m.description = 'Predare echipamente HELP'; sql DELETE FROM stock_movements WHERE description = 'Predare echipamente HELP' | Ieșirea repetată în aceeași zi
+Captura: rezervari | /iesiri/multipla | click sel:.relation-row input.searchable-select-input; wait 400; click sel:.relation-row ul.searchable-select-list li; wait 700; click sel:#op-product-0; type #op-product-0=CAM-IP-4MP-DOM; wait 700; click sel:#op-product-0-list li; wait 800; type table.operation-lines tbody tr:nth-child(1) td.number input=10; type table.operation-lines tbody tr:nth-child(1) td:nth-child(5) input=Montaj camere; wait 500; click Verifică și salvează; wait 2000; height 1300 | Ieșire din stocul rezervat de alte proiecte
 
 Înregistrezi, într-o singură operație, ieșirea mai multor produse către aceeași destinație. Operația se salvează **întreagă sau deloc**; înainte de salvare vezi un sumar cu toate avertismentele liniilor (ieșire peste stoc, produse rezervate de alte proiecte, ieșire repetată).
 
 ## Elemente
 ### Antet
 - ← Produse | buton | Revine la catalogul de produse.
-- Mesajul verde de după salvare | text | Confirmă operația și oferă linkul „Deschide bonul de consum (PDF)”, care se deschide în vizualizatorul de PDF al browserului.
+- Mesajul verde de după salvare | text | Confirmă operația și oferă linkul „Deschide bonul de consum (PDF)”, care se deschide în vizualizatorul de PDF al browserului. | img: salvat | sel: .success-banner
 ### Datele operației
 - Data ieșirii * | câmp | Data ieșirii, aleasă din calendar; nu poate fi în viitor.
 - Referință comună | câmp | Avizul, bonul sau numărul de predare, același pentru toate liniile (opțional).
@@ -27,11 +31,11 @@ Captura: pagina | /iesiri/multipla |  | Ieșirea multiplă
 - + Adaugă produs | buton | Adaugă o linie nouă (cel mult 50 de linii într-o operație).
 - Verifică și salvează | buton | Verifică liniile și arată sumarul de dinainte de salvare.
 ### Sumarul de dinainte de salvare
-- Depășește stocul | avertisment | Linia iese peste stocul disponibil: stocul devine negativ, iar produsul apare în „De regularizat”. Poți alege cauza (necunoscută, intrare neoperată sau stoc greșit în bază).
-- Rezervări ale altor proiecte | avertisment | Ieșirea ia bucăți rezervate de alte proiecte; alegi ce se întâmplă cu rezervările.
-- Ieșire repetată | avertisment | Aceeași ieșire a mai fost înregistrată azi; trebuie să scrii un motiv.
-- Salvează operația | buton | Înregistrează toate liniile deodată.
-- Modific | buton | Te întoarce la formular, fără nicio modificare în stoc.
+- Depășește stocul | avertisment | Linia iese peste stocul disponibil: stocul devine negativ, iar produsul apare în „De regularizat”. Poți alege cauza (necunoscută, intrare neoperată sau stoc greșit în bază). | img: sumar
+- Rezervări ale altor proiecte | avertisment | Ieșirea ia bucăți rezervate de alte proiecte; alegi ce se întâmplă cu rezervările. | img: rezervari | sel: .invoice-warning li
+- Ieșire repetată | avertisment | Aceeași ieșire a mai fost înregistrată azi; trebuie să scrii un motiv. | img: repetat | sel: .invoice-warning li
+- Salvează operația | buton | Înregistrează toate liniile deodată. | img: sumar
+- Modific | buton | Te întoarce la formular, fără nicio modificare în stoc. | img: sumar
 
 ## Flux: Cum înregistrez o ieșire către un beneficiar
 1. Alege data ieșirii și, dacă există, scrie referința (aviz, bon).

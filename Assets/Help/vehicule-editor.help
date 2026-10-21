@@ -1,6 +1,7 @@
 # Formularul de vehicul
 Cautare: vehicul formular numar inmatriculare descriere itp asigurare rovinieta expirare
 Captura: formular | /vehicule | click Adaugă vehicul | Formularul de vehicul
+Captura: editare | /vehicule | click sel:button.row-icon.edit[aria-label*='Editează vehiculul']; wait 1200 | Editarea unui vehicul
 
 Formularul pentru un vehicul nou sau pentru editarea unuia existent. Se deschide deasupra registrului sau fișei vehiculului.
 
@@ -11,7 +12,7 @@ Formularul pentru un vehicul nou sau pentru editarea unuia existent. Se deschide
 - Data expirare ITP * | câmp | Data se alege din calendar.
 - Data expirare asigurare * | câmp | La fel.
 - Data expirare rovinietă * | câmp | La fel.
-- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
 ### Butoane
 - Salvează vehiculul | buton | Salvează; la editare cere confirmarea modificărilor.
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.

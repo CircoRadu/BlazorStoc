@@ -92,3 +92,16 @@ Pasi:
 5. Deschide ajutorul unui formular (de exemplu Beneficiari -> "Adauga beneficiar" -> "?"): captura arata formularul; fiecare topic are captura.
 6. Verifica ca imaginile nu contin date reale (firme, persoane fictive).
 
+
+### 21.10.2026 - Help: fiecare element are chenar pe imaginea din help (nu mai exista "Arata pe pagina")
+
+**Ce s-a adaugat:** butonul "Arata pe pagina" a fost scos; iconita de pe fiecare rand ("Arata elementul pe imagine") incadreaza elementul numai pe captura din help. Toate topicurile au capturi pentru toate elementele (pasii fiecarui asistent, ferestre deschise, stari de eroare, liste cu pagini). Un test (grupul help) esueaza daca un element nu are chenar.
+
+**Ce face acum:** apasarea iconitei de pe un rand deruleaza captura potrivita (unele topicuri au mai multe capturi) si pulseaza chenarul; ajutorul ramane deschis, pagina live nu este atinsa. Exceptie: doua elemente care cer hardware sau conturi pe care mediul demo nu le are ("Copiaza pe NAS", "Rezultatul ultimei operatii" de la conturile bazei de date) nu au iconita.
+
+Pasi:
+
+1. Deschide ajutorul pe Preluare oferta: apasa pe rand elementele fiecarui pas (fisier, beneficiar, proiect, linii, rezumat) si verifica ca captura se schimba si chenarul incadreaza elementul.
+2. Deschide ajutorul pe Preluare factura: parcurge elementele pasilor 1-3, "Regularizare", "Se preia din nou", "Preluare noua".
+3. Deschide Setari -> Actualizare -> "?": elementele (pachet verificat, nu poate fi instalat, anunt cu numaratoare, Updater-ul lucreaza, banda rosie) au capturi proprii.
+4. Verifica pe cateva topicuri ca imaginile nu contin date reale si ca niciun rand cu iconita nu duce spre pagina live.

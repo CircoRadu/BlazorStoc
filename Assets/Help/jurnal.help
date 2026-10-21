@@ -1,7 +1,7 @@
 # Jurnal activitate
 Ruta: /jurnal
 Cautare: jurnal activitate audit trasabilitate operatii operator tinta detalii motiv filtre evenimente
-Captura: pagina | /jurnal |  | Jurnalul de activitate
+Captura: pagina | /jurnal | click sel:button.audit-action.audit-filter-link; wait 900; full | Jurnalul de activitate
 
 Acțiunile operate în sistem, în ordine cronologică (cele mai recente evenimente; pentru cele mai vechi folosește „Jurnal complet”). Fiecare intrare spune cine a făcut ce, când, asupra cui, cu ce valori și de ce. Doar administratorul vede jurnalul.
 
@@ -14,10 +14,10 @@ Acțiunile operate în sistem, în ordine cronologică (cele mai recente evenime
 - Operatori | cifră | Câți utilizatori distincți au operat.
 - Produse | cifră | Editările de produse.
 ### Filtre
-- Căutare | câmp | Utilizator, țintă, detalii sau motiv.
+- Căutare | câmp | Utilizator, țintă, detalii sau motiv. | sel: label.search-box
 - Tip înregistrare | listă | Tipul obiectului (produs, beneficiar, modul etc.).
 - Operație | listă | Operația exactă (de exemplu „Modificare expirare ITP”, „Oprire manuală modul”).
-- Filtre active | etichete | Fiecare filtru activ apare ca etichetă cu „×”; „Șterge filtrele” le scoate pe toate.
+- Filtre active | etichete | Fiecare filtru activ apare ca etichetă cu „×”; „Șterge filtrele” le scoate pe toate. | sel: .audit-active-filters
 ### Tabelul
 - Data și ora | coloană | Ora locală (stocarea este UTC); apasă data ca să filtrezi după ea.
 - Operator | coloană | Utilizatorul și rolul lui; apasă numele ca să filtrezi după el.

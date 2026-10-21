@@ -1,20 +1,23 @@
 # Adăugarea unui produs la o factură
 Cautare: adauga produs factura manual intrare cantitate pe factura duplicat motiv stoc negativ componenta
 Captura: fereastra | /facturi | click sel:button.category-table-link.link-like; click Adaugă produs manual | Adăugarea unui produs la o factură
+Captura: componenta | /facturi | click sel:button.category-table-link.link-like; wait 1500; click Adaugă produs manual; wait 1000; click sel:.delete-dialog input.searchable-select-input; type .delete-dialog input.searchable-select-input=CAM-IP-4MP-DOM; wait 700; click sel:.delete-dialog ul.searchable-select-list li; wait 1500; height 1200 | Produs cu componentă de proiect
+Captura: negativ | /facturi | click sel:button.category-table-link.link-like; wait 1500; click Adaugă produs manual; wait 1000; click sel:.delete-dialog input.searchable-select-input; type .delete-dialog input.searchable-select-input=SIRENA-EXT-SOL; wait 700; click sel:.delete-dialog ul.searchable-select-list li; wait 1500; height 1200 | Produs cu stoc negativ
+Captura: duplicat | /facturi | click sel:button.category-table-link.link-like; wait 1500; click Adaugă produs manual; wait 1000; click sel:.delete-dialog input.searchable-select-input; type .delete-dialog input.searchable-select-input=CIT-RFID-125; wait 700; click sel:.delete-dialog ul.searchable-select-list li; wait 1500; type #manual-quantity=5; type #manual-description=Produs omis la preluare; click sel:.delete-dialog button.primary; wait 1500; height 1200 | Produs deja preluat din factură
 
 Adaugi manual o intrare în stoc, legată de factura deschisă, pentru un produs care nu a fost preluat. Un produs deja preluat din factură sau o cantitate mai mare decât cea scrisă pe factură se adaugă doar cu un motiv.
 
 ## Elemente
 ### Câmpuri
 - Produs * | listă | Alegi produsul (căutare după cod sau denumire).
-- Componenta proiectului | alegere | Apare când produsul face parte dintr-un proiect: poți lega intrarea de o componentă a lui.
+- Componenta proiectului | alegere | Apare când produsul face parte dintr-un proiect: poți lega intrarea de o componentă a lui. | img: componenta | sel: .entry-component-choice
 - Data intrării * | câmp | Data intrării în stoc; nu poate fi în viitor.
 - Cantitate * | câmp | Câte bucăți intră.
 - Cantitate pe factură | câmp | Opțional: cantitatea scrisă pe factură, ca să se poată compara.
 - Descriere * | câmp | Descrierea intrării în stoc.
 ### Avertismente
-- Regularizare | panou | Apare când produsul are stoc negativ: alegi cum se acoperă.
-- Avertismentul de duplicat sau de cantitate | mesaj | Produsul a mai fost preluat din factură sau cantitatea depășește cea de pe factură; scrii „Motiv pentru intrarea nouă”, iar butonul devine „Adaugă totuși”.
+- Regularizare | panou | Apare când produsul are stoc negativ: alegi cum se acoperă. | img: negativ | sel: .negative-stock-panel
+- Avertismentul de duplicat sau de cantitate | mesaj | Produsul a mai fost preluat din factură sau cantitatea depășește cea de pe factură; scrii „Motiv pentru intrarea nouă”, iar butonul devine „Adaugă totuși”. | img: duplicat | sel: .invoice-warning
 ### Butoane
 - Adaugă | buton | Înregistrează intrarea.
 - Închide | buton | Închide fereastra fără modificări.

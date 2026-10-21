@@ -6,7 +6,7 @@ Reînnoirea este o revizie a aceleiași analize (același număr de înregistrar
 
 ## Elemente
 ### Formular
-- Rezumatul | text | Beneficiarul, punctul, ultima reînnoire și expirarea curentă.
+- Rezumatul | text | Beneficiarul, punctul, ultima reînnoire și expirarea curentă. | sel: .form-note
 - Data reînnoirii * | câmp | Din calendar; trebuie să fie după ultima reînnoire și nu poate fi în viitor. Se propune data de azi când este posibil. Alături vezi noua expirare calculată.
 - Observații | câmp | Text liber.
 - Înregistrează reînnoirea | buton | Salvează reînnoirea.

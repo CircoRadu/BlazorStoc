@@ -18,13 +18,13 @@ Aici faci și programezi copii de siguranță, vezi pachetele existente, ștergi
 - Se șterg pachetele mai vechi de (zile) | câmp | Pragul de păstrare, pentru toate tipurile de pachete; ultimele pachete se păstrează oricum. Pachetele de pe NAS nu se șterg niciodată din aplicație.
 - Salvează | buton | Salvează setările; dacă prin noul prag se vor șterge pachete, apare confirmarea „Ștergi N pachete vechi de pe server?”.
 ### Pachetele disponibile
-- Rezumatul | cifre | Total pachete, spațiul ocupat pe server, pachetele de inventar, programate/la cerere, pre-restaurare și pre-actualizare (făcute înainte de o restaurare, respectiv de o actualizare a aplicației) și cele de pe NAS.
+- Rezumatul | cifre | Total pachete, spațiul ocupat pe server, pachetele de inventar, programate/la cerere, pre-restaurare și pre-actualizare (făcute înainte de o restaurare, respectiv de o actualizare a aplicației) și cele de pe NAS. | sel: section.metrics
 - Fă backup acum | buton | Creează imediat un backup pe server (și pe NAS, dacă e activ). Pachetul crește odată cu imaginile și fișierele; backup-ul durează mai mult pe un server cu multe imagini.
 - Reîmprospătează NAS | buton | Apare când NAS-ul e activ: reia citirea partajării.
 - Restaurează baza de date | buton | Restaurează un pachet ales: baza de date, imaginile și fișierele (cere confirmare). Un pachet făcut înainte ca backup-urile să includă imaginile restaurează numai baza de date și lasă imaginile de acum neschimbate; mesajul de după restaurare spune ce s-a întâmplat cu fișierele.
-- Tabelul | tabel | Tip, denumire, data, operator, dimensiune și locație (server/NAS); „ora neverificată” sau „ora de pe internet” explică data pachetului. Marcajul rotund selectează un pachet.
-- Copiază pe NAS | iconita:nas | Copiază pachetul de pe server pe NAS.
-- Șterge pachetul | iconita:delete | Doar pachetele de inventar se pot șterge manual de pe server; cele programate, la cerere, pre-restaurare și pre-actualizare nu se șterg din aplicație.
+- Tabelul | tabel | Tip, denumire, data, operator, dimensiune și locație (server/NAS); „ora neverificată” sau „ora de pe internet” explică data pachetului. Marcajul rotund selectează un pachet. | sel: .table-scroll
+- Copiază pe NAS | iconita:nas | Copiază pachetul de pe server pe NAS. | sel: .row-icon.nas | img: pagina
+- Șterge pachetul | iconita:delete | Doar pachetele de inventar se pot șterge manual de pe server; cele programate, la cerere, pre-restaurare și pre-actualizare nu se șterg din aplicație. | sel: .row-icon.delete
 
 ## Flux: Cum programez backup-ul zilnic
 1. Pornește „Backup programat automat” și alege ora.

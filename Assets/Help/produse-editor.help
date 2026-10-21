@@ -1,24 +1,26 @@
 # Formularul de produs
 Cautare: produs formular cod model categorie subcategorie parametri descriere imagine clipboard salveaza pregateste produs nou
-Captura: formular | /produse | click Adaugă produs | Formularul de produs
+Captura: formular | /produse | click Adaugă produs; wait 1500; full | Formularul de produs
+Captura: editare | /produse | type .search-box input=PIR-DUAL; wait 1000; click sel:.row-icon.view; wait 1500; click Editează; wait 6000; height 1500 | Editarea unui produs existent
+Captura: parametri | /produse | click Adaugă produs; wait 1500; select #product-category = Supraveghere video; wait 800; select #product-subcategory = Camere speciale; wait 1200; height 1500 | Produs într-o subcategorie cu parametri obligatorii
 
 Formularul pentru un produs nou sau pentru editarea unuia existent. Se deschide deasupra catalogului sau ca fereastră în fluxurile de preluare (factură, ofertă), unde „Pregătește produs nou” îl pregătește fără să-l adauge în catalog (se adaugă la finalizarea preluării).
 
 ## Elemente
 ### Identificare
-- Cod produs / Model * | câmp | Codul stabilit de producător. Dacă subcategoria are parametri obligatori, aici scrii modelul (fără variantă), iar codul se compune din model și valorile alese. Aplicația te avertizează dacă a găsit caractere care se confundă ușor cu litere sau cifre.
+- Cod produs / Model * | câmp | Codul stabilit de producător. Dacă subcategoria are parametri obligatori, aici scrii modelul (fără variantă), iar codul se compune din model și valorile alese. Aplicația te avertizează dacă a găsit caractere care se confundă ușor cu litere sau cifre. | img: parametri | sel: .product-editor .editor-grid > label.full-width:first-child
 - Categorie *, Subcategorie * | listă | Doar combinații existente. „Adaugă categorie / subcategorie” (la produs nou) deschide pagina de categorii într-o fereastră separată; „Gata, înapoi la produs” o închide.
-- Parametrii obligatori | listă | Pentru fiecare parametru alegi o valoare; „Adaugă valoarea” adaugă o valoare nouă în listă. Sub ei vezi „Codul produsului rezultat”.
+- Parametrii obligatori | listă | Pentru fiecare parametru alegi o valoare; „Adaugă valoarea” adaugă o valoare nouă în listă. Sub ei vezi „Codul produsului rezultat”. | img: parametri | sel: .product-editor select:not(#product-category):not(#product-subcategory)
 - Descriere | câmp | Text liber, cel mult 1000 de caractere.
 ### Imagine
 - Imagine produs | zonă | Alegi sau tragi o imagine JPG, PNG, WebP sau GIF, de cel mult 5 MB.
 - Preia imaginea din clipboard | buton | Lipește imaginea copiată (Ctrl + V în zonă).
-- Caută imaginea pe internet | link | Deschide o fereastră cu rezultatele căutării după codul produsului; copiezi imaginea și o lipești în zonă.
-- Fără imagine | text | Produsul folosește imaginea generică „No img available”.
+- Caută imaginea pe internet | link | Deschide o fereastră cu rezultatele căutării după codul produsului; copiezi imaginea și o lipești în zonă. | img: editare | sel: .image-web-search a
+- Fără imagine | text | Produsul folosește imaginea generică „No img available”. | img: editare | sel: .image-preview-card
 ### Stoc și salvare
-- Nota de stoc | text | La produs nou: stoc 0; la editare: stocul curent (în depozit și în vehicule). Stocul nu se editează aici, ci prin intrări și ieșiri.
-- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
-- Salvează produsul / Pregătește produsul | buton | Salvează (la editare cere confirmarea modificărilor) sau pregătește produsul pentru preluare.
+- Nota de stoc | text | La produs nou: stoc 0; la editare: stocul curent (în depozit și în vehicule). Stocul nu se editează aici, ci prin intrări și ieșiri. | img: editare | sel: text:"Stoc curent"
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
+- Salvează produsul / Pregătește produsul | buton | Salvează (la editare cere confirmarea modificărilor) sau pregătește produsul pentru preluare. | sel: .editor-actions button.primary | img: formular
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
 
 ## Flux: Cum adaug un produs nou

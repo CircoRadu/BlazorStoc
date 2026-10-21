@@ -1,7 +1,8 @@
 # Fișa beneficiarului
 Ruta: /beneficiari/{id:int}
 Cautare: beneficiar fisa puncte de lucru proiecte consum net contracte mentenanta analize risc adauga proiect editeaza anaf
-Captura: pagina | /beneficiari | click Panoramic Hotel; full | Fișa unui beneficiar
+Captura: pagina | /beneficiari | click Panoramic Hotel; wait 3000; full | Fișa unui beneficiar
+Captura: proiecte | /beneficiari | click Logistic Park; wait 3000; full | Lista de proiecte cu pagini
 
 Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, contractele și intervențiile de mentenanță, analizele de risc și proiectele. De aici adaugi proiecte și puncte de lucru.
 
@@ -9,7 +10,7 @@ Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, c
 ### Antet
 - ← Beneficiari | link | Revine la registrul beneficiarilor.
 - Numele și datele beneficiarului | text | Persoană fizică sau CUI, adresa, telefonul, iar la persoanele juridice Reg. Com., cod poștal și CAEN.
-- Date preluate din ANAF / Date introduse manual | insignă | Spune de unde vin datele persoanei juridice.
+- Date preluate din ANAF / Date introduse manual | insignă | Spune de unde vin datele persoanei juridice. | sel: .page-heading .anaf-source
 - Editează | buton | Deschide formularul beneficiarului ([[beneficiari-editor]]).
 - + Adaugă proiect | buton | Deschide formularul de proiect nou pentru acest beneficiar ([[proiecte-editor]]).
 ### Puncte de lucru
@@ -28,10 +29,10 @@ Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, c
 - Contracte de mentenanță și Intervenții | secțiuni | Din modulul Mentenanță: contractele beneficiarului ([[mentenanta-contracte]]) și registrul intervențiilor pe punctele de lucru ([[mentenanta-interventii]]). Apar doar cât modulul funcționează.
 - Analize de risc | secțiune | Din modulul Analize de risc: analizele punctelor de lucru, reînnoirile și expirarea lor ([[analize-risc-sectiune]]).
 ### Proiecte
-- Caută după denumire | câmp | Filtrează proiectele beneficiarului.
-- Proiect | coloană | Apasă numele ca să deschizi pagina proiectului.
-- Ultima modificare | coloană | Data și ora ultimei modificări a proiectului.
-- Paginile | butoane | Trec la pagina anterioară sau următoare a listei de proiecte.
+- Caută după denumire | câmp | Filtrează proiectele beneficiarului. | img: proiecte
+- Proiect | coloană | Apasă numele ca să deschizi pagina proiectului. | img: proiecte
+- Ultima modificare | coloană | Data și ora ultimei modificări a proiectului. | img: proiecte
+- Paginile | butoane | Trec la pagina anterioară sau următoare a listei de proiecte. | img: proiecte | sel: .pagination
 
 ## Flux: Cum adaug un proiect pentru un beneficiar
 1. Apasă „+ Adaugă proiect”.

@@ -1,32 +1,34 @@
 # Pagina proiectului
 Ruta: /proiecte/{id:int}
 Cautare: proiect pagina componente sisteme observatii situatia proiectului echipamente editeaza sterge termen
-Captura: pagina | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; full | Pagina unui proiect
+Captura: pagina | /beneficiari | click Panoramic Hotel; wait 3000; click Supraveghere video si control acces; wait 5000; full | Pagina unui proiect
+Captura: externa | /beneficiari | click Panoramic Hotel; wait 3000; click Supraveghere video si control acces; wait 5000; click Editează; wait 1500; sql UPDATE projects SET observations = CONCAT(COALESCE(observations, ''), ' ') WHERE name LIKE 'Supraveghere video si control acces%'; wait 3500; then; sql UPDATE projects SET observations = TRIM(observations) WHERE name LIKE 'Supraveghere video si control acces%' | Proiect modificat de altă sesiune
+Captura: arhivate | /beneficiari | click Logistic Park; wait 3000; jsclick sel:button[aria-label='Pagina următoare']; wait 1000; click Supraveghere perimetrala; wait 5000; jsclick sel:label.row-toggle; wait 1500; full | Componentele arhivate ale unui proiect
 
 Pagina unui proiect: datele lui, componentele (sistemele) și conținutul: situația proiectului, echipamentele scoase din inventar și observațiile cu fișierele lor.
 
 ## Elemente
 ### Antet
-- ← Numele beneficiarului | link | Revine la fișa beneficiarului ([[beneficiari-detaliu]]).
-- Numele proiectului și beneficiarul | text | Apasă beneficiarul ca să deschizi fișa lui.
+- ← Numele beneficiarului | link | Revine la fișa beneficiarului ([[beneficiari-detaliu]]). | sel: a.nav-back
+- Numele proiectului și beneficiarul | text | Apasă beneficiarul ca să deschizi fișa lui. | sel: .page-heading
 - Editează | buton | Deschide formularul proiectului ([[proiecte-editor]]).
 - Șterge proiectul | buton | Șterge proiectul; nu se poate dacă are mișcări de stoc asociate; observațiile și fișierele lui se arhivează odată cu el.
-- Mesajul de modificare externă | mesaj | Apare când alt utilizator a schimbat proiectul.
+- Mesajul de modificare externă | mesaj | Apare când alt utilizator a schimbat proiectul. | img: externa | sel: page:div.info-banner[role='status']
 ### Observații generale
 - Observații generale | text | Textul din formularul proiectului, dacă a fost completat.
 ### Componente
 - Adaugă un sistem | listă | Alegi un tip de sistem din Nomenclator care nu e încă în proiect; „Adaugă componenta” îl adaugă.
-- Arată și arhivate | comutator | Adaugă în listă componentele arhivate.
+- Arată și arhivate | comutator | Adaugă în listă componentele arhivate. | sel: label.row-toggle
 - Situația proiectului | link | Deschide situația proiectului ([[proiecte-situatie]]).
 - Sistem | coloană | Numele componentei (cu motivul, dacă e arhivată).
 - Stare | listă | Starea componentei, pe care o poți schimba direct.
 - Predat | coloană | Cât s-a predat din necesarul componentei.
 - Scoate componenta | iconita:delete | Arhivează componenta (cere confirmare și un motiv; ce se întâmplă cu produsele deja predate se alege în fereastră); oferta și liniile ei se păstrează.
-- Reactivează componenta | iconita:reactivate | Readuce o componentă arhivată.
+- Reactivează componenta | iconita:reactivate | Readuce o componentă arhivată. | img: arhivate | sel: .row-icon.reactivate
 ### Conținutul proiectului
 - + Adaugă observație | buton | Deschide formularul de observație ([[proiecte-observatie-editor]]), dacă modulul Observații este activ.
 - Situația proiectului, Echipamente | rând | Linkuri către situație ([[proiecte-situatie]]) și către echipamentele proiectului ([[proiecte-echipamente]]).
-- Observațiile | rând | Fiecare observație, cu data, autorul și numărul de fișiere; apasă numele ca s-o deschizi ([[proiecte-observatie]]).
+- Observațiile | rând | Fiecare observație, cu data, autorul și numărul de fișiere; apasă numele ca s-o deschizi ([[proiecte-observatie]]). | sel: text:"Conținutul proiectului"
 
 ## Flux: Cum adaug componentele unui proiect
 1. La „Adaugă un sistem” alege tipul de sistem.

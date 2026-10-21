@@ -3,41 +3,47 @@ Ruta: /oferte/preluare
 Ruta: /oferte
 Cautare: oferta deviz excel xlsx preluare sablon beneficiar proiect componenta linii produse revizie achizitie rezumat
 Captura: pagina | /oferte/preluare |  | Preluarea unei oferte
+Captura: fisier | /oferte/preluare | upload oferta-demo.xlsx; wait 4000; height 1300 | Pasul 1: fișierul ofertei
+Captura: beneficiar | /oferte/preluare | upload oferta-demo.xlsx; wait 4000; click Pasul următor; wait 1800; type #offer-beneficiary-search=Logistic; wait 1000; click sel:ul.searchable-select-list li; wait 1000; height 1000 | Pasul 2: beneficiarul
+Captura: proiect | /oferte/preluare | upload oferta-demo.xlsx; wait 4000; click Pasul următor; wait 1800; click Pasul următor; wait 1800; height 1000 | Pasul 3: proiectul și componenta
+Captura: linii | /oferte/preluare | upload oferta-demo.xlsx; wait 4000; click Pasul următor; wait 1800; click Pasul următor; wait 1800; click Pasul următor; wait 1800; full | Pasul 4: liniile ofertei
+Captura: rezumat | /oferte/preluare | upload oferta-demo.xlsx; wait 4000; click Pasul următor; wait 1800; click Pasul următor; wait 1800; click Pasul următor; wait 1800; click Pasul următor; wait 1800; height 1000 | Pasul 5: rezumatul
+Captura: preluata | /oferte/preluare | upload oferta-demo.xlsx; wait 4000; click Pasul următor; wait 1800; click Pasul următor; wait 1800; click Pasul următor; wait 1800; click Pasul următor; wait 1800; click Preia oferta; wait 4000; height 800; then; sql DELETE FROM offer_lines WHERE offer_id IN (SELECT id FROM offers WHERE revision>1); sql DELETE FROM offers WHERE revision>1 | După preluare: oferta înregistrată
 
 Preiei un deviz-ofertă Excel (.xlsx): se citește cu un șablon, se leagă de beneficiar, proiect și componentă, iar liniile în bucăți se potrivesc cu produsele din catalog. Un număr de ofertă deja existent este o **revizie** a ofertei respective. Lucrezi în cinci pași: Fișier, Beneficiar, Proiect, Linii, Rezumat.
 
 ## Elemente
 ### Antet și pași
 - Șabloane de oferte | link | Deschide lista șabloanelor ([[oferte-sabloane]]).
-- Pașii 1–5 | filă | Fișier, Beneficiar, Proiect, Linii, Rezumat: poți reveni la un pas deja parcurs; pașii următori se deschid pe rând.
+- Pașii 1–5 | filă | Fișier, Beneficiar, Proiect, Linii, Rezumat: poți reveni la un pas deja parcurs; pașii următori se deschid pe rând. | sel: .settings-tabs | img: pagina
 ### Pasul 1 - Fișierul ofertei
 - Fișierul .xlsx | zonă | Alegi devizul sau îl tragi în zonă (cel mult 8 MB).
-- Șablon | listă | Șablonul cu care se citește fișierul. Dacă nu există niciun șablon activ, ți se oferă linkul de creare; dacă etichetele fișierului nu se potrivesc cu niciun șablon activ, apare un avertisment.
+- Șablon | listă | Șablonul cu care se citește fișierul. Dacă nu există niciun șablon activ, ți se oferă linkul de creare; dacă etichetele fișierului nu se potrivesc cu niciun șablon activ, apare un avertisment. | img: fisier | sel: label.movement-page-size
 - Număr ofertă *, Titlu, Categoria (sistem), Beneficiar din ofertă | câmp | Citite din fișier după șablon; le poți corecta.
-- Lista secțiunilor | listă | Fiecare secțiune a fișierului, câte linii are și dacă se importă; o secțiune necunoscută nu se importă.
-- Mesajul de revizie | mesaj | Când numărul ofertei există deja, spune că aceasta va fi revizia următoare.
+- Lista secțiunilor | listă | Fiecare secțiune a fișierului, câte linii are și dacă se importă; o secțiune necunoscută nu se importă. | img: fisier | sel: ul.operation-summary
+- Mesajul de revizie | mesaj | Când numărul ofertei există deja, spune că aceasta va fi revizia următoare. | img: fisier | sel: .info-banner
 ### Pasul 2 - Beneficiarul
 - Beneficiari asemănători | selecție | Beneficiarii din catalog apropiați de denumirea din ofertă, cu procentul de asemănare.
-- Alt beneficiar | listă | Alegi alt beneficiar (căutare în listă).
+- Alt beneficiar | listă | Alegi alt beneficiar (căutare în listă). | img: beneficiar
 - + Beneficiar nou | buton | Deschide formularul de beneficiar nou ([[beneficiari-editor]]).
-- Reține denumirea din ofertă | comutator | Păstrează denumirea din ofertă ca denumire alternativă, ca la ofertele viitoare beneficiarul să fie recunoscut singur.
+- Reține denumirea din ofertă | comutator | Păstrează denumirea din ofertă ca denumire alternativă, ca la ofertele viitoare beneficiarul să fie recunoscut singur. | img: beneficiar
 ### Pasul 3 - Proiectul și componenta
 - Proiect | selecție | Un proiect existent al beneficiarului sau „Proiect nou”; la proiect nou scrii denumirea (implicit titlul ofertei).
-- Componenta (tipul de sistem) | listă | Tipul de sistem al categoriei ofertei, din Nomenclator; poate rămâne „fără componentă”.
+- Componenta (tipul de sistem) | listă | Tipul de sistem al categoriei ofertei, din Nomenclator; poate rămâne „fără componentă”. | img: proiect
 ### Pasul 4 - Liniile ofertei
-- Denumire din ofertă | coloană | Denumirea liniei, secțiunea și unitatea de măsură.
-- Cant. | coloană | Cantitatea din ofertă.
-- Produs din catalog | listă | Produsul legat de linie. Fără produs, linia rămâne „de achiziționat”. Etichetele spun dacă legătura este reținută din oferte anterioare sau propusă automat (de verificat).
+- Denumire din ofertă | coloană | Denumirea liniei, secțiunea și unitatea de măsură. | img: linii
+- Cant. | coloană | Cantitatea din ofertă. | img: linii
+- Produs din catalog | listă | Produsul legat de linie. Fără produs, linia rămâne „de achiziționat”. Etichetele spun dacă legătura este reținută din oferte anterioare sau propusă automat (de verificat). | img: linii
 - Produsele propuse | buton | Alte produse apropiate, cu procentul de asemănare; apeși unul ca să-l alegi.
-- Produs nou | buton | Deschide formularul de produs nou ([[produse-editor]]), cu denumirea din ofertă.
-- În afara stocului | text | Metrajele și orele nu au produs; nu intră în stoc.
+- Produs nou | buton | Deschide formularul de produs nou ([[produse-editor]]), cu denumirea din ofertă. | img: linii
+- În afara stocului | text | Metrajele și orele nu au produs; nu intră în stoc. | img: linii | sel: .stock-badge
 ### Pasul 5 - Rezumat
 - Rezumatul | listă | Oferta, beneficiarul, proiectul și componenta, plus câte linii sunt legate de produse, de achiziționat sau în afara stocului.
-- Diferențele față de revizia anterioară | text | La o revizie: câte linii s-au adăugat, scos sau și-au schimbat cantitatea. Ieșirile deja făcute pe proiect nu se leagă automat de oferta nouă.
-- Preia oferta | buton | Înregistrează oferta în proiect.
-- Preia altă ofertă | link | După preluare, o iei de la capăt.
+- Diferențele față de revizia anterioară | text | La o revizie: câte linii s-au adăugat, scos sau și-au schimbat cantitatea. Ieșirile deja făcute pe proiect nu se leagă automat de oferta nouă. | img: rezumat | sel: .info-banner
+- Preia oferta | buton | Înregistrează oferta în proiect. | img: rezumat
+- Preia altă ofertă | link | După preluare, o iei de la capăt. | img: preluata
 ### Navigare
-- Înapoi, Pasul următor | buton | Trec între pași.
+- Înapoi, Pasul următor | buton | Trec între pași. | img: beneficiar
 
 ## Flux: Cum preiau o ofertă
 1. La pasul 1 alege fișierul .xlsx, verifică șablonul și corectează numărul, titlul și categoria; apasă „Pasul următor”.

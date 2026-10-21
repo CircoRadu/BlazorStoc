@@ -1,6 +1,6 @@
 # Formularul tipului de utilizator
 Cautare: tip utilizator formular nume descriere copiaza drepturile acorda tot revoca tot module acces actiuni meniu
-Captura: formular | /setari | click Tipuri de utilizatori; click Adaugă tip; height 1300 | Formularul tipului de utilizator
+Captura: formular | /setari | click Utilizatori; wait 800; click Tipuri de utilizatori; wait 1200; click Adaugă tip; wait 900; height 1700 | Formularul tipului de utilizator
 
 Formularul pentru un tip nou sau pentru editarea unuia existent. Tipul Administrator are întotdeauna toate drepturile și nu poate fi modificat; la un tip de sistem poți schimba drepturile, dar nu numele.
 
@@ -16,7 +16,7 @@ Formularul pentru un tip nou sau pentru editarea unuia existent. Tipul Administr
 - Acțiuni | comutatoare | Acțiunile permise în modul (de exemplu vizualizare, adăugare, editare, ștergere).
 - Meniul văzut de acest tip | text | Previzualizarea modulelor pe care le va vedea tipul.
 ### Butoane
-- Salvează tipul | buton | Salvează (nu apare la Administrator).
+- Salvează tipul | buton | Salvează (nu apare la Administrator). | sel: fieldset .editor-actions button.primary
 - Anulează, Închide | buton | Închid formularul.
 
 ## Flux: Cum fac un tip „doar citire”

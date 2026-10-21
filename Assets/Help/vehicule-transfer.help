@@ -6,10 +6,10 @@ Fereastra se deschide din „Materiale și echipamente” și cere ce lipsește 
 
 ## Elemente
 ### Fereastra
-- Titlul și rezumatul | text | Ce operezi: produsul sau toate produsele, din ce mașină.
+- Titlul și rezumatul | text | Ce operezi: produsul sau toate produsele, din ce mașină. | sel: .dialog-head h2, .dialog-head + p, .dialog-head ~ p.muted
 - Cantitate * | câmp | Apare la un singur produs: câte bucăți; cel mult cât este în mașină.
 - Mașina destinație * | listă | Apare la mutare: alegi mașina în care se mută produsele.
-- Restituie în depozit / Mută | buton | Execută operația.
+- Restituie în depozit / Mută | buton | Execută operația. | sel: page:.row-icon.return, .row-icon.move
 - Anulează | buton | Închide fereastra fără modificări.
 
 ## Flux: Cum restitui sau mut produse

@@ -8,8 +8,8 @@ Fișa unui furnizor: datele lui și facturile preluate în stoc de la el.
 ## Elemente
 ### Antet
 - ← Furnizori | link | Revine la registrul furnizorilor.
-- Numele și datele furnizorului | text | Țara, CUI sau codul de TVA, adresa, telefonul și, când există, Reg. Com., cod poștal și CAEN.
-- Sursa datelor | insignă | ANAF, manual etc.; la datele din ANAF se arată și data ultimei citiri.
+- Numele și datele furnizorului | text | Țara, CUI sau codul de TVA, adresa, telefonul și, când există, Reg. Com., cod poștal și CAEN. | sel: .page-heading
+- Sursa datelor | insignă | ANAF, manual etc.; la datele din ANAF se arată și data ultimei citiri. | sel: .anaf-source
 - Editează | buton | Deschide formularul furnizorului ([[furnizori-editor]]).
 ### Facturi preluate
 - Nr. factură | coloană | Numărul facturii.

@@ -119,6 +119,7 @@ public static class AuditFilterOptions
         (AuditActions.ReservationReleasedByComponent, AuditActions.ReservationReleasedByComponent),
         (AuditActions.ComponentExitReturned, AuditActions.ComponentExitReturned), (AuditActions.ComponentExitLeft, AuditActions.ComponentExitLeft),
         (AuditActions.ComponentExitMoved, AuditActions.ComponentExitMoved), (AuditActions.ComponentExitConsumed, AuditActions.ComponentExitConsumed),
+        (AuditActions.CreateInstallerAdministrator, AuditActions.CreateInstallerAdministrator),
         (AuditActions.AddSystemType, AuditActions.AddSystemType), (AuditActions.RenameSystemType, AuditActions.RenameSystemType),
         (AuditActions.ActivateSystemType, AuditActions.ActivateSystemType), (AuditActions.DeactivateSystemType, AuditActions.DeactivateSystemType),
         (AuditActions.MoveSystemType, AuditActions.MoveSystemType), (AuditActions.AddSystemTypeAlias, AuditActions.AddSystemTypeAlias),

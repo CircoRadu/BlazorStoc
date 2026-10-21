@@ -2,6 +2,7 @@
 Ruta: /nomenclator
 Cautare: nomenclator tipuri de sisteme antiefractie tvci cctv control acces incendiu retelistica denumiri alternative activ ordine
 Captura: pagina | /nomenclator |  | Tipurile de sisteme
+Captura: redenumire | /nomenclator | click sel:button.row-icon.edit; wait 800 | Redenumirea unui tip de sistem
 
 Sistemele din care sunt făcute proiectele (antiefracție, TVCI, control acces, incendiu, rețelistică…). Un tip nu se șterge: se dezactivează și nu mai apare la alegeri noi. Denumirile alternative (de exemplu „CCTV” pentru „TVCI”) ajută la recunoașterea lor în oferte.
 
@@ -15,8 +16,8 @@ Sistemele din care sunt făcute proiectele (antiefracție, TVCI, control acces, 
 - Mută mai jos | iconita:down | Coboară tipul cu o poziție.
 - Denumire | coloană | Numele tipului.
 - Redenumește | iconita:edit | Deschide câmpul de redenumire.
-- Salvează denumirea | iconita:check | Salvează noul nume.
-- Renunță | iconita:close | Renunță la redenumire.
+- Salvează denumirea | iconita:check | Salvează noul nume. | img: redenumire
+- Renunță | iconita:close | Renunță la redenumire. | img: redenumire
 - Denumiri alternative | coloană | Etichetele alternative ale tipului; „×” scoate una, iar câmpul „+ denumire alternativă” cu „Adaugă” adaugă una nouă.
 - Stare | comutator | Activ sau inactiv: un tip inactiv nu mai apare la alegeri noi.
 

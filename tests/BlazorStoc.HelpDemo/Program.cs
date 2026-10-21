@@ -36,6 +36,7 @@ var interventions = new MariaServiceInterventionRepository(configuration, admin,
 var minStock = new MariaProductMinStockRepository(configuration, admin, audit);
 var riskAnalyses = new MariaRiskAnalysisRepository(configuration, admin, audit, null, TimeProvider.System);
 
+if (args.Contains("--forms")) { await WriteInventoryFormsAsync(true); Console.WriteLine("Formulare de inventar scrise."); return 0; }
 if ((await products.GetProductsAsync()).Count > 0) { Console.WriteLine("Baza demo are deja produse; ruleaza intai tools/help-demo-db.ps1."); return 1; }
 var today = DateOnly.FromDateTime(DateTime.Today);
 DateOnly Ago(int days) => today.AddDays(-days);
@@ -91,10 +92,12 @@ var deliveries = new (int Supplier, string Number, int DaysAgo, string[] Codes)[
     (3, "VPS 14502", 22, ["SURSA-12V-5A", "ACUM-12V-7AH", "ACUM-12V-18AH"]),
     (4, "NET/2026/311", 12, ["CIT-RFID-125", "CIT-BIO-AMPR", "CTRL-ACCES-2U", "YALA-ELECTROM-300", "BUTON-IESIRE"])
 };
+var invoiceIds = new List<long>();
 foreach (var delivery in deliveries)
 {
     var supplier = supplierRecords[delivery.Supplier];
     var invoice = await invoices.CreateAsync(new SupplierInvoiceInput { SupplierId = supplier.Id, Number = delivery.Number, Date = Ago(delivery.DaysAgo) });
+    invoiceIds.Add(invoice.Id);
     foreach (var code in delivery.Codes)
     {
         var item = created.First(entry => entry.Product.Name == code);
@@ -141,7 +144,8 @@ foreach (var (plate, description, itp, insurance, rovinieta) in new (string, str
     ("BV-45-ESP", "Dacia Dokker – echipa Brașov", 220, 140, 300),
     ("B-77-ESP", "Ford Transit Connect – echipa București", 25, 330, 18),
     ("CJ-08-ESP", "Renault Kangoo – echipa Cluj", 410, 90, 200),
-    ("PH-12-ESP", "Dacia Duster – inspecții", 12, 250, 340)
+    ("PH-12-ESP", "Dacia Duster – inspecții", 12, 250, 340),
+    ("IF-33-ESP", "Fiat Doblò – service", -10, 200, 300)
 })
     vehicleRecords.Add(await vehicles.CreateAsync(new VehicleInput { PlateNumber = plate, Description = description, ItpExpiry = today.AddDays(itp), InsuranceExpiry = today.AddDays(insurance), RovinietaExpiry = today.AddDays(rovinieta) }));
 
@@ -213,7 +217,7 @@ await interventions.RecordAsync(beneficiaryRecords[4].Id, new ServiceInterventio
 // A contract that was switched off (the list shows it only with "Arată și contractele Off") and the reactivation dialog that goes with it.
 var offContract = await contracts.CreateAsync(beneficiaryRecords[3].Id, new ServiceContractInput
 {
-    NumberText = $"7/{Ago(300):dd.MM.yyyy}", CycleMonths = 6, ValidUntil = today.AddMonths(8), Notes = "Contract suspendat la cererea asociației.",
+    NumberText = $"7/{Ago(300):dd.MM.yyyy}", CycleMonths = 6, ValidUntil = today.AddMonths(-2), Notes = "Contract suspendat la cererea asociației.",
     Points = [new ServiceContractPointInput { WorkPointId = workPointRecords[6].Id, NextDue = today.AddDays(60) }]
 });
 await contracts.DeactivateAsync(offContract.Contract);
@@ -235,6 +239,185 @@ var corrected = await movements.CreateAsync(Find("BUTON-ALARMA-ADR").Id, new Sto
 var edit = StockMovementInput.From(corrected.Movement);
 edit.Quantity = 6; edit.Reason = "Cantitate corectată după numărătoare";
 await movements.UpdateAsync(corrected.Movement, edit);
+
+// ---- Scenarios for the pictures of the help (tools/help-capture.mjs): every element of a window needs a state in which it is on the screen -----------------------
+
+// A subcategory with required parameters (the product form then asks for a model and the values; the window of the parameters shows names, types, units and values).
+var parameterRepository = new MariaProductParameterRepository(configuration, admin, audit);
+var specialCameras = new ProductGroup("Supraveghere video", "Camere speciale");
+await products.CreateSubcategoryAsync(specialCameras.Category, specialCameras.Subcategory);
+var lensParameter = await parameterRepository.AddParameterAsync(specialCameras, "Lentilă", "mm", ParameterKind.Number);
+foreach (var value in new[] { "2,8", "3,6", "6" }) await parameterRepository.AddValueAsync(lensParameter.Id, value);
+var colourParameter = await parameterRepository.AddParameterAsync(specialCameras, "Culoare", "", ParameterKind.Text);
+foreach (var value in new[] { "alb", "negru" }) await parameterRepository.AddValueAsync(colourParameter.Id, value);
+
+// Risk analyses of the first beneficiary: an old one that was switched off, and a renewal in the history (so the list shows "Arată și analizele Off", the points without an active analysis, the undo of a renewal).
+var offAnalysis = await riskAnalyses.CreateAsync(beneficiaryRecords[0].Id, new RiskAnalysisInput { WorkPointId = workPointRecords[1].Id, Number = "RA-0118", Author = "Ing. Cătălin Moraru", InitialDate = Ago(400), ValidityMonths = 24, Notes = "Analiză veche, înlocuită." }, false);
+await riskAnalyses.DeactivateAsync(offAnalysis.Analysis);
+var hotelAnalysis = (await riskAnalyses.GetForBeneficiaryAsync(beneficiaryRecords[0].Id)).First(view => view.Analysis.Number == "RA-0142");
+await riskAnalyses.RenewAsync(hotelAnalysis.Analysis, new RiskAnalysisRenewalInput { Date = Ago(10), Notes = "Reînnoire periodică." });
+
+// Exits over the stock (the products wait in "De regularizat"), with the cause the user chose.
+async Task OverStockExitAsync(string code, int quantity, OverStockCause cause)
+{
+    await movements.CreateAsync(Find(code).Id, new StockMovementInput
+    {
+        Kind = StockMovementKind.Exit, Date = Ago(2), Quantity = quantity, Destination = ExitDestination.GenericSale, Description = "Vânzare peste stocul din depozit", OverStockCause = cause
+    });
+}
+await OverStockExitAsync("SIRENA-EXT-SOL", 40, OverStockCause.UnrecordedEntry);
+await OverStockExitAsync("CONTACT-MAG-ASC", 55, OverStockCause.WrongStock);
+
+// Offers taken over into the projects: the components get lines tied to products (the situation of the project, the component choice at an entry), and reservations of other projects.
+var offers = new MariaOfferRepository(configuration, projects, components, beneficiaries, admin, audit);
+var reservations = new MariaReservationRepository(configuration, admin, audit);
+OfferImportRequest OfferRequest(string number, string title, int project, int typeIndex, List<OfferImportLine> lines) => new()
+{
+    Number = number, Title = title, Category = "Securitate", FileName = $"oferta-{number}.xlsx", BeneficiaryId = projectRecords[project].BeneficiaryId, BeneficiaryText = beneficiaryRecords.First(item => item.Id == projectRecords[project].BeneficiaryId).Name,
+    RememberBeneficiaryAlias = false, ProjectId = projectRecords[project].Id, NewProjectName = "", SystemTypeId = typeRecords[typeIndex].Id, Lines = lines
+};
+OfferImportLine OfferLine(string section, int number, string name, string unit, int quantity, string? productCode, string productType = "") => new()
+{
+    Section = section, Number = number.ToString(System.Globalization.CultureInfo.InvariantCulture), ProductType = productType, Name = name, Unit = unit, Quantity = quantity, InStock = productCode is not null, ProductId = productCode is null ? null : Find(productCode).Id
+};
+await offers.ImportAsync(OfferRequest("250700101", "Supraveghere video hotel", 0, 0,
+[
+    OfferLine("Echipamente", 1, "Cameră IP dome 4 MP", "buc", 8, "CAM-IP-4MP-DOM", "Camere"), OfferLine("Echipamente", 2, "Cameră IP bullet 4 MP", "buc", 4, "CAM-IP-4MP-BUL", "Camere"),
+    OfferLine("Echipamente", 3, "NVR 16 canale 4K", "buc", 1, "NVR-16CH-4K", "NVR"), OfferLine("Echipamente", 4, "Cablu FTP cat 5", "m", 500, null, "Cabluri"),
+    OfferLine("Manoperă", 1, "Montaj și configurare camere", "oră", 24, null, "Servicii")
+]));
+await offers.ImportAsync(OfferRequest("250700102", "Control acces hotel", 0, 3,
+[
+    OfferLine("Echipamente", 1, "Controller acces 2 uși", "buc", 3, "CTRL-ACCES-2U"), OfferLine("Echipamente", 2, "Cititor RFID 125 kHz", "buc", 6, "CIT-RFID-125"), OfferLine("Echipamente", 3, "Yală electromagnetică 300 kg", "buc", 4, "YALA-ELECTROM-300")
+]));
+await offers.ImportAsync(OfferRequest("250700103", "Alarmă și incendiu clinică", 1, 2,
+[
+    OfferLine("Echipamente", 1, "Detector optic de fum adresabil", "buc", 70, "DET-FUM-ADR"), OfferLine("Echipamente", 2, "Centrală de incendiu 2 bucle", "buc", 1, "CENTR-INC-2L"), OfferLine("Echipamente", 3, "Buton manual de alarmă", "buc", 8, "BUTON-ALARMA-ADR")
+]));
+var clinicComponents = await components.GetForProjectAsync(projectRecords[1].Id);
+await reservations.ReserveAsync(projectRecords[1].Id, clinicComponents.First(item => item.SystemTypeId == typeRecords[2].Id).Id, Find("BUTON-ALARMA-ADR").Id, 6);
+var depotComponents = await components.GetForProjectAsync(projectRecords[2].Id);
+await reservations.ReserveAsync(projectRecords[2].Id, depotComponents.First().Id, Find("CAM-IP-4MP-DOM").Id, 20);
+
+// A component of a project that was archived (the list shows "Arată și arhivate" and the reactivation).
+await components.ArchiveAsync(depotComponents.Last(), "Componentă nefolosită în această etapă.");
+
+// Supplier recognition: what the reading proposed for the invoices and what the user chose.
+var recognitionLog = new MariaSupplierRecognitionLog(configuration, admin);
+var recognitionRows = new (int Invoice, SupplierMatchMethod Method, string Confidence, string ReadName, string ReadCui, int? Recognized, int? Chosen, bool TemplateChanged)[]
+{
+    (0, SupplierMatchMethod.Cui, "high", "Omega Video Systems", "RO3489021", 2, 2, false), (1, SupplierMatchMethod.Cui, "high", "Alfa Securitate Distributie", "RO3154870", 0, 0, false),
+    (2, SupplierMatchMethod.Name, "medium", "Delta Cabluri si Retele", "R02716493", 1, 3, true), (3, SupplierMatchMethod.Similar, "low", "Vega Power Suply", "RO293O748", 4, 3, false),
+    (4, SupplierMatchMethod.Alias, "high", "Nordic Electronic", "RO3672509", 4, 4, false)
+};
+foreach (var row in recognitionRows)
+    await recognitionLog.RecordAsync(new SupplierRecognitionEntry(invoiceIds[row.Invoice], row.Method, row.Confidence, row.ReadName, row.ReadCui, row.Recognized is null ? null : supplierRecords[row.Recognized.Value].Id,
+        row.Chosen is null ? null : supplierRecords[row.Chosen.Value].Id, row.TemplateChanged));
+
+// Maintenance: the expired contract that was switched off has its point in a new active contract (the reactivation window warns about both); two points at the same place on the map;
+// a point without coordinates under a contract; a longer register of interventions (the paging).
+var gardenPoint = await workPoints.CreateAsync(beneficiaryRecords[4].Id, new WorkPointInput { Name = "Garaj", Address = "Garaj, Str. Florilor 9, Sibiu", Phone = "0745000556", ContactPerson = "Ionescu Mihai", UseCoordinates = false });
+workPointRecords.Add(gardenPoint);
+var annexPoint = await workPoints.CreateAsync(beneficiaryRecords[2].Id, new WorkPointInput { Name = "Hala A – birouri", Address = "Birouri, Șos. Depozitelor 45, Ploiești", Phone = "0244700336", ContactPerson = "Vlad Stan", UseCoordinates = true, CoordinatesText = "44.9366, 26.0302" });
+workPointRecords.Add(annexPoint);
+await ContractAsync(3, $"9/{Ago(30):dd.MM.yyyy}", 12, [6], 30);
+await ContractAsync(4, $"41/{Ago(60):dd.MM.yyyy}", 12, [workPointRecords.IndexOf(gardenPoint)], 55);
+await ContractAsync(2, $"34/{Ago(60):dd.MM.yyyy}", 12, [workPointRecords.IndexOf(annexPoint)], 70);
+for (var i = 1; i <= 30; i++)
+{
+    var onDemandPoint = new[] { 2, 3, 0, 1 }[i % 4];
+    await interventions.RecordAsync(beneficiaryRecords[onDemandPoint <= 1 ? 0 : 1].Id, new ServiceInterventionInput { Kind = ServiceInterventionKind.OnDemand, WorkPointId = workPointRecords[onDemandPoint].Id, PerformedOn = Ago(i * 3), Notes = $"Intervenție la cerere nr. {i}: verificare și reglaj." });
+}
+
+// A product with a longer history (the paging of the movements of a product).
+for (var i = 1; i <= 12; i++)
+{
+    if (i % 3 == 0)
+        await movements.CreateAsync(Find("CONECTOR-RJ45").Id, new StockMovementInput { Kind = StockMovementKind.Exit, Date = Ago(60 - i * 4), Quantity = 2, Description = $"Mișcare {i} de test pentru istoric", Destination = ExitDestination.GenericSale, Reference = $"REF-{i:00}" });
+    else
+        await movements.CreateAsync(Find("CONECTOR-RJ45").Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = Ago(60 - i * 4), Quantity = 5, Description = $"Mișcare {i} de test pentru istoric", FreeType = FreeEntryType.Adjustment, Reference = $"REF-{i:00}" });
+}
+
+// More projects of the third beneficiary (the list of projects is paged by 10).
+for (var i = 1; i <= 10; i++)
+    await projects.CreateAsync(new ProjectInput { BeneficiaryId = beneficiaryRecords[2].Id, Name = $"Extindere sistem – etapa {i}", Observations = $"Lucrări de extindere, etapa {i}." });
+
+// Files: a sketch attached to an observation and two photos of a work point.
+var observationFiles = new MariaProjectFileStore(environment, configuration, admin);
+var firstObservation = (await projects.GetObservationsAsync(projectRecords[0].Id)).First();
+await observationFiles.SaveAsync(firstObservation.Id, "schita-fatada.png", "image/png", DemoImage.Png(640, 360, 70, 120, 160), "claude.test");
+var photos = new MariaServicePhotoStore(configuration, admin, audit);
+await photos.AddToWorkPointAsync(workPointRecords[1].Id, "intrare-parcare.png", DemoImage.Png(640, 400, 120, 140, 90), "Intrarea în parcare");
+await photos.AddToWorkPointAsync(workPointRecords[1].Id, "camera-rampa.png", DemoImage.Png(640, 400, 160, 110, 80), "Camera de la rampă");
+
+// An own user type (the delete icon is shown only for those).
+var userTypes = new MariaUserTypeRepository(configuration, admin, audit);
+await userTypes.CreateAsync(new UserTypeInput { Name = "Magazioner", Description = "Operează intrările și ieșirile de stoc.", Keys = [.. Permissions.GrantableKeys.Where(key => key.EndsWith(".view", StringComparison.Ordinal))] });
+
+// The inventory forms the help uploads in "Preluare inventar": the printed form (the writer of the application) with the counted values written in the last column.
+//  inventar-mic.pdf          one product counted over (taken over once by tools/help-capture.mjs --prepare: it leaves an inventory package and an entry);
+//  inventar-completat.pdf    that one too, one product counted short and a code that is not in the catalog any more (the table of differences and of the codes not found);
+//  inventar-fara-diferente.pdf  only that first correction (after --prepare nothing differs from the stock).
+async Task WriteInventoryFormsAsync(bool afterPrepare)
+{
+    var allProducts = await products.GetProductsAsync();
+    // The inventory counts what is in the warehouse: the pieces loaded into the vehicles (4 of ACUM-12V-7AH) are not counted.
+    static int Depot(Product product) => product.Quantity - (product.Name == "ACUM-12V-7AH" ? 4 : 0);
+    var groups = new[] { ("Alimentare", "Surse si acumulatori"), ("Control acces", "Cititoare"), ("Control acces", "Controllere si yale") };
+    void WriteForm(string fileName, int citDelta, int acumDelta, bool unknownCode)
+    {
+        var sections = new List<InventoryCategorySection>();
+        var counted = new Dictionary<string, int>();
+        foreach (var categoryName in groups.Select(group => group.Item1).Distinct())
+        {
+            var subSections = new List<InventorySubcategorySection>();
+            foreach (var group in groups.Where(group => group.Item1 == categoryName))
+            {
+                var inGroup = allProducts.Where(product => string.Equals(product.Category, group.Item1, StringComparison.OrdinalIgnoreCase) && string.Equals(product.Subcategory, group.Item2, StringComparison.OrdinalIgnoreCase)).OrderBy(product => product.Name, StringComparer.Ordinal).ToList();
+                var lines = inGroup.Select(product => new InventoryLine(product.Name, Depot(product))).ToList();
+                foreach (var product in inGroup) counted[product.Name] = Depot(product);
+                if (unknownCode && group.Item2 == "Cititoare") { lines.Add(new InventoryLine("CIT-RFID-VECHI", 3)); counted["CIT-RFID-VECHI"] = 3; }
+                subSections.Add(new InventorySubcategorySection(group.Item2, lines));
+            }
+            sections.Add(new InventoryCategorySection(categoryName, subSections));
+        }
+        counted["CIT-BIO-AMPR"] += citDelta;
+        counted["ACUM-12V-7AH"] += acumDelta;
+        var report = new InventoryReport(DateTime.UtcNow, sections, sections.Count, groups.Length, sections.Sum(section => section.Subcategories.Sum(sub => sub.Lines.Count)), 0);
+        var formBytes = new InventoryPdfWriter().Write(report, DateTime.Now);
+        using var formInput = new MemoryStream(formBytes);
+        using var formDocument = PdfSharp.Pdf.IO.PdfReader.Open(formInput, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Modify);
+        var formPage = formDocument.Pages[0];
+        using (var graphics = PdfSharp.Drawing.XGraphics.FromPdfPage(formPage, PdfSharp.Drawing.XGraphicsPdfPageOptions.Append))
+        {
+            PdfFonts.EnsureResolver();
+            var handFont = new PdfSharp.Drawing.XFont(PdfFonts.FamilyName, 22, PdfSharp.Drawing.XFontStyleEx.Regular);
+            var columns = InventoryPdfLayout.ComputeColumns(formPage.Width.Point);
+            double y = 40 + 2 * 16 + 10;
+            foreach (var section in sections)
+            {
+                y += 12 + 20;
+                foreach (var sub in section.Subcategories)
+                {
+                    y += 20 + 16;
+                    foreach (var line in sub.Lines)
+                    {
+                        graphics.DrawString(counted[line.Code].ToString(System.Globalization.CultureInfo.InvariantCulture), handFont, PdfSharp.Drawing.XBrushes.Black, new PdfSharp.Drawing.XRect(columns.RealX + 14, y + 4, columns.RealColumnWidth - 14, 26), PdfSharp.Drawing.XStringFormats.TopLeft);
+                        y += 34;
+                    }
+                    y += 8;
+                }
+            }
+        }
+        Directory.CreateDirectory(Path.Combine(repo, "artifacts", "help-demo-files"));
+        formDocument.Save(Path.Combine(repo, "artifacts", "help-demo-files", fileName));
+    }
+    // before --prepare: the small form is the first correction; after it (the stock has taken it over) the form with differences has both, and the other has none
+    if (!afterPrepare) { WriteForm("inventar-mic.pdf", 1, 0, false); WriteForm("inventar-completat.pdf", 1, -2, true); WriteForm("inventar-fara-diferente.pdf", 1, 0, false); }
+    else { WriteForm("inventar-completat.pdf", 1, -2, true); WriteForm("inventar-fara-diferente.pdf", 0, 0, false); }
+}
+await WriteInventoryFormsAsync(false);
+Console.WriteLine("Scenarii pentru ajutor: parametri, analize, oferte, rezervari, recunoasteri, mentenanta, fisiere, tip de utilizator.");
 
 Console.WriteLine("Gata: datele demonstrative sunt in blazorstoc_demo.");
 return 0;
@@ -270,4 +453,51 @@ sealed class DemoEnvironment(string root) : IWebHostEnvironment
     public string EnvironmentName { get; set; } = "Demo";
     public string ContentRootPath { get; set; } = root;
     public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+}
+
+// A small plain image (fictive photo): a gradient of one colour, written as a PNG without any library.
+static class DemoImage
+{
+    public static byte[] Png(int width, int height, int red, int green, int blue)
+    {
+        var raw = new byte[(width * 3 + 1) * height];
+        for (var y = 0; y < height; y++)
+        {
+            var row = y * (width * 3 + 1);
+            for (var x = 0; x < width; x++)
+            {
+                var shade = 0.55 + 0.45 * x / width;
+                raw[row + 1 + x * 3] = (byte)(red * shade); raw[row + 2 + x * 3] = (byte)(green * shade); raw[row + 3 + x * 3] = (byte)(blue * (1.2 - 0.4 * y / height));
+            }
+        }
+        using var compressed = new MemoryStream();
+        using (var zlib = new System.IO.Compression.ZLibStream(compressed, System.IO.Compression.CompressionLevel.Fastest, true)) zlib.Write(raw);
+        using var output = new MemoryStream();
+        output.Write([137, 80, 78, 71, 13, 10, 26, 10]);
+        Chunk(output, "IHDR", [.. Int(width), .. Int(height), 8, 2, 0, 0, 0]);
+        Chunk(output, "IDAT", compressed.ToArray());
+        Chunk(output, "IEND", []);
+        return output.ToArray();
+    }
+
+    private static uint Crc32(byte[] data)
+    {
+        var crc = 0xFFFFFFFFu;
+        foreach (var value in data)
+        {
+            crc ^= value;
+            for (var bit = 0; bit < 8; bit++) crc = (crc & 1) != 0 ? 0xEDB88320u ^ (crc >> 1) : crc >> 1;
+        }
+        return crc ^ 0xFFFFFFFFu;
+    }
+
+    private static byte[] Int(int value) => [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+
+    private static void Chunk(Stream output, string type, byte[] data)
+    {
+        output.Write(Int(data.Length));
+        var body = System.Text.Encoding.ASCII.GetBytes(type).Concat(data).ToArray();
+        output.Write(body);
+        output.Write(Int((int)Crc32(body)));
+    }
 }

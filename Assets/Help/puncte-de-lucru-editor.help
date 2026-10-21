@@ -1,22 +1,23 @@
 # Formularul punctului de lucru
 Cautare: punct de lucru formular adresa telefon persoana contact coordonate fotografii
-Captura: formular | /beneficiari | click Panoramic Hotel; click Adaugă punct de lucru | Formularul punctului de lucru
+Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click Adaugă punct de lucru | Formularul punctului de lucru
+Captura: editare | /beneficiari | click Panoramic Hotel; wait 3000; jsclick sel:button.row-icon.edit[aria-label*='Parcare']; wait 1500; height 2000 | Editarea unui punct de lucru, cu fotografii
 
 Formularul pentru un punct de lucru al unui beneficiar. Se deschide din fișa beneficiarului. Fotografiile se adaugă după salvarea punctului.
 
 ## Elemente
 ### Câmpuri
 - Nume * | câmp | Numele punctului de lucru.
-- Adresă | câmp | Obligatorie la punctele obișnuite; două puncte ale aceluiași beneficiar nu pot avea aceeași adresă. La punctul principal se modifică din editarea beneficiarului.
+- Adresă | câmp | Obligatorie la punctele obișnuite; două puncte ale aceluiași beneficiar nu pot avea aceeași adresă. La punctul principal se modifică din editarea beneficiarului. | img: editare | sel: label:has(input[autocomplete='street-address']), .editor-grid > label:nth-of-type(2)
 - Număr de telefon | câmp | Telefonul punctului; la punctul principal se modifică din editarea beneficiarului.
 - Persoană de contact | câmp | Cine poate fi contactat la punct.
-- Descriere | câmp | Text liber despre punct (acces, echipamente, particularități).
-- Coordonate | comutator | Pornit, apare câmpul „Latitudine, longitudine”, unde poți lipi coordonatele copiate dintr-o hartă (de exemplu 45.7489, 21.2087).
+- Descriere | câmp | Text liber despre punct (acces, echipamente, particularități). | img: editare
+- Coordonate | comutator | Pornit, apare câmpul „Latitudine, longitudine”, unde poți lipi coordonatele copiate dintr-o hartă (de exemplu 45.7489, 21.2087). | img: editare
 - Salvează punctul de lucru | buton | Salvează datele; fișa rămâne deschisă pentru fotografii.
 ### Fotografii
-- Legendă pentru fotografiile alese | câmp | Text opțional pus pe fotografiile pe care le încarci acum.
-- Alege fotografii | zonă | Alegi sau tragi fotografii JPG, PNG, WebP sau GIF (cel mult 10 MB fiecare și un număr maxim pe punct); se salvează imediat, fără să apeși „Salvează punctul de lucru”.
-- Lista fotografiilor | listă | Miniatura (apasă pentru mărire), numele fișierului, legenda, cine și când a încărcat-o, și „Șterge”.
+- Legendă pentru fotografiile alese | câmp | Text opțional pus pe fotografiile pe care le încarci acum. | img: editare | sel: label.photo-caption
+- Alege fotografii | zonă | Alegi sau tragi fotografii JPG, PNG, WebP sau GIF (cel mult 10 MB fiecare și un număr maxim pe punct); se salvează imediat, fără să apeși „Salvează punctul de lucru”. | img: editare | sel: .work-point-photos .file-drop
+- Lista fotografiilor | listă | Miniatura (apasă pentru mărire), numele fișierului, legenda, cine și când a încărcat-o, și „Șterge”. | img: editare | sel: .work-point-photos
 
 ## Flux: Cum adaug un punct de lucru cu fotografii
 1. Completează numele și adresa și apasă „Salvează punctul de lucru”.

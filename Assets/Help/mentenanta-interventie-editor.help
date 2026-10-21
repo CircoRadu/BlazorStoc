@@ -1,6 +1,8 @@
 # Formularul de intervenție
 Cautare: interventie formular mentenanta la cerere punct de lucru data observatii scadenta urmatoare baza fotografii
-Captura: formular | /beneficiari | click Panoramic Hotel; click Înregistrează intervenție | Formularul de intervenție
+Captura: formular | /beneficiari | click Panoramic Hotel; wait 3000; click Înregistrează intervenție; wait 900; select #intervention-point = Receptie; wait 900; height 1500 | Formularul de intervenție
+Captura: veche | /beneficiari | click Panoramic Hotel; wait 3000; click Înregistrează intervenție; wait 900; select #intervention-point = Receptie; wait 900; type .editor-grid input.pick-date-native=2026-08-01; wait 1000; height 1500 | Intervenție mai veche decât ultima de mentenanță
+Captura: editare | /beneficiari | click Panoramic Hotel; wait 3000; jsclick sel:button[aria-label*='Editează intervenția']; wait 1000; height 2300 | Editarea unei intervenții, cu fotografii
 
 Formularul pentru o intervenție nouă sau pentru editarea uneia existente. Se deschide în fișa beneficiarului (sau din hartă, cu punctul ales). Fotografiile se adaugă după înregistrare.
 
@@ -11,11 +13,11 @@ Formularul pentru o intervenție nouă sau pentru editarea uneia existente. Se d
 - Data efectuării * | câmp | Data intervenției, din calendar; nu poate fi în viitor. La editare, data se corectează numai la ultima intervenție de mentenanță a punctului.
 - Observații | câmp | Text liber despre lucrare.
 ### Scadența următoare (la mentenanță)
-- Scadența curentă | text | Scadența planificată și ciclicitatea punctului.
-- Baza noii scadențe | selecție | Alegi de unde se numără următoarea scadență (de exemplu de la data planificată, de la data efectuării sau o dată aleasă de tine, care trebuie să fie după data efectuării).
-- Mesajul „nu modifică scadența” | text | Apare când există o intervenție de mentenanță mai recentă: cea nouă se înregistrează în istoric, dar nu mută scadența.
+- Scadența curentă | text | Scadența planificată și ciclicitatea punctului. | sel: .due-choice p.form-note
+- Baza noii scadențe | selecție | Alegi de unde se numără următoarea scadență (de exemplu de la data planificată, de la data efectuării sau o dată aleasă de tine, care trebuie să fie după data efectuării). | sel: .due-choice
+- Mesajul „nu modifică scadența” | text | Apare când există o intervenție de mentenanță mai recentă: cea nouă se înregistrează în istoric, dar nu mută scadența. | sel: :not(.work-point-photos) > p.form-note | img: veche
 ### Fotografii
-- Legenda și alegerea fotografiilor | zonă | După înregistrare adaugi fotografii (JPG, PNG, WebP sau GIF); se salvează imediat; „Șterge” scoate o fotografie.
+- Legenda și alegerea fotografiilor | zonă | După înregistrare adaugi fotografii (JPG, PNG, WebP sau GIF); se salvează imediat; „Șterge” scoate o fotografie. | sel: .work-point-photos | img: editare
 ### Butoane
 - Înregistrează intervenția / Salvează modificările | buton | Salvează intervenția.
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.

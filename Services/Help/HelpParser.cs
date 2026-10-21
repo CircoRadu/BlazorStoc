@@ -128,7 +128,7 @@ public static partial class HelpParser
                     else if (property == "captura")
                     {
                         var fields = value.Split('|', 4, StringSplitOptions.TrimEntries);
-                        if (fields.Length < 2 || fields[0].Length == 0 || !KeyPattern.IsMatch(fields[0]) || !fields[1].StartsWith('/')) Error(number, "Captura se scrie \"Captura: id | /adresa | pasi (optional) | legenda (optional)\".");
+                        if (fields.Length < 2 || fields[0].Length == 0 || !KeyPattern.IsMatch(fields[0]) || !(fields[1].StartsWith('/') || fields[1].StartsWith("http://127.0.0.1:", StringComparison.Ordinal))) Error(number, "Captura se scrie \"Captura: id | /adresa | pasi (optional) | legenda (optional)\".");
                         else if (captures.Any(capture => capture.Id == fields[0])) Error(number, $"captura \"{fields[0]}\" apare de doua ori.");
                         else captures.Add(new HelpCapture(fields[0], fields[1], fields.Length > 2 ? fields[2].Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) : [], fields.Length > 3 && fields[3].Length > 0 ? fields[3] : null));
                     }

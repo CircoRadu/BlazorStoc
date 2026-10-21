@@ -2,6 +2,7 @@
 Ruta: /setari
 Cautare: setari configurari administrare anaf notificari harta facturi backup module tipuri de utilizatori
 Captura: pagina | /setari |  | Setările
+Captura: subsectiuni | /setari | click Backup; wait 1200 | Secțiunea Backup, cu subsecțiunile ei
 
 Configurările aplicației, rezervate administratorului; un utilizator fără acest rol ajunge doar la șabloanele de facturi (le creează și le modifică). Fiecare secțiune are propriul ajutor: apasă „?” după ce ai ales secțiunea.
 
@@ -15,7 +16,7 @@ Configurările aplicației, rezervate administratorului; un utilizator fără ac
 - Module | filă | Starea modulelor aplicației și oprirea/pornirea lor ([[setari-module]]).
 - Utilizatori | filă | Conturile utilizatorilor ([[utilizatori]]) și drepturile fiecărui tip de utilizator, în subsecțiunea „Tipuri de utilizatori” ([[setari-tipuri-utilizatori]]).
 - Bază de date | filă | Starea serverului bazei de date și conexiunea aplicației la el ([[setari-baza-stare]], [[setari-baza-conexiune]]); apare numai conturilor cu nivelul Administrator.
-- Subsecțiunile | filă | Unele secțiuni au subsecțiuni, afișate sub bara principală.
+- Subsecțiunile | filă | Unele secțiuni au subsecțiuni, afișate sub bara principală. | img: subsectiuni | sel: .settings-subtab
 
 ## Flux: Cum găsesc o setare
 1. Alege secțiunea potrivită din bara de file.

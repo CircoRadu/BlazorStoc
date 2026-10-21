@@ -2,13 +2,14 @@
 Ruta: /inventar
 Cautare: inventar situatie numarare fizica stoc categorii subcategorii pdf formular genereaza stoc zero
 Captura: pagina | /inventar |  | Inventarul
+Captura: eroare | /inventar | sql RENAME TABLE categories TO categories_x; reload; wait 800; then; sql RENAME TABLE categories_x TO categories; wait 1500 | Catalogul care nu a putut fi încărcat
 
 Generezi situația de inventar (un formular PDF) pentru categoriile și subcategoriile pe care vrei să le numeri fizic. După numărare, formularul completat de mână se încarcă în „Preluare inventar”, ca să compari stocul real cu cel din aplicație.
 
 ## Elemente
 ### Antet
 - Generează situația de inventar | buton | Creează formularul PDF pentru selecția făcută și îl arată într-o fereastră de previzualizare. Este oprit cât timp nu ai selectat nimic; titlul butonului spune de ce.
-- Reîncearcă | buton | Apare când structura catalogului nu a putut fi încărcată.
+- Reîncearcă | buton | Apare când structura catalogului nu a putut fi încărcată. | img: eroare
 ### Selecția
 - Selectează toate categoriile | comutator | Pornește sau oprește toate categoriile deodată; stă pe poziția de mijloc când selecția e parțială.
 - Elimină din situația de inventar produsele cu stoc 0 | comutator | Produsele fără stoc nu mai apar în formular.

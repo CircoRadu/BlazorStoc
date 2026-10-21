@@ -15,6 +15,10 @@ public sealed class ConsoleInstallerHost : IInstallerHost
     public bool Interactive => !Console.IsInputRedirected;
     public string? RegisteredInstallRoot => Environment.GetEnvironmentVariable("BLAZORSTOC_INSTALL_ROOT") is { Length: > 0 } fromEnvironment ? fromEnvironment : new RegistryInstallLocation().Read();
 
+    public string? DefaultInstallRoot => InstallerArguments.DefaultInstallRoot;
+
+    public AdministratorAccount? AskAdministrator() => Interactive ? new AdministratorPrompt(() => Console.ReadKey(intercept: true), Console.Out).Ask() : null;
+
     public void Info(string message) => Console.Out.WriteLine(message);
     public void Error(string message) => Console.Error.WriteLine(message);
     public string? ReadLine() => Console.ReadLine();
@@ -51,10 +55,48 @@ public sealed class ConsoleInstallerHost : IInstallerHost
             using var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet could not be started.");
             var output = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            return output.Contains("Microsoft.NETCore.App 9.", StringComparison.Ordinal) ? null
-                : "The .NET 9 runtime (Microsoft.NETCore.App 9.x) is not installed on this machine; the application and this updater need it. Install it and run the installer again.";
+            var missing = new[] { "Microsoft.NETCore.App", "Microsoft.AspNetCore.App" }.Where(runtime => !output.Contains(runtime + " 9.", StringComparison.Ordinal)).ToArray();
+            return missing.Length == 0 ? null
+                : $"The .NET 9 runtime ({string.Join(" and ", missing)} 9.x) is not installed on this machine; the application and this updater need it. Install it and run the installer again.";
         }
         catch (Exception exception) when (exception is Win32Exception or InvalidOperationException) { return $"{dotnet} could not be run: {exception.Message}"; }
+    }
+
+    public bool VisualCppRuntimeInstalled
+    {
+        get
+        {
+            if (!OperatingSystem.IsWindows()) return true;
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64");
+            return key?.GetValue("Installed") is 1 && key.GetValue("Major") is int major && major >= 14;
+        }
+    }
+
+    public bool IsSignedByMicrosoft(string file)
+    {
+        // Authenticode: the signature must be valid and the signer Microsoft Corporation (Get-AuthenticodeSignature does the checking Windows itself does).
+        var start = new ProcessStartInfo("powershell.exe") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        // The path goes in the environment: arguments after -Command are part of the command text, not $args.
+        start.Environment["BSU_PREREQUISITE"] = file;
+        foreach (var argument in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "$s = Get-AuthenticodeSignature -LiteralPath $env:BSU_PREREQUISITE; if ($s.Status -eq 'Valid' -and $s.SignerCertificate.Subject -match 'O=Microsoft Corporation') { 'SIGNED-BY-MICROSOFT' }" }) start.ArgumentList.Add(argument);
+        try
+        {
+            using var process = Process.Start(start);
+            if (process is null) return false;
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            return output.Contains("SIGNED-BY-MICROSOFT", StringComparison.Ordinal);
+        }
+        catch (Win32Exception) { return false; }
+    }
+
+    public async Task<int> RunPrerequisiteAsync(string file, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        var start = new ProcessStartInfo(file) { UseShellExecute = false };
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"{Path.GetFileName(file)} could not be started.");
+        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        return process.ExitCode;
     }
 
     public string CreateWorkFolder()
@@ -72,12 +114,13 @@ public sealed class ConsoleInstallerHost : IInstallerHost
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { Error($"The temporary folder {folder} could not be removed: {exception.Message}"); }
     }
 
-    public async Task<int> RunUpdaterAsync(string dotnet, string updaterDll, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    public async Task<int> RunUpdaterAsync(string dotnet, string updaterDll, IReadOnlyList<string> arguments, CancellationToken cancellationToken, IReadOnlyDictionary<string, string>? environment = null)
     {
         // No redirection: the updater writes to this console and asks its question (an unknown signer) on it.
         var start = new ProcessStartInfo(dotnet) { UseShellExecute = false };
         start.ArgumentList.Add(updaterDll);
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        foreach (var pair in environment ?? new Dictionary<string, string>()) start.Environment[pair.Key] = pair.Value;
         using var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet could not be started.");
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
         return process.ExitCode;
@@ -86,12 +129,18 @@ public sealed class ConsoleInstallerHost : IInstallerHost
     /// <summary>When Windows opened this console for the installer (a double click) the window would close with the result in it: wait for Enter. Not after the elevated copy ran (it waited itself).</summary>
     public void PauseIfAlone()
     {
-        if (elevatedChild || !Interactive || !OperatingSystem.IsWindows()) return;
-        var processes = new uint[4];
-        if (GetConsoleProcessList(processes, (uint)processes.Length) > 1) return;
+        if (elevatedChild || !Interactive || !OperatingSystem.IsWindows() || !OwnsConsole()) return;
         Console.Out.WriteLine();
         Console.Out.Write("Press Enter to close this window. ");
         Console.ReadLine();
+    }
+
+    /// <summary>True when this process is the only one on its console: Windows opened the console for it (a double click), no shell is waiting behind it.</summary>
+    public bool OwnsConsole()
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        var processes = new uint[4];
+        return GetConsoleProcessList(processes, (uint)processes.Length) == 1;
     }
 
     // One argument the way CommandLineToArgvW reads it back.

@@ -1,6 +1,6 @@
 # Parametri obligatori ai unei subcategorii
 Cautare: parametri obligatori model valoare cod produs subcategorie unitate
-Captura: fereastra | /categorii | click sel:.row-icon.params | Parametrii obligatori ai unei subcategorii
+Captura: fereastra | /categorii | click sel:.category-management-card summary; wait 1200; click sel:button.row-icon.params[aria-label*='speciale']; wait 2000; height 1500 | Parametrii obligatori ai unei subcategorii
 
 Un produs dintr-o subcategorie cu parametri obligatori nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru. Codul produsului devine „model - valoare - valoare”, în ordinea parametrilor. Produsele deja existente rămân blocate până li se aleg valorile.
 
@@ -9,7 +9,7 @@ Un produs dintr-o subcategorie cu parametri obligatori nu poate fi salvat sau mi
 - Numărul din titlu | insignă | Câți parametri are subcategoria.
 - Închide | buton | Închide panoul.
 ### Fiecare parametru
-- Numele și tipul | text | Numele parametrului, tipul (Număr sau Text liber), unitatea de măsură și câte produse îl folosesc.
+- Numele și tipul | text | Numele parametrului, tipul (Număr sau Text liber), unitatea de măsură și câte produse îl folosesc. | sel: .parameter-card-heading
 - Editează parametrul | iconita:edit | Doar administrator: redenumește parametrul; unitatea nu se mai schimbă după ce există produse.
 - Șterge parametrul | iconita:delete | Doar administrator și doar cât subcategoria nu are produse.
 - Valoare | coloană | Valorile din care se alege pentru produse (la tipul Număr se afișează cu unitatea).

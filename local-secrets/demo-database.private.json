@@ -1,7 +1,7 @@
 {
     "Database":  {
                      "Host":  "127.0.0.1",
-                     "Port":  3307,
+                     "Port":  5088,
                      "Name":  "blazorstoc_demo",
                      "ExpectedName":  "blazorstoc_demo",
                      "User":  "blazorstoc_test_app",

@@ -10,6 +10,8 @@ public interface IInstallLocationStore
 {
     string? Read();
     void Write(string installRoot);
+    /// <summary>Forgets the installation (the uninstaller).</summary>
+    void Clear();
 }
 
 public sealed class RegistryInstallLocation : IInstallLocationStore
@@ -37,7 +39,7 @@ public sealed class RegistryInstallLocation : IInstallLocationStore
         key.SetValue(ValueName, Path.GetFullPath(installRoot), RegistryValueKind.String);
     }
 
-    /// <summary>Removes the value (the cleanup of a test installation; no command of the updater does it).</summary>
+    /// <summary>Removes the value (the uninstaller does it).</summary>
     public void Clear()
     {
         if (!OperatingSystem.IsWindows()) return;

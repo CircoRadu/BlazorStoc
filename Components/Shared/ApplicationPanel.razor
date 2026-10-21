@@ -22,9 +22,9 @@
         <div class="anaf-grid">
             <label>Port aplicație (gol = implicit)<input id="app-port" type="number" min="1024" max="65535" @bind="appPort" autocomplete="off" /></label>
             <label>Interfață
-                <select id="app-interface" @bind="appBindAll" disabled="@(appPort is null)">
-                    <option value="false">Doar acest calculator (127.0.0.1)</option>
-                    <option value="true">Toate interfețele (accesibilă din rețea)</option>
+                <select id="app-interface" value="@(appBindAll ? "all" : "local")" @onchange="InterfaceChanged">
+                    <option value="local" selected="@(!appBindAll)">Doar acest calculator (127.0.0.1)</option>
+                    <option value="all" selected="@appBindAll">Toate interfețele (accesibilă din rețea)</option>
                 </select>
             </label>
         </div>
@@ -90,8 +90,18 @@
     {
         if (busy) return;
         if (requested == Mode.SaveAndRestart && appPort is { } port && (port < 1024 || port > 65535)) { error = DatabaseConnectionRules.AppPortMessage; notice = null; return; }
+        // No port saved yet (the address comes from the start script): a change of the interface keeps the port the application already listens on.
+        if (requested == Mode.SaveAndRestart && appPort is null && appBindAll != current.AppBindAll)
+        {
+            var uri = new Uri(Navigation.BaseUri);
+            appPort = Configuration.GetValue<int?>("Hosting:DefaultPort") ?? (uri.IsDefaultPort ? null : uri.Port);
+            if (appPort is null) { error = "Scrie un port pentru aplicație: interfața se salvează împreună cu portul."; notice = null; return; }
+        }
         error = null; notice = null; adminPassword = ""; dialogError = null; mode = requested;
     }
+
+    // Not "@bind" on a bool: the value Blazor writes back to the list for a bool does not match the options, and the choice vanished from the screen.
+    private void InterfaceChanged(ChangeEventArgs args) => appBindAll = args.Value?.ToString() == "all";
 
     private void Cancel() { mode = Mode.None; adminPassword = ""; dialogError = null; }
 

@@ -39,7 +39,7 @@ function Invoke-SqlFile([string]$Path, [string]$Database) {
 
 Write-Output "Recreating $Target from the schema of $Source"
 Invoke-Sql "DROP DATABASE IF EXISTS ``$Target``; CREATE DATABASE ``$Target`` CHARACTER SET utf8mb4 COLLATE utf8mb4_nopad_bin;"
-Invoke-Sql "GRANT SELECT, INSERT, UPDATE, DELETE ON ``$Target``.* TO 'blazorstoc_test_app'@'127.0.0.1'; GRANT CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE VIEW, TRIGGER ON ``$Target``.* TO '$migrator'@'127.0.0.1';"
+Invoke-Sql "GRANT SELECT, INSERT, UPDATE, DELETE, TRIGGER ON ``$Target``.* TO 'blazorstoc_test_app'@'127.0.0.1'; GRANT CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE VIEW, TRIGGER ON ``$Target``.* TO '$migrator'@'127.0.0.1';"
 
 $structure = Join-Path $work 'structure.sql'
 & $dump "--defaults-extra-file=$cnf" '--no-data' '--routines' '--triggers' '--default-character-set=utf8mb4' "--result-file=$structure" $Source

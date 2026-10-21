@@ -1,5 +1,5 @@
 // Finds, on the page that is open, the element a help topic describes (docs/PROPUNERE_HELP_IMAGINI.md). The same code is used by
-// tools/help-capture.mjs (to measure the boxes drawn on a screenshot) and by the "Arată pe pagină" icon of the help window (to frame the live element).
+// tools/help-capture.mjs (to measure the boxes drawn on a screenshot) (the help window no longer frames elements on the live page: the picture of the topic shows them).
 // An element of a .help file is described by { name, kind, icon, sel }: "sel" (the "sel:" option of the line) is a CSS selector or text:"...",
 // the "iconiță" kind is found by its row-icon, anything else by its name (button, link, tab, column heading, label, field, title).
 (() => {
@@ -99,7 +99,9 @@
     function bySelector(selector) {
         const text = /^text:\s*"(.*)"$/.exec(selector);
         if (text) return byText(text[1]);
-        try { return Array.from(scope().querySelectorAll(selector)).filter(visible); }
+        // "page:<css>": looked for in the whole page, also behind an open window (a notice of the page that the window leaves visible, dimmed).
+        const whole = selector.startsWith("page:");
+        try { return Array.from((whole ? document : scope()).querySelectorAll(whole ? selector.slice(5) : selector)).filter(visible); }
         catch (error) { return []; }
     }
 

@@ -3,7 +3,7 @@
 // /ajutor/... (Startup/HelpEndpoints.cs) and goes into a native modal dialog: it stays above every other window, Escape closes it, and the window
 // underneath is left untouched. Delegated listeners, so it works in the pages rendered without interactivity, in the pop-out windows and on the
 // pages outside Blazor. A topic with screenshots (docs/PROPUNERE_HELP_IMAGINI.md): a row of the table of elements shows a pulsing frame around the element on
-// the picture (only while the row is chosen), and the icon "Arată pe pagină" frames the element on the live page (wwwroot/help-match.js). From the main page ("/") the help window has a search over all the topics; elsewhere it is limited to the active window.
+// the picture (only while the row is chosen). The icon "Arată elementul pe imagine" of a row does the same as a click on the row: the element is always shown on the picture of the topic, never on the live page. From the main page ("/") the help window has a search over all the topics; elsewhere it is limited to the active window.
 (() => {
     const dialogId = "help-dialog";
     let history = [];          // the addresses shown in the dialog, for "Înapoi"
@@ -155,70 +155,6 @@
         scrollToFrame(shot);
     }
 
-    // ---- "Arată pe pagină": the element on the live page --------------------------------------------------------------------------------------------------
-    let matchLoading = null;
-    function loadMatcher() {
-        if (window.HelpMatch) return Promise.resolve();
-        matchLoading ??= new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src = "/help-match.js";
-            script.onload = () => resolve();
-            script.onerror = () => { matchLoading = null; reject(new Error("help-match")); };
-            document.head.appendChild(script);
-        });
-        return matchLoading;
-    }
-
-    function descriptorOf(row) {
-        return {
-            name: row.getAttribute("data-help-name") || "",
-            kind: row.getAttribute("data-help-kind") || "",
-            icon: row.getAttribute("data-help-icon") || "",
-            sel: row.getAttribute("data-help-sel") || ""
-        };
-    }
-
-    async function locateOnPage(dialog, row) {
-        row.querySelectorAll(".help-notfound").forEach((note) => note.remove());
-        let found = [];
-        dialog.close();
-        try {
-            await loadMatcher();
-            found = window.HelpMatch.find(descriptorOf(row));
-        } catch (error) { found = []; }
-        if (found.length === 0) {
-            dialog.showModal();
-            const note = document.createElement("div");
-            note.className = "help-notfound";
-            note.textContent = "Elementul nu este vizibil acum pe pagină (poate depinde de o secțiune sau de date care lipsesc).";
-            row.querySelector(".help-cell-name")?.appendChild(note);
-            return;
-        }
-        found[0].scrollIntoView({ block: "center", inline: "center" });
-        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        // A frame above a window of the page (a dialog) goes inside that dialog, otherwise the top layer would cover it.
-        const host = found[0].closest("dialog[open]") || document.body;
-        const frames = found.map((element) => {
-            const rect = element.getBoundingClientRect();
-            const frame = document.createElement("div");
-            frame.className = "help-frame-live";
-            frame.setAttribute("aria-hidden", "true");
-            frame.style.left = (rect.left - 5) + "px";
-            frame.style.top = (rect.top - 5) + "px";
-            frame.style.width = (rect.width + 10) + "px";
-            frame.style.height = (rect.height + 10) + "px";
-            host.appendChild(frame);
-            return frame;
-        });
-        await new Promise((resolve) => {
-            const end = () => { document.removeEventListener("pointerdown", end, true); document.removeEventListener("keydown", end, true); window.clearTimeout(timer); resolve(); };
-            const timer = window.setTimeout(end, 2800);
-            window.setTimeout(() => { document.addEventListener("pointerdown", end, true); document.addEventListener("keydown", end, true); }, 300);
-        });
-        frames.forEach((frame) => frame.remove());
-        dialog.showModal();
-    }
-
     document.addEventListener("click", (event) => {
         const target = event.target instanceof Element ? event.target : null;
         if (!target) return;
@@ -238,8 +174,6 @@
         if (target.closest("[data-help-close]") || target === dialog) { dialog.close(); return; }
         const zoom = target.closest("[data-help-zoom]");
         if (zoom) { toggleZoom(zoom); return; }
-        const locate = target.closest("[data-help-locate]");
-        if (locate) { const row = locate.closest(".help-row"); if (row) void locateOnPage(dialog, row); return; }
         const pick = target.closest("[data-help-pick]");
         if (pick instanceof HTMLElement) { togglePick(dialog, pick); return; }
         if (target.closest("[data-help-back]") && history.length > 1) {

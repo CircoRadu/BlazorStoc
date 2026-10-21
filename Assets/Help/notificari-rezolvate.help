@@ -14,8 +14,8 @@ Cele mai recente notificări rezolvate. O notificare devine rezolvată când o m
 - Rezolvată la | coloană | Data și ora rezolvării.
 - Rezolvată de | coloană | Utilizatorul, sau „sistem (automat)”.
 - Motiv | coloană | De ce a fost rezolvată.
-- Rândul | rând | Apasă un rând ca să vezi detaliile ([[notificari-rezolvata]]).
-- Numărul listat | text | Se afișează doar cele mai recente notificări rezolvate.
+- Rândul | rând | Apasă un rând ca să vezi detaliile ([[notificari-rezolvata]]). | sel: tr.notification-row
+- Numărul listat | text | Se afișează doar cele mai recente notificări rezolvate. | sel: .count-badge
 
 ## Flux: Cum aflu de ce a dispărut o notificare
 1. Deschide secțiunea „Rezolvate”.

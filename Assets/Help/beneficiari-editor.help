@@ -1,6 +1,8 @@
 # Formularul de beneficiar
 Cautare: beneficiar formular cui anaf persoana fizica juridica registrul comertului caen cod postal adresa telefon
 Captura: formular | /beneficiari | click Adaugă beneficiar | Formularul de beneficiar nou
+Captura: editare | /beneficiari | click sel:.row-icon.edit; wait 800; height 1300 | Formularul unui beneficiar existent
+Captura: fizica | /beneficiari | click Adaugă beneficiar; click Persoană fizică; wait 600 | Formularul pentru o persoană fizică
 
 Formularul pentru un beneficiar nou sau pentru editarea unuia existent. Se deschide deasupra listei sau fișei beneficiarului (și ca fereastră peste altă pagină, de exemplu la preluarea unei oferte).
 
@@ -8,19 +10,19 @@ Formularul pentru un beneficiar nou sau pentru editarea unuia existent. Se desch
 ### Tipul
 - Tip beneficiar | selecție | Persoană fizică sau Persoană juridică; schimbă câmpurile formularului.
 ### Persoană fizică
-- Nume complet * | câmp | Numele complet identifică persoana.
+- Nume complet * | câmp | Numele complet identifică persoana. | img: fizica
 - Adresă * | câmp | Adresa, cel mult 300 de caractere.
 - Număr de telefon * | câmp | Telefonul de contact.
 ### Persoană juridică
 - CUI * | câmp | 2–10 cifre, opțional precedate de RO; identifică persoana juridică.
 - Preia date din ANAF | buton | Interoghează ANAF și completează denumirea, adresa și celelalte date. Dacă ANAF are alte valori decât cele din formular, se deschide [[beneficiari-anaf-diferente]].
-- Starea datelor | text | „Date preluate din ANAF” sau „Date introduse manual” (cu câmpurile care diferă de ANAF).
+- Starea datelor | text | „Date preluate din ANAF” sau „Date introduse manual” (cu câmpurile care diferă de ANAF). | img: editare | sel: .anaf-source-cell
 - Denumire *, Adresă *, Număr de telefon * | câmp | Datele firmei.
 - Nr. Registrul Comerțului | câmp | De exemplu J40/1234/2020.
 - Cod poștal | câmp | 5 sau 6 cifre.
 - Cod CAEN | câmp | 3 sau 4 cifre.
 ### Salvare
-- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
 - Salvează beneficiarul | buton | Salvează; la editare cere mai întâi confirmarea modificărilor.
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.
 

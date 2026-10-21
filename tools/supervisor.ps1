@@ -62,6 +62,18 @@ $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 # On a server this script sits in <install root>\updater, so the folder above it is the installation (it has current.txt); on the development machine it is the repository.
 if (-not $InstallRoot -and (Test-Path (Join-Path $repo 'current.txt'))) { $InstallRoot = $repo }
 $stateDir = if ($InstallRoot) { Join-Path $InstallRoot 'state\supervisor' } else { Join-Path $repo 'artifacts\supervisor' }
+# The variables the installation gives the application (scripts\environment.json, written by "init" from --env: for example App__DataRoot) are set here: the task that starts this script has the
+# environment of the account, not the one the installer was given. scripts\ is readable by the account (updater\ is not). A variable the account already sets wins.
+if ($InstallRoot) {
+    $environmentFile = Join-Path $PSScriptRoot 'environment.json'
+    $installEnvironment = $null
+    if (Test-Path -LiteralPath $environmentFile -ErrorAction SilentlyContinue) { try { $installEnvironment = Get-Content -LiteralPath $environmentFile -Raw | ConvertFrom-Json } catch { } }
+    if ($installEnvironment) {
+        foreach ($property in $installEnvironment.PSObject.Properties) {
+            if (-not [Environment]::GetEnvironmentVariable($property.Name)) { [Environment]::SetEnvironmentVariable($property.Name, [string]$property.Value, 'Process') }
+        }
+    }
+}
 $logDir = if ($InstallRoot) { Join-Path $InstallRoot 'logs' } else { Join-Path $repo 'logs' }
 $statePath = Join-Path $stateDir "state-$Port.json"
 # The application writes a marker here while it runs (App__RunMarkerPath) and deletes it on a normal stop; one found at the next start is an unexpected stop, which
@@ -183,7 +195,9 @@ switch ($Action) {
         if ($AppDirectory) { $arguments += " -AppDirectory `"$AppDirectory`"" }
         if ($InstallRoot) { $arguments += " -InstallRoot `"$InstallRoot`"" }
         if ($ConfigPath) { $arguments += " -ConfigPath `"$ConfigPath`"" }
-        $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments -WorkingDirectory $repo
+        # No window: on Windows 10 1809 / Server 2019 and newer a console started by the task would open in Windows Terminal (where -WindowStyle Hidden does not hide it); conhost --headless runs it with no console at all.
+        if ([Environment]::OSVersion.Version.Build -ge 17763) { $taskAction = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument "--headless powershell.exe $arguments" -WorkingDirectory $repo }
+        else { $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arguments -WorkingDirectory $repo }
         # At logon, and every 5 minutes after: while the supervisor lives the task ignores the repetition (MultipleInstances IgnoreNew); if the supervisor itself was
         # killed, the next repetition starts a new one (the scheduler's own restart-on-failure does not react to a killed process).
         $logon = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
@@ -302,7 +316,8 @@ function Start-App {
     else {
         $dll = Join-Path $AppDirectory 'BlazorStoc.dll'
         if (-not (Test-Path $dll)) { throw "$dll not found (publish first: tools\start-preview.ps1)." }
-        $file = 'dotnet'
+        # The installer may have installed the .NET runtime after this session began: its PATH does not know it, the usual folder does.
+        $file = if (Get-Command dotnet -ErrorAction SilentlyContinue) { 'dotnet' } elseif (Test-Path (Join-Path $env:ProgramFiles 'dotnet\dotnet.exe')) { Join-Path $env:ProgramFiles 'dotnet\dotnet.exe' } else { 'dotnet' }
         $arguments = @("`"$dll`"")
         $workingDirectory = if ($InstallRoot) { $AppDirectory } else { $repo }
         if ($ConfigPath) { $env:Database__PrivateConfigPath = $ConfigPath }
@@ -310,6 +325,8 @@ function Start-App {
         # Exit code 75 = "restart me" (the page restarts the application to take a new port); App__Supervisor tells the page that a restart is possible.
         Remove-Item Env:\ASPNETCORE_URLS -ErrorAction SilentlyContinue
         $env:Hosting__DefaultPort = "$Port"
+        # A server installation is reachable from the network (the installer opens the port for the local subnet); the preview of a developer is not.
+        if ($InstallRoot) { $env:Hosting__DefaultBindAll = 'true' } else { Remove-Item Env:\Hosting__DefaultBindAll -ErrorAction SilentlyContinue }
         $env:App__Supervisor = 'supervisor'
         # Setari -> Actualizare works only for an installation made by the updater: the application learns from here which one it runs from.
         if ($InstallRoot) { $env:App__InstallRoot = $InstallRoot } else { Remove-Item Env:\App__InstallRoot -ErrorAction SilentlyContinue }

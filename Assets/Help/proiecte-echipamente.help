@@ -1,13 +1,13 @@
 # Echipamentele proiectului
 Ruta: /proiecte/{id:int}/echipamente
 Cautare: echipamente proiect materiale iesiri consum net inventar miscari
-Captura: pagina | /beneficiari | click Panoramic Hotel; click Supraveghere video si control acces; click sel:a[href$="/echipamente"]; full | Echipamentele unui proiect
+Captura: pagina | /beneficiari | click Panoramic Hotel; wait 3000; click Supraveghere video si control acces; wait 5000; click sel:a[href$="/echipamente"]; full | Echipamentele unui proiect
 
 Materialele și echipamentele scoase din inventar pentru proiect, adică ieșirile de stoc asociate lui, plus consumul net pe produs.
 
 ## Elemente
 ### Antet
-- ← Numele proiectului | link | Revine la pagina proiectului ([[proiecte-detaliu]]).
+- ← Numele proiectului | link | Revine la pagina proiectului ([[proiecte-detaliu]]). | sel: a.nav-back
 ### Consum net
 - Consum net | tabel | Pe produs: ieșirile, retururile legate de ele și consumul net (apare când există de arătat).
 ### Ieșirile asociate
@@ -16,7 +16,7 @@ Materialele și echipamentele scoase din inventar pentru proiect, adică ieșiri
 - Data | coloană | Data ieșirii.
 - Operator | coloană | Cine a înregistrat ieșirea.
 - Referință | coloană | Linkul „Mișcarea nr. N” deschide mișcarea.
-- Totalul | text | Numărul ieșirilor asociate proiectului.
+- Totalul | text | Numărul ieșirilor asociate proiectului. | sel: .table-footer, tfoot
 
 ## Flux: Cum văd ce s-a scos din inventar pentru un proiect
 1. Deschide „Echipamente” din pagina proiectului.

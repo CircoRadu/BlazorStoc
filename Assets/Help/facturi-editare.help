@@ -9,7 +9,7 @@ Formularul de corecție a unei facturi existente (doar administrator). Se deschi
 - Furnizor * | listă | Furnizorul facturii; îl poți schimba dacă a fost ales greșit.
 - Număr factură * | câmp | Numărul de pe factură.
 - Data emiterii * | câmp | Data de pe factură, aleasă din calendar; nu poate fi în viitor.
-- Motivul modificării | câmp | Rezumatul modificărilor se generează sau scrii un motiv propriu.
+- Motivul modificării | câmp | Rezumatul modificărilor se generează sau scrii un motiv propriu. | sel: fieldset.change-reason-field
 ### Butoane
 - Salvează | buton | Salvează modificările.
 - Închide | buton | Închide formularul fără să salveze.

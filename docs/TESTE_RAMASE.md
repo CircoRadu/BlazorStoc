@@ -882,3 +882,17 @@ Modulul Observatii proiect (19.10.2026): FACUT si verificat complet, fara nimic 
 
 - Server MariaDB pe alt calculator (motiv: nu exista pe aceasta masina): in Setari -> Baza de date -> Conexiune, cu hostul unui alt calculator, cardul „Serverul bazei de date" nu are butoane si spune ca pornirea, oprirea si portul se schimba acolo; dupa schimbarea portului pe acel calculator se pune noul port in cardul „Conexiunea" si „Salveaza si aplica". Rezultat asteptat: conexiunea trece verificarea.
 - Serviciul bazei pe serverul de productie (motiv: instalarea cere administrator si calculatorul tinta): `.\tools\install-mariadb-service.ps1 -Root <folderul instantei>` (sau serviciu propriu cu `Database:ServerServiceName`) si aceleasi operatii din pagina; aplicatia sub `LocalSystem` apartine etapei urmatoare (aplicatia ca serviciu Windows), neimplementata inca.
+
+Installerul instaleaza tot (21.10.2026): ramas numai "prima pornire dupa repornirea calculatorului" a serviciului BlazorStocMariaDB si a supervizorului (motiv: cere repornirea PC-ului, pe care utilizatorul nu a vrut-o); serviciul in sine este verificat (vezi Teste utilizator/09, 21.10.2026).
+
+Installerul cere si creeaza contul de administrator al aplicatiei (21.10.2026): Installer: promptul de parola pe o consola reala (taste reale, Backspace, linia cu "match") - verificat cu taste simulate, nu cu o persoana la tastatura; pasii sunt in Teste utilizator/09_Notificari_si_setari.md (21.10.2026).
+
+Installerul aduce si instaleaza dependentele (.NET 9, ASP.NET Core 9, Visual C++) (21.10.2026): Installer: instalarea silentioasa reala a celor trei dependente pe un server FARA .NET si fara Visual C++ (motiv: aceasta masina le are deja si nu se dezinstaleaza runtime-ul de dezvoltare); pasi in Teste utilizator/09_Notificari_si_setari.md (21.10.2026).
+
+Installer cu fereastra (GUI) (21.10.2026): Installer grafic: o persoana la un desktop real (dublu clic, fereastra UAC, mouse si tastatura reale) si actualizarea cu semnatar necunoscut din fereastra (nu e suportata: se foloseste consola cu --trust); pasi in Teste utilizator/09_Notificari_si_setari.md (21.10.2026).
+
+Acces din retea implicit si dezinstalare (cu pachet de restaurare) (21.10.2026): Dezinstalare pe un server real cu serviciul BlazorStocMariaDB real si restaurarea pachetului pe o instalare noua (pasii 2-4 din Teste utilizator/09, 21.10.2026): nu s-a facut pe serviciul real al acestui calculator ca sa nu fie sters.
+
+Script de stergere completa a BlazorStoc de pe un server (remove-blazorstoc.ps1) (21.10.2026): Script: rularea pe serverul real cu serviciul BlazorStocMariaDB real, intrebarea STERGE tastata de o persoana si -KeepData (nu au fost rulate pe un server real); parola/confirmarea se tasteaza la consola.
+
+Help: fiecare element are chenar pe imaginea din help (21.10.2026): Imagini pentru Copiaza pe NAS (necesita un NAS cu cont) si Rezultatul ultimei operatii pe conturile bazei de date (necesita conturile dedicate): nu se pot face in mediul demo.

@@ -3,6 +3,8 @@ Ruta: /mentenanta/harta
 Ruta: /mentenanta/harta/fereastra
 Cautare: harta mentenanta puncte de lucru marker scadenta contract coordonate fereastra separata incadreaza
 Captura: pagina | /mentenanta/harta |  | Harta mentenanței
+Captura: fundal | /mentenanta/harta | block *openstreetmap.org*; reload; wait 3500; then; block off | Harta cu fundalul nedisponibil
+Captura: separata | /mentenanta/harta | wait 1500; visit sel:a[title*='separat']; wait 2500 | Harta în fereastra separată
 
 Punctele de lucru acoperite de contracte, puse pe hartă la coordonatele lor. Culoarea marker-ului arată scadența, iar insigna arată contractul. Harta se poate deschide și într-o fereastră separată, care rămâne deschisă pe alt monitor cât folosești aplicația.
 
@@ -10,7 +12,7 @@ Punctele de lucru acoperite de contracte, puse pe hartă la coordonatele lor. Cu
 ### Antet
 - ← Scadențe și registru | link | Revine la pagina Mentenanță ([[mentenanta]]).
 - ⧉ Fereastră separată | link | Deschide harta într-o fereastră de browser separată.
-- Deschide aplicația | link | În fereastra separată: deschide aplicația principală.
+- Deschide aplicația | link | În fereastra separată: deschide aplicația principală. | img: separata
 - ↻ Actualizează | buton | Reîncarcă datele; mesajul de sub titlu spune când s-a făcut ultima actualizare sau dacă a eșuat.
 ### Filtre
 - Caută | câmp | Beneficiar, punct de lucru sau contract.
@@ -21,11 +23,11 @@ Punctele de lucru acoperite de contracte, puse pe hartă la coordonatele lor. Cu
 ### Harta
 - Legenda | listă | Tipurile de markere folosite și semnificația lor.
 - Încadrează rezultatele | buton | Mărește sau mută harta ca să cuprindă toate punctele afișate.
-- Markerele | marker | Apasă un marker ca să deschizi detaliile punctului ([[mentenanta-harta-punct]]).
-- Fundalul hărții | mesaj | Dacă furnizorul de hărți nu răspunde, punctele rămân afișate pe fundal gol; „Reîncearcă” reia încărcarea.
-- Numărul de puncte afișate | text | Câte puncte sunt pe hartă și câte nu au coordonate.
+- Markerele | marker | Apasă un marker ca să deschizi detaliile punctului ([[mentenanta-harta-punct]]). | sel: .leaflet-marker-icon
+- Fundalul hărții | mesaj | Dacă furnizorul de hărți nu răspunde, punctele rămân afișate pe fundal gol; „Reîncearcă” reia încărcarea. | img: fundal | sel: .error-banner
+- Numărul de puncte afișate | text | Câte puncte sunt pe hartă și câte nu au coordonate. | sel: .map-count
 ### Puncte fără coordonate
-- Tabelul | tabel | Punctele care nu pot fi puse pe hartă: beneficiarul, punctul, contractul, scadența și linkul „Deschide fișa pentru coordonate”. Nu se face geocodare automată: adresele nu se trimit niciunui serviciu extern.
+- Tabelul | tabel | Punctele care nu pot fi puse pe hartă: beneficiarul, punctul, contractul, scadența și linkul „Deschide fișa pentru coordonate”. Nu se face geocodare automată: adresele nu se trimit niciunui serviciu extern. | sel: .map-unplaced
 
 ## Flux: Cum găsesc punctele cu scadența depășită
 1. Alege „Depășite” la filtrul de scadențe.

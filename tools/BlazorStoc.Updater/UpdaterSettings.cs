@@ -5,10 +5,11 @@ namespace BlazorStoc.Updater;
 /// <summary>
 /// updater/settings.json of an installation. Port: the port the application listens on when its page has saved none (the one given to the supervisor); a port saved from Setari -> Baza de
 /// date -> Conexiune is read from the data root and tried first. MariaRoot: where the MariaDB distribution is (its tools are found for the backup and the supervisor); null = the
-/// application finds its tools by itself. Environment: variables given to every process the updater starts for the application (backup, migrations, restoration).
+/// application finds its tools by itself. DatabasePort / MariaServiceName: the port and the Windows service of the database server that the installer made (the ports are the free ones
+/// chosen at the installation, see <see cref="PortSelector"/>). Environment: variables given to every process the updater starts for the application (backup, migrations, restoration).
 /// </summary>
 public sealed record UpdaterSettings(int Port = 5087, string? MariaRoot = null, int HealthTimeoutSeconds = 120, int KeepReleases = 3, string Dotnet = "dotnet",
-    string? SupervisorScript = null, Dictionary<string, string>? Environment = null)
+    string? SupervisorScript = null, Dictionary<string, string>? Environment = null, int? DatabasePort = null, string? MariaServiceName = null)
 {
     public static UpdaterSettings Load(InstallLayout layout)
     {

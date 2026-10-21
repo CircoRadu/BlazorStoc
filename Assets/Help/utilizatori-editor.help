@@ -1,6 +1,7 @@
 # Formularul de utilizator
 Cautare: utilizator formular parola confirmare tip utilizator cont activ nume afisat
 Captura: formular | /setari | click Utilizatori; wait 1500; click Adaugă utilizator | Formularul de utilizator
+Captura: editare | /setari | click Utilizatori; wait 1500; click sel:button.row-icon.edit; wait 1500; height 1300 | Editarea unui utilizator
 
 Formularul pentru un cont nou sau pentru editarea unuia existent. Se deschide deasupra listei sau fișei utilizatorului.
 
@@ -12,8 +13,8 @@ Formularul pentru un cont nou sau pentru editarea unuia existent. Se deschide de
 - Confirmă parola | câmp | Repetă parola; mesajul de sub câmp spune dacă se potrivește.
 - Arată parola | opțiune | Afișează temporar parola scrisă.
 - Tip utilizator * | listă | Tipurile existente, cu numărul de permisiuni al fiecăruia; drepturile se definesc în Setări → Tipuri de utilizatori.
-- Cont activ | comutator | Doar la editare: un cont inactiv nu se mai poate autentifica.
-- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu.
+- Cont activ | comutator | Doar la editare: un cont inactiv nu se mai poate autentifica. | img: editare
+- Motivul modificării | câmp | Doar la editare: rezumatul modificărilor se generează sau scrii un motiv propriu. | img: editare | sel: fieldset.change-reason-field
 ### Butoane
 - Salvează utilizatorul | buton | Salvează; la editare cere confirmarea modificărilor.
 - Anulează, Închide | buton | Închid formularul; dacă ai modificat ceva, ești întrebat dacă renunți.

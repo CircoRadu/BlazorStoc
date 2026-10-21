@@ -132,13 +132,13 @@ UNLOCK TABLES;
 
 LOCK TABLES `backup_nas_settings` WRITE;
 /*!40000 ALTER TABLE `backup_nas_settings` DISABLE KEYS */;
-REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-10-20T11:46:17.833Z',1,'Pachetul nou a fost copiat pe NAS: Copie siguranta baza de date inainte restaurare baza de date folosind backup preluare inventar 17.10.2026 17-28-19 Administrator administrator demo.zip.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
+REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-10-21T09:32:43.928Z',1,'Pachetul nou a fost copiat pe NAS: Copie siguranta la cerere 21.10.2026 12-32-41 Administrator administrator demo.zip.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
 /*!40000 ALTER TABLE `backup_nas_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `backup_settings` WRITE;
 /*!40000 ALTER TABLE `backup_settings` DISABLE KEYS */;
-REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-10-20',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
+REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-10-21',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
 /*!40000 ALTER TABLE `backup_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1406,6 +1406,8 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'produse.delete'),
 (1,'produse.edit'),
 (1,'produse.export'),
+(1,'setari-actualizare.apply'),
+(1,'setari-actualizare.view'),
 (1,'setari-anaf.edit'),
 (1,'setari-anaf.view'),
 (1,'setari-backup.backup'),

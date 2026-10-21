@@ -274,14 +274,17 @@ public static class AppHosting
     public static AppHostingInfo Resolve(IConfiguration configuration, Func<int, bool> canBind)
     {
         var port = configuration.GetValue<int?>("Hosting:AppPort");
-        var bindAll = configuration.GetValue("Hosting:AppBindAll", false);
+        // Hosting:DefaultBindAll: set by the supervisor of a server installation (tools\supervisor.ps1 with -InstallRoot): the application is reachable from the network unless the administrator
+        // saved otherwise on the page (Hosting:AppBindAll saved with a port wins).
+        var defaultBindAll = configuration.GetValue("Hosting:DefaultBindAll", false);
+        var bindAll = configuration.GetValue<bool?>("Hosting:AppBindAll") ?? defaultBindAll;
         // The port a start script proposes (Hosting:DefaultPort, set by tools\supervisor.ps1 and tools\start-preview.ps1 instead of imposing the address): used when no port was saved from
         // the page, or when the saved one is taken. A script that does impose the address (ASPNETCORE_URLS, --urls) still wins, as before.
         var defaultPort = configuration.GetValue<int?>("Hosting:DefaultPort");
         if (!string.IsNullOrWhiteSpace(configuration["urls"]))
             return port is null ? new(null, bindAll, null, null)
                 : new(port, bindAll, null, "Portul salvat nu se aplică: adresele sunt impuse la pornire (variabila ASPNETCORE_URLS, --urls sau scriptul de pornire).");
-        var fallback = defaultPort is { } proposed ? $"http://127.0.0.1:{proposed}" : null;
+        var fallback = defaultPort is { } proposed ? $"http://{(defaultBindAll ? "0.0.0.0" : "127.0.0.1")}:{proposed}" : null;
         if (port is null) return new(null, bindAll, fallback, null);
         if (!canBind(port.Value))
             return new(port, bindAll, fallback, fallback is null ? $"Portul salvat ({port}) este ocupat; aplicația folosește adresa implicită."
@@ -319,6 +322,11 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
     private static readonly string[] KeyTables = ["products", "stock_movements", "web_users", "audit_events"];
     private readonly IDataProtector protector = protection.CreateProtector(DatabaseOverrideFile.ProtectorPurpose);
     private readonly Func<int, bool> canBindPort = canBind ?? AppHosting.CanBind;
+
+    // The port this application already listens on (from the start script or from the urls applied at start) is not "busy" for itself: saving the same port with another interface is allowed.
+    private bool ListensOn(int port) =>
+        new[] { hosting.AppliedUrls, configuration["urls"] }.Where(urls => !string.IsNullOrWhiteSpace(urls)).SelectMany(urls => urls!.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            .Any(url => Uri.TryCreate(url.Replace("0.0.0.0", "localhost").Replace("*", "localhost").Replace("+", "localhost"), UriKind.Absolute, out var uri) && uri.Port == port);
     private string OverridePath => DatabaseOverrideFile.PathFor(configuration);
 
     public async Task<DatabaseConnectionSettings> GetAsync(CancellationToken cancellationToken = default)
@@ -331,7 +339,8 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
         configuration["Database:Host"] ?? "127.0.0.1", configuration.GetValue("Database:Port", 3307), configuration["Database:Name"] ?? "BlazorStoc",
         configuration["Database:User"] ?? DatabaseAccounts.Find(DatabaseAccounts.ApplicationKey)!.User, configuration["Database:SslMode"] ?? "Required",
         !string.IsNullOrEmpty(configuration["Database:Password"]),
-        configuration.GetValue<int?>("Hosting:AppPort"), configuration.GetValue("Hosting:AppBindAll", false),
+        // The interface shown is the one in effect: what was saved on the page, else the default of the server installation (Hosting:DefaultBindAll).
+        configuration.GetValue<int?>("Hosting:AppPort"), configuration.GetValue<bool?>("Hosting:AppBindAll") ?? configuration.GetValue("Hosting:DefaultBindAll", false),
         configuration.GetValue("Database:OverrideActive", false), configuration["Database:OverrideProblem"], OverridePath);
 
     public async Task<DatabaseTestResult> TestAsync(DatabaseConnectionInput input, CancellationToken cancellationToken = default)
@@ -413,7 +422,7 @@ public sealed class DatabaseSettingsService(IConfiguration configuration, IDataP
         var hostingChanged = input.AppPort != current.AppPort || (input.AppPort is not null && input.AppBindAll != current.AppBindAll);
         if (!databaseChanged && !hostingChanged) return new(true, "Nu există modificări de salvat.");
 
-        if (hostingChanged && input.AppPort is { } appPort && appPort != hosting.ConfiguredPort && !canBindPort(appPort))
+        if (hostingChanged && input.AppPort is { } appPort && appPort != hosting.ConfiguredPort && !ListensOn(appPort) && !canBindPort(appPort))
             throw new DatabaseSettingsException($"Portul {appPort} este ocupat pe acest calculator. Alege alt port.");
 
         if (databaseChanged)

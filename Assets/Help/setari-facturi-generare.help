@@ -3,42 +3,51 @@ Ruta: /setari
 Tab: Generare șablon factură
 Cautare: sablon factura generare analiza pdf scanat xml zip campuri coloane linii demarcare overlay salveaza furnizor cui descriere intrare stoc
 Captura: pagina | /setari | click Facturi; upload factura-demo.pdf; full | Generarea șablonului de factură
+Captura: campuri | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(1) summary; wait 500; scroll details.invoice-section[open] | Câmpurile din antet
+Captura: coloane | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(2) summary; wait 500; scroll details.invoice-section[open] | Coloanele tabelului
+Captura: citire | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(3) summary; wait 500; scroll details.invoice-section[open] | Ce se citește cu șablonul
+Captura: descriere | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(4) summary; wait 500; scroll details.invoice-section[open] | Descrierea intrării în stoc
+Captura: salvare | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; scroll details.invoice-section[open] | Salvarea șablonului
+Captura: start | /setari | click Facturi; wait 1000 | Încărcarea facturii de probă
+Captura: editare | /setari | click Facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000 | Analiza unui șablon existent
+Captura: editare-salvare | /setari | click Facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; scroll details.invoice-section[open] | Salvarea unui șablon existent
+Captura: selectie | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; drag .invoice-page-wrap=0.05,0.3,0.95,0.55; wait 800; eval window.scrollTo(0, 0); wait 500 | Selecția mai multor elemente pe pagină
+Captura: paginile | /setari | click Facturi; wait 800; upload factura-demo-2p.pdf; wait 9000; click Pagina 2; wait 1500; height 1300 | Factura cu două pagini
 
 Creezi un șablon pe o factură de probă: aplicația citește tabelul cu liniile și câmpurile din antet și le arată pe pagină ca un șablon interactiv. Alegi ce se folosește la import, corectezi poziția elementelor, scrii descrierea intrării în stoc și salvezi. După salvare, șablonul se aplică de îndată facturii. Același editor se deschide și din „Preluare factură”, când furnizorul nu are șablon.
 
 ## Elemente
 ### Fișierul
-- Alege factura PDF, XML sau ZIP | zonă | PDF de cel mult 20 MB și 30 de pagini; o factură XML (e-Factura UBL) sau arhiva ZIP deschide editorul de șablon XML ([[setari-facturi-xml]]).
-- Numele fișierului și numărul de pagini | text | Fișierul încărcat și felul în care a fost citit (cu text sau scanat, OCR).
-- Analizează fișierul | buton | La editare, pornește analiza (câmpuri, tabel, șabloane potrivite) și așază șablonul pe fișier.
+- Alege factura PDF, XML sau ZIP | zonă | PDF de cel mult 20 MB și 30 de pagini; o factură XML (e-Factura UBL) sau arhiva ZIP deschide editorul de șablon XML ([[setari-facturi-xml]]). | img: start | sel: .file-drop
+- Numele fișierului și numărul de pagini | text | Fișierul încărcat și felul în care a fost citit (cu text sau scanat, OCR). | sel: .invoice-head
+- Analizează fișierul | buton | La editare, pornește analiza (câmpuri, tabel, șabloane potrivite) și așază șablonul pe fișier. | img: editare
 - Renunță și elimină fișierul | buton | Șterge fișierul încărcat.
 - Șabloane salvate care se potrivesc | listă | Șabloane existente potrivite după CUI și aspect; „Folosește acest șablon” îl aplică, iar „Înapoi la propunerea automată” revine.
 ### Pagina facturii
-- Paginile facturii | filă | Câte o filă pe pagină.
-- Anulează / Refă | buton | Anulează sau reface ultima modificare (Ctrl+Z / Ctrl+Y).
+- Paginile facturii | filă | Câte o filă pe pagină. | img: paginile | sel: .invoice-page-tabs
+- Anulează / Refă | buton | Anulează sau reface ultima modificare (Ctrl+Z / Ctrl+Y). | sel: .invoice-draw-tools button.act-edit
 - Adaugă câmp desenând pe pagină | buton | Desenezi un chenar în jurul unei valori din antet.
 - Adaugă celulă de antet desenând pe pagină | buton | Desenezi celula de antet a unei coloane.
 - Desenează zona unei coloane | buton | Desenezi fâșia verticală a unei coloane.
-- Elemente selectate | text | După selecția multiplă: „Șterge elementele selectate” sau „Anulează selecția”.
-- Chenarele | marcaj | Chenarele verzi sunt elemente folosite la import, cele întrerupte sunt găsite dar nefolosite, iar fâșiile verticale colorate sunt coloanele tabelului.
+- Elemente selectate | text | După selecția multiplă: „Șterge elementele selectate” sau „Anulează selecția”. | img: selectie | sel: .invoice-multi-bar
+- Chenarele | marcaj | Chenarele verzi sunt elemente folosite la import, cele întrerupte sunt găsite dar nefolosite, iar fâșiile verticale colorate sunt coloanele tabelului. | sel: .invoice-pages > p.form-note
 ### Câmpuri și coloane
-- Arată toate câmpurile găsite | comutator | Include și câmpurile fără sens recunoscut.
-- Lista câmpurilor | listă | Câmpurile grupate; fiecare are comutatorul „Folosit la import”, numele, „Editează câmpul” ([[setari-facturi-camp]]) și „Șterge câmpul”.
-- Lista coloanelor | listă | Coloanele tabelului, cu comutatorul „Folosită la import”, „Editează coloana” ([[setari-facturi-coloana]]) și „Șterge coloana”.
-- Rândurile încep la | listă | La linia numărului curent (obișnuit) sau la jumătatea distanței dintre numere.
-- Cod produs în denumire, după separatorul | câmp | Dacă denumirea este „COD ; Denumire”, textul dinaintea separatorului devine codul.
-- Antetul tabelului (limita de jos, y) | câmp | Rândurile se citesc sub această linie.
-- Citește rândurile | buton | Recitește tabelul după ce ai desenat coloanele.
+- Arată toate câmpurile găsite | comutator | Include și câmpurile fără sens recunoscut. | sel: .invoice-weak-toggle | img: campuri
+- Lista câmpurilor | listă | Câmpurile grupate; fiecare are comutatorul „Folosit la import”, numele, „Editează câmpul” ([[setari-facturi-camp]]) și „Șterge câmpul”. | img: campuri | sel: details.invoice-section[open]
+- Lista coloanelor | listă | Coloanele tabelului, cu comutatorul „Folosită la import”, „Editează coloana” ([[setari-facturi-coloana]]) și „Șterge coloana”. | img: coloane | sel: details.invoice-section[open]
+- Rândurile încep la | listă | La linia numărului curent (obișnuit) sau la jumătatea distanței dintre numere. | img: coloane | sel: .invoice-table-options label:nth-of-type(1)
+- Cod produs în denumire, după separatorul | câmp | Dacă denumirea este „COD ; Denumire”, textul dinaintea separatorului devine codul. | img: coloane | sel: .invoice-table-options label:nth-of-type(2)
+- Antetul tabelului (limita de jos, y) | câmp | Rândurile se citesc sub această linie. | img: coloane | sel: .invoice-table-options label:nth-of-type(3)
 ### Citirea
-- Câmpuri citite | tabel | Valoarea citită pentru fiecare câmp folosit.
-- Rânduri citite | tabel | Rândurile tabelului, cu coloanele alese și coloana „Verificare”; sub tabel, numărul rândurilor și nota despre sume.
+- Câmpuri citite | tabel | Valoarea citită pentru fiecare câmp folosit. | img: citire | sel: table.invoice-preview-fields
+- Rânduri citite | tabel | Rândurile tabelului, cu coloanele alese și coloana „Verificare”; sub tabel, numărul rândurilor și nota despre sume. | img: citire | sel: table.invoice-preview-rows
 ### Descrierea intrării în stoc
-- Descriere intrare în stoc a produsului | câmp cu etichete | Textul intrării în stoc a unui produs preluat. Apeși o etichetă ca s-o adaugi la cursor; etichetele vin din elementele active ale șablonului. Operațiile (de exemplu sumă) se scriu cu acolade.
-- Previzualizare | text | Cum arată descrierea cu valorile citite.
+- Descriere intrare în stoc a produsului | câmp cu etichete | Textul intrării în stoc a unui produs preluat. Apeși o etichetă ca s-o adaugi la cursor; etichetele vin din elementele active ale șablonului. Operațiile (de exemplu sumă) se scriu cu acolade. | img: descriere | sel: label.invoice-description-field
+- Previzualizare | text | Cum arată descrierea cu valorile citite. | img: descriere | sel: .notification-preview
 ### Salvare
-- Denumirea șablonului *, Furnizor *, CUI/CIF furnizor * | câmp | Cu CUI-ul se recunoaște furnizorul. Dacă furnizorul e în baza de date, șablonul se leagă de el; „+ Adaugă furnizorul” deschide formularul de furnizor, iar „Folosește acest furnizor” apare când aplicația bănuiește unul apropiat.
-- Salvează | buton | Salvează șablonul (la editare îl înlocuiește).
-- Salvează ca șablon nou | buton | La editare: păstrează șablonul curent și creează altul ([[setari-facturi-salveaza-nou]]).
+- Denumirea șablonului *, Furnizor *, CUI/CIF furnizor * | câmp | Cu CUI-ul se recunoaște furnizorul. Dacă furnizorul e în baza de date, șablonul se leagă de el; „+ Adaugă furnizorul” deschide formularul de furnizor, iar „Folosește acest furnizor” apare când aplicația bănuiește unul apropiat. | img: salvare | sel: details.invoice-section[open] .editor-grid
+- Salvează | buton | Salvează șablonul (la editare îl înlocuiește). | img: salvare | sel: details.invoice-section[open] button.primary
+- Salvează ca șablon nou | buton | La editare: păstrează șablonul curent și creează altul ([[setari-facturi-salveaza-nou]]). | img: editare-salvare
 
 ## Flux: Cum creez un șablon pentru un furnizor
 1. Încarcă o factură PDF a furnizorului.
@@ -49,6 +58,6 @@ Creezi un șablon pe o factură de probă: aplicația citește tabelul cu liniil
 Nota: tabelul de rânduri și câmpurile se actualizează la fiecare modificare.
 
 ## Flux: Cum repar o factură citită greșit
-1. Dacă tabelul nu a fost găsit, desenează mai întâi coloana cu denumirea, apoi celelalte, și apasă „Citește rândurile”.
+1. Dacă tabelul nu a fost găsit, desenează mai întâi coloana cu denumirea, apoi celelalte; tabelul se citește din nou la fiecare modificare.
 2. Dacă o valoare din antet lipsește, desenează câmpul pe pagină și alege-i eticheta.
 3. Salvează șablonul; următoarele facturi ale furnizorului se citesc după el.

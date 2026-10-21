@@ -10,6 +10,9 @@
   5. writes artifacts\release\BlazorStoc-<version>.bsu and verifies it again from the file, the way a server will;
   6. makes artifacts\release\BlazorStoc-Actualizare-<version>.exe, the installer for a server: the launcher (tools\BlazorStoc.Installer, self-contained, one file) with the package and the
      updater of this version appended; its SHA-256 is printed so the copy on the server can be compared (Get-FileHash), and it is checked once here (--check: payload, checksum, signature).
+  The installer also carries the installers of what a server may lack: the .NET 9 runtime and the ASP.NET Core 9 runtime (the same 9.0.x as on this build machine) and the Visual C++
+  runtime (x64). They are downloaded from Microsoft once into artifacts\prerequisites, refused unless their Authenticode signature is valid and Microsoft's, and run by the installer only
+  when the server lacks the runtime (-SkipPrerequisites leaves them out).
   The version is the <Version> of BlazorStoc.csproj unless -Version says otherwise. The key of a machine is never replaced by accident: a server trusts its fingerprint.
   The fingerprint is printed at the end: compare it with the one a server asks you to confirm the first time it sees a package of this machine.
 .EXAMPLE
@@ -24,7 +27,9 @@ param(
     [string]$NotesFile,                   # plain text shown to the administrator before the update (Setari -> Actualizare): what the version brings
     [string]$KeyFolder,
     [switch]$NewKey,
-    [switch]$SkipChecks
+    [switch]$SkipChecks,
+    [switch]$PackageOnly,                 # only the update package (.bsu) for servers that already run BlazorStoc: no installer, no prerequisites
+    [switch]$SkipPrerequisites            # an installer without the .NET and Visual C++ runtime installers (smaller; the server must have them)
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -85,12 +90,54 @@ Step 'Verification of the package from the file'
 $fingerprint = ((& dotnet $tool fingerprint @keyArguments) -join '').Replace(' ', '').ToLowerInvariant()
 Run-Native 'verify' { dotnet $tool verify $package --trusted $fingerprint }
 
+$prerequisites = $null
+if (-not $SkipPrerequisites -and -not $PackageOnly) {
+    Step 'Prerequisites for the installer (.NET 9 runtimes, Visual C++ runtime)'
+    $runtimeVersion = $null
+    foreach ($line in (& dotnet --list-runtimes)) {
+        if ($line -match '^Microsoft\.AspNetCore\.App (9\.\d+\.\d+) ') { $candidate = [version]$Matches[1]; if (-not $runtimeVersion -or $candidate -gt $runtimeVersion) { $runtimeVersion = $candidate } }
+    }
+    if (-not $runtimeVersion) { throw 'No Microsoft.AspNetCore.App 9.x runtime on this machine to take the version from (install it, or use -SkipPrerequisites).' }
+    $cache = Join-Path $repo 'artifacts\prerequisites'
+    $prerequisites = Join-Path $root 'prerequisites'
+    New-Item -ItemType Directory -Force $cache, $prerequisites | Out-Null
+    $wanted = @(
+        @{ Name = "dotnet-runtime-$runtimeVersion-win-x64.exe"; Url = "https://builds.dotnet.microsoft.com/dotnet/Runtime/$runtimeVersion/dotnet-runtime-$runtimeVersion-win-x64.exe" },
+        @{ Name = "aspnetcore-runtime-$runtimeVersion-win-x64.exe"; Url = "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/$runtimeVersion/aspnetcore-runtime-$runtimeVersion-win-x64.exe" },
+        @{ Name = 'vc_redist.x64.exe'; Url = 'https://aka.ms/vs/17/release/vc_redist.x64.exe' })
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    foreach ($item in $wanted) {
+        $file = Join-Path $cache $item.Name
+        if (-not (Test-Path $file)) {
+            Write-Output "  downloading $($item.Url)"
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri $item.Url -OutFile "$file.part" -UseBasicParsing
+            Move-Item "$file.part" $file -Force
+        }
+        $signature = Get-AuthenticodeSignature -LiteralPath $file
+        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+            throw "$($item.Name) is not signed by Microsoft (status $($signature.Status), signer '$($signature.SignerCertificate.Subject)'); it is NOT put in the installer (delete it from artifacts\prerequisites to download it again)."
+        }
+        Copy-Item $file $prerequisites
+        Write-Output ("  {0}: {1:N1} MB, signed by Microsoft" -f $item.Name, ((Get-Item $file).Length / 1MB))
+    }
+}
+
+if ($PackageOnly) {
+    Write-Output ''
+    Write-Output "Package:     $package"
+    Write-Output ("Size:        {0:N1} MB" -f ((Get-Item $package).Length / 1MB))
+    Write-Output ("Fingerprint: {0}" -f ((& dotnet $tool fingerprint @keyArguments) -join ''))
+    Write-Output 'Install: upload the package in Setari -> Actualizare (docs\OPERARE_ACTUALIZARE.md). No installer was made (-PackageOnly).'
+    return
+}
 Step 'Installer for the server'
 $updaterOut = Join-Path $root 'updater'
 $launcherOut = Join-Path $root 'launcher'
 Run-Native 'dotnet publish (updater)' { dotnet publish $updater -c Release -o $updaterOut --nologo -v q }
 Run-Native 'dotnet publish (launcher)' { dotnet publish $launcherProject -c Release -o $launcherOut --nologo -v q }
-Run-Native 'make-installer' { dotnet $tool make-installer --launcher (Join-Path $launcherOut 'BlazorStoc.Installer.exe') --package $package --updater $updaterOut --out $installer --version $Version }
+$prerequisiteArguments = @(); if ($prerequisites) { $prerequisiteArguments = @('--prerequisites', $prerequisites) }
+Run-Native 'make-installer' { dotnet $tool make-installer --launcher (Join-Path $launcherOut 'BlazorStoc.Installer.exe') --package $package --updater $updaterOut --out $installer --version $Version @prerequisiteArguments }
 & $installer --check --trusted $fingerprint --no-pause
 if ($LASTEXITCODE -ne 0) { throw "The installer failed its own check (exit code $LASTEXITCODE)." }
 

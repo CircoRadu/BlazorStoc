@@ -234,7 +234,7 @@ else
 
             <details class="invoice-section">
                 <summary>Coloane folosite din tabel <span>@draft.Columns.Count(column => column.Use && column.Meaning != InvoiceColumnMeanings.Ignore) folosite din @draft.Columns.Count</span></summary>
-                @if (draft.Columns.Count == 0) { <p class="muted">Nu s-a găsit tabelul cu liniile facturii. Adaugă coloanele desenând pe pagină (mai întâi coloana cu denumirea, apoi celelalte) și apasă „Citește rândurile” după ce ai stabilit antetul.</p> }
+                @if (draft.Columns.Count == 0) { <p class="muted">Nu s-a găsit tabelul cu liniile facturii. Adaugă coloanele desenând pe pagină (mai întâi coloana cu denumirea, apoi celelalte); rândurile se citesc din nou la fiecare modificare, iar antetul tabelului se stabilește în „Coloane folosite din tabel”.</p> }
                 <div class="invoice-list" role="list">
                     @foreach (var column in draft.Columns.OrderBy(column => column.Left))
                     {

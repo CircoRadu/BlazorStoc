@@ -15,7 +15,7 @@ Registrul facturilor de furnizor din care s-au preluat intrări în stoc. Apasă
 - Caută | câmp | După numărul facturii sau după furnizor.
 - Furnizor | listă | Alegi un furnizor sau „Toți furnizorii”.
 - De la, până la | câmp | Perioada de emitere a facturilor.
-- Doar fără intrări | comutator | Arată doar facturile fără intrări în stoc.
+- Doar fără intrări | comutator | Arată doar facturile fără intrări în stoc. | sel: label.row-toggle
 ### Tabelul facturilor
 - Nr. factură | coloană | Apasă numărul ca să vezi produsele preluate ([[facturi-detaliu]]).
 - Furnizor | coloană | Apasă numele ca să deschizi fișa furnizorului.

@@ -2,22 +2,24 @@
 Ruta: /furnizori
 Cautare: furnizori registru cui cod tva anf verificat recunoastere factura export csv adauga editeaza sterge
 Captura: pagina | /furnizori |  | Registrul de furnizori
+Captura: eroare | /furnizori | sql RENAME TABLE suppliers TO suppliers_x; reload; wait 800; then; sql RENAME TABLE suppliers_x TO suppliers; wait 1500 | Lista care nu a putut fi încărcată
+Captura: recunoasteri | /furnizori | jsclick sel:#supplier-recognition-summary summary; wait 900; full | Recunoașterea furnizorilor din facturi
 
 Registrul furnizorilor ale căror facturi se preiau în stoc. Un furnizor se identifică prin CUI (sau codul de TVA al unui stat UE) și nu poate apărea de două ori.
 
 ## Elemente
 ### Antet
 - + Adaugă furnizor | buton | Deschide formularul de furnizor nou ([[furnizori-editor]]); doar cu dreptul necesar.
-- Reîncearcă | buton | Apare când lista nu a putut fi încărcată.
+- Reîncearcă | buton | Apare când lista nu a putut fi încărcată. | img: eroare
 ### Rezumat
 - Total furnizori | cifră | Câți furnizori are registrul.
 - Date din ANAF | cifră | Furnizorii cu date preluate din ANAF și nemodificate.
 - De verificat | cifră | Furnizorii introduși manual sau editați după ANAF.
 - Alte state UE | cifră | Furnizorii identificați prin cod de TVA.
 ### Recunoașterea furnizorului la preluarea facturilor
-- Secțiunea colapsabilă | secțiune | Apare când există recunoașteri: arată câte facturi au fost recunoscute și câte au fost corectate de utilizator.
+- Secțiunea colapsabilă | secțiune | Apare când există recunoașteri: arată câte facturi au fost recunoscute și câte au fost corectate de utilizator. | img: recunoasteri | sel: #supplier-recognition-summary
 - Exportă jurnalul (CSV) | link | Descarcă jurnalul recunoașterilor.
-- Tabelul pe metode | tabel | Pe metodă și încredere: facturi, corectate, rata corecțiilor (⚠ peste 5% la „încredere mare”) și șabloanele schimbate.
+- Tabelul pe metode | tabel | Pe metodă și încredere: facturi, corectate, rata corecțiilor (⚠ peste 5% la „încredere mare”) și șabloanele schimbate. | img: recunoasteri | sel: #supplier-recognition-summary table
 - Ultimele corecții nerezolvate | listă | Ce s-a citit din factură și ce furnizor a ales utilizatorul; de aici se poate reține numele ca denumire alternativă.
 ### Registrul
 - Caută | câmp | Caută după denumire, CUI, adresă sau telefon.

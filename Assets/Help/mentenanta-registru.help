@@ -21,7 +21,7 @@ Toate intervențiile înregistrate la punctele de lucru, cele mai noi primele: i
 - Scadență | coloană | Pentru mentenanță: scadența planificată → noua scadență și baza ei de calcul; „Nu a modificat scadența” când există o intervenție mai recentă. La cerere: „—”.
 - Observații | coloană | Textul intervenției.
 - Foto | coloană | Câte fotografii are intervenția.
-- Paginile | butoane | Trec la pagina anterioară sau următoare.
+- Paginile | butoane | Trec la pagina anterioară sau următoare. | sel: .pagination
 
 ## Flux: Cum caut intervențiile unui punct
 1. Scrie în câmpul de căutare beneficiarul, punctul sau contractul.

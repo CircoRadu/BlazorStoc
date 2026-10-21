@@ -3,6 +3,7 @@ Ruta: /setari
 Tab: Șabloane salvate
 Cautare: sabloane facturi salvate furnizor cui format pdf xml activ editeaza sterge leaga furnizor detalii
 Captura: pagina | /setari | click Facturi; click Șabloane salvate; full | Șabloanele salvate
+Captura: fara-furnizor | /setari | sql UPDATE invoice_templates SET supplier_id=NULL WHERE id=303; click Facturi; click Șabloane salvate; wait 1500; full; then; sql UPDATE invoice_templates SET supplier_id=546 WHERE id=303 | Șablon fără furnizor
 
 Fiecare furnizor poate avea mai multe șabloane (de exemplu pentru un PDF din program și pentru unul scanat). La analiza unei facturi, aplicația propune șabloanele care se potrivesc, după CUI-ul furnizorului și după aspectul facturii.
 
@@ -16,7 +17,7 @@ Fiecare furnizor poate avea mai multe șabloane (de exemplu pentru un PDF din pr
 - Format | coloană | PDF (cu text sau scanat, OCR) sau XML.
 - Conținut | coloană | La PDF: câte câmpuri și coloane; la XML: căile liniilor.
 - Actualizat | coloană | Data și autorul ultimei modificări.
-- Leagă șablonul de un furnizor | iconita:link | Apare la șabloanele fără furnizor: deschide formularul de furnizor ([[furnizori-editor]]).
+- Leagă șablonul de un furnizor | iconita:link | Apare la șabloanele fără furnizor: deschide formularul de furnizor ([[furnizori-editor]]). | img: fara-furnizor
 - Arată detaliile șablonului | iconita:view | Desface căile XML, câmpurile folosite și coloanele tabelului.
 - Editează șablonul | iconita:edit | Deschide editorul ([[setari-facturi-editare]]).
 - Șterge șablonul | iconita:delete | Doar administratorul.

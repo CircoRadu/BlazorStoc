@@ -1,12 +1,13 @@
 # Contracte de mentenanță (fișa beneficiarului)
 Cautare: contracte mentenanta contract on off activeaza dezactiveaza expira ciclicitate puncte de lucru scadenta
-Captura: pagina | /beneficiari | click Panoramic Hotel; full | Contractele din fișa beneficiarului
+Captura: pagina | /beneficiari | click Panoramic Hotel; wait 3000; full | Contractele din fișa beneficiarului
+Captura: off | /beneficiari | click Asociatia de Proprietari; click Arată și contractele Off; wait 800; full | Contractul oprit (Off) afișat în fișa beneficiarului
 
 Secțiunea „Contracte de mentenanță” din fișa beneficiarului: contractele lui, punctele de lucru acoperite și următoarea scadență. Apare doar cât modulul Mentenanță funcționează.
 
 ## Elemente
 ### Antet
-- Arată și contractele Off | comutator | Apare când există contracte oprite.
+- Arată și contractele Off | comutator | Apare când există contracte oprite. | img: off | sel: label.row-toggle.labelled
 - + Adaugă contract | buton | Deschide formularul de contract nou ([[mentenanta-contract-editor]]); doar cu dreptul necesar.
 ### Tabelul contractelor
 - Contract | coloană | Numărul și data contractului, plus observațiile.
@@ -15,7 +16,7 @@ Secțiunea „Contracte de mentenanță” din fișa beneficiarului: contractele
 - Ciclicitate | coloană | La câte luni se repetă intervenția.
 - Puncte | buton | Numărul punctelor acoperite; apasă ca să desfaci lista lor, cu ciclicitatea, scadența și starea fiecăruia.
 - Următoarea scadență | coloană | Cea mai apropiată scadență a punctelor contractului (doar la contractele active).
-- Comutatorul On/Off | comutator | Oprește sau pornește contractul; la pornire se deschide [[mentenanta-contract-activare]].
+- Comutatorul On/Off | comutator | Oprește sau pornește contractul; la pornire se deschide [[mentenanta-contract-activare]]. | img: off | sel: tr.contract-row-off label.row-toggle
 - Editează contractul | iconita:edit | Deschide formularul contractului.
 - Șterge contractul | iconita:delete | Contractul se arhivează împreună cu punctele acoperite; pentru o simplă oprire folosește comutatorul.
 

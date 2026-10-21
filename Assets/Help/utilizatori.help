@@ -3,13 +3,14 @@ Ruta: /setari
 Tab: Utilizatori
 Cautare: utilizatori conturi autentificare tip utilizator activ inactiv administrator adauga editeaza sterge parola
 Captura: pagina | /setari | click Utilizatori; full | Lista utilizatorilor
+Captura: eroare | /setari | click Utilizatori; wait 1500; sql RENAME TABLE web_users TO web_users_x; reload; wait 800; click Utilizatori; wait 1500; full; then; sql RENAME TABLE web_users_x TO web_users; wait 1500 | Lista care nu a putut fi încărcată
 
 Conturile care se pot autentifica în aplicație și tipul fiecărui utilizator; se află în Setări → Utilizatori (subsecțiunea „Utilizatori”). Drepturile fiecărui tip se definesc în subsecțiunea „Tipuri de utilizatori” ([[setari-tipuri-utilizatori]]). Parolele nu sunt afișate și nu pot fi recuperate.
 
 ## Elemente
 ### Antet
 - + Adaugă utilizator | buton | În antetul cardului „Conturi web”. Deschide formularul de cont nou ([[utilizatori-editor]]); doar cu dreptul necesar.
-- Reîncearcă | buton | Apare când lista nu a putut fi încărcată.
+- Reîncearcă | buton | Apare când lista nu a putut fi încărcată. | img: eroare
 ### Rezumat
 - Total utilizatori | cifră | Conturile configurate.
 - Administratori activi | cifră | Conturile active cu acces complet.

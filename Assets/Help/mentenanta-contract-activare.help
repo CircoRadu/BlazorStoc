@@ -6,7 +6,7 @@ Când reiei un contract oprit (Off → On), scadențele lui nu s-au mutat cât a
 
 ## Elemente
 ### Fereastra
-- Mesajul de expirare | mesaj | Apare dacă contractul a expirat: îl poți activa oricum, dar prelungește data de expirare din „Editează”.
+- Mesajul de expirare | mesaj | Apare dacă contractul a expirat: îl poți activa oricum, dar prelungește data de expirare din „Editează”. | sel: text:"Contractul a expirat"
 - Puncte în alt contract activ | listă | Punctele care sunt acum acoperite de alt contract activ; activarea cere să le scoți din contractul reactivat.
 - Scoate aceste puncte din contractul reactivat | comutator | Confirmă scoaterea punctelor aflate în conflict.
 - Reprogramează toate punctele la | câmp | O singură dată pentru toate punctele; „Aplică tuturor” o completează pe fiecare rând.

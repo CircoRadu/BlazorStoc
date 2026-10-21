@@ -1,6 +1,6 @@
 # Salvarea ca șablon nou
 Cautare: salveaza ca sablon nou denumire sablon copie
-Captura: fereastra | /setari | click Facturi; click Șabloane salvate; click sel:.row-icon.edit; wait 2500; click Salvează ca șablon nou | Salvarea ca șablon nou
+Captura: fereastra | /setari | click Facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; jsclick Salvează ca șablon nou; wait 1200 | Salvarea ca șablon nou
 
 La editarea unui șablon, „Salvează ca șablon nou” păstrează șablonul curent neschimbat și creează un alt șablon, cu denumirea aleasă aici.
 

@@ -1,18 +1,19 @@
 # Factura preluată (fereastră separată)
 Ruta: /produse/preluare-factura/factura/{sessionId:guid}
 Cautare: factura fereastra noua comparare valori zoom marime pagini
-Captura: pagina | /produse/preluare-factura | upload factura-demo.pdf; click Pasul următor; popup Afișează factura într-o fereastră nouă | Factura în fereastra separată
+Captura: pagina | /produse/preluare-factura | upload factura-demo.pdf; wait 9000; click Pasul următor; wait 3000; popup Afișează factura într-o fereastră nouă; wait 3000 | Factura în fereastra separată
+Captura: expirata | /produse/preluare-factura/factura/6f1c2b44-9a7e-4d1b-8c53-2e0a5b7d9f11 | wait 2500 | Fereastra când factura a expirat
 
 Fereastra arată factura pe care o preiei, într-o fereastră separată de browser, ca s-o poți așeza lângă tabelul de la pasul 2 din „Preluare factură” și să compari valorile cu imaginea ei.
 
 ## Elemente
 ### Antet
-- Numele fișierului | text | Fișierul facturii aflate în preluare.
-- Numărul de pagini | text | Câte pagini are factura.
+- Numele fișierului | text | Fișierul facturii aflate în preluare. | sel: .invoice-viewer-bar strong
+- Numărul de pagini | text | Câte pagini are factura. | sel: .invoice-viewer-bar span.muted
 - Mărime | listă | Potrivit în fereastră, 150%, 200% sau 300%: mărește imaginea ca să citești cifrele mici.
 ### Pagini
-- Imaginile paginilor | imagine | Fiecare pagină a facturii, una sub alta; derulezi în fereastră ca să le parcurgi.
-- Factura nu mai este disponibilă | mesaj | Apare când fișierul nu mai este în memorie (se păstrează cel mult 30 de minute fără activitate); închide fereastra și reia preluarea.
+- Imaginile paginilor | imagine | Fiecare pagină a facturii, una sub alta; derulezi în fereastră ca să le parcurgi. | sel: .invoice-viewer-pages
+- Factura nu mai este disponibilă | mesaj | Apare când fișierul nu mai este în memorie (se păstrează cel mult 30 de minute fără activitate); închide fereastra și reia preluarea. | img: expirata
 
 ## Flux: Cum compar factura cu tabelul de preluare
 1. În „Preluare factură”, la pasul 2, apasă „Afișează factura într-o fereastră nouă”.

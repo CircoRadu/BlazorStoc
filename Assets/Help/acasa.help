@@ -2,6 +2,7 @@
 Ruta: /
 Cautare: meniu principal module placi sectiuni acasa cautare ajutor
 Captura: pagina | / |  | Pagina principală
+Captura: oprit | /setari | click Module; click sel:label.row-toggle[title*='Vehicule']; wait 600; type #module-stop-reason=Verificări programate pe server; click Oprește modulul; wait 1200; visit sel:a[href='/']; wait 800; full; then; visit sel:a[href='/setari']; click Module; click sel:label.row-toggle[title*='Pornește modulul Vehicule']; wait 1500 | Pagina principală cu un modul oprit
 
 Pagina principală este punctul de plecare: fiecare placă deschide o secțiune a aplicației. Vezi doar plăcile pentru care ai drept de acces. Din această pagină, iconița de ajutor are și o **căutare în tot ajutorul**; în orice altă fereastră ajutorul descrie doar fereastra în care ești.
 
@@ -15,7 +16,7 @@ Pagina principală este punctul de plecare: fiecare placă deschide o secțiune 
 - Categorii, Beneficiari, Furnizori, Facturi, Vehicule | placă | Administrarea datelor de bază. Facturi poate arăta intrările care așteaptă factura.
 - Oferte, Mentenanță, Analize de risc, Notificări, Jurnal activitate | placă | Modulele aplicației. Notificări și Analize de risc pot arăta un număr care cere atenție.
 - Utilizatori, Nomenclator | placă | Administrarea accesului și a tipurilor de sisteme (doar dacă ai dreptul).
-- Placă gri | placă | Modulul este oprit sau indisponibil momentan; placa se actualizează singură când modulul revine.
+- Placă gri | placă | Modulul este oprit sau indisponibil momentan; placa se actualizează singură când modulul revine. | img: oprit | sel: .main-menu-off
 ### Meniul din stânga și bara de sus
 - Meniul din stânga | meniu | Aceleași secțiuni ca plăcile, grupate (Produse, Inventar, Administrare), plus Notificări (cu semn roșu când sunt avertismente), Jurnal activitate și Setări. | sel: aside.sidebar
 - Iconița de ajutor | buton | Deschide acest ajutor pentru fereastra în care ești. | sel: .topbar .help-icon

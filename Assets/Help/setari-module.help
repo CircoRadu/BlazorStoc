@@ -3,12 +3,14 @@ Ruta: /setari
 Tab: Module
 Cautare: module oprire pornire reincearca stare circuit breaker erori cauza versiune administrator
 Captura: pagina | /setari | click Module; full | Modulele
+Captura: automat | / | sql UPDATE risk_analyses SET initial_date = '9999-12-31', last_renewal_date = '9999-12-31', validity_months = 120 WHERE registration_number = 'RA-0097'; reload; reload; reload; reload; visit sel:a[href='/setari']; wait 1500; click Module; wait 1500; full; then; sql UPDATE risk_analyses SET initial_date = '2024-11-18', last_renewal_date = '2024-11-18', validity_months = 24 WHERE registration_number = 'RA-0097'; jsclick sel:tr button.row-icon.renew; wait 1500; visit sel:a[href='/']; wait 1500 | Modul oprit automat după erori repetate
+Captura: oprire | /setari | click Module; wait 1200; jsclick sel:label.row-toggle[title*='Vehicule']; wait 900 | Confirmarea opririi unui modul
 
 Starea modulelor aplicației. Un modul oprit nu afectează restul aplicației. Un modul se oprește singur după erori repetate și se reîncearcă automat după 30 de secunde; aici poți cere reîncercarea imediat sau îl poți opri și porni manual.
 
 ## Elemente
 ### Antet
-- Numărul din titlu | insignă | Câte module are aplicația.
+- Numărul din titlu | insignă | Câte module are aplicația. | sel: h2 + .count-badge, .catalog-heading .count-badge
 - Versiunea aplicației | text | Versiunea întregii aplicații și cea mai nouă migrare a bazei de date aplicată (schema); la o actualizare ambele se schimbă. Versiunea fiecărui modul e în tabel. | sel: .app-version
 - ↻ Actualizează | buton | Reîncarcă starea.
 ### Tabelul modulelor
@@ -19,9 +21,9 @@ Starea modulelor aplicației. Un modul oprit nu afectează restul aplicației. U
 - Cauză | coloană | De ce a fost oprit.
 - Erori la rând | coloană | Câte erori consecutive a avut.
 - Pornit | comutator | Oprește sau pornește modulul; la oprire se cere confirmarea și un motiv, iar jurnalul nu se poate opri.
-- Reîncearcă modulul | iconita:renew | Repornește imediat un modul oprit automat.
+- Reîncearcă modulul | iconita:renew | Repornește imediat un modul oprit automat. | img: automat | sel: tr button.row-icon.renew
 ### Confirmarea opririi
-- Oprești modulul? | fereastră | Spune ce consecințe are (operațiile începute se termină, apelurile noi sunt refuzate); „Oprește modulul” confirmă, „Renunț” anulează.
+- Oprești modulul? | fereastră | Spune ce consecințe are (operațiile începute se termină, apelurile noi sunt refuzate); „Oprește modulul” confirmă, „Renunț” anulează. | img: oprire | sel: fieldset.module-stop-confirm
 
 ## Flux: Cum opresc temporar un modul
 1. Oprește comutatorul „Pornit” de pe rândul modulului.

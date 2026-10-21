@@ -1,14 +1,14 @@
 # Editorul de șablon de ofertă
 Cautare: sablon oferta editor fisier proba coloane antet etichete sectiuni randuri ignorate verifica pe fisier
-Captura: formular | /oferte/sabloane | click Șablon nou; height 1300 | Editorul de șablon de ofertă
+Captura: formular | /oferte/sabloane | click Șablon nou; wait 1500; upload oferta-demo.xlsx; wait 3500; jsclick Verifică pe fișier; wait 1500; height 2800 | Editorul de șablon de ofertă
 
 Aici definești un șablon: un fișier de probă (care nu se păstrează) arată foaia cu literele coloanelor, iar tu spui unde sunt câmpurile antetului, coloanele tabelului și ce secțiuni se importă.
 
 ## Elemente
 ### Fișierul de probă
-- Fișier de probă .xlsx | zonă | Alegi sau tragi un deviz de probă; nu se păstrează.
+- Fișier de probă .xlsx | zonă | Alegi sau tragi un deviz de probă; nu se păstrează. | sel: .file-drop
 - Foaia | listă | Apare când fișierul are mai multe foi.
-- Previzualizarea | tabel | Primele rânduri ale foii cu literele coloanelor, ca să știi ce coloană să alegi.
+- Previzualizarea | tabel | Primele rânduri ale foii cu literele coloanelor, ca să știi ce coloană să alegi. | sel: .offer-preview
 ### Date generale
 - Denumirea șablonului * | câmp | Numele șablonului.
 - Foaia (goală = prima) | câmp | Numele foii de citit.
