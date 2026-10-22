@@ -45,7 +45,7 @@ public static class AuditFilterOptions
         (AuditActions.ApplicationUpdateFailed, AuditActions.ApplicationUpdateFailed), (AuditActions.ApplicationUpdateRefused, AuditActions.ApplicationUpdateRefused),
         (AuditActions.ApplicationRollback, AuditActions.ApplicationRollback), (AuditActions.ApplicationUpdateAcknowledged, AuditActions.ApplicationUpdateAcknowledged),
         (AuditActions.Create, "Adăugare"), (AuditActions.Edit, "Editare"), (AuditActions.Delete, "Ștergere"), (AuditActions.Login, "Conectare"),
-        (AuditActions.Logout, "Deconectare"), (AuditActions.Unlock, "Deblocare"), (AuditActions.Generate, "Generare"),
+        (AuditActions.Logout, "Deconectare"), (AuditActions.LoginFailed, AuditActions.LoginFailed), (AuditActions.Unlock, "Deblocare"), (AuditActions.Generate, "Generare"),
         (AuditActions.ExportJournal, AuditActions.ExportJournal),
         (AuditActions.EditMapEngine, AuditActions.EditMapEngine), (AuditActions.ResetMapEngine, AuditActions.ResetMapEngine),
         (AuditActions.CreateMapPinType, AuditActions.CreateMapPinType), (AuditActions.EditMapPinType, AuditActions.EditMapPinType), (AuditActions.DeleteMapPinType, AuditActions.DeleteMapPinType),

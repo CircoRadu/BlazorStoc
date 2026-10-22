@@ -215,3 +215,8 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 - **Task:** Oprire si pornire manuala a modulelor (Setari -> Module), jurnalizarea permisiunilor consolidata, propunere de help contextual
 - **Rezumat:** `Modules/ModuleControl.cs`, `Modules/ModuleStateStore.cs`, `ModuleRegistry.Stop/Start`, migrarea 42 (`module_state`), `ModuleTile`, `ModulesPanel`, permisiunea `setari-module.toggle`, actiunile de jurnal "Oprire manuala modul"/"Pornire manuala modul"; `docs/PROPUNERE_HELP.md` (doar propunere, nimic implementat).
 - **Teste:** suita in memorie 1564 PASS, MariaDB 2353 PASS (inclusiv sectiunea "Module state"), verificat in browser pe instanta de test; detaliile in IMPLEMENTED.md si Teste utilizator/09, 10.
+
+## 22.10.2026 - Claude: versiunea 0.5.5
+
+- **Ce s-a schimbat:** jurnal cu IP la Conectare/Deconectare si operatie noua "Conectare esuata"; versiune reala pe pagina de login; lipire imagine produs doar cu Ctrl + V (butonul de clipboard scos); meniul din stanga cu scroll; regula teste tintite / suita completa inainte de commit.
+- **Teste:** suita in memorie 2033 PASS; detalii in IMPLEMENTED.md.

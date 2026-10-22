@@ -4,6 +4,17 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 
 ## Modificari de testat
 
+### 22.10.2026 - Imagine produs: lipire cu Ctrl + V fara buton
+
+**Ce s-a adaugat:** in formularul de produs, textul „sau lipeste imaginea copiata cu Ctrl + V" sta langa zona „Alege imaginea"; butonul „Preia imaginea din clipboard" si caseta de lipire au fost scoase.
+
+**Ce face acum:** Ctrl + V lipeste imaginea copiata oriunde in formular (fara sa selectezi o zona); butonul nu mai exista.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Deschide „Adauga produs"; copiaza o imagine (clic dreapta → Copiaza imaginea) si apasa Ctrl + V cu cursorul oriunde in formular (ex. in campul Descriere) | Imaginea apare in previzualizare; textul din camp nu se modifica | |
+| 2 | Priveste randul „Alege imaginea" | Langa zona de alegere apare „sau lipeste imaginea copiata cu Ctrl + V"; nu exista buton de clipboard | |
+
 ### 10.10.2026 - Ordinea subcategoriilor (drag and drop)
 
 **Ce s-a adaugat:** aceeasi aranjare prin tragere, acum si pentru subcategoriile fiecarei categorii (migrarea 41, `subcategories.sort_order`; jurnal „Reordonare subcategorii").

@@ -1,5 +1,5 @@
 # Formularul de produs
-Cautare: produs formular cod model categorie subcategorie parametri descriere imagine clipboard salveaza pregateste produs nou
+Cautare: produs formular cod model categorie subcategorie parametri descriere imagine lipire ctrl v clipboard salveaza pregateste produs nou
 Captura: formular | /produse | click Adaugă produs; wait 1500; full | Formularul de produs
 Captura: editare | /produse | type .search-box input=PIR-DUAL; wait 1000; click sel:.row-icon.view; wait 1500; click Editează; wait 6000; height 1500 | Editarea unui produs existent
 Captura: parametri | /produse | click Adaugă produs; wait 1500; select #product-category = Supraveghere video; wait 800; select #product-subcategory = Camere speciale; wait 1200; height 1500 | Produs într-o subcategorie cu parametri obligatorii
@@ -14,8 +14,8 @@ Formularul pentru un produs nou sau pentru editarea unuia existent. Se deschide 
 - Descriere | câmp | Text liber, cel mult 1000 de caractere.
 ### Imagine
 - Imagine produs | zonă | Alegi sau tragi o imagine JPG, PNG, WebP sau GIF, de cel mult 5 MB.
-- Preia imaginea din clipboard | buton | Lipește imaginea copiată (Ctrl + V în zonă).
-- Caută imaginea pe internet | link | Deschide o fereastră cu rezultatele căutării după codul produsului; copiezi imaginea și o lipești în zonă. | img: editare | sel: .image-web-search a
+- Lipire cu Ctrl + V | text | Imaginea copiată (clic dreapta → Copiază imaginea, sau o captură de ecran) se lipește cu Ctrl + V, oriunde în formular. | img: formular | sel: .paste-hint
+- Caută imaginea pe internet | link | Deschide o fereastră cu rezultatele căutării după codul produsului; copiezi imaginea și o lipești cu Ctrl + V. | img: editare | sel: .image-web-search a
 - Fără imagine | text | Produsul folosește imaginea generică „No img available”. | img: editare | sel: .image-preview-card
 ### Stoc și salvare
 - Nota de stoc | text | La produs nou: stoc 0; la editare: stocul curent (în depozit și în vehicule). Stocul nu se editează aici, ci prin intrări și ieșiri. | img: editare | sel: text:"Stoc curent"
@@ -32,7 +32,7 @@ Formularul pentru un produs nou sau pentru editarea unuia existent. Se deschide 
 ## Flux: Cum adaug imaginea unui produs
 1. Apasă „Caută imaginea pe internet” și deschide pagina potrivită.
 2. Copiază imaginea (clic dreapta → Copiază imaginea).
-3. Revino în formular și lipește-o în zona de imagine cu Ctrl + V (sau cu „Preia imaginea din clipboard”).
+3. Revino în formular și apasă Ctrl + V oriunde în formular.
 Nota: fără imagine, produsul folosește imaginea generică.
 
 ## Flux: Cum pregătesc un produs în timpul unei preluări

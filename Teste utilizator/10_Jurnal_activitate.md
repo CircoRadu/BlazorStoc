@@ -4,6 +4,19 @@ Regula: jurnalul numeste exact operatia (nu "Creare"/"Editare" generic). Fiecare
 
 ## Modificari de testat
 
+### 22.10.2026 - Adresa IP la conectari si deconectari, conectari esuate
+
+**Ce s-a adaugat:** evenimentele „Conectare" si „Deconectare" din Jurnal contin acum adresa IP de pe care s-a conectat utilizatorul (data si ora erau deja in jurnal); operatie noua „Conectare esuata" (nume tastat, motiv, IP, fara parola), si in filtrul „Operatie".
+
+**Ce face acum:** la fiecare autentificare reusita si la fiecare deconectare, coloana „Detalii" arata „Sesiune autentificata · IP <adresa>" / „Sesiune incheiata · IP <adresa>". Evenimentele mai vechi raman fara IP.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Autentifica-te, apoi deconecteaza-te; deschide Jurnal activitate | Doua evenimente (Conectare, Deconectare) cu data si ora, iar in „Detalii" adresa IP a calculatorului de pe care ai intrat | |
+| 2 | Intra de pe alt calculator din retea | Evenimentul „Conectare" arata IP-ul acelui calculator | |
+| 3 | Pe pagina de autentificare scrie un utilizator si o parola gresite, apoi intra corect si deschide Jurnal activitate | Eveniment „Conectare esuata": operatorul este numele tastat, in „Detalii" „Autentificare refuzata: utilizator sau parola incorecte · IP <adresa>"; parola nu apare nicaieri. Filtrul „Operatie" contine „Conectare esuata" | |
+| 4 | Incearca un cont inactiv si apoi parola gresita pentru administratorul configurat | Evenimente „Conectare esuata" cu motivele „cont inactiv" si „parola gresita" | |
+
 ### 20.10.2026 - Actiuni noi de jurnal pentru actualizarea aplicatiei
 
 **Ce s-a adaugat:** opt actiuni, toate si in filtrul paginii Jurnal, entitatea „Aplicatie": Actualizare aplicatie (la confirmare, pe numele administratorului, cu motiv, versiunile si suma de control a pachetului), Anulare actualizare aplicatie, Actualizare reusita, Actualizare esuata, Actualizare refuzata, Revenire la versiunea anterioara (manuala, cu installerul), Actualizare aplicatie (installer) si Confirmare esec actualizare. Rezultatele le scrie „sistem", din istoricul Updater-ului, la pornirea aplicatiei (o singura data).

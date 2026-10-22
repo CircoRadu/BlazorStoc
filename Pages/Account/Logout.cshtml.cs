@@ -13,7 +13,8 @@ public class LogoutModel(IAuditTrail auditTrail) : PageModel
         var username = User.Identity?.Name ?? "necunoscut";
         var role = User.IsInRole(AccessRoles.Administrator) ? AccessRoles.Administrator : AccessRoles.LimitedUser;
         await HttpContext.SignOutAsync();
-        await AuditRecorder.RecordSessionAsync(auditTrail, username, role, false, HttpContext.RequestAborted);
+        await AuditRecorder.RecordSessionAsync(auditTrail, username, role, false, HttpContext.RequestAborted,
+            AuditRecorder.FormatAddress(HttpContext.Connection.RemoteIpAddress));
         return LocalRedirect("/Account/Login");
     }
 }

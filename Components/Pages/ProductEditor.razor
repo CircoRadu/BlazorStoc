@@ -50,10 +50,9 @@
                     </div>
                     <div class="image-inputs">
                         <strong>Imagine produs (opțional)</strong>
-                        <FileDropZone Id="product-image-input" OnChange="ImageSelectedAsync" Accept="image/jpeg,image/png,image/webp,image/gif" Text="Alege imaginea" />
-                        <div class="clipboard-zone" @ref="pasteArea" tabindex="0">
-                            <span>Lipește aici imaginea cu <kbd>Ctrl</kbd> + <kbd>V</kbd></span>
-                            <button type="button" class="refresh act-confirm" @onclick="ReadClipboardAsync">Preia imaginea din clipboard</button>
+                        <div class="image-pick-row" @ref="pasteArea">
+                            <FileDropZone Id="product-image-input" OnChange="ImageSelectedAsync" Accept="image/jpeg,image/png,image/webp,image/gif" Text="Alege imaginea" />
+                            <span class="paste-hint">sau lipește imaginea copiată cu <kbd>Ctrl</kbd> + <kbd>V</kbd></span>
                         </div>
                         <div class="image-web-search">
                             @if (ImageSearchUrl is { } searchUrl)
@@ -319,7 +318,7 @@
         catch (JSException exception)
         {
             Logger.LogWarning("Product image clipboard module could not be loaded ({ErrorType}).", exception.GetType().Name);
-            imageError = "Preluarea din clipboard nu este disponibilă momentan. Poți selecta imaginea dintr-un fișier.";
+            imageError = "Lipirea cu Ctrl + V nu este disponibilă momentan. Poți selecta imaginea dintr-un fișier.";
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -428,19 +427,6 @@
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (ProductImageException exception) { selectedImage = null; imageError = exception.Message; }
         catch (Exception exception) { selectedImage = null; Logger.LogError("Product image loading failed ({ErrorType}).", exception.GetType().Name); imageError = "Imaginea nu a putut fi citită."; }
-    }
-
-    private async Task ReadClipboardAsync()
-    {
-        imageError = null;
-        try
-        {
-            if (imageModule is null) throw new InvalidOperationException();
-            if (!await imageModule.InvokeAsync<bool>("readClipboard", "product-image-input"))
-                imageError = "Clipboard-ul nu conține o imagine.";
-        }
-        catch (JSException) { imageError = "Browserul nu a permis citirea clipboard-ului. Selectează zona și folosește Ctrl+V."; }
-        catch (InvalidOperationException) { imageError = "Funcția clipboard nu este încă disponibilă. Reîncearcă."; }
     }
 
     public async ValueTask DisposeAsync()

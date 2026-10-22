@@ -45,7 +45,6 @@ public static partial class FullRun
               sessionAuditTrail.Entries.Count(entry => entry.Action == AuditActions.Login) == 1 &&
               sessionAuditTrail.Entries.Count(entry => entry.Action == AuditActions.Logout) == 1,
             "Successful login and confirmed logout are each recorded once");
-
         var productAuditLink = new AuditEvent(Guid.NewGuid(), DateTime.UtcNow, "admin", AccessRoles.Administrator,
             AuditEntities.Product, AuditActions.Create, "#12 · Produs", "Denumire: Produs", EntityId: "12");
         Check(AuditNavigation.DisplayTarget(productAuditLink) == "Produs" &&

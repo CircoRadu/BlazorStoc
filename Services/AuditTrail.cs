@@ -63,6 +63,8 @@ public static class AuditActions
     public const string Delete = "Ștergere";
     public const string Login = "Conectare";
     public const string Logout = "Deconectare";
+    // A sign-in that was refused (wrong password, unknown or inactive account): the user name typed and the address are in the details, never the password.
+    public const string LoginFailed = "Conectare eșuată";
     public const string Unlock = "Deblocare";
     public const string Generate = "Generare";
     public const string Restore = "Restaurare";
@@ -693,12 +695,33 @@ public static class AuditRecorder
         string target, string details, CancellationToken cancellationToken) =>
         RecordEntityAsync(trail, access, entityType, AuditActions.Restore, string.Empty, target, details, string.Empty, cancellationToken);
 
+    // The address the browser connected from (IPv4-mapped IPv6 shown as IPv4) is part of the details of both events.
+    public static string? FormatAddress(System.Net.IPAddress? address)
+    {
+        if (address is null) return null;
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        return address.ToString();
+    }
+
     public static Task RecordSessionAsync(IAuditTrail? trail, string actorUsername, string actorRole,
-        bool connected, CancellationToken cancellationToken) => trail is null
+        bool connected, CancellationToken cancellationToken, string? address = null) => trail is null
         ? Task.CompletedTask
         : trail.RecordAsync(new(actorUsername, actorRole, AuditEntities.User,
             connected ? AuditActions.Login : AuditActions.Logout, actorUsername,
-            connected ? "Sesiune autentificată" : "Sesiune încheiată", string.Empty, string.Empty), cancellationToken);
+            (connected ? "Sesiune autentificată" : "Sesiune încheiată") + (string.IsNullOrEmpty(address) ? "" : " · IP " + address),
+            string.Empty, string.Empty), cancellationToken);
+
+    // A refused sign-in: the actor and the target are the user name typed (cleaned and cut), the reason and the address are in the details. The password is never passed here.
+    public static Task RecordLoginFailedAsync(IAuditTrail? trail, string typedUsername, string reason,
+        CancellationToken cancellationToken, string? address = null)
+    {
+        if (trail is null) return Task.CompletedTask;
+        var name = new string((typedUsername ?? "").Where(character => !char.IsControl(character)).ToArray()).Trim();
+        if (name.Length > 100) name = name[..100];
+        if (name.Length == 0) name = "(necompletat)";
+        return trail.RecordAsync(new(name, AccessRoles.LimitedUser, AuditEntities.User, AuditActions.LoginFailed, name,
+            "Autentificare refuzată: " + reason + (string.IsNullOrEmpty(address) ? "" : " · IP " + address), string.Empty, string.Empty), cancellationToken);
+    }
 
     private static async Task RecordEntityAsync(IAuditTrail? trail, IAccessControl? access, string entityType,
         string action, string entityId, string target, string details, string motif, CancellationToken cancellationToken,

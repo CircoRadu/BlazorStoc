@@ -23,7 +23,7 @@ Acțiunile operate în sistem, în ordine cronologică (cele mai recente evenime
 - Operator | coloană | Utilizatorul și rolul lui; apasă numele ca să filtrezi după el.
 - Operație | coloană | Operația și tipul obiectului; apasă operația ca să filtrezi după ea.
 - Țintă | coloană | Obiectul; apasă-l ca să deschizi pagina lui.
-- Detalii | coloană | Descrierea modificării (valoarea veche și cea nouă) și motivul.
+- Detalii | coloană | Descrierea modificării (valoarea veche și cea nouă) și motivul. La „Conectare”, „Deconectare” și „Conectare eșuată” conține adresa IP de pe care s-a conectat (sau a încercat să se conecteze) utilizatorul; la „Conectare eșuată” operatorul este numele tastat și apare motivul refuzului (parolă greșită, cont inactiv), niciodată parola.
 - Evenimente pe pagină | listă | Câte evenimente se arată pe pagină; săgețile trec între pagini.
 
 ## Flux: Cum aflu cine a modificat ceva

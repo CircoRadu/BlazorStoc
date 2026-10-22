@@ -37,11 +37,11 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
             return await SignInAsync(configuredUsername, "Administrator configurat", AccessRoles.Administrator, null);
         }
         // A wrong password for the configured administrator is rejected without querying SQL.
-        if (string.Equals(Username, configuredUsername, StringComparison.Ordinal)) return InvalidLogin();
+        if (string.Equals(Username, configuredUsername, StringComparison.Ordinal)) return await RefusedAsync("parolă greșită");
         try
         {
             var result = await authenticator.AuthenticateAsync(Username, Password ?? "", HttpContext.RequestAborted);
-            if (result.Status == AuthenticationStatus.Inactive) return InvalidLogin("Contul este inactiv. Contactează administratorul pentru reactivare.");
+            if (result.Status == AuthenticationStatus.Inactive) return await RefusedAsync("cont inactiv", "Contul este inactiv. Contactează administratorul pentru reactivare.");
             if (result.Status == AuthenticationStatus.Success && result.User is not null)
                 return await SignInAsync(result.User.Username, result.User.DisplayName, result.User.Role, result.User.Id);
         }
@@ -51,8 +51,22 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
             logger.LogError("Database user authentication failed ({ErrorType}).", exception.GetType().Name);
             // A database that does not answer (or a backup/restore that holds it) is not a wrong password: say so, so nobody keeps retyping credentials.
             if (LoginMessages.IsDatabaseUnavailable(exception)) return InvalidLogin(LoginMessages.DatabaseUnavailable);
+            return InvalidLogin();   // an unexpected fault is not a refused sign-in: nothing to journal
         }
-        return InvalidLogin();
+        return await RefusedAsync("utilizator sau parolă incorecte");
+    }
+
+    // A refused sign-in is journaled (user name typed, reason, address; never the password); a journal that cannot be written must not change what the user sees.
+    private async Task<IActionResult> RefusedAsync(string reason, string message = LoginMessages.WrongCredentials)
+    {
+        try
+        {
+            await AuditRecorder.RecordLoginFailedAsync(auditTrail, Username, reason, HttpContext.RequestAborted,
+                AuditRecorder.FormatAddress(HttpContext.Connection.RemoteIpAddress));
+        }
+        catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested) { throw; }
+        catch (Exception exception) { logger.LogWarning("Failed sign-in could not be journaled ({ErrorType}).", exception.GetType().Name); }
+        return InvalidLogin(message);
     }
 
     private async Task<IActionResult> SignInAsync(string username, string displayName, string role, int? userId)
@@ -66,7 +80,8 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         if (userId is not null) claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.Value.ToString()));
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
-        await AuditRecorder.RecordSessionAsync(auditTrail, username, role, true, HttpContext.RequestAborted);
+        await AuditRecorder.RecordSessionAsync(auditTrail, username, role, true, HttpContext.RequestAborted,
+            AuditRecorder.FormatAddress(HttpContext.Connection.RemoteIpAddress));
         return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/");
     }
 

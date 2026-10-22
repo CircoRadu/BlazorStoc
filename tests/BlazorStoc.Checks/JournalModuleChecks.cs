@@ -28,6 +28,35 @@ public static class JournalModuleChecks
         await GuardedAsync(check);
         await WiringAsync(check);
         Architecture(check);
+        await SessionAddressAsync(check);
+    }
+
+    private static async Task SessionAddressAsync(Action<bool, string> check)
+    {
+        var trail = new TestAuditTrail();
+        await AuditRecorder.RecordSessionAsync(trail, "administrator.demo", AccessRoles.Administrator, true, default,
+            AuditRecorder.FormatAddress(System.Net.IPAddress.Parse("::ffff:192.168.1.20")));
+        await AuditRecorder.RecordSessionAsync(trail, "administrator.demo", AccessRoles.Administrator, false, default,
+            AuditRecorder.FormatAddress(System.Net.IPAddress.Parse("10.0.0.5")));
+        await AuditRecorder.RecordSessionAsync(trail, "administrator.demo", AccessRoles.Administrator, true, default);
+        check(trail.Entries[0].Details == "Sesiune autentificată · IP 192.168.1.20" &&
+              trail.Entries[1].Details == "Sesiune încheiată · IP 10.0.0.5" &&
+              trail.Entries[2].Details == "Sesiune autentificată" &&
+              AuditRecorder.FormatAddress(null) is null,
+            "Login and logout events carry the client IP address (IPv4-mapped IPv6 shown as IPv4)");
+
+        var refused = new TestAuditTrail();
+        await AuditRecorder.RecordLoginFailedAsync(refused, "ion.popescu\r\n", "utilizator sau parolă incorecte", default, "192.168.1.30");
+        await AuditRecorder.RecordLoginFailedAsync(refused, new string('x', 300), "cont inactiv", default);
+        await AuditRecorder.RecordLoginFailedAsync(refused, "  ", "parolă greșită", default, "10.0.0.5");
+        check(refused.Entries.Count == 3 &&
+              refused.Entries.All(entry => entry.Action == AuditActions.LoginFailed && entry.EntityType == AuditEntities.User) &&
+              refused.Entries[0].ActorUsername == "ion.popescu" && refused.Entries[0].Target == "ion.popescu" &&
+              refused.Entries[0].Details == "Autentificare refuzată: utilizator sau parolă incorecte · IP 192.168.1.30" &&
+              refused.Entries[1].ActorUsername.Length == 100 && refused.Entries[1].Details == "Autentificare refuzată: cont inactiv" &&
+              refused.Entries[2].ActorUsername == "(necompletat)",
+            "A refused sign-in is journaled with the user name typed (cleaned, cut), the reason and the IP address");
+        check(AuditFilterOptions.Actions.Any(option => option.Value == AuditActions.LoginFailed), "The journal filter offers the failed sign-in operation");
     }
 
     private static async Task<int> RefusedAsync(params Func<Task>[] calls)
