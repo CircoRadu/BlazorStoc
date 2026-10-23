@@ -10,11 +10,13 @@ Pagina de autentificare protejează accesul la aplicație. Fără cont valid nu 
 ### Formularul
 - Utilizator | câmp | Numele contului tău.
 - Parolă | câmp | Parola contului; nu se afișează pe ecran.
+- Păstrează-mă autentificat | comutator | Pornit: rămâi autentificat 30 de zile, chiar dacă închizi browserul. Oprit (implicit): sesiunea se încheie când închizi browserul sau după 8 ore. Folosește-l numai pe calculatorul tău; „Deconectare” încheie oricum sesiunea. | img: pagina | sel: .login-remember
 - Intră în aplicație | buton | Verifică datele și te duce la pagina cerută sau la pagina principală.
 - Mesajul roșu | text | Apare când datele sunt greșite sau când s-au făcut prea multe încercări într-un timp scurt. | img: eroare | sel: p.error-text
 
 ## Flux: Cum intru în aplicație
 1. Scrie numele de utilizator și parola.
-2. Apasă „Intră în aplicație”.
-3. Dacă ai fost trimis aici dintr-o pagină anume, după autentificare ajungi înapoi la ea.
+2. Dacă nu vrei să te autentifici din nou zile în șir, pornește „Păstrează-mă autentificat”.
+3. Apasă „Intră în aplicație”.
+4. Dacă ai fost trimis aici dintr-o pagină anume, după autentificare ajungi înapoi la ea.
 Nota: dacă ți-ai uitat parola, cere administratorului să ți-o reseteze; după mai multe încercări greșite autentificarea se blochează temporar.

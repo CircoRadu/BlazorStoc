@@ -220,3 +220,8 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`
 
 - **Ce s-a schimbat:** jurnal cu IP la Conectare/Deconectare si operatie noua "Conectare esuata"; versiune reala pe pagina de login; lipire imagine produs doar cu Ctrl + V (butonul de clipboard scos); meniul din stanga cu scroll; regula teste tintite / suita completa inainte de commit.
 - **Teste:** suita in memorie 2033 PASS; detalii in IMPLEMENTED.md.
+
+## 23.10.2026 - Claude: versiunea 0.5.6
+
+- **Ce s-a schimbat:** comutator "Pastreaza-ma autentificat" pe pagina de autentificare (cookie persistent 30 de zile), notat in Jurnal.
+- **Teste:** suita in memorie 2034 PASS; detalii in IMPLEMENTED.md.

@@ -45,6 +45,11 @@ public static class JournalModuleChecks
               AuditRecorder.FormatAddress(null) is null,
             "Login and logout events carry the client IP address (IPv4-mapped IPv6 shown as IPv4)");
 
+        var kept = new TestAuditTrail();
+        await AuditRecorder.RecordSessionAsync(kept, "administrator.demo", AccessRoles.Administrator, true, default, "10.0.0.5", 30);
+        check(kept.Entries[0].Details == "Sesiune autentificată · IP 10.0.0.5 · păstrat autentificat 30 zile",
+            "A sign-in kept for days says so in the journal");
+
         var refused = new TestAuditTrail();
         await AuditRecorder.RecordLoginFailedAsync(refused, "ion.popescu\r\n", "utilizator sau parolă incorecte", default, "192.168.1.30");
         await AuditRecorder.RecordLoginFailedAsync(refused, new string('x', 300), "cont inactiv", default);

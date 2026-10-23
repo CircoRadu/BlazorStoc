@@ -15,6 +15,9 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
 {
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
+    // "Păstrează-mă autentificat": the cookie outlives the browser and lasts RememberDays; without it the session cookie ends with the browser (and after 8 hours).
+    [BindProperty] public bool RememberMe { get; set; }
+    public const int RememberDays = 30;
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
     public string? Error { get; private set; }
 
@@ -79,9 +82,15 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         };
         if (userId is not null) claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.Value.ToString()));
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+        var properties = new AuthenticationProperties();
+        if (RememberMe)
+        {
+            properties.IsPersistent = true;
+            properties.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(RememberDays);
+        }
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);
         await AuditRecorder.RecordSessionAsync(auditTrail, username, role, true, HttpContext.RequestAborted,
-            AuditRecorder.FormatAddress(HttpContext.Connection.RemoteIpAddress));
+            AuditRecorder.FormatAddress(HttpContext.Connection.RemoteIpAddress), RememberMe ? RememberDays : null);
         return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/");
     }
 

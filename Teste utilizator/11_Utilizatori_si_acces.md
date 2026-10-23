@@ -4,6 +4,19 @@ Fluxul: administratorul creeaza conturi (Administrator / Utilizator) -> autentif
 
 ## Modificari de testat
 
+### 22.10.2026 - Optiunea „Pastreaza-ma autentificat"
+
+**Ce s-a adaugat:** comutator On/Off „Pastreaza-ma autentificat" pe pagina de autentificare (implicit oprit).
+
+**Ce face acum:** pornit, sesiunea tine 30 de zile si supravietuieste inchiderii browserului; oprit, sesiunea se incheie la inchiderea browserului sau dupa 8 ore. In Jurnal, evenimentul „Conectare" spune „pastrat autentificat 30 zile".
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Autentifica-te cu comutatorul oprit, inchide complet browserul, redeschide aplicatia | Esti dus la pagina de autentificare | |
+| 2 | Autentifica-te cu comutatorul pornit, inchide complet browserul, redeschide aplicatia | Esti inca autentificat | |
+| 3 | Deconecteaza-te din popup dupa pasul 2 | Esti dus la autentificare; la urmatoarea redeschidere trebuie sa te autentifici din nou | |
+| 4 | Jurnal activitate, evenimentul „Conectare" de la pasul 2 | Detaliile contin „pastrat autentificat 30 zile" | |
+
 ### 20.10.2026 - Utilizatorii se muta din Administrare in Setari
 
 **Ce s-a adaugat:** lista de utilizatori nu mai este in meniul Administrare; este in Setari, fila „Utilizatori”, subtab „Utilizatori” (langa subtab „Tipuri de utilizatori”). Vechiul /utilizatori redirectioneaza acolo (si cu ?edit=<id>); fisa /utilizatori/{id} ramane, iar „Inapoi” duce la lista din Setari.

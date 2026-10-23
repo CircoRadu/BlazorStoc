@@ -704,11 +704,12 @@ public static class AuditRecorder
     }
 
     public static Task RecordSessionAsync(IAuditTrail? trail, string actorUsername, string actorRole,
-        bool connected, CancellationToken cancellationToken, string? address = null) => trail is null
+        bool connected, CancellationToken cancellationToken, string? address = null, int? rememberedDays = null) => trail is null
         ? Task.CompletedTask
         : trail.RecordAsync(new(actorUsername, actorRole, AuditEntities.User,
             connected ? AuditActions.Login : AuditActions.Logout, actorUsername,
-            (connected ? "Sesiune autentificată" : "Sesiune încheiată") + (string.IsNullOrEmpty(address) ? "" : " · IP " + address),
+            (connected ? "Sesiune autentificată" : "Sesiune încheiată") + (string.IsNullOrEmpty(address) ? "" : " · IP " + address) +
+            (rememberedDays is > 0 ? $" · păstrat autentificat {rememberedDays} zile" : ""),
             string.Empty, string.Empty), cancellationToken);
 
     // A refused sign-in: the actor and the target are the user name typed (cleaned and cut), the reason and the address are in the details. The password is never passed here.

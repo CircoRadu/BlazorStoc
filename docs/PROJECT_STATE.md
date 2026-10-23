@@ -1,6 +1,6 @@
 # Starea curenta a proiectului
 
-Actualizat: 22.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`). Istoricul vechi: `docs/arhiva/` (vezi `docs/arhiva/INDEX.md`). Cand ceva de aici se invecheste, se inlocuieste, nu se aduna.
+Actualizat: 23.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`). Istoricul vechi: `docs/arhiva/` (vezi `docs/arhiva/INDEX.md`). Cand ceva de aici se invecheste, se inlocuieste, nu se aduna.
 
 ## Aplicatia
 
@@ -8,6 +8,11 @@ Actualizat: 22.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Module: produse/stoc, categorii, beneficiari/proiecte, vehicule, mentenanta (contracte, interventii, harta), notificari, jurnal, furnizori si facturi, preluare factura PDF/OCR cu sabloane, preluare inventar.
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
+
+## Ultimul lucru facut (23.10.2026): versiunea 0.5.6
+
+- Pagina de autentificare: comutatorul "Pastreaza-ma autentificat" (cookie de 30 de zile; implicit oprit, sesiune de 8 ore); Jurnalul spune cand o conectare a fost pastrata.
+- Verificat: suita in memorie 2034 PASS, MariaDB 2868 PASS, 0 esecuri.
 
 ## Ultimul lucru facut (22.10.2026): versiunea 0.5.5
 

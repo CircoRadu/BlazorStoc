@@ -702,3 +702,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Help: jurnal.help si produse-editor.help actualizate, capturile produse-editor refacute; Teste utilizator 01 si 10 completate.
 - Regula noua (CLAUDE.md): teste tintite la preview/task, suita completa numai inainte de commit.
 - Verificari: suita in memorie 2033 PASS, MariaDB 2867 PASS, grupul help, grupul modules (verificari noi in JournalModuleChecks); browser pe instanta demo 5089 (IP, conectare esuata, lipire, scroll).
+
+## Finalizat la 23.10.2026 08:30 - Versiunea 0.5.6: Pastreaza-ma autentificat
+
+- Pagina de autentificare: comutator On/Off "Pastreaza-ma autentificat" (implicit oprit). Pornit: cookie persistent 30 de zile (AuthenticationProperties.IsPersistent + ExpiresUtc, LoginModel.RememberDays); oprit: cookie de sesiune (8 ore, se pierde la inchiderea browserului). Evenimentul Conectare din Jurnal spune "pastrat autentificat 30 zile".
+- Help: autentificare.help (element nou + pas), capturile autentificare.pagina/eroare refacute; Teste utilizator/11 completat.
+- Verificari: suita in memorie 2034 PASS, MariaDB 2868 PASS, grupurile modules+help; pe instanta demo 5089 cookie fara expirare vs expira peste 30 de zile.
