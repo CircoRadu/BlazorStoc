@@ -2,6 +2,7 @@
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
 ## 0.5.12 | 23.10.2026
 - Preluare ActivityApp, secțiunea „Tipuri de tichete”: alegerea salvată se vede imediat la deschiderea panoului, nu abia după „Citește tipurile din ActivityApp”.
+- Preluare ActivityApp, tichete: se preiau numai tichetele de tipurile alese care menționează un cuvânt cheie de mentenanță (exact sau aproximativ) în ce s-a făcut; celelalte sunt ignorate.
 - Preluare ActivityApp, simularea beneficiarilor: două secțiuni pliabile, „Cu probleme” (pliată implicit) și „Selectați pentru preluare” (deschisă).
 - Preluare ActivityApp, „Simulează importul” / „Aplică importul”: lista arată acum și beneficiarii de creat, cei de verificat și cei legați de existenți, nu doar problemele și persoanele ignorate; persoanele fizice și punctele lor sunt la sfârșitul listei.
 ## 0.5.11 | 23.10.2026

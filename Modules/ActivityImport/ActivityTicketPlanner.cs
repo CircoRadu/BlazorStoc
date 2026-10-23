@@ -28,6 +28,7 @@ public static class ActivityTicketPlanner
     public const string ClientNotTaken = "Clientul tichetului nu se preia (persoană fizică sau discardat): tichetul nu se preia.";
     public const string ClientToVerify = "Clientul tichetului este de verificat: tichetul așteaptă clarificarea beneficiarului.";
     public const string ClientNotImported = "Clientul tichetului nu a putut fi preluat încă (vezi problemele): tichetul așteaptă.";
+    public const string NoKeyword = "Tichetul nu menționează niciun cuvânt cheie de mentenanță al tipului: nu se preia.";
     public const string MaintenanceNotAvailable = "Destinația „de mentenanță” nu este disponibilă încă (ar muta scadențele); tipul se preia ca „la cerere” după ce o alegi.";
 
     // The text with every run of white space as one space: what is compared when the report is checked to begin with the problem.
@@ -116,6 +117,7 @@ public static class ActivityTicketPlanner
             // maintenance contract covers the point (see WithCoverage): a text with the word may say that the maintenance could NOT be done.
             plans.Add(match.Kind switch
             {
+                KeywordMatchKind.None when decision is null => Make(PlanAction.Skipped, NoKeyword),
                 KeywordMatchKind.None => plan,
                 _ when decision == KeywordDecision.Confirmed => plan with { Keyword = match.Word, Decided = true },
                 _ when decision == KeywordDecision.Rejected => plan,

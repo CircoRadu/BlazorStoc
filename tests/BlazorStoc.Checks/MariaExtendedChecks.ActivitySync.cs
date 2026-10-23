@@ -39,13 +39,14 @@ public static partial class MariaExtendedChecks
             await settings.SaveSettingsAsync(new ActivityImportInput(enabled, "SERVER-" + suffix, 1433, "TIPActivity", "citire", null, new DateOnly(2026, 1, 1), 0, 24, 200, false, sync2, 60));
         try
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions" }) await Exec(probe, "DELETE FROM " + table);
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
             fake.Partners = [new(7301, $"Ext Sync {suffix} SRL", "RO" + cui, "Str. Florilor 5", "Timisoara", "Timis", "0722111222", "")];
             fake.Points = [new(7401, 7301, "Str. Florilor 5", "Timisoara", "Timis", "", "Sediu", "", true, null)];
             fake.Types = [new(4, "Service", "S", true, false, 1, 0, 0)];
             fake.TicketRows = [new(7501, 4, 7301, 0, new DateTime(2026, 3, 1), "T-7501", "Internet", "Nu merge", "Ion", 8501, new DateTime(2026, 3, 2), 1, "Nu merge\nRouter nou")];
             await settings.SaveSettingsAsync(new ActivityImportInput(true, "SERVER-" + suffix, 1433, "TIPActivity", "citire", "parola-" + suffix, new DateOnly(2026, 1, 1), 0, 24, 200, false, true, 60));
             await settings.SaveTypesAsync([new(4, "Service", true, ActivityDestination.OnDemand)]);
+            await new MariaActivityKeywordService(configuration, admin, audit).AddAsync("router");
             var saved = await settings.GetSettingsAsync();
             Check(saved.SyncEnabled && saved.SyncIntervalMinutes == 60 && saved.LastSyncUtc is null, "Activity sync: the synchronization setting and its interval are saved");
             var badInterval = 0;
@@ -190,7 +191,7 @@ public static partial class MariaExtendedChecks
         }
         finally
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions" }) await Exec(probe, "DELETE FROM " + table);
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
         }
     }
 }

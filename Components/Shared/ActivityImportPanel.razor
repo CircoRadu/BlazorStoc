@@ -143,7 +143,7 @@
             }
         </fieldset>
         <fieldset class="anaf-section"><legend>4. Tichete rezolvate</legend>
-            <p class="muted"><small>Tichetele rezolvate (cu eveniment de rezolvare) ale tipurilor alese în secțiunea 2, deschise de la data aleasă, devin intervenții „la cerere” în Mentenanță, la beneficiarul clientului și la punctul de lucru al tichetului (altfel la cel principal). Problema și rezolvarea se despart din raportul lucrării. Se preiau numai după ce clientul a fost preluat (secțiunea 3). Tipurile cu destinația „de mentenanță” nu se preiau încă. Simularea nu scrie nimic.</small></p>
+            <p class="muted"><small>Tichetele rezolvate (cu eveniment de rezolvare) ale tipurilor alese în secțiunea 2, deschise de la data aleasă, care menționează un cuvânt cheie de mentenanță (Nomenclator) în ce s-a făcut, devin intervenții „la cerere” în Mentenanță, la beneficiarul clientului și la punctul de lucru al tichetului (altfel la cel principal). Problema și rezolvarea se despart din raportul lucrării. Se preiau numai după ce clientul a fost preluat (secțiunea 3). Tipurile cu destinația „de mentenanță” nu se preiau încă. Simularea nu scrie nimic.</small></p>
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="SimulateTicketsAsync">Simulează tichetele</button>
                 <button type="button" class="primary" disabled="@(busy || ticketReport is null || ticketReport.Applied)" @onclick="() => confirmTickets = true">Aplică tichetele</button>

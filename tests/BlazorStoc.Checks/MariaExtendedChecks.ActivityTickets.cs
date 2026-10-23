@@ -36,7 +36,7 @@ public static partial class MariaExtendedChecks
         async Task<long> Count(string sql) => await Scalar<long>(probe, sql);
         try
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions" }) await Exec(probe, "DELETE FROM " + table);
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
             fake.Partners = [new(7001, $"Ext Tichete {suffix} SRL", "RO" + cui, "Str. Florilor 5", "Timisoara", "Timis", "0722111222", "")];
             fake.Points = [new(7101, 7001, "Str. Florilor 5", "Timisoara", "Timis", "", "Sediu", "", true, null), new(7102, 7001, "Bd. Libertatii 9", "Timisoara", "Timis", "", "Depozit", "", true, null)];
             fake.Types = [new(4, "Service", "S", true, false, 3, 0, 0), new(13, "Mentenanță", "M", true, false, 1, 0, 0), new(25, "Intervenție la cerere", "I", false, false, 0, 0, 0)];
@@ -47,6 +47,8 @@ public static partial class MariaExtendedChecks
             Check(noTypes == 1, "Activity tickets: without a chosen type the simulation says so");
             await settings.SaveTypesAsync([new(4, "Service", true, ActivityDestination.OnDemand), new(13, "Mentenanță", true, ActivityDestination.Maintenance), new(25, "Intervenție la cerere", false, ActivityDestination.OnDemand)]);
 
+            // Only the tickets that mention a keyword are taken: the reports of this test mention one of these words.
+            foreach (var word in new[] { "routerul", "reinstalat", "rezolvat" }) await new MariaActivityKeywordService(configuration, admin, audit).AddAsync(word);
             await partners.ApplyAsync();
             var beneficiary = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == $"Ext Tichete {suffix} SRL");
             var points = await workPoints.GetAsync(beneficiary.Id);
@@ -179,7 +181,7 @@ public static partial class MariaExtendedChecks
         }
         finally
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions" }) await Exec(probe, "DELETE FROM " + table);
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
         }
     }
 }
