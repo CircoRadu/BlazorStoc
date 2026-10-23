@@ -32,14 +32,15 @@ public static class ActivityImportPanelChecks
     private sealed class FakePartners : IActivityPartnerImportService
     {
         public List<ImportIssue> Issues = [new(1, 1, "partner", 9004, "CuiProst SRL", "CUI invalid în ActivityApp: «ABC12».", DateTime.UtcNow)];
-        public int Applies, Resolved;
+        public int Applies, Resolved; public readonly List<(long Id, bool Company)> Included = [];
         private static ImportReport Report(bool applied) => new(applied ? "apply" : "simulation", DateTime.UtcNow, "admin", applied, new PlanCounts(5, 2, 1, 0, 2, 0), new PlanCounts(5, 2, 2, 0, 0, 1),
-            [new ImportReportItem("partner", 9004, "CuiProst SRL", "Problem", "CUI invalid în ActivityApp: «ABC12»."), new ImportReportItem("workpoint", 9105, "Str. A 1", "Skipped", "Partenerul are o problemă de import.")], false);
+            [new ImportReportItem("partner", 9004, "CuiProst SRL", "Problem", "CUI invalid în ActivityApp: «ABC12»."), new ImportReportItem("workpoint", 9105, "Str. A 1", "Skipped", "Partenerul are o problemă de import."), new ImportReportItem("partner", 9200, "Ion Popescu", "Skipped", ActivityPartnerPlanner.PersonNotTaken)], false);
         public Task<ImportReport> SimulateAsync(CancellationToken cancellationToken = default) => Task.FromResult(Report(false));
         public Task<ImportReport> ApplyAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default) { Applies++; return Task.FromResult(Report(true)); }
         public Task<ImportReport> ApplyForAsync(IReadOnlySet<long> partnerIds, CancellationToken cancellationToken = default) => Task.FromResult(Report(true));
         public Task<ImportRunInfo?> GetLastRunAsync(CancellationToken cancellationToken = default) => Task.FromResult<ImportRunInfo?>(null);
         public Task<IReadOnlyList<ImportIssue>> GetOpenIssuesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ImportIssue>>([.. Issues]);
+        public Task IncludeAsync(long partnerId, bool asCompany, CancellationToken cancellationToken = default) { Included.Add((partnerId, asCompany)); return Task.CompletedTask; }
         public Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default) { Resolved++; Issues.RemoveAll(issue => issue.Id == issueId); return Task.CompletedTask; }
     }
 
@@ -108,7 +109,14 @@ public static class ActivityImportPanelChecks
         var rows = cut.FindAll("#ai-plan-summary tbody tr").Select(row => string.Join("|", row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()))).ToList();
         check(rows.SequenceEqual(["Beneficiari|5|2|1|0|2|0", "Puncte de lucru|5|2|2|0|0|1"]) && cut.Find("#ai-plan-title").TextContent.Contains("Simulare", StringComparison.Ordinal),
             "Activity import panel: the simulation shows the counts of beneficiaries and work points");
-        check(cut.FindAll("#ai-plan-problems tbody tr").Count + cut.FindAll("#ai-plan-items tbody tr").Count == 2 && cut.Find("#ai-plan-items").TextContent.Contains("Ignorat", StringComparison.Ordinal) && !cut.Find("#ai-plan-problems-group").HasAttribute("open") && cut.Find("#ai-plan-items-group").HasAttribute("open"), "Activity import panel: the simulation lists the problems in a collapsed group and the items selected for import in an open one");
+        check(cut.FindAll("#ai-plan-problems tbody tr").Count == 1 && cut.FindAll("#ai-plan-items tbody tr").Count == 0 && cut.FindAll("#ai-plan-ignored tbody tr").Count == 2 && cut.Find("#ai-plan-ignored").TextContent.Contains("Ignorat", StringComparison.Ordinal)
+            && !cut.Find("#ai-plan-problems-group").HasAttribute("open") && !cut.Find("#ai-plan-ignored-group").HasAttribute("open") && cut.Find("#ai-plan-items-group").HasAttribute("open"),
+            "Activity import panel: the simulation lists the problems (collapsed), the items selected for import (open) and the ignored ones (collapsed) apart");
+        check(cut.FindAll("#ai-plan-items-page-size").Count == 1 && cut.FindAll("#ai-plan-ignored-page-size").Count == 1, "Activity import panel: the lists of the simulation are paged, with a choice of rows per page");
+        check(cut.FindAll("#ai-plan-ignored button").Count == 2, "Activity import panel: an ignored partner can be included as a person or as a company (a work point cannot)");
+        cut.FindAll("#ai-plan-ignored button").Single(button => button.TextContent.Trim() == "Ca persoană fizică").Click();
+        cut.WaitForAssertion(() => { if (partners.Included.Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(partners.Included.Single() == (9200, false) && cut.Markup.Contains("neverificat, preluat manual", StringComparison.Ordinal), "Activity import panel: including an ignored partner asks the service, then shows the message in the section");
         check(partners.Applies == 0, "Activity import panel: the simulation applies nothing");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Aplică importul").Click();
         check(cut.Markup.Contains("Se vor crea 2 beneficiari și 2 puncte de lucru", StringComparison.Ordinal) && partners.Applies == 0, "Activity import panel: the application asks for confirmation first, with what it will do");

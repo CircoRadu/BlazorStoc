@@ -32,6 +32,8 @@ public interface IActivityPartnerImportService
     Task<ImportRunInfo?> GetLastRunAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ImportIssue>> GetOpenIssuesAsync(CancellationToken cancellationToken = default);
     Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default);
+    /// <summary>Includes by hand a partner that is ignored (a person, no valid CUI) in the import, as a person or as a company; it is taken without ANAF, marked as not verified. Needs a new simulation or run to take effect.</summary>
+    Task IncludeAsync(long partnerId, bool asCompany, CancellationToken cancellationToken = default);
 }
 
 public sealed class MariaActivityPartnerImportService(IConfiguration configuration, IActivityImportService import, IActivitySource source, IBeneficiaryRepository beneficiaries,
@@ -39,7 +41,6 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
 {
     private const string Run = "setari-import-activityapp.run";
     private const string View = "setari-import-activityapp.view";
-    private const int MaximumItems = 500;
     // ANAF answers about one company a second: a run asks for at most this many (the rest are asked in the next run).
     private const int MaximumAnafLookups = 300;
     // One run at a time in the application: two administrators cannot start the same import together.
@@ -151,7 +152,7 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
             .Concat(pointList.Where(entry => entry.Action is PlanAction.Problem or PlanAction.Skipped).Select(entry => (entry.Item, Rank: Rank(entry.Action, entry.Item, false))))
             .OrderBy(entry => entry.Rank).Select(entry => entry.Item).ToList();
         return new ImportReport(kind, at, by, applied, PlanCounts.Of(partnerList.Select(entry => entry.Action)), PlanCounts.Of(pointList.Select(entry => entry.Action)),
-            [.. items.Take(MaximumItems)], items.Count > MaximumItems, error);
+            [.. items], false, error);
     }
 
     private async Task<Loaded> LoadAsync(int pageSize, IReadOnlySet<long>? only, CancellationToken cancellationToken)
@@ -321,6 +322,19 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
         return result;
     }
 
+    public async Task IncludeAsync(long partnerId, bool asCompany, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync(Run, cancellationToken).ConfigureAwait(false);
+        var map = await ImportStore.ReadMapAsync(configuration, cancellationToken).ConfigureAwait(false);
+        var tied = map.FirstOrDefault(entry => entry.Entity == ActivityPartnerPlanner.PartnerEntity && entry.SourceId == partnerId);
+        if (tied is { LocalId: not 0 }) throw new ActivityImportException("Partenerul este deja preluat.");
+        // The ignored mark is lifted; the next simulation or run takes the partner (as a person or a company), without ANAF.
+        if (tied is not null) await ImportStore.DeleteMapAsync(configuration, ActivityPartnerPlanner.PartnerEntity, partnerId, cancellationToken).ConfigureAwait(false);
+        await ImportStore.WriteMapAsync(configuration, ActivityPartnerPlanner.IncludeEntity, partnerId, asCompany ? ActivityPartnerPlanner.IncludeAsCompany : ActivityPartnerPlanner.IncludeAsPerson, "manual", "", cancellationToken).ConfigureAwait(false);
+        await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.IncludeActivityPartner, partnerId.ToString(), $"Partener ActivityApp {partnerId}",
+            AuditDetails.Identification(("Preluat ca", asCompany ? "persoană juridică" : "persoană fizică"), ("Verificare", "neverificat, preluat manual")), "", cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync(Run, cancellationToken).ConfigureAwait(false);
@@ -355,6 +369,7 @@ internal sealed class GuardedActivityPartnerImportService(IActivityPartnerImport
     public Task<ImportRunInfo?> GetLastRunAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetLastRunAsync(cancellationToken));
     public Task<IReadOnlyList<ImportIssue>> GetOpenIssuesAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetOpenIssuesAsync(cancellationToken));
     public Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ResolveIssueAsync(issueId, cancellationToken));
+    public Task IncludeAsync(long partnerId, bool asCompany, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.IncludeAsync(partnerId, asCompany, cancellationToken));
 }
 
 internal sealed class UnavailableActivityPartnerImportService : IActivityPartnerImportService
@@ -366,4 +381,5 @@ internal sealed class UnavailableActivityPartnerImportService : IActivityPartner
     public Task<ImportRunInfo?> GetLastRunAsync(CancellationToken cancellationToken = default) => Out<ImportRunInfo?>();
     public Task<IReadOnlyList<ImportIssue>> GetOpenIssuesAsync(CancellationToken cancellationToken = default) => Out<IReadOnlyList<ImportIssue>>();
     public Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default) => Out<object>();
+    public Task IncludeAsync(long partnerId, bool asCompany, CancellationToken cancellationToken = default) => Out<object>();
 }

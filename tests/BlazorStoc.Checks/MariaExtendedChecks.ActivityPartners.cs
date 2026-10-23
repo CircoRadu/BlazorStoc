@@ -144,6 +144,17 @@ public static partial class MariaExtendedChecks
             var creations = (await audit.QueryAsync(new AuditQuery(Text: $"Ext Import Nou {suffix}", Entity: AuditEntities.Beneficiary), 1, 20)).Events;
             Check(creations.Any(entry => entry.ActorUsername == "integration.tester"), "Activity partners: the beneficiaries created by the import are in the journal under the administrator who ran it");
 
+            // An ignored person included by hand is taken as an individual, not verified in ANAF, and the inclusion is journaled.
+            await partners.IncludeAsync(9003, false);
+            await partners.ApplyAsync();
+            var manual = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == "Ext Import Persoana " + suffix);
+            Check(manual is { Kind: BeneficiaryKinds.Individual, AnafVerified: false } && await Count($"SELECT COUNT(*) FROM activity_import_map WHERE entity='partner' AND source_id=9003 AND local_id={manual.Id} AND origin='created'") == 1
+                && (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 100)).Events.Any(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.IncludeActivityPartner && entry.Details.Contains("neverificat, preluat manual", StringComparison.Ordinal)),
+                "Activity partners: an ignored person included by hand is created as an individual, not verified, and the inclusion is journaled");
+            var includeTwice = 0;
+            try { await partners.IncludeAsync(9003, false); } catch (ActivityImportException) { includeTwice++; }
+            Check(includeTwice == 1, "Activity partners: a partner already taken cannot be included again");
+
             // A company without address (and one without phone) is completed from ANAF; an answer that cannot be had is the reason of the problem, and with ANAF out the rest are not asked.
             var cuiA = Random.Shared.Next(80000000, 84999999).ToString();
             var cuiB = Random.Shared.Next(85000000, 89999999).ToString();
@@ -217,9 +228,9 @@ public static partial class MariaExtendedChecks
             var operatorAccess = new TestAccessControl(false, "operator.ext");
             var denied = new MariaActivityPartnerImportService(configuration, settings, fake, beneficiaries, workPoints, operatorAccess, audit);
             var refusals = 0;
-            foreach (var operation in new Func<Task>[] { () => denied.SimulateAsync(), () => denied.ApplyAsync(), () => denied.GetLastRunAsync(), () => denied.GetOpenIssuesAsync(), () => denied.ResolveIssueAsync(1) })
+            foreach (var operation in new Func<Task>[] { () => denied.SimulateAsync(), () => denied.ApplyAsync(), () => denied.GetLastRunAsync(), () => denied.GetOpenIssuesAsync(), () => denied.ResolveIssueAsync(1), () => denied.IncludeAsync(9003, false) })
                 try { await operation(); } catch (AccessDeniedException) { refusals++; }
-            Check(refusals == 5, "Activity partners: a user who is not the administrator can neither simulate, apply, read the runs and problems nor resolve a problem");
+            Check(refusals == 6, "Activity partners: a user who is not the administrator can neither simulate, apply, read the runs and problems, resolve a problem nor include a partner");
         }
         finally
         {

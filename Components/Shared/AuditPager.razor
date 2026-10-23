@@ -3,7 +3,7 @@
 @* Page size and page buttons under the journal tables. PageSize 0 means "all the results" (offered only when AllowAll). *@
 <div class="table-footer audit-table-footer">
     <div class="audit-page-size">
-        <label for="@Id">Evenimente pe pagină</label>
+        <label for="@Id">@Label</label>
         <select id="@Id" value="@PageSize" @onchange="SizeChangedAsync">
             @foreach (var size in PageSizes) { <option value="@size" selected="@(size == PageSize)">@(size == 0 ? "Toate" : size.ToString())</option> }
         </select>
@@ -21,6 +21,7 @@
 
 @code {
     [Parameter] public string Id { get; set; } = "audit-page-size";
+    [Parameter] public string Label { get; set; } = "Evenimente pe pagină";
     [Parameter] public IReadOnlyList<int> PageSizes { get; set; } = AuditListState.PageSizes;
     [Parameter] public int PageSize { get; set; }
     [Parameter] public int Page { get; set; } = 1;

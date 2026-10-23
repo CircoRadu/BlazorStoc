@@ -21,6 +21,15 @@ internal static class ImportStore
         return result;
     }
 
+    public static async Task DeleteMapAsync(IConfiguration configuration, string entity, long sourceId, CancellationToken cancellationToken)
+    {
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("DELETE FROM activity_import_map WHERE entity=@entity AND source_id=@source", connection);
+        command.Parameters.AddWithValue("@entity", entity);
+        command.Parameters.AddWithValue("@source", sourceId);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public static async Task WriteMapAsync(IConfiguration configuration, string entity, long sourceId, int localId, string origin, string hash, CancellationToken cancellationToken)
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);

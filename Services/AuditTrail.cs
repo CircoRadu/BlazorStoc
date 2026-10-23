@@ -221,6 +221,7 @@ public static class AuditActions
     public const string ImportActivityTickets = "Import tichete ActivityApp";
     public const string SyncActivityImport = "Sincronizare ActivityApp";
     public const string ResolveActivityImportIssue = "Rezolvare problemă import ActivityApp";
+    public const string IncludeActivityPartner = "Includere manuală partener ActivityApp";
     public const string SetDatabaseConnection = "Modificare conexiune bază de date";
     public const string TestDatabaseConnection = "Testare conexiune bază de date";
     public const string RevertDatabaseConnection = "Revenire la configurația anterioară a conexiunii bazei de date";

@@ -232,6 +232,16 @@ public static class ActivityImportChecks
         check(Of(3) is { Action: PlanAction.Skipped, Input: null } && Of(4).Action == PlanAction.Skipped && Of(12).Action == PlanAction.Skipped && Of(3).Message == ActivityPartnerPlanner.PersonNotTaken,
             "Activity import (partners): a partner without tax id, or with a name in the tax id field, is a person and is not imported (only companies with a CUI are)");
         check(Of(5).Action == PlanAction.Skipped && Of(5).Message == ActivityPartnerPlanner.PersonNotTaken, "Activity import (partners): a tax id with letters (other than RO) is not a CUI: the partner is not imported");
+        // Ignored partners included by hand: as a person (identity = the name) or as a company (needs a CUI with digits); taken without ANAF, with the note of the manual take.
+        var included = ActivityPartnerPlanner.PlanPartners(partners, existing, [new(ActivityPartnerPlanner.IncludeEntity, 3, ActivityPartnerPlanner.IncludeAsPerson), new(ActivityPartnerPlanner.IncludeEntity, 4, ActivityPartnerPlanner.IncludeAsPerson),
+            new(ActivityPartnerPlanner.IncludeEntity, 5, ActivityPartnerPlanner.IncludeAsCompany), new(ActivityPartnerPlanner.IncludeEntity, 12, ActivityPartnerPlanner.IncludeAsPerson), new(ActivityPartnerPlanner.PartnerEntity, 12, 0)],
+            new Dictionary<string, CompanyData>());
+        PartnerPlan Inc(long id) => included.Single(plan => plan.SourceId == id);
+        check(Inc(3) is { Action: PlanAction.Create, Manual: true, Input: { Kind: BeneficiaryKinds.Individual, AnafVerified: false } } && Inc(3).Message.Contains(ActivityPartnerPlanner.ManualNote, StringComparison.Ordinal) && Inc(3).Check == ""
+            && Inc(12) is { Action: PlanAction.Create, Manual: true } && Inc(4) is { Action: PlanAction.Link, LocalId: 8 },
+            "Activity import (partners): an ignored partner included as a person is created as an individual, not verified, noted as taken by hand (also when it was marked ignored); one that exists is linked");
+        check(Inc(5).Action == PlanAction.Problem && Inc(5).Message.Contains("doar ca persoană fizică", StringComparison.Ordinal) && ActivityPartnerPlanner.NeedsAnaf(partners, existing, [new(ActivityPartnerPlanner.IncludeEntity, 1, ActivityPartnerPlanner.IncludeAsCompany)]).Contains("1234567") == false,
+            "Activity import (partners): a partner without a CUI with digits cannot be included as a company; an included one is never asked of ANAF");
         check(Of(13) is { Action: PlanAction.Create, Check: "cui_invalid_form", Input.NeedsCheck: true } && Of(13).Input!.Cui == "123456789012",
             "Activity import (partners): a CUI of only digits but of the wrong form is still taken, to be verified by a human (the CUI as typed, cut to the field)");
         check(Of(6).Action == PlanAction.Problem && Of(7).Action == PlanAction.Problem && Of(6).Message.Contains("repetat", StringComparison.Ordinal), "Activity import (partners): a tax id repeated in ActivityApp makes every partner with it a problem");

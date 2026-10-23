@@ -84,6 +84,9 @@
         </fieldset>
         <fieldset class="anaf-section"><legend>3. Beneficiari și puncte de lucru</legend>
             <p class="muted"><small>Se preiau numai persoanele juridice cu CUI valid; persoanele fizice (fără CUI, cod personal sau un nume în câmpul CUI) nu se preiau și apar ca ignorate. Partenerii devin beneficiari, iar punctele lor de lucru devin puncte de lucru. Un partener care există deja la noi (același CUI) doar se leagă, fără a-i schimba datele. Firmele se verifică în ANAF (și se completează acolo adresa lipsă sau telefonul, care este opțional); un CUI necunoscut de ANAF nu se preia, iar dacă ANAF nu răspunde, firma cu CUI valid se preia marcată neverificată. Simularea nu scrie nimic; aplicarea creează prin regulile obișnuite ale aplicației și trece în Jurnal. Ce nu se poate prelua (CUI invalid sau repetat, fără adresă) apare ca problemă, nu se ghicește.</small></p>
+            @* The messages of this section's operations are shown here too, not only at the top of the window. *@
+            @if (runArea == "partners" && error is not null) { <div class="error-banner" role="alert">@error</div> }
+            @if (runArea == "partners" && notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="SimulateAsync">Simulează importul</button>
                 <button type="button" class="primary" disabled="@(busy || report is null || report.Applied)" @onclick="() => confirmApply = true">Aplică importul</button>
@@ -111,14 +114,19 @@
                 @if (report.Items.Count > 0)
                 {
                     @* Two groups: the beneficiaries with problems (collapsed) and the ones selected for import (open); ignored ones close the second list. *@
-                    var problemItems = report.Items.Where(item => item.Action == "Problem").ToList(); var takenItems = report.Items.Where(item => item.Action != "Problem").ToList();
+                    var problemItems = report.Items.Where(item => item.Action == "Problem").ToList(); var takenItems = report.Items.Where(item => item.Action is not ("Problem" or "Skipped")).ToList(); var ignoredItems = report.Items.Where(item => item.Action == "Skipped").ToList();
                     <details class="ai-type-group" id="ai-plan-problems-group">
                         <summary>Cu probleme <span class="count-badge">@problemItems.Count</span></summary>
                         @PlanTable(problemItems, "ai-plan-problems", report.Applied)
                     </details>
                     <details class="ai-type-group" id="ai-plan-items-group" open>
                         <summary>Selectați pentru preluare <span class="count-badge">@takenItems.Count</span></summary>
-                        @PlanTable(takenItems, "ai-plan-items", report.Applied)
+                        @PlanTable(takenItems, "ai-plan-items", report.Applied, takenPaging)
+                    </details>
+                    <details class="ai-type-group" id="ai-plan-ignored-group">
+                        <summary>Ignorați <span class="count-badge">@ignoredItems.Count</span></summary>
+                        <p class="muted"><small>Partenerii ignorați nu se preiau. „Include în preluare” îi preia după următoarea simulare sau rulare, ca persoană fizică sau persoană juridică (cu CUI cu cifre), cu mențiunea „neverificat, preluat manual”; tichetele lor se preiau după „Recitește tot”.</small></p>
+                        @PlanTable(ignoredItems, "ai-plan-ignored", report.Applied, ignoredPaging, true)
                     </details>
                     @if (report.Truncated) { <p class="muted"><small>Sunt afișate primele @report.Items.Count (întâi problemele, apoi ce se preia, la urmă ce nu se preia); restul nu se afișează.</small></p> }
                 }
@@ -328,7 +336,7 @@
 
     private readonly CancellationTokenSource lifetime = new();
     private bool loading = true, busy, noticeOk, hasPassword, enabled, fillEmpty;
-    private string? error, notice, busyText, typesError;
+    private string? error, notice, busyText, typesError, runArea;
     private string server = "", database = "TIPActivity", user = "", password = "";
     private int port = 1433, fromHour, toHour = 24, pageSize = 200;
     private DateOnly? since;
@@ -386,10 +394,10 @@
 
     private static string Count(int? value) => value?.ToString() ?? "—";
 
-    private async Task RunAsync(string working, Func<Task> action)
+    private async Task RunAsync(string working, Func<Task> action, string area = "")
     {
         if (busy) return;
-        busy = true; busyText = working; error = null; notice = null;
+        busy = true; busyText = working; error = null; notice = null; runArea = area;
         try { await action(); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex) when (ex is ActivityImportException or ActivitySourceException or AccessDeniedException) { error = ex.Message; }
@@ -450,7 +458,7 @@
         report = await Partners.SimulateAsync(lifetime.Token);
         await LoadImportStateAsync();
         noticeOk = true; notice = "Simularea s-a terminat; nu s-a scris nimic.";
-    });
+    }, "partners");
 
     private Task ApplyAsync() => RunAsync("Se aplică importul…", async () =>
     {
@@ -459,28 +467,58 @@
         report = await Partners.ApplyAsync(progress, lifetime.Token);
         await LoadImportStateAsync();
         noticeOk = true; notice = $"Import aplicat: {report.Partners.Create} beneficiari și {report.Points.Create} puncte de lucru create, {report.Partners.Problems + report.Points.Problems} probleme." + (report.AnafFilled > 0 ? $" Completați din ANAF: {report.AnafFilled}." : "") + (report.AnafUnverified > 0 ? $" Neverificați în ANAF: {report.AnafUnverified}." : "");
-    });
+    }, "partners");
+
+    private Task IncludeAsync(long partnerId, bool asCompany) => RunAsync("Se include partenerul…", async () =>
+    {
+        await Partners.IncludeAsync(partnerId, asCompany, lifetime.Token);
+        confirmApply = false;
+        report = await Partners.SimulateAsync(lifetime.Token);
+        await LoadImportStateAsync();
+        noticeOk = true; notice = "Partenerul a fost inclus în preluare (neverificat, preluat manual); apare în lista de preluat. Tichetele lui se preiau după „Recitește tot”.";
+    }, "partners");
 
     private Task ResolveAsync(long id) => RunAsync("Se marchează…", async () =>
     {
         await Partners.ResolveIssueAsync(id, lifetime.Token);
         await LoadImportStateAsync();
-    });
+    }, "partners");
 
     private TicketReport? ticketReport;
     private bool confirmTickets;
 
-    private RenderFragment PlanTable(List<ImportReportItem> items, string id, bool applied) => __builder =>
+    private sealed class Paging { public int Size = 25, Page = 1; }
+    private static readonly int[] planPageSizes = [10, 25, 50, 100, 0];
+    private readonly Paging takenPaging = new(), ignoredPaging = new();
+
+    private RenderFragment PlanTable(List<ImportReportItem> all, string id, bool applied, Paging? paging = null, bool includable = false) => __builder =>
     {
+        var pages = paging is null || paging.Size == 0 ? 1 : Math.Max(1, (all.Count + paging.Size - 1) / paging.Size);
+        var current = paging is null ? 1 : Math.Clamp(paging.Page, 1, pages);
+        var items = paging is null || paging.Size == 0 ? all : all.Skip((current - 1) * paging.Size).Take(paging.Size).ToList();
         <div class="table-scroll"><table class="catalog-table" id="@id">
-            <thead><tr><th>Ce</th><th>Cod ActivityApp</th><th>Denumire</th><th>Rezultat</th><th>Motiv</th></tr></thead>
+            <thead><tr><th>Ce</th><th>Cod ActivityApp</th><th>Denumire</th><th>Rezultat</th><th>Motiv</th>@if (includable) { <th>Include în preluare</th> }</tr></thead>
             <tbody>
             @foreach (var item in items)
             {
-                <tr><td>@EntityLabel(item.Entity)</td><td>@item.SourceId</td><td>@item.Name</td><td>@ActionLabel(item, applied)</td><td>@item.Message</td></tr>
+                <tr><td>@EntityLabel(item.Entity)</td><td>@item.SourceId</td><td>@item.Name</td><td>@ActionLabel(item, applied)</td><td>@item.Message</td>
+                    @if (includable)
+                    {
+                        <td>@if (item.Entity == "partner" && !applied)
+                            {
+                                <button type="button" class="refresh act-confirm" disabled="@busy" aria-label="@($"Include partenerul {item.Name} ca persoană fizică")" @onclick="() => IncludeAsync(item.SourceId, false)">Ca persoană fizică</button>
+                                <button type="button" class="refresh act-confirm" disabled="@busy" aria-label="@($"Include partenerul {item.Name} ca persoană juridică")" @onclick="() => IncludeAsync(item.SourceId, true)">Ca persoană juridică</button>
+                            }</td>
+                    }
+                </tr>
             }
             </tbody>
         </table></div>
+        if (paging is not null)
+        {
+            <AuditPager Id="@(id + "-page-size")" Label="Rânduri pe pagină" PageSizes="planPageSizes" PageSize="paging.Size" Page="current" Total="all.Count"
+                        PageChanged="page => paging.Page = page" PageSizeChanged="size => { paging.Size = size; paging.Page = 1; }" />
+        }
     };
 
     private static string ActionLabel(ImportReportItem item, bool applied) => item.Action switch

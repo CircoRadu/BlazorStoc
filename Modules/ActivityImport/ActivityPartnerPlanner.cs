@@ -12,7 +12,7 @@ namespace BlazorStoc.Modules.ActivityImport;
 
 public enum PlanAction { Create, Link, AlreadyLinked, Problem, Skipped, Waiting }
 
-public sealed record PartnerPlan(long SourceId, string Name, string Identity, PlanAction Action, int? LocalId, BeneficiaryInput? Input, string Message, string Hash, string SourceAddress, string Check = "", string CuiTyped = "");
+public sealed record PartnerPlan(long SourceId, string Name, string Identity, PlanAction Action, int? LocalId, BeneficiaryInput? Input, string Message, string Hash, string SourceAddress, string Check = "", string CuiTyped = "", bool Manual = false);
 
 public sealed record PointPlan(long SourceId, long PartnerId, string Name, PlanAction Action, int? LocalId, bool ToMain, WorkPointInput? Input, string Message, string Hash);
 
@@ -36,6 +36,10 @@ public static class ActivityPartnerPlanner
 {
     public const string PartnerEntity = "partner";
     public const string PointEntity = "workpoint";
+    /// <summary>Partners the operator included by hand (from the ignored ones): local id 1 = as a person, 2 = as a company. They are taken without ANAF, marked as not verified.</summary>
+    public const string IncludeEntity = "partner-include";
+    public const int IncludeAsPerson = 1, IncludeAsCompany = 2;
+    public const string ManualNote = "Preluat manual din ActivityApp, neverificat.";
     private static readonly Regex PhoneCandidate = new(@"\+?[0-9][0-9 .\-]{5,}[0-9]", RegexOptions.Compiled);
 
     public static string Join(params string[] parts) => string.Join(", ", parts.Select(part => part.Trim()).Where(part => part.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase));
@@ -87,7 +91,7 @@ public static class ActivityPartnerPlanner
     /// </summary>
     public static IReadOnlyList<string> NeedsAnaf(IReadOnlyList<ActivityPartner> partners, IReadOnlyList<Beneficiary> existing, IReadOnlyList<ImportMapEntry> map, IReadOnlySet<long>? only = null) =>
         [.. PlanPartners(partners, existing, map)
-            .Where(plan => (only is null || only.Contains(plan.SourceId)) && plan.Identity.Length > 0 && !plan.Identity.StartsWith("PF:", StringComparison.Ordinal) && plan.Check != "cui_invalid_form"
+            .Where(plan => !plan.Manual && (only is null || only.Contains(plan.SourceId)) && plan.Identity.Length > 0 && !plan.Identity.StartsWith("PF:", StringComparison.Ordinal) && plan.Check != "cui_invalid_form"
                 && (plan.Action == PlanAction.Create || plan.Check == MissingAddressCheck))
             .Select(plan => plan.Identity).Distinct(StringComparer.Ordinal)];
 
@@ -98,6 +102,7 @@ public static class ActivityPartnerPlanner
         foreach (var beneficiary in existing) byKey.TryAdd(KeyOf(beneficiary), beneficiary);
         var byId = existing.ToDictionary(beneficiary => beneficiary.Id);
         var mapped = map.Where(entry => entry.Entity == PartnerEntity).ToDictionary(entry => entry.SourceId, entry => entry.LocalId);
+        var included = map.Where(entry => entry.Entity == IncludeEntity).ToDictionary(entry => entry.SourceId, entry => entry.LocalId);
         var identified = partners.Select(partner => (Partner: partner, Info: Identify(partner))).ToList();
         // Repeated identities in ActivityApp: none of them is imported (which one is the right one is not for the import to guess).
         var repeated = identified.Where(item => item.Info.Problem is null && !item.Info.Individual).GroupBy(item => item.Info.Identity).Where(group => group.Count() > 1)
@@ -108,9 +113,12 @@ public static class ActivityPartnerPlanner
             var name = TextNormalization.ForObjectNameOrCode(partner.Name);
             var address = Join(partner.Address, partner.City, partner.County);
             var phone = Phone(partner.Phone);
-            var hash = Hash(name, info.Identity, address, phone);
-            PartnerPlan Problem(string message) => new(partner.Id, name, info.Identity, PlanAction.Problem, null, null, message, hash, address);
-            if (mapped.TryGetValue(partner.Id, out var local))
+            var manual = included.TryGetValue(partner.Id, out var manualKind) ? manualKind : 0;
+            // Included by hand as a person: its identity is the name, whatever the tax id says.
+            var identity = manual == IncludeAsPerson ? "PF:" + TextNormalization.UniquenessKey(name) : info.Identity;
+            var hash = Hash(name, identity, address, phone);
+            PartnerPlan Problem(string message) => new(partner.Id, name, identity, PlanAction.Problem, null, null, message, hash, address);
+            if (mapped.TryGetValue(partner.Id, out var local) && (local != 0 || manual == 0))
             {
                 if (local == 0) { plans.Add(new PartnerPlan(partner.Id, name, info.Identity, PlanAction.Skipped, null, null, PersonNotTaken, hash, address)); continue; }
                 plans.Add(byId.ContainsKey(local)
@@ -119,19 +127,20 @@ public static class ActivityPartnerPlanner
                 continue;
             }
             // Only companies with a CUI that ANAF can check are taken; a person (no CUI, a personal code, a name in the field) is not imported.
-            if (info.Individual) { plans.Add(new PartnerPlan(partner.Id, name, info.Identity, PlanAction.Skipped, null, null, PersonNotTaken, hash, address)); continue; }
+            if (info.Individual && manual == 0) { plans.Add(new PartnerPlan(partner.Id, name, info.Identity, PlanAction.Skipped, null, null, PersonNotTaken, hash, address)); continue; }
+            if (manual == IncludeAsCompany && info.Individual) { plans.Add(Problem("Partenerul nu are un CUI cu cifre: poate fi preluat doar ca persoană fizică.")); continue; }
             if (info.Problem is not null) { plans.Add(Problem(info.Problem)); continue; }
             if (name.Length == 0) { plans.Add(Problem("Partener fără denumire în ActivityApp.")); continue; }
-            if (repeated.TryGetValue(info.Identity, out var ids)) { plans.Add(Problem(info.Individual ? $"Nume repetat în ActivityApp (parteneri {ids})." : $"CUI repetat în ActivityApp (parteneri {ids}).")); continue; }
-            if (byKey.TryGetValue(info.Identity, out var found)) { plans.Add(new PartnerPlan(partner.Id, name, info.Identity, PlanAction.Link, found.Id, null, $"Există deja în BlazorStoc: «{found.Name}».", hash, address)); continue; }
+            if (manual != IncludeAsPerson && repeated.TryGetValue(info.Identity, out var ids)) { plans.Add(Problem(info.Individual ? $"Nume repetat în ActivityApp (parteneri {ids})." : $"CUI repetat în ActivityApp (parteneri {ids}).")); continue; }
+            if (byKey.TryGetValue(identity, out var found)) { plans.Add(new PartnerPlan(partner.Id, name, identity, PlanAction.Link, found.Id, null, $"Există deja în BlazorStoc: «{found.Name}».", hash, address)); continue; }
             if (name.Length > 200) { plans.Add(Problem("Denumirea depășește 200 de caractere.")); continue; }
             // A company is verified in ANAF (and completed there when it lacks the address or the phone); a person is never looked up. A CUI that ANAF does not know is not taken; when ANAF
             // cannot answer (or was not asked), a CUI of a valid form is taken and marked as not verified in ANAF.
-            var company = anaf is not null && anaf.TryGetValue(info.Identity, out var data) ? data : null;
+            var company = manual == 0 && anaf is not null && anaf.TryGetValue(info.Identity, out var data) ? data : null;
             var data2 = company is { Failure: null } ? company : null;
             // Why the beneficiary needs a human look (it is taken anyway, with its tickets waiting): a CUI of the wrong form; ANAF does not know the CUI; ANAF could not answer (or was not asked).
             // Without any lookup (anaf = null: the plan is only a simulation of the rules) only the form is judged.
-            var check = !info.FormValid ? "cui_invalid_form" : anaf is null ? "" : company is { NotFound: true } ? "cui_unknown" : data2 is null ? "anaf_unavailable" : "";
+            var check = manual != 0 ? "" : !info.FormValid ? "cui_invalid_form" : anaf is null ? "" : company is { NotFound: true } ? "cui_unknown" : data2 is null ? "anaf_unavailable" : "";
             var filled = new List<string>();
             if (address.Length == 0 && data2 is { Address.Length: > 0 }) { address = TextNormalization.ForObjectNameOrCode(data2.Address); if (address.Length > 0) filled.Add("adresa"); }
             if (phone.Length == 0 && data2 is not null && Phone(data2.Phone) is { Length: > 0 } anafPhone) { phone = anafPhone; filled.Add("telefonul"); }
@@ -143,11 +152,13 @@ public static class ActivityPartnerPlanner
                 continue;
             }
             if (address.Length > 300) address = address[..300];
-            var input = new BeneficiaryInput { Kind = BeneficiaryKinds.Legal, Name = name, Cui = info.Cui.Length > 12 ? info.Cui[..12] : info.Cui, Address = address, Phone = phone, AnafVerified = anaf is not null && check.Length == 0, NeedsCheck = !info.FormValid };
+            var input = manual == IncludeAsPerson ? new BeneficiaryInput { Kind = BeneficiaryKinds.Individual, Name = name, Address = address, Phone = phone }
+                : new BeneficiaryInput { Kind = BeneficiaryKinds.Legal, Name = name, Cui = info.Cui.Length > 12 ? info.Cui[..12] : info.Cui, Address = address, Phone = phone, AnafVerified = manual == 0 && anaf is not null && check.Length == 0, NeedsCheck = !info.FormValid };
             var notes = new List<string>();
+            if (manual != 0) notes.Add(ManualNote);
             if (filled.Count > 0) notes.Add($"{AnafFilledPrefix}: {string.Join(", ", filled)}.");
             if (check.Length > 0) notes.Add($"De verificat: {Why()}.");
-            plans.Add(new PartnerPlan(partner.Id, name, info.Identity, PlanAction.Create, null, input, string.Join(' ', notes), hash, address, check, info.Cui));
+            plans.Add(new PartnerPlan(partner.Id, name, identity, PlanAction.Create, null, input, string.Join(' ', notes), hash, address, check, info.Cui, manual != 0));
         }
         return plans;
     }
