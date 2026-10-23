@@ -129,7 +129,9 @@ public static class ActivityImportPanelChecks
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Simulează tichetele").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-tickets-summary").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(string.Join("|", cut.FindAll("#ai-tickets-summary tbody td").Select(cell => cell.TextContent.Trim())) == "6|3|1|1|1" && cut.Find("#ai-tickets-title").TextContent.Contains("Simulare tichete", StringComparison.Ordinal)
-            && cut.Find("#ai-tickets-items").TextContent.Contains("viitor", StringComparison.Ordinal), "Activity import panel: the simulation of the tickets shows the counts and the problems");
+            && cut.Find("#ai-tickets-problems").TextContent.Contains("viitor", StringComparison.Ordinal), "Activity import panel: the simulation of the tickets shows the counts and the problems");
+        check(!cut.Find("#ai-tickets-problems-group").HasAttribute("open") && !cut.Find("#ai-tickets-waiting-group").HasAttribute("open") && !cut.Find("#ai-tickets-ignored-group").HasAttribute("open") && cut.Find("#ai-tickets-taken-group").HasAttribute("open")
+            && cut.FindAll("#ai-tickets-items-page-size").Count == 1, "Activity import panel: the tickets of the simulation are in collapsible, paged groups (problems, waiting, ignored collapsed; selected open)");
         check(ticketService.Applies == 0, "Activity import panel: the simulation of the tickets applies nothing");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Aplică tichetele").Click();
         check(cut.Markup.Contains("Se vor înregistra 3 intervenții în Mentenanță", StringComparison.Ordinal) && ticketService.Applies == 0, "Activity import panel: the application of the tickets asks for confirmation first");

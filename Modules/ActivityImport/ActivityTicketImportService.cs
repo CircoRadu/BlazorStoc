@@ -24,7 +24,6 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
     IWorkPointRepository workPoints, IAccessControl access, IAuditTrail audit, IActivityPartnerImportService? partners = null) : IActivityTicketImportService
 {
     private const string Run = "setari-import-activityapp.run";
-    private const int MaximumItems = 500;
     // One run at a time in the application, of any kind of import.
     private static SemaphoreSlim Gate => ImportStore.Gate;
 
@@ -82,9 +81,9 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
     private static TicketReport Report(string kind, DateTime at, string by, bool applied, Loaded loaded, IEnumerable<(TicketPlan Plan, PlanAction Action, ImportReportItem Item)> results)
     {
         var list = results.ToList();
-        var items = list.Where(entry => entry.Action is PlanAction.Problem or PlanAction.Skipped or PlanAction.Waiting).Select(entry => entry.Item).ToList();
+        var items = list.Where(entry => entry.Action is PlanAction.Problem or PlanAction.Skipped or PlanAction.Waiting or PlanAction.Create).Select(entry => entry.Item).ToList();
         var taken = list.Where(entry => entry.Action == PlanAction.Create).Select(entry => entry.Plan).ToList();
-        return new TicketReport(kind, at, by, applied, loaded.Since, loaded.Types, loaded.Stopped, PlanCounts.Of(list.Select(entry => entry.Action)), [.. items.Take(MaximumItems)], items.Count > MaximumItems,
+        return new TicketReport(kind, at, by, applied, loaded.Since, loaded.Types, loaded.Stopped, PlanCounts.Of(list.Select(entry => entry.Action)), [.. items], false,
             taken.Count(plan => plan.Maintenance), taken.Count(plan => plan.Keyword.Length > 0 && !plan.Maintenance && !plan.NeedsValidation), list.Count(entry => entry.Plan.NeedsValidation), loaded.NewBeneficiaries, loaded.NewPoints, loaded.ToVerify);
     }
     private async Task<Loaded> LoadAsync(ActivityImportSettings settings, bool apply, CancellationToken cancellationToken)

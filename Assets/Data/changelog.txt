@@ -1,5 +1,7 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.14 | 23.10.2026
+- Preluare ActivityApp, simularea tichetelor: patru secțiuni pliabile, „Cu probleme”, „În așteptarea clientului” și „Ignorate” (pliate) și „Selectate pentru preluare” (deschisă), fiecare paginată cu alegerea numărului de rânduri pe pagină; apar toate tichetele de preluat, nu doar problemele.
 ## 0.5.13 | 23.10.2026
 - Preluare ActivityApp, secțiunea „Tipuri de tichete”: alegerea salvată se vede imediat la deschiderea panoului, nu abia după „Citește tipurile din ActivityApp”.
 - Preluare ActivityApp, tichete: se preiau numai tichetele de tipurile alese care menționează un cuvânt cheie de mentenanță (exact sau aproximativ) în ce s-a făcut; celelalte sunt ignorate.

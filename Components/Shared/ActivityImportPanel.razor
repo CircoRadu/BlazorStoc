@@ -180,15 +180,25 @@
                 }
                 @if (ticketReport.Items.Count > 0)
                 {
-                    <div class="table-scroll"><table class="catalog-table" id="ai-tickets-items">
-                        <thead><tr><th>Cod ActivityApp</th><th>Tichet</th><th>Rezultat</th><th>Motiv</th></tr></thead>
-                        <tbody>
-                        @foreach (var item in ticketReport.Items)
-                        {
-                            <tr><td>@item.SourceId</td><td>@item.Name</td><td>@ActionLabel(item, false)</td><td>@item.Message</td></tr>
-                        }
-                        </tbody>
-                    </table></div>
+                    @* Four groups, as for the beneficiaries: problems, waiting for their client and ignored (collapsed), and the ones selected for import (open). *@
+                    var ticketProblems = ticketReport.Items.Where(item => item.Action == "Problem").ToList(); var ticketWaiting = ticketReport.Items.Where(item => item.Action == "Waiting").ToList();
+                    var ticketTaken = ticketReport.Items.Where(item => item.Action == "Create").ToList(); var ticketIgnored = ticketReport.Items.Where(item => item.Action == "Skipped").ToList();
+                    <details class="ai-type-group" id="ai-tickets-problems-group">
+                        <summary>Cu probleme <span class="count-badge">@ticketProblems.Count</span></summary>
+                        @PlanTable(ticketProblems, "ai-tickets-problems", ticketReport.Applied, ticketProblemsPaging, entity: false)
+                    </details>
+                    <details class="ai-type-group" id="ai-tickets-waiting-group">
+                        <summary>În așteptarea clientului <span class="count-badge">@ticketWaiting.Count</span></summary>
+                        @PlanTable(ticketWaiting, "ai-tickets-waiting", ticketReport.Applied, ticketWaitingPaging, entity: false)
+                    </details>
+                    <details class="ai-type-group" id="ai-tickets-taken-group" open>
+                        <summary>Selectate pentru preluare <span class="count-badge">@ticketTaken.Count</span></summary>
+                        @PlanTable(ticketTaken, "ai-tickets-items", ticketReport.Applied, ticketTakenPaging, entity: false)
+                    </details>
+                    <details class="ai-type-group" id="ai-tickets-ignored-group">
+                        <summary>Ignorate <span class="count-badge">@ticketIgnored.Count</span></summary>
+                        @PlanTable(ticketIgnored, "ai-tickets-ignored", ticketReport.Applied, ticketIgnoredPaging, entity: false)
+                    </details>
                     @if (ticketReport.Truncated) { <p class="muted"><small>Sunt afișate primele @ticketReport.Items.Count.</small></p> }
                 }
             }
@@ -489,19 +499,19 @@
 
     private sealed class Paging { public int Size = 25, Page = 1; }
     private static readonly int[] planPageSizes = [10, 25, 50, 100, 0];
-    private readonly Paging takenPaging = new(), ignoredPaging = new();
+    private readonly Paging takenPaging = new(), ignoredPaging = new(), ticketProblemsPaging = new(), ticketWaitingPaging = new(), ticketTakenPaging = new(), ticketIgnoredPaging = new();
 
-    private RenderFragment PlanTable(List<ImportReportItem> all, string id, bool applied, Paging? paging = null, bool includable = false) => __builder =>
+    private RenderFragment PlanTable(List<ImportReportItem> all, string id, bool applied, Paging? paging = null, bool includable = false, bool entity = true) => __builder =>
     {
         var pages = paging is null || paging.Size == 0 ? 1 : Math.Max(1, (all.Count + paging.Size - 1) / paging.Size);
         var current = paging is null ? 1 : Math.Clamp(paging.Page, 1, pages);
         var items = paging is null || paging.Size == 0 ? all : all.Skip((current - 1) * paging.Size).Take(paging.Size).ToList();
         <div class="table-scroll"><table class="catalog-table" id="@id">
-            <thead><tr><th>Ce</th><th>Cod ActivityApp</th><th>Denumire</th><th>Rezultat</th><th>Motiv</th>@if (includable) { <th>Include în preluare</th> }</tr></thead>
+            <thead><tr>@if (entity) { <th>Ce</th> }<th>Cod ActivityApp</th><th>@(entity ? "Denumire" : "Tichet")</th><th>Rezultat</th><th>Motiv</th>@if (includable) { <th>Include în preluare</th> }</tr></thead>
             <tbody>
             @foreach (var item in items)
             {
-                <tr><td>@EntityLabel(item.Entity)</td><td>@item.SourceId</td><td>@item.Name</td><td>@ActionLabel(item, applied)</td><td>@item.Message</td>
+                <tr>@if (entity) { <td>@EntityLabel(item.Entity)</td> }<td>@item.SourceId</td><td>@item.Name</td><td>@ActionLabel(item, applied)</td><td>@item.Message</td>
                     @if (includable)
                     {
                         <td>@if (item.Entity == "partner" && !applied)
