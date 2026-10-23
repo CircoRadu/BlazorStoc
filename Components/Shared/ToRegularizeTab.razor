@@ -31,8 +31,9 @@
     }
     else
     {
+        <Paged Items="items" Id="to-regularize-page-size" Context="pageRows">
         <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">STOC</th><th class="number">IEȘIRI PESTE STOC</th><th>DE LA</th><th class="number">VECHIME</th><th>CAUZA</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
-        @foreach (var item in items)
+        @foreach (var item in pageRows)
         {
             <tr @key="item.ProductId">
                 <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(item.ProductId)"><strong>@item.ProductName</strong></a></td>
@@ -54,6 +55,7 @@
             </tr>
         }
         </tbody></table></div>
+        </Paged>
     }
 </section>
 

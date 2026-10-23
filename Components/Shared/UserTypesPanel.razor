@@ -86,8 +86,9 @@
     @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă tipurile</h3></div> }
     else
     {
+        <Paged Items="types" Id="user-types-page-size" Context="pageRows">
         <div class="table-scroll"><table><thead><tr><th>TIP</th><th>DESCRIERE</th><th>UTILIZATORI</th><th>PERMISIUNI</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
-        @foreach (var type in types)
+        @foreach (var type in pageRows)
         {
             <tr @key="type.Id"><td><strong>@type.Name</strong> @if (type.IsSystem) { <span class="role-badge admin">sistem</span> }</td><td>@type.Description</td><td>@type.UserCount</td><td>@(type.Name == AccessRoles.Administrator && type.IsSystem ? "toate" : type.PermissionCount.ToString())</td>
                 <td><div class="row-buttons">
@@ -96,6 +97,7 @@
                 </div></td></tr>
         }
         </tbody></table></div>
+        </Paged>
     }
 </section>
 

@@ -12,11 +12,12 @@
         else
         {
             <div class="table-scroll">
+                <Paged Items="Sessions" Id="open-sessions-page-size" Context="pageRows">
                 <table class="save-summary open-sessions-table">
                     <caption class="sr-only">Sesiuni deschise</caption>
                     <thead><tr><th scope="col">Utilizator</th><th scope="col">Rol</th><th scope="col">Adresa IP</th><th scope="col">Browser</th><th scope="col">Conectat de la</th><th scope="col">Pagina curentă</th><th scope="col">Acțiuni</th></tr></thead>
                     <tbody>
-                        @foreach (var session in Sessions)
+                        @foreach (var session in pageRows)
                         {
                             <tr class="@(session.Id == CurrentId ? "own-session" : "")">
                                 <th scope="row">
@@ -44,6 +45,7 @@
                         }
                     </tbody>
                 </table>
+                </Paged>
             </div>
         }
         @if (Message is not null) { <div class="@(MessageIsError ? "error-banner" : "success-banner")" role="@(MessageIsError ? "alert" : "status")">@Message</div> }

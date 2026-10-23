@@ -8,8 +8,9 @@
 {
     <section class="catalog net-consumption" aria-label="Consum net">
         <div class="catalog-heading"><h2>Consum net <span>@rows.Count</span></h2><small>Ieșiri minus retururi legate de ele, pe produs</small></div>
+        <Paged Items="rows" Id="net-consumption-page-size" Context="pageRows">
         <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">IEȘIRI</th><th class="number">RETURURI</th><th class="number">CONSUM NET</th></tr></thead><tbody>
-        @foreach (var row in rows)
+        @foreach (var row in pageRows)
         {
             <tr @key="row.ProductId">
                 <td><a class="category-table-link" href="@StockMovementNavigation.ProductUrl(row.ProductId)"><strong>@row.ProductName</strong></a></td>
@@ -19,6 +20,7 @@
             </tr>
         }
         </tbody></table></div>
+        </Paged>
     </section>
 }
 

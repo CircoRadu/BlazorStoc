@@ -26,8 +26,9 @@
         }
         else
         {
+            <Paged Items="Visible" Id="project-components-page-size" Context="pageRows">
             <div class="table-scroll"><table><thead><tr><th>SISTEM</th><th>STARE</th><th>PREDAT</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
-            @foreach (var component in Visible)
+            @foreach (var component in pageRows)
             {
                 <tr @key="component.Id" class="@(component.Archived ? "inactive-row" : "")">
                     <td><strong>@component.SystemTypeName</strong>@if (component.Archived) { <small class="muted" title="@component.ArchiveReason"> · arhivată: @component.ArchiveReason</small> }</td>
@@ -44,6 +45,7 @@
                 </tr>
             }
             </tbody></table></div>
+            </Paged>
             @if (situation is { OutsideOffer.Count: > 0 })
             {
                 <p class="muted">În afara ofertei: @situation.OutsideOffer.Count produs(e) predate care nu apar în oferte (până când ieșirile se leagă de componente, se arată la nivel de proiect).</p>

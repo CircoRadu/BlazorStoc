@@ -77,8 +77,9 @@ else if (beneficiary is not null)
             @if (canManage) { <button class="refresh act-confirm" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
         </div>
         @if (workPointError is not null) { <div class="error-banner" role="alert">@workPointError</div> }
+        <Paged Items="workPoints" Id="work-points-page-size" Context="pageRows">
         <div class="table-scroll"><table><thead><tr><th>NUME</th><th>ADRESĂ</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th><th>DESCRIERE</th><th>COORDONATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th><th>ANALIZĂ DE RISC</th>@if (canManage) { <th></th> }</tr></thead><tbody>
-            @foreach (var workPoint in workPoints)
+            @foreach (var workPoint in pageRows)
             {
                 <tr @key="workPoint.Id"><td><strong>@workPoint.Name</strong>@if (workPoint.IsPrimary) { <span class="anaf-source ok work-point-badge">Principal</span> }</td><td>@workPoint.Address</td><td>@workPoint.Phone</td><td>@workPoint.ContactPerson</td>
                     <td class="work-point-description" title="@workPoint.Description">@workPoint.Description</td>
@@ -110,6 +111,7 @@ else if (beneficiary is not null)
                 </tr>
             }
         </tbody></table></div>
+        </Paged>
     </section>
 
     <NetConsumptionSection BeneficiaryId="Id" />
@@ -139,17 +141,7 @@ else if (beneficiary is not null)
                 <tr @key="project.Id"><td><a class="category-table-link" data-restore-scroll href="@($"/proiecte/{project.Id}")"><strong>@project.Name</strong></a></td><td>@project.UpdatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td></tr>
             }
             </tbody></table></div>
-            <div class="table-footer">
-                <span>@FilteredProjects.Count proiecte</span>
-                @if (TotalPages > 1)
-                {
-                    <nav class="pagination" aria-label="Paginare proiecte">
-                        <button type="button" aria-label="Pagina anterioară" disabled="@(pageNumber <= 1)" @onclick="() => GoToPage(pageNumber - 1)">‹</button>
-                        <span>Pagina <strong>@pageNumber</strong> din <strong>@TotalPages</strong></span>
-                        <button type="button" aria-label="Pagina următoare" disabled="@(pageNumber >= TotalPages)" @onclick="() => GoToPage(pageNumber + 1)">›</button>
-                    </nav>
-                }
-            </div>
+            <AuditPager Id="beneficiary-projects-page-size" Label="Proiecte pe pagină" PageSizes="pageSizes" PageSize="projectPageSize" Page="pageNumber" Total="FilteredProjects.Count" PageChanged="GoToPage" PageSizeChanged="value => { projectPageSize = value; pageNumber = 1; SyncState(); }" />
         }
     </section>
 }
@@ -193,7 +185,8 @@ else if (beneficiary is not null)
     private Guid workPointEditorKey;
     private string query = "";
     private int pageNumber = 1;
-    private const int PageSize = 10;
+    private int projectPageSize = 10;
+    private static readonly int[] pageSizes = [10, 25, 50, 100, 0];
     private Guid editorKey, beneficiaryEditorKey;
     private readonly CancellationTokenSource lifetime = new();
 
@@ -206,8 +199,8 @@ else if (beneficiary is not null)
             return filtered.OrderBy(project => project.Name).ToList();
         }
     }
-    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredProjects.Count / (double)PageSize));
-    private IEnumerable<Project> PagedProjects => FilteredProjects.Skip((pageNumber - 1) * PageSize).Take(PageSize);
+    private int TotalPages => projectPageSize == 0 ? 1 : Math.Max(1, (int)Math.Ceiling(FilteredProjects.Count / (double)projectPageSize));
+    private IEnumerable<Project> PagedProjects => projectPageSize == 0 ? FilteredProjects : FilteredProjects.Skip((pageNumber - 1) * projectPageSize).Take(projectPageSize);
     private IDisposable? changeSubscription;
     private bool scrollRestorePending = true;
     private string? syncedUrl;

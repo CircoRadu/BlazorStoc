@@ -37,10 +37,11 @@
         </div>
     }
     <div class="table-scroll">
+        <Paged Items="modules" Id="modules-page-size" Context="pageRows">
         <table class="catalog-table">
             <thead><tr><th>Modul</th><th>Versiune</th><th>Stare</th><th>De când</th><th>Cauză</th><th>Erori la rând</th><th>Pornit</th><th><span class="sr-only">Operații</span></th></tr></thead>
             <tbody>
-            @foreach (var module in modules)
+            @foreach (var module in pageRows)
             {
                 <tr>
                     <td><strong>@module.Name</strong> <span class="muted">(@module.Id)</span></td>
@@ -63,6 +64,7 @@
             }
             </tbody>
         </table>
+        </Paged>
     </div>
 </section>
 

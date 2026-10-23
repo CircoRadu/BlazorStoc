@@ -13,10 +13,11 @@
 {
     <section class="catalog" id="beneficiary-checks">
         <div class="catalog-heading"><h2>De verificat <span class="count-badge">@items.Count</span></h2><small>Beneficiari preluați din ActivityApp care cer o verificare; tichetele lor așteaptă clarificarea</small></div>
+        <Paged Items="items" Id="checks-page-size" Context="pageRows">
         <div class="table-scroll"><table class="catalog-table" id="checks-table">
             <thead><tr><th>BENEFICIAR</th><th>CUI ÎN ACTIVITYAPP</th><th>MOTIV</th><th>TICHETE ÎN AȘTEPTARE</th><th>OPERAȚII</th></tr></thead>
             <tbody>
-            @foreach (var item in items)
+            @foreach (var item in pageRows)
             {
                 <tr @key="item.Id" id="@($"check-{item.Id}")">
                     <td>@if (item.BeneficiaryId is { } id) { <a class="category-table-link" href="@($"/beneficiari/{id}")"><strong>@item.Name</strong></a> } else { <strong>@item.Name</strong> }</td>
@@ -42,6 +43,7 @@
             }
             </tbody>
         </table></div>
+        </Paged>
     </section>
 }
 

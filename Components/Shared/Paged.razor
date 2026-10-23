@@ -1,0 +1,28 @@
+@typeparam TItem
+
+@* Pages a list under its table: the rows of the current page go to the child content, the page size and page buttons (AuditPager) under it. Rule: every table is paged with a choice of the number
+   of rows per page (CLAUDE.md). The pager is shown when the list is longer than the smallest page size; the page and the size are kept while the component lives. *@
+@{
+    var all = Items as IReadOnlyList<TItem> ?? Items.ToList();
+    var pages = size == 0 ? 1 : Math.Max(1, (all.Count + size - 1) / size);
+    var current = Math.Clamp(page, 1, pages);
+    var visible = size == 0 ? all : all.Skip((current - 1) * size).Take(size).ToList();
+}
+@ChildContent(visible)
+@if (all.Count > Sizes.Where(item => item > 0).DefaultIfEmpty(10).Min())
+{
+    <AuditPager Id="@Id" Label="@Label" PageSizes="Sizes" PageSize="size" Page="current" Total="all.Count"
+                PageChanged="value => page = value" PageSizeChanged="value => { size = value; page = 1; }" />
+}
+
+@code {
+    [Parameter, EditorRequired] public IEnumerable<TItem> Items { get; set; } = [];
+    [Parameter, EditorRequired] public RenderFragment<IReadOnlyList<TItem>> ChildContent { get; set; } = default!;
+    [Parameter] public string Id { get; set; } = "paged-size";
+    [Parameter] public string Label { get; set; } = "Rânduri pe pagină";
+    [Parameter] public int DefaultSize { get; set; } = 25;
+    [Parameter] public IReadOnlyList<int> Sizes { get; set; } = [10, 25, 50, 100, 0];
+
+    private int size, page = 1;
+    protected override void OnInitialized() => size = DefaultSize;
+}

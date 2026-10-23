@@ -30,10 +30,11 @@
     else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▤</span><h3>Nu există intrări fără factură pentru filtrele curente</h3></div> }
     else
     {
+        <Paged Items="Filtered" Id="free-entries-page-size" Context="pageRows">
         <div class="table-scroll"><table><thead><tr>
             @if (IsAdmin) { <th><span class="sr-only">Selectează</span></th> }
             <th>DATA</th><th>PRODUS</th><th class="number">BUC.</th><th>MOTIV</th><th>FURNIZOR</th><th>REFERINȚĂ</th><th>DESCRIERE</th><th>OPERATOR</th></tr></thead><tbody>
-        @foreach (var entry in Filtered)
+        @foreach (var entry in pageRows)
         {
             <tr @key="entry.MovementId">
                 @if (IsAdmin) { <td><RowSelect Selected="@selected.Contains(entry.MovementId)" AriaLabel="@($"Selectează intrarea {entry.ProductName} din {StockMovementRules.DisplayDate(entry.Date)}")" SelectedChanged="@(value => Toggle(entry.MovementId, value))" /></td> }
@@ -48,6 +49,7 @@
             </tr>
         }
         </tbody></table></div>
+        </Paged>
         @if (IsAdmin)
         {
             <div class="editor-actions">

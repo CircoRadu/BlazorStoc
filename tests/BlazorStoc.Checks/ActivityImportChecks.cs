@@ -38,6 +38,7 @@ public static class ActivityImportChecks
         await ActivityImportPanelChecks.RunAsync(check);
         await ActivityKeywordsPanelChecks.RunAsync(check);
         await BeneficiaryChecksSectionChecks.RunAsync(check);
+        await PagedChecks.RunAsync(check);
         await LiveAsync(check);
     }
 

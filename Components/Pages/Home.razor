@@ -47,7 +47,7 @@ else
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh act-reload" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
 else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }@if (incompleteProducts.Contains(p.Id)) { <small class="lock-badge incomplete-badge" title="Subcategoria cere parametri obligatori pe care produsul nu îi are încă: este blocat pentru mișcări de stoc până se editează.">⚠ Parametri obligatorii necompletați · blocat</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td>@if (stockOut) { <button class="row-icon exit" title="Ieșire rapidă" aria-label="@($"Ieșire rapidă {p.Name}")" @onclick="() => quickExit = p"></button> }<button class="row-icon view" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)" title="@($"Deschide mișcările produsului {p.Name}")"></button></td></tr> }</tbody></table></div> }
-<footer class="table-footer"><span>@Filtered.Count @(Filtered.Count == 1 ? "rezultat" : "rezultate")</span><div class="pagination"><button disabled="@(page <= 1)" @onclick="() => page--" aria-label="Pagina anterioară">‹</button><span>Pagina @(page) din @Pages</span><button disabled="@(page >= Pages)" @onclick="() => page++" aria-label="Pagina următoare">›</button></div></footer></section>
+<AuditPager Id="products-page-size" Label="Produse pe pagină" PageSizes="pageSizes" PageSize="pageSize" Page="page" Total="Filtered.Count" PageChanged="value => page = value" PageSizeChanged="value => { pageSize = value; page = 1; }" /></section>
 <p class="workspace-note"><span class="status-dot"></span> Date din BlazorStoc <span>·</span> Catalog și gestiune produse</p>
 }
 
@@ -106,7 +106,8 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private bool loading, loaded;
     private bool quantityDescending = true;
     private int page = 1;
-    private const int PageSize = 10;
+    private int pageSize = 10;
+    private static readonly int[] pageSizes = [10, 25, 50, 100, 0];
     private Product? imagePreview;
     private DateTime? lastLoaded;
     private readonly CancellationTokenSource lifetime = new();
@@ -128,8 +129,8 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
                 .ToList();
         }
     }
-    private int Pages => Math.Max(1, (Filtered.Count + PageSize - 1) / PageSize);
-    private IEnumerable<Product> Paged => Filtered.Skip((page - 1) * PageSize).Take(PageSize);
+    private int Pages => pageSize == 0 ? 1 : Math.Max(1, (Filtered.Count + pageSize - 1) / pageSize);
+    private IEnumerable<Product> Paged => pageSize == 0 ? Filtered : Filtered.Skip((page - 1) * pageSize).Take(pageSize);
     // Other sessions and external applications: refresh the catalog in place (Task 8).
     private LiveRefresh? live, liveLocks;
     protected override async Task OnInitializedAsync()

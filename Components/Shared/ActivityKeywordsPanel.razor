@@ -25,8 +25,9 @@
     }
     else
     {
+        <Paged Items="items" Id="keywords-page-size" Context="pageRows">
         <div class="table-scroll"><table class="system-types" id="keywords-table"><thead><tr><th>CUVÂNT CHEIE</th><th>ACTIV</th><th>OPERAȚII</th></tr></thead><tbody>
-        @foreach (var item in items)
+        @foreach (var item in pageRows)
         {
             <tr @key="item.Id" class="@(item.Active ? "" : "inactive-row")" id="@($"keyword-{item.Id}")">
                 <td>
@@ -60,6 +61,7 @@
             </tr>
         }
         </tbody></table></div>
+        </Paged>
     }
 </section>
 

@@ -43,6 +43,7 @@
     else
     {
         <div class="table-scroll">
+            <Paged Items="rows" Id="backup-packages-page-size" Context="pageRows">
             <table>
                 <thead><tr>
                     <th><span class="sr-only">Selectează</span></th>
@@ -51,7 +52,7 @@
                     <th><span class="sr-only">Acțiuni</span></th>
                 </tr></thead>
                 <tbody>
-                    @foreach (var row in rows)
+                    @foreach (var row in pageRows)
                     {
                         <tr @key="row.FileName">
                             <td><input type="radio" name="backup-selection" aria-label="@($"Selectează {row.FileName}")" checked="@(selectedName == row.FileName)" @onchange="() => selectedName = row.FileName" /></td>
@@ -87,6 +88,7 @@
                     }
                 </tbody>
             </table>
+            </Paged>
         </div>
     }
 </section>
