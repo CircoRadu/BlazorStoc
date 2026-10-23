@@ -7,8 +7,19 @@
 @implements IDisposable
 <PageBoundary>
 
-<PageTitle>Nomenclator · Tipuri de sisteme · BlazorStoc</PageTitle>
-<div class="page-heading"><div><p class="eyebrow">NOMENCLATOR</p><h1>Tipuri de sisteme</h1><p class="muted">Sistemele din care sunt făcute proiectele (antiefracție, TVCI, control acces, incendiu, rețelistică…). Un tip nu se șterge: se dezactivează și nu mai apare la alegeri noi. Denumirile alternative (de exemplu „CCTV” pentru „TVCI”) ajută la recunoașterea lor în oferte.</p></div></div>
+<PageTitle>Nomenclator · BlazorStoc</PageTitle>
+<div class="page-heading"><div><p class="eyebrow">NOMENCLATOR</p><h1>Nomenclator</h1><p class="muted">Listele de referință ale aplicației.</p></div></div>
+<div class="settings-tabs" role="tablist" aria-label="Liste nomenclator">
+    @foreach (var (id, title) in Tabs)
+    {
+        var selected = id == tab;
+        <button type="button" role="tab" id="tab-@id" class="settings-tab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" aria-controls="panel-@id" tabindex="@(selected ? 0 : -1)" @onclick="() => tab = id">@title</button>
+    }
+</div>
+@if (tab == SystemsTab)
+{
+<div role="tabpanel" id="panel-@SystemsTab" aria-labelledby="tab-@SystemsTab">
+<p class="muted" style="margin:16px 0 8px">Sistemele din care sunt făcute proiectele (antiefracție, TVCI, control acces, incendiu, rețelistică…). Un tip nu se șterge: se dezactivează și nu mai apare la alegeri noi. Denumirile alternative (de exemplu „CCTV” pentru „TVCI”) ajută la recunoașterea lor în oferte.</p>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 
@@ -70,10 +81,25 @@
         </tbody></table></div>
     }
 </section>
+</div>
+}
+else
+{
+<div role="tabpanel" id="panel-@KeywordsTab" aria-labelledby="tab-@KeywordsTab">
+    <ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId"><ActivityKeywordsPanel /></ModuleGate>
+</div>
+}
 
 </PageBoundary>
 
 @code {
+    private const string SystemsTab = "sisteme";
+    private const string KeywordsTab = "cuvinte-mentenanta";
+    private static readonly (string Id, string Title)[] Tabs = [(SystemsTab, "Tipuri de sisteme"), (KeywordsTab, "Cuvinte cheie mentenanță")];
+    private string tab = SystemsTab;
+
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabQuery { get; set; }
+
     private readonly CancellationTokenSource lifetime = new();
     private List<SystemType> types = [];
     private bool loading = true, busy;
@@ -85,6 +111,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (Tabs.Any(item => item.Id == TabQuery)) tab = TabQuery!;
         await RunAsync(async () => { types = [.. await Repository.GetAllAsync(lifetime.Token)]; }, null);
         loading = false;
     }

@@ -34,6 +34,8 @@ public static class MaintenanceModuleChecks
         public Task<IReadOnlyList<ServiceIntervention>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default) => Fail<IReadOnlyList<ServiceIntervention>>();
         public Task<ServiceInterventionPage> GetPageAsync(ServiceInterventionQuery query, CancellationToken cancellationToken = default) => Fail<ServiceInterventionPage>();
         public Task<ServiceInterventionSaved> RecordAsync(int beneficiaryId, ServiceInterventionInput input, CancellationToken cancellationToken = default) => Fail<ServiceInterventionSaved>();
+        public Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) => Fail<bool>();
+        public Task DeleteAsync(int beneficiaryId, int interventionId, string reason, CancellationToken cancellationToken = default) => Fail<object>();
         public Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default) => Fail<ServiceInterventionSaved>();
         public Task DeleteAsync(ServiceIntervention original, string reason, CancellationToken cancellationToken = default) => Fail<object>();
     }

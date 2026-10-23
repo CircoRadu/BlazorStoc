@@ -1,0 +1,52 @@
+@using BlazorStoc.Services
+@using BlazorStoc.Services.Update
+@inject ILogger<UpdateChangelogDialog> Logger
+@* Setari -> Actualizare -> Istoric -> iconita de changelog: what the versions an update went through brought (Assets/Data/changelog.txt, the same text as the notes of the
+   package). Nothing is changed here. *@
+<div class="delete-overlay" @onkeydown="KeyDownAsync">
+    <section class="delete-dialog save-confirmation-dialog update-changelog-dialog" role="dialog" aria-modal="true" tabindex="-1" @ref="dialog" aria-labelledby="update-changelog-title">
+        <div class="dialog-head"><h2 id="update-changelog-title">Changelog · @Title</h2><HelpButton Topic="setari-actualizare-changelog" About="Changelog-ul versiunii" /></div>
+        @if (versions.Count == 0)
+        {
+            <div class="empty-state" role="status"><h3>Nu există changelog pentru această versiune</h3></div>
+        }
+        else
+        {
+            @foreach (var entry in versions)
+            {
+                <section class="changelog-version" aria-label="@($"Versiunea {entry.Version}")">
+                    <h3>Versiunea @entry.Version @if (entry.Date.Length > 0) { <small class="muted">&nbsp;· @entry.Date</small> }</h3>
+                    <ul>
+                        @foreach (var item in entry.Items) { <li>@item</li> }
+                    </ul>
+                </section>
+            }
+        }
+        <div class="editor-actions">
+            <button type="button" class="refresh act-close" @onclick="() => Closed.InvokeAsync()">Închide</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    /// <summary>The version the update started from (null when unknown) and the version it went to.</summary>
+    [Parameter] public string? From { get; set; }
+    [Parameter, EditorRequired] public string To { get; set; } = "";
+    [Parameter, EditorRequired] public EventCallback Closed { get; set; }
+
+    private ElementReference dialog;
+    private IReadOnlyList<ChangelogVersion> versions = [];
+    private string Title => From is not null && versions.Count > 1 ? $"{From} → {To}" : $"versiunea {To}";
+
+    protected override void OnParametersSet() => versions = UpdateChangelog.Between(From, To);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await dialog.FocusAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (Exception exception) { Logger.LogWarning("Changelog dialog could not take focus ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? Closed.InvokeAsync() : Task.CompletedTask;
+}

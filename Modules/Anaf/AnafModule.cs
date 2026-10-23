@@ -22,8 +22,15 @@ public sealed class AnafModule : IModule
         services.AddSingleton<AnafStore>();
         services.AddScoped<IAnafService>(provider => new GuardedAnafService(
             ActivatorUtilities.CreateInstance<AnafService>(provider), provider.GetRequiredService<ModuleRegistry>()));
+        services.AddScoped<ICompanyDataLookup>(provider => new AnafCompanyLookup(provider.GetRequiredService<IAnafService>()));
+        services.AddScoped<ICompanyDataLookupFactory, AnafCompanyLookupFactory>();
     }
 
     // Stand-in used while the module is out: the editors of beneficiaries and suppliers still inject the service and treat its "unavailable" answer as they always did.
-    public void RegisterUnavailable(IServiceCollection services) => services.AddScoped<IAnafService, UnavailableAnafService>();
+    public void RegisterUnavailable(IServiceCollection services)
+    {
+        services.AddScoped<IAnafService, UnavailableAnafService>();
+        services.AddScoped<ICompanyDataLookup, UnavailableCompanyLookup>();
+        services.AddScoped<ICompanyDataLookupFactory, UnavailableCompanyLookupFactory>();
+    }
 }

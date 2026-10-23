@@ -1,0 +1,22 @@
+-- version: 47
+-- description: Preluare ActivityApp, sincronizarea periodica: programarea si ultimul rezultat, starile pentru notificari si semnalarea elementelor sterse in sursa
+-- note: sync_enabled / sync_interval_minutes: the periodic synchronization (it runs only while the import itself is switched on, inside the time window of the settings). last_sync_*
+-- note: and sync_failures: the last attempt and how many failed in a row (the next attempt waits longer after each failure, up to 4 hours). The alert_*_since columns are the moment a
+-- note: condition the administrator is told about began (the synchronization failing, the structure of ActivityApp changed, open problems, new or changed ticket types); NULL = no such
+-- note: condition. source_deleted in the tie table marks a row that no longer exists (or is deleted) in ActivityApp: it is only signalled, nothing is deleted in BlazorStoc.
+-- column: activity_import_settings.sync_enabled
+-- column: activity_import_settings.sync_interval_minutes
+-- column: activity_import_settings.last_sync_utc
+-- column: activity_import_settings.last_sync_ok
+-- column: activity_import_settings.last_sync_message
+-- column: activity_import_settings.sync_failures
+-- column: activity_import_settings.alert_failing_since
+-- column: activity_import_settings.alert_structure_since
+-- column: activity_import_settings.alert_issues_since
+-- column: activity_import_settings.alert_types_since
+-- column: activity_import_map.source_deleted
+-- column: activity_import_map.source_deleted_utc
+-- statement
+ALTER TABLE `activity_import_settings` ADD COLUMN IF NOT EXISTS `sync_enabled` TINYINT(1) NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS `sync_interval_minutes` INT NOT NULL DEFAULT 60, ADD COLUMN IF NOT EXISTS `last_sync_utc` DATETIME NULL, ADD COLUMN IF NOT EXISTS `last_sync_ok` TINYINT(1) NULL, ADD COLUMN IF NOT EXISTS `last_sync_message` VARCHAR(500) NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS `sync_failures` INT NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS `alert_failing_since` DATETIME NULL, ADD COLUMN IF NOT EXISTS `alert_structure_since` DATETIME NULL, ADD COLUMN IF NOT EXISTS `alert_issues_since` DATETIME NULL, ADD COLUMN IF NOT EXISTS `alert_types_since` DATETIME NULL
+-- statement
+ALTER TABLE `activity_import_map` ADD COLUMN IF NOT EXISTS `source_deleted` TINYINT(1) NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS `source_deleted_utc` DATETIME NULL

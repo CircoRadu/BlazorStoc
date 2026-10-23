@@ -20,6 +20,8 @@ public sealed class MaintenanceModule : IModule
             ActivatorUtilities.CreateInstance<MariaServiceContractRepository>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IServiceInterventionRepository>(provider => new GuardedServiceInterventionRepository(
             ActivatorUtilities.CreateInstance<MariaServiceInterventionRepository>(provider), provider.GetRequiredService<ModuleRegistry>()));
+        services.AddScoped<IOnDemandInterventionRecorder>(provider => new OnDemandInterventionRecorder(provider.GetRequiredService<IServiceInterventionRepository>()));
+        services.AddScoped<IOnDemandInterventionRecorderFactory, OnDemandInterventionRecorderFactory>();
         services.AddScoped<IMaintenanceNotificationReader>(provider => new GuardedMaintenanceNotificationReader(
             ActivatorUtilities.CreateInstance<MariaMaintenanceNotificationReader>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.Configure<MapOptions>(configuration.GetSection(MapOptions.SectionName));
@@ -33,6 +35,8 @@ public sealed class MaintenanceModule : IModule
     {
         services.AddScoped<IServiceContractRepository, UnavailableServiceContractRepository>();
         services.AddScoped<IServiceInterventionRepository, UnavailableServiceInterventionRepository>();
+        services.AddScoped<IOnDemandInterventionRecorder, UnavailableOnDemandInterventionRecorder>();
+        services.AddScoped<IOnDemandInterventionRecorderFactory, UnavailableOnDemandInterventionRecorderFactory>();
         services.AddScoped<IMapConfigurationService, UnavailableMapConfigurationService>();
     }
 

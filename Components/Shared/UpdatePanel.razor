@@ -123,9 +123,9 @@
         {
             <div class="table-scroll">
                 <table class="catalog-table" id="update-history">
-                    <thead><tr><th>Data</th><th>Versiune</th><th>Cum</th><th>Efectuat de</th><th>Rezultat</th><th>Motiv</th></tr></thead>
+                    <thead><tr><th>Data</th><th>Versiune</th><th>Cum</th><th>Efectuat de</th><th>Rezultat</th><th>Motiv</th><th>Ce conține update</th></tr></thead>
                     <tbody>
-                    @foreach (var entry in overview.History)
+                    @foreach (var entry in HistoryPage)
                     {
                         <tr>
                             <td>@UpdateJournal.Local(entry.AtUtc)</td>
@@ -134,16 +134,39 @@
                             <td>@entry.Actor</td>
                             <td><span class="due-chip @OutcomeClass(entry)">@OutcomeText(entry)</span>@if (entry.Outcome != "Succeeded") { <text> </text><span class="muted">@entry.Message</span> }</td>
                             <td>@entry.Reason</td>
+                            <td>
+                                @if (HasChangelog(entry))
+                                {
+                                    <button type="button" class="row-icon view" aria-label="@($"Vezi changelog-ul versiunii {entry.To}")" title="@($"Vezi changelog-ul versiunii {entry.To}")" @onclick="() => changelogOf = entry"></button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="row-icon view" disabled aria-label="@($"Vezi changelog-ul versiunii {entry.To}")" title="Nu există changelog pentru această versiune."></button>
+                                }
+                            </td>
                         </tr>
                     }
                     </tbody>
                 </table>
             </div>
+            <AuditPager Id="update-history-page-size" PageSizes="historyPageSizes" PageSize="historySize" Page="HistoryCurrentPage" Total="overview.History.Count"
+                        PageChanged="page => historyPage = page" PageSizeChanged="size => { historySize = size; historyPage = 1; }" />
         }
     }
 </section>
+@if (changelogOf is { } shown)
+{
+    <UpdateChangelogDialog From="@shown.From" To="@shown.To" Closed="() => changelogOf = null" />
+}
 
 @code {
+    private UpdateHistoryDocument? changelogOf;
+    private static readonly int[] historyPageSizes = [10, 25, 50, 0];
+    private int historySize = 10, historyPage = 1;
+    private int HistoryCurrentPage => historySize == 0 ? 1 : Math.Clamp(historyPage, 1, Math.Max(1, (overview.History.Count + historySize - 1) / historySize));
+    private IEnumerable<UpdateHistoryDocument> HistoryPage => historySize == 0 ? overview.History : overview.History.Skip((HistoryCurrentPage - 1) * historySize).Take(historySize);
+    private static bool HasChangelog(UpdateHistoryDocument entry) => UpdateChangelog.Between(entry.From, entry.To).Count > 0;
+
     private UpdateOverview overview = new(false, AppVersion.Current, null, null, [], null, [], null, null, null);
     private PackageCheckDocument? report;
     private string? originalName, error, notice, reasonError, reason = "";

@@ -24,7 +24,7 @@
                 {
                     <label for="beneficiary-name">Nume complet *<InputTextLive id="beneficiary-name" @bind-Value="input.Name" maxlength="200" autocomplete="name" /><small>Numele complet identifică persoana fizică.</small><ValidationMessage For="() => input.Name" /></label>
                     <label for="beneficiary-address">Adresă *<InputTextLive id="beneficiary-address" @bind-Value="input.Address" maxlength="300" autocomplete="street-address" /><ValidationMessage For="() => input.Address" /></label>
-                    <label for="beneficiary-phone">Număr de telefon *<InputTextLive id="beneficiary-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="tel" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
+                    <label for="beneficiary-phone">Număr de telefon<InputTextLive id="beneficiary-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="tel" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
                 }
                 else
                 {
@@ -47,7 +47,7 @@
                     <label for="beneficiary-name">Denumire *<InputTextLive id="beneficiary-name" @bind-Value="input.Name" maxlength="200" autocomplete="organization" /><ValidationMessage For="() => input.Name" /></label>
                     <label for="beneficiary-address">Adresă *<InputTextLive id="beneficiary-address" @bind-Value="input.Address" maxlength="300" autocomplete="street-address" /><ValidationMessage For="() => input.Address" /></label>
                     <label for="beneficiary-registry">Nr. Registrul Comerțului<InputTextLive id="beneficiary-registry" @bind-Value="input.RegistryNumber" maxlength="40" autocomplete="off" /><small>De exemplu J40/1234/2020.</small><ValidationMessage For="() => input.RegistryNumber" /></label>
-                    <label for="beneficiary-phone">Număr de telefon *<InputTextLive id="beneficiary-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="tel" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
+                    <label for="beneficiary-phone">Număr de telefon<InputTextLive id="beneficiary-phone" @bind-Value="input.Phone" maxlength="20" autocomplete="tel" inputmode="tel" /><ValidationMessage For="() => input.Phone" /></label>
                     <label for="beneficiary-postal">Cod poștal<InputTextLive id="beneficiary-postal" @bind-Value="input.PostalCode" maxlength="10" autocomplete="postal-code" inputmode="numeric" /><small>5 sau 6 cifre.</small><ValidationMessage For="() => input.PostalCode" /></label>
                     <label for="beneficiary-caen">Cod CAEN<InputTextLive id="beneficiary-caen" @bind-Value="input.CaenCode" maxlength="4" autocomplete="off" inputmode="numeric" /><small>3 sau 4 cifre.</small><ValidationMessage For="() => input.CaenCode" /></label>
                 }
@@ -159,7 +159,7 @@
                 keptMine = plan.KeptMine;
                 anafSnapshot = company with { Cui = input.Cui };
                 anafMessageIsError = false;
-                anafMessage = "Datele au fost preluate din ANAF. Completează manual câmpurile obligatorii pe care ANAF nu le-a returnat (de exemplu telefonul)." + KeptNote;
+                anafMessage = "Datele au fost preluate din ANAF. Completează manual câmpurile obligatorii pe care ANAF nu le-a returnat; telefonul este opțional." + KeptNote;
                 anafWarning = result.Warning;
             }
             else

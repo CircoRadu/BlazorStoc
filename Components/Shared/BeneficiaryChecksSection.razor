@@ -1,0 +1,98 @@
+@using BlazorStoc.Modules
+@using BlazorStoc.Services
+@inject IBeneficiaryCheckService Checks
+@inject IAccessControl Access
+@inject ILogger<BeneficiaryChecksSection> Logger
+@implements IDisposable
+
+@* Beneficiari -> "De verificat": the partners of ActivityApp taken by the import that need a human look (ANAF could not answer or does not know the CUI, the CUI has the wrong form, the address is
+   missing). The tickets of their clients wait until they are clarified. The card shows only while there is something to verify. *@
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (items.Count > 0)
+{
+    <section class="catalog" id="beneficiary-checks">
+        <div class="catalog-heading"><h2>De verificat <span class="count-badge">@items.Count</span></h2><small>Beneficiari preluați din ActivityApp care cer o verificare; tichetele lor așteaptă clarificarea</small></div>
+        <div class="table-scroll"><table class="catalog-table" id="checks-table">
+            <thead><tr><th>BENEFICIAR</th><th>CUI ÎN ACTIVITYAPP</th><th>MOTIV</th><th>TICHETE ÎN AȘTEPTARE</th><th>OPERAȚII</th></tr></thead>
+            <tbody>
+            @foreach (var item in items)
+            {
+                <tr @key="item.Id" id="@($"check-{item.Id}")">
+                    <td>@if (item.BeneficiaryId is { } id) { <a class="category-table-link" href="@($"/beneficiari/{id}")"><strong>@item.Name</strong></a> } else { <strong>@item.Name</strong> }</td>
+                    <td>@item.Cui</td>
+                    <td>@item.ReasonText</td>
+                    <td>@item.WaitingTickets</td>
+                    <td>
+                        @if (!canEdit) { <span class="muted">—</span> }
+                        else if (discarding == item.Id)
+                        {
+                            <span class="muted">Discard? Nici partenerul, nici tichetele lui nu se mai preiau.</span>
+                            <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Confirmă discard: {item.Name}")" title="Da, discard" @onclick="() => DiscardAsync(item)"></button>
+                            <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la discard" title="Renunță" @onclick="() => discarding = null"></button>
+                        }
+                        else
+                        {
+                            <button type="button" class="row-icon renew" disabled="@(busy || item.Reason == BeneficiaryCheckReasons.CuiInvalidForm)" aria-label="@($"Reîncearcă verificarea în ANAF: {item.Name}")" title="@(item.Reason == BeneficiaryCheckReasons.CuiInvalidForm ? "CUI-ul are o formă invalidă: corectează-l întâi în fișa beneficiarului." : "Reîncearcă verificarea în ANAF")" @onclick="() => RetryAsync(item)"></button>
+                            <button type="button" class="row-icon check" disabled="@(busy || item.BeneficiaryId is null)" aria-label="@($"Acceptă beneficiarul: {item.Name}")" title="@(item.BeneficiaryId is null ? "Partenerul nu are încă un beneficiar (lipsește adresa în ActivityApp)." : "Acceptă beneficiarul (verificat de mine)")" @onclick="() => AcceptAsync(item)"></button>
+                            <button type="button" class="row-icon delete" disabled="@busy" aria-label="@($"Discard partener: {item.Name}")" title="Discard (nici partenerul, nici tichetele lui nu se mai preiau)" @onclick="() => discarding = item.Id"></button>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    </section>
+}
+
+@code {
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<BeneficiaryCheck> items = [];
+    private bool busy, canEdit;
+    private string? error, notice;
+    private long? discarding;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canEdit = await Access.HasAsync("beneficiari.edit");
+        await RunAsync(async () => items = await Checks.GetPendingAsync(lifetime.Token), null);
+    }
+
+    private async Task RunAsync(Func<Task> operation, string? success)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try { await operation(); notice ??= success; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is IExpectedAnswer or AccessDeniedException) { error = ex.Message; }
+        catch (ModuleUnavailableException) { items = []; }
+        catch (Exception ex) { Logger.LogError("Beneficiary check operation failed ({ErrorType}).", ex.GetType().Name); error = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    private Task ReloadAsync() => RunAsync(async () => items = await Checks.GetPendingAsync(lifetime.Token), null);
+
+    private Task RetryAsync(BeneficiaryCheck item) => RunAsync(async () =>
+    {
+        notice = await Checks.RetryAsync(item.Id, lifetime.Token);
+        items = await Checks.GetPendingAsync(lifetime.Token);
+        await Changed.InvokeAsync();
+    }, null);
+
+    private Task AcceptAsync(BeneficiaryCheck item) => RunAsync(async () =>
+    {
+        await Checks.AcceptAsync(item.Id, lifetime.Token);
+        items = await Checks.GetPendingAsync(lifetime.Token);
+    }, "Beneficiarul a fost acceptat; tichetele lui se preiau la următoarea sincronizare.");
+
+    private Task DiscardAsync(BeneficiaryCheck item) => RunAsync(async () =>
+    {
+        discarding = null;
+        await Checks.DiscardAsync(item.Id, lifetime.Token);
+        items = await Checks.GetPendingAsync(lifetime.Token);
+    }, "Partenerul a fost discardat; tichetele lui nu se mai preiau.");
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

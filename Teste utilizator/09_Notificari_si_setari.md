@@ -4,6 +4,19 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
+### 23.10.2026 - Changelog pentru pachetele de actualizare
+
+**Ce s-a adaugat:** fiecare pachet de actualizare are un changelog (`Assets/Data/changelog.txt`, o sectiune pe versiune; `tools\release.ps1` refuza o versiune fara sectiune si foloseste sectiunea ca note ale pachetului). In Setari -> Actualizare -> Istoric, fiecare rand are iconita de ochi „Vezi changelog" care deschide o fereastra cu ce a adus versiunea.
+
+**Ce face acum:** fereastra arata versiunea (sau versiunile prin care a trecut actualizarea, cea mai noua sus) cu data si cate o linie pe schimbare; iconita e dezactivata pentru o versiune fara changelog.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Actualizare, tabelul Istoric | Coloana „Ce contine update" cu iconita de ochi pe fiecare rand | |
+| 2 | Apasa iconita de pe un rand reusit (ex. 0.5.0 → 0.5.1) | Fereastra „Changelog · versiunea 0.5.1" cu data si schimbarile; Esc sau „Inchide" o inchide | |
+| 3 | Rand pentru o versiune care nu e in changelog (ex. instalarea initiala 0.4.9) | Iconita dezactivata, cu explicatia in titlu | |
+| 4 | Dupa urmatorul release: incarca pachetul si citeste „Ce aduce" in rezultatul verificarii | Textul este changelog-ul versiunii pachetului | |
+
 ### 20.10.2026 - Backup si restaurare cu imaginile si fisierele
 
 **Verificat de agent 20.10.2026** pe baza de test, cu workerul real de backup: backup cu fisiere de proba (inclusiv un nume cu diacritice si un folder adanc), restaurare care readuce baza si fisierele exact (fisierul sters revine, cel adaugat dispare, cel modificat se schimba la loc), pachetul de siguranta de dinainte contine fisierele inlocuite, un pachet cu un fisier stricat este refuzat fara sa schimbe nimic, un pachet vechi (fara fisiere) restaureaza doar baza si lasa imaginile, baza identica dar cu fisiere diferite se restaureaza. Ramane pentru tine: pasii de mai jos in aplicatie, cu imaginile tale.

@@ -1,0 +1,19 @@
+# Changelog-ul unei versiuni
+Cautare: changelog schimbari versiune actualizare pachet ce aduce istoric note
+Captura: fereastra | /setari | click Actualizare; wait 1500; click sel:#update-history button[aria-label$="0.5.2"]; wait 1000 | Changelog-ul unei versiuni
+
+Fereastra arată ce a adus fiecare versiune prin care a trecut o actualizare: data versiunii și câte o linie pentru fiecare schimbare, cea mai nouă versiune sus. O deschizi din [[setari-actualizare]], din Istoric, cu iconița de pe rândul actualizării. Nu se schimbă nimic în ea.
+
+## Elemente
+### Conținutul
+- Titlul ferestrei | text | „versiunea X” pentru o actualizare dintr-un singur pas sau „X → Y” când actualizarea a trecut peste mai multe versiuni; atunci se arată changelog-ul tuturor versiunilor din drum. | sel: #update-changelog-title
+- Versiunea și data | titlu | Numărul versiunii și ziua în care a fost făcută.
+- Schimbările | listă | Ce aduce versiunea: funcții noi, corecturi, schimbări de aspect. Este același text ca „Ce aduce” din rezultatul verificării pachetului, înainte de instalare. | sel: .changelog-version ul
+### Butoanele ferestrei
+- Închide | buton | Închide fereastra (la fel Esc).
+
+## Flux: Cum văd ce a adus o actualizare
+1. Deschide Setări → Actualizare.
+2. În Istoric, apasă iconița „Vezi changelog” de pe rândul actualizării.
+3. Citește lista și apasă „Închide” când ai terminat.
+Nota: iconița este dezactivată pentru o versiune care nu are changelog (iar fereastra, deschisă pentru una fără secțiune, spune „Nu există changelog pentru această versiune”). Changelog-ul se scrie pe calculatorul de dezvoltare, pentru fiecare pachet, și călătorește odată cu el.

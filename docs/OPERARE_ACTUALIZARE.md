@@ -32,7 +32,7 @@ Datele (baza, fisiere, chei Data Protection, setari NAS, backup-uri) sunt in **f
 .\tools\release.ps1 -MinFromVersion 0.5.0        # nu se poate instala peste versiuni mai vechi decat 0.5.0
 ```
 
-- Versiunea este `<Version>` din `BlazorStoc.csproj` (sau `-Version x.y.z`). `note.txt` (ce aduce versiunea) apare administratorului inainte de confirmare.
+- Versiunea este `<Version>` din `BlazorStoc.csproj` (sau `-Version x.y.z`). Changelog-ul fiecarui pachet se scrie in `Assets/Data/changelog.txt` (sectiunea `## versiune | data`, cate o linie `- ` pe schimbare); `release.ps1` refuza o versiune fara sectiune si foloseste sectiunea ca note ale pachetului (apar administratorului inainte de confirmare). `-NotesFile` inlocuieste notele. In Setari -> Actualizare -> Istoric, iconita de ochi de pe fiecare rand deschide changelog-ul versiunilor prin care a trecut actualizarea.
 - La prima rulare pe un calculator se face **cheia de semnare** (protejata cu DPAPI pe utilizatorul curent, in `%LOCALAPPDATA%\BlazorStoc-release`). Nu se inlocuieste: serverele au amprenta ei. Pierderea cheii inseamna o cheie noua, care se confirma pe server (sectiunea 7).
 - La final scriptul afiseaza **amprenta cheii** si **SHA-256 al installerului**. Amprenta o compari pe server cand cheia e noua; SHA-256 il compari cu `Get-FileHash` dupa copiere.
 - Scriptul verifica pachetul si installerul (`--check`) inainte sa termine.

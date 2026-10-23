@@ -47,6 +47,9 @@ public sealed class BeneficiaryInput : IValidatableObject
 
     public bool AnafVerified { get; set; }
 
+    /// <summary>Set by the import from ActivityApp for a company whose CUI has the wrong form (it goes to the beneficiaries to verify): the CUI is then only required to be digits (with RO). Not stored.</summary>
+    public bool NeedsCheck { get; set; }
+
     [StringLength(ChangeReasonRules.MaximumLength, ErrorMessage = ChangeReasonRules.TooLongMessage)]
     public string Reason { get; set; } = "";
 
@@ -62,12 +65,12 @@ public sealed class BeneficiaryInput : IValidatableObject
         if (string.IsNullOrWhiteSpace(Name))
             yield return new(IsIndividual ? "Completează numele complet." : "Completează denumirea.", [nameof(Name)]);
         if (string.IsNullOrWhiteSpace(Address)) yield return new("Completează adresa.", [nameof(Address)]);
-        if (string.IsNullOrWhiteSpace(Phone)) yield return new("Completează numărul de telefon.", [nameof(Phone)]);
-        else if (!BeneficiaryRules.PhonePattern.IsMatch(BeneficiaryRules.NormalizePhone(Phone)))
+        // The phone is optional (ANAF often does not know it); when given it must be a valid number.
+        if (!string.IsNullOrWhiteSpace(Phone) && !BeneficiaryRules.PhonePattern.IsMatch(BeneficiaryRules.NormalizePhone(Phone)))
             yield return new("Numărul de telefon trebuie să conțină 7–15 cifre, opțional precedate de +.", [nameof(Phone)]);
         if (IsIndividual) yield break;
         if (string.IsNullOrWhiteSpace(Cui)) yield return new("Completează CUI-ul.", [nameof(Cui)]);
-        else if (!BeneficiaryRules.CuiPattern.IsMatch(BeneficiaryRules.CompactValue(Cui)))
+        else if (NeedsCheck ? !BeneficiaryRules.RawCuiPattern.IsMatch(BeneficiaryRules.CompactValue(Cui)) : !BeneficiaryRules.CuiPattern.IsMatch(BeneficiaryRules.CompactValue(Cui)))
             yield return new("CUI-ul trebuie să conțină 2–10 cifre, opțional precedate de RO.", [nameof(Cui)]);
         if (PostalCode.Length > 0 && !BeneficiaryRules.PostalCodePattern.IsMatch(BeneficiaryRules.CompactValue(PostalCode)))
             yield return new("Codul poștal trebuie să conțină 5 sau 6 cifre.", [nameof(PostalCode)]);
@@ -89,6 +92,7 @@ public sealed class BeneficiaryInput : IValidatableObject
             PostalCode = individual ? "" : BeneficiaryRules.CompactValue(PostalCode),
             CaenCode = individual ? "" : BeneficiaryRules.CompactValue(CaenCode),
             AnafVerified = !individual && AnafVerified,
+            NeedsCheck = !individual && NeedsCheck,
             Reason = ChangeReasonRules.Normalize(Reason)
         };
         var results = new List<ValidationResult>();
@@ -133,6 +137,8 @@ public static class BeneficiarySearch
 public static class BeneficiaryRules
 {
     public static readonly Regex CuiPattern = new(@"^(?i:RO)?[0-9]{2,10}$", RegexOptions.Compiled);
+    /// <summary>A CUI of any length (digits, opt. RO): what the import accepts for a beneficiary that is to be verified.</summary>
+    public static readonly Regex RawCuiPattern = new(@"^(?i:RO)?[0-9]{1,12}$", RegexOptions.Compiled);
     public static readonly Regex PhonePattern = new(@"^\+?[0-9]{7,15}$", RegexOptions.Compiled);
     public static readonly Regex PostalCodePattern = new(@"^[0-9]{5,6}$", RegexOptions.Compiled);
     public static readonly Regex CaenPattern = new(@"^[0-9]{3,4}$", RegexOptions.Compiled);

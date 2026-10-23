@@ -45,6 +45,8 @@ internal sealed class GuardedServiceInterventionRepository(IServiceInterventionR
 
     public Task<ServiceInterventionSaved> RecordAsync(int beneficiaryId, ServiceInterventionInput input, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.RecordAsync(beneficiaryId, input, cancellationToken));
+    public Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.IsCoveredAsync(beneficiaryId, workPointId, cancellationToken));
 
     public Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.UpdateAsync(original, input, cancellationToken));
@@ -109,6 +111,7 @@ internal sealed class UnavailableServiceInterventionRepository : IServiceInterve
     public Task<IReadOnlyList<ServiceIntervention>> GetForBeneficiaryAsync(int beneficiaryId, CancellationToken cancellationToken = default) => Out<IReadOnlyList<ServiceIntervention>>();
     public Task<ServiceInterventionPage> GetPageAsync(ServiceInterventionQuery query, CancellationToken cancellationToken = default) => Out<ServiceInterventionPage>();
     public Task<ServiceInterventionSaved> RecordAsync(int beneficiaryId, ServiceInterventionInput input, CancellationToken cancellationToken = default) => Out<ServiceInterventionSaved>();
+    public Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) => Out<bool>();
     public Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default) => Out<ServiceInterventionSaved>();
     public Task DeleteAsync(ServiceIntervention original, string reason, CancellationToken cancellationToken = default) => Out<object>();
 }

@@ -49,6 +49,22 @@ $launcherProject = Join-Path $repo 'tools\BlazorStoc.Installer\BlazorStoc.Instal
 function Step([string]$Text) { Write-Output ("== {0}" -f $Text) }
 function Run-Native([string]$What, [scriptblock]$Command) { & $Command; if ($LASTEXITCODE -ne 0) { throw "$What failed (exit code $LASTEXITCODE)." } }
 
+# The changelog of the packages (Assets\Data\changelog.txt, embedded in the application): the section of this version is the notes of the package unless -NotesFile gives others.
+# A version without a section is refused before anything is built; the file is part of the published application, so it must be written first.
+$changelogFile = Join-Path $repo 'Assets\Data\changelog.txt'
+$changelogItems = @()
+$inSection = $false
+foreach ($line in [IO.File]::ReadAllLines($changelogFile, [Text.Encoding]::UTF8)) {
+    if ($line -match '^##\s*([0-9]+\.[0-9]+\.[0-9]+)') { $inSection = ($Matches[1] -eq $Version); continue }
+    if ($inSection -and $line -match '^\s*-\s*(.+)$') { $changelogItems += ('- ' + $Matches[1].Trim()) }
+}
+if ($changelogItems.Count -eq 0) { throw "Assets\Data\changelog.txt has no section '## $Version | date' with changes; write the changelog of this version first." }
+if (-not $NotesFile) {
+    $NotesFile = Join-Path $repo "artifacts\release\notes-$Version.txt"
+    New-Item -ItemType Directory -Force (Split-Path $NotesFile) | Out-Null
+    [IO.File]::WriteAllText($NotesFile, ($changelogItems -join "`n"), (New-Object Text.UTF8Encoding($false)))
+}
+
 if (-not $SkipChecks) {
     Step 'Checks (whole in-memory suite)'
     & (Join-Path $PSScriptRoot 'run-checks.ps1')

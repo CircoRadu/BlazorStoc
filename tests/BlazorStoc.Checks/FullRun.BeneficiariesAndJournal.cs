@@ -219,10 +219,8 @@ beneficiary = await demoBeneficiaries.CreateAsync(LegalInput("  Beneficiár   no
                  {
                      (new() { Kind = BeneficiaryKinds.Individual, Name = "", Address = "A", Phone = "0744123456" }, "full name"),
                      (new() { Kind = BeneficiaryKinds.Individual, Name = "Ana Test", Address = "", Phone = "0744123456" }, "address"),
-                     (new() { Kind = BeneficiaryKinds.Individual, Name = "Ana Test", Address = "A", Phone = "" }, "phone"),
                      (new() { Kind = BeneficiaryKinds.Individual, Name = "Ana Test", Address = "A", Phone = "12ab" }, "phone format"),
                      (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "RO123456", Address = "", Phone = "0744123456" }, "legal address"),
-                     (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "RO123456", Address = "A", Phone = "" }, "legal phone"),
                      (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "", Address = "A", Phone = "0744123456" }, "legal CUI"),
                      (new() { Kind = BeneficiaryKinds.Legal, Name = "", Cui = "RO123456", Address = "A", Phone = "0744123456" }, "legal name"),
                      (new() { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "RO123456", Address = "A", Phone = "0744123456", CaenCode = "12" }, "CAEN"),
@@ -233,6 +231,9 @@ beneficiary = await demoBeneficiaries.CreateAsync(LegalInput("  Beneficiár   no
             try { await demoBeneficiaries.CreateAsync(broken); throw new Exception("Incomplete beneficiary accepted: " + label); }
             catch (BeneficiaryOperationException) { Check(true, "Required/invalid beneficiary field rejected: " + label); }
         }
+        // The phone is optional (ANAF does not always have it): an empty phone is valid, a wrong one is not.
+        foreach (var withoutPhone in new[] { new BeneficiaryInput { Kind = BeneficiaryKinds.Individual, Name = "Ana Test", Address = "A", Phone = "" }, new BeneficiaryInput { Kind = BeneficiaryKinds.Legal, Name = "Firma", Cui = "RO123456", Address = "A", Phone = "" } })
+            Check(!withoutPhone.Validate(new System.ComponentModel.DataAnnotations.ValidationContext(withoutPhone)).Any(result => result.MemberNames.Contains(nameof(BeneficiaryInput.Phone))), "The phone of a beneficiary is optional: empty is valid for a person and for a company");
         try { await demoBeneficiaries.CreateAsync(new BeneficiaryInput { Kind = BeneficiaryKinds.Individual, Name = "ion POPESCU", Address = "B", Phone = "0755123456" }); throw new Exception("Duplicate individual accepted"); }
         catch (BeneficiaryOperationException exception) { Check(exception.Message.Contains("persoană fizică") && exception.Message.Contains("Ion Popescu"), "A duplicate individual is detected by full name"); }
         var legalFull = await demoBeneficiaries.CreateAsync(new BeneficiaryInput

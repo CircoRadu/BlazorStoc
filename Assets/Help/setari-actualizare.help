@@ -32,12 +32,13 @@ Aici se actualizează aplicația întreagă, cu toate modulele ei, dintr-un pach
 ### Ultima actualizare
 - Ultima actualizare nu a reușit | bandă roșie | Apare administratorului (și în partea de sus a oricărei pagini) când versiunea nouă nu a pornit și aplicația a revenit la cea veche, sau când nici revenirea nu a mers. Butonul „Am luat la cunoștință” o scoate și intră în jurnal. | img: esuata | sel: #update-failure
 ### Istoricul
-- Istoric | tabel | Fiecare actualizare, refuz sau revenire: data, versiunile, de unde s-a cerut (din aplicație sau din installer pe server), cine a cerut, rezultatul și motivul. | sel: #update-history
+- Istoric | tabel | Fiecare actualizare, refuz sau revenire: data, versiunile, de unde s-a cerut (din aplicație sau din installer pe server), cine a cerut, rezultatul și motivul. Sub tabel alegi câte actualizări se văd pe pagină (10, 25, 50 sau toate) și treci între pagini. | sel: #update-history
+- Ce conține update (Vezi changelog) | iconita:view | Ultima coloană a istoricului. Deschide fereastra cu ce a adus versiunea (sau versiunile) acelei actualizări; vezi [[setari-actualizare-changelog]]. Iconița este dezactivată când versiunea nu are changelog.
 
 ## Flux: Cum actualizez aplicația
 1. Pe calculatorul de dezvoltare se construiește pachetul cu tools\release.ps1 (se oprește dacă testele nu trec) și se copiază pe calculatorul de pe care ai deschis aplicația.
 2. Alege pachetul în câmpul de fișier și așteaptă rezultatul verificării.
-3. Citește versiunea, schema bazei de date și notele; dacă scrie „Poate fi instalat”, scrie motivul și apasă „Aplică actualizarea”.
+3. Citește versiunea, schema bazei de date și notele (changelog-ul versiunii); dacă scrie „Poate fi instalat”, scrie motivul și apasă „Aplică actualizarea”.
 4. Utilizatorii sunt anunțați; poți anula cât numără. La sfârșit aplicația se oprește câteva minute: se face backup al bazei de date, se trece pe versiunea nouă, se aplică migrările, se pornește.
 5. Dacă versiunea nouă nu răspunde în două minute, Updater-ul revine singur la cea veche (și la baza de date de dinainte, dacă migrările porniseră). Apare banda roșie până o confirmi.
 Nota: dacă aplicația nu mai pornește deloc, actualizarea sau repararea se face cu installerul, pe server (nu depinde de aplicație).

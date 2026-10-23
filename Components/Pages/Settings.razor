@@ -1,24 +1,38 @@
 ﻿@page "/setari"
-@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-actualizare.view|utilizatori.view|tipuri-utilizatori.view")]
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-actualizare.view|setari-import-activityapp.view|utilizatori.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject BlazorStoc.Services.IDatabaseAccountService DatabaseAccountsGate
 @inject UnsavedChanges Guard
 @inject IInvoiceTemplateService InvoiceTemplates
 @inject IAccessControl Access
+@inject NavigationManager Navigation
+@implements IDisposable
 <PageBoundary>
 
 <PageTitle>Setări · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
 <div class="page-heading"><div><p class="eyebrow">@(isAdmin ? "ADMINISTRARE" : "FACTURI")</p><h1>Setări</h1><p class="muted">@(isAdmin ? "Configurări și operații rezervate administratorului." : "Șabloanele de citire a facturilor: creare și modificare.")</p></div></div>
 <section class="catalog settings-panel">
-    <div class="settings-tabs" role="tablist" aria-label="Secțiuni setări" @onkeydown="OnTabKeyDown">
-        @foreach (var tab in VisibleTabs)
-        {
-            var selected = tab.Id == activeTab;
-            <button type="button" role="tab" id="tab-@tab.Id" class="settings-tab @(selected ? "active" : "")" aria-selected="@(selected ? "true" : "false")" aria-controls="panel-@tab.Id" tabindex="@(selected ? 0 : -1)" @onclick="() => SelectTab(tab.Id)">@tab.Title</button>
-        }
-    </div>
+    @* The settings are a dashboard: one tile for each section the user has the right to; a tile opens its section, and the bar above the section leads back to the tiles. *@
+    @if (activeTab is null)
+    {
+        <div class="settings-dashboard" id="settings-dashboard">
+            @foreach (var tab in VisibleTabs)
+            {
+                <button type="button" class="settings-tile" id="tile-@tab.Id" aria-label="@tab.Title" @onclick="() => SelectTab(tab.Id)"><strong>@tab.Title</strong><small>@TileText(tab.Id)</small></button>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="settings-section-bar">
+            @if (VisibleTabs.Length > 1) { <button type="button" id="settings-back" class="refresh act-nav" @onclick="() => SelectTab(null)">‹ Toate setările</button> }
+            <div role="tablist" aria-label="Secțiunea deschisă">
+                <button type="button" role="tab" id="tab-@activeTab" class="settings-tab active" aria-selected="true" aria-controls="panel-@activeTab" tabindex="0">@(Tabs.FirstOrDefault(tab => tab.Id == activeTab).Title)</button>
+            </div>
+        </div>
+    }
     @* The invoices panel stays mounted (hidden) when another tab is shown, so a template being edited keeps its changes. *@
         <div role="tabpanel" id="panel-@InvoicesTab" aria-labelledby="tab-@InvoicesTab" class="settings-body" hidden="@(activeTab != InvoicesTab)">
             <ModuleGate ModuleId="@BlazorStoc.Modules.Invoices.InvoicesModule.ModuleId">
@@ -47,6 +61,12 @@
     {
         <div role="tabpanel" id="panel-@AnafTab" aria-labelledby="tab-@AnafTab" class="settings-body">
             <ModuleGate ModuleId="@BlazorStoc.Modules.Anaf.AnafModule.ModuleId"><AnafConfigurator /></ModuleGate>
+        </div>
+    }
+    else if (activeTab == ActivityImportTab && allowedTabs.Contains(ActivityImportTab))
+    {
+        <div role="tabpanel" id="panel-@ActivityImportTab" aria-labelledby="tab-@ActivityImportTab" class="settings-body">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId"><ActivityImportPanel /></ModuleGate>
         </div>
     }
     else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))
@@ -147,6 +167,7 @@
     private void ServerChanged() => connectionRevision++;
 
     private const string AnafTab = "anaf";
+    private const string ActivityImportTab = "preluare-activityapp";
     private const string NotificationsTab = SettingsNavigation.NotificationsTab;
     private const string MapTab = SettingsNavigation.MapTab;
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
@@ -177,22 +198,49 @@
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare ActivityApp"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
-        [AnafTab] = "setari-anaf.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
+        [AnafTab] = "setari-anaf.view", [ActivityImportTab] = "setari-import-activityapp.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
         [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [UpdateTab] = "setari-actualizare.view"
     };
     private readonly HashSet<string> allowedTabs = [];
-    private string activeTab = AnafTab;
+    // The open section; null shows the dashboard of the sections.
+    private string? activeTab;
+
+    private static string TileText(string id) => id switch
+    {
+        AnafTab => "Interogarea serviciului public ANAF pentru datele firmelor.",
+        ActivityImportTab => "Conexiunea la ActivityApp, tichetele preluate, corespondența câmpurilor și programarea importului.",
+        NotificationsTab => "Șabloanele de notificări și setările lor.",
+        MapTab => "Furnizorul și aspectul hărții de mentenanță.",
+        InvoicesTab => "Șabloanele de citire a facturilor.",
+        BackupTab => "Backup, restaurare, copiere pe NAS și verificarea orei.",
+        ModulesTab => "Starea modulelor și oprirea sau pornirea lor.",
+        UpdateTab => "Versiunea aplicației, pachetele de actualizare și istoricul lor.",
+        UsersTab => "Conturile utilizatorilor și drepturile fiecărui tip de utilizator.",
+        DatabaseTab => "Starea serverului bazei de date și conexiunea aplicației la el.",
+        _ => ""
+    };
 
     // The administrator has every tab; a user without that role only reaches the invoice templates (creating and changing them).
     private bool isAdmin => allowedTabs.Any(tab => tab != InvoicesTab);
     private (string Id, string Title)[] VisibleTabs => [.. Tabs.Where(tab => allowedTabs.Contains(tab.Id))];
 
+    // The "Setări" entry of the menu leads back to the dashboard from an open section (the address is the same, so the page is not rebuilt: the click is seen here).
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
+    {
+        var uri = new Uri(args.Location);
+        if (!uri.AbsolutePath.Equals("/setari", StringComparison.OrdinalIgnoreCase) || uri.Query.Length > 1 || activeTab is null || VisibleTabs.Length < 2) return;
+        _ = InvokeAsync(() => { SelectTab(null); StateHasChanged(); });
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
     protected override async Task OnInitializedAsync()
     {
+        Navigation.LocationChanged += OnLocationChanged;
         // The Database tab depends only on the Administrator role (from the sign-in cookie, no database involved): it must open when the database is down,
         // because it is where the connection is fixed. A key that cannot be read (the database does not answer) only hides its own tab.
         if (await Access.IsAdministratorAsync()) allowedTabs.Add(DatabaseTab);
@@ -225,7 +273,9 @@
             }
             catch (Exception exception) when (exception is not OperationCanceledException) { }
         }
-        if (!allowedTabs.Contains(activeTab) && VisibleTabs.Length > 0) activeTab = VisibleTabs[0].Id;
+        // A user with a single section (the invoice templates) goes straight into it: a dashboard of one tile would only be a step more.
+        if (activeTab is not null && !allowedTabs.Contains(activeTab)) activeTab = null;
+        if (activeTab is null && VisibleTabs.Length == 1) activeTab = VisibleTabs[0].Id;
     }
 
 
@@ -362,7 +412,7 @@
 
     // Leaving the "Editare șablon" sub-tab (for another sub-tab, another tab or another page) closes the editing; with unsaved changes the user is
     // asked first (the same question as for every editor), and the change happens only after he chose to leave.
-    private void SelectTab(string id)
+    private void SelectTab(string? id)
     {
         if (id != InvoicesTab && activeTab == InvoicesTab && editTemplate is not null) AfterEditingClosed(() => activeTab = id);
         else activeTab = id;
@@ -408,18 +458,4 @@
         SelectSubtab(subtabs, subtabs[index].Id);
     }
 
-    private void OnTabKeyDown(KeyboardEventArgs args)
-    {
-        var tabs = VisibleTabs;
-        var index = Array.FindIndex(tabs, tab => tab.Id == activeTab);
-        index = args.Key switch
-        {
-            "ArrowRight" => (index + 1) % tabs.Length,
-            "ArrowLeft" => (index - 1 + tabs.Length) % tabs.Length,
-            "Home" => 0,
-            "End" => tabs.Length - 1,
-            _ => index
-        };
-        SelectTab(tabs[index].Id);
-    }
 }

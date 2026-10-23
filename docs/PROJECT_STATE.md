@@ -9,6 +9,13 @@ Actualizat: 23.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (23.10.2026): versiunile 0.5.7 - 0.5.11 (Preluare tichete ActivityApp, Setari ca panou)
+
+- Modulul **Preluare tichete ActivityApp** (`Modules/ActivityImport/`, Setari -> Preluare ActivityApp; vezi `docs/PROPUNERE_IMPORT_TICHETE.md` si `docs/HARTA_COD.md`): citire read-only din SQL Server, tipuri de tichete alese, corespondenta campurilor, cuvinte cheie de mentenanta (Nomenclator), sincronizare periodica sau la ore fixe + "Importa acum", beneficiari verificati in ANAF (`ICompanyDataLookup` din nucleu), coada beneficiarilor de verificat (Beneficiari -> De verificat), citire incrementala cu marcaj ("Reciteste tot"), tichete in asteptare, verificare umana a mentenantei (mentenanta s-a facut / la cerere / discard, reactivare). Migrarile 044-050.
+- Setari este un panou cu tile-uri; pagina principala are acelasi aspect; meniul lateral are bara verde la activ/hover; Istoricul de actualizari are paginare; changelog pe versiune (`Assets/Data/changelog.txt`).
+- Telefonul beneficiarului este optional. Persoanele fizice (fara CUI, cod personal, nume in campul CUI) nu se preiau din ActivityApp.
+- Verificat (23.10.2026): suita in memorie 2039 PASS, MariaDB 3009 PASS, 0 esecuri; pachetul de update 0.5.11 (schema 50) facut si verificat. Neverificat pe un ActivityApp real (doar pe date din export si pe un SQL Server simulat); help-ul nu este actualizat (lista in `docs/HELP_DE_REGENERAT.md`, regula din 23.10.2026).
+
 ## Ultimul lucru facut (23.10.2026): versiunea 0.5.6
 
 - Pagina de autentificare: comutatorul "Pastreaza-ma autentificat" (cookie de 30 de zile; implicit oprit, sesiune de 8 ore); Jurnalul spune cand o conectare a fost pastrata.

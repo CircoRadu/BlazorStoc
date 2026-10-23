@@ -1,0 +1,19 @@
+# Componente modificate - help de regenerat la cerere
+
+Regula (23.10.2026): help-ul (`Assets/Help/*.help`) si capturile (`node tools/help-capture.mjs --topic cheie`, doar pe baza demo, vezi `docs/PROPUNERE_HELP_IMAGINI.md`) NU se actualizeaza odata cu o schimbare. Aici se noteaza componentele modificate; help-ul se regenereaza numai cand utilizatorul cere, pentru componentele din lista. Randurile refacute se scot de aici. Fara diacritice.
+
+Stare: **text** = topicul `.help` este la zi; **captura** = imaginea si harta elementelor sunt la zi. „de facut” = ramas de refacut.
+
+| Componenta | Ce s-a schimbat | Topicuri / capturi afectate | Text | Captura | Data |
+|------------|-----------------|-----------------------------|------|---------|------|
+| Setari (panou) | Pagina /setari este un panou cu cate un tile pe sectiune; sectiunea deschisa are bara „‹ Toate setarile” + numele ei in locul barii de file; butonul „Setari” din meniul general readuce la panou | `setari` (pagina, subsectiuni) | la zi | la zi | 23.10.2026 |
+| Setari (toate sectiunile) | Bara de file de sus a disparut din sectiunile deschise (apare bara cu „‹ Toate setarile”); capturile pornesc de la /setari si dau clic pe tile | toate capturile care incep cu `/setari`: `setari-anaf`, `setari-notificari-sabloane`, `setari-notificari-setari`, `setari-harta-motor`, `setari-harta-overlay`, `setari-facturi-generare`, `setari-facturi-sabloane`, `setari-facturi-editare` (+ variantele XML), `setari-backup`, `setari-backup-nas`, `setari-backup-ora`, `setari-module`, `setari-actualizare` (+ changelog, neinstalata, verificat, refuzat, numaratoare, lucreaza, esuata), `setari-baza-stare`, `setari-baza-conexiune` (+ ferestrele ei), `setari-tipuri-utilizatori` | nu e nevoie | de facut | 23.10.2026 |
+| Setari -> Actualizare -> Istoric | Paginare cu alegerea numarului de randuri pe pagina (10, 25, 50, toate) | `setari-actualizare` (pagina) | la zi | de facut | 23.10.2026 |
+| Setari -> Preluare ActivityApp | Sectiunile 5 (programare), 6 (corespondenta campurilor), 7 (evenimente de validat); completare din ANAF, verificare ANAF si „neverificat”, doar persoane juridice in sectiunea 3 | fereastra nu are topic `.help` (de facut la cerere) | de facut | de facut | 23.10.2026 |
+| Nomenclator | Tab nou „Cuvinte cheie mentenanta”; „Tipuri de sisteme” e primul tab | `nomenclator`, `nomenclator-cuvinte-mentenanta` | la zi | la zi | 23.10.2026 |
+| Pagina principala | Tile-urile principale au aspectul tile-urilor din Setari (iconitele pastrate, sageata scoasa, titlul verde) | `acasa` (pagina, oprit) | nu e nevoie | la zi | 23.10.2026 |
+| Beneficiar (formular) | Telefonul nu mai este obligatoriu | `beneficiari-editor` | la zi | la zi | 23.10.2026 |
+| Setari -> Baza de date -> Sesiuni deschise | Fereastra mai lata, coloanele pe un singur rand | `setari-baza-sesiuni` | nu e nevoie | la zi | 23.10.2026 |
+| Meniu lateral | Elementul activ si cel cu hover au bara verde curbata din stanga (rosie la cele cu alerta), ca la tile-urile din panouri | toate capturile care arata meniul lateral (o schimbare de meniu atinge toate ferestrele: `--all` doar la cererea utilizatorului) | nu e nevoie | de facut | 23.10.2026 |
+| Beneficiari (card De verificat) | Card nou deasupra registrului, cu partenerii preluati din ActivityApp care cer verificare (reincearca ANAF, accepta, discard) | `beneficiari` (pagina) | de facut | de facut | 23.10.2026 |
+| Setari -> Preluare ActivityApp (flux pe tichete) | Citire incrementala, „Reciteste tot”, sectiunea 7 cu 3 decizii (mentenanta s-a facut / nu / discard), lista „Tichete discardate” cu reactivare | fereastra nu are topic `.help` | de facut | de facut | 23.10.2026 |

@@ -88,6 +88,8 @@ public interface IServiceInterventionRepository
     /// <summary>Records an intervention. Maintenance needs a work point under an active contract and moves its due date (unless a more
     /// recent maintenance intervention of the point exists); on demand takes any work point of the beneficiary and moves nothing.</summary>
     Task<ServiceInterventionSaved> RecordAsync(int beneficiaryId, ServiceInterventionInput input, CancellationToken cancellationToken = default);
+    /// <summary>Whether an active maintenance contract of the beneficiary covers the work point (a maintenance intervention can then be recorded for it).</summary>
+    Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default);
     /// <summary>Notes always; the date and the next due of the latest due-moving maintenance intervention (the choice is reopened); the date of an on-demand one.</summary>
     Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default);
     /// <summary>Archived deletion with its photos. Deleting the latest due-moving maintenance intervention returns the due date to the one it closed.</summary>

@@ -4,22 +4,23 @@ Cautare: setari configurari administrare anaf notificari harta facturi backup mo
 Captura: pagina | /setari |  | Setările
 Captura: subsectiuni | /setari | click Backup; wait 1200 | Secțiunea Backup, cu subsecțiunile ei
 
-Configurările aplicației, rezervate administratorului; un utilizator fără acest rol ajunge doar la șabloanele de facturi (le creează și le modifică). Fiecare secțiune are propriul ajutor: apasă „?” după ce ai ales secțiunea.
+Configurările aplicației, rezervate administratorului; un utilizator fără acest rol ajunge doar la șabloanele de facturi (le creează și le modifică). Setările sunt un panou cu un tile pentru fiecare secțiune; fiecare secțiune are propriul ajutor: apasă „?” după ce ai deschis secțiunea.
 
 ## Elemente
 ### Secțiunile
-- Preluare date ANAF | filă | Configurarea interogării serviciului public ANAF ([[setari-anaf]]).
-- Notificări | filă | Șabloanele de notificări și setările lor ([[setari-notificari-sabloane]], [[setari-notificari-setari]]).
-- Hartă | filă | Furnizorul și aspectul hărții de mentenanță ([[setari-harta-motor]], [[setari-harta-overlay]]).
-- Facturi | filă | Șabloanele de citire a facturilor ([[setari-facturi-generare]], [[setari-facturi-sabloane]]).
-- Backup | filă | Backup, restaurare, copiere pe NAS și verificarea orei ([[setari-backup]], [[setari-backup-nas]], [[setari-backup-ora]]).
-- Module | filă | Starea modulelor aplicației și oprirea/pornirea lor ([[setari-module]]).
-- Utilizatori | filă | Conturile utilizatorilor ([[utilizatori]]) și drepturile fiecărui tip de utilizator, în subsecțiunea „Tipuri de utilizatori” ([[setari-tipuri-utilizatori]]).
-- Bază de date | filă | Starea serverului bazei de date și conexiunea aplicației la el ([[setari-baza-stare]], [[setari-baza-conexiune]]); apare numai conturilor cu nivelul Administrator.
-- Subsecțiunile | filă | Unele secțiuni au subsecțiuni, afișate sub bara principală. | img: subsectiuni | sel: .settings-subtab
+- Preluare date ANAF | buton | Configurarea interogării serviciului public ANAF ([[setari-anaf]]).
+- Notificări | buton | Șabloanele de notificări și setările lor ([[setari-notificari-sabloane]], [[setari-notificari-setari]]).
+- Hartă | buton | Furnizorul și aspectul hărții de mentenanță ([[setari-harta-motor]], [[setari-harta-overlay]]).
+- Facturi | buton | Șabloanele de citire a facturilor ([[setari-facturi-generare]], [[setari-facturi-sabloane]]).
+- Backup | buton | Backup, restaurare, copiere pe NAS și verificarea orei ([[setari-backup]], [[setari-backup-nas]], [[setari-backup-ora]]).
+- Module | buton | Starea modulelor aplicației și oprirea/pornirea lor ([[setari-module]]).
+- Utilizatori | buton | Conturile utilizatorilor ([[utilizatori]]) și drepturile fiecărui tip de utilizator, în subsecțiunea „Tipuri de utilizatori” ([[setari-tipuri-utilizatori]]).
+- Bază de date | buton | Starea serverului bazei de date și conexiunea aplicației la el ([[setari-baza-stare]], [[setari-baza-conexiune]]); apare numai conturilor cu nivelul Administrator.
+- Toate setările | buton | Din interiorul unei secțiuni te întoarce la tile-urile cu toate secțiunile. | img: subsectiuni | sel: #settings-back
+- Subsecțiunile | filă | Unele secțiuni au subsecțiuni, afișate sub numele secțiunii deschise. | img: subsectiuni | sel: .settings-subtab
 
 ## Flux: Cum găsesc o setare
-1. Alege secțiunea potrivită din bara de file.
+1. Alege tile-ul secțiunii potrivite din pagina Setări; „‹ Toate setările” te readuce la tile-uri.
 2. Dacă are subsecțiuni, alege-o pe cea dorită.
 3. Apasă „?” ca să vezi ce face fiecare element al secțiunii.
 Nota: vezi doar secțiunile la care ai drept; un utilizator obișnuit vede doar Facturi.

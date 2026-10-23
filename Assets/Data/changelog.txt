@@ -1,0 +1,49 @@
+# Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
+# Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.11 | 23.10.2026
+- Preluare tichete din ActivityApp, flux nou: se citesc numai tichetele închise noi sau modificate de la ultima sincronizare (buton „Recitește tot” pentru o citire completă); clienții lor se preiau la nevoie, nu mai tot tabelul de parteneri, și se verifică în ANAF.
+- Beneficiari → De verificat: partenerii preluați din ActivityApp care cer o verificare (ANAF indisponibil sau CUI necunoscut, CUI cu formă invalidă, adresă lipsă), cu operațiile reîncearcă ANAF, acceptă manual și discard. Notificare pentru administrator. Tichetele clientului așteaptă clarificarea.
+- Un CUI cu cifre dar cu formă greșită se preia pentru verificare; un CUI cu litere (în afară de prefixul RO) nu se preia.
+- Orice cuvânt cheie de mentenanță (exact sau aproximativ) la un punct cu contract: tichetul intră imediat între intervențiile beneficiarului, la cerere, iar operatorul alege: mentenanța s-a făcut (devine mentenanță și mută scadența), nu este mentenanță sau discard (șterge intervenția și tichetul nu se mai preia; poate fi reactivat).
+- Tichete discardate: listă în Setări → Preluare ActivityApp, cu reactivare. Migrarea 50 a bazei de date.
+## 0.5.10 | 23.10.2026
+- Preluare ActivityApp: se preiau numai persoanele juridice cu CUI valid; persoanele fizice (fără CUI, cod personal sau un nume în câmpul CUI) nu se preiau și apar ca ignorate.
+- Firmele se verifică în ANAF și își completează adresa sau telefonul de acolo; un CUI necunoscut de ANAF nu se preia, iar dacă ANAF nu răspunde, firma cu CUI valid se preia marcată „neverificată în ANAF”.
+- Preluare ActivityApp, secțiunea „Tipuri de tichete”: două grupuri pliabile, tipurile nefolosite (pliat) și cele folosite (deschis implicit).
+- Beneficiar: telefonul nu mai este obligatoriu.
+- Backup și restaurare: tabelele modulului ActivityApp sunt incluse în backup.
+- Setări: butonul „Setări” din meniu readuce la panou din orice secțiune.
+- Pagina principală: tile-urile au aspectul tile-urilor din Setări, cu iconițele păstrate; meniul lateral arată o bară verde la elementul activ sau cu cursorul deasupra.
+## 0.5.9 | 23.10.2026
+- Preluare tichete din ActivityApp: corespondența câmpurilor (coloane alese din setări), cuvinte cheie pentru mentenanță găsite în ce s-a făcut în tichet, programare la interval sau la ore fixe și „Importă acum”.
+- Un cuvânt scris greșit sau incomplet (inclusiv cu cifre sau semne de la tastatura telefonului) nu se preia singur: administratorul primește o notificare și validează în Setări → Preluare ActivityApp → Evenimente de validat.
+- Nomenclator: tab nou „Cuvinte cheie mentenanță” (lista cuvintelor, modificare, activare, ștergere, „Încearcă un text”); „Tipuri de sisteme” este primul tab.
+- Setări: panou cu un tile pentru fiecare secțiune; butonul „‹ Toate setările” readuce la panou.
+- Setări → Actualizare → Istoric: paginare cu alegerea numărului de rânduri pe pagină.
+- Sesiuni deschise: fereastra mai lată, coloanele pe un singur rând.
+## 0.5.8 | 23.10.2026
+- Pagina de autentificare: comutatorul „Păstrează-mă autentificat” se afișează corect în orice browser și la orice lățime.
+## 0.5.7 | 23.10.2026
+- Setări → Actualizare → Istoric: iconiță de changelog pe fiecare rând; fereastra arată ce a adus fiecare versiune prin care a trecut actualizarea.
+- Fiecare pachet de actualizare are un changelog (notele pachetului se iau din el).
+## 0.5.6 | 23.10.2026
+- Pagina de autentificare: opțiunea „Păstrează-mă autentificat” (30 de zile; implicit oprită, sesiunea ține 8 ore).
+- Jurnal: evenimentul „Conectare” arată când sesiunea a fost păstrată.
+## 0.5.5 | 22.10.2026
+- Jurnal: „Conectare” și „Deconectare” arată adresa IP; operație nouă „Conectare eșuată” (numele tastat, motivul, adresa IP, fără parolă).
+- Pagina de autentificare afișează versiunea reală a aplicației.
+- Formular produs: imaginea se lipește cu Ctrl + V (butonul de clipboard a fost scos).
+- Meniul din stânga are zonă de derulare.
+## 0.5.4 | 22.10.2026
+- Help: fiecare element are chenar pe imaginea din help; capturi refăcute.
+- Corecturi la scripturile de server și la installer.
+## 0.5.3 | 21.10.2026
+- Versiune de verificare a actualizării (fără schimbări de funcționalitate).
+## 0.5.2 | 21.10.2026
+- Versiune de verificare a actualizării (fără schimbări de funcționalitate).
+## 0.5.1 | 21.10.2026
+- Versiune de verificare a actualizării (fără schimbări de funcționalitate).
+## 0.5.0 | 21.10.2026
+- Prima versiune cu actualizare a aplicației: pachete .bsu semnate, Setări → Actualizare, installer, revenire automată la versiunea anterioară.
+- Registrul schimbărilor bazei de date (schema_migrations) și versiunea aplicației în Setări → Module și /health.
+- Backup și restaurare cu imaginile și fișierele aplicației.

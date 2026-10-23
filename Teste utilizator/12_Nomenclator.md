@@ -27,3 +27,15 @@ Decizie: tipurile nu se sterg niciodata (se dezactiveaza), ca sa nu se piarda le
 
 1. Adaugi tipurile -> le ordonezi -> adaugi denumirile alternative folosite in oferte.
 2. Un tip scos din uz se dezactiveaza (nu mai apare la alegeri noi, dar ramane la proiectele care il au).
+
+### 23.10.2026 - Tab nou: Cuvinte cheie mentenanta
+
+**Ce s-a adaugat:** Nomenclatorul are doua taburi: „Tipuri de sisteme” (ca pana acum) si „Cuvinte cheie mentenanta” (lista cuvintelor folosite la preluarea tichetelor din ActivityApp; vezi `18_Preluare_tichete_ActivityApp.md`). Dreptul: nomenclator view/add/edit/delete.
+
+**Ce face acum:** poti adauga, redenumi, activa/dezactiva si sterge cuvinte cheie; „Incearca un text” arata ce ar face importul cu un text.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Nomenclator | Doua taburi; primul arata tipurile de sisteme ca inainte | |
+| 2 | Tabul „Cuvinte cheie mentenanta” | Lista, campul de adaugare si „Incearca un text” | |
+| 3 | Un cont fara dreptul de modificare la nomenclator | Nu poate adauga, modifica sau sterge | |

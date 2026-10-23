@@ -142,6 +142,16 @@ public sealed class MariaServiceInterventionRepository(
         return saved;
     }
 
+    public async Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.add", cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, null, CoverageSelect + " WHERE p.active_work_point_id=@workPoint AND c.beneficiary_id=@beneficiary LIMIT 1",
+            ("@workPoint", workPointId), ("@beneficiary", beneficiaryId));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureAsync("mentenanta.edit", cancellationToken).ConfigureAwait(false);

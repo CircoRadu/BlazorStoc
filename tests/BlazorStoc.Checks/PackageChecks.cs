@@ -20,8 +20,25 @@ public static class PackageChecks
         }
     });
 
+    // The changelog of the packages (Assets/Data/changelog.txt): its format, the versions an update went through and the notes of a version.
+    private static void ChangelogChecks(Action<bool, string> check)
+    {
+        var sample = BlazorStoc.Services.Update.UpdateChangelog.Parse("# comentariu\n## 0.3.0 | 03.01.2026\n- trei a\n- trei b\n## 0.2.0 | 02.01.2026\n- doi\n## 0.1.0\n- unu\n");
+        check(sample.Count == 3 && sample[0].Version == "0.3.0" && sample[0].Date == "03.01.2026" && sample[0].Items.Count == 2 && sample[2].Date == "",
+            "Changelog: sections are read with version, date and one line per change");
+        string Versions(string? from, string? to) => string.Join(",", BlazorStoc.Services.Update.UpdateChangelog.Between(sample, from, to).Select(entry => entry.Version));
+        check(Versions("0.1.0", "0.3.0") == "0.3.0,0.2.0" && Versions(null, "0.3.0") == "0.3.0" && Versions("0.3.0", "0.1.0") == "0.1.0" && Versions("0.1.0", "9.9.9") == "" && Versions("0.1.0", "?") == "",
+            "Changelog: an update shows the versions after its origin up to its target (newest first); a rollback or an unknown version shows only its own");
+        check(BlazorStoc.Services.Update.UpdateChangelog.NotesFor(sample, "0.2.0") == "- doi" && BlazorStoc.Services.Update.UpdateChangelog.NotesFor(sample, "0.9.0") is null,
+            "Changelog: the notes of a version are its lines; a version without a section has none");
+        var current = BlazorStoc.Services.Update.UpdateChangelog.Versions;
+        check(current.Count > 0 && current.All(entry => entry.Items.Count > 0) && BlazorStoc.Services.Update.UpdateChangelog.NotesFor(BlazorStoc.Services.AppVersion.Current) is not null,
+            "Changelog: the embedded changelog has a section with changes for the version of the application");
+    }
+
     public static async Task RunAsync(Action<bool, string> check)
     {
+        ChangelogChecks(check);
         var folder = Path.Combine(Path.GetTempPath(), "blazorstoc-pkg-" + Guid.NewGuid().ToString("N"));
         try
         {

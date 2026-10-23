@@ -40,6 +40,11 @@ public static partial class MariaExtendedChecks
             await Section("User types: system types, catalog permissions, seeding, assignment", () => UserTypesAsync(configuration, admin, audit, probe));
             await Section("Stock permissions: each kind of movement asks for its own key", () => StockPermissionsAsync(configuration, admin, audit));
             await Section("Module state: modules stopped by hand are saved, put back at restart, journal", () => ModuleStateAsync(configuration, admin, audit, probe));
+            await Section("Activity import: settings with encrypted password, test, structure state, ticket types, journal, administrator only", () => ActivityImportAsync(configuration, admin, audit, probe));
+            await Section("Activity import partners: simulation, application, ties, problems, journal, administrator only", () => ActivityPartnersAsync(configuration, admin, audit, probe));
+            await Section("Activity import tickets: simulation, application, date limit, destinations, source detail, journal, administrator only", () => ActivityTicketsAsync(configuration, admin, audit, probe));
+            await Section("Activity import maintenance: keywords nomenclator, tickets that are also maintenance, events to validate, decisions, journal", () => ActivityMaintenanceAsync(configuration, admin, audit, probe));
+            await Section("Activity import synchronization: by hand and scheduled, backoff, alerts, deleted in the source (only signalled), worker", () => ActivitySyncAsync(configuration, admin, audit, probe));
             await Section("Schema ledger: applied migrations are recorded, read back, never overwritten, drift of an edited file", () => SchemaLedgerAsync(configuration, probe));
             await Section("Module permissions: registers are read by anyone with a permission, add/edit/delete each ask for their key", () => ModulePermissionsAsync(configuration, admin, audit));
             await Section("Subcategory order: arranged by the administrator, new ones at the end, journal", () => SubcategoryOrderAsync(configuration, admin, audit));

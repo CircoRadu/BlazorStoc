@@ -1,0 +1,32 @@
+﻿# Nomenclator · Cuvinte cheie mentenanță
+Ruta: /nomenclator
+Tab: Cuvinte cheie mentenanță
+Cautare: nomenclator cuvinte cheie mentenanta activityapp tichete eveniment inchidere scris gresit telefon validare notificare incearca un text
+Captura: pagina | /nomenclator | sql INSERT IGNORE INTO activity_import_keywords (keyword, keyword_key, active, created_by, created_utc, version) VALUES ('mentenanță', 'mentenanta', 1, 'demo', NOW(), 0), ('revizie periodică', 'revizie periodica', 0, 'demo', NOW(), 0); reload; click Cuvinte cheie mentenanță; wait 800; full | Cuvintele cheie de mentenanță
+Captura: modificare | /nomenclator | click Cuvinte cheie mentenanță; click sel:#keywords-table button.row-icon.edit; wait 800 | Modificarea unui cuvânt cheie
+
+Cuvinte care, găsite în ce s-a făcut într-un tichet din ActivityApp (descrierea de la închiderea evenimentului), arată că s-a făcut și mentenanță. Se aplică tuturor tipurilor de tichete preluate, cu excepția celor preluate ca mentenanță. Dacă beneficiarul are contract de mentenanță activ pe punctul de lucru, evenimentul se înregistrează ca mentenanță și mută următoarea scadență; altfel rămâne intervenție la cerere. Nu contează literele mari sau mici, semnele de punctuație și diacriticele. Un cuvânt scris greșit sau incomplet (mai ales de pe telefon, cu cifre sau semne în loc de litere) nu se preia singur: administratorul primește o notificare și îl validează sau îl respinge în Setări → Preluare ActivityApp, „Evenimente de validat”.
+
+## Elemente
+### Cuvântul nou
+- Cuvânt cheie nou | câmp | Scrii un cuvânt sau o expresie (cel puțin 3 litere, fără virgulă), de exemplu „mentenanță”. Același cuvânt scris cu alte litere, cu semne sau fără diacritice este refuzat ca duplicat.
+- Adaugă cuvântul | buton | Adaugă cuvântul în listă, activ.
+### Lista cuvintelor
+- Cuvânt cheie | coloană | Cuvântul sau expresia căutată în ce s-a făcut în tichet.
+- Activ | comutator | Un cuvânt inactiv nu mai este căutat, dar rămâne în listă.
+- Modifică | iconita:edit | Deschide câmpul de modificare a cuvântului.
+- Salvează | iconita:check | Salvează cuvântul modificat (sau confirmă ștergerea). | img: modificare
+- Renunță | iconita:close | Renunță la modificare sau la ștergere. | img: modificare
+- Șterge | iconita:delete | Cere confirmarea și șterge cuvântul.
+### Încearcă un text
+- Text de încercat | câmp | Scrii sau lipești descrierea de la închiderea unui eveniment; dedesubt vezi dacă este cuvânt găsit, cuvânt care doar seamănă (cere validare) sau niciun cuvânt.
+
+## Flux: Cum adaug un cuvânt cheie
+1. Scrie cuvântul în câmpul de sus (poți folosi începutul unui cuvânt, de exemplu „mentenan”, ca să prindă și „mentenanță” și „mentenante”).
+2. Apasă „Adaugă cuvântul”.
+3. Verifică în „Încearcă un text” cu o descriere reală dintr-un tichet.
+
+## Flux: Cum procedez cu un cuvânt scris greșit
+1. Importul observă că în tichet scrie ceva care seamănă cu un cuvânt cheie (o literă lipsă sau în plus, spațiu în cuvânt, cifre sau semne în loc de litere).
+2. Dacă punctul de lucru are contract de mentenanță activ, tichetul nu se preia, iar tu primești o notificare.
+3. În Setări → Preluare ActivityApp, secțiunea „Evenimente de validat”, alegi „Este mentenanță” sau „Nu este mentenanță”; tichetul se preia la următoarea sincronizare.

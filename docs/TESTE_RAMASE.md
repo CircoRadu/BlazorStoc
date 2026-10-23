@@ -896,3 +896,5 @@ Acces din retea implicit si dezinstalare (cu pachet de restaurare) (21.10.2026):
 Script de stergere completa a BlazorStoc de pe un server (remove-blazorstoc.ps1) (21.10.2026): Script: rularea pe serverul real cu serviciul BlazorStocMariaDB real, intrebarea STERGE tastata de o persoana si -KeepData (nu au fost rulate pe un server real); parola/confirmarea se tasteaza la consola.
 
 Help: fiecare element are chenar pe imaginea din help (21.10.2026): Imagini pentru Copiaza pe NAS (necesita un NAS cu cont) si Rezultatul ultimei operatii pe conturile bazei de date (necesita conturile dedicate): nu se pot face in mediul demo.
+
+Preluare tichete ActivityApp: etapele 5-7 (flux pe tichete), Setari ca panou, versiunile 0.5.7-0.5.11 (23.10.2026): Preluare ActivityApp: de testat pe un ActivityApp real cu cont read-only (pasii din Teste utilizator/18); help-ul si capturile din docs/HELP_DE_REGENERAT.md raman de refacut la cerere; pachetul 0.5.11 de instalat pe server.

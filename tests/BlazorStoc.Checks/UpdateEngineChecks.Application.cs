@@ -377,6 +377,8 @@ public static partial class UpdateEngineChecks
         var panel = context.Render<UpdatePanel>();
         check(panel.Markup.Contains("5.0.0") && panel.FindAll("#update-package").Count == 1 && panel.FindAll("#update-history tbody tr").Count == 1 && panel.FindAll("#update-not-managed").Count == 0,
             "Update screen: the page shows the version, the field for the package and the history");
+        check(panel.FindAll("#update-history-page-size option").Select(option => option.TextContent).SequenceEqual(["10", "25", "50", "Toate"]) && panel.Markup.Contains("1–1 din 1"),
+            "Update screen: the history has a selector of the number of entries per page and the range shown");
 
         var package = await world.PackAsync(keys, "5.1.0", notes: "Linia unu\nLinia doi");
         panel.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(await File.ReadAllBytesAsync(package), "BlazorStoc-5.1.0.bsu"));

@@ -1,0 +1,137 @@
+@using BlazorStoc.Modules.ActivityImport
+@using BlazorStoc.Services
+@inject IActivityKeywordService Keywords
+@inject ILogger<ActivityKeywordsPanel> Logger
+@implements IDisposable
+
+@* Nomenclator -> Cuvinte cheie mentenanță: the words that show that maintenance was also done in a ticket of ActivityApp (see ActivityKeywords). *@
+<p class="muted" style="margin:16px 0 8px">Cuvinte care, găsite în ce s-a făcut într-un tichet din ActivityApp (descrierea de la închiderea evenimentului), arată că s-a făcut și mentenanță. Se aplică tuturor tipurilor de tichete preluate, cu excepția celor preluate ca mentenanță. Dacă beneficiarul are contract de mentenanță activ pe punctul de lucru, evenimentul se înregistrează ca mentenanță și mută următoarea scadență; altfel rămâne intervenție la cerere. Nu contează literele mari sau mici, semnele de punctuație și diacriticele. Un cuvânt scris greșit sau incomplet (mai ales de pe telefon, cu cifre sau semne în loc de litere) nu se preia singur: administratorul primește o notificare și îl validează sau îl respinge.</p>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Cuvinte cheie <span class="count-badge">@items.Count</span></h2></div>
+    <form class="filters" @onsubmit="AddAsync" @onsubmit:preventDefault>
+        <label class="search-box"><span>＋</span><input id="keyword-new" aria-label="Cuvânt cheie nou" placeholder="Un cuvânt sau o expresie, de exemplu „mentenanță”…" maxlength="@ActivityKeywords.MaximumLength" disabled="@busy" @bind="newKeyword" @bind:event="oninput" /></label>
+        <button type="submit" class="primary" disabled="@(busy || string.IsNullOrWhiteSpace(newKeyword))">Adaugă cuvântul</button>
+    </form>
+    @if (loading)
+    {
+        <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+    }
+    else if (items.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>Nu există cuvinte cheie</h3><p>Fără cuvinte cheie, niciun tichet nu este tratat ca mentenanță. Adaugă primul cuvânt de mai sus (de exemplu „mentenanță”).</p></div>
+    }
+    else
+    {
+        <div class="table-scroll"><table class="system-types" id="keywords-table"><thead><tr><th>CUVÂNT CHEIE</th><th>ACTIV</th><th>OPERAȚII</th></tr></thead><tbody>
+        @foreach (var item in items)
+        {
+            <tr @key="item.Id" class="@(item.Active ? "" : "inactive-row")" id="@($"keyword-{item.Id}")">
+                <td>
+                    @if (renamingId == item.Id)
+                    {
+                        <form @onsubmit="() => RenameAsync(item)" @onsubmit:preventDefault>
+                            <input aria-label="@($"Cuvântul cheie nou pentru {item.Keyword}")" maxlength="@ActivityKeywords.MaximumLength" disabled="@busy" @bind="renameText" @bind:event="oninput" />
+                        </form>
+                    }
+                    else { <strong>@item.Keyword</strong> }
+                </td>
+                <td><ToggleSwitch Compact Value="item.Active" ValueChanged="value => SetActiveAsync(item, value)" Disabled="busy" AriaLabel="@($"Activ: {item.Keyword}")" /></td>
+                <td>
+                    @if (renamingId == item.Id)
+                    {
+                        <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Salvează cuvântul {item.Keyword}")" title="Salvează" @onclick="() => RenameAsync(item)"></button>
+                        <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la modificare" title="Renunță" @onclick="() => renamingId = null"></button>
+                    }
+                    else if (deletingId == item.Id)
+                    {
+                        <span class="muted">Ștergi „@item.Keyword”?</span>
+                        <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Confirmă ștergerea cuvântului {item.Keyword}")" title="Da, șterge" @onclick="() => DeleteAsync(item)"></button>
+                        <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la ștergere" title="Renunță" @onclick="() => deletingId = null"></button>
+                    }
+                    else
+                    {
+                        <button type="button" class="row-icon edit" disabled="@busy" aria-label="@($"Modifică cuvântul {item.Keyword}")" title="@($"Modifică {item.Keyword}")" @onclick="() => StartRename(item)"></button>
+                        <button type="button" class="row-icon delete" disabled="@busy" aria-label="@($"Șterge cuvântul {item.Keyword}")" title="@($"Șterge {item.Keyword}")" @onclick="() => deletingId = item.Id"></button>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</section>
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Încearcă un text</h2></div>
+    <div class="catalog-body">
+        <p class="muted"><small>Scrie sau lipește descrierea de la închiderea unui eveniment și vezi ce ar face importul cu cuvintele active de mai sus.</small></p>
+        <label>Text de încercat<textarea id="keyword-try" rows="3" maxlength="2000" @bind="tryText" @bind:event="oninput"></textarea></label>
+        <p role="status" id="keyword-try-result">@TryResult</p>
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private List<ActivityKeyword> items = [];
+    private bool loading = true, busy;
+    private string? error, notice;
+    private string newKeyword = "", renameText = "", tryText = "";
+    private int? renamingId, deletingId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunAsync(async () => { items = [.. await Keywords.GetAllAsync(lifetime.Token)]; }, null);
+        loading = false;
+    }
+
+    private string TryResult
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(tryText)) return "";
+            var match = ActivityKeywords.Match(tryText, [.. items.Where(item => item.Active).Select(item => item.Keyword)]);
+            return match.Kind switch
+            {
+                KeywordMatchKind.Exact => $"Cuvânt găsit: „{match.Word}”. Evenimentul se preia ca mentenanță (dacă punctul de lucru are contract de mentenanță activ).",
+                KeywordMatchKind.Approximate => $"Seamănă cu „{match.Word}”: în text scrie „{match.Found}”. Evenimentul nu se preia singur; administratorul primește o notificare și îl validează.",
+                _ => "Niciun cuvânt cheie găsit: evenimentul se preia ca intervenție la cerere."
+            };
+        }
+    }
+
+    private async Task RunAsync(Func<Task> operation, string? success)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try { await operation(); notice = success; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is ActivityImportException or AccessDeniedException)
+        {
+            error = ex.Message;
+            try { items = [.. await Keywords.GetAllAsync(lifetime.Token)]; } catch (Exception) { }
+        }
+        catch (Exception ex) { Logger.LogError("Maintenance keyword operation failed ({ErrorType}).", ex.GetType().Name); error = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    private void Replace(ActivityKeyword updated)
+    {
+        var index = items.FindIndex(item => item.Id == updated.Id);
+        if (index >= 0) items[index] = updated; else items.Add(updated);
+        items = [.. items.OrderBy(item => ActivityKeywords.Normalize(item.Keyword), StringComparer.Ordinal)];
+    }
+
+    private Task AddAsync() => RunAsync(async () => { Replace(await Keywords.AddAsync(newKeyword, lifetime.Token)); newKeyword = ""; }, "Cuvântul cheie a fost adăugat.");
+
+    private void StartRename(ActivityKeyword item) { renamingId = item.Id; deletingId = null; renameText = item.Keyword; }
+
+    private Task RenameAsync(ActivityKeyword item) => RunAsync(async () => { Replace(await Keywords.RenameAsync(item, renameText, lifetime.Token)); renamingId = null; }, "Cuvântul cheie a fost modificat.");
+
+    private Task SetActiveAsync(ActivityKeyword item, bool active) => RunAsync(async () => Replace(await Keywords.SetActiveAsync(item, active, lifetime.Token)), active ? "Cuvântul cheie este activ." : "Cuvântul cheie este dezactivat.");
+
+    private Task DeleteAsync(ActivityKeyword item) => RunAsync(async () => { await Keywords.DeleteAsync(item, lifetime.Token); items.RemoveAll(entry => entry.Id == item.Id); deletingId = null; }, "Cuvântul cheie a fost șters.");
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

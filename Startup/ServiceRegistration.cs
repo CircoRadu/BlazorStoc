@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using BlazorStoc.Components;
 using BlazorStoc.Modules;
+using BlazorStoc.Modules.ActivityImport;
 using BlazorStoc.Modules.Anaf;
 using BlazorStoc.Modules.Backup;
 using BlazorStoc.Modules.Inventory;
@@ -127,6 +128,7 @@ internal static class ServiceRegistration
         registry.Add(new ProjectReportsModule(), services, configuration);
         registry.Add(new InventoryModule(), services, configuration);
         registry.Add(new AnafModule(), services, configuration);
+        registry.Add(new ActivityImportModule(), services, configuration);
         registry.Add(new InvoicesModule(), services, configuration);
         registry.Add(new SuppliersModule(), services, configuration);
         registry.Add(new NotificationsModule(), services, configuration);

@@ -177,3 +177,25 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 | 5 | Acelasi lucru cu telefonul scris de mana | Telefonul ramane al tau; mesajul spune „S-au pastrat valorile tale pentru: Telefon” | |
 | 6 | Setari -> ANAF -> Versiuni: porneste sliderul „Activa” la o versiune veche | Versiunea devine activa (apare o versiune noua cu „Revenire la versiunea #N”), editorul se incarca cu ea | |
 | 7 | Sterge o versiune inactiva (iconita cos, motiv) | Dispare din lista; versiunea activa nu are iconita activa; jurnalul o consemneaza | |
+
+## Modificari de testat - telefon optional (23.10.2026)
+
+**Ce s-a adaugat:** campul „Numar de telefon” al beneficiarului nu mai este obligatoriu (ANAF nu il are intotdeauna; preluarea din ActivityApp creeaza beneficiari si fara telefon).
+**Ce face acum:** formularul se salveaza cu telefonul gol; daca este completat, trebuie sa aiba 7-15 cifre (opțional cu +).
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Beneficiari -> Adauga, completeaza denumire, CUI, adresa, lasa telefonul gol, Salveaza | Se salveaza; in lista telefonul apare gol | |
+| 2 | Pe un beneficiar scrie telefon „12” | Mesajul cere 7-15 cifre | |
+
+## Modificari de testat - Beneficiari -> De verificat (23.10.2026, versiunea 0.5.11)
+
+**Ce s-a adaugat:** deasupra registrului de beneficiari apare cardul „De verificat” (numai cat timp exista parteneri de verificat) cu beneficiarii preluati din ActivityApp care cer o verificare.
+**Ce face acum:** pe fiecare rand: reincearca ANAF (iconita reinnoire), accepta beneficiarul (bifa), discard (cos, cu confirmare). Un beneficiar fara adresa in ActivityApp nu are inca fisa (numele nu este link) si nu poate fi acceptat. Necesita dreptul „beneficiari.edit”.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Deschide Beneficiari cand exista parteneri de verificat | Deasupra registrului apare „De verificat” cu motivul si numarul de tichete care asteapta | |
+| 2 | Reincearca ANAF pe unul | Mesaj cu raspunsul ANAF; daca ANAF confirma, iese din lista si devine „Date ANAF: Da” | |
+| 3 | Accepta si Discard pe alti doi | Ies din lista (discard cere confirmare) | |
+| 4 | Foloseste un utilizator fara dreptul de editare beneficiari | Lista se vede, operatiile nu | |

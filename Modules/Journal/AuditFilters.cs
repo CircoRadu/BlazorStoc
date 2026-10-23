@@ -28,7 +28,7 @@ public static class AuditFilterOptions
         (AuditEntities.InvoiceTemplate, "Șabloane facturi"), (AuditEntities.Supplier, "Furnizori"), (AuditEntities.SupplierInvoice, "Facturi furnizori"),
         (AuditEntities.SystemType, "Tipuri de sisteme"), (AuditEntities.OfferTemplate, "Șabloane oferte"),
         (AuditEntities.UserType, "Tipuri de utilizatori"), (AuditEntities.Module, "Module"), (AuditEntities.Application, "Aplicație"),
-        (AuditEntities.Database, "Baza de date (conexiune, port, conturi)")
+        (AuditEntities.Database, "Baza de date (conexiune, port, conturi)"), (AuditEntities.ActivityImport, "Preluare ActivityApp")
     ];
 
     public static readonly IReadOnlyList<(string Value, string Label)> Actions =
@@ -102,7 +102,7 @@ public static class AuditFilterOptions
         (AuditActions.DeleteOfferTemplate, AuditActions.DeleteOfferTemplate),
         (AuditActions.AddProjectComponent, AuditActions.AddProjectComponent), (AuditActions.ChangeProjectComponentState, AuditActions.ChangeProjectComponentState),
         (AuditActions.ArchiveProjectComponent, AuditActions.ArchiveProjectComponent), (AuditActions.ReactivateProjectComponent, AuditActions.ReactivateProjectComponent),
-        (AuditActions.SetNasBackup, AuditActions.SetNasBackup), (AuditActions.SetBackupSettings, AuditActions.SetBackupSettings),
+        (AuditActions.SetNasBackup, AuditActions.SetNasBackup), (AuditActions.SetActivityImport, AuditActions.SetActivityImport), (AuditActions.TestActivityImport, AuditActions.TestActivityImport), (AuditActions.SetActivityImportTypes, AuditActions.SetActivityImportTypes), (AuditActions.SetActivityFieldMap, AuditActions.SetActivityFieldMap), (AuditActions.DecideActivityMaintenance, AuditActions.DecideActivityMaintenance), (AuditActions.AddActivityKeyword, AuditActions.AddActivityKeyword), (AuditActions.EditActivityKeyword, AuditActions.EditActivityKeyword), (AuditActions.DeleteActivityKeyword, AuditActions.DeleteActivityKeyword), (AuditActions.RetryActivityPartnerCheck, AuditActions.RetryActivityPartnerCheck), (AuditActions.AcceptActivityPartnerCheck, AuditActions.AcceptActivityPartnerCheck), (AuditActions.DiscardActivityPartner, AuditActions.DiscardActivityPartner), (AuditActions.DiscardActivityTicket, AuditActions.DiscardActivityTicket), (AuditActions.ReactivateActivityTicket, AuditActions.ReactivateActivityTicket), (AuditActions.ResetActivityWatermark, AuditActions.ResetActivityWatermark),(AuditActions.SimulateActivityImport, AuditActions.SimulateActivityImport), (AuditActions.ImportActivityPartners, AuditActions.ImportActivityPartners), (AuditActions.ImportActivityTickets, AuditActions.ImportActivityTickets), (AuditActions.SyncActivityImport, AuditActions.SyncActivityImport), (AuditActions.ResolveActivityImportIssue, AuditActions.ResolveActivityImportIssue), (AuditActions.SetBackupSettings, AuditActions.SetBackupSettings),
         (AuditActions.SetDatabaseConnection, AuditActions.SetDatabaseConnection), (AuditActions.TestDatabaseConnection, AuditActions.TestDatabaseConnection),
         (AuditActions.RevertDatabaseConnection, AuditActions.RevertDatabaseConnection), (AuditActions.ResetDatabaseConnection, AuditActions.ResetDatabaseConnection),
         (AuditActions.SetAppPort, AuditActions.SetAppPort),
