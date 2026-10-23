@@ -82,8 +82,9 @@ public static partial class MariaExtendedChecks
             Check(await Count("SELECT COUNT(*) FROM beneficiaries") == beneficiariesBefore && await Count("SELECT COUNT(*) FROM beneficiary_work_points") == pointsBefore && await Count("SELECT COUNT(*) FROM activity_import_map") == 0,
                 "Activity partners: the simulation writes nothing (no beneficiary, no work point, no tie)");
             Check(simulation.Items.Count(item => item.Action == "Problem") == 1 && simulation.Items.Any(item => item.SourceId == 9005 && item.Message.Contains("adres", StringComparison.Ordinal))
-                && simulation.Items.Any(item => item.SourceId == 9004 && item.Action == "Skipped" && item.Message == ActivityPartnerPlanner.PersonNotTaken) && simulation.AnafUnverified == 1,
-                "Activity partners: the problem and the persons not taken are listed with their reason; the company that ANAF could not verify is counted to verify");
+                && simulation.Items.Any(item => item.SourceId == 9004 && item.Action == "Skipped" && item.Message == ActivityPartnerPlanner.PersonNotTaken) && simulation.AnafUnverified == 1
+                && simulation.Items[0].Action == "Problem" && simulation.Items.Single(item => item.SourceId == 9001).Action == "Create" && simulation.Items.Single(item => item.SourceId == 9001).Message.Contains("De verificat", StringComparison.Ordinal) && simulation.Items[^1].Action == "Skipped",
+                "Activity partners: the report lists first the problem, then the company to create (to verify), and last what is not taken (the persons and their points)");
             Check(await Count("SELECT COUNT(*) FROM activity_import_runs WHERE kind='simulation' AND status='completed'") == 1, "Activity partners: the simulation is recorded as a run");
 
             var notEnabled = 0;
@@ -175,7 +176,7 @@ public static partial class MariaExtendedChecks
             anafFake.Calls.Clear();
             anafFake.Outage = "ANAF nu răspunde.";
             var outage = await withAnaf.SimulateAsync();
-            Check(outage.Partners is { Problems: 2, Create: 1 } && outage.AnafFilled == 0 && outage.AnafUnverified == 1 && anafFake.Calls.Count == 1 && outage.Items.All(item => item.Message.Contains("(ANAF nu a putut răspunde)", StringComparison.Ordinal)),
+            Check(outage.Partners is { Problems: 2, Create: 1 } && outage.AnafFilled == 0 && outage.AnafUnverified == 1 && anafFake.Calls.Count == 1 && outage.Items.Where(item => item.Action == "Problem").All(item => item.Message.Contains("(ANAF nu a putut răspunde)", StringComparison.Ordinal)) && outage.Items.Any(item => item.Action == "Create" && item.Message.Contains("De verificat", StringComparison.Ordinal)),
                 "Activity partners: with ANAF out the first lookup is the only one; a company without address keeps the reason as a problem, and one with a valid CUI is still imported, as not verified");
             await withAnaf.ApplyAsync();
             var unverified = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == $"Ext Import Anaf F {suffix} SRL");

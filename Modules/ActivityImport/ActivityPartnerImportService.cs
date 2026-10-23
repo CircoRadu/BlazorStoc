@@ -137,7 +137,19 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
     {
         var partnerList = partners.ToList();
         var pointList = points.ToList();
-        var items = partnerList.Concat(pointList).Where(entry => entry.Action is PlanAction.Problem or PlanAction.Skipped).Select(entry => entry.Item).ToList();
+        // What the administrator reads: first the problems, then the partners to verify, those to create or created, those linked to existing ones, and last what is not taken (the persons and their
+        // points, which are many and of little interest). The partners already tied are not listed; of the work points only the problems and the ones not taken.
+        static int Rank(PlanAction action, ImportReportItem item, bool partner) => action switch
+        {
+            PlanAction.Problem => 0,
+            PlanAction.Create when item.Message.StartsWith("De verificat", StringComparison.Ordinal) || item.Message.Contains(". De verificat", StringComparison.Ordinal) => 1,
+            PlanAction.Create => 2,
+            PlanAction.Link => 3,
+            _ => partner ? 4 : 5
+        };
+        var items = partnerList.Where(entry => entry.Action is not PlanAction.AlreadyLinked).Select(entry => (entry.Item, Rank: Rank(entry.Action, entry.Item, true)))
+            .Concat(pointList.Where(entry => entry.Action is PlanAction.Problem or PlanAction.Skipped).Select(entry => (entry.Item, Rank: Rank(entry.Action, entry.Item, false))))
+            .OrderBy(entry => entry.Rank).Select(entry => entry.Item).ToList();
         return new ImportReport(kind, at, by, applied, PlanCounts.Of(partnerList.Select(entry => entry.Action)), PlanCounts.Of(pointList.Select(entry => entry.Action)),
             [.. items.Take(MaximumItems)], items.Count > MaximumItems, error);
     }

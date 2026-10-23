@@ -110,16 +110,17 @@
                 </table></div>
                 @if (report.Items.Count > 0)
                 {
-                    <div class="table-scroll"><table class="catalog-table" id="ai-plan-items">
-                        <thead><tr><th>Ce</th><th>Cod ActivityApp</th><th>Denumire</th><th>Rezultat</th><th>Motiv</th></tr></thead>
-                        <tbody>
-                        @foreach (var item in report.Items)
-                        {
-                            <tr><td>@EntityLabel(item.Entity)</td><td>@item.SourceId</td><td>@item.Name</td><td>@(item.Action == "Problem" ? "Problemă" : "Ignorat")</td><td>@item.Message</td></tr>
-                        }
-                        </tbody>
-                    </table></div>
-                    @if (report.Truncated) { <p class="muted"><small>Sunt afișate primele @report.Items.Count; restul se văd după rezolvarea acestora.</small></p> }
+                    @* Two groups: the beneficiaries with problems (collapsed) and the ones selected for import (open); ignored ones close the second list. *@
+                    var problemItems = report.Items.Where(item => item.Action == "Problem").ToList(); var takenItems = report.Items.Where(item => item.Action != "Problem").ToList();
+                    <details class="ai-type-group" id="ai-plan-problems-group">
+                        <summary>Cu probleme <span class="count-badge">@problemItems.Count</span></summary>
+                        @PlanTable(problemItems, "ai-plan-problems", report.Applied)
+                    </details>
+                    <details class="ai-type-group" id="ai-plan-items-group" open>
+                        <summary>Selectați pentru preluare <span class="count-badge">@takenItems.Count</span></summary>
+                        @PlanTable(takenItems, "ai-plan-items", report.Applied)
+                    </details>
+                    @if (report.Truncated) { <p class="muted"><small>Sunt afișate primele @report.Items.Count (întâi problemele, apoi ce se preia, la urmă ce nu se preia); restul nu se afișează.</small></p> }
                 }
             }
             else if (lastRun is not null)
@@ -176,7 +177,7 @@
                         <tbody>
                         @foreach (var item in ticketReport.Items)
                         {
-                            <tr><td>@item.SourceId</td><td>@item.Name</td><td>@(item.Action == "Problem" ? "Problemă" : "Ignorat")</td><td>@item.Message</td></tr>
+                            <tr><td>@item.SourceId</td><td>@item.Name</td><td>@ActionLabel(item, false)</td><td>@item.Message</td></tr>
                         }
                         </tbody>
                     </table></div>
@@ -360,7 +361,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        try { Apply(await Import.GetSettingsAsync(lifetime.Token)); await LoadImportStateAsync(); }
+        try
+        {
+            Apply(await Import.GetSettingsAsync(lifetime.Token));
+            await LoadImportStateAsync();
+            // The types saved are shown at once (without asking ActivityApp); "Citește tipurile din ActivityApp" refreshes them with the counts and the new types.
+            var saved = await Import.GetSavedTypesAsync(lifetime.Token);
+            if (saved.Items.Count > 0) types = [.. saved.Items.Select(item => new Row(item))];
+        }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException ex) { error = ex.Message; }
         catch (Exception ex) { Logger.LogError("ActivityApp import settings loading failed ({ErrorType}).", ex.GetType().Name); error = "Setările nu au putut fi încărcate. Verifică conexiunea la baza de date."; }
@@ -461,6 +469,29 @@
 
     private TicketReport? ticketReport;
     private bool confirmTickets;
+
+    private RenderFragment PlanTable(List<ImportReportItem> items, string id, bool applied) => __builder =>
+    {
+        <div class="table-scroll"><table class="catalog-table" id="@id">
+            <thead><tr><th>Ce</th><th>Cod ActivityApp</th><th>Denumire</th><th>Rezultat</th><th>Motiv</th></tr></thead>
+            <tbody>
+            @foreach (var item in items)
+            {
+                <tr><td>@EntityLabel(item.Entity)</td><td>@item.SourceId</td><td>@item.Name</td><td>@ActionLabel(item, applied)</td><td>@item.Message</td></tr>
+            }
+            </tbody>
+        </table></div>
+    };
+
+    private static string ActionLabel(ImportReportItem item, bool applied) => item.Action switch
+    {
+        "Problem" => "Problemă",
+        "Create" when item.Message.Contains("De verificat", StringComparison.Ordinal) => applied ? "Creat, de verificat" : "De creat, de verificat",
+        "Create" => applied ? "Creat" : "De creat",
+        "Link" => applied ? "Legat de existent" : "De legat de existent",
+        "Waiting" => "În așteptare",
+        _ => "Ignorat"
+    };
 
     private static string EntityLabel(string entity) => entity switch { "partner" => "Partener", "ticket" => "Tichet", "partner-deleted" => "Partener șters în ActivityApp", "workpoint-deleted" => "Punct de lucru șters în ActivityApp", "ticket-deleted" => "Tichet șters în ActivityApp", _ => "Punct de lucru" };
 

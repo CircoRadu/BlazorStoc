@@ -101,6 +101,8 @@ public interface IActivityImportService
     Task<ActivityTestResult> TestAsync(ActivityImportInput input, CancellationToken cancellationToken = default);
     /// <summary>The types of ActivityApp (read now, with the stored connection) merged with the administrator's choices.</summary>
     Task<ActivityTypesView> GetTypesAsync(CancellationToken cancellationToken = default);
+    /// <summary>The choices saved, as they were last seen (no reading of ActivityApp, so no counts): what the panel shows when it opens.</summary>
+    Task<ActivityTypesView> GetSavedTypesAsync(CancellationToken cancellationToken = default);
     Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default);
     /// <summary>The stored connection (with the decrypted password) for the import run, or null when it is not complete. Needs the right to run the import.</summary>
     Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default);
@@ -314,6 +316,15 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         catch (ActivitySourceException exception) { return new ActivityTypesView(Merge([], chosen), settings.StructureStatus, exception.Message); }
     }
 
+    public async Task<ActivityTypesView> GetSavedTypesAsync(CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync(View, cancellationToken).ConfigureAwait(false);
+        var (settings, _) = await ReadAsync(cancellationToken).ConfigureAwait(false);
+        var chosen = await ReadChosenAsync(cancellationToken).ConfigureAwait(false);
+        return new ActivityTypesView([.. chosen.Select(item => new ActivityTypeItem(item.Id, item.Name, "", null, null, null, null, null, item.Active, item.Destination, item.Active ? ActivityImportRules.StateSelected : ""))],
+            settings.StructureStatus, null);
+    }
+
     private async Task SaveStructureAsync(StructureReport report, CancellationToken cancellationToken)
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
@@ -493,6 +504,7 @@ internal sealed class UnavailableActivityImportService : IActivityImportService
     public Task SaveSettingsAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => Out<object>();
     public Task<ActivityTestResult> TestAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => Out<ActivityTestResult>();
     public Task<ActivityTypesView> GetTypesAsync(CancellationToken cancellationToken = default) => Out<ActivityTypesView>();
+    public Task<ActivityTypesView> GetSavedTypesAsync(CancellationToken cancellationToken = default) => Out<ActivityTypesView>();
     public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => Out<object>();
     public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => Out<ActivityConnection?>();
     public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Out<ActivityFieldMap>();
@@ -508,6 +520,7 @@ internal sealed class GuardedActivityImportService(IActivityImportService inner,
     public Task SaveSettingsAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SaveSettingsAsync(input, cancellationToken));
     public Task<ActivityTestResult> TestAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.TestAsync(input, cancellationToken));
     public Task<ActivityTypesView> GetTypesAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetTypesAsync(cancellationToken));
+    public Task<ActivityTypesView> GetSavedTypesAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetSavedTypesAsync(cancellationToken));
     public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SaveTypesAsync(choices, cancellationToken));
     public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetConnectionAsync(cancellationToken));
     public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFieldMapAsync(cancellationToken));

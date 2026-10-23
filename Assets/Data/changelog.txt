@@ -1,5 +1,9 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.12 | 23.10.2026
+- Preluare ActivityApp, secțiunea „Tipuri de tichete”: alegerea salvată se vede imediat la deschiderea panoului, nu abia după „Citește tipurile din ActivityApp”.
+- Preluare ActivityApp, simularea beneficiarilor: două secțiuni pliabile, „Cu probleme” (pliată implicit) și „Selectați pentru preluare” (deschisă).
+- Preluare ActivityApp, „Simulează importul” / „Aplică importul”: lista arată acum și beneficiarii de creat, cei de verificat și cei legați de existenți, nu doar problemele și persoanele ignorate; persoanele fizice și punctele lor sunt la sfârșitul listei.
 ## 0.5.11 | 23.10.2026
 - Preluare tichete din ActivityApp, flux nou: se citesc numai tichetele închise noi sau modificate de la ultima sincronizare (buton „Recitește tot” pentru o citire completă); clienții lor se preiau la nevoie, nu mai tot tabelul de parteneri, și se verifică în ANAF.
 - Beneficiari → De verificat: partenerii preluați din ActivityApp care cer o verificare (ANAF indisponibil sau CUI necunoscut, CUI cu formă invalidă, adresă lipsă), cu operațiile reîncearcă ANAF, acceptă manual și discard. Notificare pentru administrator. Tichetele clientului așteaptă clarificarea.

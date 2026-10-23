@@ -152,3 +152,5 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 | 8 | Tichet cu „mentenanta nu s-a putut face” la un punct cu contract: „Discard” (confirma) | Interventia dispare; tichetul apare in „Tichete discardate”; sincronizarea urmatoare nu il mai preia | |
 | 9 | „Reactiveaza” tichetul discardat | Se preia din nou la urmatoarea sincronizare si se propune din nou | |
 | 10 | Sectiunea 5 -> „Reciteste tot”, apoi „Importa acum” | Se citesc toate tichetele; nu apar duplicate | |
+| 11 | Sectiunea 3 -> „Simuleaza importul” pe un ActivityApp cu firme si persoane | Doua sectiuni pliabile: „Cu probleme” (pliata implicit) si „Selectati pentru preluare” (deschisa; firmele „De creat” / „De creat, de verificat”, cele legate de existente, la urma persoanele ignorate) | |
+| 12 | Alege si salveaza tipuri de tichete (sectiunea „Tipuri de tichete”), iesi din pagina si reintra | Tipurile salvate apar imediat, bifate, in grupul „folosite”, fara a citi din nou ActivityApp | |

@@ -17,6 +17,8 @@ public static class ActivityImportPanelChecks
         public Task<ActivityTestResult> TestAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => Task.FromResult(new ActivityTestResult(true, "ok", StructureStatus.Ok, false, false));
         public List<ActivityTypeItem> Types = [];
         public Task<ActivityTypesView> GetTypesAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ActivityTypesView([.. Types], StructureStatus.Ok, null));
+        public List<ActivityTypeItem> Saved = [];
+        public Task<ActivityTypesView> GetSavedTypesAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ActivityTypesView([.. Saved], StructureStatus.Ok, null));
         public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => Task.FromResult<ActivityConnection?>(null);
         public Dictionary<string, string>? SavedMap;
@@ -90,8 +92,13 @@ public static class ActivityImportPanelChecks
         context.Services.AddSingleton<IActivitySyncService>(syncService);
         var reviewService = new FakeReviews();
         context.Services.AddSingleton<IActivityReviewService>(reviewService);
+        // The types saved before are shown at once when the panel opens (the choice is not lost from sight); reading ActivityApp only refreshes them.
+        settingsService.Saved = [new(4, "Service", "", null, null, null, null, null, true, ActivityDestination.OnDemand, ActivityImportRules.StateSelected)];
         var cut = context.Render<ActivityImportPanel>();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-issues").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.FindAll("#ai-types tbody tr").Count == 1 && cut.Find("#ai-types").TextContent.Contains("Service", StringComparison.Ordinal) && cut.Find("#ai-types input[role=switch]").HasAttribute("checked") && cut.Find("#ai-types-used").HasAttribute("open"),
+            "Activity import panel: the types saved are shown, selected, as soon as the panel opens");
+        settingsService.Saved = [];
         check(cut.Find("#ai-issues").TextContent.Contains("CuiProst SRL", StringComparison.Ordinal) && cut.FindAll("#ai-plan-summary").Count == 0,
             "Activity import panel: the open problems are listed when the panel opens, before any simulation");
         var apply = cut.FindAll("button").Single(button => button.TextContent.Trim() == "Aplică importul");
@@ -101,7 +108,7 @@ public static class ActivityImportPanelChecks
         var rows = cut.FindAll("#ai-plan-summary tbody tr").Select(row => string.Join("|", row.QuerySelectorAll("td").Select(cell => cell.TextContent.Trim()))).ToList();
         check(rows.SequenceEqual(["Beneficiari|5|2|1|0|2|0", "Puncte de lucru|5|2|2|0|0|1"]) && cut.Find("#ai-plan-title").TextContent.Contains("Simulare", StringComparison.Ordinal),
             "Activity import panel: the simulation shows the counts of beneficiaries and work points");
-        check(cut.FindAll("#ai-plan-items tbody tr").Count == 2 && cut.Find("#ai-plan-items").TextContent.Contains("Ignorat", StringComparison.Ordinal), "Activity import panel: the problems and the skipped items of the simulation are listed with their reason");
+        check(cut.FindAll("#ai-plan-problems tbody tr").Count + cut.FindAll("#ai-plan-items tbody tr").Count == 2 && cut.Find("#ai-plan-items").TextContent.Contains("Ignorat", StringComparison.Ordinal) && !cut.Find("#ai-plan-problems-group").HasAttribute("open") && cut.Find("#ai-plan-items-group").HasAttribute("open"), "Activity import panel: the simulation lists the problems in a collapsed group and the items selected for import in an open one");
         check(partners.Applies == 0, "Activity import panel: the simulation applies nothing");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Aplică importul").Click();
         check(cut.Markup.Contains("Se vor crea 2 beneficiari și 2 puncte de lucru", StringComparison.Ordinal) && partners.Applies == 0, "Activity import panel: the application asks for confirmation first, with what it will do");
