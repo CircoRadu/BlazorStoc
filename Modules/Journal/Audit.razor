@@ -5,6 +5,8 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IAuditReader Reader
+@using BlazorStoc.Modules.Journal
+@inject IJournalSettings JournalSettings
 @inject ILogger<Audit> Logger
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
@@ -22,10 +24,10 @@
     <article><span>Produse</span><strong>@(summary is null ? "—" : summary.Products.ToString("N0"))</strong><small>Editări produse</small><i>▦</i></article>
 </section>
 <section class="catalog">
-    <div class="catalog-heading"><h2>Istoric operații <span>@(result?.Total ?? 0)</span></h2><small>Ultimele @AuditQueryRules.RecentWindow de evenimente · sincronizare automată la 15 secunde · afișare în ora locală · stocare UTC</small></div>
-    @if (result is not null && result.JournalTotal > AuditQueryRules.RecentWindow)
+    <div class="catalog-heading"><h2>Istoric operații <span>@(result?.Total ?? 0)</span></h2><small>Ultimele @recentWindow de evenimente · sincronizare automată la 15 secunde · afișare în ora locală · stocare UTC</small></div>
+    @if (result is not null && result.JournalTotal > recentWindow)
     {
-        <p class="form-note audit-window-note" role="status">Această pagină lucrează pe cele mai recente @AuditQueryRules.RecentWindow de evenimente din @result.JournalTotal.ToString("N0"). Pentru evenimente mai vechi folosește <a href="@CompleteUrl">Jurnal complet</a>@(values.Any || dateKey is not null ? " (filtrele alese se păstrează)" : "").</p>
+        <p class="form-note audit-window-note" role="status">Această pagină lucrează pe cele mai recente @recentWindow de evenimente din @result.JournalTotal.ToString("N0"). Pentru evenimente mai vechi folosește <a href="@CompleteUrl">Jurnal complet</a>@(values.Any || dateKey is not null ? " (filtrele alese se păstrează)" : "").</p>
     }
     <AuditFilterBar Values="values" Changed="FiltersChangedAsync" DateChip="@selectedDateLabel" DateRemoved="RemoveDateAsync" Cleared="ClearAsync" />
     @if (loading && result is null) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă jurnalul</h3></div> }
@@ -55,6 +57,8 @@
     private string? syncedUrl, selectedDateLabel, dateKey, error;
     private bool loading;
     private int pageSize = AuditListState.DefaultPageSize, currentPage = 1, loadVersion;
+    // How many of the most recent events this page works on (Setari -> Jurnal activitate; 500 until the administrator changes it).
+    private int recentWindow = AuditQueryRules.RecentWindow;
     private IJSObjectReference? timeModule;
     private CancellationTokenSource? loadCts, debounce;
     private readonly CancellationTokenSource lifetime = new();
@@ -126,9 +130,10 @@
         if (showLoading) loading = true;
         try
         {
+            recentWindow = await JournalSettings.GetRecentWindowAsync(source.Token);
             var range = await RangeAsync();
             var query = new AuditQuery(values.Query, values.Entity, values.Action, values.Actor, range.From, range.To);
-            var page = await Reader.QueryAsync(query, currentPage, pageSize, AuditQueryRules.RecentWindow, source.Token);
+            var page = await Reader.QueryAsync(query, currentPage, pageSize, recentWindow, source.Token);
             var removed = await Reader.RemovalTimesAsync(page.Events, source.Token);
             var totals = await Reader.SummaryAsync(DateTime.UtcNow.Date, source.Token);
             if (version != loadVersion) return;

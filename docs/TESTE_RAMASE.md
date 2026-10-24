@@ -909,3 +909,4 @@ Scosi la cererea utilizatorului; ramane manual doar partea de ecran, marcata mai
 | 02_Intrari_si_iesiri_produs | Retur partial si cantitatea ramasa (5 buc, 2 apoi 4) | `MariaExtendedChecks.Exits` | Mesajele din formularul de retur |
 | 02_Intrari_si_iesiri_produs | Storno pe o operatie cu retururi | `MariaExtendedChecks.Exits` (storno refuzat) | Mesajul afisat in aplicatie |
 | 07_Vehicule | Numar de inmatriculare duplicat | `MariaIntegrationChecks` (`VehicleOperationException`) | Mesajul din formularul de vehicul |
+| 09_Notificari_si_setari | Tema intunecata pe telefon si pe monitoare reale (confort vizual noaptea) | verificata in browser pe instanta demo, nu si de ochii utilizatorului | Daca paleta e potrivita seara |

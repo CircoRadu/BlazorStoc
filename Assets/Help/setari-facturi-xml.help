@@ -1,8 +1,8 @@
 # Șablonul XML de factură
 Cautare: sablon xml factura ubl efactura cai arbore alege fisier proba linii descriere intrare stoc furnizor
-Captura: pagina | /setari | click Facturi; upload factura-demo.xml; full | Șablonul unei facturi XML
-Captura: start | /setari | click Facturi; wait 1000 | Încărcarea unui fișier XML sau ZIP de probă
-Captura: avansat | /setari | click Facturi; wait 800; upload factura-demo.xml; wait 2500; jsclick sel:details.invoice-section:last-of-type summary; wait 600; scroll details.invoice-section[open] | Căile XML ale valorilor
+Captura: pagina | /setari | click sel:#tile-facturi; upload factura-demo.xml; full | Șablonul unei facturi XML
+Captura: start | /setari | click sel:#tile-facturi; wait 1000 | Încărcarea unui fișier XML sau ZIP de probă
+Captura: avansat | /setari | click sel:#tile-facturi; wait 800; upload factura-demo.xml; wait 2500; jsclick sel:details.invoice-section:last-of-type summary; wait 600; scroll details.invoice-section[open] | Căile XML ale valorilor
 
 Pentru facturile XML (e-Factura UBL): legi vizual elementele șablonului de valorile din fișierul de probă. Apeși „Alege” la un element, apoi apeși în arbore valoarea lui; citirea se actualizează la fiecare legătură.
 

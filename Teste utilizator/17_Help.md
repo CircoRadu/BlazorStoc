@@ -4,6 +4,19 @@ Propunere si decizii: `docs/PROPUNERE_HELP.md`. Continutul sta in `Assets/Help/*
 
 ## Modificari de testat
 
+### 24.10.2026 - Ajutor unificat si cautare in orice fereastra
+
+**Ce s-a adaugat:** intrarea „Ajutor" in meniul din stanga si placa „Ajutor" pe pagina principala deschid cuprinsul ajutorului (toate ferestrele pe sectiuni). Campul „Cauta in tot ajutorul" apare acum in orice fereastra de ajutor, nu doar pe pagina principala.
+
+**Ce face acum:** din cuprins deschizi o sectiune si apoi o fereastra; „Inapoi" revine la cuprins; cautarea functioneaza din orice fereastra.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Apasa „Ajutor" din meniul din stanga | Fereastra de ajutor cu cuprinsul pe 12 sectiuni si campul de cautare | |
+| 2 | Deschide „Furnizori si facturi" si alege o fereastra | Descrierea ferestrei; „Inapoi" te readuce la cuprins | |
+| 3 | Pe pagina principala apasa placa „Ajutor" | Acelasi cuprins | |
+| 4 | Intr-o pagina oarecare (ex. Produse) apasa iconita „?" din bara de sus si scrie „factura" in cautare | Rezultate din tot ajutorul, nu doar pagina curenta | |
+
 ### 19.10.2026 - Infrastructura help si primele topicuri
 
 **Ce s-a adaugat:** iconita "?" in bara de sus a aplicatiei (langa "Deconectare"), in ferestrele separate (harta mentenantei, categorii), pe paginile Autentificare si Acces refuzat, si in antetul dialogului "Istoricul modificarilor". Fereastra de ajutor (popup) cu: fluxuri de lucru colapsabile marcate cu "+", elementele ferestrei descrise (cu iconita reala pentru actiunile de pe randuri), cautare in tot ajutorul numai din pagina principala. Topicuri scrise: Pagina principala, Produse si stocuri (Catalog), De regularizat, Istoricul modificarilor unei operatii, Autentificare, Acces refuzat.

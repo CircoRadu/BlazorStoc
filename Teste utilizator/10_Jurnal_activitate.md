@@ -4,6 +4,22 @@ Regula: jurnalul numeste exact operatia (nu "Creare"/"Editare" generic). Fiecare
 
 ## Modificari de testat
 
+### 24.10.2026 - Setari -> Jurnal activitate: cate evenimente recente arata pagina
+
+**Ce s-a adaugat:** in Setari apare tile-ul „Jurnal activitate" (doar administrator), unde alegi cate dintre cele mai recente evenimente le arata implicit pagina Jurnal activitate (minim 50, maxim 50 000; 500 pana la prima modificare). Nu se sterge nimic din jurnal. Operatie noua in jurnal: „Modificare evenimente afisate in jurnal".
+
+**Ce face acum:** pagina Jurnal activitate (titlul „Ultimele N de evenimente" si nota de sub el) lucreaza pe numarul setat; „Jurnalul complet" nu depinde de el si arata toate evenimentele. Valoarea se aplica in cel mult 30 de secunde.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Deschide Setari -> Jurnal activitate | Un camp cu 500 (valoarea implicita) si, sub el, intervalul 50 - 50 000 si numarul de evenimente din jurnal | |
+| 2 | Scrie 49 si apasa Salveaza | Mesaj ca numarul trebuie sa fie intre 50 si 50 000; nimic nu se salveaza | |
+| 3 | Scrie 1000 si apasa Salveaza | Mesaj de confirmare | |
+| 4 | Deschide pagina Jurnal activitate | Titlul spune „Ultimele 1000 de evenimente"; daca jurnalul are mai multe, nota de sub titlu spune ca pagina lucreaza pe cele mai recente 1000 | |
+| 5 | Deschide Jurnal complet | Toate evenimentele raman accesibile, nu doar 1000 | |
+| 6 | In Jurnal filtreaza dupa operatia „Modificare evenimente afisate in jurnal" | Apare evenimentul cu detalii vechi -> nou (500 -> 1000) | |
+| 7 | Intra cu un cont care nu este administrator | Tile-ul Jurnal activitate nu apare in Setari | |
+
 ### 22.10.2026 - Adresa IP la conectari si deconectari, conectari esuate
 
 **Ce s-a adaugat:** evenimentele „Conectare" si „Deconectare" din Jurnal contin acum adresa IP de pe care s-a conectat utilizatorul (data si ora erau deja in jurnal); operatie noua „Conectare esuata" (nume tastat, motiv, IP, fara parola), si in filtrul „Operatie".

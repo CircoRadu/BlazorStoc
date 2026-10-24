@@ -265,10 +265,20 @@ public partial class InvoiceTemplateWorkbench
                 UpdateAnchors(target);
                 Select('c', target.Id);
             }
-            else if (drawMode == "field")
+            else if (drawMode is "field" or "cui")
             {
+                var isCui = drawMode == "cui";
                 var value = InvoiceTemplateEngine.ReadRegion(session.Document, page, x, y, width, height);
-                draft.Fields.Add(new DraftField { Id = id, Name = "", Use = true, Page = page, X = x, Y = y, Width = width, Height = height, Value = value, Manual = true, Mode = InvoiceFieldModes.Region, Kind = InvoiceValues.KindOf(value, decimalHint) switch { InvoiceValueKind.Number => "number", InvoiceValueKind.Date => "date", _ => "text" } });
+                if (isCui)
+                {
+                    // The zone the user pointed at is the supplier's tax id: the field takes that meaning (and feeds the CUI of the template); an earlier
+                    // CUI field the analysis found wrong or the user drew before is replaced.
+                    value = InvoiceValues.CleanCui(value);
+                    draft.Fields.RemoveAll(item => item.Meaning == InvoiceFieldMeanings.SupplierCui);
+                }
+                draft.Fields.Add(new DraftField { Id = id, Name = isCui ? "CUI furnizor" : "", Meaning = isCui ? InvoiceFieldMeanings.SupplierCui : "", Section = isCui ? InvoiceVocabulary.SupplierSection : "",
+                    Use = true, Page = page, X = x, Y = y, Width = width, Height = height, Value = value, Manual = true, Mode = InvoiceFieldModes.Region,
+                    Kind = isCui ? "text" : InvoiceValues.KindOf(value, decimalHint) switch { InvoiceValueKind.Number => "number", InvoiceValueKind.Date => "date", _ => "text" } });
                 OpenEdit('f', id);
             }
             drawMode = "";

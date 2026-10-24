@@ -7,6 +7,8 @@
 @using System.Text
 @using BlazorStoc.Services
 @inject IAuditReader Reader
+@using BlazorStoc.Modules.Journal
+@inject IJournalSettings JournalSettings
 @inject IAuditTrail AuditTrail
 @inject IAccessControl Access
 @inject TimeProvider Clock
@@ -19,7 +21,7 @@
 <PageTitle>Jurnal complet · BlazorStoc</PageTitle>
 <div class="page-heading"><div><p class="eyebrow">TRASABILITATE</p><h1>Jurnal complet</h1><p class="muted">Toate evenimentele din jurnal, căutate direct pe server, pe pagini. Se afișează implicit ultima lună; alege alt interval sau tot jurnalul.</p></div>
     <div class="heading-actions">
-        <a class="refresh act-nav" href="@AuditListState.Default.Url()">← Jurnal activitate (ultimele @AuditQueryRules.RecentWindow)</a>
+        <a class="refresh act-nav" href="@AuditListState.Default.Url()">← Jurnal activitate (ultimele @recentWindow)</a>
         <button type="button" class="refresh act-reload" disabled="@(loading || exporting)" @onclick="() => ReloadAsync(0)">↻ Actualizează</button>
     </div>
 </div>
@@ -65,6 +67,7 @@
     private string? syncedUrl, error, notice;
     private bool loading, exporting;
     private int pageSize = AuditQueryRules.DefaultCompletePageSize, currentPage = 1, loadVersion;
+    private int recentWindow = AuditQueryRules.RecentWindow;
     private IJSObjectReference? timeModule;
     private CancellationTokenSource? loadCts, debounce;
     private readonly CancellationTokenSource lifetime = new();
@@ -125,6 +128,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        try { recentWindow = await JournalSettings.GetRecentWindowAsync(lifetime.Token); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { /* the default number stays in the link text */ }
         ApplyStateFromAddress();
         await LoadAsync(true);
     }

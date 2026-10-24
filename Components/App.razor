@@ -5,7 +5,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    <script>try { if (localStorage.getItem("blazorstoc-theme") === "dark") document.documentElement.setAttribute("data-theme", "dark"); } catch (e) { }</script>
     <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["theme-dark.css"]" />
     <ImportMap />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <HeadOutlet @rendermode="InteractiveServer" />
@@ -28,6 +30,7 @@
     <script src="@Assets["leave-guard.js"]"></script>
     <script src="@Assets["searchable-select.js"]"></script>
     <script src="@Assets["logout-dialog.js"]"></script>
+    <script src="@Assets["theme.js"]"></script>
     <script src="@Assets["help.js"]"></script>
     <script src="@Assets["romanian-ui.js"]"></script>
     <script src="@Assets["maintenance-watch.js"]"></script>

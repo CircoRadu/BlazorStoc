@@ -1,7 +1,7 @@
 # Beneficiari
 Ruta: /beneficiari
 Cautare: beneficiari persoane fizice juridice cui registru adauga editeaza sterge cautare
-Captura: pagina | /beneficiari |  | Lista beneficiarilor
+Captura: pagina | /beneficiari | sql INSERT INTO activity_import_partner_checks (partner_id, name, cui_as_typed, reason, status, beneficiary_id, created_utc, last_check_utc) VALUES (9000, 'Demo verificare 1 SRL', 'RO4000100', 'anaf_unavailable', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9001, 'Demo verificare 2 SRL', 'RO4000101', 'cui_unknown', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9002, 'Demo verificare 3 SRL', 'RO4000102', 'cui_invalid_form', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9003, 'Demo verificare 4 SRL', 'RO4000103', 'missing_address', 'pending', NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9004, 'Demo verificare 5 SRL', 'RO4000104', 'anaf_unavailable', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9005, 'Demo verificare 6 SRL', 'RO4000105', 'cui_unknown', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9006, 'Demo verificare 7 SRL', 'RO4000106', 'cui_invalid_form', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9007, 'Demo verificare 8 SRL', 'RO4000107', 'missing_address', 'pending', NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9008, 'Demo verificare 9 SRL', 'RO4000108', 'anaf_unavailable', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9009, 'Demo verificare 10 SRL', 'RO4000109', 'cui_unknown', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9010, 'Demo verificare 11 SRL', 'RO4000110', 'cui_invalid_form', 'pending', (SELECT MIN(id) FROM beneficiaries), UTC_TIMESTAMP(), UTC_TIMESTAMP()), (9011, 'Demo verificare 12 SRL', 'RO4000111', 'missing_address', 'pending', NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP()); reload; wait 2500; full; then; sql DELETE FROM activity_import_partner_checks WHERE name LIKE 'Demo verificare%' | Lista beneficiarilor
 Captura: eroare | /beneficiari | sql RENAME TABLE beneficiaries TO beneficiaries_x; reload; wait 800; then; sql RENAME TABLE beneficiaries_x TO beneficiaries; wait 1500 | Lista care nu a putut fi încărcată
 
 Registrul beneficiarilor: persoanele fizice și juridice către care se operează ieșiri de stoc și pentru care ai proiecte. CUI-ul (persoană juridică) sau numele complet (persoană fizică) identifică în mod unic fiecare beneficiar.
@@ -15,11 +15,18 @@ Registrul beneficiarilor: persoanele fizice și juridice către care se opereaz�
 - Persoane juridice | cifră | Beneficiarii identificați prin CUI.
 - Persoane fizice | cifră | Beneficiarii identificați prin nume complet.
 - Actualizare | cifră | Lista se sincronizează singură la 15 secunde, deci vezi modificările făcute de alți utilizatori.
+### De verificat
+- De verificat | card | Apare deasupra registrului doar cât există beneficiari preluați din ActivityApp care cer o verificare (ANAF nu a răspuns sau nu cunoaște CUI-ul, CUI cu formă invalidă, adresă lipsă). Tichetele lor așteaptă clarificarea. Lista este paginată, cu „Rânduri pe pagină”. | sel: #beneficiary-checks
+- Beneficiar, CUI în ActivityApp, Motiv, Tichete în așteptare | coloană | Cine este, ce CUI vine din ActivityApp, de ce cere verificare și câte tichete așteaptă.
+- Reîncearcă verificarea în ANAF | iconita:renew | Interoghează din nou ANAF; dezactivat când CUI-ul are formă invalidă (îl corectezi întâi în fișa beneficiarului).
+- Acceptă beneficiarul | iconita:check | Îl marchezi ca verificat de tine, iar tichetele lui sunt preluate; dezactivat dacă partenerul nu are încă beneficiar (lipsește adresa în ActivityApp).
+- Discard partener | iconita:delete | După confirmare, nici partenerul, nici tichetele lui nu se mai preiau.
 ### Registrul
 - Caută | câmp | Caută după nume, CUI, adresă sau telefon.
 - Beneficiar | coloană | Numele; apasă-l ca să deschizi fișa beneficiarului ([[beneficiari-detaliu]]).
 - Tip / CUI | coloană | CUI-ul pentru persoanele juridice, „Persoană fizică” pentru restul.
 - Adresă, Telefon | coloană | Datele de contact.
+- Rânduri pe pagină | listă | Sub tabel alegi câte rânduri se arată (10, 25, 50, 100 sau Toate) și treci între pagini.
 - Editează beneficiarul | iconita:edit | Deschide formularul de editare.
 - Șterge beneficiarul | iconita:delete | Șterge beneficiarul; nu se poate dacă are proiecte sau mișcări de stoc.
 

@@ -32,6 +32,10 @@ public static class HelpEndpoints
         app.MapGet("/ajutor/cautare", (string? q) => Fragment(HelpRenderer.Results(catalog.Search(q ?? ""), (q ?? "").Trim())))
             .RequireAuthorization();
 
+        // The table of contents of the unified help (menu entry and tile "Ajutor"): every topic by area, for the signed-in users.
+        app.MapGet("/ajutor/cuprins", () => Fragment(HelpContents.Render(catalog.Topics.Values.Where(topic => !topic.Public || topic.Key == "acasa"))))
+            .RequireAuthorization();
+
         app.MapGet("/ajutor/imagine/{name}", (HttpContext context, string name) =>
         {
             // The pictures of the public topics (Login, AccessDenied: <key>.<capture>.jpg) are readable without signing in too.

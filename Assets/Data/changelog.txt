@@ -1,5 +1,12 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.17 | 24.10.2026
+- Temă întunecată cu comutator în bara de sus (lângă „Deconectare”): paletă calmă pentru ochi pe timp de noapte; alegerea rămâne doar în browserul local.
+- Ajutor unificat: intrarea „Ajutor” din meniu și placa „Ajutor” de pe pagina principală deschid cuprinsul tuturor ferestrelor, pe secțiuni; căutarea în tot ajutorul este acum în orice fereastră de ajutor.
+- Setări → Jurnal activitate: administratorul alege câte evenimente recente (50 – 50 000, implicit 500) arată implicit pagina Jurnal activitate; nu se șterge nimic, Jurnalul complet arată tot.
+- Editarea șabloanelor de factură PDF: când analiza nu găsește CUI-ul furnizorului, apare „Selectează zona CUI” și zona desenată devine câmpul „CUI furnizor”.
+- Panoul Setări are iconițe pe tile-uri; meniul, sub-meniurile și taburile arată bara verde la selectare sau hover (taburile pe marginea de sus).
+- Versiuni pe module (Setări → Module) și un registru al lor; modulele modificate primesc versiune nouă.
 ## 0.5.16 | 24.10.2026
 - Pagina cu testele de utilizator (/teste/teste-utilizator.html): fără pașii acoperiți de teste automate și fără opțiunea „Automat”.
 ## 0.5.15 | 24.10.2026

@@ -31,3 +31,10 @@ internal sealed class UnavailableAuditReader : IAuditReader
     public Task<AuditSummary> SummaryAsync(DateTime todayStartUtc, CancellationToken cancellationToken = default) => Out<AuditSummary>();
     public Task<IReadOnlyDictionary<string, DateTime>> RemovalTimesAsync(IEnumerable<AuditEvent> events, CancellationToken cancellationToken = default) => Out<IReadOnlyDictionary<string, DateTime>>();
 }
+
+// The journal settings behind the circuit breaker (a number out of range is an answer, not a fault).
+internal sealed class GuardedJournalSettings(IJournalSettings inner, ModuleRegistry modules) : IJournalSettings
+{
+    public Task<int> GetRecentWindowAsync(CancellationToken cancellationToken = default) => modules.RunAsync(JournalModule.ModuleId, () => inner.GetRecentWindowAsync(cancellationToken));
+    public Task SaveRecentWindowAsync(int value, CancellationToken cancellationToken = default) => modules.RunAsync(JournalModule.ModuleId, () => inner.SaveRecentWindowAsync(value, cancellationToken));
+}

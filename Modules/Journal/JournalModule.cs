@@ -11,13 +11,20 @@ public sealed class JournalModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Jurnal de activitate";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 1, 0);
     // The menu entry sits after the notifications (MainLayout), shown only while the module is available.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
-    public void Register(IServiceCollection services, IConfiguration configuration) =>
+    public void Register(IServiceCollection services, IConfiguration configuration)
+    {
         services.AddScoped<IAuditReader>(provider => new GuardedAuditReader(provider.GetRequiredService<IAuditTrail>(), provider.GetRequiredService<ModuleRegistry>()));
+        services.AddScoped<IJournalSettings>(provider => new GuardedJournalSettings(ActivatorUtilities.CreateInstance<MariaJournalSettings>(provider), provider.GetRequiredService<ModuleRegistry>()));
+    }
 
     // Stand-in used while the module is out (nothing outside the two pages injects the reader, but a page created by hand must not fail to resolve it).
-    public void RegisterUnavailable(IServiceCollection services) => services.AddScoped<IAuditReader, UnavailableAuditReader>();
+    public void RegisterUnavailable(IServiceCollection services)
+    {
+        services.AddScoped<IAuditReader, UnavailableAuditReader>();
+        services.AddScoped<IJournalSettings, UnavailableJournalSettings>();
+    }
 }

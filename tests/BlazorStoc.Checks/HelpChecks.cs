@@ -67,7 +67,22 @@ public static class HelpChecks
         ReferencedTopics(check);
         Shots(check);
         ShippedShots(check);
+        Contents(check);
         return Task.CompletedTask;
+    }
+
+    // The unified help: the table of contents lists every shipped topic once, under an area of the application (none is left in "Alte ferestre").
+    private static void Contents(Action<bool, string> check)
+    {
+        var catalog = HelpCatalog.Default;
+        var topics = catalog.Topics.Values.Where(topic => !topic.Public).ToList();
+        var html = HelpContents.Render(topics);
+        var missing = topics.Where(topic => !html.Contains($"data-help-topic=\"{topic.Key}\"", StringComparison.Ordinal)).Select(topic => topic.Key).ToList();
+        check(missing.Count == 0, "Help: the table of contents lists every topic" + (missing.Count > 0 ? ": " + string.Join(", ", missing.Take(8)) : ""));
+        var unassigned = topics.Where(topic => HelpContents.AreaOf(topic.Key) == HelpContents.Other).Select(topic => topic.Key).ToList();
+        check(unassigned.Count == 0, "Help: every topic belongs to an area of the table of contents (HelpContents.Areas)" + (unassigned.Count > 0 ? ": " + string.Join(", ", unassigned.Take(8)) : ""));
+        check(HelpContents.AreaOf("produse-detaliu") == "Produse și stoc" && HelpContents.AreaOf("proiecte-detaliu") != HelpContents.AreaOf("produse-detaliu"),
+            "Help: an area is chosen by the whole prefix of the key (produse is not proiecte)");
     }
 
     private static void Parser(Action<bool, string> check)
@@ -202,9 +217,11 @@ public static class HelpChecks
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.
     //  - the copy icon of a package row: it needs a NAS that answers with its account (the demo has none and the session is not an administrator, so no share can be made);
+    //  - the "Selectează zona CUI" button of the warning: it shows only when the analysis cannot find the supplier's CUI, and every demo invoice has one;
     //  - the result of the last operation on the database accounts: it needs the dedicated accounts and the account that administers the server (the demo database has neither).
     private static readonly HashSet<string> UnframedElements = new(StringComparer.Ordinal)
     {
+        "setari-facturi-generare|Selectează zona CUI",
         "setari-backup|Copiază pe NAS",
         "setari-baza-conexiune|Rezultatul ultimei operații"
     };

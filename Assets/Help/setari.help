@@ -4,18 +4,21 @@ Cautare: setari configurari administrare anaf notificari harta facturi backup mo
 Captura: pagina | /setari |  | Setările
 Captura: subsectiuni | /setari | click Backup; wait 1200 | Secțiunea Backup, cu subsecțiunile ei
 
-Configurările aplicației, rezervate administratorului; un utilizator fără acest rol ajunge doar la șabloanele de facturi (le creează și le modifică). Setările sunt un panou cu un tile pentru fiecare secțiune; fiecare secțiune are propriul ajutor: apasă „?” după ce ai deschis secțiunea.
+Configurările aplicației, rezervate administratorului; un utilizator fără acest rol ajunge doar la șabloanele de facturi (le creează și le modifică). Setările sunt un panou cu un tile pentru fiecare secțiune; fiecare tile are o iconiță, titlul secțiunii și o scurtă descriere; fiecare secțiune are propriul ajutor: apasă „?” după ce ai deschis secțiunea.
 
 ## Elemente
-### Secțiunile
-- Preluare date ANAF | buton | Configurarea interogării serviciului public ANAF ([[setari-anaf]]).
-- Notificări | buton | Șabloanele de notificări și setările lor ([[setari-notificari-sabloane]], [[setari-notificari-setari]]).
-- Hartă | buton | Furnizorul și aspectul hărții de mentenanță ([[setari-harta-motor]], [[setari-harta-overlay]]).
-- Facturi | buton | Șabloanele de citire a facturilor ([[setari-facturi-generare]], [[setari-facturi-sabloane]]).
-- Backup | buton | Backup, restaurare, copiere pe NAS și verificarea orei ([[setari-backup]], [[setari-backup-nas]], [[setari-backup-ora]]).
-- Module | buton | Starea modulelor aplicației și oprirea/pornirea lor ([[setari-module]]).
-- Utilizatori | buton | Conturile utilizatorilor ([[utilizatori]]) și drepturile fiecărui tip de utilizator, în subsecțiunea „Tipuri de utilizatori” ([[setari-tipuri-utilizatori]]).
-- Bază de date | buton | Starea serverului bazei de date și conexiunea aplicației la el ([[setari-baza-stare]], [[setari-baza-conexiune]]); apare numai conturilor cu nivelul Administrator.
+### Secțiunile (tile-uri)
+- Preluare ActivityApp | tile | Conexiunea la ActivityApp, tichetele preluate, corespondența câmpurilor și programarea importului.
+- Preluare date ANAF | tile | Configurarea interogării serviciului public ANAF ([[setari-anaf]]).
+- Notificări | tile | Șabloanele de notificări și setările lor ([[setari-notificari-sabloane]], [[setari-notificari-setari]]).
+- Hartă | tile | Furnizorul și aspectul hărții de mentenanță ([[setari-harta-motor]], [[setari-harta-overlay]]).
+- Facturi | tile | Șabloanele de citire a facturilor ([[setari-facturi-generare]], [[setari-facturi-sabloane]]).
+- Actualizare | tile | Versiunea aplicației, pachetele de actualizare și istoricul lor ([[setari-actualizare]]).
+- Backup | tile | Backup, restaurare, copiere pe NAS și verificarea orei ([[setari-backup]], [[setari-backup-nas]], [[setari-backup-ora]]).
+- Jurnal activitate | tile | Câte evenimente recente arată implicit pagina Jurnal activitate ([[setari-jurnal]]).
+- Module | tile | Starea modulelor aplicației și oprirea/pornirea lor ([[setari-module]]).
+- Utilizatori | tile | Conturile utilizatorilor ([[utilizatori]]) și drepturile fiecărui tip de utilizator, în subsecțiunea „Tipuri de utilizatori” ([[setari-tipuri-utilizatori]]).
+- Bază de date | tile | Starea serverului bazei de date și conexiunea aplicației la el ([[setari-baza-stare]], [[setari-baza-conexiune]]); apare numai conturilor cu nivelul Administrator.
 - Toate setările | buton | Din interiorul unei secțiuni te întoarce la tile-urile cu toate secțiunile. | img: subsectiuni | sel: #settings-back
 - Subsecțiunile | filă | Unele secțiuni au subsecțiuni, afișate sub numele secțiunii deschise. | img: subsectiuni | sel: .settings-subtab
 

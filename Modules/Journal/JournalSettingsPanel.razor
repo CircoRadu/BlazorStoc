@@ -1,0 +1,78 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules.Journal
+@inject IJournalSettings Settings
+@inject IAuditReader Reader
+@inject IAccessControl Access
+@inject ILogger<JournalSettingsPanel> Logger
+@implements IDisposable
+@* Setari -> Jurnal activitate (administrator only): how many of the most recent events the page Jurnal activitate works on by default. Nothing is deleted: the complete
+   journal keeps every event. The number is at least 50; until it is changed the page works on 500 (what it always showed) and at most 50 000 (the most rows one query returns). *@
+<section class="catalog" aria-labelledby="journal-settings-title">
+    <div class="catalog-heading"><h2 id="journal-settings-title">Jurnal activitate</h2></div>
+    <div class="catalog-body">
+        @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+        else
+        {
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+            <p class="muted">Pagina <strong>Jurnal activitate</strong> afișează implicit cele mai recente evenimente, cu filtre, căutare și paginare. Aici alegi câte evenimente recente intră în această vedere.
+                Nu se șterge nimic: <strong>Jurnalul complet</strong> arată oricând toate evenimentele, iar jurnalul continuă să înregistreze tot.</p>
+            <div class="editor-grid">
+                <label>Evenimente recente afișate în Jurnal activitate
+                    <input id="journal-recent-window" type="number" min="@JournalDisplayRules.MinRecentWindow" max="@JournalDisplayRules.MaxRecentWindow" step="100" @bind="recentWindow" @bind:event="oninput" disabled="@(busy || !canEdit)" />
+                    <small>Între @JournalDisplayRules.MinRecentWindow.ToString("N0") și @JournalDisplayRules.MaxRecentWindow.ToString("N0"). @(total is null ? "" : $"Acum jurnalul are {total:N0} evenimente.")</small></label>
+            </div>
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@(busy || !canEdit)" @onclick="SaveAsync">@(busy ? "Se salvează…" : "Salvează")</button>
+                @if (!canEdit) { <span class="muted">Nu ai dreptul să modifici această setare.</span> }
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private int recentWindow = JournalDisplayRules.DefaultRecentWindow;
+    private int? total;
+    private bool loading = true, busy, canEdit;
+    private string? error, notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            canEdit = await Access.HasAsync("setari-jurnal.edit", lifetime.Token);
+            recentWindow = await Settings.GetRecentWindowAsync(lifetime.Token);
+            total = (await Reader.SummaryAsync(DateTime.UtcNow.Date, lifetime.Token)).Total;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ModuleUnavailableException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Journal settings could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Setarea nu a putut fi citită. Încearcă din nou.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        busy = true; error = notice = null;
+        try
+        {
+            await Settings.SaveRecentWindowAsync(recentWindow, lifetime.Token);
+            notice = $"Jurnal activitate afișează acum implicit ultimele {recentWindow:N0} evenimente.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is JournalSettingsException or AccessDeniedException or ModuleUnavailableException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Journal settings could not be saved ({ErrorType}).", exception.GetType().Name);
+            error = "Setarea nu a putut fi salvată. Încearcă din nou.";
+        }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

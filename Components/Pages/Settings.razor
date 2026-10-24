@@ -1,5 +1,5 @@
 ﻿@page "/setari"
-@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-actualizare.view|setari-import-activityapp.view|utilizatori.view|tipuri-utilizatori.view")]
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-actualizare.view|setari-import-activityapp.view|utilizatori.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject BlazorStoc.Services.IDatabaseAccountService DatabaseAccountsGate
@@ -20,7 +20,7 @@
         <div class="settings-dashboard" id="settings-dashboard">
             @foreach (var tab in VisibleTabs)
             {
-                <button type="button" class="settings-tile" id="tile-@tab.Id" aria-label="@tab.Title" @onclick="() => SelectTab(tab.Id)"><strong>@tab.Title</strong><small>@TileText(tab.Id)</small></button>
+                <button type="button" class="settings-tile" id="tile-@tab.Id" aria-label="@tab.Title" @onclick="() => SelectTab(tab.Id)"><span class="main-menu-icon" aria-hidden="true">@TileIcon(tab.Id)</span><strong>@tab.Title</strong><small>@TileText(tab.Id)</small></button>
             }
         </div>
     }
@@ -131,6 +131,12 @@
             }
         </div>
     }
+    else if (activeTab == JournalTab && allowedTabs.Contains(JournalTab))
+    {
+        <div role="tabpanel" id="panel-@JournalTab" aria-labelledby="tab-@JournalTab" class="settings-body">
+            <JournalSettingsPanel />
+        </div>
+    }
     else if (activeTab == ModulesTab && allowedTabs.Contains(ModulesTab))
     {
         <div role="tabpanel" id="panel-@ModulesTab" aria-labelledby="tab-@ModulesTab" class="settings-body">
@@ -172,6 +178,7 @@
     private const string MapTab = SettingsNavigation.MapTab;
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
     private const string BackupTab = "backup";
+    private const string JournalTab = "jurnal";
     // The Administrator role (every administrator, also the one configured in the private file) sees this tab; it is not a key of the catalog.
     private const string DatabaseTab = "baza-de-date";
     private const string DatabaseStatusSubtab = "stare";
@@ -198,16 +205,33 @@
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare ActivityApp"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare ActivityApp"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
         [AnafTab] = "setari-anaf.view", [ActivityImportTab] = "setari-import-activityapp.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
-        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [UpdateTab] = "setari-actualizare.view"
+        [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [JournalTab] = "setari-jurnal.view", [UpdateTab] = "setari-actualizare.view"
     };
     private readonly HashSet<string> allowedTabs = [];
     // The open section; null shows the dashboard of the sections.
     private string? activeTab;
+
+    // The glyph on the tile of a section of the settings dashboard (the same icon box as the tiles of the main page).
+    private static string TileIcon(string id) => id switch
+    {
+        AnafTab => "⌕",
+        ActivityImportTab => "⇅",
+        NotificationsTab => "✉",
+        MapTab => "⌖",
+        InvoicesTab => "▤",
+        BackupTab => "⤓",
+        JournalTab => "≡",
+        ModulesTab => "▦",
+        UpdateTab => "↻",
+        UsersTab => "♙",
+        DatabaseTab => "▥",
+        _ => "☰"
+    };
 
     private static string TileText(string id) => id switch
     {
@@ -218,6 +242,7 @@
         InvoicesTab => "Șabloanele de citire a facturilor.",
         BackupTab => "Backup, restaurare, copiere pe NAS și verificarea orei.",
         ModulesTab => "Starea modulelor și oprirea sau pornirea lor.",
+        JournalTab => "Câte evenimente recente arată implicit pagina Jurnal activitate.",
         UpdateTab => "Versiunea aplicației, pachetele de actualizare și istoricul lor.",
         UsersTab => "Conturile utilizatorilor și drepturile fiecărui tip de utilizator.",
         DatabaseTab => "Starea serverului bazei de date și conexiunea aplicației la el.",

@@ -44,7 +44,7 @@ public static class ModuleChecks
         var root = AppContext.BaseDirectory;
         while (root is not null && !File.Exists(Path.Combine(root, "BlazorStoc.csproj"))) root = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar));
         if (root is null) { check(false, "Dashboard tiles: the project folder is found"); return; }
-        var core = new HashSet<string> { "/produse", "/iesiri/multipla", "/categorii", "/beneficiari", "/setari?tab=utilizatori", "/nomenclator", "/setari" };
+        var core = new HashSet<string> { "/produse", "/iesiri/multipla", "/categorii", "/beneficiari", "/setari?tab=utilizatori", "/nomenclator", "/setari", "#ajutor" };
         var ungated = File.ReadAllLines(Path.Combine(root, "Components", "Pages", "Dashboard.razor"))
             .Where(line => line.Contains("main-menu-icon") || line.Contains("<ModuleTile "))
             .Select(line => (Href: Regex.Match(line, "(?:<a href|<ModuleTile [^>]*Href)=\"([^\"]+)\"").Groups[1].Value, Gated: line.Contains("<ModuleGate") || line.Contains("<ModuleTile ")))

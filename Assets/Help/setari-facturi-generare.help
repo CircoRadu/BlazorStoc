@@ -2,17 +2,17 @@
 Ruta: /setari
 Tab: Generare șablon factură
 Cautare: sablon factura generare analiza pdf scanat xml zip campuri coloane linii demarcare overlay salveaza furnizor cui descriere intrare stoc
-Captura: pagina | /setari | click Facturi; upload factura-demo.pdf; full | Generarea șablonului de factură
-Captura: campuri | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(1) summary; wait 500; scroll details.invoice-section[open] | Câmpurile din antet
-Captura: coloane | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(2) summary; wait 500; scroll details.invoice-section[open] | Coloanele tabelului
-Captura: citire | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(3) summary; wait 500; scroll details.invoice-section[open] | Ce se citește cu șablonul
-Captura: descriere | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(4) summary; wait 500; scroll details.invoice-section[open] | Descrierea intrării în stoc
-Captura: salvare | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; scroll details.invoice-section[open] | Salvarea șablonului
-Captura: start | /setari | click Facturi; wait 1000 | Încărcarea facturii de probă
-Captura: editare | /setari | click Facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000 | Analiza unui șablon existent
-Captura: editare-salvare | /setari | click Facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; scroll details.invoice-section[open] | Salvarea unui șablon existent
-Captura: selectie | /setari | click Facturi; wait 800; upload factura-demo.pdf; wait 1500; drag .invoice-page-wrap=0.05,0.3,0.95,0.55; wait 800; eval window.scrollTo(0, 0); wait 500 | Selecția mai multor elemente pe pagină
-Captura: paginile | /setari | click Facturi; wait 800; upload factura-demo-2p.pdf; wait 9000; click Pagina 2; wait 1500; height 1300 | Factura cu două pagini
+Captura: pagina | /setari | click sel:#tile-facturi; upload factura-demo.pdf; full | Generarea șablonului de factură
+Captura: campuri | /setari | click sel:#tile-facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(1) summary; wait 500; scroll details.invoice-section[open] | Câmpurile din antet
+Captura: coloane | /setari | click sel:#tile-facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(2) summary; wait 500; scroll details.invoice-section[open] | Coloanele tabelului
+Captura: citire | /setari | click sel:#tile-facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(3) summary; wait 500; scroll details.invoice-section[open] | Ce se citește cu șablonul
+Captura: descriere | /setari | click sel:#tile-facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(4) summary; wait 500; scroll details.invoice-section[open] | Descrierea intrării în stoc
+Captura: salvare | /setari | click sel:#tile-facturi; wait 800; upload factura-demo.pdf; wait 1500; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; scroll details.invoice-section[open] | Salvarea șablonului
+Captura: start | /setari | click sel:#tile-facturi; wait 1000 | Încărcarea facturii de probă
+Captura: editare | /setari | click sel:#tile-facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000 | Analiza unui șablon existent
+Captura: editare-salvare | /setari | click sel:#tile-facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; scroll details.invoice-section[open] | Salvarea unui șablon existent
+Captura: selectie | /setari | click sel:#tile-facturi; wait 800; upload factura-demo.pdf; wait 1500; drag .invoice-page-wrap=0.05,0.3,0.95,0.55; wait 800; eval window.scrollTo(0, 0); wait 500 | Selecția mai multor elemente pe pagină
+Captura: paginile | /setari | click sel:#tile-facturi; wait 800; upload factura-demo-2p.pdf; wait 9000; click Pagina 2; wait 1500; height 1300 | Factura cu două pagini
 
 Creezi un șablon pe o factură de probă: aplicația citește tabelul cu liniile și câmpurile din antet și le arată pe pagină ca un șablon interactiv. Alegi ce se folosește la import, corectezi poziția elementelor, scrii descrierea intrării în stoc și salvezi. După salvare, șablonul se aplică de îndată facturii. Același editor se deschide și din „Preluare factură”, când furnizorul nu are șablon.
 
@@ -28,6 +28,7 @@ Creezi un șablon pe o factură de probă: aplicația citește tabelul cu liniil
 - Anulează / Refă | buton | Anulează sau reface ultima modificare (Ctrl+Z / Ctrl+Y). | sel: .invoice-draw-tools button.act-edit
 - Adaugă câmp desenând pe pagină | buton | Desenezi un chenar în jurul unei valori din antet.
 - Adaugă celulă de antet desenând pe pagină | buton | Desenezi celula de antet a unei coloane.
+- Selectează zona CUI | buton | Apare în avertismentul „Nu am putut stabili CUI/CIF-ul furnizorului”, când analiza nu a găsit CUI-ul. Trage un chenar peste CUI în pagină: zona devine câmpul „CUI furnizor” și completează CUI/CIF-ul șablonului. | sel: #invoice-cui-missing
 - Desenează zona unei coloane | buton | Desenezi fâșia verticală a unei coloane.
 - Elemente selectate | text | După selecția multiplă: „Șterge elementele selectate” sau „Anulează selecția”. | img: selectie | sel: .invoice-multi-bar
 - Chenarele | marcaj | Chenarele verzi sunt elemente folosite la import, cele întrerupte sunt găsite dar nefolosite, iar fâșiile verticale colorate sunt coloanele tabelului. | sel: .invoice-pages > p.form-note
@@ -59,5 +60,6 @@ Nota: tabelul de rânduri și câmpurile se actualizează la fiecare modificare.
 
 ## Flux: Cum repar o factură citită greșit
 1. Dacă tabelul nu a fost găsit, desenează mai întâi coloana cu denumirea, apoi celelalte; tabelul se citește din nou la fiecare modificare.
-2. Dacă o valoare din antet lipsește, desenează câmpul pe pagină și alege-i eticheta.
+2. Dacă apare avertismentul că CUI-ul furnizorului nu a fost stabilit, apasă „Selectează zona CUI” și încadrează CUI-ul pe pagină.
+3. Dacă o valoare din antet lipsește, desenează câmpul pe pagină și alege-i eticheta.
 3. Salvează șablonul; următoarele facturi ale furnizorului se citesc după el.

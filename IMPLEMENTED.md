@@ -712,3 +712,12 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 23.10.2026 16:55 - Preluare tichete ActivityApp: etapele 5-7 (flux pe tichete), Setari ca panou, versiunile 0.5.7-0.5.11
 
 - Etapa 5 corespondenta campurilor; etapa 6 cuvinte cheie de mentenanta in Nomenclator, sincronizare la interval sau la ore fixe, Importa acum; etapa 7 flux pe tichete: citire incrementala (marcaj + Reciteste tot), clienti preluati la nevoie si verificati in ANAF, coada beneficiarilor de verificat (Beneficiari -> De verificat, notificare), tichete in asteptare, verificare umana a mentenantei cu discard si reactivare. Migrarile 044-050; ICompanyDataLookup si IBeneficiaryCheckService in nucleu.,Telefonul beneficiarului optional; persoanele fizice nu se preiau; Setari ca panou de tile-uri, pagina principala cu acelasi aspect, meniu cu bara verde; istoric de actualizari cu paginare; changelog pe versiune.,Verificari: suita in memorie 2039 PASS, MariaDB 3009 PASS, 0 esecuri; pachetul 0.5.11 facut si verificat din fisier.
+
+## Finalizat la 24.10.2026 - Tema dark, ajutor unificat, Setari -> Jurnal activitate, versiuni pe module (versiunea 0.5.17)
+
+- Tema dark cu comutator in bara de sus (tokenuri `--c-<hex>` in `app.css`, `wwwroot/theme-dark.css`, `wwwroot/theme.js`, alegere in localStorage, implicit light); iconite pe tile-urile Setarilor; bara verde pe meniuri, sub-meniuri si taburi.
+- Ajutor unificat: intrare in meniu si placa pe pagina principala, cuprins pe sectiuni (`/ajutor/cuprins`, `HelpContents`), cautare in orice fereastra de ajutor; help si capturile refacute (doar tema light).
+- Setari -> Jurnal activitate: numarul de evenimente recente afisate implicit (50-50 000, implicit 500), migrarea 51 (`journal_settings`), cheia `setari-jurnal`, actiunea `Modificare evenimente afisate in jurnal`; nimic nu se sterge.
+- Versiuni pe module: `Modules/module-versions.json`, `tools/module-version.ps1`, grupul `moduleversions`; Preluare factura 1.1.0 (zona CUI), Jurnal 1.1.0.
+- Editor sabloane PDF: „Selecteaza zona CUI" cand analiza nu gaseste CUI-ul furnizorului.
+

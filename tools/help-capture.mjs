@@ -462,10 +462,10 @@ try {
         console.log("Pregatit: o notificare rezolvata.");
         // and one saved invoice template (made from the sample PDF written by: dotnet run --project tests/BlazorStoc.HelpDemo -- --files artifacts/help-demo-files)
         await navigate(cdp, base + "/setari");
-        for (const step of ["click Facturi", "click Șabloane salvate"]) await runStep(cdp, step);
+        for (const step of ["click sel:#tile-facturi", "click Șabloane salvate"]) await runStep(cdp, step);
         if (!(await cdp.evaluate(`!!document.querySelector(".row-icon.edit")`))) {
             await navigate(cdp, base + "/setari");
-            for (const step of ["click Facturi", "wait 800", "upload factura-demo.pdf", "wait 1500", "jsclick sel:details.invoice-section:nth-of-type(5) summary", "wait 600", "jsclick sel:details.invoice-section[open] button.primary", "wait 3500"]) await runStep(cdp, step);
+            for (const step of ["click sel:#tile-facturi", "wait 800", "upload factura-demo.pdf", "wait 1500", "jsclick sel:details.invoice-section:nth-of-type(5) summary", "wait 600", "jsclick sel:details.invoice-section[open] button.primary", "wait 3500"]) await runStep(cdp, step);
         }
         console.log("Pregatit: un sablon de factura salvat.");
         // the copy on a NAS was configured and ran once (the page shows the last operation); the UNC path is built with CHAR(92) (a backslash)

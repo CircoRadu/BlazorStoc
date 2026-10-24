@@ -59,6 +59,7 @@ data = await new DemoProductRepository().GetProductsAsync();
             ["package"] = async () => { await PackageChecks.RunAsync(Check); await UpdateEngineChecks.RunAsync(Check); },
             ["help"] = () => HelpChecks.RunAsync(Check),
             ["modules"] = () => ModuleChecks.RunAsync(Check),
+            ["moduleversions"] = () => ModuleVersionChecks.RunAsync(Check),
             ["activityimport"] = () => ActivityImportChecks.RunAsync(Check),
             ["ocrworker"] = () => OcrWorkerChecks.RunAsync(Check),
             ["backupworker"] = () => BackupWorkerChecks.RunAsync(Check),

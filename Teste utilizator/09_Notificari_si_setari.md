@@ -4,6 +4,20 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 
 ## Modificari de testat
 
+### 24.10.2026 - Tema intunecata, iconite pe tile-urile Setarilor, bara verde pe meniuri si taburi
+
+**Ce s-a adaugat:** comutator de tema (luna/soare) in bara de sus, langa „Deconectare"; iconite pe tile-urile din Setari; bara verde pe orice element de meniu, sub-meniu si tab cand e selectat sau la hover (la taburi pe marginea de sus).
+
+**Ce face acum:** tema intunecata are o paleta calma pentru seara; alegerea se tine doar in browserul curent (nu pe server, nu pentru alti utilizatori). Implicit ramane tema luminoasa.
+
+| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+|---|---|---|---|
+| 1 | Apasa luna din bara de sus | Aplicatia trece pe tema intunecata, fara alb puternic; butonul devine soare | |
+| 2 | Reincarca pagina si deschide alta pagina | Tema ramane intunecata; intr-un alt browser sau la alt utilizator ramane luminoasa | |
+| 3 | Apasa soarele | Revine tema luminoasa | |
+| 4 | Deschide Setari | Fiecare tile are o iconita | |
+| 5 | Treci cu mausul peste meniu, un sub-meniu (ex. Produse -> categorie) si un tab | Bara verde in stanga elementului; la tab, sus | |
+
 ### 23.10.2026 - Changelog pentru pachetele de actualizare
 
 **Ce s-a adaugat:** fiecare pachet de actualizare are un changelog (`Assets/Data/changelog.txt`, o sectiune pe versiune; `tools\release.ps1` refuza o versiune fara sectiune si foloseste sectiunea ca note ale pachetului). In Setari -> Actualizare -> Istoric, fiecare rand are iconita de ochi „Vezi changelog" care deschide o fereastra cu ce a adus versiunea.

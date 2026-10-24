@@ -1,0 +1,18 @@
+# Setări · Jurnal activitate
+Ruta: /setari
+Tab: Jurnal activitate
+Cautare: jurnal activitate evenimente recente afisate implicit numar setare administrator
+Captura: pagina | /setari | click sel:#tile-jurnal; wait 3000 | Setarea jurnalului de activitate
+
+Aici administratorul alege câte dintre cele mai recente evenimente le arată implicit pagina „Jurnal activitate”. Nu se șterge nimic: jurnalul continuă să înregistreze toate operațiile, iar „Jurnalul complet” arată oricând toate evenimentele.
+
+## Elemente
+### Setarea
+- Evenimente recente afișate în Jurnal activitate | câmp | Numărul de evenimente recente pe care lucrează pagina Jurnal activitate (filtre, căutare, paginare). Minim 50, maxim 50 000; până la prima modificare sunt 500. Sub câmp vezi intervalul și câte evenimente are acum jurnalul. | sel: #journal-recent-window
+- Salvează | buton | Păstrează numărul ales; pagina Jurnal activitate îl folosește imediat (cel mult 30 de secunde până la reîmprospătare). Modificarea se înregistrează în jurnal. | sel: section[aria-labelledby='journal-settings-title'] button.primary
+
+## Flux: Cum schimb câte evenimente arată Jurnal activitate
+1. Din Setări alege tile-ul „Jurnal activitate”.
+2. Scrie numărul dorit (între 50 și 50 000).
+3. Apasă „Salvează”.
+Nota: o valoare mare face pagina mai grea; pentru evenimente mai vechi folosește oricând „Jurnalul complet”, care nu depinde de acest număr.

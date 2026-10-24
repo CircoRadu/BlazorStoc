@@ -29,6 +29,37 @@ public static class JournalModuleChecks
         await WiringAsync(check);
         Architecture(check);
         await SessionAddressAsync(check);
+        await DisplaySettingAsync(check);
+    }
+
+    // Setari -> Jurnal activitate: how many recent events the journal page works on (500..50 000; nothing is ever deleted).
+    private static async Task DisplaySettingAsync(Action<bool, string> check)
+    {
+        check(JournalDisplayRules.MinRecentWindow == 50 && JournalDisplayRules.DefaultRecentWindow == 500 && JournalDisplayRules.MaxRecentWindow == AuditQueryRules.MaxRows
+              && !JournalDisplayRules.Valid(49) && JournalDisplayRules.Valid(50) && JournalDisplayRules.Valid(50_000) && !JournalDisplayRules.Valid(50_001) && !JournalDisplayRules.Valid(0),
+            "Journal settings: the number of recent events is between 50 and 50 000 (500 until it is set) (the most rows a query returns)");
+        var services = new ServiceCollection();
+        var registry = new ModuleRegistry();
+        services.AddSingleton<ModuleRegistry>(registry);
+        services.AddSingleton<IAuditTrail, TestAuditTrail>();
+        services.AddSingleton<IAccessControl>(new TestAccessControl(true, "administrator.demo"));
+        services.AddSingleton<IConfiguration>(Empty());
+        registry.Add(new JournalModule(), services, Empty());
+        using (var provider = services.BuildServiceProvider())
+        using (var scope = provider.CreateScope())
+            check(scope.ServiceProvider.GetService<IJournalSettings>()?.GetType().Name == "GuardedJournalSettings", "Journal settings: the module registers the settings behind the circuit breaker");
+        var offRegistry = new ModuleRegistry();
+        var offServices = new ServiceCollection();
+        offRegistry.Add(new JournalModule(), offServices, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Modules:jurnal:Enabled"] = "false" }).Build());
+        using (var provider = offServices.BuildServiceProvider())
+        using (var scope = provider.CreateScope())
+        {
+            var settings = scope.ServiceProvider.GetRequiredService<IJournalSettings>();
+            var failed = false;
+            try { await settings.SaveRecentWindowAsync(1000); } catch (ModuleUnavailableException) { failed = true; }
+            check(await settings.GetRecentWindowAsync() == 500 && failed, "Journal settings: while the module is out the page works on 500 events and a save says the module is out");
+        }
+        check(Permissions.IsAdminOnly("setari-jurnal.edit") && Permissions.Modules.Any(item => item.Id == "setari-jurnal"), "Journal settings: the permission module setari-jurnal exists and is for the administrator only");
     }
 
     private static async Task SessionAddressAsync(Action<bool, string> check)

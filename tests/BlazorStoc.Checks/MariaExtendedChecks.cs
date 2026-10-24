@@ -66,6 +66,7 @@ public static partial class MariaExtendedChecks
             await Section("Database settings: server status, connection test, refusals, no password in the journal", () => DatabaseSettingsAsync(configuration, audit, probe));
             await Section("Database accounts: status, change of password, interrupted change, reset, export and import (a throw-away account)", () => DatabaseAccountsAsync(configuration, audit));
             await Section("NAS backup settings: encrypted password, administrators only, journal", () => NasBackupSettingsAsync(configuration, admin, audit, probe));
+            await Section("Journal display setting: default 500, range, administrators only, journal", () => JournalDisplayAsync(configuration, admin, audit, probe));
             await Section("Default notification templates: made once per event, existing and deleted ones left alone, journal", () => DefaultTemplatesAsync(configuration, admin, audit, probe));
             await Section("Offer templates: save, refuse, change, journal", () => OfferTemplatesAsync(configuration, admin, audit, probe));
             await Section("Project components: add, state, archive, reactivate", () => ProjectComponentsAsync(configuration, admin, audit, probe));

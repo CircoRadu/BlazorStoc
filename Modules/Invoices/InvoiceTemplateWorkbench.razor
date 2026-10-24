@@ -75,6 +75,13 @@ else
             <FileDropZone Id="invoice-file-replace" Accept=".pdf,application/pdf" Text="Încarcă alt PDF pentru acest șablon" OnChange="OnFileAsync" Disabled="busy || saving" />
         </section>
     }
+    @if (draft is not null && (!IsEditMode || analyzed) && !draft.Fields.Any(item => item.Meaning == InvoiceFieldMeanings.SupplierCui && item.Value.Trim().Length > 0))
+    {
+        <div class="invoice-warning" id="invoice-cui-missing" role="status">
+            ⚠ Nu am putut stabili CUI/CIF-ul furnizorului din factură. Selectează pe pagină zona în care apare, iar zona primește eticheta „CUI furnizor”.
+            <button type="button" class="refresh act-confirm @(drawMode == "cui" ? "active" : "")" aria-pressed="@(drawMode == "cui" ? "true" : "false")" @onclick="@(() => ToggleDraw("cui"))">▭ Selectează zona CUI</button>
+        </div>
+    }
     @if (CuiMismatch is { } mismatch) { <div class="invoice-warning" role="status">⚠ @mismatch</div> }
     @foreach (var warning in session.Analysis.Warnings) { <div class="invoice-warning" role="status">⚠ @warning</div> }
 
@@ -116,7 +123,7 @@ else
                 <button type="button" class="refresh act-confirm @(drawMode == "field" ? "active" : "")" aria-pressed="@(drawMode == "field" ? "true" : "false")" @onclick="@(() => ToggleDraw("field"))">▭ Adaugă câmp desenând pe pagină</button>
                 <button type="button" class="refresh act-confirm @(drawMode == "column" ? "active" : "")" aria-pressed="@(drawMode == "column" ? "true" : "false")" @onclick="@(() => ToggleDraw("column"))">▯ Adaugă celulă de antet desenând pe pagină</button>
                 <button type="button" class="refresh act-edit @(drawMode == "zone" ? "active" : "")" aria-pressed="@(drawMode == "zone" ? "true" : "false")" @onclick="@(() => ToggleDraw("zone"))">▮ Desenează zona unei coloane</button>
-                @if (drawMode.Length > 0) { <span class="muted">Trage cu mausul pe pagină@(drawMode == "column" ? " (celula din capul de tabel: lățimea ei devine lățimea coloanei)" : drawMode == "zone" ? " (sub celula coloanei: contează doar înălțimea, unde începe și unde se termină valorile)" : "").</span> }
+                @if (drawMode.Length > 0) { <span class="muted">Trage cu mausul pe pagină@(drawMode == "column" ? " (celula din capul de tabel: lățimea ei devine lățimea coloanei)" : drawMode == "zone" ? " (sub celula coloanei: contează doar înălțimea, unde începe și unde se termină valorile)" : drawMode == "cui" ? " (încadrează CUI/CIF-ul furnizorului)" : "").</span> }
                 @if (drawMode.Length == 0 && multiIds.Count == 0) { <span class="muted">Trage pe pagină, într-un loc liber, ca să selectezi mai multe elemente.</span> }
                 @if (multiIds.Count > 0)
                 {

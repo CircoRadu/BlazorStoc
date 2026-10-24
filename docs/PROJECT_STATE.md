@@ -9,6 +9,14 @@ Actualizat: 23.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (24.10.2026): versiunea 0.5.17 (tema dark, ajutor unificat, Setari -> Jurnal activitate, versiuni pe module)
+- Tema dark: tokenuri de culoare in `app.css`, paleta in `wwwroot/theme-dark.css` (generata din `:root` cu luminozitatea inversata, apoi ajustata), comutator `wwwroot/theme.js` in bara de sus, alegerea in localStorage (cheia `blazorstoc-theme`). Help si capturi numai pentru light.
+- Ajutor unificat: `Services/Help/HelpContents.cs` (sectiuni dupa prefixul cheii topicului), endpoint `/ajutor/cuprins`, intrarea „Ajutor" in meniu si placa pe pagina principala; cautarea apare in orice fereastra de ajutor.
+- Setari -> Jurnal activitate (`Modules/Journal/JournalSettings*.cs`, migrarea 51 `journal_settings`, cheia `setari-jurnal`): evenimentele recente afisate implicit (50-50 000, implicit 500); jurnalul nu se sterge niciodata.
+- Versiuni pe module: `Modules/module-versions.json` + `tools/module-version.ps1` (-Bump, -Init, -Refresh, -Status) + grupul de teste `moduleversions`.
+- Help: capturile au fost regenerate (`--all`, tema light) dupa intrarea „Ajutor" din meniu; vezi `docs/HELP_DE_REGENERAT.md` pentru ce ramane.
+- Pachetul de update 0.5.17 se construieste cu `tools\release.ps1`; instalarea pe serverul real ramane pasul utilizatorului (Teste utilizator/09).
+
 ## Ultimul lucru facut (23.10.2026): versiunile 0.5.7 - 0.5.11 (Preluare tichete ActivityApp, Setari ca panou)
 
 - Modulul **Preluare tichete ActivityApp** (`Modules/ActivityImport/`, Setari -> Preluare ActivityApp; vezi `docs/PROPUNERE_IMPORT_TICHETE.md` si `docs/HARTA_COD.md`): citire read-only din SQL Server, tipuri de tichete alese, corespondenta campurilor, cuvinte cheie de mentenanta (Nomenclator), sincronizare periodica sau la ore fixe + "Importa acum", beneficiari verificati in ANAF (`ICompanyDataLookup` din nucleu), coada beneficiarilor de verificat (Beneficiari -> De verificat), citire incrementala cu marcaj ("Reciteste tot"), tichete in asteptare, verificare umana a mentenantei (mentenanta s-a facut / la cerere / discard, reactivare). Migrarile 044-050.

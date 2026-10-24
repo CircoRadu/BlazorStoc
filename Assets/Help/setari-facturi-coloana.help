@@ -1,7 +1,7 @@
 # Editarea unei coloane a șablonului
 Cautare: editare coloana sablon antet celula legarea de rand pozitie verticala ordine zona automata
-Captura: fereastra | /setari | click Facturi; upload factura-demo.pdf; jsclick Editează coloana | Editarea unei coloane a șablonului
-Captura: zona | /setari | click Facturi; upload factura-demo.pdf; wait 2500; click sel:.invoice-column; wait 600; drag .invoice-handle:not(.move)=0.5,0.5,0.5,4.1; wait 600; jsclick Editează coloana; wait 1000 | Coloană cu zona modificată
+Captura: fereastra | /setari | click sel:#tile-facturi; upload factura-demo.pdf; jsclick Editează coloana | Editarea unei coloane a șablonului
+Captura: zona | /setari | click sel:#tile-facturi; upload factura-demo.pdf; wait 2500; click sel:.invoice-column; wait 600; drag .invoice-handle:not(.move)=0.5,0.5,0.5,4.1; wait 600; jsclick Editează coloana; wait 1000 | Coloană cu zona modificată
 
 Fereastra editează o coloană a tabelului de linii: denumirea din antet, celula de antet și felul în care valorile se leagă de rânduri.
 

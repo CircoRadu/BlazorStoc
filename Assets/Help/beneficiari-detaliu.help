@@ -12,7 +12,8 @@ Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, c
 - Numele și datele beneficiarului | text | Persoană fizică sau CUI, adresa, telefonul, iar la persoanele juridice Reg. Com., cod poștal și CAEN.
 - Date preluate din ANAF / Date introduse manual | insignă | Spune de unde vin datele persoanei juridice. | sel: .page-heading .anaf-source
 - Editează | buton | Deschide formularul beneficiarului ([[beneficiari-editor]]).
-- + Adaugă proiect | buton | Deschide formularul de proiect nou pentru acest beneficiar ([[proiecte-editor]]).
+### Secțiunile fișei
+- Puncte de lucru, Consum net, Contracte, Intervenții, Analize de risc, Proiecte | secțiuni | Fiecare secțiune se strânge sau se deschide apăsând pe titlul ei; numărul de lângă titlu arată câte elemente are.
 ### Puncte de lucru
 - + Adaugă punct de lucru | buton | Deschide formularul de punct de lucru ([[puncte-de-lucru-editor]]).
 - Nume | coloană | Numele punctului; „Principal” marchează punctul creat odată cu beneficiarul.
@@ -29,13 +30,14 @@ Fișa unui beneficiar: datele lui, punctele de lucru, consumul net de produse, c
 - Contracte de mentenanță și Intervenții | secțiuni | Din modulul Mentenanță: contractele beneficiarului ([[mentenanta-contracte]]) și registrul intervențiilor pe punctele de lucru ([[mentenanta-interventii]]). Apar doar cât modulul funcționează.
 - Analize de risc | secțiune | Din modulul Analize de risc: analizele punctelor de lucru, reînnoirile și expirarea lor ([[analize-risc-sectiune]]).
 ### Proiecte
+- + Adaugă proiect | buton | Se află în secțiunea Proiecte; deschide formularul de proiect nou pentru acest beneficiar ([[proiecte-editor]]).
 - Caută după denumire | câmp | Filtrează proiectele beneficiarului. | img: proiecte
 - Proiect | coloană | Apasă numele ca să deschizi pagina proiectului. | img: proiecte
 - Ultima modificare | coloană | Data și ora ultimei modificări a proiectului. | img: proiecte
 - Paginile | butoane | Trec la pagina anterioară sau următoare a listei de proiecte. | img: proiecte | sel: .pagination
 
 ## Flux: Cum adaug un proiect pentru un beneficiar
-1. Apasă „+ Adaugă proiect”.
+1. În secțiunea „Proiecte” apasă „+ Adaugă proiect”.
 2. Scrie denumirea proiectului, observațiile și alege componentele (sistemele) proiectului.
 3. Apasă „Salvează proiectul”; apoi îl găsești în lista „Proiecte” a fișei.
 

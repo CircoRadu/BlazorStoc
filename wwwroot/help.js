@@ -73,7 +73,7 @@
         const params = new URLSearchParams();
         params.set("ruta", location.pathname);
         selectedTabs().forEach((label) => params.append("tab", label));
-        return show("/ajutor/fereastra?" + params.toString(), location.pathname === "/");
+        return show("/ajutor/fereastra?" + params.toString(), true);
     }
 
     async function runSearch(dialog) {
@@ -161,6 +161,7 @@
         const dialog = document.getElementById(dialogId);
 
         if (target.closest("[data-help-open]")) { event.preventDefault(); openForWindow(); return; }
+        if (target.closest("[data-help-index]")) { event.preventDefault(); show("/ajutor/cuprins", true); return; }
 
         const topic = target.closest("[data-help-topic]");
         if (topic instanceof HTMLElement) {

@@ -18,6 +18,7 @@ public static class AuditEntities
     public const string Inventory = "Inventar";
     public const string DatabaseBackup = "CopieSiguranta";
     public const string ActivityImport = "PreluareActivityApp";
+    public const string JournalSettings = "SetariJurnal";
     public const string NotificationTemplate = "SablonNotificare";
     public const string Notification = "Notificare";
     public const string NotificationSettings = "SetariNotificari";
@@ -203,6 +204,7 @@ public static class AuditActions
     public const string FetchBackupFromNas = "Aducere pachet backup de pe NAS";
     public const string TestNasBackup = "Testare conexiune NAS";
     public const string SetActivityImport = "Modificare setări preluare ActivityApp";
+    public const string SetJournalDisplay = "Modificare evenimente afișate în jurnal";
     public const string TestActivityImport = "Testare conexiune ActivityApp";
     public const string SetActivityImportTypes = "Modificare tipuri tichete preluate ActivityApp";
     public const string SetActivityFieldMap = "Modificare corespondență câmpuri ActivityApp";

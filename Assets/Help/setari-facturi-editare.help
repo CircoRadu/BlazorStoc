@@ -2,8 +2,8 @@
 Ruta: /setari
 Tab: Editare șablon
 Cautare: editare sablon factura model analizeaza fisierul salveaza inlocuieste salveaza ca nou
-Captura: pagina | /setari | click Facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000 | Editarea unui șablon salvat
-Captura: salvare | /setari | click Facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; scroll details.invoice-section[open] | Salvarea unui șablon existent
+Captura: pagina | /setari | click sel:#tile-facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000 | Editarea unui șablon salvat
+Captura: salvare | /setari | click sel:#tile-facturi; wait 800; click Șabloane salvate; wait 1500; click sel:.row-icon.edit; wait 6000; jsclick sel:details.invoice-section:nth-of-type(5) summary; wait 500; scroll details.invoice-section[open] | Salvarea unui șablon existent
 
 Editezi un șablon salvat: elementele lui (câmpuri, coloane, descrierea intrării în stoc), denumirea și furnizorul. Șablonul se afișează exact așa cum a fost salvat, peste factura model; analiza pornește doar la cererea ta. Editorul este același ca la „Generare șablon factură” ([[setari-facturi-generare]]).
 

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using MySqlConnector;
+using BlazorStoc.Modules.Journal;
 using BlazorStoc.Services;
 
 namespace BlazorStoc.Checks;
@@ -85,6 +86,29 @@ public static partial class MariaExtendedChecks
                 "Backup settings: administrators only, every change is journaled with its own action");
         }
         finally { await using var cleanup = new MySqlCommand("DELETE FROM backup_nas_settings WHERE id=1; DELETE FROM backup_settings WHERE id=1", probe); await cleanup.ExecuteNonQueryAsync(); }
+    }
+
+    private static async Task JournalDisplayAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
+    {
+        var started = DateTime.UtcNow.AddSeconds(-1);
+        try
+        {
+            await using (var reset = new MySqlCommand("DELETE FROM journal_settings WHERE id=1", probe)) await reset.ExecuteNonQueryAsync();
+            var settings = new MariaJournalSettings(configuration, admin, audit);
+            var before = await new MariaJournalSettings(configuration, admin, audit).GetRecentWindowAsync();
+            await settings.SaveRecentWindowAsync(1500);
+            var after = await new MariaJournalSettings(configuration, admin, audit).GetRecentWindowAsync();
+            var tooSmall = await Rejects<JournalSettingsException>(() => settings.SaveRecentWindowAsync(49), "Fewer than 50 recent events is refused");
+            var tooBig = await Rejects<JournalSettingsException>(() => settings.SaveRecentWindowAsync(50_001), "More than 50 000 recent events is refused");
+            var denied = await Rejects<AccessDeniedException>(() => new MariaJournalSettings(configuration, new TestAccessControl(false, "limited"), audit).SaveRecentWindowAsync(2000), "A limited user cannot change the journal setting");
+            await settings.SaveRecentWindowAsync(1500);
+            var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started && item.Action == AuditActions.SetJournalDisplay).ToList();
+            Check(before == 500 && after == 1500 && tooSmall is not null && tooBig is not null && denied is not null,
+                "Journal setting: 500 until it is set, then the saved number; below 50 or above 50 000 and a limited user are refused");
+            Check(events.Count == 1 && events[0].Details.Contains("Evenimente afișate implicit în Jurnal activitate"),
+                "Journal setting: the change is journaled once with its own action (a save of the same number is not)");
+        }
+        finally { await using var cleanup = new MySqlCommand("DELETE FROM journal_settings WHERE id=1", probe); await cleanup.ExecuteNonQueryAsync(); }
     }
 
     private static async Task DefaultTemplatesAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit, MySqlConnection probe)
