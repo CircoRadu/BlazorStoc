@@ -10,6 +10,52 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*M!100616 SET @OLD_NOTE_VERBOSITY=@@NOTE_VERBOSITY, NOTE_VERBOSITY=0 */;
 
+LOCK TABLES `activity_import_issues` WRITE;
+/*!40000 ALTER TABLE `activity_import_issues` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_import_issues` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `activity_import_keywords` WRITE;
+/*!40000 ALTER TABLE `activity_import_keywords` DISABLE KEYS */;
+REPLACE INTO `activity_import_keywords` (`id`, `keyword`, `keyword_key`, `active`, `created_by`, `created_utc`, `version`) VALUES (1,'mentenanță','mentenanta',1,'admin','2026-10-24 11:54:37',0);
+/*!40000 ALTER TABLE `activity_import_keywords` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `activity_import_map` WRITE;
+/*!40000 ALTER TABLE `activity_import_map` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_import_map` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `activity_import_partner_checks` WRITE;
+/*!40000 ALTER TABLE `activity_import_partner_checks` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_import_partner_checks` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `activity_import_runs` WRITE;
+/*!40000 ALTER TABLE `activity_import_runs` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_import_runs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `activity_import_settings` WRITE;
+/*!40000 ALTER TABLE `activity_import_settings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_import_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `activity_import_suggestions` WRITE;
+/*!40000 ALTER TABLE `activity_import_suggestions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_import_suggestions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `activity_import_tickets` WRITE;
+/*!40000 ALTER TABLE `activity_import_tickets` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_import_tickets` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `activity_import_types` WRITE;
+/*!40000 ALTER TABLE `activity_import_types` DISABLE KEYS */;
+/*!40000 ALTER TABLE `activity_import_types` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `app_metadata` WRITE;
 /*!40000 ALTER TABLE `app_metadata` DISABLE KEYS */;
 REPLACE INTO `app_metadata` (`key`, `value`) VALUES ('diacritics_normalized','2026-09-28T09:30:13.7557522Z'),
@@ -246,8 +292,11 @@ REPLACE INTO `notification_template_seeds` (`source_key`, `seeded_utc`) VALUES (
 ('mentenanta.scadenta','2026-10-08T08:47:08.955Z'),
 ('proiect.deficit-termen','2026-10-08T08:47:08.984Z'),
 ('sistem.backup-lipsa','2026-10-08T08:47:08.988Z'),
+('sistem.beneficiari-activityapp-de-verificat','2026-10-24T11:46:00.944Z'),
 ('sistem.ceas-server-decalat','2026-10-08T10:05:36.723Z'),
 ('sistem.copie-nas-lipsa','2026-10-08T08:47:08.991Z'),
+('sistem.mentenanta-activityapp-de-validat','2026-10-24T11:46:00.937Z'),
+('sistem.preluare-activityapp','2026-10-24T11:46:00.933Z'),
 ('stoc.iesiri-peste-stoc','2026-10-08T08:47:08.971Z'),
 ('stoc.rezervare-fara-miscare','2026-10-08T08:47:08.981Z'),
 ('stoc.sub-minim','2026-10-08T08:47:08.975Z'),
@@ -272,7 +321,10 @@ REPLACE INTO `notification_templates` (`id`, `source_key`, `subject`, `body`, `t
 (11,'sistem.backup-lipsa','Backup lipsă – ultimul: <ultimul backup>','Nu s-a făcut niciun backup de peste <vechime maxima> zile. Ultimul backup: <ultimul backup>. Ultima eroare: <ultima eroare backup>. Verifică Setări → Backup NAS și programarea zilnică.',1,1,0,'sistem.backup-lipsa'),
 (12,'sistem.copie-nas-lipsa','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: <ultima copiere>. Cauza: <cauza copiere>. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.',1,1,0,'sistem.copie-nas-lipsa'),
 (13,'sistem.ceas-server-decalat','Ceasul serverului este decalat','Ceasul serverului este <decalaj ceas> față de ora de pe internet (constatat: <constatat ceas>). Backup-urile iau ora de pe internet, iar ștergerea automată a pachetelor vechi este oprită până la corectare. Verifică data și ora serverului.',1,1,0,'sistem.ceas-server-decalat'),
-(14,'analiza-risc.expirare','Expirare analiză de risc – <beneficiar>, <punct de lucru>','Analiza de risc nr. <numar inregistrare> a punctului de lucru <punct de lucru> (<adresa punct de lucru>) al beneficiarului <beneficiar>, întocmită de <intocmit de>, expiră la data de <data expirare> (ultima reînnoire: <data ultima reinnoire>; valabilitate: <valabilitate luni> luni; zile rămase: <zile ramase>; zile de depășire: <zile depasire>).',60,1,0,'analiza-risc.expirare');
+(14,'analiza-risc.expirare','Expirare analiză de risc – <beneficiar>, <punct de lucru>','Analiza de risc nr. <numar inregistrare> a punctului de lucru <punct de lucru> (<adresa punct de lucru>) al beneficiarului <beneficiar>, întocmită de <intocmit de>, expiră la data de <data expirare> (ultima reînnoire: <data ultima reinnoire>; valabilitate: <valabilitate luni> luni; zile rămase: <zile ramase>; zile de depășire: <zile depasire>).',60,1,0,'analiza-risc.expirare'),
+(15,'sistem.preluare-activityapp','Preluare ActivityApp: <problema preluare>','<detalii preluare> Vezi Setări → Preluare ActivityApp.',1,1,0,'sistem.preluare-activityapp'),
+(16,'sistem.mentenanta-activityapp-de-validat','Validează mentenanța: <tichet de validat>','<detalii validare> Vezi Setări → Preluare ActivityApp, „Evenimente de validat”.',1,1,0,'sistem.mentenanta-activityapp-de-validat'),
+(17,'sistem.beneficiari-activityapp-de-verificat','Verifică beneficiarul: <beneficiar de verificat>','<detalii verificare> Vezi Beneficiari → De verificat.',1,1,0,'sistem.beneficiari-activityapp-de-verificat');
 /*!40000 ALTER TABLE `notification_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -795,7 +847,14 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (40,'Tipuri de utilizatori cu permisiuni: tipul (nume, descriere, tip de sistem), permisiunile lui si legatura utilizatorului cu tipul','b5f93a399626c3f5ad69907bbe9c510e85a37c1fbe70e8931b9b14b0a411154b','baseline','2026-10-20 11:48:35','0.5.0'),
 (41,'Subcategorii: ordinea de afisare in categorie (sort_order)','2f5c90a0afe25517af3b70e3a0a64a3cd47eed63eb2fbf603a803d846e68775a','baseline','2026-10-20 11:48:35','0.5.0'),
 (42,'Module oprite manual de administrator (Setari -> Module): modulul, motivul, cine l-a oprit si cand','bd14f6d542b50c4f860539bc56f521ceece47a8f52e1487379091d89c9359eeb','baseline','2026-10-20 11:48:35','0.5.0'),
-(43,'Registrul migrarilor aplicate (versiune, checksum, origine): baza actualizarii aplicatiei','de255874f4b4d85a9f3969d4811eab43e837ad66c61b6c7d814fd2eca1857296','applied','2026-10-20 12:45:46','0.5.2');
+(43,'Registrul migrarilor aplicate (versiune, checksum, origine): baza actualizarii aplicatiei','de255874f4b4d85a9f3969d4811eab43e837ad66c61b6c7d814fd2eca1857296','applied','2026-10-20 12:45:46','0.5.2'),
+(44,'Preluare tichete ActivityApp: setarile conexiunii (cont doar citire), tipurile de tichete alese de administrator si starea structurii sursei','449ecc0d9f762c26bb772779d2ea8666effa7dc048a3ad5d4b636449cbb13add','applied','2026-10-24 11:46:01','0.5.14'),
+(45,'Preluare ActivityApp, etapa beneficiari si puncte de lucru: harta identitatilor, rularile (simulare/aplicare) si problemele','31ba72b0c23d8bf99e4753387661ff85421430102a18f05b26740d89152c238c','applied','2026-10-24 11:46:01','0.5.14'),
+(46,'Preluare ActivityApp, etapa tichete: detaliul sursei fiecarei interventii preluate (problema, rezolvarea, raportul original, executantul)','ab49481860f01ce6f8f9d8f620848d4897204f84f81c4dc404c53278bbfcfc02','applied','2026-10-24 11:46:01','0.5.14'),
+(47,'Preluare ActivityApp, sincronizarea periodica: programarea si ultimul rezultat, starile pentru notificari si semnalarea elementelor sterse in sursa','a11949d66dd4013116c671925d0ab576b4ca9f6e7849da269de470a971b32337','applied','2026-10-24 11:46:01','0.5.14'),
+(48,'Preluare ActivityApp, corespondenta campurilor: coloana din ActivityApp din care se citeste fiecare text al tichetului','9e59ef8d1fa575a8e9fd20e0f06debaa1e4e5d34a36ff52033c812e7530164ed','applied','2026-10-24 11:46:01','0.5.14'),
+(49,'Preluare ActivityApp: nomenclatorul cuvintelor cheie de mentenanta, evenimentele de validat si programarea sincronizarii (interval sau ore fixe)','e7db925fb2b47bc2b824a1a349ff9db1649667a1682cd11a42c57310290d134e','applied','2026-10-24 11:46:01','0.5.14'),
+(50,'Preluare ActivityApp: citire incrementala, beneficiari de verificat, coada tichetelor in asteptare, discard si validarea oricarei potriviri cu un cuvant cheie','3deb0429d42dfbde79f6705e691a690d9e67ad6da36c7d95998b80c4022fbbc8','applied','2026-10-24 11:46:01','0.5.14');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -809,6 +868,11 @@ LOCK TABLES `service_contracts` WRITE;
 /*!40000 ALTER TABLE `service_contracts` DISABLE KEYS */;
 REPLACE INTO `service_contracts` (`id`, `beneficiary_id`, `contract_number`, `contract_date`, `cycle_months`, `valid_until`, `is_active`, `notes`, `version`) VALUES (1,2,'26','2026-10-03',3,'2027-10-10',1,'',0);
 /*!40000 ALTER TABLE `service_contracts` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `service_intervention_source` WRITE;
+/*!40000 ALTER TABLE `service_intervention_source` DISABLE KEYS */;
+/*!40000 ALTER TABLE `service_intervention_source` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `service_interventions` WRITE;
@@ -1341,10 +1405,11 @@ UNLOCK TABLES;
 
 LOCK TABLES `system_types` WRITE;
 /*!40000 ALTER TABLE `system_types` DISABLE KEYS */;
-REPLACE INTO `system_types` (`id`, `name`, `name_key`, `active`, `sort_order`, `version`, `created_utc`, `updated_utc`) VALUES (1,'TVCI','tvci',1,1,10,'2026-10-07T12:37:25.959Z','2026-10-10T09:30:28.518Z'),
-(2,'CA','ca',1,2,3,'2026-10-08T11:39:39.606Z','2026-10-10T09:30:03.318Z'),
-(3,'EFR','efr',1,3,4,'2026-10-08T11:39:51.644Z','2026-10-10T09:30:03.318Z'),
-(4,'IDSAI','idsai',1,4,6,'2026-10-08T11:40:17.548Z','2026-10-10T09:30:43.158Z');
+REPLACE INTO `system_types` (`id`, `name`, `name_key`, `active`, `sort_order`, `version`, `created_utc`, `updated_utc`) VALUES (1,'TVCI','tvci',1,1,11,'2026-10-07T12:37:25.959Z','2026-10-24T11:53:55.130Z'),
+(2,'CA','ca',1,2,4,'2026-10-08T11:39:39.606Z','2026-10-24T11:53:55.131Z'),
+(3,'EFR','efr',1,3,5,'2026-10-08T11:39:51.644Z','2026-10-24T11:53:55.131Z'),
+(4,'IDSAI','idsai',1,5,7,'2026-10-08T11:40:17.548Z','2026-10-24T11:53:55.131Z'),
+(5,'TEST Detecție efracție','testdetectieefractie',1,4,4,'2026-10-24T11:52:56.698Z','2026-10-24T11:54:04.489Z');
 /*!40000 ALTER TABLE `system_types` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1420,6 +1485,10 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-facturi.view'),
 (1,'setari-harta.edit'),
 (1,'setari-harta.view'),
+(1,'setari-import-activityapp.edit'),
+(1,'setari-import-activityapp.reset'),
+(1,'setari-import-activityapp.run'),
+(1,'setari-import-activityapp.view'),
 (1,'setari-module.retry'),
 (1,'setari-module.toggle'),
 (1,'setari-module.view'),

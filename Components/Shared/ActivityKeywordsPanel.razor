@@ -96,9 +96,9 @@
             var match = ActivityKeywords.Match(tryText, [.. items.Where(item => item.Active).Select(item => item.Keyword)]);
             return match.Kind switch
             {
-                KeywordMatchKind.Exact => $"Cuvânt găsit: „{match.Word}”. Evenimentul se preia ca mentenanță (dacă punctul de lucru are contract de mentenanță activ).",
-                KeywordMatchKind.Approximate => $"Seamănă cu „{match.Word}”: în text scrie „{match.Found}”. Evenimentul nu se preia singur; administratorul primește o notificare și îl validează.",
-                _ => "Niciun cuvânt cheie găsit: evenimentul se preia ca intervenție la cerere."
+                KeywordMatchKind.Exact => $"Cuvânt găsit: „{match.Word}”. Tichetul se preia; dacă punctul de lucru are contract de mentenanță activ, administratorul validează dacă mentenanța s-a făcut, altfel se preia la cerere.",
+                KeywordMatchKind.Approximate => $"Seamănă cu „{match.Word}”: în text scrie „{match.Found}”. Tichetul se preia; dacă punctul de lucru are contract de mentenanță activ, administratorul primește o notificare și validează dacă mentenanța s-a făcut.",
+                _ => "Niciun cuvânt cheie găsit: tichetul nu se preia (se preiau numai tichetele care menționează un cuvânt cheie)."
             };
         }
     }

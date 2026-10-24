@@ -37,15 +37,12 @@ Fluxul: deschizi un produs -> pagina de miscari -> adaugi intrare sau iesire -> 
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
 |---|---|---|---|
 | 1 | Pe randul unei iesiri apasa „Bon” | Se deschide un PDF cu titlul „Bon de consum / aviz de predare”, nr. operatiei, data, beneficiar (CUI), proiect, referinta, tabel cu produse si cantitati, casetele de semnatura, diacriticele corecte | |
-| 2 | Bonul unei iesiri multiple (3 produse) | Toate liniile operatiei apar pe bon; descrierile lungi se continua pe randul urmator, fara sa iasa din tabel | |
 | 3 | „Stornează” pe o iesire a unei operatii cu 2 linii; fara motiv, apoi cu motiv | Fara motiv: eroare; cu motiv: ambele iesiri apar taiate cu eticheta „stornat”, stocul revine, mesaj „Operatia #… a fost stornata” | |
 | 4 | Pe iesirile stornate | Nu mai au Editeaza/Sterge, dar au „Bon” (bonul arata „OPERAȚIE STORNATĂ” cu motivul); la hover pe „stornat” se vede cine si de ce | |
 | 5 | Jurnal | „Stornare operatie de iesire” cu produsele si motivul | |
 | 6 | Storno pentru iesire spre o masina, dupa ce produsul a fost folosit din masina | Refuzat cu mesajul despre stoc negativ in masina; nimic nu se schimba | |
 | 7 | Intrare libera, motiv „Primit de la beneficiar / vehicul” | Apare lista „Ieșirea returnată”, cu data, beneficiar/proiect, referinta si „rămase N din M buc.” | |
-| 8 | Alege o iesire de 5 buc. si returneaza 2, apoi 4 | 2 se salveaza (Istoric/jurnal „Retur de la beneficiar”, in tabel „retur al ieșirii #…”); 4 este refuzat cu „depășește cantitatea … (3 buc.)”; 3 se salveaza | |
 | 9 | Dupa returnarea integrala | Iesirea nu mai apare in lista de retururi | |
-| 10 | Incearca storno pe o operatie care are retururi | Refuzat cu mesajul despre retururi | |
 | 11 | Pagina proiectului -> Echipamente si pagina beneficiarului | Sectiunea „Consum net”: iesiri, retururi, consum net pe produs (iesirile stornate nu se numara); nu apare daca nu exista iesiri; un utilizator fara drept nu o vede | |
 | 12 | Lista iesirilor proiectului (Echipamente) | Nu include iesirile stornate | |
 | 13 | Ecran ingust | Randul cu butoanele Bon/Stornează nu iese din tabel (tabelul se deruleaza) | |
@@ -62,11 +59,11 @@ Fluxul: deschizi un produs -> pagina de miscari -> adaugi intrare sau iesire -> 
 |---|---|---|---|
 | 1 | Produse -> „Ieșire multiplă”; alege vânzare generică, referința „Aviz 5”, descriere comună, apoi 3 produse cu stoc suficient | La fiecare produs se vede „Depozit: N buc.”; „Verifică și salvează” salvează direct, mesaj „Operația #… a fost salvată: 3 ieșiri” | |
 | 2 | Pe pagina fiecărui produs și în /jurnal | Fiecare ieșire apare cu referința „Aviz 5”, iar jurnalul are „Vânzare generică” cu „Operație: #id” (același id la toate trei) | |
-| 3 | O linie cu cantitate mai mare decât stocul | Apare rezumatul galben: „depășește stocul cu N buc.; stocul va fi …”, cu alegerea cauzei (opțional) | |
+| 3 | O linie cu cantitate mai mare decât stocul | Apare rezumatul galben: „depășește stocul cu N buc.; stocul va fi …”, cu alegerea cauzei (opțional) | OK - iesire multipla: linia peste stoc arata Linia 1 depaseste stocul cu 99988 buc., stocul va fi -99988 si produsul apare in De regularizat, cu alegerea cauzei (Necunoscuta / Intrare neoperata / Stoc gresit in baza); operatia nu a fost salvata (24.10.2026) |
 | 4 | „Salvează operația” din rezumat | Se salvează; pe produs ieșirea e „peste stoc” cu cauza aleasă; produsul apare în „De regularizat” | |
 | 5 | Repetă aceeași operație, aceeași zi | Rezumatul spune „ieșire repetată” și cere „Motiv pentru ieșirile repetate”; fără motiv: eroare; cu motiv: se salvează, jurnal „Ieșire dublată (confirmat)” | |
 | 6 | Linie cu sursa „Mașina X” (apare în listă doar dacă produsul e în mașină) | Se scoate din mașină; peste cantitatea din mașină se permite, marcat „peste stoc” | |
-| 7 | „Modific” din rezumat | Revii la formular fără să se fi salvat nimic | |
+| 7 | „Modific” din rezumat | Revii la formular fără să se fi salvat nimic | OK - Modific din rezumat revine la formular cu liniile pastrate (24.10.2026) |
 | 8 | Elimină o linie (×), adaugă altele; încearcă fără produs sau cantitate | Mesaj „Linia N: alege produsul și o cantitate mai mare ca zero.” | |
 | 9 | Destinație „Beneficiar” + proiect | Alegerea proiectului funcționează ca la ieșirea simplă; fără destinație completă se refuză | |
 | 10 | Fă o ieșire simplă pe pagina unui produs | Jurnalul arată „Operație: #id” și la ea (operație cu o singură linie) | |

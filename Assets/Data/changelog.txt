@@ -1,5 +1,10 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.16 | 24.10.2026
+- Pagina cu testele de utilizator (/teste/teste-utilizator.html): fără pașii acoperiți de teste automate și fără opțiunea „Automat”.
+## 0.5.15 | 24.10.2026
+- Nomenclator → Cuvinte cheie mentenanță, „Încearcă un text”: mesajele spun acum ce face importul de la 0.5.13 (un tichet fără cuvânt cheie nu se preia; unul cu cuvânt cheie se preia și, la un punct cu contract activ, ajunge la validare).
+- Pagina cu testele de utilizator se deschide la /teste/teste-utilizator.html (pași de bifat din browser sau de pe telefon, cu export al rezultatelor).
 ## 0.5.14 | 23.10.2026
 - Preluare ActivityApp, simularea tichetelor: patru secțiuni pliabile, „Cu probleme”, „În așteptarea clientului” și „Ignorate” (pliate) și „Selectate pentru preluare” (deschisă), fiecare paginată cu alegerea numărului de rânduri pe pagină; apar toate tichetele de preluat, nu doar problemele.
 - Toate listele de date au paginare cu alegerea numărului de rânduri pe pagină (10, 25, 50, 100, Toate): utilizatori, tipuri de utilizatori, module, backup-uri, cuvinte cheie, intrări libere, de regularizat, consum net, componente proiect, puncte de lucru, beneficiari, sesiuni deschise, beneficiari de verificat; Produse și proiectele beneficiarului au acum selector în loc de 10 fix.

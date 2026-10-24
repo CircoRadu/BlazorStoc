@@ -898,3 +898,14 @@ Script de stergere completa a BlazorStoc de pe un server (remove-blazorstoc.ps1)
 Help: fiecare element are chenar pe imaginea din help (21.10.2026): Imagini pentru Copiaza pe NAS (necesita un NAS cu cont) si Rezultatul ultimei operatii pe conturile bazei de date (necesita conturile dedicate): nu se pot face in mediul demo.
 
 Preluare tichete ActivityApp: etapele 5-7 (flux pe tichete), Setari ca panou, versiunile 0.5.7-0.5.11 (23.10.2026): Preluare ActivityApp: de testat pe un ActivityApp real cu cont read-only (pasii din Teste utilizator/18); help-ul si capturile din docs/HELP_DE_REGENERAT.md raman de refacut la cerere; pachetul 0.5.11 de instalat pe server.
+
+## Pasi scosi din "Teste utilizator" pentru ca sunt acoperiti de teste automate (24.10.2026)
+
+Scosi la cererea utilizatorului; ramane manual doar partea de ecran, marcata mai jos.
+
+| Fisier | Pas scos | Acoperit de | Ramas de verificat manual |
+|---|---|---|---|
+| 02_Intrari_si_iesiri_produs | Bonul unei iesiri multiple (3 produse) | `ConsumptionNoteChecks` (grupul `notes`): toate liniile, descrieri lungi pe randuri urmatoare, diacritice, mai multe pagini | Deschiderea PDF-ului din buton in browser |
+| 02_Intrari_si_iesiri_produs | Retur partial si cantitatea ramasa (5 buc, 2 apoi 4) | `MariaExtendedChecks.Exits` | Mesajele din formularul de retur |
+| 02_Intrari_si_iesiri_produs | Storno pe o operatie cu retururi | `MariaExtendedChecks.Exits` (storno refuzat) | Mesajul afisat in aplicatie |
+| 07_Vehicule | Numar de inmatriculare duplicat | `MariaIntegrationChecks` (`VehicleOperationException`) | Mesajul din formularul de vehicul |

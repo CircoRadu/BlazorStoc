@@ -50,7 +50,6 @@ else if (beneficiary is not null)
             }</div>
         <div class="heading-actions">
             @if (canManage) { <button class="refresh act-edit" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenEditBeneficiaryAsync">Editează</button> }
-            @if (permAdd) { @if (permAdd) { <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button> } }
         </div>
     </div>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -73,9 +72,9 @@ else if (beneficiary is not null)
     }
 
     <section class="catalog">
-        <div class="catalog-heading"><h2>Puncte de lucru <span>@workPoints.Count</span></h2>
+        <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Puncte de lucru <span>@workPoints.Count</span></h2>
             @if (canManage) { <button class="refresh act-confirm" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
-        </div>
+        </summary>
         @if (workPointError is not null) { <div class="error-banner" role="alert">@workPointError</div> }
         <Paged Items="workPoints" Id="work-points-page-size" Context="pageRows">
         <div class="table-scroll"><table><thead><tr><th>NUME</th><th>ADRESĂ</th><th>TELEFON</th><th>PERSOANĂ DE CONTACT</th><th>DESCRIERE</th><th>COORDONATE</th><th class="number">FOTO</th><th>MENTENANȚĂ</th><th>ANALIZĂ DE RISC</th>@if (canManage) { <th></th> }</tr></thead><tbody>
@@ -112,6 +111,7 @@ else if (beneficiary is not null)
             }
         </tbody></table></div>
         </Paged>
+    </details>
     </section>
 
     <NetConsumptionSection BeneficiaryId="Id" />
@@ -123,7 +123,9 @@ else if (beneficiary is not null)
     <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
 
     <section class="catalog">
-        <div class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2></div>
+        <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2>
+            @if (permAdd) { <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button> }
+        </summary>
         <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută proiecte" placeholder="Caută după denumire…" @bind="query" @bind:event="oninput" @bind:after="QueryChanged" /></label></div>
         @if (projectsLoading)
         {
@@ -143,6 +145,7 @@ else if (beneficiary is not null)
             </tbody></table></div>
             <AuditPager Id="beneficiary-projects-page-size" Label="Proiecte pe pagină" PageSizes="pageSizes" PageSize="projectPageSize" Page="pageNumber" Total="FilteredProjects.Count" PageChanged="GoToPage" PageSizeChanged="value => { projectPageSize = value; pageNumber = 1; SyncState(); }" />
         }
+    </details>
     </section>
 }
 

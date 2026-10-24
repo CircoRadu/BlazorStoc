@@ -49,6 +49,7 @@ data = await new DemoProductRepository().GetProductsAsync();
             },
             ["groups"] = async () => await ProductGroupsChecks.RunAsync(Check),
             ["reasons"] = () => { ReasonSummaryChecks.Run(Check); return Task.CompletedTask; },
+            ["notes"] = () => ConsumptionNoteChecks.RunAsync(Check),
             ["nas"] = () => NasBackupChecks.RunAsync(Check),
             ["backupassets"] = () => BackupAssetsChecks.RunAsync(Check),
             ["dbsettings"] = () => DatabaseSettingsChecks.RunAsync(Check),

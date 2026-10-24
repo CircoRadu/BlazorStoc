@@ -72,7 +72,6 @@ Pasi:
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
 |---|---|---|---|
 | 1 | Taburile vehiculului si datele de expirare | Notificarile de expirare apar la timp (vezi 09) | |
-| 2 | Numar de inmatriculare duplicat | Mesaj de eroare | |
 | 3 | Stergere vehicul cu miscari | Refuzata/arhivata cu motiv | |
 
 ## Fluxul de baza

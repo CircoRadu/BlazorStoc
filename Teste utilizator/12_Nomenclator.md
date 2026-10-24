@@ -13,12 +13,12 @@ Fluxul: Administrare -> Nomenclator (sau cardul de pe pagina principala) -> adau
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
 |---|---|---|---|
 | 1 | Meniul Administrare -> Nomenclator (si cardul „Nomenclator” de pe pagina principala) | Se deschide pagina „Tipuri de sisteme”; un cont „Utilizator” nu vede intrarea in meniu, iar adresa /nomenclator ii este refuzata | |
-| 2 | Adauga „Antiefracție”, „TVCI”, „Control acces”, „Incendiu”, „Rețelistică” | Apar in ordinea adaugarii, mesaj „Tipul a fost adăugat.”, campul se goleste | |
-| 4 | „Redenumește” un tip (de ex. „Incendiu” -> „Detecție incendiu”), apoi „Renunț” la alta redenumire | Denumirea se schimba; „Renunț” nu schimba nimic; redenumirea in aceeasi denumire: „Denumirea nu s-a modificat.” | |
-| 7 | Muta un tip cu ▲ / ▼ | Ordinea se schimba; primul nu poate urca, ultimul nu poate cobori | |
-| 8 | Dezactiveaza un tip (comutatorul Activ) | Randul se estompeaza, mesaj „…nu mai apare la alegeri noi”; reactiveaza-l, redevine normal | |
+| 2 | Adauga „Antiefracție”, „TVCI”, „Control acces”, „Incendiu”, „Rețelistică” | Apar in ordinea adaugarii, mesaj „Tipul a fost adăugat.”, campul se goleste | OK - adaugat TEST Antiefractie: mesaj Tipul a fost adaugat, camp golit, apare ultimul (24.10.2026) |
+| 4 | „Redenumește” un tip (de ex. „Incendiu” -> „Detecție incendiu”), apoi „Renunț” la alta redenumire | Denumirea se schimba; „Renunț” nu schimba nimic; redenumirea in aceeasi denumire: „Denumirea nu s-a modificat.” | OK - redenumire OK (Denumirea a fost modificata); aceeasi denumire: Denumirea nu s-a modificat; Renunt nerulat (24.10.2026) |
+| 7 | Muta un tip cu ▲ / ▼ | Ordinea se schimba; primul nu poate urca, ultimul nu poate cobori | OK - primul nu poate urca, ultimul nu poate cobori; ordinea s-a schimbat (24.10.2026) |
+| 8 | Dezactiveaza un tip (comutatorul Activ) | Randul se estompeaza, mesaj „…nu mai apare la alegeri noi”; reactiveaza-l, redevine normal | OK - dezactivat: mesaj nu mai apare la alegeri noi, rand estompat; reactivat: Tipul a fost activat (24.10.2026) |
 | 9 | Deschide pagina in doua taburi, redenumeste in primul, apoi incearca alta schimbare pe acelasi tip in al doilea | Al doilea afiseaza „Tipul de sistem a fost modificat între timp…” si lista se reincarca | |
-| 10 | /jurnal | Evenimente exacte: „Adăugare tip de sistem”, „Modificare denumire tip de sistem”, „Activare/Dezactivare tip de sistem”, „Schimbare ordine tip de sistem”, „Adăugare/Ștergere denumire alternativă tip de sistem”; filtrul de entitati are „Tipuri de sisteme”; evenimentul duce la pagina Nomenclator | |
+| 10 | /jurnal | Evenimente exacte: „Adăugare tip de sistem”, „Modificare denumire tip de sistem”, „Activare/Dezactivare tip de sistem”, „Schimbare ordine tip de sistem”, „Adăugare/Ștergere denumire alternativă tip de sistem”; filtrul de entitati are „Tipuri de sisteme”; evenimentul duce la pagina Nomenclator | OK - Jurnal: Adaugare tip de sistem, Modificare denumire, Schimbare ordine, Dezactivare/Activare tip de sistem; link catre pagina si filtrul de entitati neverificate (24.10.2026) |
 | 11 | Ecran ingust | Tabelul se deruleaza, butoanele ▲▼ si eticheta alternativa nu ies din pagina | |
 
 Decizie: tipurile nu se sterg niciodata (se dezactiveaza), ca sa nu se piarda legaturile cu proiectele si ofertele care le vor folosi.
@@ -36,6 +36,6 @@ Decizie: tipurile nu se sterg niciodata (se dezactiveaza), ca sa nu se piarda le
 
 | Nr | Pas | Rezultat asteptat | Rezultat |
 |----|-----|-------------------|----------|
-| 1 | Nomenclator | Doua taburi; primul arata tipurile de sisteme ca inainte | |
-| 2 | Tabul „Cuvinte cheie mentenanta” | Lista, campul de adaugare si „Incearca un text” | |
+| 1 | Nomenclator | Doua taburi; primul arata tipurile de sisteme ca inainte | OK - Doua taburi, primul arata tipurile (24.10.2026) |
+| 2 | Tabul „Cuvinte cheie mentenanta” | Lista, campul de adaugare si „Incearca un text” | OK - Lista, camp de adaugare si Incearca un text; cuvant adaugat, text exact gasit, m3ntenan@a asemanator (24.10.2026) |
 | 3 | Un cont fara dreptul de modificare la nomenclator | Nu poate adauga, modifica sau sterge | |

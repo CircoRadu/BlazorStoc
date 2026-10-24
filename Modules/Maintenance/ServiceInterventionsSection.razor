@@ -12,7 +12,7 @@
 }
 
 <section class="catalog">
-    <div class="catalog-heading"><h2>Intervenții <span>@Visible.Count</span></h2>
+    <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Intervenții <span>@Visible.Count</span></h2>
         <div class="heading-actions">
             <label class="kind-filter">Fel <select aria-label="Filtrează după felul intervenției" @bind="kindFilter">
                 <option value="">Toate</option>
@@ -21,7 +21,7 @@
             </select></label>
             @if (CanManage) { <button class="refresh act-confirm" disabled="@Locked" @onclick="OpenAdd">+ Înregistrează intervenție</button> }
         </div>
-    </div>
+    </summary>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     @if (loading)
@@ -61,6 +61,7 @@
         }
         </tbody></table></div>
     }
+</details>
 </section>
 
 @if (deleting is not null)

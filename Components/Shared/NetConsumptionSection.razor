@@ -7,7 +7,7 @@
 @if (rows.Count > 0)
 {
     <section class="catalog net-consumption" aria-label="Consum net">
-        <div class="catalog-heading"><h2>Consum net <span>@rows.Count</span></h2><small>Ieșiri minus retururi legate de ele, pe produs</small></div>
+        <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Consum net <span>@rows.Count</span></h2><small>Ieșiri minus retururi legate de ele, pe produs</small></summary>
         <Paged Items="rows" Id="net-consumption-page-size" Context="pageRows">
         <div class="table-scroll"><table><thead><tr><th>PRODUS</th><th class="number">IEȘIRI</th><th class="number">RETURURI</th><th class="number">CONSUM NET</th></tr></thead><tbody>
         @foreach (var row in pageRows)
@@ -21,6 +21,7 @@
         }
         </tbody></table></div>
         </Paged>
+    </details>
     </section>
 }
 

@@ -45,7 +45,7 @@ Pasi:
 
 | Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
 |---|---|---|---|
-| 2 | Furnizor nou cu CUI real, ANAF activ | Formularul se completeaza; sursa "Date preluate din ANAF"; modifici adresa -> "Preluate din ANAF, editate manual" | |
+| 2 | Furnizor nou cu CUI real, ANAF activ | Formularul se completeaza; sursa "Date preluate din ANAF"; modifici adresa -> "Preluate din ANAF, editate manual" | OK - Preia date din ANAF pe RO9178894: denumire, adresa, telefon, Reg. Com., cod postal, CAEN completate si marcate Date preluate din ANAF; salvarea nu a fost rulata (24.10.2026) |
 | 3 | ANAF oprit sau dezactivat din Setari | Se salveaza ca "Introdus manual (ANAF indisponibil)" | |
 | 4 | CUI valid dar necunoscut ANAF | "CUI negasit", se accepta manual cu avertizare | |
 | 5 | Furnizor UE (de ex. DE + 9 cifre) | Se accepta fara interogare ANAF | |

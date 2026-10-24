@@ -16,12 +16,12 @@
 }
 
 <section class="catalog">
-    <div class="catalog-heading"><h2>Analize de risc <span>@Visible.Count</span></h2>
+    <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Analize de risc <span>@Visible.Count</span></h2>
         <div class="heading-actions">
             @if (OffCount > 0) { <ToggleSwitch @bind-Value="showOff">Arată și analizele Off (@OffCount)</ToggleSwitch> }
             @if (CanManage) { <button class="refresh act-confirm" disabled="@Locked" @onclick="() => OpenAdd(0)">+ Adaugă analiză de risc</button> }
         </div>
-    </div>
+    </summary>
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     @if (WithoutAnalysis.Count > 0)
@@ -86,6 +86,7 @@
         }
         </tbody></table></div>
     }
+</details>
 </section>
 
 @if (deleting is not null)

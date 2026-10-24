@@ -14,7 +14,7 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 
 | Nr | Pas | Rezultat asteptat | Rezultat |
 |----|-----|-------------------|----------|
-| 1 | Autentifica-te ca administrator, deschide Setari | Exista fila „Preluare ActivityApp" | |
+| 1 | Autentifica-te ca administrator, deschide Setari | Exista fila „Preluare ActivityApp" | OK - Setari -> Preluare ActivityApp se deschide ca administrator (24.10.2026) |
 | 2 | Autentifica-te cu un utilizator obisnuit | Fila nu apare in Setari | |
 | 3 | Completeaza serverul, contul (nu sa) si parola, apasa Salveaza | „Setarile au fost salvate"; parola nu se mai afiseaza (apare „salvata - lasa gol...") | |
 | 4 | Incearca contul `sa` | Mesaj: foloseste un cont dedicat doar pentru citire | |
@@ -158,4 +158,4 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 | 14 | Sectiunea 3 -> simulare cu multi parteneri | Trei sectiuni: Cu probleme (pliata), Selectati pentru preluare (deschisa, toti candidatii, paginata cu „Randuri pe pagina”), Ignorati (pliata, paginata); mesajele operatiei apar si sub textul sectiunii 3 | |
 | 15 | In „Ignorati”: „Ca persoana fizica” sau „Ca persoana juridica” pe un partener | Mesaj „neverificat, preluat manual”; partenerul trece in „Selectati pentru preluare”; dupa „Aplica importul” beneficiarul exista, cu „Date ANAF: Nu”; Jurnal „Includere manuala partener ActivityApp”; tichetele lui se preiau dupa „Reciteste tot” | |
 | 16 | Sectiunea 4 -> „Simuleaza tichetele” | Patru sectiuni: Cu probleme, In asteptarea clientului, Ignorate (pliate) si Selectate pentru preluare (deschisa), fiecare paginata cu „Randuri pe pagina” | |
-| 17 | Orice lista de date (Beneficiari, Setari -> Utilizatori, Module, Backup, Produse etc.) cu peste 10 randuri | Sub tabel apare „Randuri pe pagina” (10/25/50/100/Toate) si butoanele de pagina; schimbarea numarului de randuri reia de la pagina 1 | |
+| 17 | Orice lista de date (Beneficiari, Setari -> Utilizatori, Module, Backup, Produse etc.) cu peste 10 randuri | Sub tabel apare „Randuri pe pagina” (10/25/50/100/Toate) si butoanele de pagina; schimbarea numarului de randuri reia de la pagina 1 | OK - Produse: Randuri pe pagina 10/25/50/100/Toate, 370 rezultate, 25 randuri dupa alegere; Beneficiari (9 randuri) fara pager, cum e prevazut (24.10.2026) |

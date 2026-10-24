@@ -199,3 +199,15 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 | 2 | Reincearca ANAF pe unul | Mesaj cu raspunsul ANAF; daca ANAF confirma, iese din lista si devine „Date ANAF: Da” | |
 | 3 | Accepta si Discard pe alti doi | Ies din lista (discard cere confirmare) | |
 | 4 | Foloseste un utilizator fara dreptul de editare beneficiari | Lista se vede, operatiile nu | |
+
+## Modificari de testat - pagina beneficiarului, sectiuni colapsabile (24.10.2026)
+
+**Ce s-a adaugat:** fiecare sectiune a paginii beneficiarului (Puncte de lucru, Consum net, Contracte de mentenanta, Interventii, Analize de risc, Proiecte) se poate plia/desfasura din antet; butonul „+ Adauga proiect” a trecut din antetul paginii in sectiunea Proiecte.
+**Ce face acum:** clic pe antetul sectiunii (sageata din stanga) o pliaza sau o desfasoara; toate sunt desfasurate la intrare; butoanele din antet (adauga punct de lucru, contract, interventie, analiza, proiect) si filtrele raman functionale si nu pliaza sectiunea.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Deschide un beneficiar cu puncte de lucru, contracte, interventii, analize si proiecte | Toate sectiunile desfasurate, cu sageata in antet | OK - 5 sectiuni desfasurate cu sageata (Consum net apare doar cu date); testat pe beneficiarul Servicii Industriale SA, instanta locala 5090 (24.10.2026) |
+| 2 | Plieaza si desfa fiecare sectiune | Continutul dispare/apare; numarul din antet ramane vizibil | OK - Puncte de lucru pliat/desfacut, celelalte neatinse (24.10.2026) |
+| 3 | In antetul paginii: lipseste „+ Adauga proiect”; in sectiunea Proiecte apare in antet | Butonul deschide formularul de proiect | OK - Adauga proiect doar in antetul sectiunii Proiecte; deschide formularul Adauga proiect (24.10.2026) |
+| 4 | Apasa „+ Adauga punct de lucru”, „+ Adauga contract” si altele din antete | Formularul se deschide fara sa plieze sectiunea | OK - Adauga proiect si Adauga contract deschid formularul, sectiunea ramane deschisa, butonul se dezactiveaza cat timp formularul e deschis (24.10.2026) |

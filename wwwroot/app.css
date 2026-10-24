@@ -1297,3 +1297,11 @@ tr[data-subcategory-index].drop-after>td{box-shadow:inset 0 -3px 0 var(--green)}
 .ai-type-group > summary { padding:12px 16px; font-weight:650; cursor:pointer; }
 .ai-type-group[open] > summary { border-bottom:1px solid var(--line); }
 .ai-type-group > summary .count-badge { margin-left:8px; }
+
+/* Collapsible sections of a catalog card (beneficiary page): the heading is the summary; its buttons keep working. */
+.catalog-collapse > summary.catalog-heading { cursor:pointer; list-style:none; gap:12px; }
+.catalog-collapse > summary.catalog-heading::-webkit-details-marker { display:none; }
+.catalog-collapse > summary.catalog-heading::before { content:""; flex:none; width:8px; height:8px; margin-right:6px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(-45deg); transition:transform .15s; }
+.catalog-collapse[open] > summary.catalog-heading::before { transform:rotate(45deg); }
+.catalog-collapse > summary.catalog-heading > h2 { margin-right:auto; }
+.catalog-collapse > summary.catalog-heading:focus-visible { outline:2px solid var(--green); outline-offset:-2px; }
