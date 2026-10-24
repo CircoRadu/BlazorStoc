@@ -721,3 +721,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Versiuni pe module: `Modules/module-versions.json`, `tools/module-version.ps1`, grupul `moduleversions`; Preluare factura 1.1.0 (zona CUI), Jurnal 1.1.0.
 - Editor sabloane PDF: „Selecteaza zona CUI" cand analiza nu gaseste CUI-ul furnizorului.
 
+## Finalizat la 24.10.2026 - Corectii tema dark (versiunea 0.5.18)
+
+- Tema dark nu se pierde la navigarea intre pagini (navigarea enhanced a lui Blazor stergea `data-theme` de pe `<html>`; `wwwroot/theme.js` il pune la loc cu un MutationObserver).
+- Paleta dark: mapare pe puncte a luminozitatii (fundaluri apropiate, texte discrete lizibile), butoane `primary`/`danger` cu verde si rosu adanc, campuri de text fara fundal implicit gri, imaginea generica de produs si placile hartii adaptate; verificare automata a zonelor deschise la culoare pe toate paginile, dialogurile si ferestrele separate.
+- Tehnic: `Modules/module-versions.json` nu se schimba (nicio schimbare in directoarele modulelor); `tools/module-version.ps1 -Refresh` pastreaza versiunea unui modul editat in aceeasi lucrare.
+

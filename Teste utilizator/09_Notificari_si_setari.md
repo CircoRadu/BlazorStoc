@@ -14,6 +14,7 @@ Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de 
 |---|---|---|---|
 | 1 | Apasa luna din bara de sus | Aplicatia trece pe tema intunecata, fara alb puternic; butonul devine soare | |
 | 2 | Reincarca pagina si deschide alta pagina | Tema ramane intunecata; intr-un alt browser sau la alt utilizator ramane luminoasa | |
+| 2b | Cu tema intunecata activa, navigheaza prin meniu (Produse, Oferte, Setari, Jurnal) si deschide ferestre (Ajutor, Adauga produs, Deconectare) | Tema ramane intunecata pe toate paginile si in toate ferestrele; nimic alb puternic | |
 | 3 | Apasa soarele | Revine tema luminoasa | |
 | 4 | Deschide Setari | Fiecare tile are o iconita | |
 | 5 | Treci cu mausul peste meniu, un sub-meniu (ex. Produse -> categorie) si un tab | Bara verde in stanga elementului; la tab, sus | |

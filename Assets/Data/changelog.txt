@@ -1,5 +1,7 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.18 | 24.10.2026
+- Tema întunecată rămâne activă la trecerea de la o pagină la alta (înainte se pierdea); ferestrele de dialog, câmpurile de text, butoanele roșii și verzi și imaginea generică de produs respectă tema, cu contrast mai bun pe textele discrete.
 ## 0.5.17 | 24.10.2026
 - Temă întunecată cu comutator în bara de sus (lângă „Deconectare”): paletă calmă pentru ochi pe timp de noapte; alegerea rămâne doar în browserul local.
 - Ajutor unificat: intrarea „Ajutor” din meniu și placa „Ajutor” de pe pagina principală deschid cuprinsul tuturor ferestrelor, pe secțiuni; căutarea în tot ajutorul este acum în orice fereastră de ajutor.

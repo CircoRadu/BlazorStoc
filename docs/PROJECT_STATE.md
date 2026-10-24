@@ -9,6 +9,10 @@ Actualizat: 23.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (24.10.2026): versiunea 0.5.18 (corectii tema dark)
+- `wwwroot/theme.js` pastreaza tema peste navigarea intre pagini; `wwwroot/theme-dark.css` are mapare pe puncte a luminozitatii (generata cu un script din `:root`, apoi reguli ajustate manual dupa marcajul `/* --- hand-tuned --- */`), reguli pentru butoane, campuri, imaginea generica si placile hartii.
+- Suita completa: 2047 PASS in memorie, 3024 PASS pe MariaDB; pachetul 0.5.18 se construieste cu `tools\release.ps1`.
+
 ## Ultimul lucru facut (24.10.2026): versiunea 0.5.17 (tema dark, ajutor unificat, Setari -> Jurnal activitate, versiuni pe module)
 - Tema dark: tokenuri de culoare in `app.css`, paleta in `wwwroot/theme-dark.css` (generata din `:root` cu luminozitatea inversata, apoi ajustata), comutator `wwwroot/theme.js` in bara de sus, alegerea in localStorage (cheia `blazorstoc-theme`). Help si capturi numai pentru light.
 - Ajutor unificat: `Services/Help/HelpContents.cs` (sectiuni dupa prefixul cheii topicului), endpoint `/ajutor/cuprins`, intrarea „Ajutor" in meniu si placa pe pagina principala; cautarea apare in orice fereastra de ajutor.
