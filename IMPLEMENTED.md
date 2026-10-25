@@ -733,3 +733,7 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Preluare oferta: indicator de pasi (`wizard-steps`) si bara `wizard-nav` comuna (Pasul precedent / Pasul urmator, „Preia oferta” la pasul 5), cu pasul blocat si mesajul lipsei; in locul taburilor si al butoanelor din fiecare pas. Offers 1.1.0.
 - Pagina beneficiarului: sectiunile pliabile pornesc inchise (`StartOpen=false` pentru Consum net si Analize de risc, folosite si pe alte pagini). Maintenance 1.0.1, RiskAnalyses 1.0.1.
 - Preluare ActivityApp: `GetFieldChoicesAsync(readSource)`; corespondenta salvata se arata la deschidere fara interogarea ActivityApp. ActivityImport 0.2.0.
+
+## Finalizat la 25.10.2026 - Incarcarea pachetului de actualizare prin HTTP direct (versiunea 0.5.20)
+
+- Pachetul .bsu (~113 MB) nu mai trece prin conexiunea paginii Blazor (sute de mii de schimburi mici: peste 6 minute pe telefon); `wwwroot/update-upload.js` il trimite cu XMLHttpRequest la `POST /api/actualizare/pachet` (permisiunea de aplicare, antet `X-Requested-With`, limita de corp ridicata la 1 GB), cu procentul afisat; pagina primeste rezultatul prin `UploadProgress`/`UploadFinished` si citeste raportul cu `GetReportAsync`.

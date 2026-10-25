@@ -381,7 +381,16 @@ public static partial class UpdateEngineChecks
             "Update screen: the history has a selector of the number of entries per page and the range shown");
 
         var package = await world.PackAsync(keys, "5.1.0", notes: "Linia unu\nLinia doi");
+        // The file goes to the server through an HTTP request made by the browser (wwwroot/update-upload.js): the page only asks the script to send it and is told the result.
+        var send = context.JSInterop.SetupVoid("updateUpload.send", _ => true);
+        send.SetVoidResult();
         panel.FindComponent<InputFile>().UploadFiles(InputFileContent.CreateFromBinary(await File.ReadAllBytesAsync(package), "BlazorStoc-5.1.0.bsu"));
+        panel.WaitForState(() => send.Invocations.Count == 1 && panel.FindAll("#update-checking").Count == 1, TimeSpan.FromSeconds(5));
+        await panel.InvokeAsync(() => panel.Instance.UploadProgress(40));
+        check(panel.Find("#update-checking").TextContent.Contains("40%") && send.Invocations.First().Arguments[0] as string == "update-package",
+            "Update screen: the page asks the script to send the chosen file by HTTP and shows the progress");
+        var uploaded = await page.UploadAsync(package);
+        await panel.InvokeAsync(() => panel.Instance.UploadFinished(uploaded.Id, null));
         panel.WaitForState(() => panel.FindAll("#update-report").Count == 1, TimeSpan.FromSeconds(10));
         check(panel.Find("#update-verdict").TextContent.Contains("Poate fi instalat") && panel.Markup.Contains("5.0.0 → 5.1.0") && panel.Markup.Contains("nicio migrare nouă") && panel.Markup.Contains("Linia unu")
             && panel.FindAll("#update-confirm-title").Count == 1, "Update screen: after the upload the page shows the report: versions, signer, schema, notes and the confirmation");

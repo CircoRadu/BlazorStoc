@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject ApplicationUpdateService Updates
 @inject IAccessControl Access
+@inject IJSRuntime Js
 @* Setari -> Actualizare (administrator only): the version that runs, an update package taken from this computer, its verification by the updater (signature, signer, version,
    schema), the confirmation with a reason, the notice to the users and the follow-up of the update, then the history. The application does not install anything itself: it hands
    the package to the updater (a separate program with the rights of an administrator), which also puts the old version back by itself when the new one does not answer. *@
@@ -65,7 +66,7 @@
         {
             <div class="catalog-body">
                 <FileDropZone Id="update-package" Accept=".bsu" Disabled="@(busy || report is not null)" OnChange="PackageChosenAsync" Text="Alege pachetul de actualizare (.bsu)" />
-                @if (uploading) { <p class="muted" role="status" id="update-checking">Se încarcă pachetul și Updater-ul îl verifică (semnătură, semnatar, versiune, schema bazei de date)…</p> }
+                @if (uploading) { <p class="muted" role="status" id="update-checking">@(uploadPercent < 100 ? $"Se încarcă pachetul: {uploadPercent}%…" : "Pachetul este încărcat; Updater-ul îl verifică (semnătură, semnatar, versiune, schema bazei de date)…")</p> }
             </div>
             @if (report is not null)
             {
@@ -171,6 +172,8 @@
     private PackageCheckDocument? report;
     private string? originalName, error, notice, reasonError, reason = "";
     private bool busy, uploading, canApply, disposed;
+    private int uploadPercent;
+    private DotNetObjectReference<UpdatePanel>? uploadReference;
     private Timer? timer;
 
     protected override async Task OnInitializedAsync()
@@ -198,6 +201,7 @@
     {
         disposed = true;
         timer?.Dispose();
+        uploadReference?.Dispose();
     }
 
     private void Reload()
@@ -213,16 +217,37 @@
         reason = "";
         reasonError = null;
         busy = uploading = true;
+        uploadPercent = 0;
         originalName = args.File.Name;
+        // The file does not go through the connection of the page (many small round trips: minutes for 100 MB on a phone): the browser sends it
+        // in one HTTP request (wwwroot/update-upload.js -> /api/actualizare/pachet) and tells UploadProgress / UploadFinished how it went.
+        uploadReference?.Dispose();
+        uploadReference = DotNetObjectReference.Create(this);
+        try { await Js.InvokeVoidAsync("updateUpload.send", "update-package", uploadReference, args.File.Name); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            error = "Încărcarea nu a putut porni. Reîncarcă pagina și încearcă din nou.";
+            busy = uploading = false;
+        }
+    }
+
+    [JSInvokable]
+    public Task UploadProgress(int percent) => InvokeAsync(() => { if (disposed) return; uploadPercent = percent; StateHasChanged(); });
+
+    [JSInvokable]
+    public Task UploadFinished(string? checkId, string? failure) => InvokeAsync(async () =>
+    {
+        if (disposed) return;
         try
         {
-            await using var stream = args.File.OpenReadStream(ApplicationUpdateService.MaximumPackageBytes);
-            report = await Updates.UploadAndCheckAsync(stream, args.File.Name);
+            if (failure is not null) error = failure;
+            else if (checkId is not null) report = await Updates.GetReportAsync(checkId) ?? throw new UpdateOperationException("Verificarea pachetului nu a fost găsită: încarcă pachetul din nou.");
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { error = ErrorText(exception); }
         busy = uploading = false;
         overview = Updates.Overview();
-    }
+        StateHasChanged();
+    });
 
     private async Task ConfirmAsync()
     {

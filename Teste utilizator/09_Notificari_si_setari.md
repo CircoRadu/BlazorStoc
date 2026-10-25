@@ -399,3 +399,14 @@ Pasi:
 ## Fluxul de baza
 
 1. Data de expirare apropiata -> notificare -> rezolvare -> dispare automat.
+
+## Modificari de testat - incarcarea pachetului de actualizare (25.10.2026, versiunea 0.5.20)
+
+**Ce s-a adaugat:** pachetul .bsu se incarca printr-o cerere HTTP directa, cu procent.
+**Ce face acum:** dupa alegerea fisierului apare „Se incarca pachetul: N%”, apoi „Pachetul este incarcat; Updater-ul il verifica”; raportul apare ca inainte. Pe telefon, prin VPN, incarcarea dureaza cat viteza de upload.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Setari -> Actualizare, alege un .bsu de pe telefon | Procentul creste pana la 100%, apoi apare raportul pachetului | |
+| 2 | Alege un fisier care nu este .bsu | Mesaj de eroare clar, fara blocare | |
+| 3 | Fara dreptul de aplicare a actualizarilor | Mesaj ca nu ai dreptul | |

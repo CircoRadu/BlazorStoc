@@ -1,5 +1,7 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.20 | 25.10.2026
+- Setări → Actualizare: pachetul de actualizare se încarcă printr-o cerere HTTP directă, cu procentul afișat, nu prin conexiunea paginii; pe telefon sau prin VPN încărcarea unui pachet de ~110 MB durează acum cât viteza de upload, nu minute în șir.
 ## 0.5.19 | 25.10.2026
 - Preluare ofertă: proces în 5 pași, ca la preluarea facturii (Fișier, Beneficiar, Proiect, Linii, Rezumat), cu indicator de pași și bara „Pasul precedent / Pasul următor”; ultimul pas preia oferta.
 - Pagina beneficiarului: secțiunile pliabile (Puncte de lucru, Consum net, Contracte, Intervenții, Analize de risc, Proiecte) pornesc închise.

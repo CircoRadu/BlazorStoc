@@ -36,6 +36,13 @@ public sealed class ApplicationUpdateService(UpdateInstallation installation, IU
     /// <summary>True while the updater works on an update (its status is not "done" and was written in the last hour).</summary>
     public bool UpdaterIsWorking() => installation.IsManaged && installation.Status() is { Phase: not "done" } status && clock.GetUtcNow().UtcDateTime - status.UpdatedUtc < TimeSpan.FromHours(1);
 
+    /// <summary>The report of a check made earlier (by the id the upload answered with), for the page that did the upload through the HTTP endpoint.</summary>
+    public async Task<PackageCheckDocument?> GetReportAsync(string checkId, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync(ApplyPermission, cancellationToken).ConfigureAwait(false);
+        return installation.Check(checkId);
+    }
+
     /// <summary>Stores the uploaded package in updates\staged and has the updater check it; returns its report (which may say the package cannot be installed).</summary>
     public async Task<PackageCheckDocument> UploadAndCheckAsync(Stream package, string fileName, CancellationToken cancellationToken = default)
     {

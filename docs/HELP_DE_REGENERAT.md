@@ -24,3 +24,4 @@ Stare: **text** = topicul `.help` este la zi; **captura** = imaginea si harta el
 | Preluare oferta (/oferte/preluare) | Proces in 5 pasi cu indicator de pasi si bara „Pasul precedent / Pasul urmator” (inlocuiesc taburile si butoanele din fiecare pas) | `oferte-preluare` (pagina, pasii) | de facut | de facut | 25.10.2026 |
 | Pagina beneficiarului | Sectiunile pliabile pornesc inchise | `beneficiari-detaliu` | nu e nevoie | de facut | 25.10.2026 |
 | Setari -> Preluare ActivityApp (corespondenta campurilor) | Tabelul sectiunii 6 se afiseaza la deschidere, din corespondenta salvata | `setari-import-activityapp` | de facut | nu e nevoie | 25.10.2026 |
+| Setari -> Actualizare (incarcare pachet) | Pachetul se incarca printr-o cerere HTTP directa (`/api/actualizare/pachet`, `wwwroot/update-upload.js`), cu procentul afisat in loc de mesajul fix | `setari-actualizare` (pasul de incarcare) | de facut | nu e nevoie | 25.10.2026 |

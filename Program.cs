@@ -158,6 +158,21 @@ app.MapGet("/api/iesiri/{operationId:int}/bon.pdf", async (int operationId, ISto
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For("stoc.view"));
 // Situatia proiectului: PDF and CSV exports (the same calculation as the page).
+// The update package (Setari -> Actualizare) arrives as one raw HTTP body (a file of about 100 MB: through the connection of the page it takes many minutes on a phone).
+// The custom header keeps another site from posting a file with the cookie of the administrator (a cross-site request cannot set it without a preflight).
+app.MapPost("/api/actualizare/pachet", async (HttpContext context, BlazorStoc.Services.Update.ApplicationUpdateService updates, CancellationToken token) =>
+{
+    if (context.Request.Headers["X-Requested-With"] != "BlazorStoc") return Results.BadRequest(new { error = "Cerere nevalidă." });
+    if (context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit) limit.MaxRequestBodySize = BlazorStoc.Services.Update.ApplicationUpdateService.MaximumPackageBytes + 1024;
+    var name = Path.GetFileName(Uri.UnescapeDataString(context.Request.Headers["X-Package-Name"].ToString()));
+    try
+    {
+        var report = await updates.UploadAndCheckAsync(context.Request.Body, name, token);
+        return Results.Ok(new { id = report.Id });
+    }
+    catch (BlazorStoc.Services.Update.UpdateOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For(BlazorStoc.Services.Update.ApplicationUpdateService.ApplyPermission));
 app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, string? pana, IConsumptionReader reader, CancellationToken token) =>
 {
     try
