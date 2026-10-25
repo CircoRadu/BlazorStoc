@@ -148,7 +148,7 @@ public static partial class MariaExtendedChecks
             // Stage 5: the correspondence of the ticket texts to columns of ActivityApp.
             var defaultColumns = fake.Columns;
             fake.Columns = [.. defaultColumns, new ActivityColumn("Tickete", "Detalii", "nvarchar")];
-            var choices = await settings.GetFieldChoicesAsync();
+            var choices = await settings.GetFieldChoicesAsync(true);
             Check(choices.Fields.Single(item => item.Field.Key == "Tickete.DescriptionInternal").Available.Contains("Detalii") && choices.SourceError is null && !choices.Fields.Any(item => item.CurrentMissing),
                 "Activity field map: the columns of the table with text are offered, the default is in use");
             await settings.SaveFieldMapAsync(new Dictionary<string, string> { ["Tickete.DescriptionInternal"] = "Detalii", ["Tickete.Subject"] = "Subject" });
@@ -176,7 +176,7 @@ public static partial class MariaExtendedChecks
             var deniedSettings = new MariaActivityImportService(configuration, protection, fake, new TestAccessControl(false, "operator.ext"), audit);
             var deniedMap = 0;
             try { await deniedSettings.SaveFieldMapAsync(new Dictionary<string, string> { ["Tickete.Subject"] = "Subject" }); } catch (AccessDeniedException) { deniedMap++; }
-            try { await deniedSettings.GetFieldChoicesAsync(); } catch (AccessDeniedException) { deniedMap++; }
+            try { await deniedSettings.GetFieldChoicesAsync(true); } catch (AccessDeniedException) { deniedMap++; }
             Check(deniedMap == 2, "Activity field map: a user who is not the administrator can neither read nor change the correspondence");
         }
         finally

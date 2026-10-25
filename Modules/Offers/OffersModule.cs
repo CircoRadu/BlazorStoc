@@ -11,7 +11,7 @@ public sealed class OffersModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Oferte";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 1, 0);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [new("/oferte", "Oferte", "▤", ModuleId)];
 
     public void Register(IServiceCollection services, IConfiguration configuration)

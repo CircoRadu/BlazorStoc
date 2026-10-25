@@ -211,3 +211,14 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 | 2 | Plieaza si desfa fiecare sectiune | Continutul dispare/apare; numarul din antet ramane vizibil | OK - Puncte de lucru pliat/desfacut, celelalte neatinse (24.10.2026) |
 | 3 | In antetul paginii: lipseste „+ Adauga proiect”; in sectiunea Proiecte apare in antet | Butonul deschide formularul de proiect | OK - Adauga proiect doar in antetul sectiunii Proiecte; deschide formularul Adauga proiect (24.10.2026) |
 | 4 | Apasa „+ Adauga punct de lucru”, „+ Adauga contract” si altele din antete | Formularul se deschide fara sa plieze sectiunea | OK - Adauga proiect si Adauga contract deschid formularul, sectiunea ramane deschisa, butonul se dezactiveaza cat timp formularul e deschis (24.10.2026) |
+
+## Modificari de testat - sectiuni pornite inchise (25.10.2026, versiunea 0.5.19)
+
+**Ce s-a adaugat:** sectiunile pliabile ale paginii beneficiarului pornesc inchise.
+**Ce face acum:** la intrarea pe pagina beneficiarului toate sectiunile (Puncte de lucru, Consum net, Contracte, Interventii, Analize de risc, Proiecte) sunt pliate; clic pe antet le desface. Consum net de pe pagina echipamentelor proiectului si lista Analize de risc raman desfasurate.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Deschide un beneficiar | Toate sectiunile pliate, cu numarul in antet | |
+| 2 | Desfa o sectiune, apoi navigheaza in alta pagina si revino | Sectiunile sunt din nou pliate | |
+| 3 | Deschide Analize de risc si echipamentele unui proiect | Sectiunile Analize de risc / Consum net sunt desfasurate | |

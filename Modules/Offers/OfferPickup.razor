@@ -20,13 +20,15 @@
 <div class="page-heading"><div><p class="eyebrow">OFERTE</p><h1>Preluare ofertă</h1><p class="muted">Un deviz-ofertă Excel (.xlsx) se citește cu un șablon, se leagă de beneficiar, proiect și componentă, iar liniile în bucăți se potrivesc cu produsele din catalog. Același număr de ofertă este o revizie a ofertei existente.</p></div><div class="heading-actions"><a class="refresh act-nav" href="/oferte/sabloane">Șabloane de oferte</a></div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 
-<div class="settings-tabs" role="tablist" aria-label="Pașii preluării">
-    @foreach (var (number, label) in Steps)
+<ol class="wizard-steps" aria-label="Pașii preluării ofertei">
+    @foreach (var (n, label) in Steps)
     {
-        var target = number;
-        <button type="button" role="tab" class="settings-tab @(step == number ? "active" : "")" aria-selected="@(step == number)" disabled="@(busy || number > maxStep || result is not null)" @onclick="() => step = target">@number. @label</button>
+        <li class="wizard-step @(result is not null || n < step ? "done" : n == step ? "current" : "todo")" aria-current="@(result is null && n == step ? "step" : null)">
+            <span class="wizard-circle">@(result is not null || n < step ? "✓" : n.ToString())</span>
+            <span class="wizard-title">@label</span>
+        </li>
     }
-</div>
+</ol>
 
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
 else if (result is not null)
@@ -78,7 +80,6 @@ else if (step == 1)
                 {
                     <div class="info-banner" role="status">Oferta nr. @existing.Number există (revizia @existing.Revision, proiect „@existing.ProjectName”): aceasta va fi <strong>revizia @(existing.Revision + 1)</strong>.</div>
                 }
-                <div class="editor-actions"><button type="button" class="primary" disabled="@(busy || number.Trim().Length == 0 || reading.StockLines.Count() == 0 && reading.Sections.All(part => !part.Import))" @onclick="ToBeneficiaryAsync">Pasul următor</button></div>
             }
         }
     </section>
@@ -111,10 +112,6 @@ else if (step == 2)
         {
             <ToggleSwitch @bind-Value="rememberAlias" OnText="Reține denumirea din ofertă pentru oferte viitoare" OffText="Nu reține denumirea din ofertă" AriaLabel="Reține denumirea din ofertă ca denumire alternativă" />
         }
-        <div class="editor-actions">
-            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 1">Înapoi</button>
-            <button type="button" class="primary" disabled="@(busy || beneficiaryId is null)" @onclick="ToProjectAsync">Pasul următor</button>
-        </div>
     </section>
 }
 else if (step == 3)
@@ -141,10 +138,6 @@ else if (step == 3)
             </select></label>
         @if (systemTypeId is null) { <small class="form-note">Categoria „@category” nu corespunde niciunui tip de sistem din <a href="/nomenclator">Nomenclator</a> (nici ca denumire alternativă): alege manual sau lasă fără componentă.</small> }
         else if (ComponentNote() is { } note) { <small class="form-note">@note</small> }
-        <div class="editor-actions">
-            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 2">Înapoi</button>
-            <button type="button" class="primary" disabled="@(busy || (!newProject && projectId is null) || (newProject && newProjectName.Trim().Length == 0))" @onclick="ToLinesAsync">Pasul următor</button>
-        </div>
     </section>
 }
 else if (step == 4)
@@ -182,10 +175,6 @@ else if (step == 4)
             </tr>
         }
         </tbody></table></div>
-        <div class="editor-actions">
-            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 3">Înapoi</button>
-            <button type="button" class="primary" disabled="@busy" @onclick="ToSummaryAsync">Pasul următor</button>
-        </div>
     </section>
 }
 else if (step == 5)
@@ -206,11 +195,16 @@ else if (step == 5)
                 <small class="muted">Ieșirile deja făcute pe proiect nu se leagă automat de oferta nouă.</small>
             </div>
         }
-        <div class="editor-actions">
-            <button type="button" class="refresh act-nav" disabled="@busy" @onclick="() => step = 4">Înapoi</button>
-            <button type="button" class="primary" disabled="@busy" @onclick="ImportAsync">@(busy ? "Se preia…" : "Preia oferta")</button>
-        </div>
     </section>
+}
+
+@if (!loading && result is null && (step > 1 || reading is not null))
+{
+    <div class="wizard-nav">
+        <button type="button" class="refresh act-nav" disabled="@(busy || step == 1)" @onclick="PreviousStep">← Pasul precedent</button>
+        <span class="muted">Pasul @step din @Steps.Length@(NextHint is { } hint ? " · " + hint : "")</span>
+        <button type="button" class="primary @(NextBlocked ? "blocked" : "")" disabled="@busy" aria-disabled="@(NextBlocked ? "true" : null)" @onclick="NextStep">@(step == Steps.Length ? (busy ? "Se preia…" : "Preia oferta") : "Pasul următor →")</button>
+    </div>
 }
 
 @if (addingBeneficiary)
@@ -267,6 +261,30 @@ else if (step == 5)
     private string NewProductName => newProductFor is null ? "" : Limit(FirstLine(newProductFor.Line.Name), 100);
     private string NewProductDescription => newProductFor is null ? "" : RestOf(newProductFor.Line.Name);
     private static string Limit(string text, int length) => text.Length <= length ? text : text[..length];
+
+    private bool NextBlocked => step switch
+    {
+        1 => reading is null || number.Trim().Length == 0 || reading.StockLines.Count() == 0 && reading.Sections.All(part => !part.Import),
+        2 => beneficiaryId is null,
+        3 => (!newProject && projectId is null) || (newProject && newProjectName.Trim().Length == 0),
+        _ => false
+    };
+
+    private string? NextHint => !NextBlocked ? null : step switch
+    {
+        1 => "completează numărul ofertei și păstrează cel puțin o secțiune de importat",
+        2 => "alege beneficiarul",
+        3 => "alege proiectul sau denumește proiectul nou",
+        _ => null
+    };
+
+    private void PreviousStep() { if (step > 1 && !busy) { step--; error = null; } }
+
+    private Task NextStep()
+    {
+        if (busy || NextBlocked) return Task.CompletedTask;
+        return step switch { 1 => ToBeneficiaryAsync(), 2 => ToProjectAsync(), 3 => ToLinesAsync(), 4 => ToSummaryAsync(), _ => ImportAsync() };
+    }
 
     protected override async Task OnInitializedAsync()
     {

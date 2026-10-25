@@ -386,6 +386,8 @@
             // The types saved are shown at once (without asking ActivityApp); "Citește tipurile din ActivityApp" refreshes them with the counts and the new types.
             var saved = await Import.GetSavedTypesAsync(lifetime.Token);
             if (saved.Items.Count > 0) types = [.. saved.Items.Select(item => new Row(item))];
+            // The saved correspondence of the fields is shown at once too (the column lists come with "Citește coloanele din ActivityApp").
+            fields = [.. (await Import.GetFieldChoicesAsync(false, lifetime.Token)).Fields.Select(choice => new FieldRow(choice))];
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException ex) { error = ex.Message; }
@@ -579,7 +581,7 @@
 
     private async Task ReadFieldsAsync()
     {
-        var view = await Import.GetFieldChoicesAsync(lifetime.Token);
+        var view = await Import.GetFieldChoicesAsync(true, lifetime.Token);
         fieldsError = view.SourceError;
         fields = [.. view.Fields.Select(choice => new FieldRow(choice))];
     }

@@ -180,10 +180,10 @@ public static class MaintenanceModuleChecks
                 && beneficiary.Contains("TryRunAsync(BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"),
             "Maintenance: the beneficiary file shows the contract and intervention sections only inside the module gate and reads the contracts through TryRunAsync");
         var projectsHeading = Regex.Match(beneficiary, @"<summary class=""catalog-heading""><h2>Proiecte.*?</summary>", RegexOptions.Singleline).Value;
-        check(Regex.Matches(beneficiary, @"<details class=""catalog-collapse"" open>").Count == 2 && projectsHeading.Contains("+ Adaugă proiect", StringComparison.Ordinal) && Regex.Matches(beneficiary, "[+] Adaugă proiect").Count == 1
+        check(Regex.Matches(beneficiary, @"<details class=""catalog-collapse"">").Count == 2 && projectsHeading.Contains("+ Adaugă proiect", StringComparison.Ordinal) && Regex.Matches(beneficiary, "[+] Adaugă proiect").Count == 1
                 && File.ReadAllText(Path.Combine(root, "Modules", "Maintenance", "ServiceContractsSection.razor")).Contains("catalog-collapse", StringComparison.Ordinal)
                 && File.ReadAllText(Path.Combine(root, "Modules", "RiskAnalyses", "RiskAnalysesSection.razor")).Contains("catalog-collapse", StringComparison.Ordinal),
-            "Beneficiary page: the work points, projects, contracts, interventions, risk analyses and net consumption sections are collapsible (open by default) and the add-project button is in the projects section");
+            "Beneficiary page: the work points, projects, contracts, interventions, risk analyses and net consumption sections are collapsible (closed by default) and the add-project button is in the projects section");
         var settings = File.ReadAllText(Path.Combine(root, "Components", "Pages", "Settings.razor"));
         check(Regex.IsMatch(settings, @"<ModuleGate[^>]*MaintenanceModule[^>]*><MapEngineEditor />") && Regex.IsMatch(settings, @"<ModuleGate[^>]*MaintenanceModule[^>]*><MapPinTypesEditor"),
             "Maintenance: the map tabs of the settings page are inside the gate of the module");

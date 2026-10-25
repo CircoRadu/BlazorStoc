@@ -51,3 +51,17 @@ Cunoscut: proiectul nou si componenta se creeaza chiar la „Preia oferta”, im
 
 1. Oferta noua: fisier -> beneficiar -> proiect/componenta -> linii -> preluare.
 2. Oferta revizuita (acelasi numar): aceeasi cale, cu diferentele afisate si potrivirile retinute.
+
+## Modificari de testat - preluare oferta in pasi (25.10.2026, versiunea 0.5.19)
+
+**Ce s-a adaugat:** preluarea ofertei este un proces in 5 pasi ca preluarea facturii: indicator de pasi (cercuri numerotate) si bara „Pasul precedent / Pasul urmator”.
+**Ce face acum:** cercurile arata pasul curent si bifa pe cele parcurse (nu se apasa); butoanele de pas sunt in bara de jos; cand lipseste ceva (numar oferta, beneficiar, proiect) „Pasul urmator” apare estompat si bara spune ce lipseste; la pasul 5 butonul devine „Preia oferta”.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Deschide /oferte/preluare, alege un .xlsx | Apar cercurile 1-5, pasul 1 evidentiat; bara de jos apare dupa citirea fisierului | |
+| 2 | Sterge numarul ofertei | „Pasul urmator” estompat, mesaj „completeaza numarul ofertei...” | |
+| 3 | Parcurge pasii cu „Pasul urmator”, apoi inapoi cu „Pasul precedent” | Alegerile se pastreaza; cercurile parcurse au bifa | |
+| 4 | Fara beneficiar ales, apasa „Pasul urmator” | Nu avanseaza; mesaj „alege beneficiarul” | |
+| 5 | La pasul 5 apasa „Preia oferta” | Oferta se preia, cercurile devin toate bifate, mesaj de succes | |
+| 6 | Tema dark (comutator sus) | Cercurile, linia dintre ele si bara de jos au culori din tema dark | |

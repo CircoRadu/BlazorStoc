@@ -12,7 +12,7 @@ public sealed class ActivityImportModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Preluare tichete ActivityApp";
-    public Version Version { get; } = new(0, 1, 0);
+    public Version Version { get; } = new(0, 2, 0);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)

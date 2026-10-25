@@ -1,13 +1,18 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.1.0",
-                                           "hash":  "2a2719dbc01ee2ea696cf0fb7470b10f0d1c5de1b14fbd8dac0029269fed8a9a",
+                                           "version":  "0.2.0",
+                                           "hash":  "3e3d48fb3eeae79619a28cff3c6a14eba71872e29f7217f9e117529872e7c98b",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
                                                                "date":  "24.10.2026",
                                                                "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                           },
+                                                           {
+                                                               "version":  "0.2.0",
+                                                               "date":  "25.10.2026",
+                                                               "note":  "Corespondenta campurilor ActivityApp: coloanele salvate se afiseaza imediat la deschiderea panoului"
                                                            }
                                                        ]
                                        },
@@ -77,13 +82,18 @@
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.0.0",
-                                        "hash":  "60efdf9b1a71fd0f817a7c7bf1373f0d8733854c3e63b176cd88fe0af82da5be",
+                                        "version":  "1.0.1",
+                                        "hash":  "4f3640ba1298fceb7cb7a04e3393ea0a67deb0579af94729f009b88f5908bb0e",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
                                                             "date":  "24.10.2026",
                                                             "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                        },
+                                                        {
+                                                            "version":  "1.0.1",
+                                                            "date":  "25.10.2026",
+                                                            "note":  "Sectiunile Contracte si Interventii de pe pagina beneficiarului pornesc inchise"
                                                         }
                                                     ]
                                     },
@@ -110,13 +120,18 @@
                                             ]
                             },
                     "Offers":  {
-                                   "version":  "1.0.0",
-                                   "hash":  "b4debe4c0dd39a2e110727bbd495d071cc6af4eda5e4893402ecf9a7eb8febcd",
+                                   "version":  "1.1.0",
+                                   "hash":  "f4d68c7b56fbad2b2f80bdc8418748e2cd41a91bfe068a727ce818f9cbc754ea",
                                    "history":  [
                                                    {
                                                        "version":  "1.0.0",
                                                        "date":  "24.10.2026",
                                                        "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                   },
+                                                   {
+                                                       "version":  "1.1.0",
+                                                       "date":  "25.10.2026",
+                                                       "note":  "Preluarea ofertei: proces in pasi cu stepper si bara Pasul precedent/urmator, ca la preluarea facturii"
                                                    }
                                                ]
                                },
@@ -143,13 +158,18 @@
                                                        ]
                                        },
                     "RiskAnalyses":  {
-                                         "version":  "1.0.0",
-                                         "hash":  "13f98eba2bc172446ccd491ff4fd9dbed47939ce8e15bcac65ffed93a523a918",
+                                         "version":  "1.0.1",
+                                         "hash":  "951ba1fd973f625dd2ad017164a3678ea13c2e8dcb4a03e2d060dc9f21969c00",
                                          "history":  [
                                                          {
                                                              "version":  "1.0.0",
                                                              "date":  "24.10.2026",
                                                              "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                         },
+                                                         {
+                                                             "version":  "1.0.1",
+                                                             "date":  "25.10.2026",
+                                                             "note":  "Sectiunea Analize de risc de pe pagina beneficiarului porneste inchisa"
                                                          }
                                                      ]
                                      },

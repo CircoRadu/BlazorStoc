@@ -159,3 +159,14 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 | 15 | In „Ignorati”: „Ca persoana fizica” sau „Ca persoana juridica” pe un partener | Mesaj „neverificat, preluat manual”; partenerul trece in „Selectati pentru preluare”; dupa „Aplica importul” beneficiarul exista, cu „Date ANAF: Nu”; Jurnal „Includere manuala partener ActivityApp”; tichetele lui se preiau dupa „Reciteste tot” | |
 | 16 | Sectiunea 4 -> „Simuleaza tichetele” | Patru sectiuni: Cu probleme, In asteptarea clientului, Ignorate (pliate) si Selectate pentru preluare (deschisa), fiecare paginata cu „Randuri pe pagina” | |
 | 17 | Orice lista de date (Beneficiari, Setari -> Utilizatori, Module, Backup, Produse etc.) cu peste 10 randuri | Sub tabel apare „Randuri pe pagina” (10/25/50/100/Toate) si butoanele de pagina; schimbarea numarului de randuri reia de la pagina 1 | OK - Produse: Randuri pe pagina 10/25/50/100/Toate, 370 rezultate, 25 randuri dupa alegere; Beneficiari (9 randuri) fara pager, cum e prevazut (24.10.2026) |
+
+## Modificari de testat - corespondenta campurilor la deschidere (25.10.2026, versiunea 0.5.19)
+
+**Ce s-a adaugat:** la deschiderea panoului, sectiunea „6. Corespondenta campurilor” se incarca din ce este salvat.
+**Ce face acum:** dupa salvare, la o noua intrare pe pagina tabelul arata imediat coloana aleasa pentru fiecare camp (fara conexiune la ActivityApp); „Citeste coloanele din ActivityApp” aduce lista coloanelor disponibile.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Citeste coloanele, alege o coloana diferita, „Salveaza corespondenta” | Mesaj de salvare | |
+| 2 | Paraseste pagina si intra din nou in Setari -> Preluare ActivityApp | Tabelul de la sectiunea 6 este afisat imediat, cu coloana salvata | |
+| 3 | „Citeste coloanele din ActivityApp” | Apar listele de coloane; alegerea ramane | |

@@ -109,7 +109,9 @@ public interface IActivityImportService
     /// <summary>The stored correspondence of the ticket texts to ActivityApp columns (empty = every field uses its default column).</summary>
     Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default);
     /// <summary>Every mappable field with the column in use and the text columns ActivityApp has now (read with the stored connection).</summary>
-    Task<ActivityFieldMapView> GetFieldChoicesAsync(CancellationToken cancellationToken = default);
+    Task<ActivityFieldMapView> GetFieldChoicesAsync(CancellationToken cancellationToken = default) => GetFieldChoicesAsync(true, cancellationToken);
+    /// <summary>With readSource false the saved choice is returned without asking ActivityApp (no list of available columns), so the page can show it at once.</summary>
+    Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default);
     /// <summary>Saves the chosen columns (key "Table.Column" of the contract, value the real column; the default or an empty value clears the choice). Journaled.</summary>
     Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default);
 }
@@ -445,11 +447,12 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         return value is string json ? ActivityFieldMap.FromJson(json) : ActivityFieldMap.Empty;
     }
 
-    public async Task<ActivityFieldMapView> GetFieldChoicesAsync(CancellationToken cancellationToken = default)
+    public async Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync(View, cancellationToken).ConfigureAwait(false);
         var map = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
         IReadOnlyList<ActivityFieldChoice> Offline() => [.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, map.ColumnOf(field), [], false))];
+        if (!readSource) return new ActivityFieldMapView(Offline(), null);
         var (settings, password) = await ReadAsync(cancellationToken).ConfigureAwait(false);
         if (settings.Server.Length == 0 || settings.User.Length == 0 || password is null)
             return new ActivityFieldMapView(Offline(), "Completează și salvează mai întâi conexiunea la ActivityApp.");
@@ -508,7 +511,7 @@ internal sealed class UnavailableActivityImportService : IActivityImportService
     public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => Out<object>();
     public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => Out<ActivityConnection?>();
     public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Out<ActivityFieldMap>();
-    public Task<ActivityFieldMapView> GetFieldChoicesAsync(CancellationToken cancellationToken = default) => Out<ActivityFieldMapView>();
+    public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) => Out<ActivityFieldMapView>();
     public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) => Out<object>();
 }
 
@@ -524,6 +527,6 @@ internal sealed class GuardedActivityImportService(IActivityImportService inner,
     public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SaveTypesAsync(choices, cancellationToken));
     public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetConnectionAsync(cancellationToken));
     public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFieldMapAsync(cancellationToken));
-    public Task<ActivityFieldMapView> GetFieldChoicesAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFieldChoicesAsync(cancellationToken));
+    public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFieldChoicesAsync(readSource, cancellationToken));
     public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SaveFieldMapAsync(chosen, cancellationToken));
 }

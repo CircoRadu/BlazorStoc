@@ -1,5 +1,9 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.19 | 25.10.2026
+- Preluare ofertă: proces în 5 pași, ca la preluarea facturii (Fișier, Beneficiar, Proiect, Linii, Rezumat), cu indicator de pași și bara „Pasul precedent / Pasul următor”; ultimul pas preia oferta.
+- Pagina beneficiarului: secțiunile pliabile (Puncte de lucru, Consum net, Contracte, Intervenții, Analize de risc, Proiecte) pornesc închise.
+- Setări → Preluare ActivityApp: corespondența câmpurilor salvată se afișează imediat la deschiderea panoului, fără să apeși „Citește coloanele din ActivityApp”.
 ## 0.5.18 | 24.10.2026
 - Tema întunecată rămâne activă la trecerea de la o pagină la alta (înainte se pierdea); ferestrele de dialog, câmpurile de text, butoanele roșii și verzi și imaginea generică de produs respectă tema, cu contrast mai bun pe textele discrete.
 ## 0.5.17 | 24.10.2026

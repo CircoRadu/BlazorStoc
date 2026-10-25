@@ -72,7 +72,7 @@ else if (beneficiary is not null)
     }
 
     <section class="catalog">
-        <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Puncte de lucru <span>@workPoints.Count</span></h2>
+        <details class="catalog-collapse"><summary class="catalog-heading"><h2>Puncte de lucru <span>@workPoints.Count</span></h2>
             @if (canManage) { <button class="refresh act-confirm" disabled="@(addingWorkPoint || editingWorkPoint is not null || editingBeneficiary)" @onclick="OpenAddWorkPoint">+ Adaugă punct de lucru</button> }
         </summary>
         @if (workPointError is not null) { <div class="error-banner" role="alert">@workPointError</div> }
@@ -114,16 +114,16 @@ else if (beneficiary is not null)
     </details>
     </section>
 
-    <NetConsumptionSection BeneficiaryId="Id" />
+    <NetConsumptionSection BeneficiaryId="Id" StartOpen="false" />
 
     <ModuleGate ModuleId="@BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId"><ServiceContractsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" ThresholdDays="thresholdDays" Changed="ReloadContractsAsync" />
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" /></ModuleGate>
 
-    <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
+    <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" StartOpen="false" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
 
     <section class="catalog">
-        <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2>
+        <details class="catalog-collapse"><summary class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2>
             @if (permAdd) { <button class="primary" disabled="@(addingProject || editingBeneficiary)" @onclick="OpenAddProjectAsync">+ Adaugă proiect</button> }
         </summary>
         <div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută proiecte" placeholder="Caută după denumire…" @bind="query" @bind:event="oninput" @bind:after="QueryChanged" /></label></div>

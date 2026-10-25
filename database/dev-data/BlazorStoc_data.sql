@@ -274,6 +274,11 @@ REPLACE INTO `invoice_templates` (`id`, `name`, `supplier_name`, `supplier_cui`,
 /*!40000 ALTER TABLE `invoice_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `journal_settings` WRITE;
+/*!40000 ALTER TABLE `journal_settings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `journal_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `module_state` WRITE;
 /*!40000 ALTER TABLE `module_state` DISABLE KEYS */;
 /*!40000 ALTER TABLE `module_state` ENABLE KEYS */;
@@ -854,7 +859,8 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (47,'Preluare ActivityApp, sincronizarea periodica: programarea si ultimul rezultat, starile pentru notificari si semnalarea elementelor sterse in sursa','a11949d66dd4013116c671925d0ab576b4ca9f6e7849da269de470a971b32337','applied','2026-10-24 11:46:01','0.5.14'),
 (48,'Preluare ActivityApp, corespondenta campurilor: coloana din ActivityApp din care se citeste fiecare text al tichetului','9e59ef8d1fa575a8e9fd20e0f06debaa1e4e5d34a36ff52033c812e7530164ed','applied','2026-10-24 11:46:01','0.5.14'),
 (49,'Preluare ActivityApp: nomenclatorul cuvintelor cheie de mentenanta, evenimentele de validat si programarea sincronizarii (interval sau ore fixe)','e7db925fb2b47bc2b824a1a349ff9db1649667a1682cd11a42c57310290d134e','applied','2026-10-24 11:46:01','0.5.14'),
-(50,'Preluare ActivityApp: citire incrementala, beneficiari de verificat, coada tichetelor in asteptare, discard si validarea oricarei potriviri cu un cuvant cheie','3deb0429d42dfbde79f6705e691a690d9e67ad6da36c7d95998b80c4022fbbc8','applied','2026-10-24 11:46:01','0.5.14');
+(50,'Preluare ActivityApp: citire incrementala, beneficiari de verificat, coada tichetelor in asteptare, discard si validarea oricarei potriviri cu un cuvant cheie','3deb0429d42dfbde79f6705e691a690d9e67ad6da36c7d95998b80c4022fbbc8','applied','2026-10-24 11:46:01','0.5.14'),
+(51,'Setari -> Jurnal activitate: cate evenimente recente arata implicit pagina Jurnal activitate','1e008138a884d84a839d6a0564200c5398368d7b30ba95f8e67c69a37c27fcad','applied','2026-10-25 12:09:30','0.5.18');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1485,6 +1491,12 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-facturi.view'),
 (1,'setari-harta.edit'),
 (1,'setari-harta.view'),
+(1,'setari-import-activityapp.edit'),
+(1,'setari-import-activityapp.reset'),
+(1,'setari-import-activityapp.run'),
+(1,'setari-import-activityapp.view'),
+(1,'setari-jurnal.edit'),
+(1,'setari-jurnal.view'),
 (1,'setari-module.retry'),
 (1,'setari-module.toggle'),
 (1,'setari-module.view'),

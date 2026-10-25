@@ -727,3 +727,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Paleta dark: mapare pe puncte a luminozitatii (fundaluri apropiate, texte discrete lizibile), butoane `primary`/`danger` cu verde si rosu adanc, campuri de text fara fundal implicit gri, imaginea generica de produs si placile hartii adaptate; verificare automata a zonelor deschise la culoare pe toate paginile, dialogurile si ferestrele separate.
 - Tehnic: `Modules/module-versions.json` nu se schimba (nicio schimbare in directoarele modulelor); `tools/module-version.ps1 -Refresh` pastreaza versiunea unui modul editat in aceeasi lucrare.
 
+
+## Finalizat la 25.10.2026 - Preluare oferta in pasi, sectiuni inchise pe beneficiar, corespondenta campurilor la deschidere (versiunea 0.5.19)
+
+- Preluare oferta: indicator de pasi (`wizard-steps`) si bara `wizard-nav` comuna (Pasul precedent / Pasul urmator, „Preia oferta” la pasul 5), cu pasul blocat si mesajul lipsei; in locul taburilor si al butoanelor din fiecare pas. Offers 1.1.0.
+- Pagina beneficiarului: sectiunile pliabile pornesc inchise (`StartOpen=false` pentru Consum net si Analize de risc, folosite si pe alte pagini). Maintenance 1.0.1, RiskAnalyses 1.0.1.
+- Preluare ActivityApp: `GetFieldChoicesAsync(readSource)`; corespondenta salvata se arata la deschidere fara interogarea ActivityApp. ActivityImport 0.2.0.

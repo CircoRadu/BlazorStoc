@@ -23,7 +23,7 @@ public static class ActivityImportPanelChecks
         public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => Task.FromResult<ActivityConnection?>(null);
         public Dictionary<string, string>? SavedMap;
         public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Task.FromResult(ActivityFieldMap.Empty);
-        public Task<ActivityFieldMapView> GetFieldChoicesAsync(CancellationToken cancellationToken = default) =>
+        public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ActivityFieldMapView([.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, SavedMap?.GetValueOrDefault(field.Key) ?? field.Column,
                 field.Table == "Tickete" ? ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject"] : ["DescriptionInternal", "Rezumat"], false))], null));
         public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) { SavedMap = new(chosen); return Task.CompletedTask; }

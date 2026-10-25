@@ -18,7 +18,7 @@
 }
 
 <section class="catalog">
-    <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Contracte de mentenanță <span>@Visible.Count</span></h2>
+    <details class="catalog-collapse"><summary class="catalog-heading"><h2>Contracte de mentenanță <span>@Visible.Count</span></h2>
         <div class="heading-actions">
             @if (OffCount > 0) { <ToggleSwitch @bind-Value="showOff">Arată și contractele Off (@OffCount)</ToggleSwitch> }
             @if (CanManage) { <button class="refresh act-confirm" disabled="@Locked" @onclick="OpenAdd">+ Adaugă contract</button> }

@@ -16,7 +16,7 @@
 }
 
 <section class="catalog">
-    <details class="catalog-collapse" open><summary class="catalog-heading"><h2>Analize de risc <span>@Visible.Count</span></h2>
+    <details class="catalog-collapse" open="@StartOpen"><summary class="catalog-heading"><h2>Analize de risc <span>@Visible.Count</span></h2>
         <div class="heading-actions">
             @if (OffCount > 0) { <ToggleSwitch @bind-Value="showOff">Arată și analizele Off (@OffCount)</ToggleSwitch> }
             @if (CanManage) { <button class="refresh act-confirm" disabled="@Locked" @onclick="() => OpenAdd(0)">+ Adaugă analiză de risc</button> }
@@ -100,6 +100,7 @@
 @code {
     // 0 = the analyses of several beneficiaries (the page of all analyses): the beneficiary column is shown and the form chooses it.
     [Parameter] public int BeneficiaryId { get; set; }
+    [Parameter] public bool StartOpen { get; set; } = true;
     [Parameter, EditorRequired] public IReadOnlyList<RiskAnalysisView> Views { get; set; } = Array.Empty<RiskAnalysisView>();
     // The work points of the beneficiary (fixed beneficiary only): the ones without an active analysis are listed above the table.
     [Parameter] public IReadOnlyList<WorkPoint> WorkPoints { get; set; } = Array.Empty<WorkPoint>();
