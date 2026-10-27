@@ -105,7 +105,7 @@
         }
         <div class="sidebar-bottom"><span class="status-dot"></span> Versiunea @BlazorStoc.Services.AppVersion.Current <p>Gestiune produse</p><small>BlazorStoc · MariaDB</small></div>
     </aside>
-    <div class="main-shell"><header class="topbar"><span>Inventar <span class="breadcrumb">/ BlazorStoc</span></span><div class="topbar-actions"><span class="mode-pill">Sesiune autentificată</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="help-icon" data-help-open aria-haspopup="dialog" aria-label="Ajutor pentru această fereastră" title="Ajutor pentru această fereastră"></button><button type="button" class="theme-toggle" data-theme-toggle aria-pressed="false" aria-label="Treci la tema întunecată" title="Treci la tema întunecată"></button><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
+    <div class="main-shell"><header class="topbar">@RouteTrail()<div class="topbar-actions"><span class="mode-pill">Sesiune autentificată</span><AuthorizeView><Authorized Context="session"><span>@session.User.Identity?.Name · @(session.User.IsInRole("Administrator") ? "Administrator" : "Utilizator")</span></Authorized></AuthorizeView><button type="button" class="help-icon" data-help-open aria-haspopup="dialog" aria-label="Ajutor pentru această fereastră" title="Ajutor pentru această fereastră"></button><button type="button" class="theme-toggle" data-theme-toggle aria-pressed="false" aria-label="Treci la tema întunecată" title="Treci la tema întunecată"></button><button type="button" class="logout-action" data-logout-open aria-haspopup="dialog">Deconectare</button><span class="avatar">ES</span></div></header>
         @if (activeOperation is not null && !onRestorePage && !onWaitingPage)
         {
             <div class="error-banner" role="alert" id="maintenance-banner">
@@ -132,6 +132,9 @@
     private List<string> categories = [];
     private bool productSection, administrationSection, administrationExpanded, inventorySection, inventoryExpanded, productsMenuSection, productsExpanded, onStockPage, onInvoicePickupPage, onRestorePage, onWaitingPage;
     private string selectedCategory = "", selectedSubcategory = "";
+    private int? productPageId;
+    private Product? openedProduct;
+    private Uri routeUri = new("http://localhost/");
     private OperationLockInfo? activeOperation;
     private int alertCount;
     private readonly CancellationTokenSource lifetime = new();
@@ -140,6 +143,7 @@
     {
         Navigation.LocationChanged += LocationChanged;
         ReadLocation();
+        await LoadOpenedProductAsync();
         if (productSection) await LoadGroupsAsync();
         // Subtask 3.4 (Task 3), "Notificarea sesiunilor Blazor active": MainLayout has no @rendermode of its own
         // (only individual pages like Home.razor/DatabaseRestore.razor do), so it renders once per navigation as
@@ -180,6 +184,7 @@
             await InvokeAsync(async () =>
             {
                 ReadLocation();
+                await LoadOpenedProductAsync();
                 if (productSection) await LoadGroupsAsync();
                 try { activeOperation = await OperationLock.GetActiveAsync(lifetime.Token); }
                 catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
@@ -191,10 +196,42 @@
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
     }
 
+    // On a product page the category menu stays open at the subcategory of the product, and the route names it.
+    private async Task LoadOpenedProductAsync()
+    {
+        openedProduct = null;
+        if (productPageId is not { } id) return;
+        try { openedProduct = await Products.GetProductAsync(id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception) { openedProduct = null; }
+        if (openedProduct is not null) (selectedCategory, selectedSubcategory) = (openedProduct.Category, openedProduct.Subcategory);
+    }
+
+    // Main page / section / subsection / page: every step but the last one is a link back.
+    private RenderFragment RouteTrail() => builder =>
+    {
+        var steps = Breadcrumbs.For(routeUri.AbsolutePath, selectedCategory, selectedSubcategory, openedProduct);
+        var seq = 0;
+        builder.OpenElement(seq++, "nav"); builder.AddAttribute(seq++, "class", "route-trail"); builder.AddAttribute(seq++, "aria-label", "Ruta paginii");
+        builder.OpenElement(seq++, "ol");
+        void Step(string label, string? href, bool last)
+        {
+            builder.OpenElement(seq++, "li");
+            if (last) { builder.AddAttribute(seq++, "aria-current", "page"); builder.AddContent(seq++, label); }
+            else if (href is not null) { builder.OpenElement(seq++, "a"); builder.AddAttribute(seq++, "href", href); builder.AddContent(seq++, label); builder.CloseElement(); }
+            else builder.AddContent(seq++, label);
+            builder.CloseElement();
+        }
+        Step("Meniu principal", "/", steps.Count == 0);
+        for (var index = 0; index < steps.Count; index++) Step(steps[index].Label, steps[index].Href, index == steps.Count - 1);
+        builder.CloseElement(); builder.CloseElement();
+    };
+
     private void ReadLocation()
     {
         var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
-        productSection = uri.AbsolutePath.Equals("/produse", StringComparison.OrdinalIgnoreCase);
+        productPageId = Breadcrumbs.ProductId(uri.AbsolutePath);
+        productSection = uri.AbsolutePath.Equals("/produse", StringComparison.OrdinalIgnoreCase) || productPageId is not null;
         administrationSection = uri.AbsolutePath.StartsWith("/categorii", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/beneficiari", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/furnizori", StringComparison.OrdinalIgnoreCase) ||
@@ -215,8 +252,9 @@
         onRestorePage = uri.AbsolutePath.StartsWith("/setari", StringComparison.OrdinalIgnoreCase);
         onWaitingPage = uri.AbsolutePath.StartsWith(MaintenanceSupport.WaitingPath, StringComparison.OrdinalIgnoreCase);
         var query = QueryHelpers.ParseQuery(uri.Query);
-        selectedCategory = productSection && query.TryGetValue("categorie", out var categoryValue) ? categoryValue.ToString() : "";
-        selectedSubcategory = productSection && query.TryGetValue("subcategorie", out var subcategoryValue) ? subcategoryValue.ToString() : "";
+        selectedCategory = uri.AbsolutePath.Equals("/produse", StringComparison.OrdinalIgnoreCase) && query.TryGetValue("categorie", out var categoryValue) ? categoryValue.ToString() : "";
+        selectedSubcategory = uri.AbsolutePath.Equals("/produse", StringComparison.OrdinalIgnoreCase) && query.TryGetValue("subcategorie", out var subcategoryValue) ? subcategoryValue.ToString() : "";
+        routeUri = uri;
     }
 
     private async Task LoadGroupsAsync()

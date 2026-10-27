@@ -178,13 +178,13 @@ UNLOCK TABLES;
 
 LOCK TABLES `backup_nas_settings` WRITE;
 /*!40000 ALTER TABLE `backup_nas_settings` DISABLE KEYS */;
-REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-10-23T07:00:37.011Z',1,'Copiate 1, deja pe NAS 22.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
+REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-10-27T08:00:41.451Z',1,'Copiate 1, deja pe NAS 5.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
 /*!40000 ALTER TABLE `backup_nas_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `backup_settings` WRITE;
 /*!40000 ALTER TABLE `backup_settings` DISABLE KEYS */;
-REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-10-23',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
+REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-10-27',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
 /*!40000 ALTER TABLE `backup_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -212,13 +212,14 @@ LOCK TABLES `beneficiary_work_points` WRITE;
 REPLACE INTO `beneficiary_work_points` (`id`, `beneficiary_id`, `name`, `address`, `normalized_address`, `phone`, `contact_person`, `version`, `description`, `is_primary`, `latitude`, `longitude`, `primary_beneficiary_id`) VALUES (1,1,'Punct de lucru principal','Strada Demo 1, Bucuresti','STRADA DEMO 1 BUCURESTI','0721000001','',0,'',1,NULL,NULL,1),
 (2,2,'Punct de lucru principal','','','','',0,'',1,NULL,NULL,2),
 (3,3,'Punct de lucru principal','','','','',0,'',1,NULL,NULL,3),
-(4,4,'Punct de lucru principal','JUD. HUNEDOARA, ORS. SIMERIA, STR. LIBERTATII, NR.39','JUDETUL HUNEDOARA ORASUL SIMERIA STRADA LIBERTATII 39','0254261787','',0,'',1,NULL,NULL,4),
+(4,4,'Punct de lucru principal','JUD. HUNEDOARA, ORS. SIMERIA, STR. LIBERTATII, NR.39','JUDETUL HUNEDOARA ORASUL SIMERIA STRADA LIBERTATII 39','0254261787','',1,'',1,45.851568,23.019270,4),
 (5,5,'Punct de lucru principal','Strada Pacii 5, Deva','STRADA PACII 5 DEVA','0744123456','',0,'',1,NULL,NULL,5),
 (6,6,'Punct de lucru principal','JUD. BACAU, MUN. BACAU, CAL. MARASESTI, NR.110, SC.C, ET.1, AP.7','JUDETUL BACAU MUNICIPIUL BACAU CAL MARASESTI 110 SCARA C ETAJ 1 APARTAMENT 7','0334418118','',0,'',1,NULL,NULL,6),
 (7,7,'Punct de lucru principal','Strada Florilor 3, Deva','STRADA FLORILOR 3 DEVA','0733111222','',0,'',1,NULL,NULL,7),
-(8,8,'Punct de lucru principal','JUD. HUNEDOARA, SAT VETEL COM. VETEL, STR. MIHAI EMINESCU, NR.256','JUDETUL HUNEDOARA SAT VETEL COMUNA VETEL STRADA MIHAI EMINESCU 256','0254237733','',0,'',1,NULL,NULL,8),
-(10,10,'Punct de lucru principal','JUD. HUNEDOARA, ORS. SIMERIA, STR. AVRAM IANCU, NR.26','JUDETUL HUNEDOARA ORASUL SIMERIA STRADA AVRAM IANCU 26','+40254260681','',0,'',1,NULL,NULL,10),
-(11,2,'test','1111','1111','','',0,'punct de test',0,45.853099,23.009245,NULL);
+(8,8,'Punct de lucru principal - Cladire Primarie','JUD. HUNEDOARA, SAT VETEL COM. VETEL, STR. MIHAI EMINESCU, NR.256','JUDETUL HUNEDOARA SAT VETEL COMUNA VETEL STRADA MIHAI EMINESCU 256','0254237733','',1,'',1,45.902781,22.801561,8),
+(10,10,'Punct de lucru principal','JUD. HUNEDOARA, ORS. SIMERIA, STR. AVRAM IANCU, NR.26','JUDETUL HUNEDOARA ORASUL SIMERIA STRADA AVRAM IANCU 26','+40254260681','',1,'',1,45.848525,23.012281,10),
+(11,2,'test','1111','1111','','',0,'punct de test',0,45.853099,23.009245,NULL),
+(12,4,'Birou Proiectare','Simeria, str. 1 Decembrie, nr. 104, jud. Hunedoara','SIMERIA STRADA 1 DECEMBRIE 104 JUDETUL HUNEDOARA','','',1,'',0,45.849535,23.009057,NULL);
 /*!40000 ALTER TABLE `beneficiary_work_points` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -245,7 +246,9 @@ REPLACE INTO `expiry_notifications` (`id`, `template_id`, `source_key`, `object_
 (5,12,'sistem.copie-nas-lipsa',1,'2026-10-13','2026-10-12T05:27:27.301Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-12T06:09:51.119Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 13.10.2026 la 16.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"09.10.2026 10:00\",\"cauza copiere\":\"Copiate 1, deja pe NAS 5.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 12.10.2026 09:08. Cauza: Pachetul nou a fost copiat pe NAS: Copie siguranta la cerere 12.10.2026 09-08-19 Administrator administrator demo.zip.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
 (6,11,'sistem.backup-lipsa',1,'2026-10-16','2026-10-15T08:50:21.162Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-15T10:44:31.807Z','S-a făcut un backup nou: termenul s-a mutat de la 16.10.2026 la 19.10.2026.',1,'Backup-ul bazei de date','{\"ultimul backup\":\"12.10.2026 10:00\",\"ultima eroare backup\":\"15.10.2026 11:49 \\u2014 Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).\",\"vechime maxima\":\"4\"}','Backup lipsă – ultimul: 15.10.2026 13:44','Nu s-a făcut niciun backup de peste 4 zile. Ultimul backup: 15.10.2026 13:44. Ultima eroare: 15.10.2026 13:06 — Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).. Verifică Setări → Backup NAS și programarea zilnică.','Sistem · Backup lipsă'),
 (7,12,'sistem.copie-nas-lipsa',1,'2026-10-16','2026-10-15T08:50:21.165Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-15T10:41:18.617Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 16.10.2026 la 19.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"12.10.2026 10:00\",\"cauza copiere\":\"Copiate 1, deja pe NAS 7.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 15.10.2026 13:20. Cauza: Copiate 2, deja pe NAS 4.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
-(8,12,'sistem.copie-nas-lipsa',1,'2026-10-19','2026-10-19T05:34:21.535Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-19T05:44:36.960Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 19.10.2026 la 23.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"15.10.2026 13:20\",\"cauza copiere\":\"Copiate 2, deja pe NAS 4.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 19.10.2026 08:44. Cauza: Pachetul nou a fost copiat pe NAS: Copie siguranta la cerere 19.10.2026 08-44-01 Administrator administrator demo.zip.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă');
+(8,12,'sistem.copie-nas-lipsa',1,'2026-10-19','2026-10-19T05:34:21.535Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-19T05:44:36.960Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 19.10.2026 la 23.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"15.10.2026 13:20\",\"cauza copiere\":\"Copiate 2, deja pe NAS 4.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 19.10.2026 08:44. Cauza: Pachetul nou a fost copiat pe NAS: Copie siguranta la cerere 19.10.2026 08-44-01 Administrator administrator demo.zip.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
+(9,11,'sistem.backup-lipsa',1,'2026-10-27','2026-10-26T07:09:23.059Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-26T08:00:44.262Z','S-a făcut un backup nou: termenul s-a mutat de la 27.10.2026 la 30.10.2026.',1,'Backup-ul bazei de date','{\"ultimul backup\":\"23.10.2026 10:00\",\"ultima eroare backup\":\"15.10.2026 13:06 \\u2014 Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).\",\"vechime maxima\":\"4\"}','Backup lipsă – ultimul: 26.10.2026 10:00','Nu s-a făcut niciun backup de peste 4 zile. Ultimul backup: 26.10.2026 10:00. Ultima eroare: 15.10.2026 13:06 — Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).. Verifică Setări → Backup NAS și programarea zilnică.','Sistem · Backup lipsă'),
+(10,12,'sistem.copie-nas-lipsa',1,'2026-10-27','2026-10-26T07:09:23.062Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-26T08:00:44.264Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 27.10.2026 la 30.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"23.10.2026 10:00\",\"cauza copiere\":\"Copiate 1, deja pe NAS 22.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 26.10.2026 10:00. Cauza: Copiate 1, deja pe NAS 8.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă');
 /*!40000 ALTER TABLE `expiry_notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -354,6 +357,11 @@ LOCK TABLES `offers` WRITE;
 /*!40000 ALTER TABLE `offers` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `parameter_families` WRITE;
+/*!40000 ALTER TABLE `parameter_families` DISABLE KEYS */;
+/*!40000 ALTER TABLE `parameter_families` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `parameter_values` WRITE;
 /*!40000 ALTER TABLE `parameter_values` DISABLE KEYS */;
 /*!40000 ALTER TABLE `parameter_values` ENABLE KEYS */;
@@ -377,6 +385,11 @@ UNLOCK TABLES;
 LOCK TABLES `product_parameter_values` WRITE;
 /*!40000 ALTER TABLE `product_parameter_values` DISABLE KEYS */;
 /*!40000 ALTER TABLE `product_parameter_values` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `product_tags` WRITE;
+/*!40000 ALTER TABLE `product_tags` DISABLE KEYS */;
+/*!40000 ALTER TABLE `product_tags` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `products` WRITE;
@@ -560,7 +573,7 @@ REPLACE INTO `products` (`id`, `category_id`, `subcategory_id`, `name`, `normali
 (206,13,33,'K38','K38','Tastatura wireless LCD Paradox K38 32 zone',1,0,NULL),
 (207,15,66,'DS-K4H258S','DS-K4H258S','Electromagnet de forta Hikvision DS-K4H258S, 280 kg',1,0,NULL),
 (208,15,69,'DS-K4H258-LZ','DS-K4H258-LZ','Suport electromagnet L and Z Hikvision',1,0,NULL),
-(209,11,21,'DS-7608NXI-K1','DS-7608NXI-K1','8-ch 1U K Series AcuSense 4K NVR',3,0,NULL),
+(209,11,21,'DS-7608NXI-K1','DS-7608NXI-K1','8-ch 1U K Series AcuSense 4K NVR',3,1,NULL),
 (210,11,19,'DS-2CE72DF3T-FS 2.8mm','DS-2CE72DF3T-FS 2.8MM','2 MP ColorVu Audio Fixed Turret Camera',1,0,NULL),
 (211,11,63,'DS-2XS2T41G1-ID-4G-C05S07 4mm','DS-2XS2T41G1-ID-4G-C05S07 4MM','4MP Solar-powered Security Camera Setup',3,0,NULL),
 (212,11,21,'DS-7604NXI-K1','DS-7604NXI-K1','4-ch 1U K Series AcuSense 4K NVR',1,0,NULL),
@@ -860,7 +873,9 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (48,'Preluare ActivityApp, corespondenta campurilor: coloana din ActivityApp din care se citeste fiecare text al tichetului','9e59ef8d1fa575a8e9fd20e0f06debaa1e4e5d34a36ff52033c812e7530164ed','applied','2026-10-24 11:46:01','0.5.14'),
 (49,'Preluare ActivityApp: nomenclatorul cuvintelor cheie de mentenanta, evenimentele de validat si programarea sincronizarii (interval sau ore fixe)','e7db925fb2b47bc2b824a1a349ff9db1649667a1682cd11a42c57310290d134e','applied','2026-10-24 11:46:01','0.5.14'),
 (50,'Preluare ActivityApp: citire incrementala, beneficiari de verificat, coada tichetelor in asteptare, discard si validarea oricarei potriviri cu un cuvant cheie','3deb0429d42dfbde79f6705e691a690d9e67ad6da36c7d95998b80c4022fbbc8','applied','2026-10-24 11:46:01','0.5.14'),
-(51,'Setari -> Jurnal activitate: cate evenimente recente arata implicit pagina Jurnal activitate','1e008138a884d84a839d6a0564200c5398368d7b30ba95f8e67c69a37c27fcad','applied','2026-10-25 12:09:30','0.5.18');
+(51,'Setari -> Jurnal activitate: cate evenimente recente arata implicit pagina Jurnal activitate','1e008138a884d84a839d6a0564200c5398368d7b30ba95f8e67c69a37c27fcad','applied','2026-10-25 12:09:30','0.5.18'),
+(52,'Produse: familii de parametri (cel putin 2 parametri ai aceleiasi subcategorii; un produs are exact unul activ din familie)','2a4c7a6afa55e91f0028c64df27600e1042e5212d1fe08ddd4cc47c1a8202664','applied','2026-10-26 09:59:33','0.5.22'),
+(53,'Produse: etichete pe subcategorie (On/Off pe produs, neobligatorii, folosite la filtrarea catalogului)','03ec7f4856bf28467d53a4fc7936842f00c85dcd35b5a144a17b041f1b77b19c','applied','2026-10-27 13:05:03','0.5.26');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1273,18 +1288,18 @@ UNLOCK TABLES;
 
 LOCK TABLES `subcategories` WRITE;
 /*!40000 ALTER TABLE `subcategories` DISABLE KEYS */;
-REPLACE INTO `subcategories` (`id`, `category_id`, `name`, `normalized_name`, `sort_order`) VALUES (19,11,'Camere analogice','CAMERE ANALOGICE',1),
-(20,11,'Recuperari','RECUPERARI',2),
-(21,11,'NVR','NVR',3),
-(22,11,'Alimentatori','ALIMENTATORI',4),
-(23,11,'Acumulatori','ACUMULATORI',5),
-(24,11,'Video balun','VIDEO BALUN',6),
-(25,11,'Injectoare PoE (Supraveghere Video)','INJECTOARE POE (SUPRAVEGHERE VIDEO)',7),
+REPLACE INTO `subcategories` (`id`, `category_id`, `name`, `normalized_name`, `sort_order`) VALUES (19,11,'Camere analogice','CAMERE ANALOGICE',4),
+(20,11,'Recuperari','RECUPERARI',22),
+(21,11,'NVR','NVR',1),
+(22,11,'Alimentatori','ALIMENTATORI',8),
+(23,11,'Acumulatori','ACUMULATORI',9),
+(24,11,'Video balun','VIDEO BALUN',10),
+(25,11,'Injectoare PoE (Supraveghere Video)','INJECTOARE POE (SUPRAVEGHERE VIDEO)',11),
 (26,12,'Convertor media','CONVERTOR MEDIA',1),
 (27,12,'SFP','SFP',2),
-(28,11,'Rack','RACK',8),
-(29,11,'Suporturi camere','SUPORTURI CAMERE',9),
-(30,11,'Cabluri mufate','CABLURI MUFATE',10),
+(28,11,'Rack','RACK',12),
+(29,11,'Suporturi camere','SUPORTURI CAMERE',14),
+(30,11,'Cabluri mufate','CABLURI MUFATE',15),
 (31,13,'Centrale efractie','CENTRALE EFRACTIE',1),
 (32,13,'Detectori miscare','DETECTORI MISCARE',2),
 (33,13,'Tastaturi','TASTATURI',3),
@@ -1317,29 +1332,29 @@ REPLACE INTO `subcategories` (`id`, `category_id`, `name`, `normalized_name`, `s
 (60,12,'Adaptoare wireless','ADAPTOARE WIRELESS',4),
 (61,12,'Router','ROUTER',5),
 (62,13,'Modul Extensie','MODUL EXTENSIE',12),
-(63,11,'Camere IP','CAMERE IP',11),
+(63,11,'Camere IP','CAMERE IP',3),
 (64,15,'Amortizor hidraulic','AMORTIZOR HIDRAULIC',6),
 (65,14,'Centrala incendiu','CENTRALA INCENDIU',8),
 (66,15,'Electromagneti','ELECTROMAGNETI',7),
 (67,12,'PDU','PDU',6),
-(68,11,'Surse (Supraveghere Video)','SURSE (SUPRAVEGHERE VIDEO)',12),
+(68,11,'Surse (Supraveghere Video)','SURSE (SUPRAVEGHERE VIDEO)',7),
 (69,15,'Suport electromagnet','SUPORT ELECTROMAGNET',8),
 (70,11,'Tavite rack','TAVITE RACK',13),
-(71,11,'Webcam','WEBCAM',14),
+(71,11,'Webcam','WEBCAM',6),
 (72,16,'Surse (Interfonie/Telefonie)','SURSE (INTERFONIE/TELEFONIE)',6),
 (73,14,'Comutator/Relee/Module adresabile','COMUTATOR/RELEE/MODULE ADRESABILE',9),
 (74,17,'Diverse (Porti)','DIVERSE (PORTI)',1),
 (75,15,'Surse CA','SURSE CA',9),
-(76,11,'Splitter','SPLITTER',15),
+(76,11,'Splitter','SPLITTER',16),
 (77,14,'Surse alimentare','SURSE ALIMENTARE',10),
 (78,12,'Acces point','ACCES POINT',7),
 (79,14,'Diverse (Incendiu)','DIVERSE (INCENDIU)',11),
 (80,15,'Diverse (Control Acces)','DIVERSE (CONTROL ACCES)',10),
 (81,12,'Oraganizatoare cabluri','ORAGANIZATOARE CABLURI',8),
-(82,11,'Accesorii TVCI','ACCESORII TVCI',16),
+(82,11,'Accesorii TVCI','ACCESORII TVCI',17),
 (83,17,'Telecomenzi (Porti)','TELECOMENZI (PORTI)',2),
 (84,13,'Telecomenzi (Efractie)','TELECOMENZI (EFRACTIE)',13),
-(85,11,'Hard disk','HARD DISK',17),
+(85,11,'Hard disk','HARD DISK',5),
 (86,11,'Extender','EXTENDER',18),
 (87,11,'UPS','UPS',19),
 (88,15,'Butoane exit','BUTOANE EXIT',11),
@@ -1350,8 +1365,8 @@ REPLACE INTO `subcategories` (`id`, `category_id`, `name`, `normalized_name`, `s
 (93,13,'Sirene Interior','SIRENE INTERIOR',14),
 (94,14,'SCHRACK','SCHRACK',12),
 (95,12,'Patch panel','PATCH PANEL',10),
-(96,11,'DVR','DVR',21),
-(97,11,'Doze/Cutii','DOZE/CUTII',22),
+(96,11,'DVR','DVR',2),
+(97,11,'Doze/Cutii','DOZE/CUTII',21),
 (98,12,'Injectoare PoE (Retelistica)','INJECTOARE POE (RETELISTICA)',11),
 (99,19,'Servere','SERVERE',1),
 (100,13,'Transformatori','TRANSFORMATORI',15);
@@ -1360,7 +1375,13 @@ UNLOCK TABLES;
 
 LOCK TABLES `subcategory_parameters` WRITE;
 /*!40000 ALTER TABLE `subcategory_parameters` DISABLE KEYS */;
+REPLACE INTO `subcategory_parameters` (`id`, `subcategory_id`, `name`, `normalized_name`, `unit`, `kind`, `position`, `version`, `family_id`) VALUES (3,63,'Lentila','LENTILA','mm',1,1,0,NULL);
 /*!40000 ALTER TABLE `subcategory_parameters` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `subcategory_tags` WRITE;
+/*!40000 ALTER TABLE `subcategory_tags` DISABLE KEYS */;
+/*!40000 ALTER TABLE `subcategory_tags` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `supplier_aliases` WRITE;
@@ -1393,7 +1414,7 @@ LOCK TABLES `suppliers` WRITE;
 REPLACE INTO `suppliers` (`id`, `name`, `cui`, `normalized_cui`, `country`, `address`, `phone`, `registry_number`, `postal_code`, `caen_code`, `source`, `verified_utc`, `created_by`, `created_utc`, `version`) VALUES (4,'TELESYSTEM SRL','22460883','22460883','RO','JUD. BACAU, MUN. BACAU, CAL. MARASESTI, NR.110, SC.C, ET.1, AP.7','0334418118','J2007001650049','600073','8009','A','2026-10-06T12:20:43.011Z','administrator.demo','2026-10-06T12:20:43.011Z',0),
 (5,'GENERAL SECURITY SRL','11160619','11160619','RO','JUD. CLUJ, MUN. CLUJ-NAPOCA, PTA. 1 MAI, NR.4-5','0264439200','J1998001732127','','4321','A','2026-10-09T07:48:48.526Z','administrator.demo','2026-10-09T07:48:48.526Z',0),
 (6,'SECPRAL COM SRL','5908775','5908775','RO','JUD. CLUJ, MUN. CLUJ-NAPOCA, STR. CAMPUL PAINII, NR.26','0722211414','J1994001811121','400629','4650','A','2026-10-09T13:40:56.797Z','administrator.demo','2026-10-09T13:40:56.797Z',0),
-(8,'altex','2864518','2864518','RO','','','','','','M','','utilizator.demo','2026-10-12T05:42:13.869Z',0);
+(8,'ALTEX ROMANIA SRL','2864518','2864518','RO','JUD. ILFOV, ORS. VOLUNTARI, SOS. BUCURESTI NORD, NR.10, CLADIREA GLOBAL CITY BUSINESS PARK. CORPUL O11. ETAJELE 9 SI 10','0233210671','J23/2611/2016','77190','4754','A','2026-10-27T07:39:08.493Z','utilizator.demo','2026-10-12T05:42:13.869Z',1);
 /*!40000 ALTER TABLE `suppliers` ENABLE KEYS */;
 UNLOCK TABLES;
 

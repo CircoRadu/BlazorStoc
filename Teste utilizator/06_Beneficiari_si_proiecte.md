@@ -2,7 +2,28 @@
 
 Fluxul: Administrare -> Beneficiari (PF sau PJ cu preluare ANAF) -> pagina beneficiarului -> proiecte -> observatii, echipamente si fisiere. Iesirile din stoc spre beneficiar/proiect se aleg din combobox.
 
-## Modificari de testat
+### 27.10.2026 - Cautarea coordonatelor dupa adresa scoasa; ramane doar introducerea manuala
+**Ce s-a scos:** butonul „Caută coordonate după adresă” (Geoapify) din editorul punctului de lucru si sectiunea „Cautare adrese (Geoapify)” din Setari -> Harta -> Motor harta. Coordonatele se introduc manual (sau se trage pinul pe harta). Ramane butonul „Caută în Google Maps” (simplu link, fara cheie).
+
+
+**Ce s-a adaugat:** in editorul punctului de lucru, cu „Coordonate” activ, butonul „Caută în Google Maps” langa „Caută coordonate după adresă”.
+
+**Ce face acum:** deschide Google Maps intr-o fereastra separata, gol, fara adresa precompletata (fara cheie si fara apel din server). Copiezi coordonatele din Google Maps si le lipesti in campul „Latitudine, longitudine”. Puncte cu coordonate 0,0 (din Activity) sunt tratate ca fara coordonate (coloana GPS din registru, harta de mentenanta).
+
+**Pasi:** 1) deschide un punct de lucru, activeaza Coordonate; 2) apasa „Caută în Google Maps” - se deschide Google Maps gol, in fereastra separata; 3) copiaza coordonatele, lipeste-le in camp, salveaza;
+
+
+### 26.10.2026 - Registru beneficiari: coloana „Coordonate GPS”
+
+**Ce s-a adaugat:** in Beneficiari -> Registru beneficiari, intre „Adresa” si „Telefon”, coloana „COORDONATE GPS” cu o iconita: bifa verde (Da: toate punctele de lucru au coordonate), liniuta galbena (Partial: unele au, altele nu) sau X rosu (Nu: niciunul). Titlul iconitei spune cate puncte au coordonate.
+
+**Ce face acum:** bifa apare cand TOATE punctele de lucru ale beneficiarului (inclusiv cel principal) au coordonate; altfel X. Cu mausul peste iconita (si pentru cititoare de ecran) se vede cate puncte au coordonate, de exemplu „Nu: 1 din 2 puncte de lucru au coordonate”. Valorile se iau dintr-o singura interogare pentru tot registrul si se actualizeaza la sincronizarea automata de 15 secunde.
+
+Pasi:
+
+1. Deschide Beneficiari: coloana apare in tabel; un beneficiar nou, fara coordonate, are X rosu.
+2. Pe fisa lui, in editorul punctului de lucru principal, porneste „Coordonate”, pune coordonate (sau cauta dupa adresa) si salveaza; revino in registru: bifa verde (daca are un singur punct).
+3. Adauga un al doilea punct de lucru fara coordonate: in registru revine X, iar titlul iconitei spune „1 din 2”.
 
 ### 19.10.2026 - Observatiile proiectului ca modul
 

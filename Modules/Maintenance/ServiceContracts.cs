@@ -24,7 +24,7 @@ public sealed record ServiceContractPointView(ServiceContractPoint Point, string
 public sealed record ServiceDueRow(int BeneficiaryId, string BeneficiaryName, ServiceContract Contract, ServiceContractPointView Point,
     decimal? Latitude = null, decimal? Longitude = null, DateOnly? LastIntervention = null)
 {
-    public bool HasCoordinates => Latitude is not null && Longitude is not null;
+    public bool HasCoordinates => Latitude is not null && Longitude is not null && !(Latitude == 0 && Longitude == 0);
 }
 
 public sealed record ServiceContractDetails(ServiceContract Contract, IReadOnlyList<ServiceContractPointView> Points)

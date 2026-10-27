@@ -1,5 +1,47 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.27 | 27.10.2026
+- Parametri: tip nou „Valoare fixă” (de exemplu „Fisheye”): are o singură valoare, egală cu denumirea, și lucrează numai într-o familie de parametri; alegerea lui la un produs dă familiei valoarea, fără alte valori de completat.
+- Etichete pe subcategorie: etichete opționale, On/Off pe fiecare produs, care nu fac parte din cod și nu blochează stocul. Se aleg în formularul produsului, apar în catalog (coloana PARAMETRI / ETICHETE) și devin filtre; mai multe etichete active cer ca produsul să le aibă pe toate. Jurnalul are acțiuni proprii.
+- Categorii: fereastra „Parametri și etichete” a subcategoriei are trei secțiuni colapsabile (Etichete, Familii de parametri, Parametri), fiecare cu tabel, iconițe de editare și ștergere și buton de adăugare; în pagină a rămas o singură iconiță pe subcategorie.
+- Produse: adăugarea și editarea unui produs se fac într-o fereastră popup peste catalog.
+- Tabele paginate: numărul de rânduri ales pentru un tabel se păstrează în browser, pe tabel, și la următoarea deschidere a paginii, până la schimbare.
+- Jurnal: modulul trece la versiunea 1.2.0 (filtre pentru acțiunile etichetelor).
+- Baza de date: migrarea 53 (tabelele subcategory_tags și product_tags).
+
+## 0.5.26 | 27.10.2026
+- Produsele cu parametri obligatori necompletați sunt blocate în toate operațiunile de stoc (intrări, ieșiri noi, transferuri, modificarea mișcărilor, rezervări, ieșire rapidă, ieșire multiplă) până la completarea parametrilor.
+- Pagina de intrări/ieșiri a produsului arată un banner cu parametrii lipsă și butonul „Completează parametrii”; formularul de mișcare se ascunde.
+- Stornarea unei ieșiri și ștergerea unei mișcări rămân permise pe produsele incomplete.
+- Rezervările pentru proiecte se refuză acum pe produse incomplete.
+
+## 0.5.25 | 27.10.2026
+- Bara de sus arată ruta paginii (Meniu principal › secțiune › subsecțiune › pagină) pe toate paginile. Pe pagina unui produs, meniul de categorii rămâne deschis la subcategoria produsului, iar săgeata „←” duce la subcategorie.
+- Catalog produse: iconiță de editare pe fiecare rând.
+- Parametri obligatori: tipul unui parametru se poate schimba la editare (Număr / Text liber / Interval), dacă valorile existente se potrivesc cu tipul nou.
+- Parametri obligatori: un parametru se poate șterge și când subcategoria are produse; produsele pierd valoarea, iar codul lor se rescrie fără ea (refuz, cu lista numelor, dacă două coduri ar deveni identice).
+- Mentenanță: modulul trece la versiunea 1.3.0 (coordonatele 0,0 contează ca lipsă, fără căutare după adresă).
+
+## 0.5.24 | 27.10.2026
+- Catalog produse: coloană nouă „PARAMETRI” (când subcategoria are parametri definiți); valorile sunt etichete pe care se poate filtra (mai multe etichete active deodată, bară „Filtrat după” cu scoaterea lor).
+- Catalog produse: filtru „Doar incomplete (N)” pentru produsele cărora le lipsesc parametri obligatorii (apare când există astfel de produse; adresa cu &incomplete=1 îl pornește direct). În coloana „PARAMETRI” parametrii lipsă apar ca etichete „Nume: lipsește”, cu clic spre editarea produsului.
+- Registru beneficiari: coloana „Coordonate GPS” are trei stări: da (toate punctele de lucru au coordonate), parțial și nu. Coordonatele 0,0 (din Activity) contează ca lipsă, inclusiv pe harta de mentenanță.
+- Punct de lucru: căutarea coordonatelor după adresă (Geoapify) și setările ei au fost scoase; coordonatele se introduc manual sau trăgând pinul. Butonul „Caută în Google Maps” deschide Google Maps într-o fereastră separată.
+- Parametri obligatori: secțiunea de familii este vizibilă întotdeauna.
+
+## 0.5.23 | 26.10.2026
+- Parametri obligatori ai subcategoriei: tip nou „Interval” (valori cu început și sfârșit, de exemplu 2,8 – 12 mm), cu două câmpuri „De la” / „Până la”; în codul produsului apare ca „2.8-12 mm”.
+- Parametri obligatori: familii de parametri (de exemplu „Lentilă”: Fixă și Varifocală). O familie are cel puțin 2 parametri, iar un produs are exact unul activ; gruparea e refuzată dacă un produs are deja valori pentru doi membri. Formularul de produs cere tipul activ al familiei, iar produsele fără exact un membru sunt incomplete și blocate la mișcările de stoc. Jurnalul înregistrează adăugarea, modificarea și desfacerea familiei. Migrare de schemă nouă (52).
+- Parametri obligatori: panoul se deschide acum ca fereastră popup.
+- Hartă: fundal satelit opțional (de exemplu ArcGIS World Imagery cu cheie) cu comutator Hartă / Satelit, cu zoom nativ maxim configurabil și adaptare automată când imaginile lipsesc la zoom mare; la căutarea după adresă, butonul rămâne vizibil, dar inactiv, cu mesaj când nu e configurată.
+## 0.5.22 | 26.10.2026
+- Beneficiari → Registru beneficiari: coloană nouă „Coordonate GPS” cu bifă verde (toate punctele de lucru ale beneficiarului au coordonate) sau X roșu; titlul iconiței arată câte puncte au coordonate.
+- Editorul punctului de lucru: căutarea după adresă recunoaște corect strada, numărul și localitatea indiferent de ordinea în adresă (str., bd., bdul., alee, aleea pentru stradă; ors., mun., com., sat, loc. pentru localitate).
+## 0.5.21 | 26.10.2026
+- Editorul punctului de lucru: buton „Caută coordonate după adresă” (Geoapify), cu panou Stradă / Număr / Localitate / Județ precompletat din adresă; se trimit către serviciu numai aceste patru câmpuri, de pe server și doar la apăsarea butonului. Rezultatele arată cât de exactă e potrivirea.
+- Editorul punctului de lucru: hartă cu pin care se poate trage sau pune printr-un clic; eticheta pinului arată numele punctului, adresa și coordonatele, iar câmpul de coordonate se actualizează.
+- Setări → Hartă → Motor hartă: secțiunea „Căutare adrese (Geoapify)” cu comutator, cheie păstrată doar pe server și buton „Testează cheia”; salvarea este înregistrată în jurnal fără cheie.
+- Secțiunile pliabile ale fișei beneficiarului sunt mai joase când sunt închise.
 ## 0.5.20 | 25.10.2026
 - Setări → Actualizare: pachetul de actualizare se încarcă printr-o cerere HTTP directă, cu procentul afișat, nu prin conexiunea paginii; pe telefon sau prin VPN încărcarea unui pachet de ~110 MB durează acum cât viteza de upload, nu minute în șir.
 ## 0.5.19 | 25.10.2026

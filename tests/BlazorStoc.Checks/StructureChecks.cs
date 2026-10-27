@@ -12,6 +12,12 @@ public static class StructureChecks
 {
     public static void Run(Action<bool, string> check)
     {
+        var catalogTrail = Breadcrumbs.For("/produse", "Camere", "Analogice");
+        check(catalogTrail.Select(step => step.Label).SequenceEqual(["Produse", "Stoc", "Camere", "Analogice"]) && catalogTrail[1].Href == "/produse" && catalogTrail[^1].Href is null,
+            "Route: the catalog shows section / stock / category / subcategory, linked but for the last step");
+        check(Breadcrumbs.ProductId("/produse/12/miscari") == 12 && Breadcrumbs.ProductId("/produse/preluare-factura") is null && Breadcrumbs.For("/").Count == 0
+            && Breadcrumbs.For("/beneficiari/3").Select(step => step.Label).SequenceEqual(["Administrare", "Beneficiari", "Fișa beneficiarului"]),
+            "Route: a product address is recognised, the main page has no steps and a detail page links back to its list");
         Routes(check);
         SettleNumbers(check);
         OverStock(check);

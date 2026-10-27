@@ -66,8 +66,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.1.0",
-                                    "hash":  "8dd2e57a106ebf8265bdf84fc8c0a9769577b2c9eaff773a3985fde5aca4d312",
+                                    "version":  "1.2.0",
+                                    "hash":  "b64d00aaeb459ee7ffc1c73595e40e5455ea5ea37e11e6f1eda898aa4f53a78b",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -78,12 +78,27 @@
                                                         "version":  "1.1.0",
                                                         "date":  "24.10.2026",
                                                         "note":  "Setari -\u003e Jurnal activitate: administratorul alege cate evenimente recente (500-50000) afiseaza implicit pagina Jurnal activitate"
+                                                    },
+                                                    {
+                                                        "version":  "1.1.1",
+                                                        "date":  "26.10.2026",
+                                                        "note":  "Filtru jurnal: Modificare cautare adrese harta"
+                                                    },
+                                                    {
+                                                        "version":  "1.1.2",
+                                                        "date":  "26.10.2026",
+                                                        "note":  "Filtru jurnal: actiunile pentru familii de parametri"
+                                                    },
+                                                    {
+                                                        "version":  "1.2.0",
+                                                        "date":  "27.10.2026",
+                                                        "note":  "Filtru de jurnal pentru actiunile etichetelor de subcategorie (adaugare, redenumire, stergere, modificare etichete produs)"
                                                     }
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.0.1",
-                                        "hash":  "4f3640ba1298fceb7cb7a04e3393ea0a67deb0579af94729f009b88f5908bb0e",
+                                        "version":  "1.3.0",
+                                        "hash":  "b94c8c8645f6a48bb2f551dfcdad1359f2e7934d38bc9314000cc45d30b2eede",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -94,6 +109,51 @@
                                                             "version":  "1.0.1",
                                                             "date":  "25.10.2026",
                                                             "note":  "Sectiunile Contracte si Interventii de pe pagina beneficiarului pornesc inchise"
+                                                        },
+                                                        {
+                                                            "version":  "1.1.0",
+                                                            "date":  "26.10.2026",
+                                                            "note":  "Cautare coordonate dupa adresa (Geoapify, la cerere, doar strada/numar/localitate/judet), setari in Setari -\u003e Harta, harta cu pin tras in editorul punctului de lucru"
+                                                        },
+                                                        {
+                                                            "version":  "1.1.1",
+                                                            "date":  "26.10.2026",
+                                                            "note":  "Parser adresa: partile se recunosc dupa prefix (str/bd/bdul/alee/aleea = strada; ors/mun/com/sat/loc = localitate), indiferent de ordine"
+                                                        },
+                                                        {
+                                                            "version":  "1.1.2",
+                                                            "date":  "26.10.2026",
+                                                            "note":  "Butonul de cautare dupa adresa ramane vizibil, inactiv, cu mesaj despre lipsa configurarii"
+                                                        },
+                                                        {
+                                                            "version":  "1.2.0",
+                                                            "date":  "26.10.2026",
+                                                            "note":  "Fundal satelit optional (ex. ArcGIS World Imagery cu cheie) cu comutator Harta/Satelit pe hartile mentenantei si din editorul punctului"
+                                                        },
+                                                        {
+                                                            "version":  "1.2.1",
+                                                            "date":  "26.10.2026",
+                                                            "note":  "Zoom nativ maxim pentru satelit: peste el dala se mareste in loc sa dispara"
+                                                        },
+                                                        {
+                                                            "version":  "1.2.2",
+                                                            "date":  "26.10.2026",
+                                                            "note":  "Satelit: zoom nativ detectat automat cand dalele lipsesc la zoom mare (se mareste ultimul nivel cu imagini)"
+                                                        },
+                                                        {
+                                                            "version":  "1.2.3",
+                                                            "date":  "27.10.2026",
+                                                            "note":  "Punctele cu coordonate 0,0 (din Activity) sunt tratate ca fara coordonate pe harta"
+                                                        },
+                                                        {
+                                                            "version":  "1.2.4",
+                                                            "date":  "27.10.2026",
+                                                            "note":  "Markerul si textul coordonatelor ignora tot 0,0"
+                                                        },
+                                                        {
+                                                            "version":  "1.3.0",
+                                                            "date":  "27.10.2026",
+                                                            "note":  "Scoasa cautarea de coordonate dupa adresa (Geoapify) si setarile ei; coordonatele raman manuale"
                                                         }
                                                     ]
                                     },

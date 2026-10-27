@@ -2,6 +2,7 @@
 @inject IProductRepository Repository
 @inject IStockMovementRepository Movements
 @inject IProductParameterRepository ParameterRepository
+@inject IProductTagRepository TagRepository
 @inject IProductImageStore ImageStore
 @inject ILogger<ProductEditor> Logger
 @inject IJSRuntime JS
@@ -24,26 +25,42 @@
                 @if (!HasSelectableGroup) { <p class="validation-message full-width" role="alert">Nu există nicio combinație categorie–subcategorie disponibilă. Creează mai întâi o subcategorie în pagina dedicată.</p> }
                 @if (HasParameters)
                 {
-                    @foreach (var parameter in CurrentParameters)
+                    @foreach (var slot in CurrentSlots)
                     {
-                        <div class="parameter-field" @key="parameter.Id">
-                            <label for="@($"product-parameter-{parameter.Id}")">@parameter.Name@(parameter.Unit.Length > 0 ? $" ({parameter.Unit})" : "") *
-                                <select id="@($"product-parameter-{parameter.Id}")" @onchange="args => ChooseValue(parameter, args.Value?.ToString())">
-                                    <option value="" selected="@(!chosen.ContainsKey(parameter.Id))">— alege valoarea —</option>
-                                    @foreach (var value in parameter.Values) { <option value="@value.Id" selected="@(chosen.TryGetValue(parameter.Id, out var chosenId) && chosenId == value.Id)">@value.Value</option> }
-                                </select>
-                            </label>
-                            <div class="parameter-add">
-                                <input aria-label="@($"Valoare nouă pentru {parameter.Name}")" maxlength="@ProductParameterRules.ValueMaximumLength" placeholder="@(parameter.Kind == ParameterKind.Number ? "Valoare nouă (număr)" : "Valoare nouă")"
-                                       value="@NewParameterValue(parameter.Id)" @oninput="args => newParameterValues[parameter.Id] = args.Value?.ToString() ?? string.Empty" autocomplete="off" />
-                                <button type="button" class="refresh act-confirm" @onclick="() => AddParameterValueAsync(parameter)">Adaugă valoarea</button>
-                            </div>
-                        </div>
+                        @if (slot.Family is null)
+                        {
+                            @FieldFor(slot.Members[0])
+                        }
+                        else
+                        {
+                            var active = ActiveMember(slot);
+                            <fieldset class="parameter-family full-width" @key="@($"family:{slot.Family.Id}")">
+                                <legend>@slot.Family.Name *</legend>
+                                <label for="@($"product-family-{slot.Family.Id}")">Tipul (unul singur poate fi activ)
+                                    <select id="@($"product-family-{slot.Family.Id}")" @onchange="args => ChooseFamilyMember(slot, args.Value?.ToString())">
+                                        <option value="" selected="@(active is null)">— alege —</option>
+                                        @foreach (var member in slot.Members) { <option value="@member.Id" selected="@(active?.Id == member.Id)">@member.Name</option> }
+                                    </select>
+                                </label>
+                                @if (active is not null) { @FieldFor(active) }
+                            </fieldset>
+                        }
                     }
                     <p class="form-note full-width" id="product-composed-code">Codul produsului rezultat: <strong>@ComposedPreview</strong>@if (!ParametersComplete) { <text> (incomplet: alege câte o valoare pentru fiecare parametru)</text> }</p>
                 }
                 <label class="full-width" for="product-description">Descriere<InputTextArea id="product-description" @bind-Value="input.Description" @oninput="args => input.Description = args.Value?.ToString() ?? string.Empty" maxlength="1000" rows="3" /><ValidationMessage For="() => input.Description" /></label>
                 @if (InvoiceAmbiguity.Found(input.Description) is { Length: > 0 } descriptionDoubt) { <p class="uncertain-note full-width" id="product-description-doubt" role="status"><span class="uncertain-badge">⚠ caractere nesigure: @descriptionDoubt</span> Descrierea conține caractere care se confundă ușor cu litere sau cifre. Verifică-o.</p> }
+                @if (!Staging && CurrentTags.Count > 0)
+                {
+                    <fieldset class="parameter-kind product-tags full-width" aria-describedby="product-tags-note">
+                        <legend>Etichete (opționale)</legend>
+                        @foreach (var tag in CurrentTags)
+                        {
+                            <ToggleSwitch @key="tag.Id" Value="@tagsOn.Contains(tag.Id)" ValueChanged="on => SetTag(tag.Id, on)" AriaLabel="@($"Etichetă: {tag.Name}")">@tag.Name</ToggleSwitch>
+                        }
+                        <small id="product-tags-note" class="form-note">Etichetele active devin filtre în catalogul de produse; nu fac parte din cod și nu sunt obligatorii.</small>
+                    </fieldset>
+                }
                 <div class="product-image-editor full-width">
                     <div class="image-preview-card">
                         <img src="@ImagePreviewUrl" alt="Previzualizare imagine pentru produs" />
@@ -111,7 +128,7 @@
     [Parameter] public EventCallback<Product> Saved { get; set; }
     [Parameter] public EventCallback Closed { get; set; }
     private UnsavedChangesTracker? tracker;
-    private string CurrentSnapshot() => FormSnapshot.Of(input, imageFileName, string.Join(",", chosen.OrderBy(item => item.Key).Select(item => $"{item.Key}:{item.Value}")));
+    private string CurrentSnapshot() => FormSnapshot.Of(input, imageFileName, string.Join(",", chosen.OrderBy(item => item.Key).Select(item => $"{item.Key}:{item.Value}")) + "|" + string.Join(",", tagsOn.Order()));
     // "Părăsește editarea": the leave warning closes the form without saving (Task 1).
     private Task DiscardAsync() => Closed.InvokeAsync();
     private ProductInput input = new();
@@ -129,8 +146,17 @@
         new(ProductCode.Label, Original.Name, input.Name), new("Categorie", Original.Category, input.Category),
         new("Subcategorie", Original.Subcategory, input.Subcategory), new("Descriere", Original.Description, input.Description),
         new("Parametri", ChoiceSummary(originalChoices), ChoiceSummary(CurrentChoices)),
+        new("Etichete", TagSummary(originalTagsOn), TagSummary(tagsOn)),
         new("Imagine", "neschimbată", selectedImage is null ? "neschimbată" : $"înlocuită cu {imageFileName}")
     ]);
+
+    // Tags of the chosen subcategory (optional, On/Off): saved with the product, shown as filters in the catalog.
+    private IReadOnlyList<SubcategoryTag> allTags = [];
+    private readonly HashSet<int> tagsOn = [], originalTagsOn = [];
+    private IReadOnlyList<SubcategoryTag> CurrentTags => allTags
+        .Where(tag => string.Equals(tag.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(tag.Subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
+    private void SetTag(int id, bool on) { if (on) tagsOn.Add(id); else tagsOn.Remove(id); }
+    private string TagSummary(IEnumerable<int> ids) => string.Join(", ", allTags.Where(tag => ids.Contains(tag.Id)).Select(tag => tag.Name).Order(StringComparer.CurrentCultureIgnoreCase)) is { Length: > 0 } text ? text : "—";
     private ProductImageData? selectedImage;
     private ElementReference pasteArea;
     private IJSObjectReference? imageModule;
@@ -183,11 +209,61 @@
     private IReadOnlyList<SubcategoryParameter> CurrentParameters => allParameters
         .Where(parameter => string.Equals(parameter.Category, input.Category, StringComparison.OrdinalIgnoreCase)
             && string.Equals(parameter.Subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
-    private bool HasParameters => CurrentParameters.Count > 0;
-    private bool ParametersComplete => CurrentParameters.All(parameter => chosen.ContainsKey(parameter.Id));
-    private IReadOnlyList<ProductParameterChoice> CurrentChoices => CurrentParameters.Where(parameter => chosen.ContainsKey(parameter.Id))
+    private bool HasParameters => CurrentSlots.Count > 0;
+
+    // Families of the chosen subcategory: a product has exactly one active member per family (the member picked in the family list, with its value).
+    private IReadOnlyList<ParameterFamily> allFamilies = [];
+    private readonly Dictionary<int, int> familyPick = [];
+    private IReadOnlyList<ParameterSlot> CurrentSlots => ProductParameterRules.Slots(CurrentParameters,
+        allFamilies.Where(family => string.Equals(family.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(family.Subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)));
+    private SubcategoryParameter? ActiveMember(ParameterSlot slot) =>
+        slot.Members.FirstOrDefault(member => chosen.ContainsKey(member.Id))
+        ?? (slot.Family is not null && familyPick.TryGetValue(slot.Family.Id, out var picked) ? slot.Members.FirstOrDefault(member => member.Id == picked) : null);
+    private bool ParametersComplete => ProductParameterRules.Problems(CurrentSlots, chosen.Keys.ToHashSet()).Count == 0;
+    private IReadOnlyList<ProductParameterChoice> CurrentChoices => ProductParameterRules.CodeOrder(CurrentSlots, chosen.Keys.ToHashSet())
         .Select(parameter => new ProductParameterChoice(parameter.Id, chosen[parameter.Id])).ToList();
+
+    // Switching the active member of a family drops the value of the other members.
+    private void ChooseFamilyMember(ParameterSlot slot, string? text)
+    {
+        foreach (var member in slot.Members) chosen.Remove(member.Id);
+        if (int.TryParse(text, out var id) && slot.Members.FirstOrDefault(member => member.Id == id) is { } picked)
+        {
+            familyPick[slot.Family!.Id] = id;
+            // A fixed member has only one value (its name): choosing the member gives the family its value.
+            if (picked.Kind == ParameterKind.Fixed && picked.Values.Count > 0) chosen[picked.Id] = picked.Values[0].Id;
+        }
+        else familyPick.Remove(slot.Family!.Id);
+        SyncName();
+    }
+
+    private RenderFragment FieldFor(SubcategoryParameter parameter) => parameter.Kind == ParameterKind.Fixed ? FixedNote(parameter) : ParameterField(parameter);
+    private RenderFragment FixedNote(SubcategoryParameter parameter) => @<p class="form-note fixed-parameter-note" @key="parameter.Id">Valoare fixă: <strong>@parameter.Name</strong>. Nu mai ai de completat nimic pentru această familie.</p>;
+    private RenderFragment ParameterField(SubcategoryParameter parameter) => @<div class="parameter-field" @key="parameter.Id">
+        <label for="@($"product-parameter-{parameter.Id}")">@parameter.Name@(parameter.Unit.Length > 0 ? $" ({parameter.Unit})" : "") *
+            <select id="@($"product-parameter-{parameter.Id}")" @onchange="args => ChooseValue(parameter, args.Value?.ToString())">
+                <option value="" selected="@(!chosen.ContainsKey(parameter.Id))">— alege valoarea —</option>
+                @foreach (var value in parameter.Values) { <option value="@value.Id" selected="@(chosen.TryGetValue(parameter.Id, out var chosenId) && chosenId == value.Id)">@value.Value</option> }
+            </select>
+        </label>
+        <div class="parameter-add">
+            @if (parameter.Kind == ParameterKind.Interval)
+            {
+                <IntervalInputs Label="@($"Interval nou pentru {parameter.Name}")" Start="@NewParameterStart(parameter.Id)" End="@NewParameterEnd(parameter.Id)"
+                                StartChanged="value => newParameterStarts[parameter.Id] = value" EndChanged="value => newParameterEnds[parameter.Id] = value" />
+            }
+            else
+            {
+            <input aria-label="@($"Valoare nouă pentru {parameter.Name}")" maxlength="@ProductParameterRules.ValueMaximumLength" placeholder="@(parameter.Kind == ParameterKind.Number ? "Valoare nouă (număr)" : "Valoare nouă")"
+                   value="@NewParameterValue(parameter.Id)" @oninput="args => newParameterValues[parameter.Id] = args.Value?.ToString() ?? string.Empty" autocomplete="off" />
+            }
+            <button type="button" class="refresh act-confirm" @onclick="() => AddParameterValueAsync(parameter)">Adaugă valoarea</button>
+        </div>
+    </div>;
     private string NewParameterValue(int parameterId) => newParameterValues.TryGetValue(parameterId, out var text) ? text : "";
+    private readonly Dictionary<int, string> newParameterStarts = [], newParameterEnds = [];
+    private string NewParameterStart(int parameterId) => newParameterStarts.TryGetValue(parameterId, out var text) ? text : "";
+    private string NewParameterEnd(int parameterId) => newParameterEnds.TryGetValue(parameterId, out var text) ? text : "";
     private string CodeText
     {
         get => HasParameters ? input.BaseModel : input.Name;
@@ -198,7 +274,7 @@
         get
         {
             var model = TextNormalization.ForObjectNameOrCode(input.BaseModel);
-            var displays = CurrentParameters.Where(parameter => chosen.ContainsKey(parameter.Id))
+            var displays = ProductParameterRules.CodeOrder(CurrentSlots, chosen.Keys.ToHashSet())
                 .Select(parameter => parameter.Values.FirstOrDefault(value => value.Id == chosen[parameter.Id]) is { } value ? parameter.Display(value.Value) : "…");
             return model.Length == 0 ? "—" : ProductParameterRules.ComposeName(model, displays);
         }
@@ -229,6 +305,8 @@
     {
         var wasParametric = input.BaseModel.Length > 0;
         foreach (var id in chosen.Keys.Where(id => CurrentParameters.All(parameter => parameter.Id != id)).ToList()) chosen.Remove(id);
+        familyPick.Clear();
+        tagsOn.RemoveWhere(id => CurrentTags.All(tag => tag.Id != id));
         if (HasParameters && input.BaseModel.Length == 0) input.BaseModel = input.Name;
         else if (!HasParameters && wasParametric && string.IsNullOrWhiteSpace(input.Name)) input.Name = input.BaseModel;
         SyncName();
@@ -236,7 +314,11 @@
 
     private async Task LoadParametersAsync()
     {
-        try { allParameters = await ParameterRepository.GetParametersAsync(lifetime.Token); }
+        try
+        {
+            allParameters = await ParameterRepository.GetParametersAsync(lifetime.Token);
+            allFamilies = await ParameterRepository.GetFamiliesAsync(lifetime.Token);
+        }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { Logger.LogWarning("Parameter list loading failed ({ErrorType}).", exception.GetType().Name); }
     }
@@ -246,8 +328,9 @@
         error = null;
         try
         {
-            var added = await ParameterRepository.AddValueAsync(parameter.Id, NewParameterValue(parameter.Id), lifetime.Token);
-            newParameterValues.Remove(parameter.Id);
+            var text = parameter.Kind == ParameterKind.Interval ? IntervalInputs.Compose(NewParameterStart(parameter.Id), NewParameterEnd(parameter.Id)) : NewParameterValue(parameter.Id);
+            var added = await ParameterRepository.AddValueAsync(parameter.Id, text, lifetime.Token);
+            newParameterValues.Remove(parameter.Id); newParameterStarts.Remove(parameter.Id); newParameterEnds.Remove(parameter.Id);
             await LoadParametersAsync();
             chosen[parameter.Id] = added.Id;
             SyncName();
@@ -269,6 +352,13 @@
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { Logger.LogWarning("Category list reloading failed ({ErrorType}).", exception.GetType().Name); }
         await LoadParametersAsync();
+        try
+        {
+            allTags = await TagRepository.GetTagsAsync(lifetime.Token);
+            if (Original is not null) foreach (var id in await TagRepository.GetProductTagIdsAsync(Original.Id, lifetime.Token)) { tagsOn.Add(id); originalTagsOn.Add(id); }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Tag loading failed ({ErrorType}).", exception.GetType().Name); }
         NormalizeGroupSelection();
         if (Original is not null)
         {
@@ -359,6 +449,7 @@
                     new(ProductCode.Label, Original.Name, value.Name), new("Categorie", Original.Category, value.Category),
                     new("Subcategorie", Original.Subcategory, value.Subcategory), new("Descriere", Original.Description, value.Description),
                     new("Parametri", ChoiceSummary(originalChoices), ChoiceSummary(CurrentChoices)),
+                    new("Etichete", TagSummary(originalTagsOn), TagSummary(tagsOn)),
                     new("Imagine", "neschimbată", selectedImage is null ? "neschimbată" : $"înlocuită cu {imageFileName}"));
             }
             catch (ProductOperationException exception) { error = exception.Message; }
@@ -396,6 +487,8 @@
         {
             saved = Original is null ? await Repository.CreateAsync(input, lifetime.Token) : await Repository.UpdateAsync(Original, input, lifetime.Token);
             if (selectedImage is not null) await ImageStore.SaveAsync(saved.Id, selectedImage, lifetime.Token);
+            if (CurrentTags.Count > 0 || originalTagsOn.Count > 0)
+                await TagRepository.SetProductTagsAsync(saved.Id, tagsOn.Where(id => CurrentTags.Any(tag => tag.Id == id)).ToList(), lifetime.Token);
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (ProductOperationException ex) { error = ex.Message; }

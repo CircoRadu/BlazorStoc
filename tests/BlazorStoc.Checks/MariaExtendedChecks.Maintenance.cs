@@ -69,6 +69,9 @@ public static partial class MariaExtendedChecks
             var afterDescription = await workPoints.UpdateAsync(created, description);
             var coordinates = WorkPointInput.From(afterDescription); coordinates.CoordinatesText = "45.75, 21.21";
             var afterCoordinates = await workPoints.UpdateAsync(afterDescription, coordinates);
+            var counts = await workPoints.GetCoordinateCountsAsync();
+            Check(counts.TryGetValue(owner.Id, out var ownerCount) && ownerCount.Total == 2 && ownerCount.WithCoordinates == 1 && !ownerCount.AllLocated,
+                "The registry of beneficiaries counts the work points with coordinates in one query (one of two here, so not all located)");
             var switchOff = WorkPointInput.From(afterCoordinates); switchOff.UseCoordinates = false;
             var afterOff = await workPoints.UpdateAsync(afterCoordinates, switchOff);
             Check(!afterOff.HasCoordinates && afterCoordinates.Latitude == 45.75m, "The coordinates can be changed and switched off");

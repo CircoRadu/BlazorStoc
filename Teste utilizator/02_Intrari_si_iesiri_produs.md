@@ -4,6 +4,14 @@ Fluxul: deschizi un produs -> pagina de miscari -> adaugi intrare sau iesire -> 
 
 ## Modificari de testat
 
+### 27.10.2026 - Produs cu parametri necompletati: blocat in toate operatiunile de stoc
+
+**Ce s-a adaugat:** pe pagina Intrari/Iesiri a unui produs caruia ii lipsesc parametri obligatori apare un banner „Produs blocat: parametri necompletati” cu lista parametrilor lipsa si butonul „Completeaza parametrii”; formularul de miscare nu se mai afiseaza. Iconita „Iesire rapida” din catalog e inactiva, iar in „Iesire din stoc / Iesire multipla” linia cu un astfel de produs arata avertisment si nu se poate continua.
+
+**Ce face acum:** se blocheaza intrari, iesiri, transferuri, modificarea unei miscari si rezervarile pentru proiecte (rezervarile nu erau verificate pana acum). Raman posibile: vizualizarea, editarea produsului, stergerea produsului, stornarea unei iesiri si stergerea unei miscari (corecteaza ce s-a facut deja). Dupa completarea parametrilor blocajul dispare singur.
+
+**Pasi:** 1) deschide un produs din „Doar incomplete”: bannerul listeaza parametrii lipsa, fara formular; 2) „Completeaza parametrii” duce la editare; dupa salvare formularul revine; 3) in Iesire multipla alege produsul incomplet: avertisment, nu poti merge mai departe; 4) incearca o rezervare pentru un proiect pe acest produs: refuzata cu lista parametrilor; 5) stornarea unei iesiri vechi a produsului ramane posibila.
+
 ### 10.10.2026 - Pagina de miscari a produsului, reorganizata in cod
 
 **Ce s-a schimbat:** nimic vizibil; codul paginii `/produse/{id}/miscari` a fost impartit pe fisiere. Verificarea este ca totul se comporta ca inainte.

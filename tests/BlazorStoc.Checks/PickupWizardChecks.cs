@@ -45,6 +45,7 @@ public static class PickupWizardChecks
         context.Services.AddSingleton<IInvoiceTemplateService>(new NoTemplates());
         context.Services.AddSingleton<IProductRepository>(repository);
         context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
+        context.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
         context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         context.Services.AddSupplierFakes();
@@ -160,6 +161,7 @@ public static class PickupWizardChecks
             labContext.Services.AddSingleton<IInvoiceTemplateService>(new NoTemplates());
             labContext.Services.AddSingleton<IProductRepository>(repository);
             labContext.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
+            labContext.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
             labContext.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
             labContext.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
             labContext.Services.AddSupplierFakes();
@@ -252,6 +254,7 @@ public static class PickupWizardChecks
         context.Services.AddSingleton<IInvoiceTemplateService>(templates);
         context.Services.AddSingleton<IProductRepository>(new DemoProductRepository(access));
         context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
+        context.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
         context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         var registered = new MemorySupplierRepository();
@@ -298,6 +301,7 @@ public static class PickupWizardChecks
         second.Services.AddSingleton<IInvoiceTemplateService>(new MemoryTemplates());
         second.Services.AddSingleton<IProductRepository>(new DemoProductRepository(access));
         second.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
+        second.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
         second.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         second.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         second.Services.AddSupplierFakes();

@@ -8,6 +8,9 @@ namespace BlazorStoc.Checks;
 // The categories page (Categorii și subcategorii): where the form of a subcategory opens.
 public static class ProductGroupsChecks
 {
+    // For WaitForAssertion: throws until the page shows what the check waits for.
+    private static void Expect(bool condition) { if (!condition) throw new InvalidOperationException("The page does not show the expected state yet."); }
+
     public static async Task RunAsync(Action<bool, string> check)
     {
         var access = new TestAccessControl(true, "groups.admin");
@@ -18,6 +21,7 @@ public static class ProductGroupsChecks
         context.Services.AddSingleton<IAccessControl>(access);
         context.Services.AddSingleton<IProductRepository>(repository);
         context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
+        context.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
         context.Services.AddScoped<UnsavedChanges>();
 
         // The names of categories and subcategories are unique all together (a subcategory is not named like a category, nor the other way round).
@@ -132,16 +136,24 @@ public static class ProductGroupsChecks
         // Required parameters of a subcategory: a panel opened from the row, parameters and their values added by the user.
         var parametersPage = context.Render<ProductGroups>();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".category-management-list"), TimeSpan.FromSeconds(5));
-        var firstSubcategory = parametersPage.FindAll("tbody button").First(button => (button.GetAttribute("aria-label") ?? "").StartsWith("Parametri obligatori"));
-        check(firstSubcategory.ClassList.Contains("params") && parametersPage.FindAll(".subcategory-parameters").Count == 0, "Categories page: each subcategory has an icon for its required parameters and the panel is closed");
+        var firstSubcategory = parametersPage.FindAll("tbody button").First(button => (button.GetAttribute("aria-label") ?? "").StartsWith("Parametri și etichete"));
+        check(firstSubcategory.ClassList.Contains("params") && parametersPage.FindAll(".subcategory-parameters").Count == 0, "Categories page: each subcategory has one icon for its parameters and tags and the panel is closed");
         firstSubcategory.Click();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".subcategory-parameters"), TimeSpan.FromSeconds(5));
+        check(parametersPage.FindAll("details.def-section").Count == 3 && parametersPage.FindAll("details.def-section[open]").Count == 0
+              && parametersPage.FindAll("details.def-section > summary").Select(item => item.TextContent).SequenceEqual(["Etichete0", "Familii de parametri0", "Parametri0"]),
+            "Categories page: parameters and tags are three collapsible sections (Etichete, Familii de parametri, Parametri), closed when the window opens");
+        void ClickButton(string text) => parametersPage.FindAll("button").First(button => button.TextContent.Trim() == text).Click();
+        check(parametersPage.FindAll("#new-parameter-name").Count == 0, "Categories page: the form of a new parameter appears only after the add button");
+        ClickButton("Adaugă parametru");
         parametersPage.Find("#new-parameter-name").Input("Lentila");
         parametersPage.FindAll("fieldset.parameter-kind input[type=checkbox]")[1].Change(true);   // the kind is chosen with two switches (turning one on turns the other off)
         parametersPage.Find("#new-parameter-unit").Input("mm");
         parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă parametrul")).Click();
-        parametersPage.WaitForAssertion(() => parametersPage.Find(".parameter-card"), TimeSpan.FromSeconds(5));
-        check(parametersPage.Find(".parameter-card-heading").TextContent.Contains("Lentila") && parametersPage.Find(".parameter-card-heading").TextContent.Contains("Număr"), "Categories page: a number parameter with its unit is added to the subcategory");
+        parametersPage.WaitForAssertion(() => parametersPage.Find(".parameter-row"), TimeSpan.FromSeconds(5));
+        check(parametersPage.Find(".parameter-row").TextContent.Contains("Lentila") && parametersPage.Find(".parameter-row").TextContent.Contains("Număr") && parametersPage.Find(".parameter-row").TextContent.Contains("mm"),
+            "Categories page: a number parameter with its unit is added to the subcategory and listed in the table");
+        parametersPage.Find(".parameter-row button.row-icon.view").Click();
         parametersPage.Find(".parameter-add input").Input("2,8");
         parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă valoarea")).Click();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".parameter-card tbody tr"), TimeSpan.FromSeconds(5));
@@ -150,7 +162,45 @@ public static class ProductGroupsChecks
         parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă valoarea")).Click();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".subcategory-parameters .error-banner"), TimeSpan.FromSeconds(5));
         check(parametersPage.Find(".subcategory-parameters .error-banner").TextContent.Contains("există deja"), "Categories page: the same value written another way is refused");
-        check(parametersPage.FindAll(".parameter-card button.row-icon.edit").Count == 2 && parametersPage.FindAll(".parameter-card button.row-icon.delete").Count == 2,
+        check(parametersPage.FindAll(".parameter-row button.row-icon.edit").Count == 1 && parametersPage.FindAll(".parameter-row button.row-icon.delete").Count == 1
+              && parametersPage.FindAll(".parameter-card button.row-icon.edit").Count == 1 && parametersPage.FindAll(".parameter-card button.row-icon.delete").Count == 1,
             "Categories page: an administrator sees the icons to edit and delete the parameter and its values");
+
+        // A second parameter of the Interval kind (a start and an end number per value), then a family of the two.
+        check(parametersPage.FindAll(".family-card").Count == 0 && parametersPage.FindAll("#new-family-name").Count == 0 && parametersPage.Find("#family-needs-parameters").TextContent.Contains("cel puțin 2 parametri"),
+            "Categories page: the family section is always there; with one parameter it explains that a family needs at least two and has no form yet");
+        ClickButton("Adaugă parametru");
+        parametersPage.Find("#new-parameter-name").Input("Varifocala");
+        parametersPage.FindAll("fieldset.parameter-kind input[type=checkbox]")[2].Change(true);   // Text, Number, Interval, Fixed: four switches, one on at a time
+        parametersPage.Find("#new-parameter-unit").Input("mm");
+        parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă parametrul")).Click();
+        parametersPage.WaitForAssertion(() => Expect(parametersPage.FindAll(".parameter-row").Count == 2), TimeSpan.FromSeconds(5));
+        parametersPage.FindAll(".parameter-row")[1].QuerySelector("button.row-icon.view")!.Click();
+        var intervalCard = parametersPage.FindAll(".parameter-card")[1];
+        check(parametersPage.FindAll(".parameter-row")[1].TextContent.Contains("Interval") && intervalCard.QuerySelectorAll(".interval-inputs input").Length == 2, "Categories page: an interval parameter has two number fields (start and end) for a new value");
+        var intervalFields = intervalCard.QuerySelectorAll(".interval-inputs input");
+        parametersPage.FindAll(".parameter-card")[1].QuerySelectorAll(".interval-inputs input")[0].Input("2,8");
+        parametersPage.FindAll(".parameter-card")[1].QuerySelectorAll(".interval-inputs input")[1].Input("12");
+        parametersPage.FindAll(".parameter-card")[1].QuerySelectorAll("button.act-confirm").Last().Click();
+        parametersPage.WaitForAssertion(() => Expect(parametersPage.FindAll(".parameter-card")[1].TextContent.Contains("2.8-12 mm")), TimeSpan.FromSeconds(5));
+        parametersPage.FindAll(".parameter-card")[1].QuerySelectorAll(".interval-inputs input")[0].Input("12");
+        parametersPage.FindAll(".parameter-card")[1].QuerySelectorAll(".interval-inputs input")[1].Input("2,8");
+        parametersPage.FindAll(".parameter-card")[1].QuerySelectorAll("button.act-confirm").Last().Click();
+        parametersPage.WaitForAssertion(() => Expect(parametersPage.Find(".subcategory-parameters .error-banner").TextContent.Contains("mai mic")), TimeSpan.FromSeconds(5));
+        check(intervalFields.Length == 2, "Categories page: an interval whose start is above its end is refused with a clear message");
+
+        ClickButton("Adaugă familie");
+        parametersPage.WaitForAssertion(() => parametersPage.Find("#new-family-name"), TimeSpan.FromSeconds(5));
+        parametersPage.Find("#new-family-name").Input("Lentila familie");
+
+        var familyToggles = parametersPage.FindAll("fieldset.parameter-kind")[0].QuerySelectorAll("input[type=checkbox]");
+        check(familyToggles.Length == 2 && parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă familia")).HasAttribute("disabled"), "Categories page: the family form lists the free parameters and needs at least two");
+        parametersPage.FindAll("fieldset.parameter-kind")[0].QuerySelectorAll("input[type=checkbox]")[0].Change(true);
+        check(parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă familia")).HasAttribute("disabled"), "Categories page: one parameter is not enough for a family");
+        parametersPage.FindAll("fieldset.parameter-kind")[0].QuerySelectorAll("input[type=checkbox]")[1].Change(true);
+        parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă familia")).Click();
+        parametersPage.WaitForAssertion(() => Expect(parametersPage.Find(".family-card").TextContent.Contains("Lentila familie")), TimeSpan.FromSeconds(5));
+        check(parametersPage.Find(".family-card").TextContent.Contains("Lentila") && parametersPage.Find(".family-card").TextContent.Contains("Varifocala") && parametersPage.FindAll(".parameter-row")[0].TextContent.Contains("Lentila familie"),
+            "Categories page: the family groups the two parameters and each shows its family");
     }
 }

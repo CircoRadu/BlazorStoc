@@ -17,22 +17,34 @@ public sealed partial class MariaProductRepository
     private static async Task<ParameterResolution> ResolveParametersAsync(MySqlConnection connection, MySqlTransaction transaction,
         int subcategoryId, string subcategory, ProductInput value, CancellationToken token)
     {
-        var definitions = new List<(int Id, string Name, string Unit)>();
+        var definitions = new List<(int Id, string Name, string Unit, int? FamilyId, int Position, ParameterKind Kind)>();
         await using (var select = Command(connection, transaction,
-            "SELECT id,name,unit FROM subcategory_parameters WHERE subcategory_id=@sub ORDER BY position,id", ("@sub", subcategoryId)))
+            "SELECT id,name,unit,family_id,position,kind FROM subcategory_parameters WHERE subcategory_id=@sub ORDER BY position,id", ("@sub", subcategoryId)))
         await using (var reader = await select.ExecuteReaderAsync(token).ConfigureAwait(false))
             while (await reader.ReadAsync(token).ConfigureAwait(false))
-                definitions.Add((checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2)));
+                definitions.Add((checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : checked((int)reader.GetInt64(3)), reader.GetInt32(4), (ParameterKind)reader.GetInt32(5)));
         if (definitions.Count == 0) return new ParameterResolution(value.Name, null, []);
+        var families = new List<ParameterFamily>();
+        await using (var selectFamilies = Command(connection, transaction, "SELECT id,name FROM parameter_families WHERE subcategory_id=@sub", ("@sub", subcategoryId)))
+        await using (var reader = await selectFamilies.ExecuteReaderAsync(token).ConfigureAwait(false))
+            while (await reader.ReadAsync(token).ConfigureAwait(false))
+                families.Add(new ParameterFamily(checked((int)reader.GetInt64(0)), "", subcategory, reader.GetString(1), 0, 0, []));
 
+        // Every parameter of its own needs a value and every family exactly one of its members; the value of a family goes at the place of its first member.
+        var slots = ProductParameterRules.Slots(definitions.Select(item => new SubcategoryParameter(item.Id, "", subcategory, item.Name, item.Unit, item.Kind, item.Position, 0, [], item.FamilyId)), families);
+        if (slots.Count == 0) return new ParameterResolution(value.Name, null, []);
+        var chosenIds = value.Parameters.Select(item => item.ParameterId).Where(id => definitions.Any(item => item.Id == id)).ToHashSet();
         var baseModel = value.BaseModel.Length == 0
-            ? throw new ProductOperationException(ProductParameterRules.RequiredMessage(subcategory, definitions.Select(item => item.Name)))
+            ? throw new ProductOperationException(ProductParameterRules.RequiredMessage(subcategory, slots.Select(slot => slot.Name)))
             : ProductParameterRules.BaseModel(value.BaseModel);
+        if (ProductParameterRules.Problems(slots, chosenIds) is { Count: > 0 } problems)
+            throw new ProductOperationException(ProductParameterRules.RequiredMessage(subcategory, problems));
         var rows = new List<ParameterRow>();
-        foreach (var (id, name, unit) in definitions)
+        foreach (var parameter in ProductParameterRules.CodeOrder(slots, chosenIds))
         {
-            var choice = value.Parameters.FirstOrDefault(item => item.ParameterId == id)
-                ?? throw new ProductOperationException(ProductParameterRules.RequiredMessage(subcategory, definitions.Select(item => item.Name)));
+            var (id, name) = (parameter.Id, parameter.Name);
+            var unit = definitions.First(item => item.Id == id).Unit;
+            var choice = value.Parameters.First(item => item.ParameterId == id);
             await using var selectValue = Command(connection, transaction,
                 "SELECT value FROM parameter_values WHERE id=@value AND parameter_id=@parameter", ("@value", choice.ValueId), ("@parameter", id));
             var text = await selectValue.ExecuteScalarAsync(token).ConfigureAwait(false) as string

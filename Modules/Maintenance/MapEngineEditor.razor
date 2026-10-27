@@ -1,6 +1,7 @@
 @using System.Globalization
 @namespace BlazorStoc.Components.Shared
 @using BlazorStoc.Services
+@using BlazorStoc.Modules
 @inject IMapConfigurationService Service
 @inject IJSRuntime JS
 @inject ILogger<MapEngineEditor> Logger
@@ -38,9 +39,22 @@ else if (state is not null)
                 {
                     <label class="toggle-switch" for="map-clear-key"><input id="map-clear-key" type="checkbox" role="switch" @bind="clearKey" /><span class="toggle-track" aria-hidden="true"></span><span>Șterge cheia salvată</span></label>
                 }
+                <h4 class="full-width">Fundal satelit (opțional)</h4>
+                <p class="muted full-width">Dacă adresa dalelor satelit este completată, hărțile au un comutator Hartă / Satelit. Exemplu ArcGIS World Imagery: <code>https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token={key}</code> (cheia ArcGIS în câmpul „Cheie satelit”; în contul ArcGIS restricționează cheia la domeniul aplicației). Dalele satelit sunt cerute de browser direct la furnizor, ca dalele hărții.</p>
+                <label for="map-sat-url" class="anaf-wide">Adresa dalelor satelit <input id="map-sat-url" @bind="edit.SatelliteTileUrl" @bind:event="oninput" maxlength="@MapEngineRules.MaxTileUrl" autocomplete="off" spellcheck="false" /><small>Gol = fără strat satelit. https, cu <code>{z}</code>, <code>{x}</code>, <code>{y}</code> și <code>{key}</code> acolo unde se pune cheia.</small></label>
+                <label for="map-sat-attribution">Text atribuire satelit <input id="map-sat-attribution" @bind="edit.SatelliteAttributionText" maxlength="@MapEngineRules.MaxAttribution" autocomplete="off" placeholder="Esri, Maxar, Earthstar Geographics, and the GIS User Community" /></label>
+                <label for="map-sat-attribution-url">Adresa atribuirii satelit (https, opțional) <input id="map-sat-attribution-url" @bind="edit.SatelliteAttributionUrl" maxlength="300" autocomplete="off" /></label>
+                <label for="map-sat-native-zoom">Zoom nativ maxim satelit <input id="map-sat-native-zoom" type="number" min="0" max="20" step="1" @bind="edit.SatelliteMaxNativeZoom" /><small>Nivelul până la care furnizorul are imagini (în afara orașelor, de obicei 17–18). Peste el harta mărește ultima dală în loc să ceară dale inexistente, care ar apărea goale. 0 = fără limită.</small></label>
+                <label for="map-sat-key">Cheie satelit<input id="map-sat-key" type="password" @bind="newSatelliteKey" @bind:event="oninput" maxlength="300" autocomplete="new-password" placeholder="@(state.Engine.SatelliteApiKey.Length > 0 && !clearSatelliteKey ? "cheie salvată (nu se afișează)" : "")" />
+                    <small>@(state.Engine.SatelliteApiKey.Length > 0 ? "Există o cheie salvată; completează câmpul pentru a o înlocui. Cheia nu se afișează și nu apare în jurnal." : "Se pune în adresă acolo unde scrie {key}. Nu apare în jurnal.")</small></label>
+                @if (state.Engine.SatelliteApiKey.Length > 0)
+                {
+                    <label class="toggle-switch" for="map-clear-sat-key"><input id="map-clear-sat-key" type="checkbox" role="switch" @bind="clearSatelliteKey" /><span class="toggle-track" aria-hidden="true"></span><span>Șterge cheia satelit salvată</span></label>
+                }
             </div>
             <div class="editor-actions">
                 <button class="refresh act-reload" type="button" disabled="@testing" @onclick="TestAsync">@(testing ? "Se testează…" : "Testează furnizorul")</button>
+                <button class="refresh act-reload" type="button" disabled="@(testing || edit.SatelliteTileUrl.Trim().Length == 0)" @onclick="TestSatelliteAsync">Testează satelitul</button>
                 <button class="primary" type="button" @onclick="BeginSave">Salvează setările</button>
                 <button class="refresh act-close" type="button" disabled="@(!Changed)" @onclick="Discard">Renunță la modificări</button>
                 @if (state.EngineSaved) { <button class="danger" type="button" @onclick="BeginReset">Revino la valorile din configurația aplicației</button> }
@@ -68,8 +82,8 @@ else if (state is not null)
     private MapEngineSettings edit = new();
     private Confirmation? confirming;
     private IJSObjectReference? module;
-    private bool loading, saving, testing, testOk, clearKey;
-    private string newKey = "";
+    private bool loading, saving, testing, testOk, clearKey, clearSatelliteKey;
+    private string newKey = "", newSatelliteKey = "";
     private string? error, notice, testMessage, testUrl;
 
     private MapEngineSettings Candidate
@@ -78,6 +92,7 @@ else if (state is not null)
         {
             var value = edit.Clone();
             value.ApiKey = clearKey ? "" : newKey.Trim().Length > 0 ? newKey.Trim() : state?.Engine.ApiKey ?? "";
+            value.SatelliteApiKey = clearSatelliteKey ? "" : newSatelliteKey.Trim().Length > 0 ? newSatelliteKey.Trim() : state?.Engine.SatelliteApiKey ?? "";
             return MapEngineRules.Normalize(value);
         }
     }
@@ -108,8 +123,8 @@ else if (state is not null)
     {
         if (state is null) return;
         edit = state.Engine.Clone();
-        edit.ApiKey = "";
-        newKey = ""; clearKey = false; testMessage = testUrl = null;
+        edit.ApiKey = ""; edit.SatelliteApiKey = "";
+        newKey = ""; clearKey = false; newSatelliteKey = ""; clearSatelliteKey = false; testMessage = testUrl = null;
     }
 
     // The test loads one tile of Europe (zoom 3) in the browser, exactly like the map will: what works here works on the map.
@@ -126,6 +141,27 @@ else if (state is not null)
             var result = await module.InvokeAsync<TileTest>("testTile", lifetime.Token, url, 10000);
             testOk = result.Ok;
             testMessage = result.Ok ? $"Furnizorul a răspuns cu o dală validă în {result.Milliseconds} ms." : "Furnizorul nu a livrat o dală: adresa este greșită, cheia lipsește sau este invalidă, furnizorul nu răspunde ori nu există conexiune la internet.";
+            testUrl = result.Ok ? url : null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (JSException) { testOk = false; testMessage = "Testul nu a putut rula în browser."; }
+        finally { testing = false; }
+    }
+
+    // The same test for the satellite address: one tile of Europe (zoom 3) loaded in the browser, exactly like the map will.
+    private async Task TestSatelliteAsync()
+    {
+        testing = true; testMessage = testUrl = null; error = null; notice = null;
+        try
+        {
+            var candidate = Candidate;
+            if (MapEngineRules.Validate(candidate) is { } problem) { testOk = false; testMessage = problem; return; }
+            var url = candidate.SatelliteTileUrl.Replace("{key}", Uri.EscapeDataString(candidate.SatelliteApiKey), StringComparison.Ordinal).Replace("{s}", "a").Replace("{r}", "")
+                .Replace("{z}", "3").Replace("{x}", "4").Replace("{y}", "2");
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./map-settings.js");
+            var result = await module.InvokeAsync<TileTest>("testTile", lifetime.Token, url, 10000);
+            testOk = result.Ok;
+            testMessage = result.Ok ? $"Furnizorul satelit a răspuns cu o dală validă în {result.Milliseconds} ms." : "Furnizorul satelit nu a livrat o dală: adresa este greșită, cheia lipsește, este invalidă sau restricționată la alt domeniu, ori nu există conexiune la internet.";
             testUrl = result.Ok ? url : null;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }

@@ -211,6 +211,7 @@ public static class InvoiceXmlChecks
             context.Services.AddSingleton<IInvoiceTemplateService>(new FixedTemplates(templates));
             context.Services.AddSingleton<IProductRepository>(repository);
             context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
+            context.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
             context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
             context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
             context.Services.AddSupplierFakes();

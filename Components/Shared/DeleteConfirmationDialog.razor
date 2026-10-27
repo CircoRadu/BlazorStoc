@@ -11,6 +11,7 @@
             {
                 <p id="@DescriptionId">@Description</p>
             }
+            @Details
             <fieldset class="delete-reason-options" disabled="@Busy">
                 <legend>Motivul ștergerii</legend>
                 <label>
@@ -70,6 +71,7 @@
     [Parameter, EditorRequired] public string Subject { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string ObjectLabel { get; set; } = string.Empty;
     [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public RenderFragment? Details { get; set; }
     // Most callers archive the object (the default text below stays accurate for them); a caller whose deletion is
     // not an archive - a backup package removed outright from disk (Task 3, subtask 3.2) - overrides this instead
     // of leaving the operator with an inaccurate promise of recoverability.

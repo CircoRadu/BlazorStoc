@@ -25,6 +25,7 @@ public static class ComponentChecks
         context.Services.AddLogging();
         context.Services.AddSingleton<IProductRepository>(repository);
         context.Services.AddSingleton<IProductParameterRepository>(parameterStore);
+        context.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
         context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         context.Services.AddScoped<UnsavedChanges>();
@@ -135,6 +136,43 @@ public static class ComponentChecks
         otherSubcategory.WaitForAssertion(() => { if (Options(otherSubcategory, "product-category").Length == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(otherSubcategory.FindAll("#product-composed-code").Count == 0 && otherSubcategory.Find("label[for=product-code]").TextContent.Contains(ProductCode.Label),
             "Product form: a subcategory without parameters keeps the single code field");
+
+        // A family of parameters (Fixed or Varifocal lens): the form asks for one member of the family and its value, plus the parameters of their own.
+        await repository.CreateSubcategoryAsync("Camere video", "Camere cu familie");
+        var familyGroup = new ProductGroup("Camere video", "Camere cu familie");
+        var fixedLens = await parameterStore.AddParameterAsync(familyGroup, "Fixa", "mm", ParameterKind.Number);
+        var varifocalLens = await parameterStore.AddParameterAsync(familyGroup, "Varifocala", "mm", ParameterKind.Interval);
+        var colorParameter = await parameterStore.AddParameterAsync(familyGroup, "Culoare", "", ParameterKind.Text);
+        var fixed28 = await parameterStore.AddValueAsync(fixedLens.Id, "2,8");
+        var varifocal212 = await parameterStore.AddValueAsync(varifocalLens.Id, "2,8-12");
+        var whiteValue = await parameterStore.AddValueAsync(colorParameter.Id, "alb");
+        var lensFamily = await parameterStore.CreateFamilyAsync(familyGroup, "Lentila", [fixedLens.Id, varifocalLens.Id]);
+        StagedProduct? stagedFamily = null;
+        var familyForm = context.Render<ProductEditor>(parameters => parameters.Add(p => p.Staging, true).Add(p => p.Groups, stale)
+            .Add(p => p.InitialCategory, "Camere video").Add(p => p.InitialSubcategory, "Camere cu familie").Add(p => p.InitialName, "CAM-F")
+            .Add(p => p.Staged, (StagedProduct item) => { stagedFamily = item; }));
+        familyForm.WaitForAssertion(() => familyForm.Find($"#product-family-{lensFamily.Id}"), TimeSpan.FromSeconds(5));
+        check(familyForm.FindAll($"#product-family-{lensFamily.Id} option").Count == 3 && familyForm.FindAll($"#product-parameter-{fixedLens.Id}").Count == 0 && familyForm.FindAll($"#product-parameter-{varifocalLens.Id}").Count == 0
+              && familyForm.FindAll($"#product-parameter-{colorParameter.Id}").Count == 1 && familyForm.Find("#product-composed-code").TextContent.Contains("incomplet"),
+            "Product form: a family shows a choice of its members (none chosen yet, so no value list) next to the parameters of their own");
+        familyForm.Find($"#product-parameter-{colorParameter.Id}").Change(whiteValue.Id.ToString());
+        check(familyForm.Find("#product-composed-code").TextContent.Contains("incomplet"), "Product form: without a member of the family the product is incomplete");
+        familyForm.Find($"#product-family-{lensFamily.Id}").Change(varifocalLens.Id.ToString());
+        familyForm.WaitForAssertion(() => familyForm.Find($"#product-parameter-{varifocalLens.Id}"), TimeSpan.FromSeconds(5));
+        check(familyForm.FindAll($"#product-parameter-{fixedLens.Id}").Count == 0 && familyForm.FindAll($"#product-parameter-{varifocalLens.Id} option").Count == 2 && familyForm.FindAll(".interval-inputs input").Count == 2,
+            "Product form: choosing a member shows only its values, and an interval member takes a start and an end for a new value");
+        familyForm.Find($"#product-parameter-{varifocalLens.Id}").Change(varifocal212.Id.ToString());
+        check(familyForm.Find("#product-composed-code").TextContent.Contains("CAM-F - 2.8-12 mm - alb") && !familyForm.Find("#product-composed-code").TextContent.Contains("incomplet"),
+            "Product form: the code has the value of the active member at the place of the family");
+        familyForm.Find($"#product-family-{lensFamily.Id}").Change(fixedLens.Id.ToString());
+        familyForm.WaitForAssertion(() => familyForm.Find($"#product-parameter-{fixedLens.Id}"), TimeSpan.FromSeconds(5));
+        check(familyForm.Find("#product-composed-code").TextContent.Contains("incomplet") && familyForm.FindAll($"#product-parameter-{varifocalLens.Id}").Count == 0,
+            "Product form: switching the active member drops the value of the other one");
+        familyForm.Find($"#product-parameter-{fixedLens.Id}").Change(fixed28.Id.ToString());
+        familyForm.Find("form").Submit();
+        familyForm.WaitForAssertion(() => { if (stagedFamily is null) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(stagedFamily!.Input.Name == "CAM-F - 2.8 mm - alb" && stagedFamily.Input.Parameters.Count == 2 && stagedFamily.Input.Parameters.All(item => item.ParameterId != varifocalLens.Id),
+            "Product form: the prepared product carries one member of the family and the other parameters");
 
         // Invoice pickup and required parameters: a row whose code is the model of products with parameters offers their variants.
         var v1 = new Product(901, "Camere video", "Camere IP", "DS-2CD1043 - 2.8 mm", "", 3);

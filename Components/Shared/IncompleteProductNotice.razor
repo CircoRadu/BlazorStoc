@@ -1,0 +1,12 @@
+<section class="movement-card incomplete-notice" role="alert" aria-labelledby="incomplete-notice-title">
+    <h2 id="incomplete-notice-title">⚠ Produs blocat: parametri necompletați</h2>
+    <p>Subcategoria produsului cere parametri obligatorii pe care el nu îi are încă. Până se completează nu se pot face intrări, ieșiri, transferuri, modificări de mișcări sau rezervări; stornarea rămâne posibilă.</p>
+    <ul>@foreach (var problem in Missing) { <li @key="problem">@problem</li> }</ul>
+    @if (EditUrl is not null) { <a class="refresh act-edit" href="@EditUrl">Completează parametrii</a> }
+    else { <p class="form-note">Cere unui operator cu drept de editare să completeze parametrii produsului.</p> }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<string> Missing { get; set; } = [];
+    [Parameter] public string? EditUrl { get; set; }
+}

@@ -1,4 +1,5 @@
 @using BlazorStoc.Services
+@using BlazorStoc.Modules
 @inject IWorkPointRepository Repository
 @inject IServicePhotoStore PhotoStore
 @inject ILogger<WorkPointEditor> Logger
@@ -29,7 +30,11 @@
                 <ToggleSwitch Class="full-width" Id="work-point-use-coordinates" @bind-Value="input.UseCoordinates" OnText="Activ" OffText="Inactiv">Coordonate (opțional)</ToggleSwitch>
                 @if (input.UseCoordinates)
                 {
-                    <label for="work-point-coordinates" class="full-width">Latitudine, longitudine<InputTextLive id="work-point-coordinates" @bind-Value="input.CoordinatesText" maxlength="60" autocomplete="off" placeholder="45.7489, 21.2087" /><small>Poți lipi coordonatele copiate dintr-o hartă (de exemplu 45.7489, 21.2087). Latitudinea este între -90 și 90, longitudinea între -180 și 180. Cu comutatorul oprit, punctul rămâne fără coordonate.</small><ValidationMessage For="() => input.CoordinatesText" /></label>
+                    <label for="work-point-coordinates" class="full-width">Latitudine, longitudine<InputTextLive id="work-point-coordinates" @bind-Value="input.CoordinatesText" maxlength="60" autocomplete="off" placeholder="45.7489, 21.2087" /><small>Poți lipi coordonatele copiate dintr-o hartă (de exemplu 45.7489, 21.2087), le poți căuta cu butonul „Caută în Google Maps” sau poți trage pinul pe hartă. Latitudinea este între -90 și 90, longitudinea între -180 și 180. Cu comutatorul oprit, punctul rămâne fără coordonate.</small><ValidationMessage For="() => input.CoordinatesText" /></label>
+                    <div class="full-width editor-actions">
+                        <a class="refresh act-nav google-maps-link" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" title="Deschide Google Maps într-o fereastră separată; caută acolo adresa și copiază coordonatele în câmpul de mai sus.">Caută în Google Maps</a>
+                    </div>
+                    <MapHolder Latitude="HolderLatitude" Longitude="HolderLongitude" Name="@input.Name" Address="@input.Address" PositionChanged="PinMoved" />
                 }
             </div>
             <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : "Salvează punctul de lucru")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
@@ -91,6 +96,17 @@
     private string caption = "";
     private readonly CancellationTokenSource lifetime = new();
     private bool IsPrimary => Original?.IsPrimary == true;
+
+
+    // The pin follows the coordinates field while its text is valid.
+    private decimal? HolderLatitude => WorkPointCoordinates.TryParse(input.CoordinatesText, out var lat, out _, out _) ? lat : null;
+    private decimal? HolderLongitude => WorkPointCoordinates.TryParse(input.CoordinatesText, out _, out var lng, out _) ? lng : null;
+
+    private Task PinMoved((decimal Latitude, decimal Longitude) position)
+    {
+        input.CoordinatesText = WorkPointCoordinates.Format(position.Latitude, position.Longitude);
+        return Task.CompletedTask;
+    }
 
     protected override async Task OnInitializedAsync()
     {

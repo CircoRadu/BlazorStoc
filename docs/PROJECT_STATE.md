@@ -1,6 +1,6 @@
 # Starea curenta a proiectului
 
-Actualizat: 23.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`). Istoricul vechi: `docs/arhiva/` (vezi `docs/arhiva/INDEX.md`). Cand ceva de aici se invecheste, se inlocuieste, nu se aduna.
+Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`). Istoricul vechi: `docs/arhiva/` (vezi `docs/arhiva/INDEX.md`). Cand ceva de aici se invecheste, se inlocuieste, nu se aduna.
 
 ## Aplicatia
 
@@ -8,6 +8,14 @@ Actualizat: 23.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Module: produse/stoc, categorii, beneficiari/proiecte, vehicule, mentenanta (contracte, interventii, harta), notificari, jurnal, furnizori si facturi, preluare factura PDF/OCR cu sabloane, preluare inventar.
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
+
+## Ultimul lucru facut (27.10.2026): versiunile 0.5.24 - 0.5.27 (parametri, familii, etichete, popup produs)
+- Catalog: coloana PARAMETRI cu etichete de filtrare, filtru "Doar incomplete", iconita de editare pe rand; editarea unui produs se face intr-un popup (`Components/Pages/Home.razor`, `ProductEditor.razor`).
+- Parametri obligatori: tip Valoare fixa (`ParameterKind.Fixed`, doar in familie), schimbarea tipului la editare, stergerea unui parametru cu produse (codurile se rescriu), produsele incomplete sunt blocate in toate operatiile de stoc (storno permis, banner pe pagina produsului).
+- Etichete pe subcategorie (migrarea 53, `Services/ProductTags.cs`, tabelele `subcategory_tags`/`product_tags`): On/Off pe produs, filtre in catalog, jurnal propriu; fereastra "Parametri si etichete" are trei sectiuni colapsabile (`SubcategoryParametersPanel.razor`).
+- Ruta paginii in bara de sus, meniul ramane deschis la subcategoria produsului; numarul de randuri ales la un tabel paginat se pastreaza in browser (`AuditPager.razor`, localStorage pe id-ul tabelului).
+- Modulul Jurnal 1.2.0, Mentenanta 1.3.0. Cont de test pentru migrari: `local-secrets/test-migrator.private.json` (cont `claude_test_migrator`, DDL numai pe `blazorstoc_test`), folosit prin `MARIA_TEST_MIGRATOR_CONFIG_PATH`.
+- Verificat: suita in memorie 2064 PASS, MariaDB 3115 PASS, 0 esecuri; pachetul 0.5.27 se construieste cu `tools\release.ps1`. Captura help `categorii-parametri` este scoasa si de refacut la cerere (`docs/HELP_DE_REGENERAT.md`).
 
 ## Ultimul lucru facut (24.10.2026): versiunea 0.5.18 (corectii tema dark)
 - `wwwroot/theme.js` pastreaza tema peste navigarea intre pagini; `wwwroot/theme-dark.css` are mapare pe puncte a luminozitatii (generata cu un script din `:root`, apoi reguli ajustate manual dupa marcajul `/* --- hand-tuned --- */`), reguli pentru butoane, campuri, imaginea generica si placile hartii.

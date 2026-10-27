@@ -52,3 +52,6 @@ Directorul contine, pentru fiecare componenta a aplicatiei, un fisier cu pasii p
 ## Rularea testelor dintr-o pagina de lucru (unealta `tools/teste-utilizator.mjs`)
 
 Ca sa nu parcurgi fisierele de mana: `node tools/teste-utilizator.mjs html` (sau `html 06 18` pentru anumite fisiere, dupa prefix) genereaza `artifacts/teste-utilizator.html` cu pasii nerezolvati (coloana Rezultat goala), grupati pe fisier si sectiune. Pentru fiecare pas alegi OK / Esuat / Sarit si poti scrie o nota; progresul se pastreaza in browser. „Exporta rezultate" descarca (si copiaza) un JSON; il dai agentului sau rulezi `node tools/teste-utilizator.mjs apply rezultate-teste.json`, care scrie `OK`, `ESUAT - nota` sau `SARIT` (cu data) in coloana Rezultat a fisierelor. `node tools/teste-utilizator.mjs list` arata cati pasi nerezolvati are fiecare fisier. Pasii esuati ii preia agentul; cei confirmati se muta in `docs/TESTE_RAMASE.md` conform regulii.
+
+## Pagini cu tabele paginate - numarul de randuri se pastreaza (27.10.2026)
+Cand alegi cate randuri se afiseaza pe pagina unui tabel, alegerea ramane in browser, pe tabel, si se aplica din nou la urmatoarea deschidere a paginii (inclusiv dupa o noua autentificare pe acelasi calculator), pana o schimbi. Test: Produse -> alege 50 randuri -> alta pagina -> revino in Produse: raman 50. Alegerea nu trece pe alt browser sau alt calculator.

@@ -59,7 +59,7 @@ public static class MaintenanceMapRules
 
     // Rows without coordinates cannot be placed: they are listed apart, to be completed on the work point.
     public static MapMarker? Marker(ServiceDueRow row, DateOnly today, int dueThresholdDays, int expiryThresholdDays, IReadOnlyList<MapPinType>? pinTypes = null) =>
-        row.Latitude is { } latitude && row.Longitude is { } longitude
+        row is { HasCoordinates: true, Latitude: { } latitude, Longitude: { } longitude }
             ? new(row.Point.Point.Id, (double)latitude, (double)longitude, Fill(row, today, dueThresholdDays), Badge(row, today, expiryThresholdDays), Title(row), MapPinRules.ExtraBadges(row, today, pinTypes))
             : null;
 
@@ -69,7 +69,7 @@ public static class MaintenanceMapRules
             ? rows.Where(row => row.Point.Point.Id != selected.Point.Point.Id && row.Latitude == selected.Latitude && row.Longitude == selected.Longitude).ToList()
             : [];
 
-    public static string CoordinatesText(ServiceDueRow row) => row is { Latitude: { } latitude, Longitude: { } longitude }
+    public static string CoordinatesText(ServiceDueRow row) => row is { HasCoordinates: true, Latitude: { } latitude, Longitude: { } longitude }
         ? string.Create(CultureInfo.InvariantCulture, $"{latitude:0.######}, {longitude:0.######}") : string.Empty;
 
     // The link that opens the intervention dialog of a work point on the page of its beneficiary.

@@ -26,6 +26,14 @@ public sealed class MapEngineSettings
     public int StartZoom { get; set; } = 6;
     // Optional key of the provider, used where the address has {key}; it is never shown again after saving and never written to the journal.
     public string ApiKey { get; set; } = "";
+    // An optional satellite background (for example ArcGIS World Imagery) offered next to the street map; empty address = no satellite layer.
+    // Its own key goes where the address has {key}; like the other key it is never shown again after saving and never journaled.
+    public string SatelliteTileUrl { get; set; } = "";
+    public string SatelliteAttributionText { get; set; } = "";
+    public string SatelliteAttributionUrl { get; set; } = "";
+    public string SatelliteApiKey { get; set; } = "";
+    // The highest zoom at which the satellite provider has imagery (0 = as far as the map zoom goes). Above it the last tile is enlarged instead of asking for tiles that do not exist.
+    public int SatelliteMaxNativeZoom { get; set; }
 
     public MapEngineSettings Clone() => (MapEngineSettings)MemberwiseClone();
 
@@ -34,7 +42,10 @@ public sealed class MapEngineSettings
     {
         TileUrl = TileUrl.Replace("{key}", Uri.EscapeDataString(ApiKey ?? ""), StringComparison.Ordinal),
         Attribution = MapEngineRules.AttributionHtml(AttributionText, AttributionUrl),
-        MinZoom = MinZoom, MaxZoom = MaxZoom, CenterLatitude = CenterLatitude, CenterLongitude = CenterLongitude, StartZoom = StartZoom
+        MinZoom = MinZoom, MaxZoom = MaxZoom, CenterLatitude = CenterLatitude, CenterLongitude = CenterLongitude, StartZoom = StartZoom,
+        SatelliteTileUrl = (SatelliteTileUrl ?? "").Trim().Replace("{key}", Uri.EscapeDataString(SatelliteApiKey ?? ""), StringComparison.Ordinal),
+        SatelliteAttribution = (SatelliteTileUrl ?? "").Trim().Length == 0 ? "" : MapEngineRules.AttributionHtml(SatelliteAttributionText, SatelliteAttributionUrl),
+        SatelliteMaxNativeZoom = SatelliteMaxNativeZoom
     }.Normalized();
 
     // The starting values when nothing was saved: what appsettings.json says.
@@ -46,7 +57,9 @@ public sealed class MapEngineSettings
         return new()
         {
             TileUrl = options.TileUrl, AttributionText = text.Trim(), AttributionUrl = link.Success ? link.Groups[1].Value : "",
-            MinZoom = options.MinZoom, MaxZoom = options.MaxZoom, CenterLatitude = options.CenterLatitude, CenterLongitude = options.CenterLongitude, StartZoom = options.StartZoom
+            MinZoom = options.MinZoom, MaxZoom = options.MaxZoom, CenterLatitude = options.CenterLatitude, CenterLongitude = options.CenterLongitude, StartZoom = options.StartZoom,
+            SatelliteTileUrl = options.SatelliteTileUrl ?? "", SatelliteMaxNativeZoom = options.SatelliteMaxNativeZoom,
+            SatelliteAttributionText = WebUtility.HtmlDecode(Regex.Replace(options.SatelliteAttribution ?? "", "<[^>]+>", "")).Trim()
         };
     }
 }
@@ -82,6 +95,7 @@ public static class MapEngineRules
         if (text.Length == 0) return "Completează textul atribuirii (furnizorii de hărți o cer).";
         if (text.Length > MaxAttribution || text.Any(char.IsControl)) return $"Textul atribuirii poate avea cel mult {MaxAttribution} de caractere, fără caractere de control.";
         if (!string.IsNullOrWhiteSpace(settings.AttributionUrl) && !IsHttps(settings.AttributionUrl)) return "Adresa atribuirii trebuie să fie o adresă https validă (sau să rămână necompletată).";
+        if (ValidateSatellite(settings) is { } satelliteProblem) return satelliteProblem;
         if (settings.MinZoom is < 0 or > 18) return "Zoom-ul minim trebuie să fie între 0 și 18.";
         if (settings.MaxZoom < settings.MinZoom || settings.MaxZoom > 20) return "Zoom-ul maxim trebuie să fie între zoom-ul minim și 20.";
         if (settings.StartZoom < settings.MinZoom || settings.StartZoom > settings.MaxZoom) return "Zoom-ul de pornire trebuie să fie între zoom-ul minim și cel maxim.";
@@ -90,9 +104,34 @@ public static class MapEngineRules
         return null;
     }
 
+    // The satellite layer is optional: an empty address means none. When there is one it follows the same rules as the street map, with its own key and attribution.
+    private static string? ValidateSatellite(MapEngineSettings settings)
+    {
+        var url = settings.SatelliteTileUrl?.Trim() ?? "";
+        if (url.Length == 0) return null;
+        if (url.Length > MaxTileUrl) return $"Adresa dalelor satelit poate avea cel mult {MaxTileUrl} de caractere.";
+        if (url.Any(char.IsWhiteSpace)) return "Adresa dalelor satelit nu poate conține spații.";
+        if (!url.Contains("{z}") || !url.Contains("{x}") || !url.Contains("{y}")) return "Adresa dalelor satelit trebuie să conțină {z}, {x} și {y}.";
+        var probe = url.Replace("{z}", "0").Replace("{x}", "0").Replace("{y}", "0").Replace("{s}", "a").Replace("{r}", "").Replace("{key}", "k");
+        if (!Uri.TryCreate(probe, UriKind.Absolute, out var parsed) || parsed.Scheme != Uri.UriSchemeHttps) return "Adresa dalelor satelit trebuie să înceapă cu https:// și să fie o adresă validă.";
+        if (parsed.UserInfo.Length > 0) return "Adresa dalelor satelit nu poate conține nume de utilizator sau parolă; folosește câmpul „Cheie satelit”.";
+        if (url.Contains("{key}") && string.IsNullOrWhiteSpace(settings.SatelliteApiKey)) return "Adresa satelit conține {key}: completează câmpul „Cheie satelit”.";
+        if (settings.SatelliteApiKey?.Length > 300 || settings.SatelliteApiKey?.Any(char.IsControl) == true) return "Cheia satelit nu este validă.";
+        if (settings.SatelliteMaxNativeZoom is < 0 or > 20) return "Zoom-ul nativ maxim al satelitului trebuie să fie între 0 (nelimitat) și 20.";
+        var text = settings.SatelliteAttributionText?.Trim() ?? "";
+        if (text.Length == 0) return "Completează textul atribuirii pentru satelit (furnizorii de imagini o cer).";
+        if (text.Length > MaxAttribution || text.Any(char.IsControl)) return $"Textul atribuirii satelit poate avea cel mult {MaxAttribution} de caractere, fără caractere de control.";
+        if (!string.IsNullOrWhiteSpace(settings.SatelliteAttributionUrl) && !IsHttps(settings.SatelliteAttributionUrl)) return "Adresa atribuirii satelit trebuie să fie o adresă https validă (sau să rămână necompletată).";
+        return null;
+    }
+
     public static MapEngineSettings Normalize(MapEngineSettings settings)
     {
         var copy = settings.Clone();
+        copy.SatelliteTileUrl = (copy.SatelliteTileUrl ?? "").Trim();
+        copy.SatelliteAttributionText = (copy.SatelliteAttributionText ?? "").Trim();
+        copy.SatelliteAttributionUrl = IsHttps(copy.SatelliteAttributionUrl) ? new Uri(copy.SatelliteAttributionUrl!.Trim()).AbsoluteUri : "";
+        copy.SatelliteApiKey = (copy.SatelliteApiKey ?? "").Trim();
         copy.TileUrl = (copy.TileUrl ?? "").Trim();
         copy.AttributionText = (copy.AttributionText ?? "").Trim();
         copy.AttributionUrl = IsHttps(copy.AttributionUrl) ? new Uri(copy.AttributionUrl!.Trim()).AbsoluteUri : "";
@@ -113,6 +152,11 @@ public static class MapEngineRules
         yield return new("Longitudine centru", Number(before.CenterLongitude), Number(after.CenterLongitude));
         // The key itself never appears in the journal or on screen.
         yield return new("Cheie furnizor", before.ApiKey.Length == 0 ? "necompletată" : "completată", before.ApiKey == after.ApiKey ? (after.ApiKey.Length == 0 ? "necompletată" : "completată") : (after.ApiKey.Length == 0 ? "ștearsă" : "schimbată"));
+        yield return new("Adresa dalelor satelit", before.SatelliteTileUrl, after.SatelliteTileUrl);
+        yield return new("Zoom nativ maxim satelit", before.SatelliteMaxNativeZoom.ToString(CultureInfo.InvariantCulture), after.SatelliteMaxNativeZoom.ToString(CultureInfo.InvariantCulture));
+        yield return new("Text atribuire satelit", before.SatelliteAttributionText, after.SatelliteAttributionText);
+        yield return new("Adresa atribuirii satelit", before.SatelliteAttributionUrl, after.SatelliteAttributionUrl);
+        yield return new("Cheie satelit", before.SatelliteApiKey.Length == 0 ? "necompletată" : "completată", MapKeyRules.KeyText(before.SatelliteApiKey.Length > 0, after.SatelliteApiKey.Length > 0, before.SatelliteApiKey != after.SatelliteApiKey));
     }
 }
 
@@ -262,6 +306,12 @@ public static class MapPinRules
         return pinTypes.Where(type => !type.BuiltIn && type.Active && type.Rule == MapPinType.RuleNoIntervention &&
                 (row.LastIntervention is not { } last || last.AddMonths(type.Months) <= today)).Select(type => type.Key).ToList();
     }
+}
+
+public static class MapKeyRules
+{
+    public static string KeyText(bool hadKey, bool hasKey, bool changed) =>
+        !hadKey ? (hasKey ? "completată" : "necompletată") : !hasKey ? "ștearsă" : changed ? "schimbată" : "completată";
 }
 
 public sealed class MapConfiguration

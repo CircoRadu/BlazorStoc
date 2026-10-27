@@ -70,7 +70,8 @@ public partial class ProductMovements
             var data = await Movements.GetPageAsync(Id, CurrentQuery(), lifetime.Token);
             var vehicles = canManage ? await Movements.GetVehicleStocksAsync(Id, lifetime.Token) : vehicleStocks;
             current = current with { Quantity = data.Stock };
-            if (current == product && SamePage(data, pageData) && vehicles.SequenceEqual(vehicleStocks)) return;
+            var missingBefore = missingParameters; await LoadMissingAsync(current);
+            if (current == product && SamePage(data, pageData) && vehicles.SequenceEqual(vehicleStocks) && missingBefore.SequenceEqual(missingParameters)) return;
             product = current; pageData = data; stock = data.Stock; inVehicles = data.InVehicles; vehicleStocks = vehicles;
             if (pageNumber > TotalPages) { pageNumber = TotalPages; await LoadPageAsync(); }
             StateHasChanged();
@@ -96,6 +97,16 @@ public partial class ProductMovements
         if (product is null) await LoadAsync();
     }
 
+    // What the product still lacks among the required parameters of its subcategory: while anything is missing no stock operation is possible on it.
+    private IReadOnlyList<string> missingParameters = [];
+    private bool Blocked => missingParameters.Count > 0;
+    private async Task LoadMissingAsync(Product current)
+    {
+        try { missingParameters = await ParameterRepository.GetMissingAsync(current, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogWarning("Missing parameters loading failed ({ErrorType}).", ex.GetType().Name); }
+    }
+
     private async Task LoadAsync()
     {
         loading = true; error = null;
@@ -111,7 +122,7 @@ public partial class ProductMovements
             permEdit = await Access.HasAsync("produse.edit", lifetime.Token); permDelete = await Access.HasAsync("produse.delete", lifetime.Token);
             if (!stateApplied) { ApplyStateFromAddress(); stateApplied = true; }
             isAdministrator = await Access.IsAdministratorAsync(lifetime.Token);
-            if (product is not null) { await LoadPageAsync(); await RefreshHolderAsync(); }
+            if (product is not null) { await LoadPageAsync(); await RefreshHolderAsync(); await LoadMissingAsync(product); }
             await RestoreExitFormAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }

@@ -23,6 +23,7 @@ public static partial class MariaExtendedChecks
         var admin = new TestAccessControl(true, "integration.tester");
         var audit = new MariaAuditTrail(configuration);
         await using var probe = await OpenRawAsync(configuration);
+        await EnsureTestSchemaCurrentAsync(probe, configuration);
         try
         {
             await Section("Products: concurrency, stock, groups", () => ProductsAsync(configuration, admin, audit, probe));
@@ -75,6 +76,8 @@ public static partial class MariaExtendedChecks
             await Section("Exit operation: grouping, all or nothing, preview, repeated line", () => ExitOperationAsync(configuration, admin, audit, probe));
             await Section("To regularize: cause, list, notification, regularization", () => ToRegularizeAsync(configuration, admin, audit, probe));
             await Section("Required parameters: definition, values, product code, blocked until complete, value change, journal", () => ProductParametersAsync(configuration, admin, audit, probe));
+            await Section("Parameter families and intervals: grouping rules, one active member, incomplete products, journal", () => ParameterFamiliesAsync(configuration, admin, audit, probe));
+            await Section("Subcategory tags: add, rename, delete, On/Off on products, journal", () => SubcategoryTagsAsync(configuration, admin, audit, probe));
             await Section("Free entries and invoice linking: reasons, awaited invoice, repeated product, overrun, attach/detach, notification", () => FreeEntriesAsync(configuration, admin, audit, probe));
             await Section("Backup worker: real backup, lock, cancellation, restoration up to the swap, NAS copier in a worker process", () => BackupWorkerAsync(configuration, admin, audit));
         }
@@ -120,6 +123,47 @@ public static partial class MariaExtendedChecks
     private static BeneficiaryInput Legal(string name, string cui) => new() { Name = name, Cui = cui, Address = "Strada Test 1, Bucuresti", Phone = "0721000111" };
 
     // ---- Raw helpers -----------------------------------------------------------------------------------------------------------------
+    // The isolated test database (never the real one) is brought up to the latest migration here: a migration whose columns are missing is run with the
+    // test account (the statements are idempotent), so a new migration does not need a separate step before the checks.
+    private static async Task EnsureTestSchemaCurrentAsync(MySqlConnection probe, IConfiguration configuration)
+    {
+        if (!string.Equals(configuration["Database:Name"], "blazorstoc_test", StringComparison.OrdinalIgnoreCase)) return;
+        foreach (var migration in MariaSchemaMigrations.All.OrderBy(item => item.Version))
+        {
+            var missing = false;
+            foreach (var (table, column) in migration.ExpectedColumns)
+            {
+                await using var look = new MySqlCommand("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=@t AND column_name=@c", probe);
+                look.Parameters.AddWithValue("@t", table); look.Parameters.AddWithValue("@c", column);
+                if (Convert.ToInt64(await look.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture) == 0) { missing = true; break; }
+            }
+            if (!missing) continue;
+            Console.WriteLine($"Test schema: applying migration {migration.Version} ({migration.Description})");
+            // The test account has no DDL rights: a migrator account (MARIA_TEST_MIGRATOR_CONFIG_PATH, a file like migration-account.private.json whose
+            // account may alter blazorstoc_test) runs the statements; without it the migration is tried with the test account.
+            await using var migrator = await OpenMigratorForTestAsync(configuration) ?? probe;
+            foreach (var statement in migration.Statements)
+            {
+                await using var command = new MySqlCommand(statement, migrator) { CommandTimeout = 120 };
+                await command.ExecuteNonQueryAsync();
+            }
+        }
+    }
+
+    private static async Task<MySqlConnection?> OpenMigratorForTestAsync(IConfiguration configuration)
+    {
+        if (Environment.GetEnvironmentVariable("MARIA_TEST_MIGRATOR_CONFIG_PATH") is not { Length: > 0 } path || !File.Exists(path)) return null;
+        var file = new ConfigurationBuilder().AddJsonFile(path).Build();
+        var builder = new MySqlConnector.MySqlConnectionStringBuilder
+        {
+            Server = configuration["Database:Host"], Port = uint.Parse(configuration["Database:Port"] ?? "3306", System.Globalization.CultureInfo.InvariantCulture),
+            Database = configuration["Database:Name"], UserID = file["Database:User"], Password = file["Database:Password"], SslMode = MySqlConnector.MySqlSslMode.Required
+        };
+        var connection = new MySqlConnection(builder.ConnectionString);
+        await connection.OpenAsync();
+        return connection;
+    }
+
     private static async Task<MySqlConnection> OpenRawAsync(IConfiguration configuration)
     {
         var builder = new MySqlConnectionStringBuilder

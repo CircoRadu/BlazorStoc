@@ -1,4 +1,5 @@
 @using BlazorStoc.Services
+@inject IJSRuntime JS
 
 @* Page size and page buttons under the journal tables. PageSize 0 means "all the results" (offered only when AllowAll). *@
 <div class="table-footer audit-table-footer">
@@ -29,6 +30,20 @@
     [Parameter] public EventCallback<int> PageChanged { get; set; }
     [Parameter] public EventCallback<int> PageSizeChanged { get; set; }
 
+    // The number of rows chosen for a table is kept in the browser (per table id) and restored when the page is opened again, until the user changes it.
+    private string StorageKey => $"blazorstoc-pager-size:{Id}";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var saved = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            if (int.TryParse(saved, out var size) && size != PageSize && PageSizes.Contains(size)) await PageSizeChanged.InvokeAsync(size);
+        }
+        catch (Exception) { }   // a convenience only: without the browser storage the size simply is not kept
+    }
+
     private int TotalPages => PageSize == 0 ? 1 : Math.Max(1, (Total + PageSize - 1) / PageSize);
 
     private string Summary
@@ -42,6 +57,11 @@
         }
     }
 
-    private Task SizeChangedAsync(ChangeEventArgs args) =>
-        int.TryParse(args.Value?.ToString(), out var size) ? PageSizeChanged.InvokeAsync(size) : Task.CompletedTask;
+    private async Task SizeChangedAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var size)) return;
+        try { await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, size.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
+        catch (Exception) { }   // a convenience only: without the browser storage the size simply is not kept
+        await PageSizeChanged.InvokeAsync(size);
+    }
 }

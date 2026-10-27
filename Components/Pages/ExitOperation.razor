@@ -11,6 +11,7 @@
 @inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject IAccessControl Access
 @inject ILogger<ExitOperation> Logger
+@inject IProductParameterRepository ParameterRepository
 @implements IDisposable
 <PageBoundary>
 @* The exit operation (the exit basket): one destination, one date and one reference for several products, each with its quantity and source
@@ -74,6 +75,7 @@ else
                             <ExitComponentChoice ProjectId="common.ProjectId" ProductId="line.ProductId" ComponentId="line.ComponentId" OutsideOffer="line.OutsideOffer" Disabled="busy"
                                                  Changed="choice => { line.ComponentId = choice.ComponentId; line.OutsideOffer = choice.OutsideOffer; }" />
                         }
+                        @if (line.Missing.Count > 0) { <div class="invoice-warning" role="alert">⚠ Produs blocat: parametri necompletați (@string.Join("; ", line.Missing)). Completează-i în editarea produsului.</div> }
                         @if (ProductOf(line) is { } product)
                         {
                             <small class="form-note">Depozit: <strong>@WarehouseOf(product) buc.</strong>@(inVehicles.GetValueOrDefault(product.Id) > 0 ? $" · în mașini: {inVehicles[product.Id]} buc." : "")@(product.Quantity < 0 ? " · stoc negativ (de regularizat)" : "")</small>
@@ -165,6 +167,7 @@ else
         public int? ComponentId { get; set; }
         public bool OutsideOffer { get; set; }
         public IReadOnlyList<VehicleStock> Held { get; set; } = [];
+        public IReadOnlyList<string> Missing { get; set; } = [];
     }
 
     private readonly CancellationTokenSource lifetime = new();
@@ -263,10 +266,14 @@ else
 
     private async Task ProductChangedAsync(Line line, int? productId)
     {
-        line.ProductId = productId; line.SourceVehicleId = null; line.Held = [];
+        line.ProductId = productId; line.SourceVehicleId = null; line.Held = []; line.Missing = [];
         if (productId is { } id)
         {
-            try { line.Held = await Movements.GetVehicleStocksAsync(id, lifetime.Token); }
+            try
+            {
+                line.Held = await Movements.GetVehicleStocksAsync(id, lifetime.Token);
+                if (products.FirstOrDefault(p => p.Id == id) is { } chosen) line.Missing = await ParameterRepository.GetMissingAsync(chosen, lifetime.Token);
+            }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
             catch (Exception ex) { Logger.LogError("Vehicle stock loading failed ({ErrorType}).", ex.GetType().Name); }
         }
@@ -280,6 +287,8 @@ else
     private string? LocalError()
     {
         if (picker?.ValidationError() is { } pickerError) return pickerError;
+        for (var index = 0; index < lines.Count; index++)
+            if (lines[index].Missing.Count > 0) return StockMovementRules.LineMessage(index, $"produs blocat, parametri necompletați ({string.Join("; ", lines[index].Missing)}). Completează-i în editarea produsului.");
         for (var index = 0; index < lines.Count; index++)
             if (lines[index].ProductId is null || lines[index].Quantity is not > 0)
                 return StockMovementRules.LineMessage(index, "alege produsul și o cantitate mai mare ca zero.");

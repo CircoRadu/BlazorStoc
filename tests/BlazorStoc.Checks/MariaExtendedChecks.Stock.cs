@@ -109,6 +109,17 @@ public static partial class MariaExtendedChecks
         Check(completed.Name == $"{oldProduct.Name} - 2.8 mm - negru" && !(await parameters.GetIncompleteProductIdsAsync()).Contains(oldProduct.Id), "Choosing the values completes the product and lifts the block");
         await movements.CreateAsync(oldProduct.Id, new StockMovementInput { Kind = StockMovementKind.Entry, Date = today, Quantity = 1, Description = "Ext param dupa completare" });
 
+        // A product that becomes incomplete again is blocked for new stock operations and reservations, but an exit already made can still be voided.
+        var oldExit = await movements.CreateAsync(oldProduct.Id, new StockMovementInput { Kind = StockMovementKind.Exit, Date = today, Quantity = 1, Description = "Ext iesire inainte de blocare", Destination = ExitDestination.StockCorrection });
+        var extra = await parameters.AddParameterAsync(group, "Extra", "", ParameterKind.Text);
+        var missingNow = await ((IProductParameterRepository)parameters).GetMissingAsync((await products.GetProductAsync(oldProduct.Id))!);
+        Check(missingNow.SequenceEqual(["Extra"]), "The missing parameters of an incomplete product are listed by name");
+        await Rejects<StockMovementOperationException>(() => movements.CreateAsync(oldProduct.Id, new StockMovementInput { Kind = StockMovementKind.Exit, Date = today, Quantity = 1, Description = "Ext iesire blocata", Destination = ExitDestination.StockCorrection }), "A new exit on an incomplete product is refused");
+        await Rejects<ReservationException>(() => new MariaReservationRepository(configuration, admin, audit).ReserveAsync(0, null, oldProduct.Id, 1), "A reservation on an incomplete product is refused");
+        await movements.VoidExitOperationAsync(oldExit.Movement.OperationId!.Value, "Ext storno produs incomplet");
+        Check((await movements.GetAsync(oldExit.Movement.Id))!.IsVoided, "Voiding an exit stays possible for a product that became incomplete");
+        await parameters.DeleteParameterAsync((await parameters.GetParametersAsync()).Single(item => item.Id == extra.Id), "Ext curatare parametru");
+
         // Deleting values: only the unused ones, by a user.
         var spare = await userParameters.AddValueAsync(lens.Id, "6");
         await Rejects<ProductOperationException>(() => userParameters.DeleteValueAsync(v28.Id, "test"), "A value attached to products cannot be deleted");
@@ -137,10 +148,10 @@ public static partial class MariaExtendedChecks
         Check(renamed!.Name == $"{model} - 2.9 mm - alb" && renamed.Version > first.Version && renamed.Quantity == 5, "A renamed product keeps its stock and gets a new version");
         Check((await parameters.GetParametersAsync()).Single(item => item.Id == lens.Id).Values.Any(item => item.Id == v28.Id && item.Value == "2.9"), "The value itself is changed once for all");
 
-        // A parameter cannot be deleted while the subcategory has products; the journal names each operation.
-        await Rejects<ProductOperationException>(() => parameters.DeleteParameterAsync(lens, "Ext sters"), "A parameter of a subcategory with products cannot be deleted");
+        // The journal names each operation.
+        Check((await parameters.PreviewParameterDeletionAsync(lens)).Affected.Count > 0, "Deleting a parameter shows the products that lose its value");
         var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started).ToList();
-        Check(events.Count(item => item.Action == AuditActions.AddSubcategoryParameter) == 2 && events.Count(item => item.Action == AuditActions.AddParameterValue) >= 4
+        Check(events.Count(item => item.Action == AuditActions.AddSubcategoryParameter) == 3 && events.Count(item => item.Action == AuditActions.AddParameterValue) >= 4
               && events.Any(item => item.Action == AuditActions.DeleteParameterValue && item.Motif == "Ext valoare nefolosita")
               && events.Any(item => item.Action == AuditActions.EditParameterValue && item.Details.Contains("2.8 mm → 2.9 mm", StringComparison.Ordinal) && item.Motif == "Ext corectie valoare")
               && events.Count(item => item.Action == AuditActions.RenameProductByParameter) == 2,

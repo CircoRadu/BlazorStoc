@@ -59,6 +59,9 @@ public sealed class MariaReservationRepository(
                     productName = reader.GetString(0);
                     var stock = Convert.ToInt32(reader.GetValue(1));
                     await reader.CloseAsync().ConfigureAwait(false);
+                    // A product that lacks required parameters is blocked for every stock operation, a reservation included.
+                    try { await MariaStockMovementRepository.EnsureParametersCompleteAsync(connection, transaction, productId, productName, cancellationToken).ConfigureAwait(false); }
+                    catch (StockMovementOperationException exception) { throw new ReservationException(exception.Message); }
                     var reserved = await ReservationSql.TotalAsync(connection, transaction, productId, cancellationToken).ConfigureAwait(false);
                     var free = ReservationRules.Free(stock, reserved);
                     if (capToFree) quantity = Math.Min(quantity, free);

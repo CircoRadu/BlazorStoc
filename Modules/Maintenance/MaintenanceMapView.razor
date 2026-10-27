@@ -134,7 +134,7 @@ else
     }
     else
     {
-        <p class="form-note">Aceste puncte de lucru nu pot fi puse pe hartă. Deschide fișa beneficiarului și adaugă coordonatele în editarea punctului („Coordonate”). Nu se face geocodare automată: adresele nu se trimit niciunui serviciu extern.</p>
+        <p class="form-note">Aceste puncte de lucru nu pot fi puse pe hartă. Deschide fișa beneficiarului și adaugă coordonatele în editarea punctului („Coordonate”). Nu se face geocodare automată: adresa se caută numai când operatorul apasă „Caută coordonate după adresă” în editorul punctului (dacă a fost activată în Setări → Hartă).</p>
         <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>SCADENȚĂ</th><th></th></tr></thead><tbody>
         @foreach (var item in Unplaced)
         {
@@ -208,7 +208,8 @@ else
     private static object EngineOptions(MapOptions options) => new
     {
         tileUrl = options.TileUrl, attribution = options.Attribution, minZoom = options.MinZoom, maxZoom = options.MaxZoom,
-        centerLatitude = options.CenterLatitude, centerLongitude = options.CenterLongitude, startZoom = options.StartZoom
+        centerLatitude = options.CenterLatitude, centerLongitude = options.CenterLongitude, startZoom = options.StartZoom,
+        satelliteTileUrl = options.SatelliteTileUrl, satelliteAttribution = options.SatelliteAttribution, satelliteMaxNativeZoom = options.SatelliteMaxNativeZoom
     };
     private IReadOnlyList<ServiceDueRow> Unplaced => Filtered.Where(row => !row.HasCoordinates).ToList();
     private ServiceDueRow? Selected => selectedId is { } id ? Filtered.FirstOrDefault(row => row.Point.Point.Id == id) : null;

@@ -4,6 +4,90 @@ Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi
 
 ## Modificari de testat
 
+### 27.10.2026 - Parametri: stergerea unui parametru care are produse
+
+**Ce s-a adaugat:** iconita de stergere a unui parametru nu mai e blocata cand subcategoria are produse; fereastra de confirmare arata produsele afectate (cod actual / cod nou / stoc).
+
+**Ce face acum:** produsele care aveau valoare pentru parametru o pierd, iar codul lor (nume) se rescrie fara ea, pastrandu-si stocul. Daca doua coduri ar deveni identice sau un cod exista deja la alt produs, stergerea e refuzata si numele care se bat sunt listate; nimic nu se schimba. Jurnalul are „Stergere parametru obligatoriu subcategorie” (cu numarul de produse actualizate) si cate o „Redenumire produs (valoare parametru)” pe produs. Daca parametrul era membru al unei familii cu doua membri, familia se desface.
+
+**Pasi:** 1) intr-o subcategorie cu produse, sterge un parametru cu valori pe produse: vezi tabelul cu codurile; 2) confirma cu motiv - produsele apar cu codul nou, stocul neschimbat; 3) incearca sa stergi un parametru care distinge doua produse (ex. Marime L / M cu restul la fel) - e refuzat cu lista numelor care s-ar potrivi; 4) un produs ramas fara parametrii ceruti apare cu insigna „Parametri obligatorii necompletati” daca mai lipseste ceva.
+
+### 27.10.2026 - Parametri: schimbarea tipului la editare
+
+**Ce s-a adaugat:** in editarea unui parametru (Categorii -> subcategorie -> Parametri obligatorii), campul „Tip parametru” (Numar / Text liber / Interval).
+
+**Ce face acum:** tipul se schimba daca toate valorile existente ale parametrului se potrivesc cu tipul nou: orice valoare se potriveste cu Text; „2.8” cu Numar; „2.8-12” cu Interval. Valorile care nu se potrivesc sunt listate in mesaj si se corecteaza/sterg intai. Unitatea se schimba odata cu tipul (Text nu are unitate), dar nu mai poate fi modificata cat timp exista produse cu parametrul (face parte din codul produsului). Jurnalul arata „Tip parametru” vechi -> nou. Desfacerea unei familii lasa parametrii ca parametri de sine statatori (fiecare obligatoriu separat), comportament neschimbat.
+
+**Pasi:** 1) creeaza un parametru Text cu valori „2.8” si „4”, editeaza-l si alege Numar - se salveaza; 2) cu o valoare „alb” schimbarea in Numar e refuzata cu lista valorilor; 3) un parametru Numar cu unitate si produse nu se poate face Text (unitatea ar disparea din coduri); 4) desfa o familie: membrii raman in lista ca parametri separati.
+
+### 27.10.2026 - Catalog produse: iconita de editare pe rand
+
+**Ce s-a adaugat:** pe fiecare rand din tabelul de produse (Stoc), iconita creion „Editeaza produsul …”, langa „Iesire rapida” si „Detalii”; apare doar cu dreptul de editare produse.
+
+**Ce face acum:** deschide direct editorul produsului (acelasi ca din pagina produsului), cu blocarea de editare; un produs aflat in editare de altcineva ramane blocat cu mesajul obisnuit.
+
+**Pasi:** 1) Stoc: iconita creion pe un rand deschide editorul; 2) salveaza/inchide - revii la lista; 3) cu un cont fara drept de editare iconita nu apare.
+
+### 27.10.2026 - Categorii: fereastra "Parametri si etichete" cu trei sectiuni
+**Ce s-a adaugat:** fereastra unica "Parametri si etichete" a subcategoriei, cu trei sectiuni colapsabile, inchise la deschidere: Etichete, Familii de parametri, Parametri.
+**Ce face acum:** fiecare sectiune are un tabel cu elementele definite (iconite de editare si stergere pe rand) si un buton "Adauga ..." care deschide formularul; valorile unui parametru se vad sub rand, cu iconita "Valorile parametrului". In pagina Categorii a ramas o singura iconita pe subcategorie.
+1. Categorii -> iconita "Parametri si etichete ale subcategoriei X": cele trei sectiuni sunt inchise.
+2. Deschide fiecare sectiune, apasa "Adauga etichetă / familie / parametru", completeaza si salveaza: elementul apare in tabel.
+3. La un parametru apasa iconita "Valorile parametrului": se vad valorile, cu adaugare, editare, stergere.
+
+### 27.10.2026 - Etichete pe subcategorie (On/Off, filtre in catalog)
+**Ce s-a adaugat:** etichete definite pe subcategorie, puse On/Off pe fiecare produs; coloana ETICHETE in Categorii; iconita "Etichetele subcategoriei".
+**Ce face acum:** o eticheta este optionala, nu intra in codul produsului si nu blocheaza stocul. In formularul produsului apar comutatoare On/Off, iar in catalog etichetele active apar ca insigne (coloana PARAMETRI/ETICHETE); un clic pe o eticheta filtreaza tabelul, mai multe etichete active cer ca produsul sa le aiba pe toate. Adaugarea o pot face operatorii de produse, redenumirea si stergerea administratorul (stergerea pastreaza produsele, doar le scoate eticheta).
+1. Categorii: iconita "Etichetele subcategoriei X" -> "Etichete noua" -> adauga "PoE"; apare in coloana ETICHETE.
+2. Editeaza un produs complet al subcategoriei, pune "PoE" pe On, salveaza (confirmarea arata "Etichete: — -> PoE").
+3. In catalog eticheta apare pe produs; clic pe ea filtreaza, "Elimina etichetele" scoate filtrul.
+4. Jurnal: "Adaugare/Redenumire/Stergere eticheta subcategorie", "Modificare etichete produs".
+
+### 27.10.2026 - Parametru cu valoare fixa (ex. Fisheye) in familie
+**Ce s-a adaugat:** tip nou de parametru, "Valoare fixa", pentru o subcategorie cu parametri.
+**Ce face acum:** parametrul are o singura valoare, egala cu denumirea lui, si nu primeste alte valori. Lucreaza numai intr-o familie de parametri: la produs, alegerea lui in lista familiei da familiei valoarea (codul devine "Model - Fisheye"), fara nimic de completat.
+1. Categorii -> subcategorie -> Parametri: adauga parametrul "Fisheye" cu tipul "Valoare fixa"; adauga "Varifocala" (Interval) si creeaza familia "Lentila" cu cele doua.
+2. Editeaza un produs din subcategorie, alege la "Lentila" tipul "Fisheye": nu apar campuri de valoare, iar codul rezultat se termina cu "- Fisheye".
+3. Un parametru fix nu are "Valoare noua", iar tipul lui nu se schimba; redenumirea si scoaterea din familie sunt refuzate cat timp produse il folosesc.
+
+### 27.10.2026 - Ruta paginii in bara de sus si meniul ramas deschis la produs
+
+**Ce s-a adaugat:** in bara de sus, in locul textului „Inventar / BlazorStoc”, ruta paginii: Meniu principal › sectiune › subsectiune › pagina, pe toate paginile (ex. Meniu principal › Produse › Stoc › Camere › Analogice › Produsul; Meniu principal › Administrare › Beneficiari › Fisa beneficiarului). Fiecare pas, in afara de ultimul, este link. Pe pagina unui produs, linkul „←” din antet are acum numele subcategoriei.
+
+**Ce face acum:** pe pagina unui produs, meniul din stanga ramane cel de categorii, cu categoria deschisa si subcategoria produsului evidentiata; „Meniu principal” si linkurile din ruta duc inapoi la subcategorie, la stoc sau la pagina principala.
+
+**Pasi:** 1) deschide un produs din tabel - meniul ramane deschis la subcategoria lui, ruta arata categoria si subcategoria; 2) clic pe subcategorie in ruta sau pe „←” - te intorci la lista subcategoriei; 3) parcurge cateva pagini (Beneficiari, o fisa de beneficiar, Setari, Jurnal) si verifica ruta; 4) pe pagina principala ruta arata doar „Meniu principal”.
+
+### 27.10.2026 - Catalog produse: filtru „Doar incomplete” si parametri lipsa
+
+**Ce s-a adaugat:** langa „Orice stoc”, selectorul „Toate produsele / Doar incomplete (N)” (apare doar cand in categoria/subcategoria curenta sunt produse incomplete); in coloana PARAMETRI, parametrii (sau familiile) necompletate apar ca etichete punctate rosii „Nume: lipsește”.
+
+**Ce face acum:** „Doar incomplete” arata numai produsele blocate pentru ca le lipsesc parametri, combinabil cu subcategoria si etichetele. Clic pe o eticheta „lipsește” deschide editarea produsului (daca ai dreptul de editare). Adresa `/produse?categorie=...&subcategorie=...&incomplete=1` porneste direct filtrul. „Reseteaza filtrele” il opreste.
+
+**Pasi:** 1) adauga un parametru nou unei subcategorii cu produse; 2) in Stoc, alege subcategoria: apare „Doar incomplete (N)”; 3) alege-l: raman produsele cu insigna ⚠; 4) in PARAMETRI vezi „… : lipsește”; clic -> editare; completeaza si salveaza - produsul dispare din lista; 5) cand nu mai sunt incomplete selectorul dispare.
+
+### 27.10.2026 - Catalog produse: coloana PARAMETRI si etichete de filtrare
+
+**Ce s-a adaugat:** in tabelul de produse (Stoc), coloana „PARAMETRI” dupa „SUBCATEGORIE”, afisata cand cel putin un produs din lista are parametri (subcategoria are parametri obligatorii definiti). Fiecare valoare e o eticheta (ex. „Rezolutie: 4 MP”).
+
+**Ce face acum:** clic pe o eticheta filtreaza lista dupa acea valoare; pot fi active mai multe etichete (produsul trebuie sa le aiba pe toate). Deasupra tabelului apare „Filtrat dupa:” cu etichetele active (clic pe una o scoate) si „Elimina etichetele”. Etichetele se sterg cand schimbi categoria/subcategoria sau apesi „Reseteaza filtrele”.
+
+**Pasi:** 1) Stoc -> alege o subcategorie cu parametri; 2) verifica coloana PARAMETRI; 3) clic pe o eticheta - raman doar produsele cu acea valoare, eticheta devine verde; 4) clic pe a doua eticheta (alt parametru) - lista se restrange; 5) „Elimina etichetele” readuce lista; 6) o subcategorie fara parametri nu arata coloana.
+
+### 26.10.2026 - Parametri obligatori: tip Interval si familii de parametri
+
+**Ce s-a adaugat:** in Categorii -> Parametri obligatori (popup): la „Tip” a aparut „Interval” (valorile au un numar de inceput si unul de sfarsit, ex. 2,8 - 12 mm) si sectiunea „Familii de parametri” (o familie are cel putin 2 parametri; un produs are exact unul dintre ei activ). In formularul de produs, familia apare ca o alegere „Tipul” (membrul activ) urmata de lista de valori a membrului ales.
+
+**Ce face acum:** un parametru de tip Interval are doua campuri numerice (De la / Pana la) pentru o valoare noua; valoarea se salveaza ca „2.8-12” si apare in codul produsului ca „2.8-12 mm”; inceputul trebuie sa fie mai mic decat sfarsitul. O familie (ex. „Lentila”: Fixa + Varifocala) se creeaza doar de administrator; nu se poate forma daca un produs are deja valori pentru doi dintre membri (se listeaza produsele de corectat). Un produs are valoare la exact un membru: nici unul sau doi sunt refuzati; codul contine valoarea membrului activ la locul primului membru al familiei. Desfacerea familiei face fiecare parametru obligatoriu separat (produsele cu un singur membru devin incomplete). Stergerea unui parametru care lasa un singur membru desface familia.
+
+Pasi:
+
+1. Categorii -> la o subcategorie fara produse, iconita „Parametri obligatori”: adauga parametrul „Fixa” (Numar, mm) cu valorile 2,8 si 4; adauga „Varifocala” (Interval, mm): la „Interval nou” scrie De la 2,8 si Pana la 12 -> apare „2.8-12 mm”; incearca De la 12, Pana la 2,8 -> mesaj ca inceputul trebuie sa fie mai mic. Adauga si „Culoare” (Text) cu „alb”.
+2. La „Familii de parametri”: bifeaza doar „Fixa” -> „Adauga familia” ramane inactiv; bifeaza si „Varifocala”, denumeste „Lentila”, „Adauga familia”. Cardul familiei arata cei doi parametri, iar parametrii arata „Familie: Lentila”.
+3. Produse -> Adauga produs in subcategorie: model „CAM-T”; la „Lentila” alege tipul „Varifocala”, apoi valoarea 2.8-12, la Culoare „alb”: „Codul produsului rezultat” = „CAM-T - 2.8-12 mm - alb”. Schimba tipul in „Fixa”: valoarea varifocala dispare si produsul devine incomplet pana alegi 2.8 mm; salveaza.
+4. Dupa ce exista produse: creeaza o alta familie cu doi parametri la care un produs are deja ambele valori -> refuzat, cu numele produsului. Desfa familia „Lentila” (iconita cos, cu motiv): produsele cu un singur membru devin incomplete si nu primesc miscari de stoc pana nu se completeaza sau nu refaci familia.
+5. Jurnal: „Adaugare familie de parametri”, „Modificare familie de parametri”, „Desfacere familie de parametri” cu motivul si numarul produselor devenite incomplete.
+
 ### 22.10.2026 - Imagine produs: lipire cu Ctrl + V fara buton
 
 **Ce s-a adaugat:** in formularul de produs, textul „sau lipeste imaginea copiata cu Ctrl + V" sta langa zona „Alege imaginea"; butonul „Preia imaginea din clipboard" si caseta de lipire au fost scoase.

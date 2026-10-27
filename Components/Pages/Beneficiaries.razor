@@ -6,6 +6,7 @@
 @inject UnsavedChanges Guard
 @inject ExitFormDraft ExitDraft
 @inject IBeneficiaryRepository Repository
+@inject IWorkPointRepository WorkPoints
 @inject NavigationManager Navigation
 @inject ILogger<Beneficiaries> Logger
 @implements IDisposable
@@ -35,10 +36,10 @@
     else
     {
         <Paged Items="Filtered" Id="beneficiaries-page-size" Context="pageRows">
-        <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TIP / CUI</th><th>ADRESĂ</th><th>TELEFON</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th>BENEFICIAR</th><th>TIP / CUI</th><th>ADRESĂ</th><th>COORDONATE GPS</th><th>TELEFON</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
         @foreach (var beneficiary in pageRows)
         {
-            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Identifier</span></td><td>@(beneficiary.Address.Length == 0 ? "—" : beneficiary.Address)</td><td>@(beneficiary.Phone.Length == 0 ? "—" : beneficiary.Phone)</td><td><div class="row-buttons">@if (permEdit) { <button class="row-icon edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)" title="Editează @beneficiary.Name"></button> }@if (permDelete) { <button class="row-icon delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)" title="Șterge @beneficiary.Name"></button> }</div></td></tr>
+            <tr @key="beneficiary.Id"><td><a class="category-table-link" href="@($"/beneficiari/{beneficiary.Id}")"><strong>@beneficiary.Name</strong></a></td><td><span class="role-badge limited">@beneficiary.Identifier</span></td><td>@(beneficiary.Address.Length == 0 ? "—" : beneficiary.Address)</td><td>@GpsCell(beneficiary.Id)</td><td>@(beneficiary.Phone.Length == 0 ? "—" : beneficiary.Phone)</td><td><div class="row-buttons">@if (permEdit) { <button class="row-icon edit" aria-label="Editează @beneficiary.Name" @onclick="() => OpenEditorAsync(beneficiary)" title="Editează @beneficiary.Name"></button> }@if (permDelete) { <button class="row-icon delete" aria-label="Șterge @beneficiary.Name" @onclick="() => RequestDeleteAsync(beneficiary)" title="Șterge @beneficiary.Name"></button> }</div></td></tr>
         }
         </tbody></table></div>
         </Paged>
@@ -103,6 +104,35 @@
         }
     }
 
+    private IReadOnlyDictionary<int, WorkPointCoordinateCount>? coordinateCounts;
+
+    // A failure here only hides the GPS column values ("—"); the registry itself still loads.
+    private async Task LoadCoordinateCountsAsync()
+    {
+        try { coordinateCounts = await WorkPoints.GetCoordinateCountsAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { coordinateCounts = null; Logger.LogWarning("Work point coordinates loading failed ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    // "Da" when every work point of the beneficiary has coordinates; the tooltip tells how many of them do.
+    private RenderFragment GpsCell(int beneficiaryId) => builder =>
+    {
+        if (coordinateCounts is null) { builder.AddContent(0, "—"); return; }
+        coordinateCounts.TryGetValue(beneficiaryId, out var count);
+        count ??= new WorkPointCoordinateCount(0, 0);
+        var state = count.AllLocated ? "yes" : count.WithCoordinates > 0 ? "partial" : "no";
+        var text = count.Total == 0 ? "Nu: beneficiarul nu are puncte de lucru"
+            : state == "yes" ? $"Da: toate cele {count.Total} puncte de lucru au coordonate"
+            : state == "partial" ? $"Parțial: {count.WithCoordinates} din {count.Total} puncte de lucru au coordonate"
+            : $"Nu: niciunul din cele {count.Total} puncte de lucru nu are coordonate";
+        builder.OpenElement(1, "span");
+        builder.AddAttribute(2, "class", "state-icon " + state);
+        builder.AddAttribute(3, "role", "img");
+        builder.AddAttribute(4, "aria-label", text);
+        builder.AddAttribute(5, "title", text);
+        builder.CloseElement();
+    };
+
     private Task RetryLoadAsync() => LoadAsync(true);
     private async Task LoadAsync(bool showLoading)
     {
@@ -110,7 +140,7 @@
         syncing = true;
         if (showLoading) loading = true;
         error = null;
-        try { beneficiaries = await Repository.GetBeneficiariesAsync(lifetime.Token); loaded = true; }
+        try { beneficiaries = await Repository.GetBeneficiariesAsync(lifetime.Token); loaded = true; await LoadCoordinateCountsAsync(); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException exception) { error = exception.Message; }
         catch (Exception exception) { Logger.LogError("Beneficiary loading failed ({ErrorType}).", exception.GetType().Name); error = "Beneficiarii nu au putut fi încărcați."; }

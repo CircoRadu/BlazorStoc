@@ -1,0 +1,10 @@
+﻿{
+    "Database":  {
+                     "Port":  5088,
+                     "Host":  "127.0.0.1",
+                     "SslMode":  "Required",
+                     "Password":  "zimx7648geNncPXHsGrybaYjOIv1",
+                     "Name":  "blazorstoc_test",
+                     "User":  "claude_test_migrator"
+                 }
+}

@@ -11,7 +11,7 @@ public sealed class JournalModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Jurnal de activitate";
-    public Version Version { get; } = new(1, 1, 0);
+    public Version Version { get; } = new(1, 2, 0);
     // The menu entry sits after the notifications (MainLayout), shown only while the module is available.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

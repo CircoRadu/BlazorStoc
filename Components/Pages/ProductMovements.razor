@@ -15,13 +15,14 @@
 @inject IChangeFeed ChangeFeed
 @inject ChangeOrigin Origin
 @inject IProductLockRepository Locks
+@inject IProductParameterRepository ParameterRepository
 @inject ILogger<ProductMovements> Logger
 @implements IDisposable
 <PageBoundary>
 
 <PageTitle>@(product is null ? "Intrări/ieșiri" : $"Intrări/ieșiri · {product.Name}") · BlazorStoc</PageTitle>
 <UnsavedChangesHost />
-<a class="nav-back" href="@CatalogUrl"><span>←</span> Produse și stocuri</a>
+<a class="nav-back" href="@CatalogUrl"><span>←</span> @(product is null ? "Produse și stocuri" : product.Subcategory)</a>
 
 @if (loading && product is null)
 {
@@ -76,7 +77,8 @@ else
 
         <ProductReservationsInfo ProductId="Id" Stock="stock" Version="reservationVersion" />
         @if (canManage) { <ProductWhere ProductId="Id" Stock="stock" Version="reservationVersion" /> }
-        @if (stockIn || stockOut || stockVoid)
+        @if (Blocked) { <IncompleteProductNotice Missing="missingParameters" EditUrl="@(permEdit && holder is null ? ReturnNavigation.EditUrl(product.Id, CurrentPath) : null)" /> }
+        @if ((stockIn || stockOut || stockVoid) && !Blocked)
         {
             <ReserveSuggestions ProductId="Id" Trigger="suggestionTrigger" Reserved="() => { reservationVersion++; }" />
             <section class="movement-card movement-form" aria-labelledby="movement-form-title">
@@ -306,7 +308,7 @@ else
                                     <td class="movement-actions">
                                         @if (!m.IsVoided && stockModify)
                                         {
-                                            <button class="row-icon edit" aria-label="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenEditAsync(m)" title="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)"></button>
+                                            @if (!Blocked) { <button class="row-icon edit" aria-label="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => OpenEditAsync(m)" title="Editează mișcarea din @StockMovementRules.DisplayDate(m.Date)"></button> }
                                             <button class="row-icon delete" aria-label="Șterge mișcarea din @StockMovementRules.DisplayDate(m.Date)" @onclick="() => RequestDelete(m)" title="Șterge mișcarea din @StockMovementRules.DisplayDate(m.Date)"></button>
                                         }
                                         @if (m.Kind == StockMovementKind.Exit && m.OperationId is { } operationId)

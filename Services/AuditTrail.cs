@@ -75,6 +75,7 @@ public static class AuditActions
     // Map settings: each operation names exactly what happened.
     public const string EditMapEngine = "Modificare furnizor hartă";
     public const string ResetMapEngine = "Resetare furnizor hartă";
+    public const string EditMapGeocoding = "Modificare căutare adrese hartă";
     public const string CreateMapPinType = "Adăugare tip pin hartă";
     public const string EditMapPinType = "Modificare tip pin hartă";
     public const string DeleteMapPinType = "Ștergere tip pin hartă";
@@ -162,6 +163,15 @@ public static class AuditActions
     public const string AddSubcategoryParameter = "Adăugare parametru obligatoriu subcategorie";
     public const string EditSubcategoryParameter = "Modificare parametru obligatoriu subcategorie";
     public const string DeleteSubcategoryParameter = "Ștergere parametru obligatoriu subcategorie";
+    // Families of parameters: a product has exactly one active member per family.
+    public const string AddParameterFamily = "Adăugare familie de parametri";
+    public const string EditParameterFamily = "Modificare familie de parametri";
+    public const string DeleteParameterFamily = "Desfacere familie de parametri";
+    // Tags of a subcategory (On/Off on each product, never required): one action for each kind of change.
+    public const string AddSubcategoryTag = "Adăugare etichetă subcategorie";
+    public const string RenameSubcategoryTag = "Redenumire etichetă subcategorie";
+    public const string DeleteSubcategoryTag = "Ștergere etichetă subcategorie";
+    public const string EditProductTags = "Modificare etichete produs";
     public const string AddParameterValue = "Adăugare valoare parametru";
     public const string DeleteParameterValue = "Ștergere valoare parametru";
     public const string EditParameterValue = "Modificare valoare parametru";
@@ -303,7 +313,7 @@ public static class AuditActions
 
     // Events whose object still has a live page (a plain edit or one of the specific edit operations).
     public static bool IsCreateOrEdit(string? action) =>
-        action is Create or Edit or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
+        action is Create or Edit or EditProductTags or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
             or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification
             or ResolveNotification or AutoResolveNotification or ReopenNotification or EditNotificationSettings
             or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto
@@ -311,7 +321,7 @@ public static class AuditActions
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or CreateRiskAnalysis or EditRiskAnalysis or EditRiskAnalysisValidity or RenewRiskAnalysis or UndoRiskAnalysisRenewal or ActivateRiskAnalysis or DeactivateRiskAnalysis
             or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
-            or EditMapEngine or ResetMapEngine or CreateMapPinType or EditMapPinType
+            or EditMapEngine or ResetMapEngine or EditMapGeocoding or CreateMapPinType or EditMapPinType
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
             or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias or LinkSupplierProductCode or ChangeSupplierProductCode
             or RecordFreeEntry or AttachEntryToInvoice or DetachEntryFromInvoice or DuplicateEntryOnInvoice or RegularizeNegativeStock or ExitOverStock

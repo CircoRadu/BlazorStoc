@@ -737,3 +737,46 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 25.10.2026 - Incarcarea pachetului de actualizare prin HTTP direct (versiunea 0.5.20)
 
 - Pachetul .bsu (~113 MB) nu mai trece prin conexiunea paginii Blazor (sute de mii de schimburi mici: peste 6 minute pe telefon); `wwwroot/update-upload.js` il trimite cu XMLHttpRequest la `POST /api/actualizare/pachet` (permisiunea de aplicare, antet `X-Requested-With`, limita de corp ridicata la 1 GB), cu procentul afisat; pagina primeste rezultatul prin `UploadProgress`/`UploadFinished` si citeste raportul cu `GetReportAsync`.
+
+## Finalizat la 26.10.2026 08:51 - Cautare coordonate dupa adresa si harta cu pin in punctul de lucru
+
+- Setari -> Harta -> Motor harta: sectiune Cautare adrese (Geoapify) cu comutator, cheie pastrata pe server (nu apare in browser/jurnal), Testeaza cheia; salvare jurnalizata ca Modificare cautare adrese harta (GeocodingSettings, SaveGeocodingAsync, AuditActions.EditMapGeocoding).
+- Editor punct de lucru: panou Strada/Numar/Localitate/Judet precompletat din adresa (AddressParser), cautare structurata Geoapify de pe server, doar la cerere, se trimit numai cele 4 campuri (GeoapifyRequest.BuildUrl); rezultate cu potrivire; fallback text liber; atribuire Geoapify/OSM.
+- Harta noua reutilizabila Components/Shared/MapHolder.razor + wwwroot/map-holder.js: un pin tras sau pus prin clic, eticheta permanenta cu nume, adresa, coordonate; sincronizata cu campul de coordonate; foloseste furnizorul de dale din Setari -> Harta.
+- Module: Maintenance 1.1.0, Journal 1.1.1. Teste: grupul geocoding (parser, URL, raspuns, setari, jurnal fara cheie, refuzuri) si moduleversions/modules/help/structure trecute; build Release.
+
+## Finalizat la 26.10.2026 09:45 - Registru beneficiari: coloana Coordonate GPS
+
+- Beneficiari: coloana COORDONATE GPS cu iconita bifa verde (toate punctele de lucru ale beneficiarului au coordonate) sau X rosu; titlul iconitei spune cate puncte au coordonate. Date dintr-o singura interogare (IWorkPointRepository.GetCoordinateCountsAsync, WorkPointCoordinateCount); un esec ascunde doar valorile (liniuta). Stil nou .state-icon in app.css.
+- Verificari: build Release; test MariaDB pe sectiunea Work points (numaratoarea 1 din 2) trecut.
+
+## Finalizat la 26.10.2026 09:56 - Cautare dupa adresa: buton vizibil dar inactiv cand nu e configurata
+
+- Editor punct de lucru: butonul Cauta coordonate dupa adresa se vede mereu (cu Coordonate pornit); fara cheie/dezactivata/modul oprit e inactiv si afiseaza mesajul de eroare cu pasii de configurare (IAddressGeocoder.GetUnavailableReasonAsync). Teste: grupul geocoding si modules trecute.
+
+## Finalizat la 26.10.2026 10:13 - Fundal satelit optional pe harta cu comutator Harta/Satelit
+
+- Setari -> Harta -> Motor harta: Fundal satelit (adresa dalelor cu {key}, atribuire, cheie satelit pastrata pe server si nejurnalizata, Testeaza satelitul). Harta mentenantei si MapHolder primesc comutator Harta/Satelit (L.control.layers, alegerea in localStorage); schimbarea setarii se aplica la reimprospatarea de 30 s. Exemplu: ArcGIS World Imagery cu token={key}.
+- Module: Maintenance 1.2.0. Teste: grupurile geocoding (validare, jurnal fara cheie) si modules/moduleversions/help/structure trecute; comutatorul verificat in browser pe pagina de proba (strat, atribuire, alegere pastrata).
+
+## Finalizat la 26.10.2026 10:24 - Satelit: zoom nativ maxim (dalele nu mai dispar la zoom mare)
+
+- Setari -> Harta -> Fundal satelit: camp Zoom nativ maxim satelit (0 = fara limita); peste el Leaflet mareste ultima dala (maxNativeZoom) in loc sa ceara dale inexistente. Jurnalizat, validat 0-20. Maintenance 1.2.1; teste geocoding/modules trecute.
+
+## Finalizat la 26.10.2026 10:56 - Satelit: adaptare automata a zoom-ului nativ
+
+- Cand 3 dale satelit esueaza la un zoom desi la un nivel mai mic s-au incarcat, stratul isi seteaza singur maxNativeZoom la nivelul anterior si mareste ultima dala (maintenance-map.js, setBaseLayers); setarea Zoom nativ maxim satelit ramane pentru valoare fixa. Verificat in browser pe server de proba fara imagini peste zoom 17 (la zoom 19 se afiseaza dalele de la 17). Maintenance 1.2.2.
+
+## Finalizat la 26.10.2026 11:06 - Parametri obligatori ai subcategoriei: popup
+
+- Panoul Parametri obligatori din Categorii se deschide acum ca popup (delete-overlay + subcategory-parameters-dialog, latime 1000 px, derulabil); confirmarile si dialogurile de editare raman deasupra. Doar aspect/fluxul de deschidere.
+
+## Finalizat la 26.10.2026 11:53 - Parametri obligatori: tip Interval si familii de parametri
+
+- Tip Interval (ParameterKind.Interval): valori start-end (2.8-12), reguli in ProductParameterRules (Interval, IntervalParts), campuri De la/Pana la (IntervalInputs.razor) in panou, dialogul de valoare si formularul de produs; unitate de masura ca la Numar.
+- Familii de parametri (migrarea 52: parameter_families + subcategory_parameters.family_id): minim 2 membri, un produs are exact unul activ; grupare permisa numai fara conflicte (produse cu doua valori in familie sunt listate); desfacere, editare, stergerea unui membru desface familia sub 2 membri. Slots/Problems/CodeOrder pentru cod si completitudine; SQL de incomplet si EnsureParametersCompleteAsync tin cont de familii; formularul de produs are alegerea membrului activ.
+- Jurnal: Adaugare/Modificare/Desfacere familie de parametri cu produsele devenite incomplete. Teste: grupul parameters (reguli), groups (pagina de categorii), components (formularul de produs), sectiunile MariaDB Parameter families (30) si Required parameters (35); journal 1.1.2. Test DB: migrarea 52 aplicata cu administratorul local pe blazorstoc_test; EnsureTestSchemaCurrentAsync in teste.
+
+## Finalizat la 27.10.2026 15:37 - Parametri, familii, etichete si popup produs (0.5.24-0.5.27)
+
+- Parametri: tip Valoare fixa (doar in familie), schimbare tip, stergere cu produse, produse incomplete blocate in stoc cu storno permis; catalog cu coloana PARAMETRI, filtre si editare in popup,Etichete pe subcategorie (migrarea 53): On/Off pe produs, filtre in catalog, jurnal; fereastra Parametri si etichete cu trei sectiuni colapsabile; numarul de randuri pe pagina se pastreaza in browser,Verificari: in memorie 2064 PASS, MariaDB 3115 PASS, browser pe 5087

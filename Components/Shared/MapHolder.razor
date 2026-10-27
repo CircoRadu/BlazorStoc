@@ -1,0 +1,127 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Services
+@using BlazorStoc.Modules
+@inject IMapConfigurationService MapConfig
+@inject IJSRuntime JS
+@inject ILogger<MapHolder> Logger
+@implements IAsyncDisposable
+
+@* One map with one pin that can be dragged (or put by a click); its label shows the name, the address and the coordinates. The page owns the
+   coordinates: it passes them in and receives the new ones in OnPositionChanged. *@
+<div class="map-holder">
+    @if (unavailable is not null) { <div class="error-banner" role="alert">@unavailable</div> }
+    @if (tilesFailed)
+    {
+        <div class="error-banner" role="alert">Fundalul hărții nu poate fi încărcat (furnizorul de hărți nu răspunde sau nu există conexiune la internet). Pinul și coordonatele rămân disponibile.
+            <button type="button" class="refresh act-reload" @onclick="RetryTilesAsync">Reîncearcă</button></div>
+    }
+    <div @ref="mapElement" class="map-canvas map-holder-canvas" role="application" aria-label="@AriaLabel" hidden="@(unavailable is not null)"></div>
+    <small class="muted">@(Draggable ? "Trage pinul sau fă clic pe hartă pentru a seta poziția exactă; coordonatele se actualizează în câmpul de mai sus." : "Poziția punctului pe hartă.")</small>
+</div>
+
+@code {
+    [Parameter] public decimal? Latitude { get; set; }
+    [Parameter] public decimal? Longitude { get; set; }
+    [Parameter] public string Name { get; set; } = "";
+    [Parameter] public string Address { get; set; } = "";
+    [Parameter] public bool Draggable { get; set; } = true;
+    [Parameter] public string AriaLabel { get; set; } = "Harta punctului de lucru";
+    [Parameter] public EventCallback<(decimal Latitude, decimal Longitude)> PositionChanged { get; set; }
+
+    private ElementReference mapElement;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<MapHolder>? self;
+    private bool ready, tilesFailed;
+    private string? unavailable;
+    private decimal? shownLatitude, shownLongitude;
+    private string shownName = "", shownAddress = "";
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var view = await MapConfig.GetViewAsync(lifetime.Token);
+                self = DotNetObjectReference.Create(this);
+                module = await JS.InvokeAsync<IJSObjectReference>("import", lifetime.Token, "./map-holder.js");
+                var options = view.Engine;
+                var pin = Latitude is { } lat && Longitude is { } lng ? new { latitude = (double)lat, longitude = (double)lng, name = Name, address = Address } : null;
+                await module.InvokeVoidAsync("create", lifetime.Token, mapElement, self,
+                    new { tileUrl = options.TileUrl, attribution = options.Attribution, minZoom = options.MinZoom, maxZoom = options.MaxZoom, centerLatitude = options.CenterLatitude, centerLongitude = options.CenterLongitude, startZoom = pin is null ? options.StartZoom : 16, satelliteTileUrl = options.SatelliteTileUrl, satelliteAttribution = options.SatelliteAttribution, satelliteMaxNativeZoom = options.SatelliteMaxNativeZoom },
+                    pin, Draggable);
+                (shownLatitude, shownLongitude, shownName, shownAddress) = (Latitude, Longitude, Name, Address);
+                ready = true;
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+            catch (ModuleUnavailableException) { unavailable = "Harta nu este disponibilă (modulul Mentenanță este oprit). Coordonatele se pot introduce în câmpul de mai sus."; StateHasChanged(); }
+            catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException)
+            {
+                Logger.LogWarning("Map holder initialisation failed ({ErrorType}).", exception.GetType().Name);
+                unavailable = "Harta nu a putut fi pornită (biblioteca de hărți nu s-a încărcat). Coordonatele se pot introduce în câmpul de mai sus.";
+                StateHasChanged();
+            }
+            return;
+        }
+        await SyncAsync();
+    }
+
+    // The page changed the coordinates (typed, or a search result was chosen) or the name/address: the pin follows.
+    private async Task SyncAsync()
+    {
+        if (!ready || module is null) return;
+        try
+        {
+            if (Latitude != shownLatitude || Longitude != shownLongitude)
+            {
+                (shownLatitude, shownLongitude, shownName, shownAddress) = (Latitude, Longitude, Name, Address);
+                if (Latitude is { } lat && Longitude is { } lng) await module.InvokeVoidAsync("setPin", lifetime.Token, mapElement, (double)lat, (double)lng, Name, Address, false);
+                else await module.InvokeVoidAsync("clearPin", lifetime.Token, mapElement);
+            }
+            else if (Name != shownName || Address != shownAddress)
+            {
+                (shownName, shownAddress) = (Name, Address);
+                await module.InvokeVoidAsync("setLabel", lifetime.Token, mapElement, Name, Address);
+            }
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+    }
+
+    // Called by the script when the pin was dragged or the map was clicked.
+    [JSInvokable]
+    public async Task OnPinMoved(double latitude, double longitude)
+    {
+        var lat = Math.Round((decimal)latitude, 6, MidpointRounding.AwayFromZero);
+        var lng = Math.Round((decimal)longitude, 6, MidpointRounding.AwayFromZero);
+        // The script already shows the pin there: remember it so the next render does not move it again.
+        (shownLatitude, shownLongitude) = (lat, lng);
+        await InvokeAsync(async () => { await PositionChanged.InvokeAsync((lat, lng)); StateHasChanged(); });
+    }
+
+    [JSInvokable]
+    public Task OnTilesFailed() => InvokeAsync(() => { tilesFailed = true; StateHasChanged(); });
+
+    [JSInvokable]
+    public Task OnTilesRecovered() => InvokeAsync(() => { tilesFailed = false; StateHasChanged(); });
+
+    private async Task RetryTilesAsync()
+    {
+        tilesFailed = false;
+        if (module is null) return;
+        try { await module.InvokeVoidAsync("retryTiles", mapElement); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        lifetime.Cancel();
+        if (module is not null)
+        {
+            try { await module.InvokeVoidAsync("dispose", mapElement); await module.DisposeAsync(); }
+            catch (Exception exception) when (exception is JSException or InvalidOperationException or JSDisconnectedException or OperationCanceledException) { }
+        }
+        self?.Dispose();
+        lifetime.Dispose();
+    }
+}

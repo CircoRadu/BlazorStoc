@@ -91,6 +91,7 @@ internal static class ServiceRegistration
     {
         services.AddScoped<IProductRepository, MariaProductRepository>();
         services.AddScoped<IProductParameterRepository, MariaProductParameterRepository>();
+        services.AddScoped<IProductTagRepository, MariaProductTagRepository>();
         services.AddScoped<IStockMovementRepository, MariaStockMovementRepository>();
         services.AddScoped<IReservationRepository, MariaReservationRepository>();
         services.AddScoped<IProductPlacementReader, MariaProductPlacementReader>();

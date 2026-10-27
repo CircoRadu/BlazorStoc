@@ -4,6 +4,32 @@ Fluxul: Mentenanta -> puncte de lucru (adresa, poze, coordonate) -> contracte de
 
 ## Modificari de testat
 
+### 26.10.2026 - Fundal satelit pe harta (comutator Harta / Satelit)
+
+**Ce s-a adaugat:** in Setari -> Harta -> Motor harta, sectiunea „Fundal satelit (optional)”: adresa dalelor satelit, text si adresa atribuirii, „Cheie satelit” si butonul „Testeaza satelitul”.
+
+**Ce face acum:** daca adresa satelit este completata, harta mentenantei (si fereastra ei separata) si harta din editorul punctului de lucru au in dreapta-sus un comutator „Harta / Satelit”; alegerea ramane in browserul local. Atribuirea furnizorului se vede pe harta cat timp stratul e activ. Cheia satelit nu se afiseaza si nu apare in jurnal.
+
+Pasi:
+
+1. Setari -> Harta -> Motor harta, la „Fundal satelit”: adresa `https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token={key}`, atribuire „Esri, Maxar, Earthstar Geographics, and the GIS User Community”, cheia ArcGIS in „Cheie satelit” (in contul ArcGIS restrictioneaz-o la domeniul aplicatiei). „Testeaza satelitul” trebuie sa dea mesaj verde cu o dala; salveaza.
+2. Mentenanta -> Harta si editorul unui punct de lucru (Coordonate pornit): apare comutatorul; la „Satelit” se vad cladirile; trage pinul pe cladire.
+3. Goleste adresa satelit si salveaza: comutatorul dispare in cel mult 30 de secunde pe hartile deschise.
+
+### 26.10.2026 - Harta cu pin in editorul punctului de lucru (cautarea dupa adresa Geoapify a fost scoasa la 27.10.2026; ignora pasii 1, 3 si 5)
+
+**Ce s-a adaugat:** in Setari -> Harta -> Motor hartă, sectiunea „Cautare adrese (Geoapify)” (comutator + cheie, buton „Testeaza cheia”). In editorul punctului de lucru (fisa beneficiarului), cu comutatorul „Coordonate” pornit: butonul „Cauta coordonate dupa adresa” (doar daca cautarea e activa) si o harta cu pin.
+
+**Ce face acum:** butonul deschide un panou cu Strada, Numar, Localitate, Judet, precompletate din adresa punctului. „Cauta” trimite serviciului Geoapify (de pe server) numai aceste patru valori; nu se trimit numele punctului, telefonul, contactul sau descrierea. Rezultatele arata adresa gasita si cat de exacta e potrivirea; „Foloseste” completeaza coordonatele si pune pinul. Pinul se poate trage sau se poate face clic pe harta; coordonatele din camp se actualizeaza, iar eticheta pinului arata numele punctului, adresa si coordonatele. Cheia nu se afiseaza si nu apare in jurnal; salvarea setarii e jurnalizata ca „Modificare cautare adrese harta”.
+
+Pasi:
+
+1. Setari -> Harta -> Motor hartă: la „Cautare adrese” pui cheia Geoapify, apesi „Testeaza cheia” (mesaj verde), activezi si salvezi. Verifica in Jurnal intrarea „Modificare cautare adrese harta” fara cheia in text.
+2. Fisa unui beneficiar -> Adauga punct de lucru (sau editeaza unul) cu adresa de forma „Str. Exemplu 12, Timisoara, Timis”; porneste „Coordonate”: apar butonul de cautare si harta.
+3. Apasa „Cauta coordonate dupa adresa”: cele 4 campuri sunt precompletate; corecteaza daca trebuie, apasa „Cauta”, alege un rezultat cu „Foloseste”: campul de coordonate se completeaza si pinul apare pe harta cu eticheta (nume, adresa, coordonate).
+4. Trage pinul in alt loc sau fa clic pe harta: coordonatele din camp se schimba, iar eticheta le arata pe cele noi. Scrie coordonate in camp: pinul se muta. Salveaza punctul si redeschide-l: pinul e la pozitia salvata.
+5. Cu cautarea dezactivata (sau fara cheie) butonul „Cauta coordonate dupa adresa” ramane vizibil dar inactiv, cu un mesaj rosu dedesubt (si in titlul butonului) care spune ca nu e configurata si ca un administrator trebuie sa puna cheia in Setari -> Harta -> Motor harta; harta cu pin si campul de coordonate merg. O adresa inexistenta da mesajul „Nu s-a gasit nicio adresa” si butonul „Cauta ca text liber”.
+
 ### 15.10.2026 - Mentenanta ca modul (oprire fara efect asupra restului aplicatiei)
 
 **Verificat de agent 19.10.2026** (pe instanta de test, baza de test; vezi `docs/TESTE_RAMASE.md`, „Verificare completa a modulelor”).

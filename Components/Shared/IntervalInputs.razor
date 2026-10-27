@@ -1,0 +1,27 @@
+@* The two numbers of an interval value (a start and an end), side by side. The page composes them with Compose into the "start-end" text that the repository reads. *@
+<span class="interval-inputs" role="group" aria-label="@Label">
+    <input type="text" inputmode="decimal" aria-label="@($"{Label}: început")" placeholder="De la" maxlength="20" autocomplete="off" disabled="@Disabled"
+           value="@Start" @oninput="args => StartChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)" @onkeydown="args => KeyDown.InvokeAsync(args)" />
+    <span class="interval-dash" aria-hidden="true">–</span>
+    <input type="text" inputmode="decimal" aria-label="@($"{Label}: sfârșit")" placeholder="Până la" maxlength="20" autocomplete="off" disabled="@Disabled"
+           value="@End" @oninput="args => EndChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)" @onkeydown="args => KeyDown.InvokeAsync(args)" />
+</span>
+
+@code {
+    [Parameter] public string Label { get; set; } = "Interval";
+    [Parameter] public string Start { get; set; } = "";
+    [Parameter] public string End { get; set; } = "";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<string> StartChanged { get; set; }
+    [Parameter] public EventCallback<string> EndChanged { get; set; }
+    [Parameter] public EventCallback<KeyboardEventArgs> KeyDown { get; set; }
+
+    // "2,8" and "12" become "2,8-12"; with one number missing the text stays incomplete and the repository refuses it with a clear message.
+    public static string Compose(string? start, string? end) => $"{(start ?? "").Trim()}-{(end ?? "").Trim()}";
+
+    // The inverse, for a stored value: "2.8-12" -> ("2.8", "12"); anything else gives empty fields.
+    public static (string Start, string End) Split(string value) =>
+        BlazorStoc.Services.ProductParameterRules.IntervalParts(value) is { } parts
+            ? (parts.Start.ToString("0.############", System.Globalization.CultureInfo.InvariantCulture), parts.End.ToString("0.############", System.Globalization.CultureInfo.InvariantCulture))
+            : ("", "");
+}

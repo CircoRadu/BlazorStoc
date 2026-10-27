@@ -13,7 +13,7 @@ public sealed record WorkPoint(int Id, int BeneficiaryId, string Name, string Ad
     string ContactPerson = "", long Version = 0, bool IsPrimary = false, string Description = "",
     decimal? Latitude = null, decimal? Longitude = null)
 {
-    public bool HasCoordinates => Latitude is not null && Longitude is not null;
+    public bool HasCoordinates => Latitude is not null && Longitude is not null && !(Latitude == 0 && Longitude == 0);
 }
 
 public sealed class WorkPointInput : IValidatableObject
@@ -121,8 +121,18 @@ public static class WorkPointCoordinates
         latitude is null || longitude is null ? "" : $"{latitude.Value.ToString("0.######", CultureInfo.InvariantCulture)}, {longitude.Value.ToString("0.######", CultureInfo.InvariantCulture)}";
 }
 
+// How many work points a beneficiary has and how many of them have coordinates (the registry of beneficiaries shows it as one icon).
+public sealed record WorkPointCoordinateCount(int Total, int WithCoordinates)
+{
+    public bool AllLocated => Total > 0 && WithCoordinates == Total;
+}
+
 public interface IWorkPointRepository
 {
+    /// <summary>Per beneficiary id: the number of work points and of those with coordinates (one query for the whole registry). A beneficiary without rows is absent.</summary>
+    Task<IReadOnlyDictionary<int, WorkPointCoordinateCount>> GetCoordinateCountsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<int, WorkPointCoordinateCount>>(new Dictionary<int, WorkPointCoordinateCount>());
+
     /// <summary>All the work points of a beneficiary, the main one first (a real row, created with the beneficiary).</summary>
     Task<IReadOnlyList<WorkPoint>> GetAsync(int beneficiaryId, CancellationToken cancellationToken = default);
     Task<WorkPoint> CreateAsync(int beneficiaryId, WorkPointInput input, CancellationToken cancellationToken = default);

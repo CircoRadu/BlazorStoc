@@ -13,9 +13,20 @@
             <p>@(Value.ProductCount == 0
                 ? "Valoarea nu este folosită de niciun produs."
                 : $"Valoarea este folosită de {Value.ProductCount} produse: codurile lor se schimbă odată cu ea.")</p>
+            @if (Parameter.Kind == ParameterKind.Interval)
+            {
+                <div class="full-width">Valoare nouă *
+                    <IntervalInputs Label="Interval nou" Start="@newStart" End="@newEnd" Disabled="@busy"
+                                    StartChanged="value => { newStart = value; newValue = IntervalInputs.Compose(newStart, newEnd); change = null; error = null; }"
+                                    EndChanged="value => { newEnd = value; newValue = IntervalInputs.Compose(newStart, newEnd); change = null; error = null; }" />
+                </div>
+            }
+            else
+            {
             <label class="full-width" for="@InputId">Valoare nouă *
                 <input id="@InputId" maxlength="@ProductParameterRules.ValueMaximumLength" value="@newValue" @oninput="args => { newValue = args.Value?.ToString() ?? string.Empty; change = null; error = null; }" disabled="@busy" autocomplete="off" />
             </label>
+            }
             @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
             @if (change is not null) { @Preview }
             <div class="editor-actions">
@@ -57,7 +68,13 @@
         [new($"Valoare «{Parameter.Name}»", Parameter.Display(change.OldValue), Parameter.Display(change.NewValue))])
         + (change.Affected.Count > 0 ? $"\n{change.Affected.Count} produse redenumite" : "");
 
-    protected override void OnInitialized() => newValue = Value.Value;
+    private string newStart = "", newEnd = "";
+
+    protected override void OnInitialized()
+    {
+        newValue = Value.Value;
+        if (Parameter.Kind == ParameterKind.Interval) (newStart, newEnd) = IntervalInputs.Split(Value.Value);
+    }
 
     private RenderFragment Preview => @<div>
         @if (change!.Conflicts.Count > 0)

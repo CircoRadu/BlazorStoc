@@ -5,6 +5,7 @@
 @inject IProductRepository Repository
 @inject IStockMovementRepository Movements
 @inject IProductParameterRepository ParameterRepository
+@inject IProductTagRepository TagRepository
 @inject IProductImageStore ImageStore
 @inject IAccessControl Access
 @inject NavigationManager Navigation
@@ -25,7 +26,7 @@
 <LiveChangeNotice Visible="live?.HasPendingChange == true" Reload="ReloadLiveAsync" />
 @if (lockMessage is not null) { <div class="info-banner" role="status">@lockMessage</div> }
 @if (lockLost && editing) { <div class="info-banner" role="status">Blocarea editării a fost pierdută (a expirat sau a fost eliberată de un administrator). Poți continua, dar la salvare se verifică versiunea produsului.</div> }
-@if (editing) { <ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" /> }
+@if (editing) { <div class="invoice-modal-backdrop product-editor-backdrop" role="dialog" aria-modal="true" aria-label="@(editingProduct is null ? "Produs nou" : $"Editează produsul {editingProduct.Name}")"><div class="invoice-modal product-editor-modal"><ProductEditor @key="editorKey" Original="editingProduct" InitialCategory="@category" InitialSubcategory="@subcategory" Groups="groups" Saved="ProductSavedAsync" Closed="CloseEditorAsync" /></div></div> }
 <div class="settings-tabs" role="tablist" aria-label="Secțiuni produse">
     <button type="button" role="tab" class="settings-tab @(!regularizeTab ? "active" : "")" aria-selected="@(!regularizeTab)" @onclick="() => regularizeTab = false">Catalog</button>
     <button type="button" role="tab" class="settings-tab @(regularizeTab ? "active" : "")" aria-selected="@regularizeTab" @onclick="() => regularizeTab = true">De regularizat@(toRegularize > 0 ? $" ({toRegularize})" : "")</button>
@@ -43,10 +44,10 @@ else
     <article><span>Stoc negativ</span><strong>@(loaded ? ScopedProducts.Count(p => p.Quantity < 0).ToString() : "—")</strong><small>De verificat în selecție</small><i class="red">!</i></article>
 </section>
 <section class="catalog"><div class="catalog-heading"><h2>Catalog produse <span>@Filtered.Count</span></h2><small>@(lastLoaded is null ? "În așteptarea datelor" : $"Actualizat la {lastLoaded:HH:mm:ss} UTC")</small></div>
-<div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după cod produs sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label></div>
+<div class="filters"><label class="search-box"><span>⌕</span><input aria-label="Caută produse" placeholder="Caută după cod produs sau descriere…" @bind="query" @bind:event="oninput" @bind:after="ResetPage" /></label><label><span class="sr-only">Disponibilitate</span><select @bind="stock" @bind:after="ResetPage"><option value="">Orice stoc</option><option value="positive">În stoc</option><option value="zero">Fără stoc</option><option value="negative">Stoc negativ</option></select></label>@if (IncompleteInScope > 0 || onlyIncomplete) { <label><span class="sr-only">Completare parametri</span><select @bind="onlyIncomplete" @bind:after="ResetPage"><option value="@false">Toate produsele</option><option value="@true">Doar incomplete (@IncompleteInScope)</option></select></label> }</div>
 @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă produsele</h3><p>Preluăm catalogul pentru această sesiune.</p></div> }
 else if (Filtered.Count == 0) { <div class="empty-state"><span class="empty-icon">▦</span><h3>@(error is not null ? "Catalog indisponibil" : products.Count == 0 ? "Catalogul nu conține produse" : "Nu am găsit produse")</h3><p>@(error is not null ? "Datele nu au putut fi preluate. Reîncearcă după verificarea conexiunii." : products.Count == 0 ? "Folosește „Adaugă produs” pentru a crea primul produs și categoriile sale." : "Încearcă alt termen sau elimină filtrele.")</p>@if (products.Count > 0) { <button class="refresh act-reload" @onclick="ClearFilters">Resetează filtrele</button> }</div> }
-else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th><th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }@if (incompleteProducts.Contains(p.Id)) { <small class="lock-badge incomplete-badge" title="Subcategoria cere parametri obligatori pe care produsul nu îi are încă: este blocat pentru mișcări de stoc până se editează.">⚠ Parametri obligatorii necompletați · blocat</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td><td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td>@if (stockOut) { <button class="row-icon exit" title="Ieșire rapidă" aria-label="@($"Ieșire rapidă {p.Name}")" @onclick="() => quickExit = p"></button> }<button class="row-icon view" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)" title="@($"Deschide mișcările produsului {p.Name}")"></button></td></tr> }</tbody></table></div> }
+else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGORIE</th><th>SUBCATEGORIE</th>@if (ShowTagColumn) { <th>@(ShowParameters ? (ShowLabels ? "PARAMETRI · ETICHETE" : "PARAMETRI") : "ETICHETE")</th> }<th class="number" aria-sort="@(quantityDescending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleQuantitySort" aria-label="Sortează cantitatea @(quantityDescending ? "crescător" : "descrescător")">CANTITATE <span aria-hidden="true">@(quantityDescending ? "↓" : "↑")</span></button></th><th>DISPONIBILITATE</th><th><span class="sr-only">Detalii</span></th></tr></thead><tbody>@foreach (var p in Paged) { <tr @key="p.Id"><td><div class="product-cell"><button type="button" class="product-thumbnail" title="Mărește imaginea" aria-label="Mărește imaginea pentru @p.Name" @onclick="() => imagePreview = p"><img src="@ProductImageUrl(p)" alt="" /></button><div><button class="product-name" @onclick="() => OpenMovements(p)">@p.Name</button><small>@p.Description</small>@if (LockOfOthers(p.Id) is { } held) { <small class="lock-badge">🔒 În editare de @held.Owner</small> }@if (incompleteProducts.Contains(p.Id)) { <small class="lock-badge incomplete-badge" title="Subcategoria cere parametri obligatori pe care produsul nu îi are încă: este blocat pentru mișcări de stoc până se editează.">⚠ Parametri obligatorii necompletați · blocat</small> }</div></div></td><td><a class="category-table-link" href="@ProductUrl(p.Category)">@p.Category</a></td><td><a class="category-table-link" href="@ProductUrl(p.Category, p.Subcategory)">@p.Subcategory</a></td>@if (ShowTagColumn) { <td>@ParameterTags(p)</td> }<td class="number quantity">@p.Quantity <small>buc.</small>@if (InVehicles(p.Id) is > 0 and var inCars) { <small class="stock-breakdown">@(p.Quantity - inCars) în depozit, @inCars în vehicule</small> }</td><td><span class="stock-badge @StockClass(p.Quantity)"><span>●</span> @StockLabel(p.Quantity)</span></td><td>@if (stockOut) { <button class="row-icon exit" disabled="@incompleteProducts.Contains(p.Id)" title="@(incompleteProducts.Contains(p.Id) ? "Produs blocat: parametri obligatorii necompletați" : "Ieșire rapidă")" aria-label="@($"Ieșire rapidă {p.Name}")" @onclick="() => quickExit = p"></button> }@if (permEdit) { <button class="row-icon edit" title="@($"Editează produsul {p.Name}")" aria-label="@($"Editează produsul {p.Name}")" @onclick="() => OpenEditorAsync(p)"></button> }<button class="row-icon view" aria-label="@($"Detalii {p.Name}")" @onclick="() => OpenMovements(p)" title="@($"Deschide mișcările produsului {p.Name}")"></button></td></tr> }</tbody></table></div> }
 <AuditPager Id="products-page-size" Label="Produse pe pagină" PageSizes="pageSizes" PageSize="pageSize" Page="page" Total="Filtered.Count" PageChanged="value => page = value" PageSizeChanged="value => { pageSize = value; page = 1; }" /></section>
 <p class="workspace-note"><span class="status-dot"></span> Date din BlazorStoc <span>·</span> Catalog și gestiune produse</p>
 }
@@ -92,6 +93,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     }
     [SupplyParameterFromQuery(Name = "categorie")] public string? CategoryQuery { get; set; }
     [SupplyParameterFromQuery(Name = "subcategorie")] public string? SubcategoryQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "incomplete")] public string? IncompleteQuery { get; set; }
     [SupplyParameterFromQuery(Name = "edit")] public int? EditId { get; set; }
     [SupplyParameterFromQuery(Name = "sterge")] public int? DeleteId { get; set; }
     [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnQuery { get; set; }
@@ -123,6 +125,9 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         get
         {
             var filtered = ProductSearch.Filter(products, query, "all", category, stock)
+                .Where(p => !onlyIncomplete || incompleteProducts.Contains(p.Id))
+                .Where(p => activeTags.Count == 0 || activeTags.All(valueId => ChoicesOf(p).Any(choice => choice.ValueId == valueId)))
+                .Where(p => activeLabels.Count == 0 || activeLabels.All(id => LabelsOf(p).Contains(id)))
                 .Where(p => string.IsNullOrWhiteSpace(subcategory) || string.Equals(p.Subcategory, subcategory, StringComparison.OrdinalIgnoreCase));
             return (quantityDescending ? filtered.OrderByDescending(p => p.Quantity) : filtered.OrderBy(p => p.Quantity))
                 .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
@@ -153,6 +158,128 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     private int InVehicles(int productId) => inVehicles.GetValueOrDefault(productId);
     // Products of a subcategory with required parameters that still miss a value (blocked for stock movements).
     private IReadOnlySet<int> incompleteProducts = new HashSet<int>();
+    // Parameter values as tags: shown in the PARAMETRI column of the subcategories that define parameters; a tag click filters by it (all chosen tags must match).
+    private IReadOnlyDictionary<int, IReadOnlyList<ProductParameterChoice>> choicesByProduct = new Dictionary<int, IReadOnlyList<ProductParameterChoice>>();
+    private Dictionary<int, SubcategoryParameter> parametersById = [];
+    private Dictionary<int, string> valueTexts = [];
+    private readonly HashSet<int> activeTags = [];
+    private string scopeKey = "";
+    private static readonly IReadOnlyList<ProductParameterChoice> NoChoices = [];
+    private IReadOnlyList<ProductParameterChoice> ChoicesOf(Product product) => choicesByProduct.GetValueOrDefault(product.Id, NoChoices);
+    private bool ShowParameters => Filtered.Any(product => choicesByProduct.ContainsKey(product.Id) || incompleteProducts.Contains(product.Id));
+    // Subcategory tags (On/Off on a product, optional): shown in the same column after the parameters; a click filters by the tag (all chosen tags must be On).
+    private Dictionary<int, SubcategoryTag> labelsById = [];
+    private IReadOnlyDictionary<int, IReadOnlyList<int>> labelsByProduct = new Dictionary<int, IReadOnlyList<int>>();
+    private readonly HashSet<int> activeLabels = [];
+    private static readonly IReadOnlyList<int> NoLabels = [];
+    private IReadOnlyList<int> LabelsOf(Product product) => labelsByProduct.GetValueOrDefault(product.Id, NoLabels);
+    private bool ShowLabels => Filtered.Any(product => LabelsOf(product).Any(labelsById.ContainsKey));
+    private bool ShowTagColumn => ShowParameters || ShowLabels;
+    private void ToggleLabel(int id) { if (!activeLabels.Remove(id)) activeLabels.Add(id); ResetPage(); }
+    private bool onlyIncomplete;
+    private IReadOnlyList<ParameterFamily> families = [];
+    private int IncompleteInScope => ScopedProducts.Count(product => incompleteProducts.Contains(product.Id));
+    private static bool SameGroup(string category, string subcategory, Product product) =>
+        string.Equals(category, product.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(subcategory, product.Subcategory, StringComparison.OrdinalIgnoreCase);
+    // What an incomplete product still lacks: each parameter of its own and each family without a chosen member, in the order of the subcategory.
+    private IReadOnlyList<string> MissingOf(Product product)
+    {
+        if (!incompleteProducts.Contains(product.Id)) return [];
+        var chosen = ChoicesOf(product).Select(choice => choice.ParameterId).ToHashSet();
+        var own = parametersById.Values.Where(parameter => parameter.FamilyId is null && SameGroup(parameter.Category, parameter.Subcategory, product) && !chosen.Contains(parameter.Id)).Select(parameter => (parameter.Position, parameter.Name));
+        var byFamily = families.Where(family => SameGroup(family.Category, family.Subcategory, product) && !family.ParameterIds.Any(chosen.Contains)).Select(family => (family.Position, family.Name));
+        return own.Concat(byFamily).OrderBy(item => item.Item1).Select(item => item.Item2).ToList();
+    }
+    private async Task RefreshTagsAsync()
+    {
+        try
+        {
+            var parametersTask = ParameterRepository.GetParametersAsync(lifetime.Token);
+            var choicesTask = ParameterRepository.GetAllChoicesAsync(lifetime.Token);
+            var familiesTask = ParameterRepository.GetFamiliesAsync(lifetime.Token);
+            var labelsTask = TagRepository.GetTagsAsync(lifetime.Token);
+            var productLabelsTask = TagRepository.GetAllProductTagsAsync(lifetime.Token);
+            await Task.WhenAll(parametersTask, choicesTask, familiesTask, labelsTask, productLabelsTask); families = await familiesTask;
+            labelsById = (await labelsTask).ToDictionary(tag => tag.Id);
+            labelsByProduct = await productLabelsTask;
+            activeLabels.RemoveWhere(id => !labelsById.ContainsKey(id));
+            var parameters = await parametersTask;
+            parametersById = parameters.ToDictionary(parameter => parameter.Id);
+            valueTexts = parameters.SelectMany(parameter => parameter.Values.Select(value => (value.Id, Text: parameter.Display(value.Value)))).ToDictionary(item => item.Id, item => item.Text);
+            choicesByProduct = await choicesTask;
+            activeTags.RemoveWhere(valueId => !valueTexts.ContainsKey(valueId));
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogWarning("Parameter tags loading failed ({ErrorType}).", ex.GetType().Name); }
+    }
+    private void ToggleTag(int valueId) { if (!activeTags.Remove(valueId)) activeTags.Add(valueId); ResetPage(); }
+    private RenderFragment ParameterTags(Product product) => builder =>
+    {
+        var seq = 0;
+        builder.OpenElement(seq++, "div"); builder.AddAttribute(seq++, "class", "parameter-tags");
+        foreach (var choice in ChoicesOf(product).Where(choice => parametersById.ContainsKey(choice.ParameterId) && valueTexts.ContainsKey(choice.ValueId)).OrderBy(choice => parametersById[choice.ParameterId].Position))
+        {
+            var valueId = choice.ValueId;
+            var active = activeTags.Contains(valueId);
+            var text = $"{parametersById[choice.ParameterId].Name}: {valueTexts[valueId]}";
+            builder.OpenElement(seq++, "button"); builder.SetKey(valueId);
+            builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", active ? "param-tag active" : "param-tag");
+            builder.AddAttribute(seq++, "aria-pressed", active ? "true" : "false");
+            builder.AddAttribute(seq++, "title", active ? $"Scoate filtrul {text}" : $"Filtrează după {text}");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => ToggleTag(valueId)));
+            builder.AddContent(seq++, text); builder.CloseElement();
+        }
+        foreach (var missing in MissingOf(product))
+        {
+            builder.OpenElement(seq++, permEdit ? "button" : "span"); builder.AddAttribute(seq++, "class", "param-tag missing");
+            builder.AddAttribute(seq++, "title", permEdit ? $"{missing} nu are valoare; deschide editarea produsului" : $"{missing} nu are valoare");
+            if (permEdit) { builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => OpenEditorAsync(product))); }
+            builder.AddContent(seq++, $"{missing}: lipsește"); builder.CloseElement();
+        }
+        foreach (var labelId in LabelsOf(product).Where(labelsById.ContainsKey).OrderBy(id => labelsById[id].Position))
+        {
+            var id = labelId;
+            var active = activeLabels.Contains(id);
+            var text = labelsById[id].Name;
+            builder.OpenElement(seq++, "button"); builder.SetKey($"label:{id}");
+            builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", active ? "param-tag label-tag active" : "param-tag label-tag");
+            builder.AddAttribute(seq++, "aria-pressed", active ? "true" : "false");
+            builder.AddAttribute(seq++, "title", active ? $"Scoate filtrul etichetei {text}" : $"Filtrează după eticheta {text}");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => ToggleLabel(id)));
+            builder.AddContent(seq++, text); builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+    private RenderFragment ActiveTagsBar() => builder =>
+    {
+        if (activeTags.Count == 0 && activeLabels.Count == 0) return;
+        var seq = 0;
+        builder.OpenElement(seq++, "div"); builder.AddAttribute(seq++, "class", "parameter-filter-bar"); builder.AddAttribute(seq++, "role", "group"); builder.AddAttribute(seq++, "aria-label", "Etichete de filtrare active");
+        builder.OpenElement(seq++, "span"); builder.AddAttribute(seq++, "class", "muted"); builder.AddContent(seq++, "Filtrat după:"); builder.CloseElement();
+        foreach (var valueId in activeTags.OrderBy(id => id))
+        {
+            var id = valueId;
+            var name = parametersById.Values.FirstOrDefault(parameter => parameter.Values.Any(value => value.Id == id))?.Name ?? "";
+            builder.OpenElement(seq++, "button"); builder.SetKey(id);
+            builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", "param-tag active");
+            builder.AddAttribute(seq++, "title", "Scoate filtrul");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => ToggleTag(id)));
+            builder.AddContent(seq++, $"{name}: {valueTexts.GetValueOrDefault(id, "")} ×"); builder.CloseElement();
+        }
+        foreach (var labelId in activeLabels.OrderBy(id => id))
+        {
+            var id = labelId;
+            builder.OpenElement(seq++, "button"); builder.SetKey($"label:{id}");
+            builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", "param-tag label-tag active");
+            builder.AddAttribute(seq++, "title", "Scoate filtrul");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => ToggleLabel(id)));
+            builder.AddContent(seq++, $"Etichetă: {labelsById.GetValueOrDefault(id)?.Name ?? ""} ×"); builder.CloseElement();
+        }
+        builder.OpenElement(seq++, "button"); builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", "refresh act-close");
+        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => { activeTags.Clear(); activeLabels.Clear(); ResetPage(); }));
+        builder.AddContent(seq++, "Elimină etichetele"); builder.CloseElement();
+        builder.CloseElement();
+    };
     private async Task RefreshIncompleteAsync()
     {
         try { incompleteProducts = await ParameterRepository.GetIncompleteProductIdsAsync(lifetime.Token); }
@@ -170,7 +297,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
             await Task.WhenAll(productsTask, groupsTask, vehiclesTask);
             products = await productsTask; groups = await groupsTask; inVehicles = await vehiclesTask;
             lastLoaded = DateTime.UtcNow; page = Math.Min(page, Pages);
-            await RefreshIncompleteAsync();
+            await RefreshIncompleteAsync(); await RefreshTagsAsync();
             await RefreshLocksAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -181,6 +308,8 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     {
         category = CategoryQuery?.Trim() ?? "";
         subcategory = SubcategoryQuery?.Trim() ?? "";
+        onlyIncomplete = IncompleteQuery == "1";
+        var scope = category + "001f" + subcategory; if (scope != scopeKey) { scopeKey = scope; activeTags.Clear(); activeLabels.Clear(); }
         ResetPage();
         if (EditId is > 0 && loaded && (!editing || editingProduct?.Id != EditId.Value))
         {
@@ -213,7 +342,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
             stockOut = await Access.HasAsync("stoc.iesire", lifetime.Token); permMultiExit = await Access.HasAsync("iesire-multipla.view", lifetime.Token);
             permAdd = await Access.HasAsync("produse.add", lifetime.Token); permEdit = await Access.HasAsync("produse.edit", lifetime.Token); permDelete = await Access.HasAsync("produse.delete", lifetime.Token);
             loaded = true; lastLoaded = DateTime.UtcNow; ResetPage();
-            await RefreshIncompleteAsync();
+            await RefreshIncompleteAsync(); await RefreshTagsAsync();
             await RefreshLocksAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -318,6 +447,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
         groups = groups.Append(new(product.Category, product.Subcategory)).Distinct().ToArray();
         var origin = !created && EditId is not null ? ReturnNavigation.Safe(ReturnQuery) : null;
         await CloseEditorAsync(); query = stock = ""; loaded = true; error = null;
+        await RefreshIncompleteAsync(); await RefreshTagsAsync();
         notice = created ? "Produsul a fost adăugat." : "Modificările au fost salvate.";
         // An edit started from the product page returns there after saving; other saves show the catalog.
         Navigation.NavigateTo(origin ?? ProductUrl(product.Category, product.Subcategory));
@@ -364,7 +494,7 @@ else { <div class="table-scroll"><table><thead><tr><th>COD PRODUS</th><th>CATEGO
     }
     private void ResetPage() => page = 1;
     private void ToggleQuantitySort() { quantityDescending = !quantityDescending; ResetPage(); }
-    private void ClearFilters() { query = stock = ""; Navigation.NavigateTo("/produse"); ResetPage(); }
+    private void ClearFilters() { query = stock = ""; activeTags.Clear(); activeLabels.Clear(); onlyIncomplete = false; Navigation.NavigateTo("/produse"); ResetPage(); }
     private static string ProductUrl(string? category, string? subcategory = null)
     {
         if (string.IsNullOrWhiteSpace(category)) return "/produse";

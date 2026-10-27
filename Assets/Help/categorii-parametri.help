@@ -1,27 +1,25 @@
-# Parametri obligatori ai unei subcategorii
-Cautare: parametri obligatori model valoare cod produs subcategorie unitate
-Captura: fereastra | /categorii | click sel:.category-management-card summary; wait 1200; click sel:button.row-icon.params[aria-label*='speciale']; wait 2000; height 1500 | Parametrii obligatori ai unei subcategorii
+# Parametri și etichete ale unei subcategorii
+Cautare: parametri obligatori model valoare cod produs subcategorie unitate etichete familii
 
 Un produs dintr-o subcategorie cu parametri obligatori nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru. Codul produsului devine „model - valoare - valoare”, în ordinea parametrilor. Produsele deja existente rămân blocate până li se aleg valorile.
 
 ## Elemente
 ### Antet
-- Numărul din titlu | insignă | Câți parametri are subcategoria.
-- Închide | buton | Închide panoul.
-### Fiecare parametru
-- Numele și tipul | text | Numele parametrului, tipul (Număr sau Text liber), unitatea de măsură și câte produse îl folosesc. | sel: .parameter-card-heading
-- Editează parametrul | iconita:edit | Doar administrator: redenumește parametrul; unitatea nu se mai schimbă după ce există produse.
-- Șterge parametrul | iconita:delete | Doar administrator și doar cât subcategoria nu are produse.
-- Valoare | coloană | Valorile din care se alege pentru produse (la tipul Număr se afișează cu unitatea).
-- Produse | coloană | Câte produse folosesc valoarea.
-- Editează valoarea | iconita:edit | Doar administrator.
-- Șterge valoarea | iconita:delete | Doar dacă niciun produs nu o folosește.
-- Valoare nouă | câmp | Scrii valoarea (la număr, de exemplu 2,8) și apeși „Adaugă valoarea”.
-### Parametru nou
-- Denumire parametru * | câmp | De exemplu „Lentilă”.
-- Tip * | comutatoare | Text liber (de exemplu culoare) sau Număr (de exemplu 2,8).
-- Unitate de măsură | câmp | Apare la tipul Număr, de exemplu mm.
-- Adaugă parametrul | buton | Creează parametrul.
+- Numărul din titlu | insignă | Câte etichete, familii și parametri are subcategoria în total.
+- Închide | buton | Închide fereastra.
+### Secțiunea „Etichete” (închisă la deschidere)
+- Adaugă etichetă | buton | Deschide formularul „Denumire etichetă” (de exemplu „PoE”); etichetele sunt opționale și devin filtre în catalog.
+- Tabel etichete | tabel | Eticheta și câte produse o au activă (On).
+- Redenumește eticheta | iconita:edit | Doar administrator.
+- Șterge eticheta | iconita:delete | Doar administrator; produsele care o aveau activă o pierd.
+### Secțiunea „Familii de parametri” (închisă la deschidere)
+- Adaugă familie | buton | Doar administrator; denumirea și cel puțin doi parametri; un produs are activ exact unul dintre ei.
+- Tabel familii | tabel | Familia și parametrii ei; editare și desfacere (iconițe).
+### Secțiunea „Parametri” (închisă la deschidere)
+- Adaugă parametru | buton | Denumire, tip (Text liber, Număr, Interval sau Valoare fixă numai în familie) și, la numere, unitatea.
+- Tabel parametri | tabel | Parametrul, tipul, unitatea, familia, câte valori are și câte produse îl folosesc.
+- Valorile parametrului | iconita:view | Deschide sub rând lista valorilor, cu adăugare, editare (administrator) și ștergere.
+- Editează / Șterge parametrul | iconita:edit | Doar administrator; la ștergere produsele pierd valoarea și codul lor se rescrie.
 
 ## Flux: Cum definesc un parametru obligatoriu
 1. În „Categorii și subcategorii” apasă iconița „Parametri obligatori” de pe rândul subcategoriei.

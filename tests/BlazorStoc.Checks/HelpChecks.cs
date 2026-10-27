@@ -213,6 +213,8 @@ public static class HelpChecks
     // The list only shrinks: a topic that gets a "Captura:" must be taken out, a new topic without capture must be added (or get one).
     private static readonly HashSet<string> WithoutCapture = new(StringComparer.OrdinalIgnoreCase)
     {
+        // The window was restructured on 27.10.2026 (three sections); the old picture was removed and is made again on request (docs/HELP_DE_REGENERAT.md), then the key leaves this list.
+        "categorii-parametri"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.

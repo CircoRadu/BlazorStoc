@@ -36,6 +36,19 @@ public sealed class MariaWorkPointRepository(
         return result;
     }
 
+    public async Task<IReadOnlyDictionary<int, WorkPointCoordinateCount>> GetCoordinateCountsAsync(CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAnyPermissionAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        var result = new Dictionary<int, WorkPointCoordinateCount>();
+        await using var command = Command(connection, null,
+            "SELECT beneficiary_id, COUNT(*), CAST(COALESCE(SUM(latitude IS NOT NULL AND longitude IS NOT NULL AND NOT (latitude = 0 AND longitude = 0)), 0) AS SIGNED) FROM beneficiary_work_points GROUP BY beneficiary_id");
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            result[reader.GetInt32(0)] = new WorkPointCoordinateCount(checked((int)reader.GetInt64(1)), checked((int)reader.GetInt64(2)));
+        return result;
+    }
+
     public async Task<WorkPoint> CreateAsync(int beneficiaryId, WorkPointInput input, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureAsync("beneficiari.edit", cancellationToken).ConfigureAwait(false);

@@ -17,6 +17,10 @@ public sealed class MapOptions
     public double CenterLatitude { get; set; } = 45.9;
     public double CenterLongitude { get; set; } = 25.0;
     public int StartZoom { get; set; } = 6;
+    // An optional second background (satellite imagery) the map offers next to the street map; empty = none. Its address has the key already put in.
+    public string SatelliteTileUrl { get; set; } = "";
+    public string SatelliteAttribution { get; set; } = "";
+    public int SatelliteMaxNativeZoom { get; set; }
 
     // The provider used when the configured values are unusable: a tile address must be https and contain the three coordinates.
     public MapOptions Normalized()
@@ -28,7 +32,11 @@ public sealed class MapOptions
         {
             TileUrl = url, Attribution = string.IsNullOrWhiteSpace(Attribution) ? DefaultAttribution : Attribution,
             MinZoom = min, MaxZoom = Math.Clamp(MaxZoom, min, 20),
-            CenterLatitude = Math.Clamp(CenterLatitude, -90, 90), CenterLongitude = Math.Clamp(CenterLongitude, -180, 180), StartZoom = Math.Clamp(StartZoom, 0, 20)
+            CenterLatitude = Math.Clamp(CenterLatitude, -90, 90), CenterLongitude = Math.Clamp(CenterLongitude, -180, 180), StartZoom = Math.Clamp(StartZoom, 0, 20),
+            SatelliteTileUrl = SatelliteTileUrl is { Length: > 0 } satellite && Uri.TryCreate(satellite.Replace("{z}", "0").Replace("{x}", "0").Replace("{y}", "0").Replace("{s}", "a").Replace("{r}", ""), UriKind.Absolute, out var satelliteUri) &&
+                satelliteUri.Scheme == Uri.UriSchemeHttps && satellite.Contains("{z}") && satellite.Contains("{x}") && satellite.Contains("{y}") ? satellite : "",
+            SatelliteAttribution = SatelliteAttribution ?? "",
+            SatelliteMaxNativeZoom = Math.Clamp(SatelliteMaxNativeZoom, 0, 20)
         };
     }
 }

@@ -23,7 +23,7 @@ function loadScript(src) {
     });
 }
 
-function ensureLibrary() {
+export function ensureLibrary() {
     if (!loading) {
         loading = (async () => {
             loadCss(base + "leaflet.css");
@@ -71,6 +71,52 @@ function iconFor(state, marker, selected, flash) {
     });
 }
 
+// The optional satellite background: when the settings have a satellite address the map offers a Hartă / Satelit switch (the choice is kept in this
+// browser only). Shared with the map holder of the work point editor. state needs: map, tiles (the street layer), and optionally watchTiles(layer).
+const baseKey = "blazorstoc-map-base";
+
+export function savedBaseIsSatellite() {
+    try { return localStorage.getItem(baseKey) === "satellite"; } catch { return false; }
+}
+
+function rememberBase(satellite) {
+    try { localStorage.setItem(baseKey, satellite ? "satellite" : "street"); } catch { /* the choice is only not kept */ }
+}
+
+export function setBaseLayers(state, options, preferSatellite) {
+    const map = state.map;
+    if (state.layerControl) { state.layerControl.remove(); state.layerControl = null; }
+    if (state.satellite) { map.removeLayer(state.satellite); state.satellite = null; }
+    if (!state.baseListener) {
+        state.baseListener = true;
+        map.on("baselayerchange", event => rememberBase(event.layer === state.satellite));
+    }
+    if (!options.satelliteTileUrl) {
+        if (!map.hasLayer(state.tiles)) state.tiles.addTo(map);
+        return;
+    }
+    const native = options.satelliteMaxNativeZoom > 0 ? { maxNativeZoom: options.satelliteMaxNativeZoom } : {};
+    state.satellite = L.tileLayer(options.satelliteTileUrl, { attribution: options.satelliteAttribution, minZoom: options.minZoom, maxZoom: options.maxZoom, crossOrigin: false, ...native });
+    if (state.watchTiles) state.watchTiles(state.satellite);
+    // Self-adjusting native zoom: when several satellite tiles fail at a zoom although tiles loaded at a lower one, the provider has no imagery
+    // that deep here; the layer then enlarges the last level instead of showing grey (the setting "Zoom nativ maxim satelit" fixes it for good).
+    const loadedAt = new Set(), failedAt = new Map();
+    const layer = state.satellite;
+    layer.on("tileload", event => { loadedAt.add(event.coords.z); });
+    layer.on("tileerror", event => {
+        const z = event.coords.z;
+        if (loadedAt.has(z) || ![...loadedAt].some(level => level < z)) return;
+        failedAt.set(z, (failedAt.get(z) || 0) + 1);
+        if (failedAt.get(z) >= 3 && (!layer.options.maxNativeZoom || layer.options.maxNativeZoom >= z)) {
+            layer.options.maxNativeZoom = z - 1;
+            layer.redraw();
+        }
+    });
+    state.layerControl = L.control.layers({ "Hartă": state.tiles, "Satelit": state.satellite }, null, { position: "topright", collapsed: false }).addTo(map);
+    if (preferSatellite) { if (map.hasLayer(state.tiles)) map.removeLayer(state.tiles); state.satellite.addTo(map); }
+    else if (!map.hasLayer(state.tiles)) state.tiles.addTo(map);
+}
+
 export async function create(element, dotnet, options, styles) {
     await ensureLibrary();
     const map = L.map(element, { minZoom: options.minZoom, maxZoom: options.maxZoom, zoomControl: true })
@@ -78,18 +124,21 @@ export async function create(element, dotnet, options, styles) {
     const state = { map, dotnet, styles, markers: new Map(), selected: null, failures: 0, failureTimer: null, reported: false };
     state.tiles = L.tileLayer(options.tileUrl, { attribution: options.attribution, minZoom: options.minZoom, maxZoom: options.maxZoom, crossOrigin: false });
     // A single failed tile is nothing; several in a short while are reported once, and the page offers a retry.
-    state.tiles.on("tileerror", () => {
-        state.failures += 1;
-        clearTimeout(state.failureTimer);
-        state.failureTimer = setTimeout(() => { state.failures = 0; }, 10000);
-        if (state.failures >= 6 && !state.reported) { state.reported = true; dotnet.invokeMethodAsync("OnTilesFailed"); }
-    });
-    state.tiles.on("tileload", () => {
-        if (state.reported) { state.reported = false; dotnet.invokeMethodAsync("OnTilesRecovered"); }
-        state.failures = 0;
-    });
+    state.watchTiles = layer => {
+        layer.on("tileerror", () => {
+            state.failures += 1;
+            clearTimeout(state.failureTimer);
+            state.failureTimer = setTimeout(() => { state.failures = 0; }, 10000);
+            if (state.failures >= 6 && !state.reported) { state.reported = true; dotnet.invokeMethodAsync("OnTilesFailed"); }
+        });
+        layer.on("tileload", () => {
+            if (state.reported) { state.reported = false; dotnet.invokeMethodAsync("OnTilesRecovered"); }
+            state.failures = 0;
+        });
+    };
+    state.watchTiles(state.tiles);
     state.attribution = options.attribution;
-    state.tiles.addTo(map);
+    setBaseLayers(state, options, savedBaseIsSatellite());
     state.cluster = L.markerClusterGroup({ showCoverageOnHover: false, spiderfyOnMaxZoom: true, maxClusterRadius: 45, disableClusteringAtZoom: options.maxZoom });
     map.addLayer(state.cluster);
     element.__maintenanceMap = state;
@@ -136,11 +185,16 @@ export function configure(element, options, styles) {
     state.map.setMaxZoom(options.maxZoom);
     state.tiles.options.minZoom = options.minZoom;
     state.tiles.options.maxZoom = options.maxZoom;
+    const streetShown = state.map.hasLayer(state.tiles);
+    if (streetShown) state.map.attributionControl.removeAttribution(state.attribution);
     state.tiles.options.attribution = options.attribution;
-    state.map.attributionControl.removeAttribution(state.attribution);
     state.attribution = options.attribution;
-    state.map.attributionControl.addAttribution(options.attribution);
+    if (streetShown) state.map.attributionControl.addAttribution(options.attribution);
     if (state.tiles._url !== options.tileUrl) state.tiles.setUrl(options.tileUrl);
+    // The satellite background was added, removed or changed in Setări: the layers are set again, keeping the one that is shown.
+    const satelliteUrl = options.satelliteTileUrl || "";
+    if (satelliteUrl !== (state.satellite ? state.satellite._url : "") || (options.satelliteAttribution || "") !== (state.satellite ? state.satellite.options.attribution : "") || (options.satelliteMaxNativeZoom || 0) !== (state.satellite ? (state.satellite.options.maxNativeZoom || 0) : 0))
+        setBaseLayers(state, options, !!state.satellite && state.map.hasLayer(state.satellite));
     state.reported = false;
     state.failures = 0;
     for (const item of state.markers.values()) item.layer.setIcon(iconFor(state, item.marker, item.marker.id === state.selected, false));
@@ -171,6 +225,7 @@ export function retryTiles(element) {
     state.reported = false;
     state.failures = 0;
     state.tiles.redraw();
+    if (state.satellite) state.satellite.redraw();
 }
 
 // Automatic refresh, only while the map can be seen: the window or tab is not hidden (or minimized) and the map is on screen. It asks

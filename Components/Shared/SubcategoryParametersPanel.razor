@@ -1,12 +1,14 @@
 @using BlazorStoc.Services
 @inject IProductParameterRepository Parameters
+@inject IProductTagRepository Tags
 @inject IAccessControl Access
 @inject ILogger<SubcategoryParametersPanel> Logger
 @implements IDisposable
 
-<section class="product-editor subcategory-parameters" aria-labelledby="@TitleId">
-    <div class="catalog-heading"><h2 id="@TitleId">Parametri obligatori · @Group.Subcategory<span class="count-badge">@parameters.Count</span></h2><span class="heading-actions"><HelpButton Topic="categorii-parametri" About="Parametrii obligatori ai subcategoriei" /><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
-    <p class="form-note">Un produs din această subcategorie nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru. Codul lui devine „model - valoare - valoare”, în ordinea parametrilor. Produsele deja existente rămân blocate până li se aleg valorile.</p>
+<div class="delete-overlay">
+<section class="delete-dialog subcategory-parameters-dialog subcategory-parameters" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+    <div class="catalog-heading"><h2 id="@TitleId">Parametri și etichete · @Group.Subcategory<span class="count-badge">@(parameters.Count + families.Count + tags.Count)</span></h2><span class="heading-actions"><HelpButton Topic="categorii-parametri" About="Parametrii și etichetele subcategoriei" /><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+    <p class="form-note">Parametrii sunt obligatorii: un produs din această subcategorie nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru, iar codul lui devine „model - valoare - valoare”. Etichetele sunt opționale (On/Off pe produs) și devin filtre în catalog.</p>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
     @if (loading)
@@ -15,98 +17,260 @@
     }
     else
     {
-        @if (parameters.Count == 0) { <div class="empty-state compact"><p>Subcategoria nu are parametri obligatori.</p></div> }
-        @foreach (var parameter in parameters)
-        {
-            <div class="parameter-card" @key="parameter.Id">
-                <div class="parameter-card-heading">
-                    <strong>@parameter.Name</strong>
-                    <span class="count-badge">@(parameter.Kind == ParameterKind.Number ? "Număr" : "Text liber")</span>
-                    @if (parameter.Unit.Length > 0) { <span class="muted">unitate: @parameter.Unit</span> }
-                    <span class="muted">@parameter.ProductCount produse</span>
-                    @if (isAdministrator)
-                    {
-                        <span class="heading-actions">
-                            <button class="row-icon edit" disabled="@busy" aria-label="@($"Editează parametrul {parameter.Name}")" title="@($"Editează parametrul {parameter.Name}")" @onclick="() => EditParameter(parameter)"></button>
-                            <button class="row-icon delete" disabled="@(busy || !SubcategoryIsEmpty)" aria-label="@($"Șterge parametrul {parameter.Name}")" title="@(SubcategoryIsEmpty ? $"Șterge parametrul {parameter.Name}" : "Subcategoria are produse: parametrul nu se mai șterge.")" @onclick="() => { deletingParameter = parameter; deleteError = null; }"></button>
-                        </span>
-                    }
-                </div>
-                @if (editingParameter?.Id == parameter.Id)
+        @* ---- Etichete ---- *@
+        <details class="def-section" id="section-tags">
+            <summary><span>Etichete</span><span class="count-badge">@tags.Count</span></summary>
+            <div class="def-body">
+                <p class="form-note">Etichetele sunt opționale: fiecare produs al subcategoriei le are pe On sau pe Off din formularul produsului. Nu fac parte din codul produsului și nu blochează stocul.</p>
+                @if (canEdit) { <div class="def-toolbar"><button type="button" class="refresh act-confirm" aria-expanded="@showAddTag.ToString().ToLowerInvariant()" disabled="@busy" @onclick="() => showAddTag = !showAddTag">Adaugă etichetă</button></div> }
+                @if (showAddTag && canEdit)
                 {
-                    <div class="editor-grid parameter-edit">
-                        <label>Denumire parametru *<input maxlength="@ProductParameterRules.NameMaximumLength" @bind="editName" @bind:event="oninput" disabled="@busy" autocomplete="off" /></label>
-                        @if (parameter.Kind == ParameterKind.Number)
-                        {
-                            <label>Unitate de măsură<input maxlength="@ProductParameterRules.UnitMaximumLength" @bind="editUnit" @bind:event="oninput" disabled="@(busy || parameter.ProductCount > 0)" autocomplete="off" />
-                                @if (parameter.ProductCount > 0) { <small class="form-note">Unitatea face parte din codurile produselor și nu se mai schimbă.</small> }</label>
-                        }
-                        <ChangeReasonField Id="parameter-reason" @bind-Value="editReason" AutoText="@EditSummary" @bind-UseAuto="editReasonAuto" Disabled="@busy" />
+                    <div class="def-form">
+                        <div class="editor-grid">
+                            <label for="new-tag-name">Denumire etichetă *<input id="new-tag-name" maxlength="@ProductTagRules.NameMaximumLength" @bind="newTagName" @bind:event="oninput" @onkeydown="AddTagKeyAsync" disabled="@busy" autocomplete="off" placeholder="ex. PoE" /></label>
+                        </div>
+                        <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="AddTagAsync">Adaugă eticheta</button><button type="button" class="danger" disabled="@busy" @onclick="() => showAddTag = false">Anulează</button></div>
                     </div>
-                    <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="RequestSaveParameter">Salvează parametrul</button><button type="button" class="danger" disabled="@busy" @onclick="CancelEditParameter">Anulează</button></div>
                 }
-                @if (parameter.Values.Count == 0) { <p class="form-note">Parametrul nu are încă valori. Adaugă mai jos valorile din care se alege.</p> }
+                @if (tags.Count == 0) { <div class="empty-state compact"><p>Subcategoria nu are etichete.</p></div> }
                 else
                 {
-                    <div class="table-scroll"><table><thead><tr><th>VALOARE</th><th>PRODUSE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
-                    @foreach (var value in parameter.Values)
+                    <div class="table-scroll"><table class="def-table"><thead><tr><th>ETICHETĂ</th><th>PRODUSE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                    @foreach (var tag in tags)
                     {
-                        <tr @key="value.Id"><td><strong>@parameter.Display(value.Value)</strong></td><td>@value.ProductCount produse</td><td class="row-actions">
-                            @if (isAdministrator)
-                            {
-                                <button class="row-icon edit" disabled="@busy" aria-label="@($"Editează valoarea {parameter.Display(value.Value)}")" title="@($"Editează valoarea {parameter.Display(value.Value)}")" @onclick="() => { editingValue = (parameter, value); notice = null; }"></button>
-                            }
-                            @if (canEdit)
-                            {
-                            <button class="row-icon delete" disabled="@(busy || value.ProductCount > 0)" aria-label="@($"Șterge valoarea {parameter.Display(value.Value)}")"
-                                    title="@(value.ProductCount > 0 ? $"Folosită de {value.ProductCount} produse: nu se poate șterge." : $"Șterge valoarea {parameter.Display(value.Value)}")"
-                                    @onclick="() => { deletingValue = (parameter, value); deleteError = null; }"></button>
-                            }
-                        </td></tr>
+                        <tr @key="@($"tag:{tag.Id}")"><td><strong>@tag.Name</strong></td><td>@tag.ProductCount produse</td>
+                            <td class="row-actions">
+                                @if (isAdministrator)
+                                {
+                                    <button class="row-icon edit" disabled="@busy" aria-label="@($"Redenumește eticheta {tag.Name}")" title="@($"Redenumește eticheta {tag.Name}")" @onclick="() => BeginRenameTag(tag)"></button>
+                                    <button class="row-icon delete" disabled="@busy" aria-label="@($"Șterge eticheta {tag.Name}")" title="@($"Șterge eticheta {tag.Name}")" @onclick="() => { deletingTag = tag; deleteError = null; }"></button>
+                                }
+                            </td></tr>
+                        @if (renamingTag?.Id == tag.Id)
+                        {
+                            <tr class="def-detail" @key="@($"tag-edit:{tag.Id}")"><td colspan="3"><div class="editor-grid parameter-edit">
+                                <label>Denumire etichetă *<input maxlength="@ProductTagRules.NameMaximumLength" @bind="renameTagText" @bind:event="oninput" disabled="@busy" autocomplete="off" /></label>
+                                <ChangeReasonField Id="tag-reason" @bind-Value="renameTagReason" AutoText="@RenameTagSummary" @bind-UseAuto="renameTagReasonAuto" Disabled="@busy" />
+                            </div>
+                            <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="RenameTagAsync">Salvează eticheta</button><button type="button" class="danger" disabled="@busy" @onclick="() => renamingTag = null">Anulează</button></div></td></tr>
+                        }
                     }
                     </tbody></table></div>
                 }
-                @if (canEdit)
+                @if (!isAdministrator) { <p class="form-note">Redenumirea și ștergerea etichetelor o face administratorul.</p> }
+            </div>
+        </details>
+
+        @* ---- Familii de parametri (always shown, so it can be found; its form needs at least two parameters) ---- *@
+        <details class="def-section" id="section-families">
+            <summary><span>Familii de parametri</span><span class="count-badge">@families.Count</span></summary>
+            <div class="def-body parameter-families">
+                @if (parameters.Count < ProductParameterRules.FamilyMinimumMembers && families.Count == 0)
                 {
-                <div class="parameter-add">
-                    <input aria-label="@($"Valoare nouă pentru {parameter.Name}")" maxlength="@ProductParameterRules.ValueMaximumLength" placeholder="@(parameter.Kind == ParameterKind.Number ? "Valoare nouă (număr, ex. 2,8)" : "Valoare nouă")"
-                           value="@NewValue(parameter.Id)" @oninput="args => newValues[parameter.Id] = args.Value?.ToString() ?? string.Empty" @onkeydown="args => AddValueKeyAsync(args, parameter)" disabled="@busy" autocomplete="off" />
-                    <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => AddValueAsync(parameter)">Adaugă valoarea</button>
-                </div>
+                    <p class="form-note" id="family-needs-parameters">Subcategoria are @parameters.Count @(parameters.Count == 1 ? "parametru" : "parametri"). O familie grupează cel puțin @ProductParameterRules.FamilyMinimumMembers parametri (de exemplu „Fixă” și „Varifocală” într-o familie „Lentilă”, dintre care un produs are doar unul activ): adaugă mai întâi parametrii, apoi creează familia aici.</p>
+                }
+                else
+                {
+                    <p class="form-note">O familie grupează cel puțin @ProductParameterRules.FamilyMinimumMembers parametri; un produs are exact unul dintre ei activ (de exemplu o cameră este cu lentilă fixă sau varifocală, nu ambele). Parametrii din afara familiilor rămân obligatorii. Familia ocupă în codul produsului locul primului ei parametru.</p>
+                    @if (isAdministrator) { <div class="def-toolbar"><button type="button" class="refresh act-confirm" aria-expanded="@showAddFamily.ToString().ToLowerInvariant()" disabled="@busy" @onclick="() => showAddFamily = !showAddFamily">Adaugă familie</button></div> }
+                    else { <p class="form-note">Familiile se creează și se modifică de administrator.</p> }
+                    @if (showAddFamily && isAdministrator)
+                    {
+                        <div class="def-form">
+                            <div class="editor-grid">
+                                <label for="new-family-name">Denumire familie nouă<input id="new-family-name" maxlength="@ProductParameterRules.NameMaximumLength" @bind="newFamilyName" @bind:event="oninput" disabled="@busy" autocomplete="off" placeholder="ex. Lentilă" /></label>
+                                <fieldset class="parameter-kind"><legend>Parametri în familie (cel puțin @ProductParameterRules.FamilyMinimumMembers)</legend>
+                                    @foreach (var parameter in parameters.Where(item => item.FamilyId is null))
+                                    {
+                                        <ToggleSwitch Value="@newFamilyMembers.Contains(parameter.Id)" Disabled="@busy" ValueChanged="on => SetNewFamilyMember(parameter.Id, on)">@parameter.Name</ToggleSwitch>
+                                    }
+                                    @if (!parameters.Any(item => item.FamilyId is null)) { <p class="muted">Toți parametrii sunt deja în familii.</p> }
+                                </fieldset>
+                            </div>
+                            <div class="editor-actions"><button type="button" class="primary" disabled="@(busy || newFamilyMembers.Count < ProductParameterRules.FamilyMinimumMembers)" @onclick="AddFamilyAsync">Adaugă familia</button><button type="button" class="danger" disabled="@busy" @onclick="() => showAddFamily = false">Anulează</button></div>
+                        </div>
+                    }
+                    @if (families.Count == 0) { <div class="empty-state compact"><p>Subcategoria nu are familii de parametri.</p></div> }
+                    else
+                    {
+                        <div class="table-scroll"><table class="def-table"><thead><tr><th>FAMILIE</th><th>PARAMETRI</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                        @foreach (var family in families)
+                        {
+                            <tr class="family-card" @key="@($"family:{family.Id}")"><td><strong>@family.Name</strong></td><td>@string.Join(" · ", parameters.Where(parameter => parameter.FamilyId == family.Id).Select(parameter => parameter.Name))</td>
+                                <td class="row-actions">
+                                    @if (isAdministrator)
+                                    {
+                                        <button class="row-icon edit" disabled="@busy" aria-label="@($"Editează familia {family.Name}")" title="@($"Editează familia {family.Name}")" @onclick="() => EditFamily(family)"></button>
+                                        <button class="row-icon delete" disabled="@busy" aria-label="@($"Desfă familia {family.Name}")" title="@($"Desfă familia {family.Name} (parametrii rămân, fiecare obligatoriu separat)")" @onclick="() => { deletingFamily = family; deleteError = null; }"></button>
+                                    }
+                                </td></tr>
+                            @if (editingFamily?.Id == family.Id)
+                            {
+                                <tr class="def-detail" @key="@($"family-edit:{family.Id}")"><td colspan="3"><div class="editor-grid parameter-edit">
+                                    <label>Denumire familie *<input maxlength="@ProductParameterRules.NameMaximumLength" @bind="familyName" @bind:event="oninput" disabled="@busy" autocomplete="off" /></label>
+                                    <fieldset class="parameter-kind"><legend>Parametri în familie * (cel puțin @ProductParameterRules.FamilyMinimumMembers)</legend>
+                                        @foreach (var parameter in parameters.Where(item => item.FamilyId is null || item.FamilyId == family.Id))
+                                        {
+                                            <ToggleSwitch Value="@familyMembers.Contains(parameter.Id)" Disabled="@busy" ValueChanged="on => SetFamilyMember(parameter.Id, on)">@parameter.Name</ToggleSwitch>
+                                        }
+                                    </fieldset>
+                                    <ChangeReasonField Id="family-reason" @bind-Value="familyReason" AutoText="@FamilySummary" @bind-UseAuto="familyReasonAuto" Disabled="@busy" />
+                                </div>
+                                <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="SaveFamilyAsync">Salvează familia</button><button type="button" class="danger" disabled="@busy" @onclick="() => editingFamily = null">Anulează</button></div></td></tr>
+                            }
+                        }
+                        </tbody></table></div>
+                    }
                 }
             </div>
-        }
-        @if (canEdit)
-        {
-        <h3 class="parameter-add-title">Parametru nou</h3>
-        <div class="editor-grid">
-            <label for="new-parameter-name">Denumire parametru *<input id="new-parameter-name" maxlength="@ProductParameterRules.NameMaximumLength" @bind="newName" @bind:event="oninput" disabled="@busy" autocomplete="off" placeholder="ex. Lentilă" /></label>
-            <fieldset class="parameter-kind" aria-describedby="new-parameter-kind-note">
-                <legend>Tip *</legend>
-                <ToggleSwitch Value="@(newKind == ParameterKind.Text)" Disabled="@busy" ValueChanged="on => newKind = on ? ParameterKind.Text : ParameterKind.Number">Text liber (ex. culoare)</ToggleSwitch>
-                <ToggleSwitch Value="@(newKind == ParameterKind.Number)" Disabled="@busy" ValueChanged="on => newKind = on ? ParameterKind.Number : ParameterKind.Text">Număr (ex. 2,8)</ToggleSwitch>
-            </fieldset>
-            @if (newKind == ParameterKind.Number)
-            {
-                <label for="new-parameter-unit">Unitate de măsură<input id="new-parameter-unit" maxlength="@ProductParameterRules.UnitMaximumLength" @bind="newUnit" @bind:event="oninput" disabled="@busy" autocomplete="off" placeholder="ex. mm" /></label>
-            }
-        </div>
-        <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="AddParameterAsync">Adaugă parametrul</button></div>
-        }
-        @if (!isAdministrator) { <p class="form-note">Valorile se pot adăuga și șterge (dacă nu sunt folosite) de orice utilizator; editarea valorilor și a parametrilor o face administratorul.</p> }
+        </details>
+
+        @* ---- Parametri ---- *@
+        <details class="def-section" id="section-parameters">
+            <summary><span>Parametri</span><span class="count-badge">@parameters.Count</span></summary>
+            <div class="def-body">
+                <p class="form-note">Produsele deja existente ale subcategoriei rămân blocate până li se aleg valorile noilor parametri.</p>
+                @if (canEdit) { <div class="def-toolbar"><button type="button" class="refresh act-confirm" aria-expanded="@showAddParameter.ToString().ToLowerInvariant()" disabled="@busy" @onclick="() => showAddParameter = !showAddParameter">Adaugă parametru</button></div> }
+                @if (showAddParameter && canEdit)
+                {
+                    <div class="def-form">
+                        <div class="editor-grid">
+                            <label for="new-parameter-name">Denumire parametru *<input id="new-parameter-name" maxlength="@ProductParameterRules.NameMaximumLength" @bind="newName" @bind:event="oninput" disabled="@busy" autocomplete="off" placeholder="ex. Lentilă" /></label>
+                            <fieldset class="parameter-kind" aria-describedby="new-parameter-kind-note">
+                                <legend>Tip *</legend>
+                                <ToggleSwitch Value="@(newKind == ParameterKind.Text)" Disabled="@busy" ValueChanged="on => newKind = on ? ParameterKind.Text : ParameterKind.Number">Text liber (ex. culoare)</ToggleSwitch>
+                                <ToggleSwitch Value="@(newKind == ParameterKind.Number)" Disabled="@busy" ValueChanged="on => newKind = on ? ParameterKind.Number : ParameterKind.Text">Număr (ex. 2,8)</ToggleSwitch>
+                                <ToggleSwitch Value="@(newKind == ParameterKind.Interval)" Disabled="@busy" ValueChanged="on => newKind = on ? ParameterKind.Interval : ParameterKind.Text">Interval (început și sfârșit, ex. 2,8 – 12)</ToggleSwitch>
+                                <ToggleSwitch Value="@(newKind == ParameterKind.Fixed)" Disabled="@busy" ValueChanged="on => newKind = on ? ParameterKind.Fixed : ParameterKind.Text">Valoare fixă (ex. Fisheye; numai în familie)</ToggleSwitch>
+                            </fieldset>
+                            @if (ProductParameterRules.UsesUnit(newKind))
+                            {
+                                <label for="new-parameter-unit">Unitate de măsură<input id="new-parameter-unit" maxlength="@ProductParameterRules.UnitMaximumLength" @bind="newUnit" @bind:event="oninput" disabled="@busy" autocomplete="off" placeholder="ex. mm" /></label>
+                            }
+                        </div>
+                        <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="AddParameterAsync">Adaugă parametrul</button><button type="button" class="danger" disabled="@busy" @onclick="() => showAddParameter = false">Anulează</button></div>
+                    </div>
+                }
+                @if (parameters.Count == 0) { <div class="empty-state compact"><p>Subcategoria nu are parametri obligatorii.</p></div> }
+                else
+                {
+                    <div class="table-scroll"><table class="def-table"><thead><tr><th>PARAMETRU</th><th>TIP</th><th>UNITATE</th><th>FAMILIE</th><th>VALORI</th><th>PRODUSE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                    @foreach (var parameter in parameters)
+                    {
+                        <tr class="parameter-row" @key="@($"parameter:{parameter.Id}")">
+                            <td><strong>@parameter.Name</strong></td>
+                            <td>@ProductParameterRules.KindLabel(parameter.Kind)</td>
+                            <td>@(parameter.Unit.Length > 0 ? parameter.Unit : "—")</td>
+                            <td>@(parameter.FamilyId is { } inFamily && families.FirstOrDefault(item => item.Id == inFamily) is { } parameterFamily ? parameterFamily.Name : "—")</td>
+                            <td>@parameter.Values.Count</td>
+                            <td>@parameter.ProductCount produse</td>
+                            <td class="row-actions">
+                                <button class="row-icon view" aria-expanded="@expandedParameters.Contains(parameter.Id).ToString().ToLowerInvariant()" aria-label="@($"Valorile parametrului {parameter.Name}")" title="@($"Valorile parametrului {parameter.Name}")" @onclick="() => ToggleValues(parameter.Id)"></button>
+                                @if (isAdministrator)
+                                {
+                                    <button class="row-icon edit" disabled="@busy" aria-label="@($"Editează parametrul {parameter.Name}")" title="@($"Editează parametrul {parameter.Name}")" @onclick="() => EditParameter(parameter)"></button>
+                                    <button class="row-icon delete" disabled="@busy" aria-label="@($"Șterge parametrul {parameter.Name}")" title="@($"Șterge parametrul {parameter.Name}")" @onclick="() => BeginDeleteParameterAsync(parameter)"></button>
+                                }
+                            </td>
+                        </tr>
+                        @if (editingParameter?.Id == parameter.Id)
+                        {
+                            <tr class="def-detail" @key="@($"parameter-edit:{parameter.Id}")"><td colspan="7">
+                                <div class="editor-grid parameter-edit">
+                                    <label>Denumire parametru *<input maxlength="@ProductParameterRules.NameMaximumLength" @bind="editName" @bind:event="oninput" disabled="@busy" autocomplete="off" /></label>
+                                    <label>Tip parametru<select @bind="editKind" disabled="@(busy || parameter.Kind == ParameterKind.Fixed)"><option value="@ParameterKind.Number">Număr (ex. 2,8)</option><option value="@ParameterKind.Text">Text liber (ex. culoare)</option><option value="@ParameterKind.Interval">Interval (început și sfârșit)</option>@if (parameter.Kind == ParameterKind.Fixed) { <option value="@ParameterKind.Fixed">Valoare fixă (ex. Fisheye)</option> }</select>
+                                        @if (parameter.Kind == ParameterKind.Fixed) { <small class="form-note">Valoarea fixă este denumirea parametrului: se poate redenumi doar cât timp nu există produse care o folosesc, iar tipul nu se schimbă.</small> }
+                                        else { <small class="form-note">Tipul se poate schimba dacă toate valorile existente se potrivesc cu tipul nou; unitatea nu se schimbă cât timp există produse.</small> }</label>
+                                    @if (ProductParameterRules.UsesUnit(editKind))
+                                    {
+                                        <label>Unitate de măsură<input maxlength="@ProductParameterRules.UnitMaximumLength" @bind="editUnit" @bind:event="oninput" disabled="@(busy || parameter.ProductCount > 0)" autocomplete="off" />
+                                            @if (parameter.ProductCount > 0) { <small class="form-note">Unitatea face parte din codurile produselor și nu se mai schimbă.</small> }</label>
+                                    }
+                                    <ChangeReasonField Id="parameter-reason" @bind-Value="editReason" AutoText="@EditSummary" @bind-UseAuto="editReasonAuto" Disabled="@busy" />
+                                </div>
+                                <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="RequestSaveParameter">Salvează parametrul</button><button type="button" class="danger" disabled="@busy" @onclick="CancelEditParameter">Anulează</button></div>
+                            </td></tr>
+                        }
+                        @if (expandedParameters.Contains(parameter.Id))
+                        {
+                            <tr class="def-detail parameter-card" @key="@($"parameter-values:{parameter.Id}")"><td colspan="7">
+                                @if (parameter.Kind == ParameterKind.Fixed)
+                                {
+                                    <p class="form-note fixed-parameter-note">Valoare unică: <strong>@parameter.Name</strong>. @(parameter.FamilyId is null ? "Parametrul lucrează numai într-o familie: adaugă-l într-o familie (împreună cu cel puțin un alt parametru), altfel nu apare la produse." : "Alegerea lui la un produs dă familiei valoarea, fără alte valori de completat.")</p>
+                                }
+                                else if (parameter.Values.Count == 0) { <p class="form-note">Parametrul nu are încă valori. Adaugă mai jos valorile din care se alege.</p> }
+                                else
+                                {
+                                    <div class="table-scroll"><table><thead><tr><th>VALOARE</th><th>PRODUSE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                                    @foreach (var value in parameter.Values)
+                                    {
+                                        <tr @key="value.Id"><td><strong>@parameter.Display(value.Value)</strong></td><td>@value.ProductCount produse</td><td class="row-actions">
+                                            @if (isAdministrator)
+                                            {
+                                                <button class="row-icon edit" disabled="@busy" aria-label="@($"Editează valoarea {parameter.Display(value.Value)}")" title="@($"Editează valoarea {parameter.Display(value.Value)}")" @onclick="() => { editingValue = (parameter, value); notice = null; }"></button>
+                                            }
+                                            @if (canEdit)
+                                            {
+                                            <button class="row-icon delete" disabled="@(busy || value.ProductCount > 0)" aria-label="@($"Șterge valoarea {parameter.Display(value.Value)}")"
+                                                    title="@(value.ProductCount > 0 ? $"Folosită de {value.ProductCount} produse: nu se poate șterge." : $"Șterge valoarea {parameter.Display(value.Value)}")"
+                                                    @onclick="() => { deletingValue = (parameter, value); deleteError = null; }"></button>
+                                            }
+                                        </td></tr>
+                                    }
+                                    </tbody></table></div>
+                                }
+                                @if (canEdit && parameter.Kind != ParameterKind.Fixed)
+                                {
+                                <div class="parameter-add">
+                                    @if (parameter.Kind == ParameterKind.Interval)
+                                    {
+                                        <IntervalInputs Label="@($"Interval nou pentru {parameter.Name}")" Start="@NewStart(parameter.Id)" End="@NewEnd(parameter.Id)" Disabled="@busy"
+                                                        StartChanged="value => newStarts[parameter.Id] = value" EndChanged="value => newEnds[parameter.Id] = value" KeyDown="args => AddValueKeyAsync(args, parameter)" />
+                                    }
+                                    else
+                                    {
+                                    <input aria-label="@($"Valoare nouă pentru {parameter.Name}")" maxlength="@ProductParameterRules.ValueMaximumLength" placeholder="@(parameter.Kind == ParameterKind.Number ? "Valoare nouă (număr, ex. 2,8)" : "Valoare nouă")"
+                                           value="@NewValue(parameter.Id)" @oninput="args => newValues[parameter.Id] = args.Value?.ToString() ?? string.Empty" @onkeydown="args => AddValueKeyAsync(args, parameter)" disabled="@busy" autocomplete="off" />
+                                    }
+                                    <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => AddValueAsync(parameter)">Adaugă valoarea</button>
+                                </div>
+                                }
+                            </td></tr>
+                        }
+                    }
+                    </tbody></table></div>
+                }
+                @if (!isAdministrator) { <p class="form-note">Valorile se pot adăuga și șterge (dacă nu sunt folosite) de orice utilizator; editarea valorilor și a parametrilor o face administratorul.</p> }
+            </div>
+        </details>
     }
 </section>
+</div>
 
 @if (pendingChanges is not null && editingParameter is not null)
 {
     <SaveConfirmationDialog Title="Salvezi modificările parametrului?" ObjectLabel="@($"{Group.Subcategory} / {editingParameter.Name}")" Changes="pendingChanges"
                             Reason="@editReasonChosen" Confirmed="ConfirmSaveParameterAsync" Cancelled="() => { pendingChanges = null; return Task.CompletedTask; }" />
 }
+@if (deletingTag is not null)
+{
+    <DeleteConfirmationDialog @key="@($"tag:{deletingTag.Id}")" Title="Ștergi eticheta?" Subject="Eticheta" ObjectLabel="@($"{Group.Subcategory} / {deletingTag.Name}")"
+                              Description="@(deletingTag.ProductCount > 0 ? $"{deletingTag.ProductCount} produse au eticheta activă și o pierd; produsele rămân neschimbate în rest." : "Niciun produs nu are eticheta activă.")"
+                              ConfirmationNote="Eticheta se șterge definitiv; operația se înregistrează în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteTagAsync" Cancelled="CancelDelete" />
+}
+@if (deletingFamily is not null)
+{
+    <DeleteConfirmationDialog @key="@($"family:{deletingFamily.Id}")" Title="Desfaci familia?" Subject="Familia" ObjectLabel="@($"{Group.Subcategory} / {deletingFamily.Name}")"
+                              Description="Parametrii familiei rămân, dar fiecare devine obligatoriu separat: produsele care nu au valori pentru toți devin incomplete până li se aleg."
+                              ConfirmationNote="Familia se desface; operația se înregistrează în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteFamilyAsync" Cancelled="CancelDelete" />
+}
 @if (deletingParameter is not null)
 {
     <DeleteConfirmationDialog @key="@($"param:{deletingParameter.Id}")" Title="Ștergi parametrul?" Subject="Parametrul" ObjectLabel="@($"{Group.Subcategory} / {deletingParameter.Name}")"
-                              Description="Se șterge parametrul cu toate valorile lui. Se poate numai cât subcategoria nu are produse."
-                              ConfirmationNote="Parametrul și valorile lui se șterg definitiv; operația se înregistrează în jurnal."
+                              Description="@DeleteParameterDescription" Details="DeleteParameterDetails"
+                              ConfirmationNote="Parametrul, valorile lui și valorile de pe produse se șterg definitiv, iar codurile produselor se rescriu; operația se înregistrează în jurnal."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteParameterAsync" Cancelled="CancelDelete" />
 }
 @if (deletingValue is not null)
@@ -136,19 +300,22 @@
     private IReadOnlyList<SubcategoryParameter> parameters = [];
     private bool loading = true, busy, deleteBusy, isAdministrator, canEdit;
     private string? error, notice, deleteError;
-    private readonly Dictionary<int, string> newValues = [];
+    private readonly Dictionary<int, string> newValues = [], newStarts = [], newEnds = [];
+    private string NewStart(int parameterId) => newStarts.TryGetValue(parameterId, out var text) ? text : "";
+    private string NewEnd(int parameterId) => newEnds.TryGetValue(parameterId, out var text) ? text : "";
     private string newName = "", newUnit = "";
     private ParameterKind newKind = ParameterKind.Text;
     private SubcategoryParameter? editingParameter, deletingParameter;
     private (SubcategoryParameter Parameter, ParameterListValue Value)? editingValue, deletingValue;
     private string editName = "", editUnit = "", editReason = "";
+    private ParameterKind editKind = ParameterKind.Text;
     private bool editReasonAuto = true;
     private IReadOnlyList<AuditChange>? pendingChanges;
     private string editReasonChosen = "";
     private bool SubcategoryIsEmpty => ProductCount == 0;
     private string NewValue(int parameterId) => newValues.TryGetValue(parameterId, out var text) ? text : "";
     private string EditSummary => editingParameter is null ? "" : ChangeReasonSummary.Build(
-        [new("Denumire parametru", editingParameter.Name, editName), new("Unitate", editingParameter.Unit, editingParameter.Kind == ParameterKind.Number ? editUnit : "")]);
+        [new("Denumire parametru", editingParameter.Name, editName), new("Unitate", editingParameter.Unit, ProductParameterRules.UsesUnit(editKind) ? editUnit : ""), new("Tip parametru", ProductParameterRules.KindLabel(editingParameter.Kind), ProductParameterRules.KindLabel(editKind))]);
 
     protected override async Task OnInitializedAsync()
     {
@@ -157,6 +324,86 @@
         await LoadAsync();
     }
 
+    // ---- sections: add forms, expanded value lists ----
+    private bool showAddTag, showAddFamily, showAddParameter;
+    private readonly HashSet<int> expandedParameters = [];
+    private void ToggleValues(int parameterId) { if (!expandedParameters.Remove(parameterId)) expandedParameters.Add(parameterId); }
+
+    // ---- tags of the subcategory (optional, On/Off on each product) ----
+    private IReadOnlyList<SubcategoryTag> tags = [];
+    private SubcategoryTag? renamingTag, deletingTag;
+    private string newTagName = "", renameTagText = "", renameTagReason = "";
+    private bool renameTagReasonAuto = true;
+    private string RenameTagSummary => renamingTag is null ? "" : ChangeReasonSummary.Build([new("Denumire etichetă", renamingTag.Name, renameTagText)]);
+    private void BeginRenameTag(SubcategoryTag tag) { renamingTag = tag; renameTagText = tag.Name; renameTagReason = ""; renameTagReasonAuto = true; notice = null; error = null; }
+
+    private Task AddTagAsync() => RunAsync(async () =>
+    {
+        var added = await Tags.AddTagAsync(Group, newTagName, lifetime.Token);
+        newTagName = ""; showAddTag = false;
+        return $"Eticheta „{added.Name}” a fost adăugată.";
+    }, "Eticheta nu a putut fi adăugată.");
+
+    private Task AddTagKeyAsync(KeyboardEventArgs args) => args.Key == "Enter" ? AddTagAsync() : Task.CompletedTask;
+
+    private Task RenameTagAsync() => RunAsync(async () =>
+    {
+        var tag = renamingTag!;
+        if (ChangeReasonSummary.ValidationError(renameTagReasonAuto, RenameTagSummary, renameTagReason) is { } reasonError) throw new ProductOperationException(reasonError);
+        var saved = await Tags.RenameTagAsync(tag, renameTagText, ChangeReasonSummary.Chosen(renameTagReasonAuto, RenameTagSummary, renameTagReason), lifetime.Token);
+        renamingTag = null;
+        return $"Eticheta a fost redenumită „{saved.Name}”.";
+    }, "Eticheta nu a putut fi redenumită.");
+
+    private Task DeleteTagAsync(string reason) => RunDeleteAsync(async () =>
+    {
+        await Tags.DeleteTagAsync(deletingTag!, reason, lifetime.Token);
+        return $"Eticheta „{deletingTag!.Name}” a fost ștearsă.";
+    });
+
+    // ---- families of parameters ----
+    private IReadOnlyList<ParameterFamily> families = [];
+    private ParameterFamily? editingFamily, deletingFamily;
+    private string familyName = "", newFamilyName = "", familyReason = "";
+    private bool familyReasonAuto = true;
+    private readonly HashSet<int> familyMembers = [], newFamilyMembers = [];
+
+    private string MemberNames(IEnumerable<int> ids) => string.Join(", ", parameters.Where(parameter => ids.Contains(parameter.Id)).Select(parameter => parameter.Name));
+    private string FamilySummary => editingFamily is null ? "" : ChangeReasonSummary.Build([new("Denumire familie", editingFamily.Name, familyName),
+        new("Parametri", MemberNames(editingFamily.ParameterIds), MemberNames(familyMembers))]);
+
+    private void EditFamily(ParameterFamily family)
+    {
+        editingFamily = family; familyName = family.Name; familyReason = ""; familyReasonAuto = true; notice = null; error = null;
+        familyMembers.Clear();
+        foreach (var id in family.ParameterIds) familyMembers.Add(id);
+    }
+
+    private void SetFamilyMember(int id, bool on) { if (on) familyMembers.Add(id); else familyMembers.Remove(id); }
+    private void SetNewFamilyMember(int id, bool on) { if (on) newFamilyMembers.Add(id); else newFamilyMembers.Remove(id); }
+
+    private Task AddFamilyAsync() => RunAsync(async () =>
+    {
+        var added = await Parameters.CreateFamilyAsync(Group, newFamilyName, newFamilyMembers.ToList(), lifetime.Token);
+        newFamilyName = ""; newFamilyMembers.Clear(); showAddFamily = false;
+        return $"Familia „{added.Name}” a fost adăugată. Produsele care nu au valoare pentru niciunul dintre parametrii ei sunt incomplete până li se alege una.";
+    }, "Familia nu a putut fi adăugată.");
+
+    private Task SaveFamilyAsync() => RunAsync(async () =>
+    {
+        var family = editingFamily!;
+        if (ChangeReasonSummary.ValidationError(familyReasonAuto, FamilySummary, familyReason) is { } reasonError) throw new ProductOperationException(reasonError);
+        var saved = await Parameters.UpdateFamilyAsync(family, familyName, familyMembers.ToList(), ChangeReasonSummary.Chosen(familyReasonAuto, FamilySummary, familyReason), lifetime.Token);
+        editingFamily = null;
+        return $"Familia „{saved.Name}” a fost actualizată.";
+    }, "Familia nu a putut fi actualizată.");
+
+    private Task DeleteFamilyAsync(string reason) => RunDeleteAsync(async () =>
+    {
+        await Parameters.DeleteFamilyAsync(deletingFamily!, reason, lifetime.Token);
+        return $"Familia „{deletingFamily!.Name}” a fost desfăcută.";
+    });
+
     private async Task LoadAsync()
     {
         try
@@ -164,6 +411,11 @@
             parameters = (await Parameters.GetParametersAsync(lifetime.Token))
                 .Where(parameter => string.Equals(parameter.Category, Group.Category, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(parameter.Subcategory, Group.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
+            tags = (await Tags.GetTagsAsync(lifetime.Token))
+                .Where(tag => string.Equals(tag.Category, Group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(tag.Subcategory, Group.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
+            families = (await Parameters.GetFamiliesAsync(lifetime.Token))
+                .Where(family => string.Equals(family.Category, Group.Category, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(family.Subcategory, Group.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { Logger.LogError("Parameter loading failed ({ErrorType}).", exception.GetType().Name); error = "Parametrii nu au putut fi încărcați."; }
@@ -190,14 +442,15 @@
     private Task AddParameterAsync() => RunAsync(async () =>
     {
         var added = await Parameters.AddParameterAsync(Group, newName, newUnit, newKind, lifetime.Token);
-        newName = newUnit = ""; newKind = ParameterKind.Text;
+        newName = newUnit = ""; newKind = ParameterKind.Text; showAddParameter = false;
         return $"Parametrul „{added.Name}” a fost adăugat. Produsele existente ale subcategoriei rămân blocate până li se aleg valorile.";
     }, "Parametrul nu a putut fi adăugat.");
 
     private Task AddValueAsync(SubcategoryParameter parameter) => RunAsync(async () =>
     {
-        var added = await Parameters.AddValueAsync(parameter.Id, NewValue(parameter.Id), lifetime.Token);
-        newValues.Remove(parameter.Id);
+        var text = parameter.Kind == ParameterKind.Interval ? IntervalInputs.Compose(NewStart(parameter.Id), NewEnd(parameter.Id)) : NewValue(parameter.Id);
+        var added = await Parameters.AddValueAsync(parameter.Id, text, lifetime.Token);
+        newValues.Remove(parameter.Id); newStarts.Remove(parameter.Id); newEnds.Remove(parameter.Id);
         return $"Valoarea „{parameter.Display(added.Value)}” a fost adăugată.";
     }, "Valoarea nu a putut fi adăugată.");
 
@@ -205,7 +458,7 @@
 
     private void EditParameter(SubcategoryParameter parameter)
     {
-        editingParameter = parameter; editName = parameter.Name; editUnit = parameter.Unit; editReason = ""; editReasonAuto = true; pendingChanges = null; notice = null; error = null;
+        editingParameter = parameter; editName = parameter.Name; editUnit = parameter.Unit; editKind = parameter.Kind; editReason = ""; editReasonAuto = true; pendingChanges = null; notice = null; error = null;
     }
 
     private void CancelEditParameter() { editingParameter = null; pendingChanges = null; }
@@ -217,7 +470,8 @@
         editReasonChosen = ChangeReasonSummary.Chosen(editReasonAuto, EditSummary, editReason);
         if (ChangeReasonSummary.ValidationError(editReasonAuto, EditSummary, editReason) is { } reasonError) { error = reasonError; return; }
         pendingChanges = SaveSummary.Changed(new("Denumire parametru", editingParameter.Name, TextNormalization.ForObjectNameOrCode(editName)),
-            new("Unitate", editingParameter.Unit, editingParameter.Kind == ParameterKind.Number ? TextNormalization.ForObjectNameOrCode(editUnit) : ""));
+            new("Unitate", editingParameter.Unit, ProductParameterRules.UsesUnit(editKind) ? TextNormalization.ForObjectNameOrCode(editUnit) : ""),
+            new("Tip parametru", ProductParameterRules.KindLabel(editingParameter.Kind), ProductParameterRules.KindLabel(editKind)));
     }
 
     private async Task ConfirmSaveParameterAsync()
@@ -227,13 +481,50 @@
         if (parameter is null) return;
         await RunAsync(async () =>
         {
-            await Parameters.UpdateParameterAsync(parameter, editName, editUnit, editReasonChosen, lifetime.Token);
+            await Parameters.UpdateParameterAsync(parameter, editName, editUnit, editKind, editReasonChosen, lifetime.Token);
             editingParameter = null;
             return "Parametrul a fost actualizat.";
         }, "Parametrul nu a putut fi actualizat.");
     }
 
-    private Task CancelDelete() { deletingParameter = null; deletingValue = null; deleteError = null; return Task.CompletedTask; }
+    private ParameterDeletionPreview? deletionPreview;
+    private string DeleteParameterDescription => deletingParameter is null ? "" : deletionPreview is { Affected.Count: > 0 }
+        ? $"Se șterge parametrul cu toate valorile lui. {deletionPreview.Affected.Count} produse au o valoare pentru el: o pierd, iar codul lor se rescrie fără ea."
+        : "Se șterge parametrul cu toate valorile lui. Niciun produs nu are o valoare pentru el.";
+    private async Task BeginDeleteParameterAsync(SubcategoryParameter parameter)
+    {
+        deleteError = null; deletionPreview = null;
+        try { deletionPreview = await Parameters.PreviewParameterDeletionAsync(parameter, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; return; }
+        catch (Exception) { error = "Efectul ștergerii nu a putut fi calculat. Reîncearcă."; return; }
+        deletingParameter = parameter;
+    }
+    private RenderFragment DeleteParameterDetails => builder =>
+    {
+        if (deletionPreview is null) return;
+        var seq = 0;
+        if (deletionPreview.Conflicts.Count > 0)
+        {
+            builder.OpenElement(seq++, "div"); builder.AddAttribute(seq++, "class", "error-banner"); builder.AddAttribute(seq++, "role", "alert");
+            builder.AddContent(seq++, ProductParameterRules.ConflictMessage(deletionPreview.Conflicts)); builder.CloseElement();
+        }
+        if (deletionPreview.Affected.Count == 0) return;
+        builder.OpenElement(seq++, "div"); builder.AddAttribute(seq++, "class", "table-scroll");
+        builder.OpenElement(seq++, "table"); builder.AddAttribute(seq++, "class", "save-summary");
+        builder.AddMarkupContent(seq++, "<thead><tr><th scope=\"col\">Cod actual</th><th scope=\"col\">Cod nou</th><th scope=\"col\">Stoc</th></tr></thead>");
+        builder.OpenElement(seq++, "tbody");
+        foreach (var product in deletionPreview.Affected)
+        {
+            builder.OpenElement(seq++, "tr"); builder.SetKey(product.ProductId);
+            builder.OpenElement(seq++, "td"); builder.AddContent(seq++, product.OldName); builder.CloseElement();
+            builder.OpenElement(seq++, "td"); builder.OpenElement(seq++, "strong"); builder.AddContent(seq++, product.NewName); builder.CloseElement(); builder.CloseElement();
+            builder.OpenElement(seq++, "td"); builder.AddContent(seq++, $"{product.Quantity} buc."); builder.CloseElement();
+            builder.CloseElement();
+        }
+        builder.CloseElement(); builder.CloseElement(); builder.CloseElement();
+    };
+    private Task CancelDelete() { deletionPreview = null; deletingParameter = null; deletingValue = null; deletingFamily = null; deletingTag = null; deleteError = null; return Task.CompletedTask; }
 
     private Task DeleteParameterAsync(string reason) => RunDeleteAsync(async () =>
     {
@@ -254,7 +545,7 @@
         try
         {
             var message = await delete();
-            deletingParameter = null; deletingValue = null;
+            deletingParameter = null; deletingValue = null; deletingFamily = null; deletingTag = null;
             await LoadAsync();
             notice = message;
             await Changed.InvokeAsync();
