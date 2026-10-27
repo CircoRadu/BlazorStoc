@@ -181,7 +181,8 @@ public static class ActivityImportPanelChecks
             "Activity import panel: the ticket types are in two groups, the unused first and collapsed, the used after it and open by default");
         cut.Find("#ai-types-unused input[role=switch]").Change(true);
         check(cut.FindAll("#ai-types-unused tbody tr").Count == 1 && cut.FindAll("#ai-types tbody tr").Count == 2, "Activity import panel: a type whose switch is turned on moves to the used group");
-        check(cut.FindAll("#ai-fields").Count == 0 && cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").HasAttribute("disabled"), "Activity import panel: the correspondence of the fields is empty and cannot be saved before the columns are read");
+        // Since 0.5.19 the saved correspondence is shown at once (with the default columns), before the columns are read from ActivityApp.
+        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Fields.Count && !cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").HasAttribute("disabled"), "Activity import panel: the saved correspondence of the fields is shown at once, before the columns are read");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Citește coloanele din ActivityApp").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-fields tbody tr").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Fields.Count && cut.Find("#ai-fields").TextContent.Contains("Detalii", StringComparison.Ordinal) && cut.Find("#ai-fields").TextContent.Contains("DescriptionInternal (implicit)", StringComparison.Ordinal),
