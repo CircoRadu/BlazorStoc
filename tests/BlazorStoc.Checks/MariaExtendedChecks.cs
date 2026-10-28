@@ -55,6 +55,7 @@ public static partial class MariaExtendedChecks
             await Section("Subcategory move: drag and drop of nodes, whole branch moves, conflicts refused, journal", () => SubcategoryMoveAsync(configuration, admin, audit));
             await Section("Subcategory inventory: a node stands for its leaves, leaves titled with their path", () => SubcategoryInventoryAsync(configuration, admin, audit));
             await Section("Branch move keeps definitions: copy, merge, verification, incomplete products", () => BranchMoveKeepsDefinitionsAsync(configuration, admin, audit));
+            await Section("Family return: a branch with its own family under the parent that has it, merged on decision", () => FamilyReturnsUnderParentAsync(configuration, admin, audit));
             await Section("Leaf promotion: a leaf becomes a category, the new name is checked first, definitions stay, journal", () => LeafPromotionAsync(configuration, admin, audit));
             await Section("Journal: server-side filtering, paging, window, ranges, removals, summary", () => AuditQueryAsync(configuration, audit, probe));
             await Section("Change events", () => ChangeEventsAsync(configuration, admin, audit));

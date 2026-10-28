@@ -155,6 +155,22 @@ public static class DefinitionRelocationPlannerChecks
 
 
 
+        // A branch that returns under the parent its copies came from: its own family and parameters repeat the parent's (same names, same content).
+        var back = Snapshot([P(50, "Fixa", C, ParameterKind.Text, "", 80, values: ["a"]), P(51, "Varifocala", C, ParameterKind.Text, "", 80, values: ["b"]), P(52, "Fixa", Y, ParameterKind.Text, "", 81, values: ["a"]), P(53, "Varifocala", Y, ParameterKind.Text, "", 81, values: ["b", "c"])],
+            [F(80, "Lentila", C), F(81, "Lentila", Y)]);
+        plan = Branch(back, C, Y, 1);
+        check(plan.Blocks.Count == 0 && plan.Items.Single().Action == BranchMoveAction.NeedsDecision && plan.Items.Single().Ref == new DefinitionRef(DefinitionKind.Family, 80) && plan.Operations.Count == 0,
+            "Branch move plan: an own family that repeats a family of the new ancestors needs a decision, not a block");
+        plan = Branch(back, C, Y, 1, new DefinitionRef(DefinitionKind.Family, 80));
+        check(plan.Blocks.Count == 0 && plan.Items.Single().Action == BranchMoveAction.OwnMerged
+              && plan.Operations.SequenceEqual(new RelocationOp[] { new MergeParameterOp(50, 52), new MergeParameterOp(51, 53), new DropFamilyOp(80) }),
+            "Branch move plan: a confirmed own family merges its parameters into the family above and disappears");
+        var extra = Snapshot([P(50, "Fixa", C, ParameterKind.Text, "", 80), P(54, "Fisheye", C, ParameterKind.Text, "", 80), P(52, "Fixa", Y, ParameterKind.Text, "", 81)], [F(80, "Lentila", C), F(81, "Lentila", Y)]);
+        plan = Branch(extra, C, Y, 1, new DefinitionRef(DefinitionKind.Family, 80));
+        check(plan.Operations.SequenceEqual(new RelocationOp[] { new MergeParameterOp(50, 52), new JoinFamilyOp(54, 81, Y), new DropFamilyOp(80) }), "Branch move plan: a parameter of the own family that the family above lacks joins it");
+        var different = Snapshot([P(50, "Fixa", C, ParameterKind.Text, "", 80), P(52, "Fixa", Y, ParameterKind.Number, "mm", 81)], [F(80, "Lentila", C), F(81, "Lentila", Y)]);
+        check(Branch(different, C, Y, 1, new DefinitionRef(DefinitionKind.Family, 80)).Blocks.Single().Contains("tip sau unitate", StringComparison.Ordinal), "Branch move plan: an own family with a parameter of another type or unit still blocks");
+
         // Leaving the category: its definitions are lost, those of the new category are gained.
         var categories = new DefSnapshot(
             new Dictionary<int, int?> { [X] = null, [C] = X, [Y] = null, [D] = Y },

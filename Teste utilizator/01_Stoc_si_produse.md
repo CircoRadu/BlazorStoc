@@ -319,6 +319,7 @@ Pasi:
 3. Daca noii parinti au o definitie cu acelasi nume (sau ramura are una proprie cu acelasi nume ca la noii parinti), apare "Imbina cu cele de la noii parinti": pana o pornesti, "Muta" ramane inactiv; valorile se unesc (existente / noi). Un tip sau o unitate diferita, o definitie arhivata sau o familie omonima blocheaza mutarea, cu mesaj.
 4. Produsele ramurii care nu au valoare pentru un parametru mostenit de la noii parinti sunt listate (paginat) si trebuie acceptate explicit; raman blocate la mutari de stoc pana li se aleg valorile.
 5. Se cere motivul; jurnalul "Mutare subcategorie" arata definitiile copiate, imbinate si produsele ramase incomplete.
+6. Intoarcere sub fostul parinte (0.5.30): daca subcategoria are propria familie/proprii parametri cu aceleasi nume ca la noul parinte (de exemplu copiile facute la o mutare anterioara), mutarea nu mai este blocata: familia apare cu comutatorul "Imbina cu cele de la noii parinti"; dupa activare parametrii cu acelasi nume se unesc, ceilalti intra in familia parintelui, iar produsele isi pastreaza valorile. Raman blocate doar tip/unitate diferite sau definitii arhivate.
 
 ### 28.10.2026 - Tragere pe niveluri si transformarea unei frunze in categorie
 

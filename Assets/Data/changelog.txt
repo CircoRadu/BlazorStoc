@@ -1,5 +1,8 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.30 | 28.10.2026
+- Mutare: o subcategorie care se întoarce sub părintele de la care avea copii ale parametrilor nu mai este blocată de familiile și parametrii cu același nume. Familia proprie se îmbină cu cea a părintelui după decizia ta („Îmbină cu cele de la noii părinți”): parametrii cu același nume se unesc, ceilalți intră în familia părintelui, iar produsele își păstrează valorile. Rămân blocate doar cazurile cu tip sau unitate diferite ori definiții arhivate.
+
 ## 0.5.29 | 28.10.2026
 - Parametri, familii și etichete: cele folosite nu se mai șterg, ci se arhivează. Textul valorii se păstrează la sfârșitul modelului produsului, iar legătura rămâne marcată ca arhivată; restaurarea o desface și listează problemele (text lipsă, nume ocupat, prea lung) cu redenumire automată sau manuală. Cele nefolosite apar la „Nefolosite”, cu ștergere definitivă și istoric de folosire. O familie se arhivează împreună cu membrii ei.
 - Setări → Catalog: perioada după care se poate renunța definitiv la restaurare (30–360 de zile, implicit 30).

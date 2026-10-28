@@ -518,9 +518,47 @@ internal static class BranchMovePlanner
             items.Add(new BranchMoveItem(reference, tag.Name, BranchMoveAction.CopyMerged, snapshot.Name(tag.Owner), snapshot.Name(clash.Owner), [], "Produsele ramurii cu eticheta On trec la eticheta de la noii părinți."));
         }
 
+        // The families of the branch that repeat a family of the new ancestors (what a branch gets back when it returns under the parent its copies came from): the user decides to merge them,
+        // the parameters of the same name are merged one into the other, the others join the family above.
+        var mergedFamilyMembers = new HashSet<int>();
+        foreach (var family in snapshot.Families.Where(item => subtree.Contains(item.Owner) && !item.Archived))
+        {
+            if (gainedFamilies.FirstOrDefault(item => item.Key == family.Key) is not { } survivor) continue;
+            var reference = new DefinitionRef(DefinitionKind.Family, family.Id);
+            var members = snapshot.Parameters.Where(item => item.FamilyId == family.Id).ToList();
+            foreach (var member in members) mergedFamilyMembers.Add(member.Id);
+            if (survivor.Archived) { Block(reference, family.Name, snapshot.Name(family.Owner), $"Familia «{family.Name}» există arhivată la {snapshot.Name(survivor.Owner)}: restaurează-o sau șterge-o înainte."); continue; }
+            var survivorMembers = snapshot.Parameters.Where(item => item.FamilyId == survivor.Id).ToList();
+            var familyOperations = new List<RelocationOp>();
+            var mappings = new List<ValueMapping>();
+            var failed = false;
+            foreach (var member in members)
+            {
+                var match = survivorMembers.FirstOrDefault(item => item.Key == member.Key);
+                if (match is not null)
+                {
+                    if (match.Archived || member.Archived || match.Kind != member.Kind || match.Unit != member.Unit)
+                    { Block(reference, family.Name, snapshot.Name(family.Owner), $"Parametrul «{member.Name}» al familiei «{family.Name}» diferă ca tip sau unitate de cel de la {snapshot.Name(match.Owner)} (sau este arhivat); redenumește unul dintre ele."); failed = true; break; }
+                    familyOperations.Add(new MergeParameterOp(member.Id, match.Id));
+                    mappings.AddRange(Map(member, match));
+                    continue;
+                }
+                if (gainedParameters.FirstOrDefault(item => item.Key == member.Key) is { } taken)
+                { Block(reference, family.Name, snapshot.Name(family.Owner), $"Parametrul «{member.Name}» al familiei «{family.Name}» ar intra în familia de la {snapshot.Name(survivor.Owner)}, dar există deja la {snapshot.Name(taken.Owner)}; redenumește unul dintre ele."); failed = true; break; }
+                familyOperations.Add(new JoinFamilyOp(member.Id, survivor.Id, survivor.Owner));
+            }
+            if (failed) continue;
+            if (!confirmed.Contains(reference))
+            { items.Add(new BranchMoveItem(reference, family.Name, BranchMoveAction.NeedsDecision, snapshot.Name(family.Owner), snapshot.Name(survivor.Owner), [], $"Familia «{family.Name}» a ramurii există și la noii părinți: îmbin-o sau renunță la mutare.")); continue; }
+            operations.AddRange(familyOperations);
+            operations.Add(new DropFamilyOp(family.Id));
+            items.Add(new BranchMoveItem(reference, family.Name, BranchMoveAction.OwnMerged, snapshot.Name(family.Owner), snapshot.Name(survivor.Owner), mappings, "Familia ramurii se îmbină cu cea de la noii părinți: parametrii cu același nume se unesc, ceilalți intră în familie."));
+        }
+
         // The definitions of the branch that repeat the ones the new ancestors have.
         foreach (var parameter in snapshot.Parameters.Where(item => subtree.Contains(item.Owner) && !item.Archived))
         {
+            if (mergedFamilyMembers.Contains(parameter.Id)) continue;
             if (gainedParameters.FirstOrDefault(item => item.Key == parameter.Key) is not { } clash) continue;
             var reference = new DefinitionRef(DefinitionKind.Parameter, parameter.Id);
             if (parameter.FamilyId is not null) { Block(reference, parameter.Name, snapshot.Name(parameter.Owner), $"Parametrul «{parameter.Name}» face parte dintr-o familie a ramurii și există la {snapshot.Name(clash.Owner)}; redenumește unul dintre ele."); continue; }
@@ -532,9 +570,7 @@ internal static class BranchMovePlanner
             operations.Add(new MergeParameterOp(parameter.Id, clash.Id));
             items.Add(new BranchMoveItem(reference, parameter.Name, BranchMoveAction.OwnMerged, snapshot.Name(parameter.Owner), snapshot.Name(clash.Owner), Map(parameter, clash), "Parametrul ramurii se îmbină cu cel de la noii părinți; valorile se unesc."));
         }
-        foreach (var family in snapshot.Families.Where(item => subtree.Contains(item.Owner) && !item.Archived))
-            if (gainedFamilies.FirstOrDefault(item => item.Key == family.Key) is { } sameFamily)
-                Block(new DefinitionRef(DefinitionKind.Family, family.Id), family.Name, snapshot.Name(family.Owner), $"Familia «{family.Name}» a ramurii există și la {snapshot.Name(sameFamily.Owner)}; redenumește una dintre ele înainte de mutare.");
+
         foreach (var tag in snapshot.Tags.Where(item => subtree.Contains(item.Owner) && !item.Archived))
         {
             if (gainedTags.FirstOrDefault(item => item.Key == tag.Key) is not { } clash) continue;

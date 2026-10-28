@@ -7,6 +7,49 @@ public static partial class MariaExtendedChecks
 {
     // A leaf becomes a category (stage 7): the category takes the leaf's name, the leaf stays under it as its only subcategory under a new name, the products, the parameters and the tags
     // stay on it, what it inherited is copied onto it, and nothing is written before the name and the checks pass.
+    // A branch with its own family returns under the parent that has the same family (copies made by an earlier move): the user merges them, nothing is blocked.
+    private static async Task FamilyReturnsUnderParentAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit)
+    {
+        var suffix = Suffix();
+        var products = new MariaProductRepository(configuration, admin, audit);
+        var parameters = new MariaProductParameterRepository(configuration, admin);
+        var category = $"Ext Fam Cat {suffix}";
+        await products.CreateCategoryAsync(category);
+        var y = await products.CreateSubcategoryAsync(category, $"Ext Fam Y {suffix}");
+        var c = await products.CreateSubcategoryAsync(category, $"Ext Fam C {suffix}");
+        async Task<(SubcategoryParameter Fixa, SubcategoryParameter Vari, SubcategoryParameter? Extra, ParameterFamily Family)> Define(ProductGroup group, bool extra)
+        {
+            var fixa = await parameters.AddParameterAsync(group, "Fixa fam", "", ParameterKind.Text);
+            var vari = await parameters.AddParameterAsync(group, "Vari fam", "", ParameterKind.Text);
+            await parameters.AddValueAsync(fixa.Id, "a");
+            await parameters.AddValueAsync(vari.Id, "b");
+            SubcategoryParameter? more = extra ? await parameters.AddParameterAsync(group, "Fisheye fam", "", ParameterKind.Text) : null;
+            if (more is not null) await parameters.AddValueAsync(more.Id, "x");
+            var family = await parameters.CreateFamilyAsync(group, "Lentila fam", more is null ? [fixa.Id, vari.Id] : [fixa.Id, vari.Id, more.Id]);
+            return (fixa, vari, more, family);
+        }
+        var above = await Define(y, false);
+        var own = await Define(c, true);
+        var valueA = (await parameters.GetParametersAsync()).Single(item => item.Id == own.Fixa.Id).Values.Single(value => value.Value == "a");
+        var product = await products.CreateAsync(new ProductInput
+        {
+            Name = $"FAM1-{suffix}", BaseModel = $"FAM1-{suffix}", Category = c.Category, Subcategory = c.Subcategory,
+            Parameters = [new ProductParameterChoice(own.Fixa.Id, valueA.Id)]
+        });
+        var familyRef = new DefinitionRef(DefinitionKind.Family, own.Family.Id);
+
+        var undecided = await products.PreviewMoveAsync(c, y, category, 0, null);
+        Check(undecided.Blocks.Count == 0 && undecided.NeedsDecision && undecided.Items.Single().Ref == familyRef && !undecided.CanApply, "Family return: the own family that repeats the parent's needs a decision, nothing is blocked");
+        await products.MoveAsync(c, y, category, 0, new BranchMoveChoices([familyRef], true, "Ext intoarcere familie"));
+        var families = (await parameters.GetFamiliesAsync()).Where(item => item.Category == category && item.Name == "Lentila fam").ToList();
+        var all = (await parameters.GetParametersAsync()).Where(item => item.Category == category).ToList();
+        var state = await parameters.GetProductStateAsync(product.Id);
+        var above2 = all.Single(item => item.Id == above.Fixa.Id);
+        Check(families.Count == 1 && families[0].Id == above.Family.Id && all.Count(item => item.Name == "Fixa fam") == 1 && all.Count(item => item.Name == "Vari fam") == 1 && all.Single(item => item.Name == "Fisheye fam").Subcategory == y.Subcategory
+              && all.All(item => item.Subcategory == y.Subcategory) && state.Choices.Single().ParameterId == above.Fixa.Id && above2.Values.Single(value => value.Id == state.Choices.Single().ValueId).Value == "a",
+            "Family return: the families and the parameters of the same name are merged into the parent's, the extra parameter joins the family, the product keeps its value");
+    }
+
     private static async Task LeafPromotionAsync(IConfiguration configuration, IAccessControl admin, IAuditTrail audit)
     {
         var suffix = Suffix();
