@@ -1,5 +1,14 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.29 | 28.10.2026
+- Parametri, familii și etichete: cele folosite nu se mai șterg, ci se arhivează. Textul valorii se păstrează la sfârșitul modelului produsului, iar legătura rămâne marcată ca arhivată; restaurarea o desface și listează problemele (text lipsă, nume ocupat, prea lung) cu redenumire automată sau manuală. Cele nefolosite apar la „Nefolosite”, cu ștergere definitivă și istoric de folosire. O familie se arhivează împreună cu membrii ei.
+- Setări → Catalog: perioada după care se poate renunța definitiv la restaurare (30–360 de zile, implicit 30).
+- Categoriile pot avea parametri, familii și etichete proprii, moștenite de toate subcategoriile de sub ele; pictograma „Parametri și etichete” apare și pe titlul categoriei.
+- „Preia de la copil” (pe subcategorii cu copii și pe categorii): definițiile unui copil urcă la părinte, cu previzualizare reală anulată, decizie pentru omonime (îmbinare), listă de produse care devin incomplete și motiv.
+- Mutarea unei ramuri păstrează ce moștenea: parametrii, familiile și etichetele părinților părăsiți se copiază pe nodul mutat sau se îmbină cu omonimele noilor părinți, iar produsele care nu au valori pentru ce moștenesc acum sunt listate și trebuie acceptate (fereastra „Verificări la mutare”). Refuzurile vechi la mutarea între categorii au dispărut.
+- Tragerea pe niveluri: zone de plasare cu explicație lângă cursor (roșie și fără drop când mutarea e refuzată). O frunză trasă între categorii devine categorie nouă: alegi numele subcategoriei care păstrează produsele, parametrii și etichetele, verifici efectele, apoi confirmi; nimic nu se scrie înainte.
+- Jurnal: acțiuni noi pentru arhivare, restaurare, îmbinare, relocare și promovare de subcategorie în categorie; modulul trece la versiunea 1.4.0.
+
 ## 0.5.28 | 28.10.2026
 - Categorii: arbore de subcategorii pe oricâte niveluri. O subcategorie poate avea subcategorii copil; copilul moștenește automat parametrii obligatorii, familiile de parametri și etichetele părinților și își poate adăuga altele. Categoriile (primul nivel) nu au parametri și nici etichete. Produsele se asociază numai frunzelor; o frunză cu produse care primește un copil își mută produsele în el, păstrându-le parametrii și etichetele.
 - Categorii: aranjare și mutare prin tragere pentru orice nod (înainte, după sau ca subcategorie copil; titlul unei categorii îl pune ultimul la primul nivel). Mutarea duce toată structura de sub nod, inclusiv între categorii. Conflictele sunt refuzate cu mesaj: mutare în propriul subarbore, adâncime depășită, părinte cu produse, nume de parametru sau etichetă repetat, valori sau etichete moștenite care s-ar pierde.
@@ -11,7 +20,6 @@
 - Backup: tabela catalog_settings face parte din pachetele de backup.
 - Jurnal: acțiuni noi (adăugare subcategorie copil, mutare produse în subcategorie copil, mutare subcategorie, modificare adâncime maximă); modulul trece la versiunea 1.3.1. Inventar 1.1.0, Facturi 1.1.1.
 - Baza de date: migrările 54 (subcategories.parent_id) și 55 (tabela catalog_settings).
-- Interfață: butoanele de acțiune devin iconițe cu titlu (Salvează, Anulează, Șterge, Exportă CSV etc.); pe pagina produsului și în formularele ei butoanele rămân cu text.
 - Interfață: elementele paginii se reașază la îngustarea ferestrei (antete, filtre, grupuri de butoane), iar tabelele care nu încap au bară de defilare orizontală.
 - Produs: cardul „Descriere” sub cardul „Produs”, cu spațiu mai mic între carduri.
 - Meniul Stoc: un clic pe numele unei categorii sau subcategorii o deschide și o lasă deschisă; închiderea se face cu săgeata.

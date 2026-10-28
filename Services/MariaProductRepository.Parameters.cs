@@ -15,19 +15,19 @@ public sealed partial class MariaProductRepository
 
     // Without parameters on the subcategory the name stays what the user typed; with them the name is composed from the model and the values.
     private static async Task<ParameterResolution> ResolveParametersAsync(MySqlConnection connection, MySqlTransaction transaction,
-        int subcategoryId, string subcategory, ProductInput value, CancellationToken token)
+        int categoryId, int subcategoryId, string subcategory, ProductInput value, CancellationToken token)
     {
-        // The parameters and families of the subcategory and of every ancestor (migration 54); the categories have none.
+        // The parameters and families of the category (migration 56), of the subcategory and of every ancestor (migration 54): the category's come first.
         var chainList = SubcategoryAncestry.InList(await SubcategoryAncestry.ChainAsync(connection, transaction, subcategoryId, token).ConfigureAwait(false));
         var definitions = new List<(int Id, string Name, string Unit, int? FamilyId, int Position, ParameterKind Kind)>();
         await using (var select = Command(connection, transaction,
-            $"SELECT id,name,unit,family_id,position,kind FROM subcategory_parameters WHERE subcategory_id IN ({chainList}) ORDER BY FIELD(subcategory_id,{chainList}),position,id"))
+            $"SELECT id,name,unit,family_id,position,kind FROM subcategory_parameters WHERE {DefinitionOwners.ChainSql(chainList)} AND archived_utc IS NULL ORDER BY (category_id IS NULL),FIELD(subcategory_id,{chainList}),position,id", ("@chainCategory", categoryId)))
         await using (var reader = await select.ExecuteReaderAsync(token).ConfigureAwait(false))
             while (await reader.ReadAsync(token).ConfigureAwait(false))
                 definitions.Add((checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2), reader.IsDBNull(3) ? null : checked((int)reader.GetInt64(3)), reader.GetInt32(4), (ParameterKind)reader.GetInt32(5)));
         if (definitions.Count == 0) return new ParameterResolution(value.Name, null, []);
         var families = new List<ParameterFamily>();
-        await using (var selectFamilies = Command(connection, transaction, $"SELECT id,name FROM parameter_families WHERE subcategory_id IN ({chainList})"))
+        await using (var selectFamilies = Command(connection, transaction, $"SELECT id,name FROM parameter_families WHERE {DefinitionOwners.ChainSql(chainList)} AND archived_utc IS NULL", ("@chainCategory", categoryId)))
         await using (var reader = await selectFamilies.ExecuteReaderAsync(token).ConfigureAwait(false))
             while (await reader.ReadAsync(token).ConfigureAwait(false))
                 families.Add(new ParameterFamily(checked((int)reader.GetInt64(0)), "", subcategory, reader.GetString(1), 0, 0, []));
@@ -58,9 +58,14 @@ public sealed partial class MariaProductRepository
     }
 
     private static async Task StoreParametersAsync(MySqlConnection connection, MySqlTransaction transaction, int productId,
-        ParameterResolution resolution, CancellationToken token)
+        ParameterResolution resolution, string actor, CancellationToken token)
     {
-        await using (var clear = Command(connection, transaction, "DELETE FROM product_parameter_values WHERE product_id=@id", ("@id", productId)))
+        // The links of archived parameters stay: they hold the value baked into the model of the product (migration 56).
+        var before = new HashSet<(int Parameter, int Value)>();
+        await using (var existing = Command(connection, transaction, "SELECT parameter_id,value_id FROM product_parameter_values WHERE product_id=@id AND archived=0", ("@id", productId)))
+        await using (var reader = await existing.ExecuteReaderAsync(token).ConfigureAwait(false))
+            while (await reader.ReadAsync(token).ConfigureAwait(false)) before.Add((checked((int)reader.GetInt64(0)), checked((int)reader.GetInt64(1))));
+        await using (var clear = Command(connection, transaction, "DELETE FROM product_parameter_values WHERE product_id=@id AND archived=0", ("@id", productId)))
             await clear.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         await using (var model = Command(connection, transaction, "UPDATE products SET base_model=@model WHERE id=@id",
                          ("@model", resolution.BaseModel is null ? DBNull.Value : resolution.BaseModel), ("@id", productId)))
@@ -72,6 +77,12 @@ public sealed partial class MariaProductRepository
                 ("@product", productId), ("@parameter", row.ParameterId), ("@value", row.ValueId));
             await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
         }
+        // The usage log keeps the links that appeared and disappeared with this save (an unchanged link writes nothing).
+        var after = resolution.Rows.Select(row => (row.ParameterId, row.ValueId)).ToHashSet();
+        foreach (var (parameter, value) in before.Where(link => !after.Contains(link)))
+            await ParameterUsageLog.WriteLinkAsync(connection, transaction, productId, parameter, value, ParameterUsageActions.Removed, actor, token).ConfigureAwait(false);
+        foreach (var (parameter, value) in after.Where(link => !before.Contains(link)))
+            await ParameterUsageLog.WriteLinkAsync(connection, transaction, productId, parameter, value, ParameterUsageActions.Applied, actor, token).ConfigureAwait(false);
     }
 
     // "Lentilă: 2.8 mm; Culoare: alb" - what the product has now, for the journal.
@@ -81,7 +92,7 @@ public sealed partial class MariaProductRepository
             SELECT sp.name,sp.unit,v.value FROM product_parameter_values pv
             INNER JOIN subcategory_parameters sp ON sp.id=pv.parameter_id
             INNER JOIN parameter_values v ON v.id=pv.value_id
-            WHERE pv.product_id=@id ORDER BY sp.position,sp.id
+            WHERE pv.product_id=@id AND pv.archived=0 ORDER BY sp.position,sp.id
             """, ("@id", productId));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
         var values = new List<(string, string)>();

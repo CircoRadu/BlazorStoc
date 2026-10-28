@@ -367,6 +367,12 @@ LOCK TABLES `parameter_families` WRITE;
 /*!40000 ALTER TABLE `parameter_families` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `parameter_usage_log` WRITE;
+/*!40000 ALTER TABLE `parameter_usage_log` DISABLE KEYS */;
+REPLACE INTO `parameter_usage_log` (`id`, `definition_kind`, `definition_id`, `parameter_name`, `value_text`, `product_id`, `product_name`, `node_path`, `action`, `actor`, `reason`, `occurred_utc`) VALUES (1,'parameter',4,'ZZ Test arhiva','',NULL,'','Supraveghere Video / Camere Video IP','stergere definitie','claude.dev','Definitia nu va mai fi folosita','2026-10-28T10:51:25.995Z');
+/*!40000 ALTER TABLE `parameter_usage_log` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `parameter_values` WRITE;
 /*!40000 ALTER TABLE `parameter_values` DISABLE KEYS */;
 /*!40000 ALTER TABLE `parameter_values` ENABLE KEYS */;
@@ -882,7 +888,8 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (52,'Produse: familii de parametri (cel putin 2 parametri ai aceleiasi subcategorii; un produs are exact unul activ din familie)','2a4c7a6afa55e91f0028c64df27600e1042e5212d1fe08ddd4cc47c1a8202664','applied','2026-10-26 09:59:33','0.5.22'),
 (53,'Produse: etichete pe subcategorie (On/Off pe produs, neobligatorii, folosite la filtrarea catalogului)','03ec7f4856bf28467d53a4fc7936842f00c85dcd35b5a144a17b041f1b77b19c','applied','2026-10-27 13:05:03','0.5.26'),
 (54,'Produse: arbore de subcategorii (o subcategorie poate avea subcategorii copil, pe oricate niveluri)','cc95ad7f610714cf73b5ec8e1db73f69c21c3309b72fb85127c650074d133213','applied','2026-10-28 05:46:38','0.5.27'),
-(55,'Produse: setari de catalog (adancimea maxima a arborelui de subcategorii)','54d4e8bcac7a0266a5e4a3d2df47c6deba00d1bac18192264280b48c28460013','applied','2026-10-28 05:46:38','0.5.27');
+(55,'Produse: setari de catalog (adancimea maxima a arborelui de subcategorii)','54d4e8bcac7a0266a5e4a3d2df47c6deba00d1bac18192264280b48c28460013','applied','2026-10-28 05:46:38','0.5.27'),
+(56,'Produse: arhivarea parametrilor si etichetelor, parametri si etichete pe categorie, jurnal de utilizare','3036181973f67a24bc336305f0640ed70d153d8a41f29d792f1e9050b89bbc3c','applied','2026-10-28 10:49:50','0.5.28');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1385,7 +1392,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `subcategory_parameters` WRITE;
 /*!40000 ALTER TABLE `subcategory_parameters` DISABLE KEYS */;
-REPLACE INTO `subcategory_parameters` (`id`, `subcategory_id`, `name`, `normalized_name`, `unit`, `kind`, `position`, `version`, `family_id`) VALUES (3,63,'Lentila','LENTILA','mm',1,1,0,NULL);
+REPLACE INTO `subcategory_parameters` (`id`, `subcategory_id`, `name`, `normalized_name`, `unit`, `kind`, `position`, `version`, `family_id`, `category_id`, `archived_utc`, `archived_by`) VALUES (3,63,'Lentila','LENTILA','mm',1,1,0,NULL,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `subcategory_parameters` ENABLE KEYS */;
 UNLOCK TABLES;
 

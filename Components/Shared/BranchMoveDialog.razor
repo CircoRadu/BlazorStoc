@@ -1,0 +1,188 @@
+@using BlazorStoc.Services
+@inject ISubcategoryTree Tree
+@inject ILogger<BranchMoveDialog> Logger
+@implements IDisposable
+
+@* The verification of a move that changes what a branch inherits (stage 6): the parameters, families and tags of the parents the branch leaves are copied onto the moved node (or merged
+   into the namesakes of the new parents, when the user agrees), those of the new parents are gained, and the products that lack what is gained are listed and must be accepted.
+   The preview is a rolled-back run of the real move. The same dialog also promotes a leaf to a category (stage 7): the user first names the subcategory that will stay under the new
+   category (the old name goes to the category), the checks run as a rolled-back preview of the whole change, and nothing is written before they pass and the user confirms. *@
+<div class="delete-overlay">
+<section class="delete-dialog archive-dialog take-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+    <div class="catalog-heading dialog-head"><h2 id="@TitleId">@(Promote ? "Transformare în categorie" : "Verificări la mutare") · @Node.Subcategory</h2><HelpButton Topic="categorii-parametri" About="@(Promote ? "Transformarea unei subcategorii în categorie" : "Verificările la mutarea unei subcategorii")" /></div>
+    @if (Promote)
+    {
+        <p class="delete-object"><strong>@Node.Subcategory → categorie nouă „@Node.Subcategory”</strong></p>
+        <p class="form-note">Subcategoria devine categorie și își păstrează produsele, parametrii și etichetele sub o subcategorie nouă a categoriei. Numele de acum trece la categorie, deci subcategoria are nevoie de alt nume. Structura se schimbă numai după ce numele trece verificările și confirmi.</p>
+        <label for="promote-name">Denumirea subcategoriei din noua categorie *<input id="promote-name" maxlength="100" value="@newName" @oninput="NameChanged" disabled="@(busy || loading)" autocomplete="off" /></label>
+    }
+    else
+    {
+        <p class="delete-object"><strong>@Node.Subcategory → @DestinationText</strong></p>
+    }
+    @if (loading)
+    {
+        <div class="empty-state compact" role="status"><div class="spinner"></div></div>
+    }
+    else if (preview is not null)
+    {
+        @if (Promote) { <p class="form-note">Subcategoria „@newName.Trim()” păstrează parametrii, familiile și etichetele pe care le moștenea: ele se copiază pe ea (fostul părinte le păstrează pentru ceilalți copii). Categoria nu moștenește nimic.</p> }
+        else { <p class="form-note">Subcategoria păstrează parametrii, familiile și etichetele pe care le moștenea: ele se copiază pe ea (părintele vechi le păstrează pentru ceilalți copii). Ce definesc noii părinți devine moștenit de produsele ramurii.</p> }
+        @foreach (var block in preview.Blocks) { <div class="error-banner" role="alert">@block</div> }
+        @if (preview.Items.Count == 0) { <p class="form-note">Nu se copiază și nu se îmbină nicio definiție.</p> }
+        else
+        {
+            <div class="table-scroll"><table class="save-summary take-preview"><thead><tr><th scope="col">Definiție</th><th scope="col">Ce se întâmplă</th><th scope="col">Decizie</th></tr></thead><tbody>
+            @foreach (var item in preview.Items)
+            {
+                <tr @key="@($"{item.Ref.Kind}:{item.Ref.Id}")" class="@(item.Action is BranchMoveAction.NeedsDecision or BranchMoveAction.Blocked ? "restore-problem" : "")">
+                    <td><strong>@item.Name</strong><small class="muted"> · @KindText(item.Ref.Kind) · @item.From</small></td>
+                    <td>
+                        @ActionText(item)
+                        @if (item.Values.Count > 0)
+                        {
+                            <details class="take-values"><summary>Valori (@item.Values.Count)</summary>
+                                <ul>@foreach (var value in item.Values) { <li>@value.Value — @(value.ExistsAtSurvivor ? "există deja" : "valoare nouă") (@value.Products produse)</li> }</ul>
+                            </details>
+                        }
+                    </td>
+                    <td>
+                        @if (item.Action is BranchMoveAction.NeedsDecision or BranchMoveAction.CopyMerged or BranchMoveAction.OwnMerged)
+                        {
+                            <ToggleSwitch Value="@confirmed.Contains(item.Ref)" Disabled="@busy" ValueChanged="on => SetMergeAsync(item.Ref, on)">Îmbină cu cele de la noii părinți</ToggleSwitch>
+                        }
+                        else { <span class="muted">—</span> }
+                    </td></tr>
+            }
+            </tbody></table></div>
+        }
+        @if (preview.Incomplete.Count > 0)
+        {
+            <div class="info-banner take-incomplete" role="status">@preview.Incomplete.Count @(preview.Incomplete.Count == 1 ? "produs devine incomplet" : "produse devin incomplete"): nu au valoare pentru un parametru moștenit de la noii părinți și rămân blocate la mișcări de stoc până li se aleg valorile.</div>
+            <Paged Items="preview.Incomplete" Id="branch-incomplete" Label="Produse pe pagină" DefaultSize="10" Sizes="@pageSizes">
+                <div class="table-scroll"><table class="save-summary"><thead><tr><th scope="col">Produse care devin incomplete</th></tr></thead><tbody>
+                @foreach (var product in context) { <tr @key="product.ProductId"><td>@product.Name</td></tr> }
+                </tbody></table></div>
+            </Paged>
+            <ToggleSwitch Value="@accepted" Disabled="@busy" ValueChanged="on => accepted = on">Accept ca aceste produse să rămână blocate până li se aleg valorile</ToggleSwitch>
+        }
+        <ChangeReasonField Id="branch-reason" @bind-Value="reason" Error="@reasonError" Disabled="@busy" Hint="Descrie motivul mutării. Informația va fi păstrată în jurnalul de activitate." />
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@(busy || !CanApply)" @onclick="ApplyAsync">@(busy ? (Promote ? "Se transformă…" : "Se mută…") : Promote ? "Transformă în categorie" : "Mută")</button>
+            <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => Closed.InvokeAsync()">Anulează</button>
+        </div>
+    }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        <div class="editor-actions">
+            @if (Promote) { <button type="button" class="primary" disabled="@(busy || loading || newName.Trim().Length == 0)" @onclick="CheckPromotionAsync">Verifică numele și efectele</button> }
+            <button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">@(Promote ? "Anulează" : "Închide")</button>
+        </div>
+    }
+</section>
+</div>
+
+@code {
+    // What the drag asked for: the node, its new parent (null = first level), the category it ends in and the place among its siblings.
+    [Parameter, EditorRequired] public ProductGroup Node { get; set; } = new("", "");
+    [Parameter] public ProductGroup? NewParent { get; set; }
+    [Parameter, EditorRequired] public string Destination { get; set; } = "";
+    [Parameter] public int Position { get; set; }
+    // Promotion of a leaf to a category: the place of the new category among the categories (0 = first); Destination and NewParent are not used.
+    [Parameter] public bool Promote { get; set; }
+    [Parameter] public int CategoryPosition { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+    [Parameter] public EventCallback<SubcategoryMoveResult> Moved { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private readonly IReadOnlyList<int> pageSizes = [10, 25, 50, 0];
+    private readonly HashSet<DefinitionRef> confirmed = [];
+    private BranchMovePreview? preview;
+    private bool loading = true, busy, accepted;
+    private string reason = "", newName = "";
+    private string? error, reasonError;
+    private string TitleId => $"branch-title-{instanceId}";
+    private string DestinationText => NewParent is null ? Destination : $"{Destination} / {NewParent.Subcategory}";
+    private bool CanApply => preview is { CanApply: true } && (preview.Incomplete.Count == 0 || accepted);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Promote) { loading = false; return; }
+        await RunPreviewAsync();
+        loading = false;
+    }
+
+    private Task<BranchMovePreview> PreviewCallAsync() => Promote
+        ? Tree.PreviewPromotionAsync(Node, newName, CategoryPosition, Choices(), lifetime.Token)
+        : Tree.PreviewMoveAsync(Node, NewParent, Destination, Position, Choices(), lifetime.Token);
+
+    private async Task RunPreviewAsync()
+    {
+        try { preview = await PreviewCallAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Move preview failed ({ErrorType}).", exception.GetType().Name); error = "Efectul mutării nu a putut fi calculat. Reîncearcă."; }
+    }
+
+    // Another name means other checks: the previous result and the decisions taken on it are dropped.
+    private void NameChanged(ChangeEventArgs args)
+    {
+        newName = args.Value?.ToString() ?? "";
+        preview = null; accepted = false; error = null; confirmed.Clear();
+    }
+
+    private async Task CheckPromotionAsync()
+    {
+        if (busy || loading) return;
+        busy = true; error = null;
+        try { await RunPreviewAsync(); }
+        finally { busy = false; }
+    }
+
+    private BranchMoveChoices Choices() => new([.. confirmed], accepted, ChangeReasonRules.Normalize(reason));
+
+    private async Task SetMergeAsync(DefinitionRef reference, bool on)
+    {
+        if (busy) return;
+        if (on) confirmed.Add(reference); else confirmed.Remove(reference);
+        accepted = false; busy = true; error = null;
+        try { await RunPreviewAsync(); }
+        finally { busy = false; }
+    }
+
+    private async Task ApplyAsync()
+    {
+        if (busy || preview is null) return;
+        reasonError = ChangeReasonRules.ValidationError(ChangeReasonRules.Normalize(reason));
+        if (reasonError is not null) return;
+        busy = true; error = null;
+        try
+        {
+            var result = Promote
+                ? await Tree.PromoteAsync(Node, newName, CategoryPosition, Choices(), lifetime.Token)
+                : await Tree.MoveAsync(Node, NewParent, Destination, Position, Choices(), lifetime.Token);
+            await Moved.InvokeAsync(result);
+            await Closed.InvokeAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Branch move failed ({ErrorType}).", exception.GetType().Name); error = "Mutarea nu a reușit. Actualizează lista și reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private static string KindText(DefinitionKind kind) => kind switch { DefinitionKind.Parameter => "parametru", DefinitionKind.Family => "familie", _ => "etichetă" };
+
+    private static string ActionText(BranchMoveItem item) => item.Action switch
+    {
+        BranchMoveAction.Copy => $"Se copiază pe subcategoria mutată. {item.Note}",
+        BranchMoveAction.CopyMerged => $"Se îmbină cu definiția de la {item.To}. {item.Note}",
+        BranchMoveAction.OwnMerged => $"Se îmbină cu definiția de la {item.To}. {item.Note}",
+        BranchMoveAction.NeedsDecision => item.Note,
+        _ => item.Note
+    };
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

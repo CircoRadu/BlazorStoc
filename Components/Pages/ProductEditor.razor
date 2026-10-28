@@ -222,8 +222,9 @@
         if (names.Count == 0 && !string.IsNullOrWhiteSpace(input.Subcategory)) names.Add(input.Subcategory);
         return names;
     }
-    private bool InLineage(string subcategory) => Lineage().Contains(subcategory, StringComparer.OrdinalIgnoreCase);
-    private int LineageIndex(string subcategory) => Lineage().FindIndex(name => string.Equals(name, subcategory, StringComparison.OrdinalIgnoreCase));
+    // A definition with no subcategory belongs to the category and reaches every subcategory of it (migration 56).
+    private bool InLineage(string subcategory) => subcategory.Length == 0 || Lineage().Contains(subcategory, StringComparer.OrdinalIgnoreCase);
+    private int LineageIndex(string subcategory) => subcategory.Length == 0 ? -1 : Lineage().FindIndex(name => string.Equals(name, subcategory, StringComparison.OrdinalIgnoreCase));
     private bool IsLeafName(string subcategory) => treeNodes.FirstOrDefault(item => string.Equals(item.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Name, subcategory, StringComparison.OrdinalIgnoreCase))?.IsLeaf ?? true;
 
     private int inVehicles;

@@ -1395,6 +1395,14 @@ tr[data-node-name].drop-before>td{box-shadow:inset 0 3px 0 var(--green)}
 tr[data-node-name].drop-after>td{box-shadow:inset 0 -3px 0 var(--green)}
 tr[data-node-name].drop-inside>td{background:var(--c-eaf4f0);box-shadow:inset 0 0 0 1px var(--green)}
 [data-category-drop].drop-inside{outline:2px dashed var(--green);outline-offset:2px;border-radius:4px}
+/* Stage 7: while a node is dragged, strips between the categories turn a leaf into a new category; a tooltip next to the pointer says what a drop does (red when refused). */
+.category-drop-strip{display:none}
+body.dragging-node .category-drop-strip{display:block;height:18px;margin:2px 0;border:2px dashed var(--c-9fc9bd);border-radius:6px}
+body.dragging-node .category-drop-strip.drop-inside{background:var(--c-eaf4f0);border-color:var(--green)}
+body.dragging-node .category-drop-strip.drop-blocked{background:var(--c-fff0eb);border-color:var(--c-eacbc0)}
+.drag-tip{position:fixed;z-index:1000;max-width:380px;pointer-events:none;background:var(--c-192d31);color:var(--c-ffffff);border:1px solid var(--green);border-radius:8px;padding:9px 12px;font-size:12px;line-height:1.5}
+.drag-tip[hidden]{display:none}
+.drag-tip.blocked{background:var(--c-a83d35);border-color:var(--c-eacbc0)}
 
 /* The menu of the stock section is a tree; the sidebar widens by --sidebar-extra (set by the layout from the open branches) and the page follows. */
 .sidebar{width:calc(236px + var(--sidebar-extra,0px));transition:width .18s ease}
@@ -1407,12 +1415,6 @@ tr[data-node-name].drop-inside>td{background:var(--c-eaf4f0);box-shadow:inset 0 
 .menu-tree-toggle:hover,.menu-tree-toggle.active{background:var(--c-edf5f1);color:var(--green);font-weight:650;box-shadow:inset 4px 0 0 var(--green)}
 .menu-tree-children{display:grid;gap:2px;margin:2px 0 4px 10px;padding-left:9px;border-left:1px solid var(--c-d6e4df)}
 .category-submenu a,.menu-tree-children a{white-space:nowrap}
-
-/* Icon buttons: icon-buttons.js sets data-ico + --ico; the label stays in the DOM (title/aria-label) but is not shown. */
-button[data-ico], a[data-ico] { font-size: 0 !important; gap: 0; width: 40px; min-width: 40px; padding-left: 0; padding-right: 0; flex: 0 0 auto; }
-td button[data-ico], .table-scroll button[data-ico], td a[data-ico] { width: 32px; min-width: 32px; }
-button[data-ico]::before, a[data-ico]::before { content: ""; width: 20px; height: 20px; flex: 0 0 20px; background-color: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
-button[data-ico] > *, a[data-ico] > * { display: none; }
 
 /* Responsive reflow: blocks wrap and share the available width instead of overlapping or forcing a horizontal scroll. */
 .page-heading { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-start; justify-content: space-between; }
@@ -1454,3 +1456,20 @@ tr[data-depth="3"] > td { background: var(--c-f3ecfa); }
 tr[data-depth="4"] > td, tr[data-depth="5"] > td, tr[data-depth="6"] > td { background: var(--c-fbeceb); }
 tr[data-depth] > td { border-bottom: 2px solid var(--c-d6e4df); }
 tr[data-depth="0"] > td { border-top: 4px solid var(--c-d6e4df); }
+
+/* ---- Archive of parameters, families and tags (migration 56) ---- */
+.row-icon.archive { color:var(--c-4f6b73); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4h18v4H3z'/%3E%3Cpath d='M5 8v12h14V8'/%3E%3Cpath d='M10 12h4'/%3E%3C/svg%3E"); }
+.row-icon.restore { color:var(--green); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 3-6.7L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3C/svg%3E"); }
+.archive-dialog { width:min(860px,94vw); max-height:92vh; overflow:auto; padding:22px 28px 28px; line-height:1.5; }
+.archive-dialog > .catalog-heading { padding:0 0 14px; }
+.restore-dialog { width:min(1040px,94vw); }
+.restore-table .restore-current { display:block; color:var(--c-5c706d); font-size:.9em; }
+.restore-table .restore-new { display:block; }
+.restore-table tr.restore-problem > td { background:var(--c-fbf3e3); }
+.restore-table td input { width:100%; min-width:180px; margin-top:6px; }
+.archive-table .muted { font-weight:400; }
+.row-icon.pull { color:var(--c-4f6b73); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 18V6'/%3E%3Cpath d='M6 11l6-6 6 6'/%3E%3Cpath d='M5 21h14'/%3E%3C/svg%3E"); }
+.take-dialog { width:min(980px,94vw); }
+.take-child select { max-width:420px; }
+.take-values summary { cursor:pointer; color:var(--c-5c706d); font-size:.9em; }
+.take-preview tr.restore-problem > td { background:var(--c-fbf3e3); }

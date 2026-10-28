@@ -1,0 +1,67 @@
+@using BlazorStoc.Services
+
+@* Archiving a parameter, a family or a tag (migration 56): what changes for the products is listed first (the value of an archived parameter moves into their model, so
+   their code changes: "Cod actual" -> "Cod nou"), then the reason is asked. A definition no product uses can also be deleted for good: the host opens the deletion dialog. *@
+<div class="delete-overlay">
+<section class="delete-dialog archive-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+    <div class="catalog-heading dialog-head"><h2 id="@TitleId">@Title</h2><HelpButton Topic="categorii-parametri" About="Arhivarea parametrilor, familiilor și etichetelor" /></div>
+    <p class="delete-object"><strong>@ObjectLabel</strong></p>
+    @if (!string.IsNullOrWhiteSpace(Description)) { <p>@Description</p> }
+    @if (Conflicts.Count > 0)
+    {
+        <div class="error-banner" role="alert">@ProductParameterRules.ConflictMessage(Conflicts)</div>
+    }
+    @if (Affected.Count > 0)
+    {
+        <Paged Items="Affected" Id="@($"archive-preview-{instanceId}")" Label="Produse pe pagină" DefaultSize="10" Sizes="@pageSizes">
+            <div class="table-scroll"><table class="save-summary archive-preview"><thead><tr><th scope="col">Cod actual</th><th scope="col">Cod nou</th><th scope="col">Stoc</th></tr></thead><tbody>
+            @foreach (var product in context)
+            {
+                <tr @key="product.ProductId"><td>@product.OldName</td><td><strong>@product.NewName</strong></td><td>@product.Quantity buc.</td></tr>
+            }
+            </tbody></table></div>
+        </Paged>
+    }
+    else if (Unused && CanDelete)
+    {
+        <p class="form-note archive-unused">Niciun produs nu o folosește. Poți s-o arhivezi (rămâne în fila „Nefolosite”) sau s-o ștergi definitiv.</p>
+    }
+    <ChangeReasonField Id="@($"archive-reason-{instanceId}")" @bind-Value="reason" Error="@reasonError" Disabled="@Busy" Hint="Descrie motivul arhivării. Informația va fi păstrată în jurnalul de activitate." />
+    @if (Error is not null) { <div class="error-banner delete-error" role="alert">@Error</div> }
+    <div class="editor-actions">
+        <button type="button" class="primary" disabled="@(Busy || Conflicts.Count > 0)" @onclick="ArchiveAsync">@(Busy ? "Se arhivează…" : "Arhivează")</button>
+        @if (Unused && CanDelete) { <button type="button" class="danger" disabled="@Busy" @onclick="() => DeleteRequested.InvokeAsync()">Șterge definitiv</button> }
+        <button type="button" class="refresh act-close" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
+    </div>
+</section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ObjectLabel { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+    // The products whose code changes (a tag changes none).
+    [Parameter] public IReadOnlyList<ParameterAffectedProduct> Affected { get; set; } = [];
+    [Parameter] public IReadOnlyList<string> Conflicts { get; set; } = [];
+    // No product uses the definition: deleting it for good is offered too (when CanDelete).
+    [Parameter] public bool Unused { get; set; }
+    [Parameter] public bool CanDelete { get; set; } = true;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter, EditorRequired] public EventCallback<string> Archived { get; set; }
+    [Parameter] public EventCallback DeleteRequested { get; set; }
+    [Parameter, EditorRequired] public EventCallback Cancelled { get; set; }
+
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private readonly IReadOnlyList<int> pageSizes = [10, 25, 50, 0];
+    private string reason = "";
+    private string TitleId => $"archive-title-{instanceId}";
+    private string? reasonError;
+
+    private async Task ArchiveAsync()
+    {
+        reasonError = ChangeReasonRules.ValidationError(ChangeReasonRules.Normalize(reason));
+        if (reasonError is not null) return;
+        await Archived.InvokeAsync(ChangeReasonRules.Normalize(reason));
+    }
+}

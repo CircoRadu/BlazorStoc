@@ -35,7 +35,7 @@ public static class MariaArchiveSchema
         "service_photos", "archive_work_points", "archive_service_photos", "service_contracts", "service_contract_points", "archive_service_contracts", "service_interventions", "archive_service_interventions",
         "invoice_templates", "invoice_template_versions", "invoice_template_models", "suppliers", "archive_suppliers", "supplier_invoices", "supplier_aliases", "supplier_recognitions", "supplier_invoice_lines",
         "system_types", "system_type_aliases", "project_components", "offer_templates", "offers", "offer_lines", "offer_line_matches", "beneficiary_aliases", "project_reservations", "vehicle_target_levels", "product_min_stock", "project_deadlines", "backup_nas_settings", "notification_template_seeds", "backup_settings", "supplier_product_codes",
-        "subcategory_tags", "product_tags", "parameter_families", "subcategory_parameters", "parameter_values", "product_parameter_values", "risk_analyses", "risk_analysis_renewals", "archive_risk_analyses",
+        "subcategory_tags", "product_tags", "parameter_usage_log", "parameter_families", "subcategory_parameters", "parameter_values", "product_parameter_values", "risk_analyses", "risk_analysis_renewals", "archive_risk_analyses",
         "user_types", "user_type_permissions", "module_state", "schema_migrations", "journal_settings", "catalog_settings",
         "activity_import_settings", "activity_import_types", "activity_import_map", "activity_import_runs", "activity_import_issues", "activity_import_suggestions", "activity_import_partner_checks", "activity_import_tickets", "activity_import_keywords", "service_intervention_source"];
 

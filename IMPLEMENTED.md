@@ -783,8 +783,16 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 
 ## Finalizat la 28.10.2026 12:07 - Interfata: iconite, reflow, popup categorii, descriere produs
 
-- Butoane de actiune ca iconite prin wwwroot/icon-buttons.js (exceptie: pagina produsului); reguli de reflow si defilare orizontala in app.css; tabele infasurate in table-scroll (6 fisiere)
+- Butoanele de actiune au revenit la text (script de iconite scos 28.10.2026, la cererea utilizatorului); reguli de reflow si defilare orizontala in app.css; tabele infasurate in table-scroll (6 fisiere)
 - Pagina produsului: card Descriere sub Produs, spatiu 5px; meniul Stoc nu se mai restrange la clic pe nume (collapsible.js)
 - Categorii: adaugare/editare in popup, doar numele la subcategorie, culori pe nivel si linii de separare
 - Module: Invoices 1.1.2, Maintenance 1.3.1, RiskAnalyses 1.0.2
 - Verificari: build Release, browser pe instanta de test; suita completa inainte de commit
+## Finalizat la 28.10.2026 - Catalog: arhivare, definitii pe categorie, relocare, mutare cu pastrarea definitiilor, tragere pe niveluri (0.5.29)
+
+- Arhivare: parametri, familii si etichete folosite nu se sterg; textul valorii se coace la sfarsitul `products.base_model`, legatura ramane cu `archived=1`; restaurare cu probleme listate si redenumire; fila "Nefolosite" cu stergere definitiva si istoric (`parameter_usage_log`); retentie 30-360 zile in Setari -> Catalog (migrarea 056)
+- Definitii pe categorie (`category_id`), mostenite de toate subcategoriile; `IDefinitionRelocation` (planificator pur + executie in tranzactie, previzualizare = rulare anulata); "Preia de la copil" (`TakeFromChildDialog`)
+- Mutarea unei ramuri pastreaza definitiile mostenite (`BranchMovePlanner`, `BranchMoveDialog`, `MoveNeedsVerificationException`); refuzurile vechi dispar
+- Tragere pe niveluri: explicatie dinamica (`category-order.js`), fasii intre categorii, frunza -> categorie (`PreviewPromotionAsync` / `PromoteAsync`, mod `Promote` in `BranchMoveDialog`), jurnal "Promovare subcategorie in categorie"; nedeschis: retrogradarea categorie -> subcategorie si scurtaturile Ctrl+sageti
+- Module: Journal 1.4.0; versiunea aplicatiei 0.5.29 (changelog completat); butoanele de actiune raman cu text (scriptul de iconite scos la cererea utilizatorului)
+- Verificari: suitele tintite pe fiecare etapa, browser pe instanta 5099 cu contul claude.dev (date de test sterse); suita completa inainte de commit

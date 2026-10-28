@@ -94,6 +94,7 @@ internal static class ServiceRegistration
         services.AddScoped<ICatalogSettings, MariaCatalogSettings>();
         services.AddScoped<IProductParameterRepository, MariaProductParameterRepository>();
         services.AddScoped<IProductTagRepository, MariaProductTagRepository>();
+        services.AddScoped<IDefinitionRelocation, MariaDefinitionRelocation>();
         services.AddScoped<IStockMovementRepository, MariaStockMovementRepository>();
         services.AddScoped<IReservationRepository, MariaReservationRepository>();
         services.AddScoped<IProductPlacementReader, MariaProductPlacementReader>();

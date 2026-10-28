@@ -89,6 +89,13 @@ Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Schimbari de comportament voite: retry la deadlock si pentru Project, ProjectComponent, Offer, OfferTemplate, SystemType; Project verifica `IsAllowedDatabase`; anularea se verifica inainte de deschiderea conexiunii.
 - Teste noi `StructureChecks` (grupul `structure`, 23): rutele (`@page` din .razor = rutele compilate; prinde un `@` pierdut), `SettleNumbers`, `OverStockOf`. Verificat pe 30 de PDF-uri reale (raport identic) si pe fixturile OCR (identic).
 - Suita in memorie 1089 trecute, MariaDB 1744 trecute, 0 esecuri; migrarea 38 aplicata acum si pe `blazorstoc_test`. Paginile impartite verificate in browser de agent (miscari produs, preluare factura PDF/ZIP, sabloane, categorii, vehicule, harta, nomenclator, inventar); raman de verificat de utilizator pasul 3 al preluarii facturii si salvarea unui sablon (`Teste utilizator/` 02 si 04).
+## Ultimul lucru facut (28.10.2026, catalog: arhivare, definitii pe categorie, relocare, tragere pe niveluri)
+
+- Ramura `claude/arhivare-parametri-categorii` (necomisa): etapele 0-8 gata. Migrarea 056; servicii `ParameterArchive`, `DefinitionRelocation`/`MariaDefinitionRelocation`, `DefinitionOwner`; `SubcategoryTree` cu `PreviewMoveAsync`/`MoveAsync(choices)` si `PreviewPromotionAsync`/`PromoteAsync`; ferestre `ParameterArchive/Restore/UsageDialog`, `TakeFromChildDialog`, `BranchMoveDialog`.
+- Reguli: definitiile folosite se arhiveaza, nu se sterg; categoria are definitii proprii (cheia negativa = categorie); mutarea copiaza ce se mostenea; frunza devine categorie numai dupa redenumirea subcategoriei si verificari.
+- Versiune 0.5.29, Journal 1.4.0. Help/capturi de refacut: `docs/HELP_DE_REGENERAT.md`. Teste de urmarit de utilizator: `Teste utilizator/01_Stoc_si_produse.md`.
+- Nefacut: retrogradarea categorie -> subcategorie, scurtaturi Ctrl+sageti; pista paralela (asistent de curatare produse si export pachet) incepe cu migrarea 57.
+
 ## Ultimul lucru facut (10.10.2026, catalog si preluare factura)
 
 - Ordinea categoriilor prin drag and drop (administrator; migrarea 38 `categories.sort_order`, `ReorderCategoriesAsync`, `wwwroot/category-order.js`), aceeasi ordine in meniul lateral; jurnal "Reordonare categorii".
@@ -296,4 +303,4 @@ Il stabileste utilizatorul.
 - Verificat: suita completa in memorie, sectiunile MariaDB, browser pe instanta de test (vezi IMPLEMENTED.md).
 - Help cu capturi (19.10.2026, necomis, branch `feature/help`): 89 de capturi 1920x1080, una pe topic (9 MB), chenar pulsatil la clic pe un rand din tabel, "Arata pe pagina", marire; toate topicurile au captura (lista `WithoutCapture` din `HelpChecks.cs` este goala; fereastra ANAF se fotografiaza cu CUI-ul real RO9178894, cerut de utilizator, si cere internet). Fisiere demo pentru incarcare: `dotnet run --project tests/BlazorStoc.HelpDemo -- --files artifacts/help-demo-files`. Regenerare: vezi antetul `tools/help-capture.mjs` (baza demo + `--prepare` + `--all`); la schimbarea unei ferestre se reruleaza `--topic cheie`. Teste `-Group help`: 61 PASS.
 
-Actualizare 28.10.2026: iconite pe butoane (icon-buttons.js), reflow la ingustare, popup categorii/subcategorii, card Descriere pe pagina produsului. Urmeaza pe ramura noua: arhivarea parametrilor/etichetelor, categorii cu parametri, mutare cu pastrare, drag&drop pe niveluri (plan etapele 0-8 discutat 28.10.2026).
+Actualizare 28.10.2026: butoanele de actiune raman cu text (scriptul de iconite a fost scos), reflow la ingustare, popup categorii/subcategorii, card Descriere pe pagina produsului. Urmeaza pe ramura noua: arhivarea parametrilor/etichetelor, categorii cu parametri, mutare cu pastrare, drag&drop pe niveluri (plan etapele 0-8 discutat 28.10.2026).

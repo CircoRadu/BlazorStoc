@@ -167,11 +167,29 @@ public static class AuditActions
     public const string AddParameterFamily = "Adăugare familie de parametri";
     public const string EditParameterFamily = "Modificare familie de parametri";
     public const string DeleteParameterFamily = "Desfacere familie de parametri";
+    // Archive (migration 56): a used definition is archived and restored (the products renamed back) or its restore is given up; an unused one is deleted for good.
+    public const string ArchiveSubcategoryParameter = "Arhivare parametru obligatoriu subcategorie";
+    public const string RestoreSubcategoryParameter = "Restaurare parametru obligatoriu subcategorie";
+    public const string GiveUpParameterRestore = "Renunțare definitivă la restaurare parametru";
+    public const string DeleteUnusedParameter = "Ștergere parametru nefolosit";
+    public const string ArchiveParameterFamily = "Arhivare familie de parametri";
+    public const string RestoreParameterFamily = "Restaurare familie de parametri";
+    public const string GiveUpFamilyRestore = "Renunțare definitivă la restaurare familie";
+    public const string DeleteUnusedFamily = "Ștergere familie nefolosită";
+    public const string ArchiveSubcategoryTag = "Arhivare etichetă subcategorie";
+    public const string RestoreSubcategoryTag = "Restaurare etichetă subcategorie";
+    public const string GiveUpTagRestore = "Renunțare definitivă la restaurare etichetă";
+    public const string DeleteUnusedTag = "Ștergere etichetă nefolosită";
+    public const string SetRestoreRetention = "Modificare perioadă de păstrare pentru restaurare";
+    // Relocation of definitions inside the tree (stage 4): a plain move, or a merge with the definitions of the same name met at the target.
+    public const string RelocateDefinition = "Mutare definiție (parametru, familie, etichetă) în arbore";
+    public const string MergeDefinitions = "Îmbinare definiții (parametri, familii, etichete) la mutare";
     // Tree of subcategories (migration 54): a child under a subcategory, and the products that move into it when the parent was a leaf.
     public const string AddChildSubcategory = "Adăugare subcategorie copil";
     public const string MoveProductsToChildSubcategory = "Mutare produse în subcategorie copil";
     public const string SetMaxSubcategoryDepth = "Modificare adâncime maximă subcategorii";
     public const string MoveSubcategory = "Mutare subcategorie (cu structura de sub ea)";
+    public const string PromoteSubcategory = "Promovare subcategorie în categorie";
     // Tags of a subcategory (On/Off on each product, never required): one action for each kind of change.
     public const string AddSubcategoryTag = "Adăugare etichetă subcategorie";
     public const string RenameSubcategoryTag = "Redenumire etichetă subcategorie";

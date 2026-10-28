@@ -1,4 +1,4 @@
-﻿@page "/categorii"
+@page "/categorii"
 @attribute [Authorize(Policy = "perm:categorii.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
@@ -46,6 +46,22 @@ else if (editingSubcategory is not null || creatingSubcategory)
                                 Closed="CloseParameters" Changed="LoadAsync" />
 }
 
+@if (pendingMove is { } move)
+{
+    <BranchMoveDialog @key="@($"move:{move.Node.Category}:{move.Node.Subcategory}")" Node="move.Node" NewParent="move.Parent" Destination="@move.Destination" Position="move.Position"
+                      Closed="ClosePendingMove" Moved="PendingMoveDoneAsync" />
+}
+@if (pendingPromotion is { } promotion)
+{
+    <BranchMoveDialog @key="@($"promote:{promotion.Leaf.Category}:{promotion.Leaf.Subcategory}")" Promote="true" Node="promotion.Leaf" Destination="" CategoryPosition="promotion.Position"
+                      Closed="ClosePendingPromotion" Moved="PendingPromotionDoneAsync" />
+}
+
+@if (takeGroup is not null)
+{
+    <TakeFromChildDialog @key="@($"take:{takeGroup.Category}:{takeGroup.Subcategory}")" Target="takeGroup" Closed="CloseTake" Changed="LoadAsync" />
+}
+
 @if (pendingChanges is not null)
 {
     <SaveConfirmationDialog Title="@(editingCategory is not null ? "Salvezi modificările categoriei?" : "Salvezi modificările subcategoriei?")"
@@ -74,10 +90,11 @@ else if (editingSubcategory is not null || creatingSubcategory)
 }
 else
 {
-    <div class="category-management-list">
+    <div class="category-management-list" data-max-depth="@maxDepth">
         @foreach (var category in Categories)
         {
             var categoryIndex = Categories.IndexOf(category);
+            if (isAdministrator) { <div class="category-drop-strip" data-new-category-at="@categoryIndex" aria-hidden="true"></div> }
             <div class="category-drag-item @(isAdministrator ? "has-handle" : null)" data-category-index="@categoryIndex" data-category-name="@category">
                 @if (isAdministrator)
                 {
@@ -97,6 +114,8 @@ else
                     <span class="category-disclosure-text"><span class="category-title" data-category-drop="@category">@category</span><small>@SubcategoryCountLabel(category)</small><small>@ProductCount(category) produse asociate</small></span>
                 </Header>
                 <Actions>
+                    <button class="row-icon params" disabled="@(saving || IsEditing)" aria-label="@($"Parametri și etichete ale categoriei {category}")" title="@($"Parametri și etichete ale categoriei {category} (moștenite de toate subcategoriile)")" @onclick="() => OpenParameters(new ProductGroup(category, string.Empty))"></button>
+                    @if (isAdministrator && Subcategories(category).Count > 0) { <button class="row-icon pull" disabled="@(saving || IsEditing)" aria-label="@($"Preia definiții de la subcategoriile categoriei {category}")" title="@($"Preia parametri, familii și etichete de la o subcategorie a categoriei {category}")" @onclick="() => OpenTake(new ProductGroup(category, string.Empty))"></button> }
                     <button class="row-icon add" disabled="@(saving || IsEditing)" aria-label="@($"Adaugă subcategorie în {category}")" title="@($"Adaugă subcategorie în {category}")" @onclick="() => CreateSubcategory(category)"></button>
                     @if (permEdit) { <button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează categoria {category}")" title="@($"Editează categoria {category}")" @onclick="() => EditCategory(category)"></button> }
                     @if (permDelete) { <button class="row-icon delete" disabled="@(saving || IsEditing || !CategoryIsEmpty(category))" aria-label="@($"Șterge categoria {category}")" title="@(DeleteCategoryTitle(category))" @onclick="() => RequestDeleteCategory(category)"></button> }
@@ -112,14 +131,14 @@ else
                         @foreach (var (group, depth) in Flattened(category))
                         {
                             var subIndex = depth == 0 ? Subcategories(category).IndexOf(group) : -1;
-                            <tr @key="@($"{group.Category}:{group.Subcategory}")" data-depth="@depth" data-subcategory-index="@(depth == 0 ? subIndex : null)" data-subcategory-category="@(depth == 0 ? category : null)" data-subcategory-name="@(depth == 0 ? group.Subcategory : null)" data-node-category="@category" data-node-name="@group.Subcategory">
+                            <tr @key="@($"{group.Category}:{group.Subcategory}")" data-depth="@depth" data-subcategory-index="@(depth == 0 ? subIndex : null)" data-subcategory-category="@(depth == 0 ? category : null)" data-subcategory-name="@(depth == 0 ? group.Subcategory : null)" data-node-category="@category" data-node-name="@group.Subcategory" data-node-leaf="@(IsLeaf(group) ? "1" : "0")" data-node-products="@ProductCount(group)" data-node-height="@Height(group)">
                                 @if (isAdministrator)
                                 {
                                     <td class="drag-column"><span role="button" tabindex="0" class="row-icon drag" draggable="@(saving || IsEditing ? "false" : "true")" data-subcategory-handle aria-disabled="@((saving || IsEditing).ToString().ToLowerInvariant())" aria-label="@($"Mută subcategoria {group.Subcategory}")" title="Trage pentru a muta; sau săgețile sus/jos pe element"
                                           @onkeydown="args => depth == 0 ? SubcategoryKeyAsync(args, category, subIndex) : NodeKeyAsync(args, group)"></span></td>
                                 }
                                 <td style="@(depth > 0 ? $"padding-left:{depth * 28 + 12}px" : null)">@if (depth > 0) { <span aria-hidden="true">↳ </span> }<strong>@group.Subcategory</strong></td><td>@ProductCount(group) produse</td><td><span class="count-badge">@ParameterCount(group)</span></td><td><span class="count-badge">@TagCount(group)</span></td><td class="row-actions">@if (permAdd && depth + 1 < maxDepth) { <button type="button" class="row-icon addchild" disabled="@(saving || IsEditing)" aria-label="@($"Adaugă subcategorie copil în {group.Subcategory}")" title="@($"Adaugă subcategorie copil în {group.Subcategory}")" @onclick="() => CreateChild(group)"></button> }
-<button type="button" class="row-icon params" disabled="@(saving || IsEditing)" aria-label="@($"Parametri și etichete ale subcategoriei {group.Subcategory}")" title="@($"Parametri și etichete ale subcategoriei {group.Subcategory}")" @onclick="() => OpenParameters(group)"></button>@if (permEdit) { <button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează sau mută subcategoria {group.Subcategory}")" title="@($"Editează sau mută subcategoria {group.Subcategory}")" @onclick="() => EditSubcategory(group)"></button> }
+<button type="button" class="row-icon params" disabled="@(saving || IsEditing)" aria-label="@($"Parametri și etichete ale subcategoriei {group.Subcategory}")" title="@($"Parametri și etichete ale subcategoriei {group.Subcategory}")" @onclick="() => OpenParameters(group)"></button>@if (isAdministrator && !IsLeaf(group)) { <button type="button" class="row-icon pull" disabled="@(saving || IsEditing)" aria-label="@($"Preia definiții de la copiii subcategoriei {group.Subcategory}")" title="@($"Preia parametri, familii și etichete de la un copil al subcategoriei {group.Subcategory}")" @onclick="() => OpenTake(group)"></button> }@if (permEdit) { <button class="row-icon edit" disabled="@(saving || IsEditing)" aria-label="@($"Editează sau mută subcategoria {group.Subcategory}")" title="@($"Editează sau mută subcategoria {group.Subcategory}")" @onclick="() => EditSubcategory(group)"></button> }
                                 @if (ProductCount(group) == 0 && IsLeaf(group))
                                 {
                                     @if (permDelete) { <button class="row-icon delete" disabled="@(saving || IsEditing)" aria-label="@($"Șterge subcategoria goală {group.Subcategory}")" title="@($"Șterge subcategoria goală {group.Subcategory}")" @onclick="() => RequestDeleteSubcategory(group)"></button> }
@@ -132,6 +151,7 @@ else
             </CollapsibleSection>
             </div>
         }
+        if (isAdministrator) { <div class="category-drop-strip" data-new-category-at="@Categories.Count" aria-hidden="true"></div> }
     </div>
 }
 
@@ -230,6 +250,17 @@ else
     private async Task DropSubcategoryAsync(string category, string name, string targetCategory, string targetName, string zone)
     {
         if (saving || IsEditing || !isAdministrator) return;
+        if (zone == "newcategory")
+        {
+            // targetCategory carries the place among the categories; nothing is written before the dialog passes its checks.
+            var leaf = Node(new ProductGroup(category, name));
+            if (leaf is null) return;
+            if (!leaf.IsLeaf) { error = SubcategoryTreeRules.PromoteLeafOnlyMessage; notice = null; StateHasChanged(); return; }
+            pendingPromotion = (new ProductGroup(leaf.Category, leaf.Name), int.TryParse(targetCategory, out var at) ? at : int.MaxValue);
+            notice = error = null;
+            StateHasChanged();
+            return;
+        }
         ProductGroup? parent = null;
         var destination = targetCategory;
         var position = int.MaxValue;
@@ -264,6 +295,7 @@ else
             if (result.IncompleteProducts > 0)
                 notice += $" {result.IncompleteProducts} produse moștenesc parametri noi și trebuie completate înainte de orice mișcare de stoc.";
         }
+        catch (MoveNeedsVerificationException) { pendingMove = (group, parent, destination, position); }
         catch (ProductOperationException exception) { failure = exception.Message; }
         catch (AccessDeniedException exception) { failure = exception.Message; }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -356,7 +388,7 @@ else
         var count = Flattened(category).Count;
         return $"{count} {(count == 1 ? "subcategorie" : "subcategorii")}";
     }
-    private int ProductCount(ProductGroup group) => products.Count(product =>
+    private int ProductCount(ProductGroup group) => group.Subcategory.Length == 0 ? ProductCount(group.Category) : products.Count(product =>
         string.Equals(product.Category, group.Category, StringComparison.OrdinalIgnoreCase) &&
         string.Equals(product.Subcategory, group.Subcategory, StringComparison.OrdinalIgnoreCase));
     private static string CategoryId(string category) => $"category-{Uri.EscapeDataString(TextNormalization.UniquenessKey(category))}";
@@ -385,6 +417,16 @@ else
         string.Equals(node.Category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(node.Name, group.Subcategory, StringComparison.OrdinalIgnoreCase));
     private bool IsRoot(ProductGroup group) => Node(group)?.Parent is null;
     private bool IsLeaf(ProductGroup group) => Node(group)?.IsLeaf ?? true;
+    // The levels of the branch under a node, itself included (1 for a leaf): the tooltip of a drag checks them against the maximum depth.
+    private int Height(ProductGroup group)
+    {
+        var index = tree.ToList().FindIndex(node => string.Equals(node.Category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(node.Name, group.Subcategory, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) return 1;
+        var depth = tree[index].Depth;
+        var deepest = depth;
+        for (var next = index + 1; next < tree.Count && tree[next].Depth > depth; next++) deepest = Math.Max(deepest, tree[next].Depth);
+        return deepest - depth + 1;
+    }
     private List<(ProductGroup Group, int Depth)> Flattened(string category) => tree
         .Where(node => string.Equals(node.Category, category, StringComparison.OrdinalIgnoreCase)).Select(node => (new ProductGroup(node.Category, node.Name), node.Depth)).ToList();
     private void CreateChild(ProductGroup parent)
@@ -396,11 +438,16 @@ else
     // The parameters and tags a subcategory inherits from its ancestors (edited at the ancestor, not here).
     private string Inherited(ProductGroup group)
     {
+        if (group.Subcategory.Length == 0) return "";
         var ancestors = new List<string>();
         for (var node = Node(group); node?.Parent is { } parent; node = tree.FirstOrDefault(item => string.Equals(item.Category, group.Category, StringComparison.OrdinalIgnoreCase) && item.Name == parent))
             ancestors.Insert(0, parent);
-        if (ancestors.Count == 0) return "";
         var names = new List<string>();
+        // What the category defines reaches every subcategory under it.
+        var ownParameters = allParameters.Where(item => item.Subcategory.Length == 0 && string.Equals(item.Category, group.Category, StringComparison.OrdinalIgnoreCase)).Select(item => item.Name).ToList();
+        var ownTags = allTags.Where(item => item.Subcategory.Length == 0 && string.Equals(item.Category, group.Category, StringComparison.OrdinalIgnoreCase)).Select(item => item.Name).ToList();
+        if (ownParameters.Count + ownTags.Count > 0)
+            names.Add($"Categoria {group.Category}: parametri ({(ownParameters.Count == 0 ? "—" : string.Join(", ", ownParameters))}), etichete ({(ownTags.Count == 0 ? "—" : string.Join(", ", ownTags))})");
         foreach (var ancestor in ancestors)
         {
             var parameters = allParameters.Where(item => string.Equals(item.Subcategory, ancestor, StringComparison.OrdinalIgnoreCase)).Select(item => item.Name).ToList();
@@ -408,7 +455,7 @@ else
             if (parameters.Count + tags.Count > 0)
                 names.Add($"{ancestor}: parametri ({(parameters.Count == 0 ? "—" : string.Join(", ", parameters))}), etichete ({(tags.Count == 0 ? "—" : string.Join(", ", tags))})");
         }
-        return names.Count == 0 ? "" : "Moștenește de la părinți (se modifică la părintele care le definește) — " + string.Join("; ", names) + ".";
+        return names.Count == 0 ? "" : "Moștenește de la categorie și de la părinți (se modifică la nodul care le definește) — " + string.Join("; ", names) + ".";
     }
 
     // The required parameters of a subcategory (values chosen when a product is saved): panel under the editors, opened from the row or after a subcategory is created.
@@ -418,6 +465,35 @@ else
         string.Equals(parameter.Category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(parameter.Subcategory, group.Subcategory, StringComparison.OrdinalIgnoreCase));
     private void OpenParameters(ProductGroup group) { CancelEdit(); parametersGroup = group; notice = null; }
     private Task CloseParameters() { parametersGroup = null; return Task.CompletedTask; }
+
+    // A move that changes what the branch inherits waits for the verification dialog (stage 6).
+    private (ProductGroup Node, ProductGroup? Parent, string Destination, int Position)? pendingMove;
+    private Task ClosePendingMove() { pendingMove = null; return Task.CompletedTask; }
+    // A leaf dropped between the categories becomes a category (stage 7): the dialog asks for the new name of the subcategory and runs the checks first.
+    private (ProductGroup Leaf, int Position)? pendingPromotion;
+    private Task ClosePendingPromotion() { pendingPromotion = null; return Task.CompletedTask; }
+    private async Task PendingPromotionDoneAsync(SubcategoryMoveResult result)
+    {
+        var name = pendingPromotion?.Leaf.Subcategory ?? "";
+        notice = $"Subcategoria „{name}” a devenit categorie, cu produsele, parametrii și etichetele păstrate pe o subcategorie nouă.";
+        if (result.IncompleteProducts > 0) notice += $" {result.IncompleteProducts} produse moștenesc parametri noi și trebuie completate înainte de orice mișcare de stoc.";
+        SetCategoryExpanded(name, true);
+        pendingPromotion = null;
+        await LoadAsync();
+    }
+    private async Task PendingMoveDoneAsync(SubcategoryMoveResult result)
+    {
+        var name = pendingMove?.Node.Subcategory ?? "";
+        notice = $"Subcategoria „{name}” a fost mutată împreună cu structura de sub ea ({result.NodesMoved} {(result.NodesMoved == 1 ? "nod" : "noduri")}), cu parametrii și etichetele moștenite păstrate.";
+        if (result.IncompleteProducts > 0) notice += $" {result.IncompleteProducts} produse moștenesc parametri noi și trebuie completate înainte de orice mișcare de stoc.";
+        pendingMove = null;
+        await LoadAsync();
+    }
+
+    // "Preia de la copil": the definitions of a child move up to this node or category (stage 5 of the catalog work).
+    private ProductGroup? takeGroup;
+    private void OpenTake(ProductGroup group) { CancelEdit(); parametersGroup = null; takeGroup = group; notice = null; }
+    private Task CloseTake() { takeGroup = null; return Task.CompletedTask; }
 
     private IReadOnlyList<SubcategoryTag> allTags = [];
     private int TagCount(ProductGroup group) => allTags.Count(tag =>

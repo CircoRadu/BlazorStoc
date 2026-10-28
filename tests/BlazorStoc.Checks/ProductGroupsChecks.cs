@@ -14,6 +14,11 @@ public static class ProductGroupsChecks
     public static async Task RunAsync(Action<bool, string> check)
     {
         await ProductGroupsTreeChecks.RunAsync(check);
+        await ParameterArchiveUiChecks.RunAsync(check);
+        DefinitionRelocationPlannerChecks.Run(check);
+        DefinitionRelocationPlannerChecks.RunBranch(check);
+        await TakeFromChildChecks.RunAsync(check);
+        await BranchMoveChecks.RunAsync(check);
         var access = new TestAccessControl(true, "groups.admin");
         var repository = new DemoProductRepository(access);
         using var context = new BunitContext();
@@ -133,9 +138,9 @@ public static class ProductGroupsChecks
         check(firstSubcategory.ClassList.Contains("params") && parametersPage.FindAll(".subcategory-parameters").Count == 0, "Categories page: each subcategory has one icon for its parameters and tags and the panel is closed");
         firstSubcategory.Click();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".subcategory-parameters"), TimeSpan.FromSeconds(5));
-        check(parametersPage.FindAll("details.def-section").Count == 3 && parametersPage.FindAll("details.def-section[open]").Count == 0
-              && parametersPage.FindAll("details.def-section > summary").Select(item => item.TextContent).SequenceEqual(["Etichete0", "Familii de parametri0", "Parametri0"]),
-            "Categories page: parameters and tags are three collapsible sections (Etichete, Familii de parametri, Parametri), closed when the window opens");
+        check(parametersPage.FindAll("details.def-section").Count == 4 && parametersPage.FindAll("details.def-section[open]").Count == 0
+              && parametersPage.FindAll("details.def-section > summary").Select(item => item.TextContent).SequenceEqual(["Etichete0", "Familii de parametri0", "Parametri0", "Arhivă0"]),
+            "Categories page: parameters and tags are four collapsible sections (Etichete, Familii de parametri, Parametri, Arhivă), closed when the window opens");
         void ClickButton(string text) => parametersPage.FindAll("button").First(button => button.TextContent.Trim() == text).Click();
         check(parametersPage.FindAll("#new-parameter-name").Count == 0, "Categories page: the form of a new parameter appears only after the add button");
         ClickButton("Adaugă parametru");
@@ -155,9 +160,9 @@ public static class ProductGroupsChecks
         parametersPage.FindAll("button").First(button => button.TextContent.Contains("Adaugă valoarea")).Click();
         parametersPage.WaitForAssertion(() => parametersPage.Find(".subcategory-parameters .error-banner"), TimeSpan.FromSeconds(5));
         check(parametersPage.Find(".subcategory-parameters .error-banner").TextContent.Contains("există deja"), "Categories page: the same value written another way is refused");
-        check(parametersPage.FindAll(".parameter-row button.row-icon.edit").Count == 1 && parametersPage.FindAll(".parameter-row button.row-icon.delete").Count == 1
+        check(parametersPage.FindAll(".parameter-row button.row-icon.edit").Count == 1 && parametersPage.FindAll(".parameter-row button.row-icon.archive").Count == 1 && parametersPage.FindAll(".parameter-row button.row-icon.delete").Count == 0
               && parametersPage.FindAll(".parameter-card button.row-icon.edit").Count == 1 && parametersPage.FindAll(".parameter-card button.row-icon.delete").Count == 1,
-            "Categories page: an administrator sees the icons to edit and delete the parameter and its values");
+            "Categories page: an administrator sees the icons to edit and archive the parameter and to edit and delete its values");
 
         // A second parameter of the Interval kind (a start and an end number per value), then a family of the two.
         check(parametersPage.FindAll(".family-card").Count == 0 && parametersPage.FindAll("#new-family-name").Count == 0 && parametersPage.Find("#family-needs-parameters").TextContent.Contains("cel puțin 2 parametri"),

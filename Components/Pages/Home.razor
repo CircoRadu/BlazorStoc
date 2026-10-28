@@ -1,4 +1,4 @@
-﻿@page "/produse"
+@page "/produse"
 @attribute [Authorize(Policy = "perm:stoc.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
@@ -208,8 +208,20 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
     private bool onlyIncomplete;
     private IReadOnlyList<ParameterFamily> families = [];
     private int IncompleteInScope => ScopedProducts.Count(product => incompleteProducts.Contains(product.Id));
-    private static bool SameGroup(string category, string subcategory, Product product) =>
-        string.Equals(category, product.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(subcategory, product.Subcategory, StringComparison.OrdinalIgnoreCase);
+    // The definition (a parameter or a family) reaches the product: it belongs to the product's category (no subcategory), to its subcategory or to one of the ancestors.
+    private bool SameGroup(string category, string subcategory, Product product)
+    {
+        if (!string.Equals(category, product.Category, StringComparison.OrdinalIgnoreCase)) return false;
+        if (subcategory.Length == 0) return true;
+        var node = tree.FirstOrDefault(item => string.Equals(item.Category, product.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Name, product.Subcategory, StringComparison.OrdinalIgnoreCase));
+        for (var guard = 0; node is not null && guard < 32; guard++)
+        {
+            if (string.Equals(node.Name, subcategory, StringComparison.OrdinalIgnoreCase)) return true;
+            var parent = node.Parent;
+            node = parent is null ? null : tree.FirstOrDefault(item => string.Equals(item.Category, product.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Name, parent, StringComparison.OrdinalIgnoreCase));
+        }
+        return string.Equals(subcategory, product.Subcategory, StringComparison.OrdinalIgnoreCase);
+    }
     // What an incomplete product still lacks: each parameter of its own and each family without a chosen member, in the order of the subcategory.
     private IReadOnlyList<string> MissingOf(Product product)
     {

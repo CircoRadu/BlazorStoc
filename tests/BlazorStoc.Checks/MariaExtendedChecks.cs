@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using MySqlConnector;
 using BlazorStoc.Services;
@@ -50,8 +50,12 @@ public static partial class MariaExtendedChecks
             await Section("Module permissions: registers are read by anyone with a permission, add/edit/delete each ask for their key", () => ModulePermissionsAsync(configuration, admin, audit));
             await Section("Subcategory order: arranged by the administrator, new ones at the end, journal", () => SubcategoryOrderAsync(configuration, admin, audit));
             await Section("Subcategory tree: children, inherited parameters and tags, leaf-only products, leaf turning into a parent, journal", () => SubcategoryTreeAsync(configuration, admin, audit, probe));
+            await Section("Category parameters: parameters, families and tags of a category, inherited by its tree, archive, unique names", () => CategoryParametersAsync(configuration, admin, audit));
+            await Section("Definition relocation: merge, preview as rolled-back run, incomplete products, families, blocks", () => DefinitionRelocationAsync(configuration, admin, audit));
             await Section("Subcategory move: drag and drop of nodes, whole branch moves, conflicts refused, journal", () => SubcategoryMoveAsync(configuration, admin, audit));
             await Section("Subcategory inventory: a node stands for its leaves, leaves titled with their path", () => SubcategoryInventoryAsync(configuration, admin, audit));
+            await Section("Branch move keeps definitions: copy, merge, verification, incomplete products", () => BranchMoveKeepsDefinitionsAsync(configuration, admin, audit));
+            await Section("Leaf promotion: a leaf becomes a category, the new name is checked first, definitions stay, journal", () => LeafPromotionAsync(configuration, admin, audit));
             await Section("Journal: server-side filtering, paging, window, ranges, removals, summary", () => AuditQueryAsync(configuration, audit, probe));
             await Section("Change events", () => ChangeEventsAsync(configuration, admin, audit));
             await Section("Expiry notifications: templates, engine, take over, reminder", () => NotificationsAsync(configuration, admin, audit, probe));

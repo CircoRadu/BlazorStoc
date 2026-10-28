@@ -262,7 +262,7 @@ Pasi:
 
 ### 28.10.2026 - Pagina produsului, meniul Stoc si categoriile (popup)
 
-**Ce s-a adaugat:** card "Descriere" sub "Produs"; popup pentru adaugarea/editarea categoriilor si subcategoriilor; culori pe nivel si linii in tabelul de categorii; butoane de actiune ca iconite.
+**Ce s-a adaugat:** card "Descriere" sub "Produs"; popup pentru adaugarea/editarea categoriilor si subcategoriilor; culori pe nivel si linii in tabelul de categorii; butoanele de actiune raman cu text.
 
 **Ce face acum:**
 1. Deschide un produs: sub cardul "Produs" apare "Descriere" (sau "Produsul nu are descriere."); butoanele Editeaza, Sterge produs, Seteaza (stoc minim), Preia din PDF si Adauga au text.
@@ -270,6 +270,66 @@ Pasi:
 3. Categorii: Adauga categorie / editeaza / adauga subcategorie se deschid in popup; la editarea unei subcategorii exista doar campul nume.
 4. Tabelul de subcategorii: fiecare nivel are alta culoare de fundal si linii de separare groase.
 5. Ingusteaza fereastra: filtrele si grupurile de butoane trec pe randul urmator, tabelele late au bara de defilare orizontala.
+
+### 28.10.2026 - Arhivarea parametrilor, familiilor si etichetelor
+
+**Ce s-a adaugat:** parametrii, familiile si etichetele folosite de produse nu se mai sterg: se arhiveaza; fila "Arhiva" cu restaurare, renuntare dupa perioada de pastrare si stergere definitiva a celor nefolosite; istoricul "Unde a fost folosit"; setarea perioadei de pastrare (Setari -> Catalog).
+
+**Ce face acum:**
+1. Categorii -> iconita "Parametri si etichete" a unei subcategorii: la parametri, familii si etichete iconita de stergere a fost inlocuita de "Arhiveaza".
+2. Arhiveaza un parametru folosit de produse: fereastra arata fiecare produs (Cod actual -> Cod nou); valoarea parametrului trece in modelul produsului; se cere motivul. Parametrul dispare din lista si apare in "Arhiva".
+3. Un parametru din familie nu se arhiveaza singur (iconita e inactiva); se arhiveaza familia.
+4. Un parametru/eticheta fara produse: fereastra ofera "Arhiveaza" sau "Sterge definitiv" (cu confirmare).
+5. Arhiva -> Restaureaza: produsele isi recapata numele; un produs al carui model a fost editat intre timp apare cu problema si nume propus sub numele curent; "Redenumire manuala" permite scrierea modelului; "Redenumeste automat tot" revine la propuneri; "Restaureaza" ramane inactiv cat timp un nume e gol, prea lung sau dublat.
+6. "Renunta definitiv la restaurare" este inactiva pana trece perioada de pastrare (implicit 30 zile, Setari -> Catalog, 30-360); apoi produsele raman cu numele actual, iar definitia trece in fila "Nefolosite", unde se poate sterge definitiv.
+7. Iconita ceas deschide "Unde a fost folosit" (produs, valoare, loc, actiune, cand, cine).
+8. Etichetele arhivate nu mai apar la produse si in filtre; produsele isi pastreaza On/Off-ul si il recapata la restaurare.
+
+### 28.10.2026 - Parametri, familii si etichete pe categorie
+
+**Ce s-a adaugat:** o categorie poate avea parametri, familii si etichete proprii, mostenite de toate subcategoriile ei, pe toate nivelurile.
+
+**Ce face acum:**
+1. Categorii: pe titlul fiecarei categorii exista iconita "Parametri si etichete ale categoriei"; se deschide aceeasi fereastra ca la subcategorii, cu nota ca definitiile se mostenesc.
+2. Adauga un parametru/eticheta/familie pe categorie: la o subcategorie de sub ea, fereastra ei arata sus "Mosteneste de la categorie si de la parinti" cu numele lor.
+3. Produsele subcategoriilor ei au nevoie de valorile parametrilor categoriei (produsele existente devin incomplete pana li se aleg); codul produsului incepe cu valorile categoriei, apoi cele ale parintilor si ale subcategoriei.
+4. Numele sunt unice in toata categoria: o subcategorie nu poate repeta un parametru/eticheta a categoriei si invers.
+5. Arhivarea functioneaza la fel ca la subcategorii (valoarea trece in modelul produselor din toata ramura, restaurarea o scoate).
+6. Mutarea unei ramuri in alta categorie: definitiile categoriei sursa se copiaza pe nodul mutat (vezi "Mutare cu pastrarea parametrilor").
+
+### 28.10.2026 - Preia de la copil
+
+**Ce s-a adaugat:** iconita "Preia definitii de la copii" pe subcategoriile cu copii si pe titlul categoriilor (numai administrator): parametrii, familiile si etichetele unui copil trec la parinte (sau la categorie) si sunt mostenite de toate subcategoriile de sub el.
+
+**Ce face acum:**
+1. Pasul 1: alege copilul si ce preiei (parametri, familii, etichete); "Alege tot" selecteaza tot; "Continua" ramane inactiv fara alegere.
+2. Pasul 2 (previzualizare = rularea reala, anulata): fiecare definitie arata ce se intampla (se muta / se imbina) si valorile care se unesc (existente / noi).
+3. Daca un frate al copilului are deja o definitie cu acelasi nume, apare marcata "Exista deja" si "Preia" ramane inactiv pana alegi "Imbina cu cele existente" (sau scoti definitia - Inapoi).
+4. Un nume cu alt tip sau alta unitate de masura, o definitie arhivata cu acelasi nume sau o familie partiala blocheaza mutarea, cu mesaj.
+5. Produsele care raman fara valoare pentru un parametru devenit obligatoriu sunt listate (paginat) si trebuie acceptate explicit; ele ramana blocate la mutari de stoc pana li se aleg valorile.
+6. Se cere motivul; dupa "Preia" pagina se reincarca, definitiile apar la parinte, iar jurnalul are intrare "Mutare definitie" sau "Imbinare definitii".
+
+### 28.10.2026 - Mutare cu pastrarea parametrilor si etichetelor
+
+**Ce s-a adaugat:** cand o subcategorie se muta prin tragere si isi schimba parintii, parametrii, familiile si etichetele pe care le mostenea nu se mai pierd (si mutarea nu mai este refuzata): se copiaza pe nodul mutat, dupa o fereastra de verificari.
+
+**Ce face acum:**
+1. Trage o subcategorie sub alt parinte (sau in alta categorie). Daca nu se schimba nimic la ce mosteneste, mutarea se face ca pana acum.
+2. Daca se schimba, se deschide "Verificari la mutare" (nimic nu s-a mutat inca): fiecare definitie mostenita de la parintii vechi apare ca "Se copiaza pe subcategoria mutata" (parintele vechi o pastreaza pentru ceilalti copii; produsele ramurii pastreaza valorile, legate de copie).
+3. Daca noii parinti au o definitie cu acelasi nume (sau ramura are una proprie cu acelasi nume ca la noii parinti), apare "Imbina cu cele de la noii parinti": pana o pornesti, "Muta" ramane inactiv; valorile se unesc (existente / noi). Un tip sau o unitate diferita, o definitie arhivata sau o familie omonima blocheaza mutarea, cu mesaj.
+4. Produsele ramurii care nu au valoare pentru un parametru mostenit de la noii parinti sunt listate (paginat) si trebuie acceptate explicit; raman blocate la mutari de stoc pana li se aleg valorile.
+5. Se cere motivul; jurnalul "Mutare subcategorie" arata definitiile copiate, imbinate si produsele ramase incomplete.
+
+### 28.10.2026 - Tragere pe niveluri si transformarea unei frunze in categorie
+
+**Ce s-a adaugat:** la tragerea unei subcategorii apare o explicatie lipita de cursor care spune ce se intampla la drop (sau de ce nu se poate, in rosu, fara drop); o frunza trasa intre categorii devine categorie noua.
+
+**Ce face acum:**
+1. Categorii: apuca iconita de mutare a unei subcategorii si plimb-o peste randuri: explicatia arata nivelul rezultat ("la nivelul 2", "ca subcategorie copil", "pe primul nivel al categoriei X"). Refuzuri in rosu: tinta are produse, adancime maxima depasita, tinta este in propriul subarbore.
+2. In timpul tragerii apar fasii punctate intre categorii. Trage o frunza (subcategorie fara copii) pe una: explicatia spune "Face din X o categorie noua, dupa Y". Un nod cu copii pe fasie este refuzat (rosu).
+3. La drop se deschide "Transformare in categorie" si nimic nu s-a scris. Numele de acum al frunzei trece la categorie, deci scrie alt nume pentru subcategoria din noua categorie; acelasi nume sau unul ocupat (subcategorie sau categorie) da eroare la "Verifica numele si efectele".
+4. Dupa verificare apar definitiile copiate pe subcategorie, deciziile de imbinare si produsele care devin incomplete (de acceptat); schimbarea numelui sterge verificarea. Se cere motivul.
+5. "Transforma in categorie": categoria apare la locul fasiei, cu o singura subcategorie (noul nume) care pastreaza produsele, parametrii si etichetele; jurnalul are "Promovare subcategorie in categorie".
 
 ## Fluxul de baza
 
