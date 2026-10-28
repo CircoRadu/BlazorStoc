@@ -260,6 +260,17 @@ Pasi:
 | 4 | Editeaza o subcategorie: campul Categorie | Camp cu alegere si scriere pentru filtrare | |
 | 5 | Export consum si filtrele Furnizor/Beneficiar din Miscari: alege cu clic | Alegerea se pastreaza (si in Brave) | |
 
+### 28.10.2026 - Pagina produsului, meniul Stoc si categoriile (popup)
+
+**Ce s-a adaugat:** card "Descriere" sub "Produs"; popup pentru adaugarea/editarea categoriilor si subcategoriilor; culori pe nivel si linii in tabelul de categorii; butoane de actiune ca iconite.
+
+**Ce face acum:**
+1. Deschide un produs: sub cardul "Produs" apare "Descriere" (sau "Produsul nu are descriere."); butoanele Editeaza, Sterge produs, Seteaza (stoc minim), Preia din PDF si Adauga au text.
+2. In meniul Stoc apasa de doua ori pe numele aceleiasi categorii/subcategorii: ramane deschisa; se inchide doar cu sageata.
+3. Categorii: Adauga categorie / editeaza / adauga subcategorie se deschid in popup; la editarea unei subcategorii exista doar campul nume.
+4. Tabelul de subcategorii: fiecare nivel are alta culoare de fundal si linii de separare groase.
+5. Ingusteaza fereastra: filtrele si grupurile de butoane trec pe randul urmator, tabelele late au bara de defilare orizontala.
+
 ## Fluxul de baza
 
 1. Adauga produs (nume, cod, categorie/subcategorie) -> apare in lista.

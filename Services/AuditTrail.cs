@@ -167,6 +167,11 @@ public static class AuditActions
     public const string AddParameterFamily = "Adăugare familie de parametri";
     public const string EditParameterFamily = "Modificare familie de parametri";
     public const string DeleteParameterFamily = "Desfacere familie de parametri";
+    // Tree of subcategories (migration 54): a child under a subcategory, and the products that move into it when the parent was a leaf.
+    public const string AddChildSubcategory = "Adăugare subcategorie copil";
+    public const string MoveProductsToChildSubcategory = "Mutare produse în subcategorie copil";
+    public const string SetMaxSubcategoryDepth = "Modificare adâncime maximă subcategorii";
+    public const string MoveSubcategory = "Mutare subcategorie (cu structura de sub ea)";
     // Tags of a subcategory (On/Off on each product, never required): one action for each kind of change.
     public const string AddSubcategoryTag = "Adăugare etichetă subcategorie";
     public const string RenameSubcategoryTag = "Redenumire etichetă subcategorie";

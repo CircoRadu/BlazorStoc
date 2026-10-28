@@ -1189,7 +1189,8 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     internal static async Task EnsureParametersCompleteAsync(MySqlConnection connection, MySqlTransaction transaction, int productId, string name, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT sp.name FROM products p INNER JOIN subcategory_parameters sp ON sp.subcategory_id=p.subcategory_id
+            WITH RECURSIVE chain(id,parent_id) AS (SELECT s.id,s.parent_id FROM subcategories s INNER JOIN products q ON q.subcategory_id=s.id WHERE q.id=@id UNION ALL SELECT s.id,s.parent_id FROM subcategories s INNER JOIN chain c ON s.id=c.parent_id)
+            SELECT sp.name FROM products p INNER JOIN subcategory_parameters sp ON sp.subcategory_id IN (SELECT id FROM chain)
             WHERE p.id=@id AND sp.family_id IS NULL AND sp.kind<>4 AND NOT EXISTS(SELECT 1 FROM product_parameter_values pv WHERE pv.product_id=p.id AND pv.parameter_id=sp.id)
             ORDER BY sp.position,sp.id
             """, ("@id", productId));
@@ -1198,11 +1199,12 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             while (await reader.ReadAsync(token).ConfigureAwait(false)) missing.Add(reader.GetString(0));
         // A family needs exactly one active member: none or several block the product.
         await using var families = Command(connection, transaction, """
+            WITH RECURSIVE chain(id,parent_id) AS (SELECT s.id,s.parent_id FROM subcategories s INNER JOIN products q ON q.subcategory_id=s.id WHERE q.id=@id UNION ALL SELECT s.id,s.parent_id FROM subcategories s INNER JOIN chain c ON s.id=c.parent_id)
             SELECT t.name,t.chosen,t.members FROM (
                 SELECT f.name,f.position,
                        (SELECT COUNT(*) FROM product_parameter_values pv INNER JOIN subcategory_parameters m ON m.id=pv.parameter_id WHERE pv.product_id=p.id AND m.family_id=f.id) AS chosen,
                        (SELECT GROUP_CONCAT(m.name ORDER BY m.position,m.id SEPARATOR ', ') FROM subcategory_parameters m WHERE m.family_id=f.id) AS members
-                FROM products p INNER JOIN parameter_families f ON f.subcategory_id=p.subcategory_id WHERE p.id=@id) t
+                FROM products p INNER JOIN parameter_families f ON f.subcategory_id IN (SELECT id FROM chain) WHERE p.id=@id) t
             WHERE t.chosen<>1 ORDER BY t.position
             """, ("@id", productId));
         await using (var reader = await families.ExecuteReaderAsync(token).ConfigureAwait(false))

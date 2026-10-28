@@ -10,7 +10,7 @@ public sealed class VehiclesModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Vehicule";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 0, 1);
     // The entry sits in the Administration menu (MainLayout), which is shown only while the module works; no item of its own here.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

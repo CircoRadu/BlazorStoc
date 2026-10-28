@@ -13,6 +13,7 @@ public static class ProductGroupsChecks
 
     public static async Task RunAsync(Action<bool, string> check)
     {
+        await ProductGroupsTreeChecks.RunAsync(check);
         var access = new TestAccessControl(true, "groups.admin");
         var repository = new DemoProductRepository(access);
         using var context = new BunitContext();
@@ -22,6 +23,8 @@ public static class ProductGroupsChecks
         context.Services.AddSingleton<IProductRepository>(repository);
         context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
         context.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
+        context.Services.AddSingleton<ISubcategoryTree>(provider => new DemoSubcategoryTree(provider.GetRequiredService<IProductRepository>()));
+        context.Services.AddSingleton<ICatalogSettings, DemoCatalogSettings>();
         context.Services.AddScoped<UnsavedChanges>();
 
         // The names of categories and subcategories are unique all together (a subcategory is not named like a category, nor the other way round).
@@ -79,28 +82,24 @@ public static class ProductGroupsChecks
         cards[1].QuerySelectorAll("button.row-icon.add").First().Click();
         page.WaitForAssertion(() => page.Find("#subcategory-name"), TimeSpan.FromSeconds(5));
         check(page.FindAll("#subcategory-name").Count == 1, "Categories page: one form for the new subcategory");
-        var card = page.FindAll(".category-management-card").First(item => item.QuerySelector(".category-title")!.TextContent == title);
-        var form = card.QuerySelector("section.product-editor");
-        check(form is not null && form.QuerySelector("#subcategory-name") is not null && form.QuerySelectorAll("*").Any(item => item.TextContent.Contains($"Adaugă subcategorie în „{title}”")),
-            "Categories page: the form of a new subcategory opens inside its category");
-        check(form!.PreviousElementSibling is { } before && before.ClassList.Contains("table-scroll") && before.QuerySelectorAll("tbody tr").Length == existingSubcategories && form.NextElementSibling is null,
-            "Categories page: the form of a new subcategory is under the last subcategory of the category");
-        check(page.FindAll(".category-management-card").Where(item => item != card).All(item => item.QuerySelector("#subcategory-name") is null) &&
-              page.FindAll("#subcategory-name").All(field => field.Closest(".category-management-card") is not null),
-            "Categories page: the form of a new subcategory is not above the list or in another category");
+        var form = page.Find(".delete-overlay > section.group-editor-dialog");
+        check(form.QuerySelector("#subcategory-name") is not null && form.QuerySelectorAll("*").Any(item => item.TextContent.Contains($"Adaugă subcategorie în „{title}”")),
+            "Categories page: the form of a new subcategory opens as a popup for its category");
+        check(page.FindAll(".category-management-card").All(item => item.QuerySelector("#subcategory-name") is null),
+            "Categories page: the form of a new subcategory is a popup over the page, not inside a category card");
 
         // Saved from there, the subcategory is created in that category.
         page.Find("#subcategory-name").Change("Subcategorie noua test");
-        page.Find("section.product-editor .editor-actions button.primary").Click();
+        page.Find("section.group-editor-dialog .editor-actions button.primary").Click();
         page.WaitForAssertion(() => { if (page.FindAll("#subcategory-name").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         var groups = await repository.GetGroupsAsync();
         check(groups.Any(group => group.Category == title && group.Subcategory == "Subcategorie noua test"), "Categories page: the subcategory typed in the form is created in its category");
 
-        // Editing an existing subcategory still opens the form above the list.
+        // Editing an existing subcategory opens the same popup, with only the name (moving is done by dragging).
         page.WaitForAssertion(() => { if (page.FindAll("tbody button").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         page.FindAll("tbody button.row-icon.edit").First().Click();
         page.WaitForAssertion(() => page.Find("#subcategory-name"), TimeSpan.FromSeconds(5));
-        check(page.Find("#subcategory-name").Closest(".category-management-card") is null, "Categories page: editing a subcategory opens the form above the list");
+        check(page.Find("#subcategory-name").Closest(".group-editor-dialog") is not null, "Categories page: editing a subcategory opens the form as a popup");
 
         // The reason of an edit: generated from the changes (one on each line) or written, chosen with radio buttons.
         string Auto(string id) => page.Find($"#{id}-auto").GetAttribute("value") ?? "";
@@ -108,25 +107,19 @@ public static class ProductGroupsChecks
         check(page.FindAll("input[type=radio][name='subcategory-reason-mode']").Count == 2 && Auto("subcategory-reason") == "", "Categories page: the reason of a subcategory edit is chosen with radio buttons, the generated one empty until a change");
         page.Find("#subcategory-name").Change(original + " modificata");
         check(Auto("subcategory-reason") == $"Subcategorie: {original} → {original} modificata", "Categories page: the generated reason shows the renamed subcategory");
-        // The category of a subcategory (only when it is moved) is picked or typed in a field with filtering, not chosen from radio buttons.
-        check(page.FindAll("input[type=radio][name='subcategory-category']").Count == 0 && page.FindAll("input#subcategory-category[role=combobox]").Count == 1 && page.FindAll("select").Count == 0,
-            "Categories page: the category of a subcategory is picked or typed in a filtering field");
-        page.Find("#subcategory-category").Click();
-        var originalChoice = page.FindAll("#subcategory-category-list li[role=option]").Select((item, index) => (item, index)).First(entry => entry.item.GetAttribute("aria-selected") == "true").index;
-        void ChooseCategory(int index) { page.Find("#subcategory-category").Click(); page.Find($"#subcategory-category-option-{index}").MouseDown(); }
-        ChooseCategory(originalChoice == 0 ? 1 : 0);
-        check(Auto("subcategory-reason").Split('\n') is [var renamed, var moved] && renamed.StartsWith("Subcategorie: ") && moved.StartsWith("Categorie: "), "Categories page: renaming and moving a subcategory are two lines of the generated reason");
+        // Only the name is edited: the category of a subcategory is not a field (the move is done by dragging).
+        check(page.FindAll("#subcategory-category").Count == 0 && page.FindAll("input[type=radio][name='subcategory-category']").Count == 0,
+            "Categories page: editing a subcategory changes only its name, without a category field");
         page.Find("#subcategory-name").Change(original);
-        ChooseCategory(originalChoice);
-        check(Auto("subcategory-reason") == "", "Categories page: putting the changes back empties the generated reason");
+        check(Auto("subcategory-reason") == "", "Categories page: putting the name back empties the generated reason");
 
-        // Moved to another category and cancelled: leaving without saving closes the form.
-        ChooseCategory(originalChoice == 0 ? 1 : 0);
+        // Changed and cancelled: leaving without saving closes the form.
+        page.Find("#subcategory-name").Change(original + " modificata");
         page.FindAll("button").First(button => button.TextContent.Contains("Anulează")).Click();
         page.WaitForAssertion(() => page.Find(".unsaved-changes-dialog"), TimeSpan.FromSeconds(5));
         page.Find(".unsaved-changes-dialog button.danger").Click();
         page.WaitForAssertion(() => { if (page.FindAll("#subcategory-name").Count != 0 || page.FindAll(".unsaved-changes-dialog").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(true, "Categories page: a subcategory moved to another category and left without saving closes its form");
+        check(true, "Categories page: a renamed subcategory left without saving closes its form");
         page.FindAll("button.row-icon.edit").First(button => (button.GetAttribute("aria-label") ?? "").StartsWith("Editează categoria")).Click();
         page.WaitForAssertion(() => page.Find("#category-name"), TimeSpan.FromSeconds(5));
         var categoryName = page.Find("#category-name").GetAttribute("value") ?? "";

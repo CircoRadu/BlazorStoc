@@ -11,7 +11,7 @@ public sealed class InventoryModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Inventar";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 1, 0);
     // The menu section (two entries: report and take-over) stays in MainLayout and is shown only while the module works; the permission modules are inventar and inventar-preluare.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

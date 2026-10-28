@@ -20,6 +20,17 @@
     document.addEventListener("click", event => {
         const summary = event.target instanceof Element ? event.target.closest(`${selector} > summary`) : null;
         if (!summary) return;
+        // Product menu (categories and subcategories): pressing the name only opens the branch and navigates; closing is
+        // done with the arrow, so one press never opens and collapses in the same move.
+        const section = summary.parentElement;
+        if (section.open && section.parentElement?.matches(".product-category-menu, .menu-tree-node") &&
+            !event.target.closest(".collapsible-indicator")) {
+            event.preventDefault();
+            const link = event.target.closest("a[href]");
+            const destination = link ? link.href : section.dataset.collapsibleOpenHref;
+            if (destination && new URL(destination, location.href).href !== location.href) window.location.assign(destination);
+            return;
+        }
         const intent = { section: summary.parentElement, at: performance.now() };
         userIntent = intent;
         // A handler that cancels the click (for example the leave guard) means no toggle follows.

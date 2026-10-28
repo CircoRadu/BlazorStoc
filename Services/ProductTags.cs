@@ -63,8 +63,10 @@ public sealed class MariaProductTagRepository(IConfiguration configuration, IAcc
             result = await WriteAsync(async (connection, transaction) =>
             {
                 var subcategoryId = await FindSubcategoryAsync(connection, transaction, group, cancellationToken).ConfigureAwait(false);
-                await using (var exists = Command(connection, transaction, "SELECT 1 FROM subcategory_tags WHERE subcategory_id=@sub AND normalized_name=@key",
-                                 ("@sub", subcategoryId), ("@key", TextNormalization.UniquenessKey(cleanName))))
+                // The name is unique across the ancestors and the descendants too: a child cannot repeat an inherited tag.
+                var scope = SubcategoryAncestry.InList(await SubcategoryAncestry.NameScopeAsync(connection, transaction, subcategoryId, cancellationToken).ConfigureAwait(false));
+                await using (var exists = Command(connection, transaction, $"SELECT 1 FROM subcategory_tags WHERE subcategory_id IN ({scope}) AND normalized_name=@key",
+                                 ("@key", TextNormalization.UniquenessKey(cleanName))))
                     if (await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null)
                         throw new ProductOperationException($"Subcategoria «{group.Subcategory}» are deja o etichetă «{cleanName}».");
                 await using var position = Command(connection, transaction, "SELECT COALESCE(MAX(position),0)+1 FROM subcategory_tags WHERE subcategory_id=@sub", ("@sub", subcategoryId));
@@ -97,8 +99,9 @@ public sealed class MariaProductTagRepository(IConfiguration configuration, IAcc
                 var (version, sub) = await LockTagAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
                 if (version != original.Version) throw new ProductOperationException("Eticheta a fost modificată între timp. Actualizează lista și reia operația.");
                 if (string.Equals(original.Name, cleanName, StringComparison.Ordinal)) throw new ProductOperationException("Nu ai modificat nimic.");
-                await using (var exists = Command(connection, transaction, "SELECT 1 FROM subcategory_tags WHERE subcategory_id=@sub AND normalized_name=@key AND id<>@id",
-                                 ("@sub", sub), ("@key", TextNormalization.UniquenessKey(cleanName)), ("@id", original.Id)))
+                var scope = SubcategoryAncestry.InList(await SubcategoryAncestry.NameScopeAsync(connection, transaction, sub, cancellationToken).ConfigureAwait(false));
+                await using (var exists = Command(connection, transaction, $"SELECT 1 FROM subcategory_tags WHERE subcategory_id IN ({scope}) AND normalized_name=@key AND id<>@id",
+                                 ("@key", TextNormalization.UniquenessKey(cleanName)), ("@id", original.Id)))
                     if (await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null)
                         throw new ProductOperationException($"Subcategoria «{original.Subcategory}» are deja o etichetă «{cleanName}».");
                 await using var update = Command(connection, transaction, "UPDATE subcategory_tags SET name=@name,normalized_name=@key,version=version+1 WHERE id=@id",
@@ -176,7 +179,9 @@ public sealed class MariaProductTagRepository(IConfiguration configuration, IAcc
                 (name, subcategoryId) = (reader.GetString(0), checked((int)reader.GetInt64(1)));
             }
             var own = new Dictionary<int, string>();
-            await using (var tags = Command(connection, transaction, "SELECT id,name FROM subcategory_tags WHERE subcategory_id=@sub", ("@sub", subcategoryId)))
+            // The tags of the subcategory and of every ancestor (migration 54).
+            var chainList = SubcategoryAncestry.InList(await SubcategoryAncestry.ChainAsync(connection, transaction, subcategoryId, cancellationToken).ConfigureAwait(false));
+            await using (var tags = Command(connection, transaction, $"SELECT id,name FROM subcategory_tags WHERE subcategory_id IN ({chainList})"))
             await using (var reader = await tags.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) own[checked((int)reader.GetInt64(0))] = reader.GetString(1);
             wanted.IntersectWith(own.Keys);

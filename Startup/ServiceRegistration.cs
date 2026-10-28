@@ -90,6 +90,8 @@ internal static class ServiceRegistration
     public static IServiceCollection AddStockServices(this IServiceCollection services)
     {
         services.AddScoped<IProductRepository, MariaProductRepository>();
+        services.AddScoped<ISubcategoryTree>(provider => (MariaProductRepository)provider.GetRequiredService<IProductRepository>());
+        services.AddScoped<ICatalogSettings, MariaCatalogSettings>();
         services.AddScoped<IProductParameterRepository, MariaProductParameterRepository>();
         services.AddScoped<IProductTagRepository, MariaProductTagRepository>();
         services.AddScoped<IStockMovementRepository, MariaStockMovementRepository>();

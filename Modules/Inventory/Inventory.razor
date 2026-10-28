@@ -6,6 +6,7 @@
 @using BlazorStoc.Services
 @using System.Globalization
 @inject IProductRepository Repository
+@inject ISubcategoryTree Tree
 @inject IInventoryReportBuilder ReportBuilder
 @inject IInventoryPdfWriter PdfWriter
 @inject IAuditTrail AuditTrail
@@ -77,9 +78,9 @@ else if (loadError is null)
                         <div class="table-scroll"><table><thead><tr><th><span class="sr-only">Selectează</span></th><th>SUBCATEGORIE</th><th>PRODUSE</th></tr></thead><tbody>
                         @foreach (var group in Subcategories(category))
                         {
-                            <tr @key="@($"{group.Category}:{group.Subcategory}")" class="selectable-row @(selection.IsSelected(group.Category, group.Subcategory) ? "selected" : null)" @onclick="() => ToggleSubcategoryAsync(group, !selection.IsSelected(group.Category, group.Subcategory))">
-<td><RowSelect Selected="@selection.IsSelected(group.Category, group.Subcategory)" AriaLabel="@($"Selectează subcategoria {group.Subcategory}")" SelectedChanged="@(value => ToggleSubcategoryAsync(group, value))" /></td>
-                                <td><strong>@group.Subcategory</strong></td>
+                            <tr @key="@($"{group.Category}:{group.Subcategory}")" class="selectable-row @(RowSelected(group) ? "selected" : null)" @onclick="() => ToggleSubcategoryAsync(group, !RowSelected(group))">
+<td><RowSelect Selected="@RowSelected(group)" Mixed="@RowMixed(group)" AriaLabel="@($"Selectează subcategoria {group.Subcategory}")" SelectedChanged="@(value => ToggleSubcategoryAsync(group, value))" /></td>
+                                <td style="@(Depth(group) > 0 ? $"padding-left:{Depth(group) * 28 + 12}px" : null)">@if (Depth(group) > 0) { <span aria-hidden="true">↳ </span> }<strong>@group.Subcategory</strong></td>
                                 <td>@ProductCount(group) produse</td>
                             </tr>
                         }
@@ -126,19 +127,42 @@ else if (loadError is null)
     private string? previewFileName, previewError;
     private ElementReference previewFrame;
     private readonly CancellationTokenSource lifetime = new();
+    // The tree of subcategories (migration 54): the rows follow the tree; products are on leaves, so a row with children selects every leaf under it.
+    private IReadOnlyList<SubcategoryNode> tree = [];
+    private SubcategoryNode? Node(ProductGroup group) => tree.FirstOrDefault(node =>
+        string.Equals(node.Category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(node.Name, group.Subcategory, StringComparison.OrdinalIgnoreCase));
+    private int Depth(ProductGroup group) => Node(group)?.Depth ?? 0;
+    private bool IsLeaf(ProductGroup group) => Node(group)?.IsLeaf ?? true;
+    private List<ProductGroup> LeavesUnder(ProductGroup group)
+    {
+        var index = tree.ToList().FindIndex(node => string.Equals(node.Category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(node.Name, group.Subcategory, StringComparison.OrdinalIgnoreCase));
+        if (index < 0 || tree[index].IsLeaf) return [group];
+        var leaves = new List<ProductGroup>();
+        for (var next = index + 1; next < tree.Count && tree[next].Depth > tree[index].Depth; next++)
+            if (tree[next].IsLeaf) leaves.Add(new ProductGroup(tree[next].Category, tree[next].Name));
+        return leaves;
+    }
+    private bool RowSelected(ProductGroup group) { var leaves = LeavesUnder(group); return leaves.Count > 0 && leaves.All(leaf => selection.IsSelected(leaf.Category, leaf.Subcategory)); }
+    private bool RowMixed(ProductGroup group)
+    {
+        var leaves = LeavesUnder(group);
+        var count = leaves.Count(leaf => selection.IsSelected(leaf.Category, leaf.Subcategory));
+        return count > 0 && count < leaves.Count;
+    }
 
     private List<string> Categories => groups.Select(group => group.Category).Where(value => value.Length > 0)
         .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
     private List<ProductGroup> Subcategories(string category) => groups
         .Where(group => string.Equals(group.Category, category, StringComparison.OrdinalIgnoreCase) && group.Subcategory.Length > 0)
-        .OrderBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase).ToList();
-    private List<string> SubcategoryNames(string category) => Subcategories(category).Select(group => group.Subcategory).ToList();
+        .OrderBy(group => tree.ToList().FindIndex(node => string.Equals(node.Category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(node.Name, group.Subcategory, StringComparison.OrdinalIgnoreCase)) is var place and >= 0 ? place : int.MaxValue)
+        .ThenBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase).ToList();
+    private List<string> SubcategoryNames(string category) => Subcategories(category).Where(IsLeaf).Select(group => group.Subcategory).ToList();
     private List<(string Category, IReadOnlyList<string> Subcategories)> CategoryEntries =>
         Categories.Select(category => (category, (IReadOnlyList<string>)SubcategoryNames(category))).ToList();
     private int ProductCount(string category) => products.Count(product => string.Equals(product.Category, category, StringComparison.OrdinalIgnoreCase));
-    private int ProductCount(ProductGroup group) => products.Count(product =>
-        string.Equals(product.Category, group.Category, StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(product.Subcategory, group.Subcategory, StringComparison.OrdinalIgnoreCase));
+    private int ProductCount(ProductGroup group) => LeavesUnder(group).Sum(leaf => products.Count(product =>
+        string.Equals(product.Category, leaf.Category, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(product.Subcategory, leaf.Subcategory, StringComparison.OrdinalIgnoreCase)));
     private string SubcategoryCountLabel(string category)
     {
         var count = Subcategories(category).Count;
@@ -177,6 +201,7 @@ else if (loadError is null)
             var productsTask = Repository.GetProductsAsync(lifetime.Token);
             await Task.WhenAll(groupsTask, productsTask);
             groups = await groupsTask;
+            tree = await Tree.GetTreeAsync(lifetime.Token);
             products = await productsTask;
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -204,7 +229,7 @@ else if (loadError is null)
 
     private Task ToggleSubcategoryAsync(ProductGroup group, bool value)
     {
-        selection.SetSubcategory(group.Category, group.Subcategory, value);
+        foreach (var leaf in LeavesUnder(group)) selection.SetSubcategory(leaf.Category, leaf.Subcategory, value);
         return Task.CompletedTask;
     }
 

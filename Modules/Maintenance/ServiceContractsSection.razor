@@ -64,6 +64,7 @@
                     @if (details.Points.Count == 0) { <span class="muted">Contractul nu acoperă niciun punct de lucru.</span> }
                     else
                     {
+                        <div class="table-scroll">
                         <table class="contract-points-table"><thead><tr><th>PUNCT DE LUCRU</th><th>CICLICITATE</th><th>SCADENȚĂ</th><th>STARE</th></tr></thead><tbody>
                         @foreach (var point in details.Points)
                         {
@@ -73,6 +74,7 @@
                                 <td>@if (contract.IsActive) { <span class="due-chip @ServiceDueRules.CssClass(ServiceDueRules.State(point.Point.NextDue, Today, ThresholdDays))">@ServiceDueRules.Label(ServiceDueRules.State(point.Point.NextDue, Today, ThresholdDays))</span> } else { <span class="contract-state off">Contract Off</span> }</td></tr>
                         }
                         </tbody></table>
+                        </div>
                     }
                 </td></tr>
             }

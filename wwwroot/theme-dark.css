@@ -1,6 +1,10 @@
 /* Dark theme (night-friendly palette): every colour of app.css is a token --c-<hex> (light values in :root of app.css); here each is redefined with its lightness inverted into a soft range (deep grey-green background, light grey text, calmer accents). Generated block first, hand-tuned rules after the marker. Help and screenshots are light only. */
 html[data-theme="dark"] {
     color-scheme: dark;
+    --c-eaf1fb:#212c3a;
+    --c-fbf3e3:#352f22;
+    --c-f3ecfa:#2d2639;
+    --c-fbeceb:#382a2b;
     --c-0a5a4e:#b1ded7;
     --c-0c6458:#addbd5;
     --c-0d5d51:#b0dbd5;
@@ -288,7 +292,7 @@ html[data-theme="dark"] {
 }
 /* --- hand-tuned --- */
 /* Solid green surfaces (the brand mark, the primary button, the file icon) keep a deep green with soft light text instead of the inverted bright teal: calmer at night. */
-html[data-theme="dark"] .primary, html[data-theme="dark"] .brand-icon, html[data-theme="dark"] .file-drop-icon, html[data-theme="dark"] .invoice-page-tab.active { background:#23695e; border-color:#23695e; color:#e4efec; }
+html[data-theme="dark"] .primary, html[data-theme="dark"] .brand-icon, html[data-theme="dark"] .file-drop-icon { background:#23695e; border-color:#23695e; color:#e4efec; }
 html[data-theme="dark"] .primary:hover { background:#2a7a6d; border-color:#2a7a6d; }
 /* Red solid buttons: a deep red with soft light text (the inverted bright pink is too loud at night). */
 html[data-theme="dark"] .danger { background:#8a3b36; border-color:#8a3b36; color:#f2e4e2; }

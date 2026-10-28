@@ -10,7 +10,7 @@ public sealed class BackupModule : IModule
 {
     public string Id => BackupWorkerRules.ModuleId;
     public string Name => "Copii de siguranta si restaurare";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 0, 1);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)

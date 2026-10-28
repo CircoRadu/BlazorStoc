@@ -45,3 +45,5 @@ Acest proiect folosește colaborare strict secvențială între Codex și Claude
    ```
 
 4. După commit, oprește lucrul. Nu începe următorul task în același ciclu.
+
+- **Cont permanent de administrator pentru agent (regula permanenta, 28 octombrie 2026):** vezi regula cu acelasi nume din CLAUDE.md: contul `claude.dev` din baza de dezvoltare locala, datele in `local-secrets/claude-dev-login.private.json`; utilizatorul nu mai este rugat sa se autentifice pentru teste.

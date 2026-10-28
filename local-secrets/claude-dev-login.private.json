@@ -1,0 +1,1 @@
+{"Purpose":"Permanent administrator account of the agent (Claude) on the LOCAL development database and local instances only; created with the application own --create-administrator (28.10.2026). Never used on a production or foreign host.","Username":"claude.dev","DisplayName":"Claude dezvoltare","Password":"Dv-aU4a2yXbSB3otKjQ7PYd-k9"}

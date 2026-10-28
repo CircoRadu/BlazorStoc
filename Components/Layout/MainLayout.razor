@@ -4,12 +4,13 @@
 @using BlazorStoc.Services
 @inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject IProductRepository Products
+@inject ISubcategoryTree SubcategoryTree
 @inject IOperationLockService OperationLock
 @inject IExpiryNotificationService Notifications
 @inject NavigationManager Navigation
 @inject ILogger<MainLayout> Logger
 
-<div class="app-shell">
+<div class="app-shell" style="@($"--sidebar-extra:{SidebarExtra()}px")">
     <aside class="sidebar">
         <a class="brand" href="/"><span class="brand-icon">B</span><span>Blazor<span class="brand-light">Stoc</span><small>ESP · GESTIUNE</small></span></a>
         @if (productSection)
@@ -30,10 +31,7 @@
                                     CloseHref="/produse">
                     <Header><span>▪</span> @category</Header>
                     <ChildContent>
-                        @foreach (var subcategory in Subcategories(category))
-                        {
-                            <a class="@(string.Equals(subcategory, selectedSubcategory, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@ProductUrl(category, subcategory)">@subcategory</a>
-                        }
+                        @Nodes((category, (string?)null))
                     </ChildContent>
                 </CollapsibleSection>
             }
@@ -257,9 +255,79 @@
         routeUri = uri;
     }
 
+    // ---- the menu of the stock section is a tree (subcategories under subcategories); it widens to show what is open ----
+    private IReadOnlyList<SubcategoryNode> tree = [];
+    private readonly HashSet<string> openNodes = new(StringComparer.Ordinal);
+
+    private IEnumerable<SubcategoryNode> Children(string category, string? parent) =>
+        tree.Where(node => string.Equals(node.Category, category, StringComparison.OrdinalIgnoreCase) && node.Parent == parent);
+    private static string NodeKey(SubcategoryNode node) => node.Category + "\u001f" + node.Name;
+    private static string NodeId(SubcategoryNode node) => $"product-node-{Uri.EscapeDataString(BlazorStoc.Services.TextNormalization.UniquenessKey(node.Category + "/" + node.Name))}";
+
+    // The selected subcategory and its ancestors: the branch that stays open.
+    private HashSet<string> SelectedBranch()
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var node = tree.FirstOrDefault(item => string.Equals(item.Category, selectedCategory, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Name, selectedSubcategory, StringComparison.OrdinalIgnoreCase));
+        while (node is not null)
+        {
+            names.Add(node.Name);
+            var parent = node.Parent;
+            node = parent is null ? null : tree.FirstOrDefault(item => string.Equals(item.Category, node.Category, StringComparison.OrdinalIgnoreCase) && item.Name == parent);
+        }
+        return names;
+    }
+    private bool IsNodeOpen(SubcategoryNode node) => openNodes.Contains(NodeKey(node)) || SelectedBranch().Contains(node.Name);
+    private void SetNodeOpen(SubcategoryNode node, bool open)
+    {
+        if (open) openNodes.Add(NodeKey(node)); else { openNodes.Remove(NodeKey(node)); }
+    }
+
+    private RenderFragment<(string Category, string? Parent)> Nodes => scope => @<text>
+        @foreach (var node in Children(scope.Category, scope.Parent))
+        {
+            var current = node;
+            if (current.IsLeaf)
+            {
+                <a class="@(string.Equals(current.Name, selectedSubcategory, StringComparison.OrdinalIgnoreCase) ? "active" : "")" href="@ProductUrl(current.Category, current.Name)">@current.Name</a>
+            }
+            else
+            {
+                <CollapsibleSection Id="@NodeId(current)"
+                                    RootClass="menu-tree-node"
+                                    HeaderRowClass="collapsible-header"
+                                    ToggleClass="@($"menu-tree-toggle {(string.Equals(current.Name, selectedSubcategory, StringComparison.OrdinalIgnoreCase) ? "active" : "")}")"
+                                    ContentClass="menu-tree-children"
+                                    Expanded="@IsNodeOpen(current)"
+                                    ExpandedChanged="@(open => SetNodeOpen(current, open))">
+                    <Header><a class="menu-tree-link" href="@ProductUrl(current.Category, current.Name)" title="Produsele de sub @current.Name">@current.Name</a></Header>
+                    <ChildContent>@Nodes((current.Category, current.Name))</ChildContent>
+                </CollapsibleSection>
+            }
+        }
+    </text>;
+
+    // The sidebar grows with the open branches: the widest visible line decides (an estimate of the text plus the indent of its level).
+    private int SidebarExtra()
+    {
+        if (!productSection) return 0;
+        var widest = 0;
+        void Visit(string category, string? parent, int depth)
+        {
+            foreach (var node in Children(category, parent))
+            {
+                widest = Math.Max(widest, depth * 19 + (int)(node.Name.Length * 7.4) + (node.IsLeaf ? 20 : 46));
+                if (!node.IsLeaf && IsNodeOpen(node)) Visit(category, node.Name, depth + 1);
+            }
+        }
+        foreach (var category in categories.Where(item => string.Equals(item, selectedCategory, StringComparison.OrdinalIgnoreCase))) Visit(category, null, 0);
+        return Math.Clamp(widest + 48 - 200, 0, 300);
+    }
+
     private async Task LoadGroupsAsync()
     {
         groups = await Products.GetGroupsAsync(lifetime.Token);
+        try { tree = await SubcategoryTree.GetTreeAsync(lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("Subcategory tree loading failed ({ErrorType}).", exception.GetType().Name); }
         categories = groups.Select(g => g.Category).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();   // the order arranged on the catalog page (the repository returns it)
     }
 

@@ -75,7 +75,7 @@ public sealed partial class MariaProductRepository
                 categoryId = checked((int)reader.GetInt64(0)); categoryName = reader.GetString(1);
             }
             var current = new List<(int Id, string Name)>();
-            await using (var read = Command(connection, transaction, "SELECT id,name FROM subcategories WHERE category_id=@category ORDER BY sort_order,name FOR UPDATE", ("@category", categoryId)))
+            await using (var read = Command(connection, transaction, "SELECT id,name FROM subcategories WHERE category_id=@category AND parent_id IS NULL ORDER BY sort_order,name FOR UPDATE", ("@category", categoryId)))
             await using (var reader = await read.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) current.Add((checked((int)reader.GetInt64(0)), reader.GetString(1)));
             var byKey = current.ToDictionary(item => TextNormalization.UniquenessKey(item.Name));
@@ -127,7 +127,7 @@ public sealed partial class MariaProductRepository
                 if (await asCategory.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string categoryNamed)
                     throw new ProductOperationException(ProductGroupManagementRules.NameTakenByCategory(categoryNamed));
             await using var insert = Command(connection, transaction,
-                "INSERT INTO subcategories(category_id,name,normalized_name,sort_order) SELECT @category,@name,@key,COALESCE(MAX(sort_order),0)+1 FROM subcategories WHERE category_id=@category",
+                "INSERT INTO subcategories(category_id,name,normalized_name,sort_order) SELECT @category,@name,@key,COALESCE(MAX(sort_order),0)+1 FROM subcategories WHERE category_id=@category AND parent_id IS NULL",
                 ("@category", categoryId), ("@name", name), ("@key", TextNormalization.UniquenessKey(name)));
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return (Id: checked((int)insert.LastInsertedId), Group: new ProductGroup(storedCategory, name));
@@ -190,6 +190,8 @@ public sealed partial class MariaProductRepository
                 name = reader.GetString(1);
                 categoryName = reader.GetString(2);
             }
+            if (await SubcategoryAncestry.HasChildrenAsync(connection, transaction, id, cancellationToken).ConfigureAwait(false))
+                throw new ProductOperationException(SubcategoryTreeRules.HasChildrenMessage);
             await using (var used = Command(connection, transaction, "SELECT COUNT(*) FROM products WHERE subcategory_id=@id", ("@id", id)))
                 if (Convert.ToInt64(await used.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) > 0)
                     throw new ProductOperationException(ProductGroupManagementRules.SubcategoryNotEmptyMessage);
@@ -291,14 +293,23 @@ public sealed partial class MariaProductRepository
                 ("@key", TextNormalization.UniquenessKey(name))))
                 if (await asCategory.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string categoryNamed)
                     throw new ProductOperationException(ProductGroupManagementRules.NameTakenByCategory(categoryNamed));
+            // The whole subtree follows a change of category (a child cannot change the category alone).
+            var parents = await SubcategoryAncestry.ParentsAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+            if (!string.Equals(TextNormalization.UniquenessKey(beforeCategory), TextNormalization.UniquenessKey(category), StringComparison.Ordinal)
+                && parents.TryGetValue(id, out var parentOfNode) && parentOfNode is not null)
+                throw new ProductOperationException(SubcategoryTreeRules.CategoryChangeNotRootMessage);
+            var subtree = SubcategoryAncestry.InList([id, .. SubcategoryAncestry.Descendants(parents, id)]);
             await using (var update = Command(connection, transaction, """
                 UPDATE subcategories SET category_id=@category,name=@name,normalized_name=@key WHERE id=@id
                 """, ("@category", categoryId), ("@name", name),
                 ("@key", TextNormalization.UniquenessKey(name)), ("@id", id)))
                 await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-            await using (var updateProducts = Command(connection, transaction, """
-                UPDATE products SET category_id=@category,version=version+1 WHERE subcategory_id=@subcategory
-                """, ("@category", categoryId), ("@subcategory", id)))
+            await using (var updateChildren = Command(connection, transaction, $"UPDATE subcategories SET category_id=@category WHERE id IN ({subtree}) AND id<>@id",
+                             ("@category", categoryId), ("@id", id)))
+                await updateChildren.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            await using (var updateProducts = Command(connection, transaction, $"""
+                UPDATE products SET category_id=@category,version=version+1 WHERE subcategory_id IN ({subtree})
+                """, ("@category", categoryId)))
                 await updateProducts.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             return (Id: id, BeforeName: beforeName, BeforeCategory: beforeCategory, After: new ProductGroup(category, name));
         }, cancellationToken).ConfigureAwait(false);

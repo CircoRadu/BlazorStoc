@@ -3,6 +3,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IProductRepository Repository
+@inject ISubcategoryTree Tree
 @inject IStockMovementRepository Movements
 @inject IProductParameterRepository ParameterRepository
 @inject IProductTagRepository TagRepository
@@ -113,9 +114,37 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
     private Product? imagePreview;
     private DateTime? lastLoaded;
     private readonly CancellationTokenSource lifetime = new();
+    // The tree of subcategories (migration 54): the products of a subcategory that has children are those of every leaf under it.
+    private IReadOnlyList<SubcategoryNode> tree = [];
+    private HashSet<string>? scopeNames;
+    private string scopeFor = "";
+    private async Task LoadTreeAsync()
+    {
+        try { tree = await Tree.GetTreeAsync(lifetime.Token); scopeNames = null; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) { Logger.LogWarning("Subcategory tree loading failed ({ErrorType}).", ex.GetType().Name); }
+    }
+    private bool InSubcategoryScope(Product product)
+    {
+        if (string.IsNullOrWhiteSpace(subcategory)) return true;
+        var key = category + "\u001f" + subcategory + "\u001f" + tree.Count;
+        if (scopeNames is null || scopeFor != key)
+        {
+            scopeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { subcategory };
+            var grew = true;
+            while (grew)
+            {
+                grew = false;
+                foreach (var node in tree.Where(item => item.Parent is not null && scopeNames.Contains(item.Parent) && (category.Length == 0 || string.Equals(item.Category, category, StringComparison.OrdinalIgnoreCase))))
+                    grew |= scopeNames.Add(node.Name);
+            }
+            scopeFor = key;
+        }
+        return scopeNames.Contains(product.Subcategory);
+    }
     private List<Product> ScopedProducts => products
         .Where(p => string.IsNullOrWhiteSpace(category) || string.Equals(p.Category, category, StringComparison.OrdinalIgnoreCase))
-        .Where(p => string.IsNullOrWhiteSpace(subcategory) || string.Equals(p.Subcategory, subcategory, StringComparison.OrdinalIgnoreCase))
+        .Where(InSubcategoryScope)
         .ToList();
     private string SelectionDescription => !string.IsNullOrWhiteSpace(subcategory)
         ? $"Subcategoria {subcategory}"
@@ -128,7 +157,7 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
                 .Where(p => !onlyIncomplete || incompleteProducts.Contains(p.Id))
                 .Where(p => activeTags.Count == 0 || activeTags.All(valueId => ChoicesOf(p).Any(choice => choice.ValueId == valueId)))
                 .Where(p => activeLabels.Count == 0 || activeLabels.All(id => LabelsOf(p).Contains(id)))
-                .Where(p => string.IsNullOrWhiteSpace(subcategory) || string.Equals(p.Subcategory, subcategory, StringComparison.OrdinalIgnoreCase));
+                .Where(InSubcategoryScope);
             return (quantityDescending ? filtered.OrderByDescending(p => p.Quantity) : filtered.OrderBy(p => p.Quantity))
                 .ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
@@ -296,6 +325,7 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
             var vehiclesTask = Movements.GetQuantitiesInVehiclesAsync(lifetime.Token);
             await Task.WhenAll(productsTask, groupsTask, vehiclesTask);
             products = await productsTask; groups = await groupsTask; inVehicles = await vehiclesTask;
+            await LoadTreeAsync();
             lastLoaded = DateTime.UtcNow; page = Math.Min(page, Pages);
             await RefreshIncompleteAsync(); await RefreshTagsAsync();
             await RefreshLocksAsync();
@@ -339,6 +369,7 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
             groups = await groupsTask;
             inVehicles = await vehiclesTask;
             canManage = await accessTask;
+            await LoadTreeAsync();
             stockOut = await Access.HasAsync("stoc.iesire", lifetime.Token); permMultiExit = await Access.HasAsync("iesire-multipla.view", lifetime.Token);
             permAdd = await Access.HasAsync("produse.add", lifetime.Token); permEdit = await Access.HasAsync("produse.edit", lifetime.Token); permDelete = await Access.HasAsync("produse.delete", lifetime.Token);
             loaded = true; lastLoaded = DateTime.UtcNow; ResetPage();

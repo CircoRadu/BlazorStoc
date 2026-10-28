@@ -68,8 +68,10 @@ public sealed class MariaProductParameterRepository(IConfiguration configuration
             result = await WriteAsync(async (connection, transaction) =>
             {
                 var subcategoryId = await FindSubcategoryAsync(connection, transaction, group, cancellationToken).ConfigureAwait(false);
-                await using (var exists = Command(connection, transaction, "SELECT 1 FROM subcategory_parameters WHERE subcategory_id=@sub AND normalized_name=@key",
-                                 ("@sub", subcategoryId), ("@key", TextNormalization.UniquenessKey(cleanName))))
+                // The name is unique across the ancestors and the descendants too: a child cannot redefine an inherited parameter (migration 54).
+                var scope = SubcategoryAncestry.InList(await SubcategoryAncestry.NameScopeAsync(connection, transaction, subcategoryId, cancellationToken).ConfigureAwait(false));
+                await using (var exists = Command(connection, transaction, $"SELECT 1 FROM subcategory_parameters WHERE subcategory_id IN ({scope}) AND normalized_name=@key",
+                                 ("@key", TextNormalization.UniquenessKey(cleanName))))
                     if (await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null)
                         throw new ProductOperationException($"Subcategoria «{group.Subcategory}» are deja un parametru «{cleanName}».");
                 await using var position = Command(connection, transaction, "SELECT COALESCE(MAX(position),0)+1 FROM subcategory_parameters WHERE subcategory_id=@sub", ("@sub", subcategoryId));
@@ -130,8 +132,9 @@ public sealed class MariaProductParameterRepository(IConfiguration configuration
                     await renameValue.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                 }
                 if (current.Kind != kind) await EnsureValuesFitKindAsync(connection, transaction, original.Id, cleanName, kind, cancellationToken).ConfigureAwait(false);
-                await using (var exists = Command(connection, transaction, "SELECT 1 FROM subcategory_parameters WHERE subcategory_id=@sub AND normalized_name=@key AND id<>@id",
-                                 ("@sub", sub), ("@key", TextNormalization.UniquenessKey(cleanName)), ("@id", original.Id)))
+                var scope = SubcategoryAncestry.InList(await SubcategoryAncestry.NameScopeAsync(connection, transaction, sub, cancellationToken).ConfigureAwait(false));
+                await using (var exists = Command(connection, transaction, $"SELECT 1 FROM subcategory_parameters WHERE subcategory_id IN ({scope}) AND normalized_name=@key AND id<>@id",
+                                 ("@key", TextNormalization.UniquenessKey(cleanName)), ("@id", original.Id)))
                     if (await exists.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null)
                         throw new ProductOperationException($"Subcategoria «{original.Subcategory}» are deja un parametru «{cleanName}».");
                 await using var update = Command(connection, transaction,

@@ -1,5 +1,6 @@
 @using BlazorStoc.Services
 @inject IProductRepository Repository
+@inject ISubcategoryTree Tree
 @inject IStockMovementRepository Movements
 @inject IProductParameterRepository ParameterRepository
 @inject IProductTagRepository TagRepository
@@ -154,7 +155,7 @@
     private IReadOnlyList<SubcategoryTag> allTags = [];
     private readonly HashSet<int> tagsOn = [], originalTagsOn = [];
     private IReadOnlyList<SubcategoryTag> CurrentTags => allTags
-        .Where(tag => string.Equals(tag.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(tag.Subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
+        .Where(tag => string.Equals(tag.Category, input.Category, StringComparison.OrdinalIgnoreCase) && InLineage(tag.Subcategory)).OrderBy(tag => LineageIndex(tag.Subcategory)).ThenBy(tag => tag.Position).ToList();
     private void SetTag(int id, bool on) { if (on) tagsOn.Add(id); else tagsOn.Remove(id); }
     private string TagSummary(IEnumerable<int> ids) => string.Join(", ", allTags.Where(tag => ids.Contains(tag.Id)).Select(tag => tag.Name).Order(StringComparer.CurrentCultureIgnoreCase)) is { Length: > 0 } text ? text : "—";
     private ProductImageData? selectedImage;
@@ -180,6 +181,7 @@
         try
         {
             refreshedGroups = await Repository.GetGroupsAsync(lifetime.Token);
+            await LoadTreeAsync();
             await LoadParametersAsync();
             NormalizeGroupSelection();
             GroupChanged();
@@ -193,11 +195,36 @@
         .Order(StringComparer.CurrentCultureIgnoreCase).ToArray();
     private IReadOnlyList<string> Subcategories => CurrentGroups
         .Where(group => string.Equals(group.Category, input.Category, StringComparison.OrdinalIgnoreCase))
-        .Select(group => group.Subcategory).Where(value => !string.IsNullOrWhiteSpace(value))
+        .Select(group => group.Subcategory).Where(value => !string.IsNullOrWhiteSpace(value) && IsLeafName(value))
         .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).ToArray();
     // The web search for the picture of the product, by its code (the name of the product): the results of an image search, opened in a popup window.
     private string? ImageSearchUrl => string.IsNullOrWhiteSpace(input.Name) ? null : "https://www.google.com/search?tbm=isch&q=" + Uri.EscapeDataString(input.Name.Trim());
     private bool HasSelectableGroup =>Categories.Count > 0 && Subcategories.Count > 0;
+    // The tree of subcategories (migration 54): the product goes on a leaf, which has the parameters, families and tags of its ancestors besides its own.
+    private IReadOnlyList<SubcategoryNode> treeNodes = [];
+    private async Task LoadTreeAsync()
+    {
+        try { treeNodes = await Tree.GetTreeAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Subcategory tree loading failed ({ErrorType}).", exception.GetType().Name); }
+    }
+    // The subcategory and its ancestors, root first.
+    private List<string> Lineage()
+    {
+        var names = new List<string>();
+        var node = treeNodes.FirstOrDefault(item => string.Equals(item.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Name, input.Subcategory, StringComparison.OrdinalIgnoreCase));
+        while (node is not null)
+        {
+            names.Insert(0, node.Name);
+            var parent = node.Parent;
+            node = parent is null ? null : treeNodes.FirstOrDefault(item => string.Equals(item.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Name, parent, StringComparison.OrdinalIgnoreCase));
+        }
+        if (names.Count == 0 && !string.IsNullOrWhiteSpace(input.Subcategory)) names.Add(input.Subcategory);
+        return names;
+    }
+    private bool InLineage(string subcategory) => Lineage().Contains(subcategory, StringComparer.OrdinalIgnoreCase);
+    private int LineageIndex(string subcategory) => Lineage().FindIndex(name => string.Equals(name, subcategory, StringComparison.OrdinalIgnoreCase));
+    private bool IsLeafName(string subcategory) => treeNodes.FirstOrDefault(item => string.Equals(item.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Name, subcategory, StringComparison.OrdinalIgnoreCase))?.IsLeaf ?? true;
 
     private int inVehicles;
 
@@ -208,14 +235,15 @@
     private IReadOnlyList<ProductParameterChoice> originalChoices = [];
     private IReadOnlyList<SubcategoryParameter> CurrentParameters => allParameters
         .Where(parameter => string.Equals(parameter.Category, input.Category, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(parameter.Subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
+            && InLineage(parameter.Subcategory)).OrderBy(parameter => LineageIndex(parameter.Subcategory)).ThenBy(parameter => parameter.Position)
+        .Select((parameter, index) => parameter with { Position = index }).ToList();
     private bool HasParameters => CurrentSlots.Count > 0;
 
     // Families of the chosen subcategory: a product has exactly one active member per family (the member picked in the family list, with its value).
     private IReadOnlyList<ParameterFamily> allFamilies = [];
     private readonly Dictionary<int, int> familyPick = [];
     private IReadOnlyList<ParameterSlot> CurrentSlots => ProductParameterRules.Slots(CurrentParameters,
-        allFamilies.Where(family => string.Equals(family.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(family.Subcategory, input.Subcategory, StringComparison.OrdinalIgnoreCase)));
+        allFamilies.Where(family => string.Equals(family.Category, input.Category, StringComparison.OrdinalIgnoreCase) && InLineage(family.Subcategory)));
     private SubcategoryParameter? ActiveMember(ParameterSlot slot) =>
         slot.Members.FirstOrDefault(member => chosen.ContainsKey(member.Id))
         ?? (slot.Family is not null && familyPick.TryGetValue(slot.Family.Id, out var picked) ? slot.Members.FirstOrDefault(member => member.Id == picked) : null);
@@ -348,6 +376,7 @@
         try
         {
             refreshedGroups = await Repository.GetGroupsAsync(lifetime.Token);
+            await LoadTreeAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { Logger.LogWarning("Category list reloading failed ({ErrorType}).", exception.GetType().Name); }

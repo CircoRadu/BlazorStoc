@@ -1,5 +1,22 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.28 | 28.10.2026
+- Categorii: arbore de subcategorii pe oricâte niveluri. O subcategorie poate avea subcategorii copil; copilul moștenește automat parametrii obligatorii, familiile de parametri și etichetele părinților și își poate adăuga altele. Categoriile (primul nivel) nu au parametri și nici etichete. Produsele se asociază numai frunzelor; o frunză cu produse care primește un copil își mută produsele în el, păstrându-le parametrii și etichetele.
+- Categorii: aranjare și mutare prin tragere pentru orice nod (înainte, după sau ca subcategorie copil; titlul unei categorii îl pune ultimul la primul nivel). Mutarea duce toată structura de sub nod, inclusiv între categorii. Conflictele sunt refuzate cu mesaj: mutare în propriul subarbore, adâncime depășită, părinte cu produse, nume de parametru sau etichetă repetat, valori sau etichete moștenite care s-ar pierde.
+- Setări → Catalog (nou, numai administrator): adâncimea maximă a arborelui de subcategorii, între 1 și 15 niveluri (implicit 10), fără a coborî sub adâncimea pe care arborele o are deja.
+- Meniul secțiunii Stoc este arborescent și își mărește lățimea după ramurile deschise; lista de produse a unui nod cuprinde produsele frunzelor de sub el.
+- Inventar: subcategoriile apar ca arbore; un nod cu copii selectează toate frunzele de sub el, iar situația de inventar are frunzele cu calea lor („Părinte › Frunză”).
+- Preluare factură: produsul nou se asociază numai unei frunze și arată calea subcategoriei în arbore.
+- Backup: pachetul făcut automat înainte de o actualizare se copiază acum și pe NAS (când copierea e activă), cu limită de timp proprie, fără să blocheze actualizarea. Backup trece la versiunea 1.0.1.
+- Backup: tabela catalog_settings face parte din pachetele de backup.
+- Jurnal: acțiuni noi (adăugare subcategorie copil, mutare produse în subcategorie copil, mutare subcategorie, modificare adâncime maximă); modulul trece la versiunea 1.3.1. Inventar 1.1.0, Facturi 1.1.1.
+- Baza de date: migrările 54 (subcategories.parent_id) și 55 (tabela catalog_settings).
+- Interfață: butoanele de acțiune devin iconițe cu titlu (Salvează, Anulează, Șterge, Exportă CSV etc.); pe pagina produsului și în formularele ei butoanele rămân cu text.
+- Interfață: elementele paginii se reașază la îngustarea ferestrei (antete, filtre, grupuri de butoane), iar tabelele care nu încap au bară de defilare orizontală.
+- Produs: cardul „Descriere” sub cardul „Produs”, cu spațiu mai mic între carduri.
+- Meniul Stoc: un clic pe numele unei categorii sau subcategorii o deschide și o lasă deschisă; închiderea se face cu săgeata.
+- Categorii: adăugarea și editarea unei categorii sau subcategorii se fac într-o fereastră popup (la subcategorie se editează doar numele), fiecare nivel al arborelui are culoare proprie de fundal și linii de separare între rânduri.
+
 ## 0.5.27 | 27.10.2026
 - Parametri: tip nou „Valoare fixă” (de exemplu „Fisheye”): are o singură valoare, egală cu denumirea, și lucrează numai într-o familie de parametri; alegerea lui la un produs dă familiei valoarea, fără alte valori de completat.
 - Etichete pe subcategorie: etichete opționale, On/Off pe fiecare produs, care nu fac parte din cod și nu blochează stocul. Se aleg în formularul produsului, apar în catalog (coloana PARAMETRI / ETICHETE) și devin filtre; mai multe etichete active cer ca produsul să le aibă pe toate. Jurnalul are acțiuni proprii.

@@ -195,7 +195,13 @@ public sealed partial class MariaProductRepository
                 var subcategoryCategoryId = checked((int)reader.GetInt64(2));
                 if (subcategoryCategoryId != categoryId)
                     throw new ProductOperationException($"Subcategoria «{reader.GetString(1)}» există deja în categoria «{reader.GetString(3)}».");
-                return new GroupResolution(categoryId, checked((int)reader.GetInt64(0)), category, reader.GetString(1), false, false);
+                var resolvedId = checked((int)reader.GetInt64(0));
+                var resolvedName = reader.GetString(1);
+                await reader.CloseAsync().ConfigureAwait(false);
+                // Products are attached to leaves only (migration 54).
+                if (await SubcategoryAncestry.HasChildrenAsync(connection, transaction, resolvedId, token).ConfigureAwait(false))
+                    throw new ProductOperationException(SubcategoryTreeRules.LeafOnlyProductsMessage);
+                return new GroupResolution(categoryId, resolvedId, category, resolvedName, false, false);
             }
         }
         throw new ProductOperationException("Subcategoria selectată nu mai există în categoria aleasă. Actualizează lista și reia salvarea.");

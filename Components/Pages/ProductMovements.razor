@@ -55,7 +55,8 @@ else
     else if (holderReleased) { <div class="success-banner" role="status">Produsul a fost eliberat și poate fi editat acum.</div> }
 
     <div class="movement-layout">
-        <section class="movement-card movement-product" aria-labelledby="movement-product-title">
+        <div class="movement-product">
+        <section class="movement-card" aria-labelledby="movement-product-title">
             <h2 id="movement-product-title">Produs</h2>
             <dl class="movement-facts">
                 <dt>Categorie</dt><dd>@product.Category</dd>
@@ -74,6 +75,12 @@ else
                 }
             </div>
         </section>
+        <section class="movement-card movement-desc-card" aria-labelledby="movement-description-title">
+            <h2 id="movement-description-title">Descriere</h2>
+            @if (string.IsNullOrWhiteSpace(product.Description)) { <p class="muted">Produsul nu are descriere.</p> }
+            else { <p class="movement-desc-text">@product.Description</p> }
+        </section>
+        </div>
 
         <ProductReservationsInfo ProductId="Id" Stock="stock" Version="reservationVersion" />
         @if (canManage) { <ProductWhere ProductId="Id" Stock="stock" Version="reservationVersion" /> }

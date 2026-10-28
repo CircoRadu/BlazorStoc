@@ -142,6 +142,7 @@ public partial class InvoicePickup
         {
             catalog = await ProductsRepository.GetProductsAsync(lifetime.Token);
             groups = await ProductsRepository.GetGroupsAsync(lifetime.Token);
+            if (Services.GetService(typeof(ISubcategoryTree)) is ISubcategoryTree treeService) subcategoryTree = await treeService.GetTreeAsync(lifetime.Token);
             try { freeEntries = await Movements.GetFreeEntriesAsync(new FreeEntryQuery(), lifetime.Token); } catch (Exception exception) when (exception is not OperationCanceledException) { freeEntries = []; }
             var previous = pick.ToList();
             pick = [.. rows.Select((row, rowIndex) =>

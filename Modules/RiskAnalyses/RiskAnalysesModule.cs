@@ -9,7 +9,7 @@ public sealed class RiskAnalysesModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Analize de risc";
-    public Version Version { get; } = new(1, 0, 1);
+    public Version Version { get; } = new(1, 0, 2);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [new("/analize-risc", "Analize de risc", "⚠", ModuleId)];
 
     public void Register(IServiceCollection services, IConfiguration configuration)

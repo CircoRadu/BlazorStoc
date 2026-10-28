@@ -26,6 +26,8 @@ public static class ComponentChecks
         context.Services.AddSingleton<IProductRepository>(repository);
         context.Services.AddSingleton<IProductParameterRepository>(parameterStore);
         context.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
+        context.Services.AddSingleton<ISubcategoryTree>(provider => new DemoSubcategoryTree(provider.GetRequiredService<IProductRepository>()));
+        context.Services.AddSingleton<ICatalogSettings, DemoCatalogSettings>();
         context.Services.AddSingleton<IStockMovementRepository>(new FakeInventoryStockMovementRepository(new Dictionary<int, int>()));
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         context.Services.AddScoped<UnsavedChanges>();

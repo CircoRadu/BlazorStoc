@@ -57,7 +57,9 @@ public interface IInventoryReportBuilder
 
 // Reads a coherent snapshot of the catalogue and builds the sections and lines shown in the PDF; the warehouse
 // value excludes what is held by vehicles (Task 2's "Ieșire spre vehicul", confirmed by the user for this report).
-public sealed class InventoryReportBuilder(IProductRepository products, IStockMovementRepository movements) : IInventoryReportBuilder
+// With the tree of subcategories (migration 54) a selected subcategory that has children stands for every leaf under it (products are on leaves only), and a leaf
+// is titled with its path ("Parent › Leaf") in the order of the tree.
+public sealed class InventoryReportBuilder(IProductRepository products, IStockMovementRepository movements, ISubcategoryTree? tree = null) : IInventoryReportBuilder
 {
     public async Task<InventoryReport> BuildAsync(InventoryRequest request, CancellationToken cancellationToken = default)
     {
@@ -73,7 +75,29 @@ public sealed class InventoryReportBuilder(IProductRepository products, IStockMo
         var canonical = groups.Where(group => group.Subcategory.Length > 0)
             .GroupBy(group => InventoryRules.Key(group.Category, group.Subcategory))
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-        var chosen = selection.Select(item => canonical[InventoryRules.Key(item.Category, item.Subcategory)]).ToList();
+        var nodes = tree is null ? [] : await tree.GetTreeAsync(cancellationToken).ConfigureAwait(false);
+        var order = new Dictionary<string, int>(StringComparer.Ordinal);
+        var labels = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var index = 0; index < nodes.Count; index++)
+        {
+            var node = nodes[index];
+            var key = InventoryRules.Key(node.Category, node.Name);
+            order[key] = index;
+            labels[key] = node.Parent is null ? node.Name : $"{labels[InventoryRules.Key(node.Category, node.Parent)]} › {node.Name}";
+        }
+        // A selected node with children becomes its leaves (the nodes come in tree order: the descendants follow it at a deeper level).
+        var expanded = new List<InventorySelectionItem>();
+        foreach (var item in selection)
+        {
+            var position = nodes.ToList().FindIndex(node => InventoryRules.Key(node.Category, node.Name) == InventoryRules.Key(item.Category, item.Subcategory));
+            if (position < 0 || nodes[position].IsLeaf) { expanded.Add(item); continue; }
+            for (var next = position + 1; next < nodes.Count && nodes[next].Depth > nodes[position].Depth; next++)
+                if (nodes[next].IsLeaf) expanded.Add(new InventorySelectionItem(nodes[next].Category, nodes[next].Name));
+        }
+        var chosen = expanded.Select(item => InventoryRules.Key(item.Category, item.Subcategory)).Distinct(StringComparer.Ordinal)
+            .Where(canonical.ContainsKey).Select(key => canonical[key]).ToList();
+        string Label(ProductGroup group) => labels.GetValueOrDefault(InventoryRules.Key(group.Category, group.Subcategory), group.Subcategory);
+        int Place(ProductGroup group) => order.GetValueOrDefault(InventoryRules.Key(group.Category, group.Subcategory), int.MaxValue);
 
         var productsBySubcategory = allProducts.ToLookup(product => InventoryRules.Key(product.Category, product.Subcategory));
         var sections = new List<InventoryCategorySection>();
@@ -85,7 +109,7 @@ public sealed class InventoryReportBuilder(IProductRepository products, IStockMo
             .OrderBy(group => group.Key, StringComparer.CurrentCultureIgnoreCase))
         {
             var subcategorySections = new List<InventorySubcategorySection>();
-            foreach (var group in categoryGroup.OrderBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase))
+            foreach (var group in categoryGroup.OrderBy(Place).ThenBy(group => group.Subcategory, StringComparer.CurrentCultureIgnoreCase))
             {
                 var lines = productsBySubcategory[InventoryRules.Key(group.Category, group.Subcategory)]
                     .Select(product => new InventoryLine(product.Name,
@@ -95,7 +119,7 @@ public sealed class InventoryReportBuilder(IProductRepository products, IStockMo
                     .OrderBy(line => line.IsNegative ? 0 : 1).ThenBy(line => line.Code, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 if (lines.Count == 0) continue;
-                subcategorySections.Add(new InventorySubcategorySection(group.Subcategory, lines));
+                subcategorySections.Add(new InventorySubcategorySection(Label(group), lines));
                 totalProducts += lines.Count;
                 totalNegative += lines.Count(line => line.IsNegative);
             }

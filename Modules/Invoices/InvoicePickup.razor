@@ -98,6 +98,7 @@ else if (session is not null)
                 <button type="button" class="refresh act-confirm" disabled="@(reading is null)" @onclick="SaveReference">Salvează ca referință</button>
             </div>
             @if (labNotice is not null) { <p class="muted" role="status">@labNotice</p> }
+            <div class="table-scroll">
             <table class="lab-table">
                 <thead><tr><th>Tabel</th><th>Rânduri găsite / așteptate</th><th>Linii P / R</th><th>Coloane P / R</th><th>Scor</th><th>Rânduri cu probleme în valori</th></tr></thead>
                 <tbody>
@@ -122,6 +123,7 @@ else if (session is not null)
                     }
                 </tbody>
             </table>
+            </div>
             <small class="muted">@(labReference is null ? "Corectează liniile și coloanele pe pagină, apoi „Salvează ca referință”: citirea se măsoară după geometrie, nu după valorile citite." : "Referința fișierului este încărcată; „Salvează ca referință” o înlocuiește cu ce vezi pe pagină.")@(Lab.ReferencesDirectory is null ? " Folderul pentru referințe nu este configurat." : "")</small>
         </section>
     }
@@ -378,7 +380,7 @@ else if (step == 2)
                                             @if (RowPicture(item, [.. ShownColumns.Where(column => NotANumber(column, item.Cells.GetValueOrDefault(column.Id, "")))]) is { } rowPicture) { <img class="pickup-region pickup-row-picture" src="@rowPicture" alt="Rândul din factură, cu valorile necitite ca număr încadrate" /> } }</td>
                                 }
                                 <td class="pickup-product">
-                                    <PickupProductCell Match="item.Match" Staged="item.Staged" ProductId="item.ProductId" Index="index" Incomplete="incompleteProducts"
+                                    <PickupProductCell SubcategoryPath="@(item.Staged is { } stagedItem ? StagedPath(stagedItem.Input) : null)" Match="item.Match" Staged="item.Staged" ProductId="item.ProductId" Index="index" Incomplete="incompleteProducts"
                                         OnPick="productId => { item.ProductId = productId; item.Staged = null; }" OnNone="() => item.ProductId = null"
                                         OnOpenNew="() => OpenNewProduct(at)" OnDiscardStaged="() => item.Staged = null" />
                                     @if (existingInvoice is not null && createdInvoice is null && TakenQuantity(item) is { } taken)
@@ -493,7 +495,7 @@ else
         <header>
             @if (line.Staged is { } staged)
             {
-                <strong>@staged.Input.Name</strong> <small class="muted">produs nou · @staged.Input.Category / @staged.Input.Subcategory@(staged.Input.Description.Length > 0 ? " · " + staged.Input.Description : "")</small>
+                <strong>@staged.Input.Name</strong> <small class="muted">produs nou · @staged.Input.Category / @StagedPath(staged.Input)@(staged.Input.Description.Length > 0 ? " · " + staged.Input.Description : "")</small>
             }
             else if (catalog.FirstOrDefault(product => product.Id == line.ProductId) is { } product)
             {

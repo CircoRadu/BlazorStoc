@@ -500,6 +500,8 @@ public static class SupplierChecks
         context.Services.AddSingleton<IProductRepository>(products);
         context.Services.AddSingleton<IProductParameterRepository>(new DemoProductParameterRepository());
         context.Services.AddSingleton<IProductTagRepository>(new DemoProductTagRepository());
+        context.Services.AddSingleton<ISubcategoryTree>(provider => new DemoSubcategoryTree(provider.GetRequiredService<IProductRepository>()));
+        context.Services.AddSingleton<ICatalogSettings, DemoCatalogSettings>();
         context.Services.AddSingleton(movements);
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         context.Services.AddScoped<UnsavedChanges>();

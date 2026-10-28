@@ -150,6 +150,9 @@ public partial class InvoicePickup
 
     private IReadOnlyList<Product> catalog = [];
     private IReadOnlyList<ProductGroup> groups = [];
+    // The tree of subcategories (migration 54): a new product is attached to a leaf, shown with its path.
+    private IReadOnlyList<SubcategoryNode> subcategoryTree = [];
+    private string StagedPath(ProductInput input) => SubcategoryPath.Label(subcategoryTree, input.Category, input.Subcategory);
     private bool step2Loading;
     private string? step2Error;
     private PickRow? newProductFor;

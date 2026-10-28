@@ -70,6 +70,7 @@
             @if (expanded.Contains(analysis.Id))
             {
                 <tr class="contract-points-row" @key="@($"history-{analysis.Id}")"><td colspan="@ColumnCount">
+                    <div class="table-scroll">
                     <table class="contract-points-table"><thead><tr><th>EVENIMENT</th><th>DATA</th><th>ÎNREGISTRAT DE</th><th>OBSERVAȚII</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
                     @for (var index = 0; index < view.Renewals.Count; index++)
                     {
@@ -81,6 +82,7 @@
                     }
                     <tr><td>Înregistrare inițială</td><td>@StockMovementRules.DisplayDate(analysis.InitialDate)</td><td>@analysis.Author <small class="muted">(întocmită de)</small></td><td></td>@if (CanManage) { <td></td> }</tr>
                     </tbody></table>
+                    </div>
                 </td></tr>
             }
         }

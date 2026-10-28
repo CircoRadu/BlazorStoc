@@ -1,0 +1,75 @@
+@using BlazorStoc.Services
+@inject ICatalogSettings Settings
+@inject ISubcategoryTree Tree
+@inject IAccessControl Access
+@inject ILogger<CatalogSettingsPanel> Logger
+@implements IDisposable
+@* Setari -> Catalog (administrator only): how many levels of subcategories the tree of a category may have. 1 means subcategories without children; the value
+   is never lower than the depth the tree already has (see CatalogSettingsRules). *@
+<section class="catalog" aria-labelledby="catalog-settings-title">
+    <div class="catalog-heading"><h2 id="catalog-settings-title">Catalog</h2></div>
+    <div class="catalog-body">
+        @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+        else
+        {
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+            <p class="muted">Subcategoriile pot avea la rândul lor subcategorii copil, pe mai multe niveluri. Copilul primește automat parametrii și etichetele părinților și își poate adăuga altele.
+                Produsele se asociază numai subcategoriilor de la ultimul nivel. Aici stabilești câte niveluri de subcategorii poate avea o categorie.</p>
+            <div class="editor-grid">
+                <label>Adâncimea maximă a arborelui de subcategorii
+                    <input id="catalog-max-depth" type="number" min="@CatalogSettingsRules.MinSubcategoryDepth" max="@CatalogSettingsRules.MaxSubcategoryDepth" step="1" @bind="maxDepth" @bind:event="oninput" disabled="@(busy || !isAdmin)" />
+                    <small>Între @CatalogSettingsRules.MinSubcategoryDepth și @CatalogSettingsRules.MaxSubcategoryDepth niveluri. Arborele are acum @currentDepth @(currentDepth == 1 ? "nivel" : "niveluri"); valoarea nu poate fi mai mică.</small></label>
+            </div>
+            <div class="editor-actions">
+                <button type="button" class="refresh act-confirm" disabled="@(busy || !isAdmin)" @onclick="SaveAsync">@(busy ? "Se salvează…" : "Salvează")</button>
+                @if (!isAdmin) { <span class="muted">Numai administratorul poate modifica această setare.</span> }
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private int maxDepth = CatalogSettingsRules.DefaultSubcategoryDepth, currentDepth = 1;
+    private bool loading = true, busy, isAdmin;
+    private string? error, notice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isAdmin = await Access.IsAdministratorAsync(lifetime.Token);
+            maxDepth = await Settings.GetMaxSubcategoryDepthAsync(lifetime.Token);
+            currentDepth = Math.Max(1, (await Tree.GetTreeAsync(lifetime.Token)).Select(node => node.Depth + 1).DefaultIfEmpty(1).Max());
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Catalog settings could not be read ({ErrorType}).", exception.GetType().Name);
+            error = "Setarea nu a putut fi citită. Încearcă din nou.";
+        }
+        finally { loading = false; }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (busy) return;
+        busy = true; error = notice = null;
+        try
+        {
+            await Settings.SaveMaxSubcategoryDepthAsync(maxDepth, lifetime.Token);
+            notice = $"Arborele de subcategorii poate avea acum cel mult {maxDepth} niveluri.";
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Catalog settings could not be saved ({ErrorType}).", exception.GetType().Name);
+            error = "Setarea nu a putut fi salvată. Încearcă din nou.";
+        }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

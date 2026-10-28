@@ -10,7 +10,7 @@
 else if (Staged is { } staged)
 {
     <div class="pickup-exact"><span class="stock-badge low"><span>●</span> Produs nou pregătit</span> <strong>@staged.Input.Name</strong>
-        <small class="muted">@staged.Input.Category / @staged.Input.Subcategory · nu e în catalog încă, se adaugă la finalizare</small>
+        <small class="muted">@staged.Input.Category / @(SubcategoryPath ?? staged.Input.Subcategory) · nu e în catalog încă, se adaugă la finalizare</small>
         <button type="button" class="refresh act-edit" @onclick="OnOpenNew">Modifică</button>
         <button type="button" class="danger" @onclick="OnDiscardStaged">Renunță</button></div>
 }
@@ -47,6 +47,8 @@ else
     [Parameter, EditorRequired] public InvoiceProductMatch Match { get; set; } = default!;
     [Parameter] public StagedProduct? Staged { get; set; }
     [Parameter] public int? ProductId { get; set; }
+    // The path of the subcategory of a new product in the tree ("Parent › Leaf"); null shows the name alone.
+    [Parameter] public string? SubcategoryPath { get; set; }
     // Products with required parameters that miss a value: they cannot take a stock entry until they are completed.
     [Parameter] public IReadOnlySet<int> Incomplete { get; set; } = new HashSet<int>();
     [Parameter] public int Index { get; set; }

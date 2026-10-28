@@ -780,3 +780,11 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 ## Finalizat la 27.10.2026 15:37 - Parametri, familii, etichete si popup produs (0.5.24-0.5.27)
 
 - Parametri: tip Valoare fixa (doar in familie), schimbare tip, stergere cu produse, produse incomplete blocate in stoc cu storno permis; catalog cu coloana PARAMETRI, filtre si editare in popup,Etichete pe subcategorie (migrarea 53): On/Off pe produs, filtre in catalog, jurnal; fereastra Parametri si etichete cu trei sectiuni colapsabile; numarul de randuri pe pagina se pastreaza in browser,Verificari: in memorie 2064 PASS, MariaDB 3115 PASS, browser pe 5087
+
+## Finalizat la 28.10.2026 12:07 - Interfata: iconite, reflow, popup categorii, descriere produs
+
+- Butoane de actiune ca iconite prin wwwroot/icon-buttons.js (exceptie: pagina produsului); reguli de reflow si defilare orizontala in app.css; tabele infasurate in table-scroll (6 fisiere)
+- Pagina produsului: card Descriere sub Produs, spatiu 5px; meniul Stoc nu se mai restrange la clic pe nume (collapsible.js)
+- Categorii: adaugare/editare in popup, doar numele la subcategorie, culori pe nivel si linii de separare
+- Module: Invoices 1.1.2, Maintenance 1.3.1, RiskAnalyses 1.0.2
+- Verificari: build Release, browser pe instanta de test; suita completa inainte de commit

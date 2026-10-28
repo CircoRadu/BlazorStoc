@@ -112,7 +112,27 @@ public static class BackupWorker
             case BackupOperations.Backup:
             {
                 var kind = Enum.Parse<BackupKind>(request.Kind ?? throw new JsonException("no kind"));
-                result = await backups.CreateBackupAsync(kind, new SynchronousProgress<BackupProgress>(step => writer.Progress(step.Stage.ToString(), step.Message)), token).ConfigureAwait(false);
+                var backup = await backups.CreateBackupAsync(kind, new SynchronousProgress<BackupProgress>(step => writer.Progress(step.Stage.ToString(), step.Message)), token).ConfigureAwait(false);
+                result = backup;
+                // The package made before an update is copied to the NAS too (when the copy is enabled), like the ones the running application makes; the updater has no other
+                // way to do it. The copy has a time limit of its own and never fails the backup, so an unreachable NAS cannot stop the update. A pre-restore package is left
+                // to the next copy: the application is frozen during a restore.
+                if (kind == BackupKind.PreUpdate && backup.Success && backup.PackageFileName is { Length: > 0 } package)
+                {
+                    try
+                    {
+                        writer.Progress("NasCopy", "Copierea pachetului pe NAS");
+                        var protectionProvider = DataProtectionProvider.Create(new DirectoryInfo(DataProtectionKeys.PathFor(configuration)), options => options.SetApplicationName("BlazorStoc"));
+                        var nasCopier = new NasBackupCopier(configuration, protectionProvider, access, audit, loggers.CreateLogger<NasBackupCopier>());
+                        using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
+                        limit.CancelAfter(TimeSpan.FromSeconds(90));
+                        await nasCopier.CopyAfterBackupAsync(package, limit.Token).ConfigureAwait(false);
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException || !token.IsCancellationRequested)
+                    {
+                        loggers.CreateLogger("BackupWorker").LogWarning("Copy of the pre-update backup to the NAS failed ({ErrorType}).", exception.GetType().Name);
+                    }
+                }
                 break;
             }
             case BackupOperations.Restore:
