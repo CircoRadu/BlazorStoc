@@ -12,14 +12,14 @@ public static class PartnerCheckStatus
     public const string Pending = "pending", Resolved = "resolved", Discarded = "discarded";
 }
 
-internal sealed record PartnerCheckRow(long Id, long PartnerId, int? BeneficiaryId, string Name, string Cui, string Reason, string Status, DateTime CreatedUtc);
+internal sealed record PartnerCheckRow(long Id, long PartnerId, int? BeneficiaryId, string Name, string Cui, string Reason, string Status, DateTime CreatedUtc, string Note = "");
 
 internal static class ActivityPartnerCheckStore
 {
-    private const string Columns = "id, partner_id, beneficiary_id, name, cui_as_typed, reason, status, created_utc";
+    private const string Columns = "id, partner_id, beneficiary_id, name, cui_as_typed, reason, status, created_utc, note";
 
     private static PartnerCheckRow Read(MySqlDataReader reader) => new(reader.GetInt64(0), reader.GetInt64(1), reader.IsDBNull(2) ? null : reader.GetInt32(2), reader.GetString(3), reader.GetString(4),
-        reader.GetString(5), reader.GetString(6), DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc));
+        reader.GetString(5), reader.GetString(6), DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc), reader.GetString(8));
 
     public static async Task<IReadOnlyList<PartnerCheckRow>> ReadAsync(IConfiguration configuration, string? status, CancellationToken cancellationToken)
     {
@@ -42,13 +42,14 @@ internal static class ActivityPartnerCheckStore
     }
 
     /// <summary>Puts the partner in the queue (or refreshes its row while it is pending; a resolved or discarded row stays as it is).</summary>
-    public static async Task UpsertAsync(IConfiguration configuration, long partnerId, string name, string cui, string reason, int? beneficiaryId, CancellationToken cancellationToken)
+    public static async Task UpsertAsync(IConfiguration configuration, long partnerId, string name, string cui, string reason, int? beneficiaryId, CancellationToken cancellationToken, string detail = "")
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
-            INSERT INTO activity_import_partner_checks (partner_id, name, cui_as_typed, reason, status, beneficiary_id, created_utc, last_check_utc) VALUES (@partner, @name, @cui, @reason, 'pending', @beneficiary, @now, @now)
-            ON DUPLICATE KEY UPDATE name=@name, cui_as_typed=@cui, reason=IF(status='pending', @reason, reason), beneficiary_id=COALESCE(@beneficiary, beneficiary_id), last_check_utc=@now
+            INSERT INTO activity_import_partner_checks (partner_id, name, cui_as_typed, reason, status, beneficiary_id, note, created_utc, last_check_utc) VALUES (@partner, @name, @cui, @reason, 'pending', @beneficiary, @detail, @now, @now)
+            ON DUPLICATE KEY UPDATE name=@name, cui_as_typed=@cui, reason=IF(status='pending', @reason, reason), note=IF(status='pending', @detail, note), beneficiary_id=COALESCE(@beneficiary, beneficiary_id), last_check_utc=@now
             """, connection);
+        command.Parameters.AddWithValue("@detail", detail.Length > 480 ? detail[..480] : detail);
         command.Parameters.AddWithValue("@partner", partnerId);
         command.Parameters.AddWithValue("@name", name.Length > 300 ? name[..300] : name);
         command.Parameters.AddWithValue("@cui", cui.Length > 100 ? cui[..100] : cui);
@@ -82,7 +83,7 @@ internal static class ActivityPartnerCheckStore
     }
 }
 
-public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, IAccessControl access, IAuditTrail audit, IBeneficiaryRepository beneficiaries, ICompanyDataLookup? lookup = null) : IBeneficiaryCheckService
+public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, IAccessControl access, IAuditTrail audit, IBeneficiaryRepository beneficiaries, ICompanyDataLookup? lookup = null, IActivityPartnerImportService? partners = null) : IBeneficiaryCheckService
 {
     private const string View = "beneficiari.view";
     private const string Edit = "beneficiari.edit";
@@ -103,7 +104,8 @@ public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, I
             await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) waiting[reader.GetInt64(0)] = (int)reader.GetInt64(1);
         }
-        return [.. rows.Select(row => new BeneficiaryCheck(row.Id, row.PartnerId, row.BeneficiaryId, row.Name, row.Cui, row.Reason, BeneficiaryCheckReasons.Text(row.Reason), row.CreatedUtc, waiting.GetValueOrDefault(row.PartnerId)))];
+        return [.. rows.Select(row => new BeneficiaryCheck(row.Id, row.PartnerId, row.BeneficiaryId, row.Name, row.Cui, row.Reason,
+            BeneficiaryCheckReasons.Text(row.Reason) + (row.Note.Length > 0 && row.Reason is BeneficiaryCheckReasons.InvalidData or BeneficiaryCheckReasons.RepeatedIdentity ? $" ({row.Note})" : ""), row.CreatedUtc, waiting.GetValueOrDefault(row.PartnerId)))];
     }
 
     public async Task<string> RetryAsync(long id, CancellationToken cancellationToken = default)
@@ -111,6 +113,7 @@ public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, I
         await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
         var row = await ActivityPartnerCheckStore.FindAsync(configuration, id, cancellationToken).ConfigureAwait(false);
         if (row is null || row.Status != PartnerCheckStatus.Pending) throw new ActivityImportException("Beneficiarul nu mai este de verificat. Actualizează lista.");
+        if (row.BeneficiaryId is null) return row.Reason == BeneficiaryCheckReasons.AwaitingAcceptance ? "Partenerul așteaptă acceptarea: folosește „Acceptă”, nu verificarea în ANAF." : "Partenerul nu are încă un beneficiar în BlazorStoc: corectează datele în ActivityApp (adresă, CUI sau nume), iar sincronizarea următoare îl preia singură.";
         if (lookup is null) throw new ActivityImportException("Verificarea în ANAF nu este disponibilă (modulul ANAF este oprit).");
         var digits = SupplierRules.CuiDigits(row.Cui);
         if (!BeneficiaryRules.CuiPattern.IsMatch(BeneficiaryRules.CompactValue(row.Cui)) || digits.Length == 0)
@@ -147,6 +150,12 @@ public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, I
         await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
         var row = await ActivityPartnerCheckStore.FindAsync(configuration, id, cancellationToken).ConfigureAwait(false);
         if (row is null || row.Status != PartnerCheckStatus.Pending) throw new ActivityImportException("Beneficiarul nu mai este de verificat. Actualizează lista.");
+        if (row.BeneficiaryId is null && row.Reason == BeneficiaryCheckReasons.AwaitingAcceptance && partners is not null)
+        {
+            await partners.AcceptPartnerAsync(row.PartnerId, cancellationToken).ConfigureAwait(false);
+            await AuditAsync(AuditActions.AcceptActivityPartnerCheck, row, "Beneficiar acceptat manual și creat din ActivityApp", cancellationToken).ConfigureAwait(false);
+            return;
+        }
         if (row.BeneficiaryId is null) throw new ActivityImportException("Partenerul nu are încă un beneficiar în BlazorStoc (lipsește adresa în ActivityApp): se completează în ActivityApp sau se discardează.");
         var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
         await ActivityPartnerCheckStore.CloseAsync(configuration, row.PartnerId, PartnerCheckStatus.Resolved, actor, "acceptat manual", cancellationToken).ConfigureAwait(false);
@@ -177,7 +186,7 @@ public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, I
             AuditDetails.Identification(("Partener ActivityApp", row.PartnerId.ToString()), ("Denumire", row.Name), ("CUI", row.Cui), ("Motiv", BeneficiaryCheckReasons.Text(row.Reason))), "", cancellationToken);
 }
 
-/// <summary>The notification for the administrator: one instance for each beneficiary to verify, on the day it was found; it goes away by itself when it is clarified.</summary>
+/// <summary>The notification for the administrator: one instance for all the beneficiaries to verify together (their number, the reasons and the tickets that wait), on the day the oldest was found; it goes away by itself when the queue is empty.</summary>
 public sealed class ActivityPartnerCheckSource(IConfiguration configuration) : IExpirySource
 {
     public const string SourceKey = "sistem.beneficiari-activityapp-de-verificat";
@@ -185,28 +194,34 @@ public sealed class ActivityPartnerCheckSource(IConfiguration configuration) : I
     public const string DetailsKey = "detalii verificare";
     public string Key => SourceKey;
     public string Category => "Sistem";
-    public string EventName => "Beneficiar din ActivityApp de verificat";
+    public string EventName => "Beneficiari din ActivityApp de verificat";
     public string DateLabel => "constatării";
     public int DefaultThresholdDays => 0;
-    public string RemovedReason => "Beneficiarul a fost clarificat sau discardat.";
-    public string DefaultSubject => "Verifică beneficiarul: <beneficiar de verificat>";
+    public string RemovedReason => "Toți beneficiarii au fost clarificați sau discardați.";
+    public string DefaultSubject => "Verifică beneficiarii din ActivityApp: <beneficiar de verificat>";
     public string DefaultBody => "<detalii verificare> Vezi Beneficiari → De verificat.";
     public IReadOnlyList<ExpiryPlaceholder> Placeholders { get; } =
     [
-        new(NameKey, "Beneficiarul preluat din ActivityApp care trebuie verificat", "Alfa SRL"),
-        new(DetailsKey, "De ce trebuie verificat și câte tichete așteaptă", "ANAF nu a putut răspunde; 2 tichete așteaptă clarificarea.")
+        new(NameKey, "Câți beneficiari preluați din ActivityApp trebuie verificați", "3 beneficiari"),
+        new(DetailsKey, "Motivele și câte tichete așteaptă", "2 — adresă lipsă, 1 — ANAF nu a putut răspunde; 5 tichete așteaptă clarificarea.")
     ];
 
     public string DateChangedReason(DateOnly from, DateOnly to, ExpiryInstance current) =>
         $"Constatarea s-a mutat de la {StockMovementRules.DisplayDate(from)} la {StockMovementRules.DisplayDate(to)}.";
 
-    public static IReadOnlyList<ExpiryInstance> Instances(IReadOnlyList<BeneficiaryCheck> items) =>
-        [.. items.Select(item => new ExpiryInstance(checked((int)item.Id), item.Name, DateOnly.FromDateTime(item.CreatedUtc.ToLocalTime()),
-            new Dictionary<string, string>
-            {
-                [NameKey] = item.Name,
-                [DetailsKey] = $"{char.ToUpperInvariant(item.ReasonText[0])}{item.ReasonText[1..]}; {(item.WaitingTickets == 0 ? "niciun tichet nu așteaptă" : item.WaitingTickets == 1 ? "un tichet așteaptă" : $"{item.WaitingTickets} tichete așteaptă")} clarificarea."
-            }, "/beneficiari?tab=de-verificat"))];
+    public const int AggregateId = 1;
+
+    public static IReadOnlyList<ExpiryInstance> Instances(IReadOnlyList<BeneficiaryCheck> items)
+    {
+        if (items.Count == 0) return [];
+        var reasons = string.Join(", ", items.GroupBy(item => item.Reason).OrderByDescending(group => group.Count()).ThenBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => $"{group.Count()} — {BeneficiaryCheckReasons.Text(group.Key)}"));
+        var waiting = items.Sum(item => item.WaitingTickets);
+        var tickets = waiting == 0 ? "niciun tichet nu așteaptă" : waiting == 1 ? "un tichet așteaptă" : $"{waiting} tichete așteaptă";
+        var count = items.Count == 1 ? "un beneficiar" : $"{items.Count} beneficiari";
+        return [new ExpiryInstance(AggregateId, "Beneficiari din ActivityApp de verificat", DateOnly.FromDateTime(items.Min(item => item.CreatedUtc).ToLocalTime()),
+            new Dictionary<string, string> { [NameKey] = count, [DetailsKey] = $"{char.ToUpperInvariant(reasons[0])}{reasons[1..]}; {tickets} clarificarea." }, "/beneficiari?tab=de-verificat")];
+    }
 
     public async Task<IReadOnlyList<ExpiryInstance>> GetInstancesAsync(CancellationToken cancellationToken = default) =>
         Instances(await MariaBeneficiaryCheckService.ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false));

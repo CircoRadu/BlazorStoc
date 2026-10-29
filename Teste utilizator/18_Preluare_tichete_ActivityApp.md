@@ -6,6 +6,18 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 
 ## Modificari de testat
 
+### 29.10.2026 - Preluare automata a persoanelor fizice si a partenerilor fara tichete, coada unica, comutatoare (0.5.31)
+
+**Ce s-a adaugat:** sincronizarea preia si persoanele fizice si partenerii fara tichete; ce are probleme merge intr-o singura coada (Beneficiari -> De verificat), cu o singura notificare pentru administratori; doua comutatoare in Setari.
+
+**Ce face acum:**
+1. Setari -> Preluare ActivityApp -> sectiunea 3: doua comutatoare, ambele pornite implicit: "Preia si beneficiarii fara tichete" si "Import automat al beneficiarilor curati"; "Salveaza" le pastreaza (Jurnal: "Preluare beneficiari fara tichete", "Import automat beneficiari").
+2. "Rulează acum" (sectiunea 5) sau sincronizarea programata: partenerii noi din ActivityApp devin beneficiari; firmele (CUI cu cifre) se verifica in ANAF, persoanele fizice (fara CUI, cod personal sau nume in campul CUI) devin persoane fizice dupa nume, fara ANAF. Mesajul sincronizarii spune cati beneficiari noi si cati sunt "de verificat". Persoanele ignorate de versiunile vechi se preiau acum.
+3. Fara adresa, ANAF fara raspuns sau CUI necunoscut, CUI sau nume repetat la mai multi parteneri, date refuzate de BlazorStoc: partenerul intra in Beneficiari -> De verificat cu motivul (la repetari si date refuzate, cu detaliul), iar tichetele lui asteapta. Nu mai apare in lista de probleme din Setari.
+4. Notificarea (Setari -> Notificari) este una singura: "N beneficiari din ActivityApp de verificat", cu motivele si numarul tichetelor care asteapta; dispare cand coada e goala.
+5. Comutatorul "Import automat" oprit: fiecare partener nou intra in coada cu motivul "asteapta acceptarea manuala" (nu se creeaza beneficiar si nici punct de lucru); "Accepta" il creeaza atunci, cu punctele lui, si il scoate din coada; "Discard" ca inainte. "Reincearca ANAF" nu se aplica acestor randuri.
+6. Comutatorul "Preia si beneficiarii fara tichete" oprit: se preiau numai clientii tichetelor citite (la fel, automat sau in coada, dupa comutatorul de import automat).
+
 ### 23.10.2026 - Fundatia modulului de preluare tichete
 
 **Ce s-a adaugat:** fila Setari -> Preluare ActivityApp, vizibila numai administratorului (permisiunile `setari-import-activityapp.*` nu se acorda altor tipuri de utilizatori). Conexiune (server, port, baza, cont, parola criptata), data de la care se preiau tichetele (implicit 1 ianuarie anul curent), fereastra orara, marimea paginii, optiunea de completare a campurilor goale; butonul „Testeaza conexiunea" (verifica accesul si structura ActivityApp fata de contractul modulului); lista tipurilor de tichete din ActivityApp cu numarul de tichete rezolvate/deschise/sterse, alegerea tipurilor si destinatia fiecaruia (la cerere / de mentenanta). Jurnal: „Modificare setari preluare ActivityApp", „Testare conexiune ActivityApp", „Modificare tipuri tichete preluate ActivityApp".

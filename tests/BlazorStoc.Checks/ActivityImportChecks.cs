@@ -230,9 +230,19 @@ public static class ActivityImportChecks
         check(Of(1) is { Action: PlanAction.Create, Input: { Cui: "1234567", Kind: BeneficiaryKinds.Legal } } && Of(1).Input!.Address == "Str. Florilor 5, Timisoara, Timis" && Of(1).Input!.Phone == "0722111222",
             "Activity import (partners): a company with a valid tax id is created with the CUI without RO, the address put together and the first phone number");
         check(Of(2) is { Action: PlanAction.Link, LocalId: 7 }, "Activity import (partners): a company that exists in BlazorStoc (same CUI, with or without RO) is only linked");
-        check(Of(3) is { Action: PlanAction.Skipped, Input: null } && Of(4).Action == PlanAction.Skipped && Of(12).Action == PlanAction.Skipped && Of(3).Message == ActivityPartnerPlanner.PersonNotTaken,
-            "Activity import (partners): a partner without tax id, or with a name in the tax id field, is a person and is not imported (only companies with a CUI are)");
-        check(Of(5).Action == PlanAction.Skipped && Of(5).Message == ActivityPartnerPlanner.PersonNotTaken, "Activity import (partners): a tax id with letters (other than RO) is not a CUI: the partner is not imported");
+        check(Of(3) is { Action: PlanAction.Create, Input: { Kind: BeneficiaryKinds.Individual, Cui: "", AnafVerified: false }, Check: "" } && Of(3).Input!.Name == "Maria Ionescu" && Of(3).Message.Contains(ActivityPartnerPlanner.PersonNote, StringComparison.Ordinal)
+              && Of(4) is { Action: PlanAction.Link, LocalId: 8 } && Of(12) is { Action: PlanAction.Create, Input.Kind: BeneficiaryKinds.Individual },
+            "Activity import (partners): a partner without tax id, or with a name in the tax id field, is a person: taken automatically as an individual by name, without ANAF; one that exists by name is only linked");
+        check(Of(5) is { Action: PlanAction.Create, Input.Kind: BeneficiaryKinds.Individual } && Of(10) is { Action: PlanAction.Create, Input: { Kind: BeneficiaryKinds.Individual, Cui: "" } },
+            "Activity import (partners): a tax id with letters (other than RO), or a 13-digit personal code, is not a CUI: the partner is a person and the code is never stored");
+        // A map entry with no beneficiary (what an earlier version left for a person it did not take) does not stop the person from being taken now.
+        var oldIgnored = ActivityPartnerPlanner.PlanPartners(partners, existing, [new(ActivityPartnerPlanner.PartnerEntity, 3, 0)]);
+        check(oldIgnored.Single(plan => plan.SourceId == 3).Action == PlanAction.Create, "Activity import (partners): a person ignored by an earlier version is planned again and taken");
+        // The same name on two partners is ambiguous: neither is taken, both wait in the queue with the reason.
+        var twins = ActivityPartnerPlanner.PlanPartners([Partner(40, "Pop Vasile", ""), Partner(41, "Pop Vasile", "-")], existing, []);
+        check(twins.All(plan => plan is { Action: PlanAction.Problem, Check: BeneficiaryCheckReasons.RepeatedIdentity }), "Activity import (partners): a person's name repeated in ActivityApp is a case for the queue, not a guess");
+        var personWithoutAddress = ActivityPartnerPlanner.PlanPartners([Partner(42, "Pop Maria", "", address: "", city: "")], existing, []).Single();
+        check(personWithoutAddress is { Action: PlanAction.Problem, Check: BeneficiaryCheckReasons.MissingAddress }, "Activity import (partners): a person without an address waits in the queue with the reason \"adresă lipsă\"");
         // Ignored partners included by hand: as a person (identity = the name) or as a company (needs a CUI with digits); taken without ANAF, with the note of the manual take.
         var included = ActivityPartnerPlanner.PlanPartners(partners, existing, [new(ActivityPartnerPlanner.IncludeEntity, 3, ActivityPartnerPlanner.IncludeAsPerson), new(ActivityPartnerPlanner.IncludeEntity, 4, ActivityPartnerPlanner.IncludeAsPerson),
             new(ActivityPartnerPlanner.IncludeEntity, 5, ActivityPartnerPlanner.IncludeAsCompany), new(ActivityPartnerPlanner.IncludeEntity, 12, ActivityPartnerPlanner.IncludeAsPerson), new(ActivityPartnerPlanner.PartnerEntity, 12, 0)],
@@ -245,7 +255,7 @@ public static class ActivityImportChecks
             "Activity import (partners): a partner without a CUI with digits cannot be included as a company; an included one is never asked of ANAF");
         check(Of(13) is { Action: PlanAction.Create, Check: "cui_invalid_form", Input.NeedsCheck: true } && Of(13).Input!.Cui == "123456789012",
             "Activity import (partners): a CUI of only digits but of the wrong form is still taken, to be verified by a human (the CUI as typed, cut to the field)");
-        check(Of(6).Action == PlanAction.Problem && Of(7).Action == PlanAction.Problem && Of(6).Message.Contains("repetat", StringComparison.Ordinal), "Activity import (partners): a tax id repeated in ActivityApp makes every partner with it a problem");
+        check(Of(6).Action == PlanAction.Problem && Of(7).Action == PlanAction.Problem && Of(6).Message.Contains("repetat", StringComparison.Ordinal) && Of(6).Check == BeneficiaryCheckReasons.RepeatedIdentity, "Activity import (partners): a tax id repeated in ActivityApp makes every partner with it a problem, for the queue of the ones to verify");
         check(Of(8).Action == PlanAction.Problem && Of(8).Message.Contains("adres", StringComparison.Ordinal) && Of(9) is { Action: PlanAction.Create, Input.Phone: "" },
             "Activity import (partners): no address is a problem; no valid phone is not (the phone is optional)");
         // ANAF: a company that lacks the address or the phone is asked of ANAF (never a person); its answer completes the plan.
@@ -260,14 +270,14 @@ public static class ActivityImportChecks
         check(Checked(1) is { Action: PlanAction.Create, Input.AnafVerified: true, Message: "", Check: "" } && Checked(9) is { Action: PlanAction.Create, Input.AnafVerified: false, Check: "anaf_unavailable" } && Checked(9).Message.Contains("De verificat", StringComparison.Ordinal)
                 && Checked(11) is { Action: PlanAction.Create, Check: "cui_unknown", Input.AnafVerified: false },
             "Activity import (partners): a company ANAF knows is created as verified; one that ANAF does not know, or when ANAF cannot answer, is created to be verified by a human");
-        check(ActivityPartnerPlanner.PlanPartners(partners, existing, []).Where(plan => plan.Action == PlanAction.Create && plan.Check.Length == 0).All(plan => !plan.Input!.AnafVerified && plan.Message == ""), "Activity import (partners): without any lookup nothing is marked verified and nothing is said about ANAF");
+        check(ActivityPartnerPlanner.PlanPartners(partners, existing, []).Where(plan => plan.Action == PlanAction.Create && plan.Check.Length == 0 && plan.Input!.Kind == BeneficiaryKinds.Legal).All(plan => !plan.Input!.AnafVerified && plan.Message == ""), "Activity import (partners): without any lookup nothing is marked verified and nothing is said about ANAF");
         var viaAnaf = ActivityPartnerPlanner.PlanPartners(partners, existing, [], new Dictionary<string, CompanyData> { ["7777777"] = new("Str. ANAF 1, Cluj", ""), ["8888888"] = new("", "+40 744 100 200") });
         PartnerPlan Filled(long id) => viaAnaf.Single(plan => plan.SourceId == id);
         check(Filled(8) is { Action: PlanAction.Create } && Filled(8).Input!.Address == "Str. ANAF 1, Cluj" && Filled(8).Message.StartsWith(ActivityPartnerPlanner.AnafFilledPrefix, StringComparison.Ordinal) && Filled(9).Input!.Phone == "+40744100200",
             "Activity import (partners): the address and the phone that ANAF gives complete the plan, and the plan says so");
         check(ActivityPartnerPlanner.PlanPartners(partners, existing, [], new Dictionary<string, CompanyData> { ["7777777"] = new("", "", "ANAF nu răspunde.") }).Single(plan => plan.SourceId == 8) is { Action: PlanAction.Problem, Check: "anaf_unavailable" } noAddress && noAddress.Message.Contains("(ANAF nu a putut răspunde)", StringComparison.Ordinal),
             "Activity import (partners): a company without address that ANAF cannot answer for stays out, in the queue to verify, with the reason");
-        check(Of(10) is { Action: PlanAction.Skipped, Input: null }, "Activity import (partners): a 13-digit personal code is not a CUI: the partner is a person and is not imported");
+
         check(Of(11).Input!.Phone == "0256123456", "Activity import (partners): of several phone numbers the first valid one is taken");
         var tied = ActivityPartnerPlanner.PlanPartners(partners.Take(2).ToList(), existing, [new ImportMapEntry("partner", 1, 7), new ImportMapEntry("partner", 2, 999)]);
         check(tied.Single(plan => plan.SourceId == 1).Action == PlanAction.AlreadyLinked && tied.Single(plan => plan.SourceId == 2) is { Action: PlanAction.Problem } p && p.Message.Contains("nu mai există", StringComparison.Ordinal),
@@ -282,7 +292,7 @@ public static class ActivityImportChecks
             Point(102, 1, "Bulevardul Libertatii nr. 9"),
             Point(103, 2, "Str. Veche 1"),
             Point(104, 2, "Str. Noua 3", closed: true),
-            Point(105, 5, "Str. Oarecare 1"),
+            Point(105, 6, "Str. Oarecare 1"),
             Point(106, 999, "Str. Orfana 1"),
             Point(107, 1, "", "Fara adresa")
         };

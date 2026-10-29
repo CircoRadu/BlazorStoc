@@ -1,5 +1,11 @@
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.31 | 29.10.2026
+- Preluare ActivityApp: se preiau automat și persoanele fizice (după nume, fără ANAF), iar sincronizarea ia toți partenerii noi, cu sau fără tichete (cel mult o dată la 6 ore la rulările programate, la fiecare „Rulează acum”). Cei curați devin beneficiari direct; cei cu probleme (fără adresă, ANAF fără răspuns sau care nu cunoaște CUI-ul, CUI sau nume repetat în ActivityApp, date refuzate) intră în Beneficiari → De verificat, cu motivul, iar tichetele lor așteaptă.
+- Notificarea pentru administratori este una singură („N beneficiari din ActivityApp de verificat”, cu motivele și numărul de tichete în așteptare), nu câte una pe beneficiar.
+- Setări → Preluare ActivityApp, secțiunea 3: comutator „Preia și beneficiarii fără tichete” și comutator „Import automat”; cu importul automat oprit, fiecare beneficiar nou așteaptă în coadă și îl accepți tu (se creează atunci, cu punctele lui de lucru).
+- Persoanele fizice ignorate de versiunile vechi se preiau la următoarea sincronizare. Migrarea 57. ActivityImport 0.3.0.
+
 ## 0.5.30 | 28.10.2026
 - Mutare: o subcategorie care se întoarce sub părintele de la care avea copii ale parametrilor nu mai este blocată de familiile și parametrii cu același nume. Familia proprie se îmbină cu cea a părintelui după decizia ta („Îmbină cu cele de la noii părinți”): parametrii cu același nume se unesc, ceilalți intră în familia părintelui, iar produsele își păstrează valorile. Rămân blocate doar cazurile cu tip sau unitate diferite ori definiții arhivate.
 

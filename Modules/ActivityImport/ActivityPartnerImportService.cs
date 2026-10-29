@@ -29,6 +29,13 @@ public interface IActivityPartnerImportService
     /// caller (the ticket import) already holds the gate. Needs the import to be switched on.
     /// </summary>
     Task<ImportReport> ApplyForAsync(IReadOnlySet<long> partnerIds, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Takes every partner of ActivityApp that is not in BlazorStoc yet (companies and persons, with or without tickets) and the new work points of those already tied, except the discarded ones: the clean ones
+    /// are created, the ones with problems go to the queue of the beneficiaries to verify. Needs the import to be switched on; null when another run holds the gate (the next synchronization takes it up).
+    /// </summary>
+    Task<ImportReport?> ApplyNewAsync(CancellationToken cancellationToken = default) => Task.FromResult<ImportReport?>(null);
+    /// <summary>The operator accepts a partner that waits in the queue (automatic import off): its beneficiary and work points are made now and the queue row is closed.</summary>
+    Task AcceptPartnerAsync(long partnerId, CancellationToken cancellationToken = default) => throw new ActivityImportException("Acceptarea nu este disponibilă.");
     Task<ImportRunInfo?> GetLastRunAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ImportIssue>> GetOpenIssuesAsync(CancellationToken cancellationToken = default);
     Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default);
@@ -71,7 +78,7 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
                 progress?.Report("Se citește ActivityApp…");
                 var loaded = await LoadAsync(settings.PageSize, null, cancellationToken).ConfigureAwait(false);
                 report = apply
-                    ? await ApplyPlanAsync(loaded, runId, actor, started, progress, cancellationToken).ConfigureAwait(false)
+                    ? await ApplyPlanAsync(loaded, runId, actor, started, progress, cancellationToken, settings.AutoAcceptPartners).ConfigureAwait(false)
                     : Report(kind, started, actor, false, loaded.Partners.Select(plan => (plan.Action, Item(plan))), loaded.Points.Select(plan => (plan.Action, Item(plan))), null)
                         with { AnafFilled = loaded.Partners.Count(plan => plan.Action == PlanAction.Create && plan.Message.Contains(ActivityPartnerPlanner.AnafFilledPrefix, StringComparison.Ordinal)),
                                AnafUnverified = loaded.Partners.Count(plan => plan.Action == PlanAction.Create && plan.Check.Length > 0) };
@@ -99,9 +106,47 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
         var settings = await import.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
         if (!settings.Enabled) throw new ActivityImportException("Preluarea este inactivă. Activeaz-o în setări înainte de aplicare.");
         var loaded = await LoadAsync(settings.PageSize, partnerIds, cancellationToken).ConfigureAwait(false);
-        var report = await ApplyPlanAsync(loaded, 0, actor, started, null, cancellationToken).ConfigureAwait(false);
+        var report = await ApplyPlanAsync(loaded, 0, actor, started, null, cancellationToken, settings.AutoAcceptPartners).ConfigureAwait(false);
         await ReverifyAsync(actor, cancellationToken).ConfigureAwait(false);
         return report;
+    }
+
+    public async Task<ImportReport?> ApplyNewAsync(CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync(Run, cancellationToken).ConfigureAwait(false);
+        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new ActivityImportException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
+        if (!await Gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return null;
+        try
+        {
+            var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
+            var started = DateTime.UtcNow;
+            var settings = await import.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
+            if (!settings.Enabled) throw new ActivityImportException("Preluarea este inactivă. Activeaz-o în setări înainte de aplicare.");
+            var loaded = await LoadAsync(settings.PageSize, null, cancellationToken, true).ConfigureAwait(false);
+            var report = await ApplyPlanAsync(loaded, 0, actor, started, null, cancellationToken, settings.AutoAcceptPartners).ConfigureAwait(false);
+            await ReverifyAsync(actor, cancellationToken).ConfigureAwait(false);
+            return report;
+        }
+        finally { Gate.Release(); }
+    }
+
+    // The operator accepts by hand a partner that waited in the queue (automatic import off): the beneficiary is made now, whatever the setting says. The check of the permission is the one of
+    // the repository of the beneficiaries (the caller, the queue, has checked the right to edit them).
+    public async Task AcceptPartnerAsync(long partnerId, CancellationToken cancellationToken = default)
+    {
+        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new ActivityImportException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
+        if (!await Gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) throw new ActivityImportException("O altă rulare a importului este în desfășurare. Așteaptă să se termine.");
+        try
+        {
+            var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
+            var settings = await import.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
+            var loaded = await LoadAsync(settings.PageSize, new HashSet<long> { partnerId }, cancellationToken).ConfigureAwait(false);
+            var report = await ApplyPlanAsync(loaded, 0, actor, DateTime.UtcNow, null, cancellationToken, true).ConfigureAwait(false);
+            if (report.Partners.Create + report.Partners.Link + report.Partners.AlreadyLinked == 0)
+                throw new ActivityImportException(report.Items.FirstOrDefault(item => item.SourceId == partnerId)?.Message is { Length: > 0 } message ? message : "Partenerul nu mai există în ActivityApp sau nu poate fi preluat acum.");
+            await ActivityPartnerCheckStore.CloseAsync(configuration, partnerId, PartnerCheckStatus.Resolved, actor, "acceptat manual", cancellationToken).ConfigureAwait(false);
+        }
+        finally { Gate.Release(); }
     }
 
     // The beneficiaries taken while ANAF could not answer are asked again at every run: when ANAF confirms the CUI the beneficiary is marked as verified and its tickets are taken; when ANAF
@@ -155,7 +200,7 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
             [.. items], false, error);
     }
 
-    private async Task<Loaded> LoadAsync(int pageSize, IReadOnlySet<long>? only, CancellationToken cancellationToken)
+    private async Task<Loaded> LoadAsync(int pageSize, IReadOnlySet<long>? only, CancellationToken cancellationToken, bool skipDiscarded = false)
     {
         var connection = await import.GetConnectionAsync(cancellationToken).ConfigureAwait(false)
             ?? throw new ActivityImportException("Conexiunea la ActivityApp nu este completată (server, cont, parolă). Salveaz-o în setări.");
@@ -169,6 +214,9 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
         var existing = await beneficiaries.GetBeneficiariesAsync(cancellationToken).ConfigureAwait(false);
         var map = await ImportStore.ReadMapAsync(configuration, cancellationToken).ConfigureAwait(false);
         // Only the asked partners (the clients of the tickets) are verified and taken; the plan is made over all of them so that a CUI repeated in ActivityApp is still seen as repeated.
+        // The pass over every partner leaves out the ones the operator discarded (their ANAF lookup too).
+        var discarded = skipDiscarded ? (await ActivityPartnerCheckStore.ReadAsync(configuration, PartnerCheckStatus.Discarded, cancellationToken).ConfigureAwait(false)).Select(row => row.PartnerId).ToHashSet() : new HashSet<long>();
+        if (skipDiscarded) only = partners.Select(partner => partner.Id).Where(id => !discarded.Contains(id)).ToHashSet();
         var partnerPlans = ActivityPartnerPlanner.PlanPartners(partners, existing, map, await LookupAnafAsync(ActivityPartnerPlanner.NeedsAnaf(partners, existing, map, only), cancellationToken).ConfigureAwait(false));
         if (only is not null)
         {
@@ -208,7 +256,7 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
         return result;
     }
 
-    private async Task<ImportReport> ApplyPlanAsync(Loaded loaded, long runId, string actor, DateTime started, IProgress<string>? progress, CancellationToken cancellationToken)
+    private async Task<ImportReport> ApplyPlanAsync(Loaded loaded, long runId, string actor, DateTime started, IProgress<string>? progress, CancellationToken cancellationToken, bool auto = true)
     {
         var partnerResults = new List<(PartnerPlan Plan, PlanAction Action, string Message, int? Local)>();
         var mainOf = new Dictionary<long, int?>();
@@ -219,6 +267,11 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
             if (++done % 20 == 0) progress?.Report($"Beneficiari: {done} din {loaded.Partners.Count}…");
             switch (plan.Action)
             {
+                case PlanAction.Create when !auto:
+                    // Automatic import is off: the partner waits in the queue of the beneficiaries to verify until the operator accepts it (its tickets wait too).
+                    await ActivityPartnerCheckStore.UpsertAsync(configuration, plan.SourceId, plan.Name, plan.CuiTyped, BeneficiaryCheckReasons.AwaitingAcceptance, null, cancellationToken, plan.Message).ConfigureAwait(false);
+                    partnerResults.Add((plan with { Check = BeneficiaryCheckReasons.AwaitingAcceptance }, PlanAction.Waiting, plan.Message, null));
+                    break;
                 case PlanAction.Create:
                     try
                     {
@@ -230,15 +283,21 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
                         else await ActivityPartnerCheckStore.CloseAsync(configuration, plan.SourceId, PartnerCheckStatus.Resolved, actor, "preluat verificat", cancellationToken).ConfigureAwait(false);
                         partnerResults.Add((plan, PlanAction.Create, "", created.Id));
                     }
-                    catch (BeneficiaryOperationException exception) { partnerResults.Add((plan, PlanAction.Problem, exception.Message, null)); }
+                    catch (BeneficiaryOperationException exception)
+                    {
+                        // A beneficiary BlazorStoc refuses is a case for the queue of the beneficiaries to verify, with the reason it gave.
+                        await ActivityPartnerCheckStore.UpsertAsync(configuration, plan.SourceId, plan.Name, plan.CuiTyped, BeneficiaryCheckReasons.InvalidData, null, cancellationToken, exception.Message).ConfigureAwait(false);
+                        partnerResults.Add((plan with { Check = BeneficiaryCheckReasons.InvalidData }, PlanAction.Problem, exception.Message, null));
+                    }
                     break;
                 case PlanAction.Link:
                     await ImportStore.WriteMapAsync(configuration, ActivityPartnerPlanner.PartnerEntity, plan.SourceId, plan.LocalId!.Value, "linked", plan.Hash, cancellationToken).ConfigureAwait(false);
+                    await ActivityPartnerCheckStore.CloseAsync(configuration, plan.SourceId, PartnerCheckStatus.Resolved, actor, "legat de un beneficiar existent", cancellationToken).ConfigureAwait(false);
                     partnerResults.Add((plan, PlanAction.Link, plan.Message, plan.LocalId));
                     break;
                 case PlanAction.Problem when plan.Check.Length > 0:
-                    // A company that cannot be made a beneficiary yet (no address): it waits in the queue of the partners to verify, with its tickets.
-                    await ActivityPartnerCheckStore.UpsertAsync(configuration, plan.SourceId, plan.Name, plan.CuiTyped, plan.Check, null, cancellationToken).ConfigureAwait(false);
+                    // A partner that cannot be made a beneficiary yet (no address, a CUI or a name repeated in ActivityApp, data BlazorStoc refuses): it waits in the queue of the partners to verify, with its tickets.
+                    await ActivityPartnerCheckStore.UpsertAsync(configuration, plan.SourceId, plan.Name, plan.CuiTyped, plan.Check, null, cancellationToken, plan.Message).ConfigureAwait(false);
                     partnerResults.Add((plan, plan.Action, plan.Message, plan.LocalId));
                     break;
                 case PlanAction.Skipped when plan.Message == ActivityPartnerPlanner.PersonNotTaken:
@@ -252,14 +311,14 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
             }
         }
         var partnerLocal = partnerResults.Where(result => result.Local is not null).ToDictionary(result => result.Plan.SourceId, result => result.Local!.Value);
-        var failedPartners = partnerResults.Where(result => result.Action == PlanAction.Problem).Select(result => result.Plan.SourceId).ToHashSet();
+        var failedPartners = partnerResults.Where(result => result.Action is PlanAction.Problem or PlanAction.Waiting).Select(result => result.Plan.SourceId).ToHashSet();
         var pointResults = new List<(PointPlan Plan, PlanAction Action, string Message)>();
         done = 0;
         foreach (var plan in loaded.Points)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (++done % 20 == 0) progress?.Report($"Puncte de lucru: {done} din {loaded.Points.Count}…");
-            if (failedPartners.Contains(plan.PartnerId)) { pointResults.Add((plan, PlanAction.Skipped, "Beneficiarul nu a putut fi creat; punctul se preia după ce se rezolvă.")); continue; }
+            if (failedPartners.Contains(plan.PartnerId)) { pointResults.Add((plan, PlanAction.Skipped, "Beneficiarul nu a fost creat încă (problemă sau acceptare manuală); punctul se preia după ce se rezolvă.")); continue; }
             switch (plan.Action)
             {
                 case PlanAction.Create:
@@ -291,7 +350,8 @@ public sealed class MariaActivityPartnerImportService(IConfiguration configurati
             AnafUnverified = partnerResults.Count(result => result.Action == PlanAction.Create && result.Plan.Check.Length > 0)
         };
         // A run for a few partners (the clients of the tickets) must not clear the open problems of the others.
-        if (runId > 0) await ImportStore.RecordIssuesAsync(configuration, runId, [ActivityPartnerPlanner.PartnerEntity, ActivityPartnerPlanner.PointEntity], partnerResults.Where(result => result.Action == PlanAction.Problem).Select(result => (ActivityPartnerPlanner.PartnerEntity, result.Plan.SourceId, result.Plan.Name, result.Message))
+        // The partners in the queue of the ones to verify are not repeated in the list of problems.
+        if (runId > 0) await ImportStore.RecordIssuesAsync(configuration, runId, [ActivityPartnerPlanner.PartnerEntity, ActivityPartnerPlanner.PointEntity], partnerResults.Where(result => result.Action == PlanAction.Problem && result.Plan.Check.Length == 0).Select(result => (ActivityPartnerPlanner.PartnerEntity, result.Plan.SourceId, result.Plan.Name, result.Message))
             .Concat(pointResults.Where(result => result.Action == PlanAction.Problem).Select(result => (ActivityPartnerPlanner.PointEntity, result.Plan.SourceId, result.Plan.Name, result.Message))), cancellationToken).ConfigureAwait(false);
         return report;
     }
@@ -366,6 +426,8 @@ internal sealed class GuardedActivityPartnerImportService(IActivityPartnerImport
     public Task<ImportReport> SimulateAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SimulateAsync(cancellationToken));
     public Task<ImportReport> ApplyAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ApplyAsync(progress, cancellationToken));
     public Task<ImportReport> ApplyForAsync(IReadOnlySet<long> partnerIds, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ApplyForAsync(partnerIds, cancellationToken));
+    public Task<ImportReport?> ApplyNewAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ApplyNewAsync(cancellationToken));
+    public Task AcceptPartnerAsync(long partnerId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.AcceptPartnerAsync(partnerId, cancellationToken));
     public Task<ImportRunInfo?> GetLastRunAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetLastRunAsync(cancellationToken));
     public Task<IReadOnlyList<ImportIssue>> GetOpenIssuesAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetOpenIssuesAsync(cancellationToken));
     public Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ResolveIssueAsync(issueId, cancellationToken));
@@ -378,6 +440,8 @@ internal sealed class UnavailableActivityPartnerImportService : IActivityPartner
     public Task<ImportReport> SimulateAsync(CancellationToken cancellationToken = default) => Out<ImportReport>();
     public Task<ImportReport> ApplyAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default) => Out<ImportReport>();
     public Task<ImportReport> ApplyForAsync(IReadOnlySet<long> partnerIds, CancellationToken cancellationToken = default) => Out<ImportReport>();
+    public Task<ImportReport?> ApplyNewAsync(CancellationToken cancellationToken = default) => Out<ImportReport?>();
+    public Task AcceptPartnerAsync(long partnerId, CancellationToken cancellationToken = default) => Out<object>();
     public Task<ImportRunInfo?> GetLastRunAsync(CancellationToken cancellationToken = default) => Out<ImportRunInfo?>();
     public Task<IReadOnlyList<ImportIssue>> GetOpenIssuesAsync(CancellationToken cancellationToken = default) => Out<IReadOnlyList<ImportIssue>>();
     public Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default) => Out<object>();

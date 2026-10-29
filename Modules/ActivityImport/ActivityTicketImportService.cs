@@ -115,7 +115,7 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
         int newBeneficiaries = 0, newPoints = 0, toVerify = 0;
         if (apply && partners is not null)
         {
-            var known = map.Where(entry => entry.Entity == ActivityPartnerPlanner.PartnerEntity).Select(entry => entry.SourceId).ToHashSet();
+            var known = map.Where(entry => entry.Entity == ActivityPartnerPlanner.PartnerEntity && entry.LocalId != 0).Select(entry => entry.SourceId).ToHashSet();
             var discardedPartners = (await ActivityPartnerCheckStore.ReadAsync(configuration, PartnerCheckStatus.Discarded, cancellationToken).ConfigureAwait(false)).Select(row => row.PartnerId).ToHashSet();
             var needed = tickets.Values.Where(ticket => ticket.PartnerId != 0 && selected.Any(item => item.Id == ticket.TypeId)).Select(ticket => ticket.PartnerId)
                 .Where(id => !known.Contains(id) && !discardedPartners.Contains(id)).ToHashSet();

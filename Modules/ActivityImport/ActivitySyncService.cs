@@ -106,6 +106,8 @@ public sealed class MariaActivitySyncService(IConfiguration configuration, IActi
 {
     private const string Run = "setari-import-activityapp.run";
     private const int SuspiciousMinimum = 20;
+    private static readonly TimeSpan PartnerPassInterval = TimeSpan.FromHours(6);
+    private static DateTime lastPartnerPass = DateTime.MinValue;
     public static readonly string[] DeletedEntities = ["partner-deleted", "workpoint-deleted", "ticket-deleted"];
 
     public async Task<SyncResult> RunNowAsync(CancellationToken cancellationToken = default)
@@ -139,14 +141,23 @@ public sealed class MariaActivitySyncService(IConfiguration configuration, IActi
         try
         {
             // The tickets lead: the clients of the tickets read (and of those that wait) are taken as needed, verified in ANAF; there is no longer a pass over the whole table of partners.
+            // Every new partner is taken first (companies and persons, with or without tickets; the clean ones are created, the others wait in the queue of the beneficiaries to verify and the
+            // administrators are notified); the pass reads the whole table of partners, so a scheduled run makes it at most every few hours, a run by hand always.
+            ImportReport? partnerReport = null;
+            if (before.TakePartners && (manual || DateTime.UtcNow - lastPartnerPass >= PartnerPassInterval))
+            {
+                partnerReport = await partners.ApplyNewAsync(cancellationToken).ConfigureAwait(false);
+                if (partnerReport is not null) lastPartnerPass = DateTime.UtcNow;
+            }
             TicketReport? ticketReport = null;
             try { ticketReport = await tickets.ApplyAsync(null, cancellationToken).ConfigureAwait(false); }
             catch (ActivityImportException exception) when (exception.Message == ActivityImportRules.NoTypesMessage) { }
             var deleted = await DetectDeletedAsync(cancellationToken).ConfigureAwait(false);
             var problems = ticketReport?.Tickets.Problems ?? 0;
-            var newBeneficiaries = ticketReport?.NewBeneficiaries ?? 0;
-            var newPoints = ticketReport?.NewPoints ?? 0;
-            var message = $"Beneficiari: {newBeneficiaries} noi" + (ticketReport is { BeneficiariesToVerify: > 0 } ? $" ({ticketReport.BeneficiariesToVerify} de verificat)" : "") + $"; puncte de lucru: {newPoints} noi; tichete: " +
+            var newBeneficiaries = (ticketReport?.NewBeneficiaries ?? 0) + (partnerReport?.Partners.Create ?? 0);
+            var newPoints = (ticketReport?.NewPoints ?? 0) + (partnerReport?.Points.Create ?? 0);
+            var toVerify = (await ActivityPartnerCheckStore.ReadAsync(configuration, PartnerCheckStatus.Pending, cancellationToken).ConfigureAwait(false)).Count;
+            var message = $"Beneficiari: {newBeneficiaries} noi" + (toVerify > 0 ? $" ({toVerify} de verificat)" : "") + $"; puncte de lucru: {newPoints} noi; tichete: " +
                 (ticketReport is null ? "niciun tip ales" : $"{ticketReport.Tickets.Create} preluate" + (ticketReport.Tickets.Waiting > 0 ? $", {ticketReport.Tickets.Waiting} în așteptare" : "")) + $"; probleme: {problems}; șterse în ActivityApp: {deleted.Total}" + (deleted.Note.Length > 0 ? $" ({deleted.Note})" : "") + ".";
             result = new SyncResult(true, message, newBeneficiaries, newPoints, ticketReport?.Tickets.Create ?? 0, problems, deleted.Newly);
         }

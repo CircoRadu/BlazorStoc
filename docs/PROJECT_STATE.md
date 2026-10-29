@@ -89,6 +89,10 @@ Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Schimbari de comportament voite: retry la deadlock si pentru Project, ProjectComponent, Offer, OfferTemplate, SystemType; Project verifica `IsAllowedDatabase`; anularea se verifica inainte de deschiderea conexiunii.
 - Teste noi `StructureChecks` (grupul `structure`, 23): rutele (`@page` din .razor = rutele compilate; prinde un `@` pierdut), `SettleNumbers`, `OverStockOf`. Verificat pe 30 de PDF-uri reale (raport identic) si pe fixturile OCR (identic).
 - Suita in memorie 1089 trecute, MariaDB 1744 trecute, 0 esecuri; migrarea 38 aplicata acum si pe `blazorstoc_test`. Paginile impartite verificate in browser de agent (miscari produs, preluare factura PDF/ZIP, sabloane, categorii, vehicule, harta, nomenclator, inventar); raman de verificat de utilizator pasul 3 al preluarii facturii si salvarea unui sablon (`Teste utilizator/` 02 si 04).
+## Ultimul lucru facut (29.10.2026, preluare ActivityApp: persoane fizice, parteneri fara tichete, coada unica)
+
+- Necomis: 0.5.31, migrarea 57 (`take_partners`, `auto_accept_partners`), ActivityImport 0.3.0. Vezi `IMPLEMENTED.md` (29.10.2026) si `Teste utilizator/18_Preluare_tichete_ActivityApp.md`. Pista paralela (asistent de curatare produse) incepe acum cu migrarea 58.
+
 ## Ultimul lucru facut (28.10.2026, catalog: arhivare, definitii pe categorie, relocare, tragere pe niveluri)
 
 - Ramura `claude/arhivare-parametri-categorii` (necomisa): etapele 0-8 gata. Migrarea 056; servicii `ParameterArchive`, `DefinitionRelocation`/`MariaDefinitionRelocation`, `DefinitionOwner`; `SubcategoryTree` cu `PreviewMoveAsync`/`MoveAsync(choices)` si `PreviewPromotionAsync`/`PromoteAsync`; ferestre `ParameterArchive/Restore/UsageDialog`, `TakeFromChildDialog`, `BranchMoveDialog`.

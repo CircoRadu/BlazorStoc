@@ -38,12 +38,15 @@ public sealed record ActivityImportSettings(bool Enabled, string Server, int Por
     /// <summary>The latest modification date of a closing event seen by the last successful ticket import (migration 50); null reads everything.</summary>
     public DateTime? SourceWatermark { get; init; }
     public string SyncTimes { get; init; } = "";
+    /// <summary>Beneficiaries (migration 57): also take the partners that have no ticket; and make a clean partner a beneficiary at once (off: every new partner waits in the queue for a manual acceptance).</summary>
+    public bool TakePartners { get; init; } = true;
+    public bool AutoAcceptPartners { get; init; } = true;
 }
 
 /// <summary>What the administrator typed. A null or empty <see cref="Password"/> keeps the stored one.</summary>
 public sealed record ActivityImportInput(bool Enabled, string Server, int Port, string Database, string User, string? Password, DateOnly? SinceDate, int WindowFromHour, int WindowToHour,
     int PageSize, bool FillEmptyFields, bool SyncEnabled = false, int SyncIntervalMinutes = ActivityImportRules.DefaultSyncMinutes,
-    string SyncMode = ActivitySyncSchedule.IntervalMode, string SyncTimes = "");
+    string SyncMode = ActivitySyncSchedule.IntervalMode, string SyncTimes = "", bool TakePartners = true, bool AutoAcceptPartners = true);
 
 public sealed record ActivityTestResult(bool Ok, string Message, StructureStatus Structure, bool WritableAccount, bool StructureChanged);
 
@@ -135,7 +138,7 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         await using var command = new MySqlCommand("""
             SELECT enabled, server_name, server_port, database_name, username, password_protected, since_date, window_from_hour, window_to_hour, page_size, fill_empty_fields,
                    last_test_utc, last_test_ok, last_test_message, structure_status, structure_fingerprint, structure_report, structure_checked_utc, updated_by, updated_utc,
-                   sync_enabled, sync_interval_minutes, last_sync_utc, last_sync_ok, last_sync_message, sync_failures, sync_mode, sync_times, source_watermark
+                   sync_enabled, sync_interval_minutes, last_sync_utc, last_sync_ok, last_sync_message, sync_failures, sync_mode, sync_times, source_watermark, take_partners, auto_accept_partners
             FROM activity_import_settings WHERE id = 1
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -155,7 +158,8 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         {
             SyncEnabled = reader.GetBoolean(20), SyncIntervalMinutes = reader.GetInt32(21), LastSyncUtc = reader.IsDBNull(22) ? null : DateTime.SpecifyKind(reader.GetDateTime(22), DateTimeKind.Utc),
             LastSyncOk = reader.IsDBNull(23) ? null : reader.GetBoolean(23), LastSyncMessage = reader.GetString(24), SyncFailures = reader.GetInt32(25),
-            SyncMode = reader.GetString(26), SyncTimes = reader.GetString(27), SourceWatermark = reader.IsDBNull(28) ? null : reader.GetDateTime(28)
+            SyncMode = reader.GetString(26), SyncTimes = reader.GetString(27), SourceWatermark = reader.IsDBNull(28) ? null : reader.GetDateTime(28),
+            TakePartners = reader.GetBoolean(29), AutoAcceptPartners = reader.GetBoolean(30)
         };
         return (settings, password);
     }
@@ -186,11 +190,11 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         {
             await using var command = new MySqlCommand("""
                 INSERT INTO activity_import_settings (id, enabled, server_name, server_port, database_name, username, password_protected, since_date, window_from_hour, window_to_hour,
-                    page_size, fill_empty_fields, sync_enabled, sync_interval_minutes, sync_mode, sync_times, updated_by, updated_utc)
-                VALUES (1, @enabled, @server, @port, @database, @user, @pass, @since, @from, @to, @page, @fill, @sync, @interval, @mode, @times, @by, @now)
+                    page_size, fill_empty_fields, sync_enabled, sync_interval_minutes, sync_mode, sync_times, take_partners, auto_accept_partners, updated_by, updated_utc)
+                VALUES (1, @enabled, @server, @port, @database, @user, @pass, @since, @from, @to, @page, @fill, @sync, @interval, @mode, @times, @take, @auto, @by, @now)
                 ON DUPLICATE KEY UPDATE enabled=@enabled, server_name=@server, server_port=@port, database_name=@database, username=@user,
                     password_protected=IF(@changed=1, @pass, password_protected), since_date=@since, window_from_hour=@from, window_to_hour=@to, page_size=@page,
-                    fill_empty_fields=@fill, sync_enabled=@sync, sync_interval_minutes=@interval, sync_mode=@mode, sync_times=@times, updated_by=@by, updated_utc=@now
+                    fill_empty_fields=@fill, sync_enabled=@sync, sync_interval_minutes=@interval, sync_mode=@mode, sync_times=@times, take_partners=@take, auto_accept_partners=@auto, updated_by=@by, updated_utc=@now
                 """, connection);
             command.Parameters.AddWithValue("@enabled", input.Enabled);
             command.Parameters.AddWithValue("@server", input.Server);
@@ -208,6 +212,8 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
             command.Parameters.AddWithValue("@interval", input.SyncIntervalMinutes);
             command.Parameters.AddWithValue("@mode", input.SyncMode);
             command.Parameters.AddWithValue("@times", ActivitySyncSchedule.FormatTimes(ActivitySyncSchedule.ParseTimes(input.SyncTimes, out _)));
+            command.Parameters.AddWithValue("@take", input.TakePartners);
+            command.Parameters.AddWithValue("@auto", input.AutoAcceptPartners);
             command.Parameters.AddWithValue("@by", actor);
             command.Parameters.AddWithValue("@now", DateTime.UtcNow);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -228,7 +234,9 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
             new AuditChange("Sincronizare periodică", Flag(old.SyncEnabled), Flag(input.SyncEnabled)),
             new AuditChange("Interval sincronizare (minute)", old.SyncIntervalMinutes.ToString(), input.SyncIntervalMinutes.ToString()),
             new AuditChange("Mod sincronizare", ActivitySyncSchedule.ModeLabel(old.SyncMode), ActivitySyncSchedule.ModeLabel(input.SyncMode)),
-            new AuditChange("Ore fixe sincronizare", Show(old.SyncTimes), Show(ActivitySyncSchedule.FormatTimes(ActivitySyncSchedule.ParseTimes(input.SyncTimes, out _))))
+            new AuditChange("Ore fixe sincronizare", Show(old.SyncTimes), Show(ActivitySyncSchedule.FormatTimes(ActivitySyncSchedule.ParseTimes(input.SyncTimes, out _)))),
+            new AuditChange("Preluare beneficiari fără tichete", Flag(old.TakePartners), Flag(input.TakePartners)),
+            new AuditChange("Import automat beneficiari", Flag(old.AutoAcceptPartners), Flag(input.AutoAcceptPartners))
         };
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.SetActivityImport, "", "Setări preluare ActivityApp",
             AuditDetails.Changes(changes), "", cancellationToken).ConfigureAwait(false);

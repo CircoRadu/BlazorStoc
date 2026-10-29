@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.2.0",
-                                           "hash":  "3e3d48fb3eeae79619a28cff3c6a14eba71872e29f7217f9e117529872e7c98b",
+                                           "version":  "0.3.0",
+                                           "hash":  "f4de011ed7c755801a632d357a0f07484c127031c4e8fff8a1999a237d1380aa",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -13,6 +13,11 @@
                                                                "version":  "0.2.0",
                                                                "date":  "25.10.2026",
                                                                "note":  "Corespondenta campurilor ActivityApp: coloanele salvate se afiseaza imediat la deschiderea panoului"
+                                                           },
+                                                           {
+                                                               "version":  "0.3.0",
+                                                               "date":  "29.10.2026",
+                                                               "note":  "Preluare automată a persoanelor fizice și a partenerilor fără tichete; coadă unică de verificare; notificare agregată; comutatoare pentru preluare și import automat"
                                                            }
                                                        ]
                                        },

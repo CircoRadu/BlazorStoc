@@ -796,3 +796,9 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Tragere pe niveluri: explicatie dinamica (`category-order.js`), fasii intre categorii, frunza -> categorie (`PreviewPromotionAsync` / `PromoteAsync`, mod `Promote` in `BranchMoveDialog`), jurnal "Promovare subcategorie in categorie"; nedeschis: retrogradarea categorie -> subcategorie si scurtaturile Ctrl+sageti
 - Module: Journal 1.4.0; versiunea aplicatiei 0.5.29 (changelog completat); butoanele de actiune raman cu text (scriptul de iconite scos la cererea utilizatorului)
 - Verificari: suitele tintite pe fiecare etapa, browser pe instanta 5099 cu contul claude.dev (date de test sterse); suita completa inainte de commit
+## Finalizat la 29.10.2026 - Preluare ActivityApp: persoane fizice, parteneri fara tichete, coada unica, notificare agregata, comutatoare (0.5.31)
+
+- Persoanele fizice se preiau automat (dupa nume, fara ANAF); sincronizarea preia si partenerii fara tichete (`ApplyNewAsync`, la rulare manuala sau cel mult o data la 6 ore); tie-urile "ignorat" ale versiunilor vechi se replanifica
+- Toate problemele de partener (adresa, ANAF, CUI/nume repetat, date refuzate) merg in coada Beneficiari -> De verificat (motive noi `repeated_identity`, `invalid_data`, `awaiting_acceptance`; detaliul in `note`); notificarea `sistem.beneficiari-activityapp-de-verificat` este agregata
+- Migrarea 57: `take_partners`, `auto_accept_partners`; comutatoare in sectiunea 3 a panoului; import automat oprit = coada de acceptare manuala (`AcceptPartnerAsync`)
+- Module: ActivityImport 0.3.0; versiune 0.5.31

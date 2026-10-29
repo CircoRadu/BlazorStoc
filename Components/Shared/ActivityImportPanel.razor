@@ -83,7 +83,14 @@
             }
         </fieldset>
         <fieldset class="anaf-section"><legend>3. Beneficiari și puncte de lucru</legend>
-            <p class="muted"><small>Se preiau numai persoanele juridice cu CUI valid; persoanele fizice (fără CUI, cod personal sau un nume în câmpul CUI) nu se preiau și apar ca ignorate. Partenerii devin beneficiari, iar punctele lor de lucru devin puncte de lucru. Un partener care există deja la noi (același CUI) doar se leagă, fără a-i schimba datele. Firmele se verifică în ANAF (și se completează acolo adresa lipsă sau telefonul, care este opțional); un CUI necunoscut de ANAF nu se preia, iar dacă ANAF nu răspunde, firma cu CUI valid se preia marcată neverificată. Simularea nu scrie nimic; aplicarea creează prin regulile obișnuite ale aplicației și trece în Jurnal. Ce nu se poate prelua (CUI invalid sau repetat, fără adresă) apare ca problemă, nu se ghicește.</small></p>
+            <p class="muted"><small>Se preiau automat toți partenerii din ActivityApp, cu sau fără tichete: firmele (CUI cu cifre) ca persoane juridice, verificate în ANAF, iar persoanele fizice (fără CUI, cod personal sau un nume în câmpul CUI) ca persoane fizice, după nume, fără ANAF. Partenerii devin beneficiari, iar punctele lor de lucru devin puncte de lucru. Un partener care există deja la noi (același CUI) doar se leagă, fără a-i schimba datele. Firmele se verifică în ANAF (și se completează acolo adresa lipsă sau telefonul, care este opțional); un CUI necunoscut de ANAF sau fără răspuns de la ANAF se preia marcat „de verificat”. Simularea nu scrie nimic; aplicarea creează prin regulile obișnuite ale aplicației și trece în Jurnal. Ce nu se poate prelua curat (fără adresă, CUI sau nume repetat în ActivityApp, date refuzate) intră în Beneficiari → De verificat și administratorii primesc o notificare; nu se ghicește.</small></p>
+            <div class="anaf-toggles">
+                <ToggleSwitch Class="anaf-check" @bind-Value="takePartners" OnText="Da" OffText="Nu">Preia și beneficiarii fără tichete (toți partenerii din ActivityApp)</ToggleSwitch>
+                <p class="muted"><small>Oprit: se preiau numai clienții tichetelor citite.</small></p>
+                <ToggleSwitch Class="anaf-check" @bind-Value="autoAcceptPartners" OnText="Automat" OffText="Manual">Import automat al beneficiarilor curați</ToggleSwitch>
+                <p class="muted"><small>Oprit: fiecare beneficiar nou se pune în coada Beneficiari → De verificat, de unde îl accepți tu; tichetele lui așteaptă acceptarea.</small></p>
+                <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează</button></div>
+            </div>
             @* The messages of this section's operations are shown here too, not only at the top of the window. *@
             @if (runArea == "partners" && error is not null) { <div class="error-banner" role="alert">@error</div> }
             @if (runArea == "partners" && notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
@@ -125,7 +132,7 @@
                     </details>
                     <details class="ai-type-group" id="ai-plan-ignored-group">
                         <summary>Ignorați <span class="count-badge">@ignoredItems.Count</span></summary>
-                        <p class="muted"><small>Partenerii ignorați nu se preiau. „Include în preluare” îi preia după următoarea simulare sau rulare, ca persoană fizică sau persoană juridică (cu CUI cu cifre), cu mențiunea „neverificat, preluat manual”; tichetele lor se preiau după „Recitește tot”.</small></p>
+                        <p class="muted"><small>Partenerii ignorați nu se preiau (cei ignorați de versiunile vechi se preiau automat la următoarea sincronizare). „Include în preluare” îi preia după următoarea simulare sau rulare, ca persoană fizică sau persoană juridică (cu CUI cu cifre), cu mențiunea „neverificat, preluat manual”; tichetele lor se preiau după „Recitește tot”.</small></p>
                         @PlanTable(ignoredItems, "ai-plan-ignored", report.Applied, ignoredPaging, true)
                     </details>
                     @if (report.Truncated) { <p class="muted"><small>Sunt afișate primele @report.Items.Count (întâi problemele, apoi ce se preia, la urmă ce nu se preia); restul nu se afișează.</small></p> }
@@ -399,10 +406,10 @@
     {
         current = settings; enabled = settings.Enabled; server = settings.Server; port = settings.Port; database = settings.Database; user = settings.User; hasPassword = settings.HasPassword;
         since = settings.SinceDate ?? settings.EffectiveSince(DateOnly.FromDateTime(DateTime.Now)); fromHour = settings.WindowFromHour; toHour = settings.WindowToHour; pageSize = settings.PageSize;
-        fillEmpty = settings.FillEmptyFields; syncEnabled = settings.SyncEnabled; syncHours = settings.SyncIntervalMinutes / 60; syncMinutes = settings.SyncIntervalMinutes % 60; syncMode = settings.SyncMode; syncTimes = settings.SyncTimes; password = "";
+        fillEmpty = settings.FillEmptyFields; syncEnabled = settings.SyncEnabled; syncHours = settings.SyncIntervalMinutes / 60; syncMinutes = settings.SyncIntervalMinutes % 60; syncMode = settings.SyncMode; syncTimes = settings.SyncTimes; takePartners = settings.TakePartners; autoAcceptPartners = settings.AutoAcceptPartners; password = "";
     }
 
-    private ActivityImportInput Input => new(enabled, server, port, database, user, string.IsNullOrEmpty(password) ? null : password, since, fromHour, toHour, pageSize, fillEmpty, syncEnabled, syncHours * 60 + syncMinutes, syncMode, syncTimes);
+    private ActivityImportInput Input => new(enabled, server, port, database, user, string.IsNullOrEmpty(password) ? null : password, since, fromHour, toHour, pageSize, fillEmpty, syncEnabled, syncHours * 60 + syncMinutes, syncMode, syncTimes, takePartners, autoAcceptPartners);
 
     private static string Count(int? value) => value?.ToString() ?? "—";
 
@@ -641,7 +648,7 @@
         await Sync.ResetReadingAsync(lifetime.Token);
         noticeOk = true; notice = "Următoarea sincronizare citește din nou toate tichetele.";
     });
-    private bool syncEnabled;
+    private bool syncEnabled, takePartners = true, autoAcceptPartners = true;
     private string syncMode = ActivitySyncSchedule.IntervalMode, syncTimes = "";
     private int syncHours = ActivityImportRules.DefaultSyncMinutes / 60, syncMinutes = ActivityImportRules.DefaultSyncMinutes % 60;
 

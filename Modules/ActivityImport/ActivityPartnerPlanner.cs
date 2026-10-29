@@ -83,6 +83,7 @@ public static class ActivityPartnerPlanner
     public const string AnafUnverifiedPrefix = "Neverificat în ANAF";
     public const string MissingAddressCheck = "missing_address";
     public const string PersonNotTaken = "Persoană fizică (fără CUI valid): nu se preia; se preiau numai persoanele juridice cu CUI.";
+    public const string PersonNote = "Persoană fizică preluată automat din ActivityApp (fără CUI).";
 
     /// <summary>
     /// The companies (partners with a CUI; never a person) that would be created, to verify them in ANAF (and complete the address or the phone they lack), and those refused only for a missing
@@ -105,7 +106,7 @@ public static class ActivityPartnerPlanner
         var included = map.Where(entry => entry.Entity == IncludeEntity).ToDictionary(entry => entry.SourceId, entry => entry.LocalId);
         var identified = partners.Select(partner => (Partner: partner, Info: Identify(partner))).ToList();
         // Repeated identities in ActivityApp: none of them is imported (which one is the right one is not for the import to guess).
-        var repeated = identified.Where(item => item.Info.Problem is null && !item.Info.Individual).GroupBy(item => item.Info.Identity).Where(group => group.Count() > 1)
+        var repeated = identified.Where(item => item.Info.Problem is null && (!item.Info.Individual || item.Info.Identity.Length > 3)).GroupBy(item => item.Info.Identity).Where(group => group.Count() > 1)
             .ToDictionary(group => group.Key, group => string.Join(", ", group.Select(item => item.Partner.Id)));
         var plans = new List<PartnerPlan>();
         foreach (var (partner, info) in identified)
@@ -117,30 +118,30 @@ public static class ActivityPartnerPlanner
             // Included by hand as a person: its identity is the name, whatever the tax id says.
             var identity = manual == IncludeAsPerson ? "PF:" + TextNormalization.UniquenessKey(name) : info.Identity;
             var hash = Hash(name, identity, address, phone);
-            PartnerPlan Problem(string message) => new(partner.Id, name, identity, PlanAction.Problem, null, null, message, hash, address);
-            if (mapped.TryGetValue(partner.Id, out var local) && (local != 0 || manual == 0))
+            // A problem the administrator can only solve in ActivityApp (or by a decision) goes to the queue of the beneficiaries to verify with its reason: check = the code of the reason.
+            PartnerPlan Problem(string message, string check = "") => new(partner.Id, name, identity, PlanAction.Problem, null, null, message, hash, address, check, info.Cui);
+            // A tie with no beneficiary (local 0) is what an earlier version made for a person it did not take: such a partner is planned again, like one never seen.
+            if (mapped.TryGetValue(partner.Id, out var local) && local != 0)
             {
-                if (local == 0) { plans.Add(new PartnerPlan(partner.Id, name, info.Identity, PlanAction.Skipped, null, null, PersonNotTaken, hash, address)); continue; }
                 plans.Add(byId.ContainsKey(local)
                     ? new PartnerPlan(partner.Id, name, info.Identity, PlanAction.AlreadyLinked, local, null, "", hash, address)
                     : Problem("Beneficiarul legat la o preluare anterioară nu mai există în BlazorStoc; legătura nu se reface singură."));
                 continue;
             }
-            // Only companies with a CUI that ANAF can check are taken; a person (no CUI, a personal code, a name in the field) is not imported.
-            if (info.Individual && manual == 0) { plans.Add(new PartnerPlan(partner.Id, name, info.Identity, PlanAction.Skipped, null, null, PersonNotTaken, hash, address)); continue; }
+            // A company (a CUI that ANAF can check) is verified in ANAF; a person (no CUI, a personal code, a name in the field) is taken as an individual, by name, without ANAF.
             if (manual == IncludeAsCompany && info.Individual) { plans.Add(Problem("Partenerul nu are un CUI cu cifre: poate fi preluat doar ca persoană fizică.")); continue; }
             if (info.Problem is not null) { plans.Add(Problem(info.Problem)); continue; }
-            if (name.Length == 0) { plans.Add(Problem("Partener fără denumire în ActivityApp.")); continue; }
-            if (manual != IncludeAsPerson && repeated.TryGetValue(info.Identity, out var ids)) { plans.Add(Problem(info.Individual ? $"Nume repetat în ActivityApp (parteneri {ids})." : $"CUI repetat în ActivityApp (parteneri {ids}).")); continue; }
+            if (name.Length == 0) { plans.Add(Problem("Partener fără denumire în ActivityApp.", BeneficiaryCheckReasons.InvalidData)); continue; }
+            if (manual != IncludeAsPerson && repeated.TryGetValue(info.Identity, out var ids)) { plans.Add(Problem(info.Individual ? $"Nume repetat în ActivityApp (parteneri {ids})." : $"CUI repetat în ActivityApp (parteneri {ids}).", BeneficiaryCheckReasons.RepeatedIdentity)); continue; }
             if (byKey.TryGetValue(identity, out var found)) { plans.Add(new PartnerPlan(partner.Id, name, identity, PlanAction.Link, found.Id, null, $"Există deja în BlazorStoc: «{found.Name}».", hash, address)); continue; }
-            if (name.Length > 200) { plans.Add(Problem("Denumirea depășește 200 de caractere.")); continue; }
+            if (name.Length > 200) { plans.Add(Problem("Denumirea depășește 200 de caractere.", BeneficiaryCheckReasons.InvalidData)); continue; }
             // A company is verified in ANAF (and completed there when it lacks the address or the phone); a person is never looked up. A CUI that ANAF does not know is not taken; when ANAF
             // cannot answer (or was not asked), a CUI of a valid form is taken and marked as not verified in ANAF.
-            var company = manual == 0 && anaf is not null && anaf.TryGetValue(info.Identity, out var data) ? data : null;
+            var company = manual == 0 && !info.Individual && anaf is not null && anaf.TryGetValue(info.Identity, out var data) ? data : null;
             var data2 = company is { Failure: null } ? company : null;
             // Why the beneficiary needs a human look (it is taken anyway, with its tickets waiting): a CUI of the wrong form; ANAF does not know the CUI; ANAF could not answer (or was not asked).
             // Without any lookup (anaf = null: the plan is only a simulation of the rules) only the form is judged.
-            var check = manual != 0 ? "" : !info.FormValid ? "cui_invalid_form" : anaf is null ? "" : company is { NotFound: true } ? "cui_unknown" : data2 is null ? "anaf_unavailable" : "";
+            var check = manual != 0 || info.Individual ? "" : !info.FormValid ? "cui_invalid_form" : anaf is null ? "" : company is { NotFound: true } ? "cui_unknown" : data2 is null ? "anaf_unavailable" : "";
             var filled = new List<string>();
             if (address.Length == 0 && data2 is { Address.Length: > 0 }) { address = TextNormalization.ForObjectNameOrCode(data2.Address); if (address.Length > 0) filled.Add("adresa"); }
             if (phone.Length == 0 && data2 is not null && Phone(data2.Phone) is { Length: > 0 } anafPhone) { phone = anafPhone; filled.Add("telefonul"); }
@@ -152,10 +153,10 @@ public static class ActivityPartnerPlanner
                 continue;
             }
             if (address.Length > 300) address = address[..300];
-            var input = manual == IncludeAsPerson ? new BeneficiaryInput { Kind = BeneficiaryKinds.Individual, Name = name, Address = address, Phone = phone }
+            var input = manual == IncludeAsPerson || info.Individual ? new BeneficiaryInput { Kind = BeneficiaryKinds.Individual, Name = name, Address = address, Phone = phone }
                 : new BeneficiaryInput { Kind = BeneficiaryKinds.Legal, Name = name, Cui = info.Cui.Length > 12 ? info.Cui[..12] : info.Cui, Address = address, Phone = phone, AnafVerified = manual == 0 && anaf is not null && check.Length == 0, NeedsCheck = !info.FormValid };
             var notes = new List<string>();
-            if (manual != 0) notes.Add(ManualNote);
+            if (manual != 0) notes.Add(ManualNote); else if (info.Individual) notes.Add(PersonNote);
             if (filled.Count > 0) notes.Add($"{AnafFilledPrefix}: {string.Join(", ", filled)}.");
             if (check.Length > 0) notes.Add($"De verificat: {Why()}.");
             plans.Add(new PartnerPlan(partner.Id, name, identity, PlanAction.Create, null, input, string.Join(' ', notes), hash, address, check, info.Cui, manual != 0));

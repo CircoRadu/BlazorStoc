@@ -13,7 +13,8 @@ public static class ActivityImportPanelChecks
     {
         public Task<ActivityImportSettings> GetSettingsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new ActivityImportSettings(true, "srv", 1433, "TIPActivity", "citire", true, null, 0, 24, 200, false, null, null, "", StructureStatus.Ok, "", [], null, "", null));
-        public Task SaveSettingsAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public ActivityImportInput? LastSaved;
+        public Task SaveSettingsAsync(ActivityImportInput input, CancellationToken cancellationToken = default) { LastSaved = input; return Task.CompletedTask; }
         public Task<ActivityTestResult> TestAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => Task.FromResult(new ActivityTestResult(true, "ok", StructureStatus.Ok, false, false));
         public List<ActivityTypeItem> Types = [];
         public Task<ActivityTypesView> GetTypesAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ActivityTypesView([.. Types], StructureStatus.Ok, null));
@@ -115,6 +116,13 @@ public static class ActivityImportPanelChecks
         check(cut.FindAll("#ai-plan-items-page-size").Count == 1 && cut.FindAll("#ai-plan-ignored-page-size").Count == 1, "Activity import panel: the lists of the simulation are paged, with a choice of rows per page");
         check(cut.FindAll("#ai-plan-ignored button").Count == 2, "Activity import panel: an ignored partner can be included as a person or as a company (a work point cannot)");
         cut.FindAll("#ai-plan-ignored button").Single(button => button.TextContent.Trim() == "Ca persoană fizică").Click();
+        // The two choices about the beneficiaries (migration 57): both start On; the automatic import is turned Off and saved with the rest of the settings.
+        var toggles = cut.FindAll(".anaf-toggles input[role=switch]");
+        check(toggles.Count == 2 && toggles.All(toggle => toggle.HasAttribute("checked")), "Activity import panel: the choices \"preia și beneficiarii fără tichete\" and \"import automat\" are shown, both On by default");
+        toggles[1].Change(false);
+        cut.Find(".anaf-toggles .editor-actions button.primary").Click();
+        cut.WaitForAssertion(() => { if (settingsService.LastSaved is null) throw new InvalidOperationException("not saved yet"); });
+        check(settingsService.LastSaved is { TakePartners: true, AutoAcceptPartners: false }, "Activity import panel: the automatic import turned Off is saved with the settings (new beneficiaries then wait for a manual acceptance)");
         cut.WaitForAssertion(() => { if (partners.Included.Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(partners.Included.Single() == (9200, false) && cut.Markup.Contains("neverificat, preluat manual", StringComparison.Ordinal), "Activity import panel: including an ignored partner asks the service, then shows the message in the section");
         check(partners.Applies == 0, "Activity import panel: the simulation applies nothing");
