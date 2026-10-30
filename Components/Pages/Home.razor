@@ -156,6 +156,7 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
             var filtered = ProductSearch.Filter(products, query, "all", category, stock)
                 .Where(p => !onlyIncomplete || incompleteProducts.Contains(p.Id))
                 .Where(p => activeTags.Count == 0 || activeTags.All(valueId => ChoicesOf(p).Any(choice => choice.ValueId == valueId)))
+                .Where(p => activeParams.Count == 0 || activeParams.All(key => ChoicesOf(p).Any(choice => parametersById.TryGetValue(choice.ParameterId, out var parameter) && ParamKey(parameter) == key)))
                 .Where(p => activeLabels.Count == 0 || activeLabels.All(id => LabelsOf(p).Contains(id)))
                 .Where(InSubcategoryScope);
             return (quantityDescending ? filtered.OrderByDescending(p => p.Quantity) : filtered.OrderBy(p => p.Quantity))
@@ -192,6 +193,12 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
     private Dictionary<int, SubcategoryParameter> parametersById = [];
     private Dictionary<int, string> valueTexts = [];
     private readonly HashSet<int> activeTags = [];
+    // Parameter filters: the key is the parameter ("p:id") or, for a fixed-value parameter of a family, the family ("f:id"); a product matches when it has a value for it.
+    private readonly HashSet<string> activeParams = [];
+    private string ParamKey(SubcategoryParameter parameter) => parameter.Kind == ParameterKind.Fixed && parameter.FamilyId is { } familyId ? $"f:{familyId}" : $"p:{parameter.Id}";
+    private string ParamTitle(SubcategoryParameter parameter) => parameter.Kind == ParameterKind.Fixed && families.FirstOrDefault(family => family.Id == parameter.FamilyId) is { } family ? family.Name : parameter.Name;
+    private string ParamTitle(string key) => parametersById.Values.Where(parameter => ParamKey(parameter) == key).Select(ParamTitle).FirstOrDefault() ?? "";
+    private void ToggleParam(string key) { if (!activeParams.Remove(key)) activeParams.Add(key); ResetPage(); }
     private string scopeKey = "";
     private static readonly IReadOnlyList<ProductParameterChoice> NoChoices = [];
     private IReadOnlyList<ProductParameterChoice> ChoicesOf(Product product) => choicesByProduct.GetValueOrDefault(product.Id, NoChoices);
@@ -262,13 +269,26 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
         {
             var valueId = choice.ValueId;
             var active = activeTags.Contains(valueId);
-            var text = $"{parametersById[choice.ParameterId].Name}: {valueTexts[valueId]}";
-            builder.OpenElement(seq++, "button"); builder.SetKey(valueId);
-            builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", active ? "param-tag active" : "param-tag");
+            var parameter = parametersById[choice.ParameterId];
+            var paramKey = ParamKey(parameter);
+            var paramActive = activeParams.Contains(paramKey);
+            var paramText = ParamTitle(parameter);
+            var valueText = valueTexts[valueId];
+            // Two parts, both filters: the parameter (products that have a value for it) and the value (products with exactly that value).
+            builder.OpenElement(seq++, "span"); builder.SetKey(valueId); builder.AddAttribute(seq++, "class", "param-tag-split");
+            builder.OpenElement(seq++, "button");
+            builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", paramActive ? "param-tag param-name active" : "param-tag param-name");
+            builder.AddAttribute(seq++, "aria-pressed", paramActive ? "true" : "false");
+            builder.AddAttribute(seq++, "title", paramActive ? $"Scoate filtrul parametrului {paramText}" : $"Filtrează după parametrul {paramText}");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => ToggleParam(paramKey)));
+            builder.AddContent(seq++, paramText); builder.CloseElement();
+            builder.OpenElement(seq++, "button");
+            builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", active ? "param-tag param-value active" : "param-tag param-value");
             builder.AddAttribute(seq++, "aria-pressed", active ? "true" : "false");
-            builder.AddAttribute(seq++, "title", active ? $"Scoate filtrul {text}" : $"Filtrează după {text}");
+            builder.AddAttribute(seq++, "title", active ? $"Scoate filtrul {paramText}: {valueText}" : $"Filtrează după {paramText}: {valueText}");
             builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => ToggleTag(valueId)));
-            builder.AddContent(seq++, text); builder.CloseElement();
+            builder.AddContent(seq++, valueText); builder.CloseElement();
+            builder.CloseElement();
         }
         foreach (var missing in MissingOf(product))
         {
@@ -293,14 +313,23 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
     };
     private RenderFragment ActiveTagsBar() => builder =>
     {
-        if (activeTags.Count == 0 && activeLabels.Count == 0) return;
+        if (activeTags.Count == 0 && activeParams.Count == 0 && activeLabels.Count == 0) return;
         var seq = 0;
         builder.OpenElement(seq++, "div"); builder.AddAttribute(seq++, "class", "parameter-filter-bar"); builder.AddAttribute(seq++, "role", "group"); builder.AddAttribute(seq++, "aria-label", "Etichete de filtrare active");
         builder.OpenElement(seq++, "span"); builder.AddAttribute(seq++, "class", "muted"); builder.AddContent(seq++, "Filtrat după:"); builder.CloseElement();
+        foreach (var paramKey in activeParams.Order())
+        {
+            var key = paramKey;
+            builder.OpenElement(seq++, "button"); builder.SetKey(key);
+            builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", "param-tag active");
+            builder.AddAttribute(seq++, "title", "Scoate filtrul");
+            builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => ToggleParam(key)));
+            builder.AddContent(seq++, $"Parametru: {ParamTitle(key)} ×"); builder.CloseElement();
+        }
         foreach (var valueId in activeTags.OrderBy(id => id))
         {
             var id = valueId;
-            var name = parametersById.Values.FirstOrDefault(parameter => parameter.Values.Any(value => value.Id == id))?.Name ?? "";
+            var name = parametersById.Values.Where(parameter => parameter.Values.Any(value => value.Id == id)).Select(ParamTitle).FirstOrDefault() ?? "";
             builder.OpenElement(seq++, "button"); builder.SetKey(id);
             builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", "param-tag active");
             builder.AddAttribute(seq++, "title", "Scoate filtrul");
@@ -317,7 +346,7 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
             builder.AddContent(seq++, $"Etichetă: {labelsById.GetValueOrDefault(id)?.Name ?? ""} ×"); builder.CloseElement();
         }
         builder.OpenElement(seq++, "button"); builder.AddAttribute(seq++, "type", "button"); builder.AddAttribute(seq++, "class", "refresh act-close");
-        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => { activeTags.Clear(); activeLabels.Clear(); ResetPage(); }));
+        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => { activeTags.Clear(); activeParams.Clear(); activeLabels.Clear(); ResetPage(); }));
         builder.AddContent(seq++, "Elimină etichetele"); builder.CloseElement();
         builder.CloseElement();
     };
@@ -351,7 +380,7 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
         category = CategoryQuery?.Trim() ?? "";
         subcategory = SubcategoryQuery?.Trim() ?? "";
         onlyIncomplete = IncompleteQuery == "1";
-        var scope = category + "001f" + subcategory; if (scope != scopeKey) { scopeKey = scope; activeTags.Clear(); activeLabels.Clear(); }
+        var scope = category + "001f" + subcategory; if (scope != scopeKey) { scopeKey = scope; activeTags.Clear(); activeParams.Clear(); activeLabels.Clear(); }
         ResetPage();
         if (EditId is > 0 && loaded && (!editing || editingProduct?.Id != EditId.Value))
         {
@@ -537,7 +566,7 @@ else { @ActiveTagsBar()<div class="table-scroll"><table><thead><tr><th>COD PRODU
     }
     private void ResetPage() => page = 1;
     private void ToggleQuantitySort() { quantityDescending = !quantityDescending; ResetPage(); }
-    private void ClearFilters() { query = stock = ""; activeTags.Clear(); activeLabels.Clear(); onlyIncomplete = false; Navigation.NavigateTo("/produse"); ResetPage(); }
+    private void ClearFilters() { query = stock = ""; activeTags.Clear(); activeParams.Clear(); activeLabels.Clear(); onlyIncomplete = false; Navigation.NavigateTo("/produse"); ResetPage(); }
     private static string ProductUrl(string? category, string? subcategory = null)
     {
         if (string.IsNullOrWhiteSpace(category)) return "/produse";

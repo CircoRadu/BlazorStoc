@@ -47,6 +47,8 @@ public static class AuditEntities
     public const string SupplierInvoice = "FacturaFurnizor";
     // Nomenclator -> Tipuri de sisteme.
     public const string SystemType = "TipSistem";
+    // Nomenclator -> Analizor de risc.
+    public const string RiskAnalyzer = "AnalizorRisc";
     // Oferte -> Sabloane: the templates of offer sheets (.xlsx).
     public const string OfferTemplate = "SablonOferta";
     // Setari -> Baza de date: the connection of the application to MariaDB and the port it listens on (administrator configured in the private file only).
@@ -109,6 +111,10 @@ public static class AuditActions
     public const string EditWorkPointDescription = "Modificare descriere punct de lucru";
     public const string EditWorkPointCoordinates = "Modificare coordonate punct de lucru";
     public const string AddWorkPointPhoto = "Adăugare fotografie punct de lucru";
+    // Files attached to a work point, maintenance contract, intervention or risk analysis (entity_files).
+    public const string AddAttachedFile = "Adăugare fișier atașat";
+    public const string DeleteAttachedFile = "Ștergere fișier atașat";
+    public const string RenameAttachedFile = "Redenumire fișier atașat";
     // Maintenance contracts and their coverage: each kind of change is named exactly. Deleting a contract is the archived "Ștergere".
     public const string CreateServiceContract = "Adăugare contract mentenanță";
     public const string EditServiceContract = "Modificare contract mentenanță";
@@ -133,6 +139,7 @@ public static class AuditActions
     public const string EditMaintenanceIntervention = "Modificare intervenție mentenanță";
     public const string RecordOnDemand = "Înregistrare intervenție la cerere";
     public const string EditOnDemandIntervention = "Modificare intervenție la cerere";
+    public const string ChangeInterventionKind = "Schimbare fel intervenție";
     public const string AddInterventionPhoto = "Adăugare fotografie intervenție";
     // Invoice templates: a new version of the layout and a change of only the name/supplier are different operations. A deleted
     // template has no page to link to (see IsDeletion).
@@ -300,6 +307,9 @@ public static class AuditActions
     public const string CreateInstallerAdministrator = "Creare cont administrator la instalare";
     public const string AccessDenied = "Acces refuzat";
     public const string ReorderSubcategories = "Reordonare subcategorii";
+    public const string AddRiskAnalyzer = "Adăugare analizor de risc";
+    public const string EditRiskAnalyzer = "Modificare analizor de risc";
+    public const string DeleteRiskAnalyzer = "Ștergere analizor de risc";
     public const string AddSystemType = "Adăugare tip de sistem";
     public const string RenameSystemType = "Modificare denumire tip de sistem";
     public const string ActivateSystemType = "Activare tip de sistem";
@@ -339,11 +349,11 @@ public static class AuditActions
         action is Create or Edit or EditProductTags or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
             or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification
             or ResolveNotification or AutoResolveNotification or ReopenNotification or EditNotificationSettings
-            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto
+            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto or AddAttachedFile or DeleteAttachedFile or RenameAttachedFile
             or CreateServiceContract or EditServiceContract or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or CreateRiskAnalysis or EditRiskAnalysis or EditRiskAnalysisValidity or RenewRiskAnalysis or UndoRiskAnalysisRenewal or ActivateRiskAnalysis or DeactivateRiskAnalysis
-            or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
+            or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or ChangeInterventionKind or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or EditMapGeocoding or CreateMapPinType or EditMapPinType
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
             or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias or LinkSupplierProductCode or ChangeSupplierProductCode
@@ -352,7 +362,7 @@ public static class AuditActions
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
-            or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion;
+            or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -417,6 +427,7 @@ public static class AuditNavigation
         // The supplier page (its data and invoices). An invoice event stores the invoice id, which has no page of its own: plain text.
         [AuditEntities.Supplier] = SupplierNavigation.SupplierUrl,
         [AuditEntities.SystemType] = SystemTypeNavigation.PageUrl,
+        [AuditEntities.RiskAnalyzer] = RiskAnalyzerNavigation.PageUrl,
         [AuditEntities.OfferTemplate] = OfferNavigation.TemplateUrl
     };
 

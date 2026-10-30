@@ -12,7 +12,7 @@ public sealed class ActivityImportModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Preluare tichete ActivityApp";
-    public Version Version { get; } = new(0, 3, 0);
+    public Version Version { get; } = new(0, 6, 2);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)
@@ -30,6 +30,7 @@ public sealed class ActivityImportModule : IModule
         services.AddScoped<IActivityKeywordService>(provider => new GuardedActivityKeywordService(ActivatorUtilities.CreateInstance<MariaActivityKeywordService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IActivityReviewService>(provider => new GuardedActivityReviewService(ActivatorUtilities.CreateInstance<MariaActivityReviewService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IBeneficiaryCheckService>(provider => new GuardedBeneficiaryCheckService(ActivatorUtilities.CreateInstance<MariaBeneficiaryCheckService>(provider), provider.GetRequiredService<ModuleRegistry>()));
+        services.AddScoped<IValidationQueues, MariaValidationQueues>();
         services.AddHostedService<ActivitySyncWorker>();
     }
 
@@ -49,5 +50,6 @@ public sealed class ActivityImportModule : IModule
         services.AddScoped<IActivityReviewService, UnavailableActivityReviewService>();
         services.AddScoped<IActivityKeywordService, UnavailableActivityKeywordService>();
         services.AddScoped<IBeneficiaryCheckService, UnavailableBeneficiaryCheckService>();
+        services.AddScoped<IValidationQueues, UnavailableValidationQueues>();
     }
 }

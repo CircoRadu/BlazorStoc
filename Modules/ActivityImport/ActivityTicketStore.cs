@@ -9,7 +9,7 @@ namespace BlazorStoc.Modules.ActivityImport;
 
 public static class TicketStates
 {
-    public const string WaitingBeneficiary = "waiting_beneficiary", Imported = "imported", Discarded = "discarded";
+    public const string WaitingBeneficiary = "waiting_beneficiary", PendingApproval = "pending_approval", Imported = "imported", Discarded = "discarded";
 }
 
 public sealed record StoredTicket(ActivityTicket Ticket, string State, int? InterventionId);

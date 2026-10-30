@@ -410,3 +410,15 @@ Pasi:
 | 1 | Setari -> Actualizare, alege un .bsu de pe telefon | Procentul creste pana la 100%, apoi apare raportul pachetului | |
 | 2 | Alege un fisier care nu este .bsu | Mesaj de eroare clar, fara blocare | |
 | 3 | Fara dreptul de aplicare a actualizarilor | Mesaj ca nu ai dreptul | |
+
+## Modificari de testat - notificari agregate, taburi de validare si paginare (30.10.2026, versiunile 0.5.33-0.5.36)
+
+**Ce s-a adaugat:** o singura notificare agregata pentru tichetele de validat si una pentru beneficiarii de verificat; taburile „Tichete de validat" si „Beneficiari de validat" (rosii cand sunt elemente de rezolvat, vizibile pe baza permisiunilor `mentenanta.validare` / `beneficiari.validare`); paginare la tabelele de notificari.
+**Ce face acum:** bannerele de sus arata cate elemente asteapta si se actualizeaza dupa rezolvare; tabelele (active, rezolvate) au selector de rand pe pagina.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Notificari cu tichete in coada | Tab rosu cu numarul si banner „Sunt X tichete de validat" | |
+| 2 | Valideaza un tichet | Numarul si textul bannerului scad | |
+| 3 | Operator cu permisiunea de validare | Vede tabul si poate valida | |
+| 4 | Lista cu peste 10 notificari | Selector rand pe pagina sub tabel | |

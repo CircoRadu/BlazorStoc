@@ -45,12 +45,12 @@ public static class Permissions
         new("inventar", "Generare situatie inventar", "Inventar", [new(View, "Vizualizare"), new(Export, "Export")]),
         new("inventar-preluare", "Preluare inventar", "Inventar", [new(View, "Vizualizare"), new(Add, "Preluare inventar")]),
         new("categorii", "Categorii", "Administrare", Crud()),
-        new("beneficiari", "Beneficiari", "Administrare", Crud(export: true)),
+        new("beneficiari", "Beneficiari", "Administrare", Plus(Crud(export: true), new PermissionAction("validare", "Validare beneficiari ActivityApp", false))),
         new("furnizori", "Furnizori", "Administrare", Crud()),
         new("facturi", "Facturi", "Administrare", Crud(export: true)),
         new("vehicule", "Vehicule", "Administrare", Crud()),
         new("oferte", "Oferte", "Oferte", Plus(Crud(export: true), new PermissionAction("sabloane", "Sabloane de oferta"))),
-        new("mentenanta", "Mentenanta", "Mentenanta", Plus(Crud(export: true), new PermissionAction("contracte", "Activare contracte"))),
+        new("mentenanta", "Mentenanta", "Mentenanta", Plus(Plus(Crud(export: true), new PermissionAction("contracte", "Activare contracte")), new PermissionAction("validare", "Validare tichete ActivityApp", false))),
         new("analize-risc", "Analize de risc", "Analize de risc", Crud()),
         new("notificari", "Notificari", "Notificari", [new(View, "Vizualizare"), new(Edit, "Marcare / rezolvare")]),
         new("setari-facturi", "Setari: Facturi (sabloane)", "Setari", [new(View, "Vizualizare"), new(Add, "Creare sablon"), new(Edit, "Modificare sablon"), new(Delete, "Stergere sablon", false)]),
@@ -83,7 +83,11 @@ public static class Permissions
     public static readonly IReadOnlyDictionary<string, string[]> Requires = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
         ["preluare-factura.add"] = ["facturi.add"],
-        ["facturi.add"] = ["furnizori.view"]
+        ["facturi.add"] = ["furnizori.view"],
+        // The validation of a ticket records or removes interventions of the register.
+        ["mentenanta.validare"] = ["mentenanta.add", "mentenanta.delete"],
+        // Accepting a beneficiary of ActivityApp creates or changes the beneficiary.
+        ["beneficiari.validare"] = ["beneficiari.add", "beneficiari.edit"]
     };
 
     private static string Label(string key)

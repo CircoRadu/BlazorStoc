@@ -1,0 +1,16 @@
+# Formularul analizorului de risc
+Cautare: analizor de risc formular denumire observatii adauga
+Formularul unui analizor de risc nou sau modificat. Se deschide din Nomenclator → Analizor de risc și, cu iconita de adăugare, din formularul analizei de risc.
+
+## Elemente
+### Câmpuri
+- Denumire * | câmp | Persoana sau firma care întocmește analize de risc. Nu poate repeta denumirea altui analizor.
+- Observații | câmp | Note libere.
+### Butoane
+- Adaugă analizorul | buton | Salvează analizorul și îl alege în formularul analizei de risc, dacă s-a deschis de acolo.
+- Anulează | buton | Închide fără salvare.
+
+## Flux: Cum adaug un analizor din formularul analizei
+1. Lângă „Analizor de risc” apasă iconita de adăugare.
+2. Completează denumirea și apasă „Adaugă analizorul”.
+3. Fereastra se închide, lista se reîncarcă și analizorul nou este ales.

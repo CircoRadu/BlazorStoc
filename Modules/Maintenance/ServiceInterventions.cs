@@ -40,6 +40,9 @@ public sealed class ServiceInterventionInput : IValidatableObject
     public ServiceNextDueBasis Basis { get; set; } = ServiceNextDueBasis.FromPerformed;
     public DateOnly? ChosenDue { get; set; }
 
+    // Maintenance only, set by the ActivityApp ticket approval: a maintenance of a point that no active contract covers (a contract not recorded yet) is accepted; it moves no due date and has no contract.
+    public bool AllowUncovered { get; set; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (WorkPointId <= 0) yield return new("Alege punctul de lucru.", [nameof(WorkPointId)]);
@@ -52,7 +55,7 @@ public sealed class ServiceInterventionInput : IValidatableObject
     {
         var normalized = new ServiceInterventionInput
         {
-            Kind = Kind, WorkPointId = WorkPointId, PerformedOn = PerformedOn, Basis = Basis, ChosenDue = ChosenDue,
+            Kind = Kind, WorkPointId = WorkPointId, PerformedOn = PerformedOn, Basis = Basis, ChosenDue = ChosenDue, AllowUncovered = AllowUncovered,
             Notes = TextNormalization.ForStorage((Notes ?? "").Replace("\r\n", "\n"))
         };
         var results = new List<ValidationResult>();
@@ -67,6 +70,9 @@ public sealed class ServiceInterventionInput : IValidatableObject
         Basis = value.Basis ?? ServiceNextDueBasis.FromPerformed, ChosenDue = value.Basis == ServiceNextDueBasis.Chosen ? value.NextDueSet : null
     };
 }
+
+/// <summary>The ActivityApp ticket an intervention was taken from (kept apart from the notes): number, title, problem, resolution, the report as written and the executor.</summary>
+public sealed record InterventionTicket(string Number, string Title, string Problem, string Resolution, string Report, string Executor, DateTime ImportedUtc);
 
 public sealed class ServiceInterventionOperationException(string message) : Exception(message);
 
@@ -94,6 +100,8 @@ public interface IServiceInterventionRepository
     Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default);
     /// <summary>Archived deletion with its photos. Deleting the latest due-moving maintenance intervention returns the due date to the one it closed.</summary>
     Task DeleteAsync(ServiceIntervention original, string reason, CancellationToken cancellationToken = default);
+    /// <summary>The ticket an intervention was taken from, or null for one recorded by hand.</summary>
+    Task<InterventionTicket?> GetTicketAsync(int interventionId, CancellationToken cancellationToken = default) => Task.FromResult<InterventionTicket?>(null);
 }
 
 public static class ServiceInterventionRules
@@ -216,6 +224,7 @@ public static class ServiceInterventionRules
 
     public static IReadOnlyList<AuditChange> Changes(ServiceIntervention before, ServiceIntervention after) =>
     [
+        new("Fel", KindLabel(before.Kind), KindLabel(after.Kind)),
         new("Efectuată la", StockMovementRules.DisplayDate(before.PerformedOn), StockMovementRules.DisplayDate(after.PerformedOn)),
         new("Varianta scadenței", before.Basis is { } oldBasis ? BasisLabel(oldBasis) : "-", after.Basis is { } newBasis ? BasisLabel(newBasis) : "-"),
         new("Scadența stabilită", DueText(before.NextDueSet), DueText(after.NextDueSet)),

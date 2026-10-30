@@ -182,3 +182,18 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 | 1 | Citeste coloanele, alege o coloana diferita, „Salveaza corespondenta” | Mesaj de salvare | |
 | 2 | Paraseste pagina si intra din nou in Setari -> Preluare ActivityApp | Tabelul de la sectiunea 6 este afisat imediat, cu coloana salvata | |
 | 3 | „Citeste coloanele din ActivityApp” | Apar listele de coloane; alegerea ramane | |
+
+## Modificari de testat - coada de validare a tichetelor (30.10.2026, versiunile 0.5.34-0.5.36)
+
+**Ce s-a adaugat:** tichetele rezolvate din ActivityApp nu se mai inregistreaza singure: intra in coada „Tichete de validat" (Notificari / Mentenanta). Intra tichetele de un tip de mentenanta si cele din categoriile alese care contin un cuvant cheie din nomenclator; un tichet de service fara cuvant cheie nu se preia. Mentenanta se poate inregistra si la un punct fara contract (fara mutarea scadentei). Operatiile sunt in ferestre (popup), iar tabelul are paginare.
+**Ce face acum:** pe fiecare rand: ochi (vizualizare), creion (modifici si preiei), bifa (preiei ca la propunere), cos (discard). Scriptul `tools\reset-activity-tickets.ps1` goleste coada si reia citirea.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Ruleaza importul de tichete | Tichetele cu cuvant cheie sau de tip mentenanta apar in coada; cele de service fara cuvant cheie nu | |
+| 2 | Ochi pe un tichet | Popup cu datele tichetului | |
+| 3 | Creion: schimba categoria/punctul/data si preia | Intrare in registrul de interventii cu categoria aleasa | |
+| 4 | Bifa pe un tichet de mentenanta la un punct fara contract | Mentenanta fara contract, scadenta neschimbata | |
+| 5 | Cos pe un tichet | Dupa confirmare tichetul nu se mai preia | |
+| 6 | Cu peste 10 tichete in coada | Apare selectorul de randuri pe pagina | |
+| 7 | `reset-activity-tickets.ps1` fara `-Apply` | Doar numara; cu `-Apply` goleste coada si reseteaza punctul de citire | |

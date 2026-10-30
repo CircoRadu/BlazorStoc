@@ -1,0 +1,20 @@
+# Beneficiar · Fișiere beneficiar
+Cautare: beneficiar fisiere atasate libere puncte de lucru contract interventie analiza de risc vizualizare redenumire stergere
+
+Categoria pliabilă (închisă la deschiderea paginii) cu toate fișierele legate de beneficiar: cele atașate punctelor de lucru, contractelor de mentenanță, intervențiilor și analizelor de risc, plus fișierele libere, care nu aparțin niciunei secțiuni.
+
+## Elemente
+### Tabelul fișierelor
+- Fișier | coloană | Numele fișierului; un clic îl deschide într-o fereastră de vizualizare.
+- Secțiune | coloană | „Liber” pentru fișierele libere; pentru celelalte, un link care deschide secțiunea de care aparțin (punct de lucru, contract, intervenție, analiză de risc).
+- Încărcat | coloană | Cine și când a încărcat fișierul.
+- Vizualizează | iconita:view | Deschide fișierul într-o fereastră (imagine, PDF, text) sau îl oferă la descărcare (Word, Excel).
+- Redenumește | iconita:edit | Doar la fișierele libere: se schimbă numele fără extensie; extensia rămâne afișată lângă câmp.
+- Șterge | iconita:delete | Doar la fișierele libere: cere confirmarea și șterge fișierul.
+### Fișiere libere
+- Adaugă fișier | buton | Deschide o fereastră în care alegi unul sau mai multe fișiere; se salvează imediat.
+
+## Flux: Cum adaug un fișier liber
+1. Deschide categoria „Fișiere beneficiar”.
+2. Apasă „Adaugă fișier” și alege fișierele.
+3. Fișierele apar în tabel, cu secțiunea „Liber”.

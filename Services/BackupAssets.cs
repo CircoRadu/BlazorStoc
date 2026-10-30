@@ -39,14 +39,15 @@ internal static class BackupAssets
     public const string EntryPrefix = "assets/";
     public const string ListEntry = "assets.json";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-    private static readonly string[] Keys = ["product-images", "project-files", "service-photos", "archive-files"];
+    private static readonly string[] Keys = ["product-images", "project-files", "service-photos", "archive-files", "entity-files"];
 
     public static IReadOnlyList<BackupAssetStore> Stores(IConfiguration configuration) =>
     [
         new(Keys[0], MariaAssetPaths.ProductImages(configuration)),
         new(Keys[1], MariaAssetPaths.ProjectFiles(configuration)),
         new(Keys[2], MariaAssetPaths.ServicePhotos(configuration)),
-        new(Keys[3], MariaAssetPaths.ArchiveFiles(configuration))
+        new(Keys[3], MariaAssetPaths.ArchiveFiles(configuration)),
+        new(Keys[4], MariaAssetPaths.EntityFiles(configuration))
     ];
 
     /// <summary>Every file of the folders, in a fixed order, with size and time of the last write.</summary>

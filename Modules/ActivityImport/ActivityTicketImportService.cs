@@ -3,24 +3,24 @@ using MySqlConnector;
 
 namespace BlazorStoc.Modules.ActivityImport;
 
-// Stage 3 of the import: the resolved tickets of the types the administrator chose, opened from the chosen date on (by default 1 January of the current year), become on-demand
-// interventions in the maintenance register of the beneficiary the ticket's client was tied to (stage 2). A simulation reads ActivityApp and BlazorStoc and reports what an application
-// would do, writing nothing but the record of the run; the application records each intervention through the ordinary register (so its rules hold and each one is in the journal under
-// the administrator who ran the import), one ticket at a time: one that is refused is a problem and the run goes on. The problem, the resolution, the original report and the executor
-// are kept apart in service_intervention_source. Only the administrator (permission "setari-import-activityapp.run").
+// Stage 3 of the import: the resolved tickets of the types the administrator chose, opened from the chosen date on (by default 1 January of the current year), go to the queue of
+// the events to validate (Setari -> Notificari, Mentenanta), linked to the beneficiary the ticket's client was tied to (stage 2). NOTHING is recorded in the register by the import: an
+// operator decides there, for each ticket, whether it is maintenance or a service on demand (viewing it, taking it as it is or editing it first), or discards it. A simulation reads
+// ActivityApp and BlazorStoc and reports what an application would do, writing nothing but the record of the run. The ticket is kept whole in activity_import_tickets while it waits.
+// Only the administrator (permission "setari-import-activityapp.run") runs the import; the scheduled synchronization runs as the system.
 
 public sealed record TicketReport(string Kind, DateTime AtUtc, string By, bool Applied, DateOnly Since, IReadOnlyList<string> Types, IReadOnlyList<string> StoppedTypes, PlanCounts Tickets,
-    IReadOnlyList<ImportReportItem> Items, bool Truncated, int Maintenance = 0, int MentionedOnly = 0, int ToValidate = 0, int NewBeneficiaries = 0, int NewPoints = 0, int BeneficiariesToVerify = 0);
+    IReadOnlyList<ImportReportItem> Items, bool Truncated, int Maintenance = 0, int Service = 0, int ToValidate = 0, int NewBeneficiaries = 0, int NewPoints = 0, int BeneficiariesToVerify = 0);
 
 public interface IActivityTicketImportService
 {
     /// <summary>Reads ActivityApp and BlazorStoc and reports what the application would do. Writes nothing but the record of the run.</summary>
     Task<TicketReport> SimulateAsync(CancellationToken cancellationToken = default);
-    /// <summary>Records the interventions the simulation shows. Needs the import to be switched on and the maintenance module to work.</summary>
+    /// <summary>Puts the tickets the simulation shows in the queue of the events to validate (no intervention is recorded). Needs the import to be switched on.</summary>
     Task<TicketReport> ApplyAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default);
 }
 
-public sealed class MariaActivityTicketImportService(IConfiguration configuration, IActivityImportService import, IActivitySource source, IOnDemandInterventionRecorder interventions,
+public sealed class MariaActivityTicketImportService(IConfiguration configuration, IActivityImportService import, IActivitySource source,
     IWorkPointRepository workPoints, IAccessControl access, IAuditTrail audit, IActivityPartnerImportService? partners = null) : IActivityTicketImportService
 {
     private const string Run = "setari-import-activityapp.run";
@@ -70,21 +70,20 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
     }
 
     private static string Summary(TicketReport report) => AuditDetails.Identification(
-        ("Tichete rezolvate", $"{report.Tickets.Total}: {report.Tickets.Create} {(report.Applied ? "preluate" : "de preluat")}, {report.Tickets.AlreadyLinked} deja preluate, {report.Tickets.Problems} probleme, {report.Tickets.Skipped} ignorate"),
-        ("Mentenanță / de validat", $"{report.Maintenance} înregistrate ca mentenanță, {report.MentionedOnly} la cerere (fără contract), {report.ToValidate} de validat"),
+        ("Tichete rezolvate", $"{report.Tickets.Total}: {report.Tickets.Create} {(report.Applied ? "puse la validare" : "de pus la validare")}, {report.Tickets.AlreadyLinked} deja preluate, {report.Tickets.Problems} probleme, {report.Tickets.Skipped} ignorate"),
+        ("Coada de validare", $"{report.ToValidate} tichete de validat ({report.Maintenance} propuse ca mentenanță, {report.Service} ca service)"),
         ("De la data", report.Since.ToString("dd.MM.yyyy")), ("Tipuri", string.Join(", ", report.Types)));
 
     private static ImportReportItem Item(TicketPlan plan, PlanAction action) => new(ActivityTicketPlanner.TicketEntity, plan.SourceId, plan.Title, action.ToString(), plan.Message);
 
-    // Of the tickets taken: how many are recorded as maintenance (a keyword was found and a contract covers the point), how many mention it but stay on demand (no contract), and how many wait
-    // for the administrator (a word that only resembles a keyword).
+    // Of the tickets put in the queue: how many look like maintenance (a type taken as maintenance, or a keyword in the text) and how many like a service.
     private static TicketReport Report(string kind, DateTime at, string by, bool applied, Loaded loaded, IEnumerable<(TicketPlan Plan, PlanAction Action, ImportReportItem Item)> results)
     {
         var list = results.ToList();
         var items = list.Where(entry => entry.Action is PlanAction.Problem or PlanAction.Skipped or PlanAction.Waiting or PlanAction.Create).Select(entry => entry.Item).ToList();
         var taken = list.Where(entry => entry.Action == PlanAction.Create).Select(entry => entry.Plan).ToList();
         return new TicketReport(kind, at, by, applied, loaded.Since, loaded.Types, loaded.Stopped, PlanCounts.Of(list.Select(entry => entry.Action)), [.. items], false,
-            taken.Count(plan => plan.Maintenance), taken.Count(plan => plan.Keyword.Length > 0 && !plan.Maintenance && !plan.NeedsValidation), list.Count(entry => entry.Plan.NeedsValidation), loaded.NewBeneficiaries, loaded.NewPoints, loaded.ToVerify);
+            taken.Count(plan => plan.MatchKind != ActivityTicketPlanner.ServiceKind), taken.Count(plan => plan.MatchKind == ActivityTicketPlanner.ServiceKind), taken.Count, loaded.NewBeneficiaries, loaded.NewPoints, loaded.ToVerify);
     }
     private async Task<Loaded> LoadAsync(ActivityImportSettings settings, bool apply, CancellationToken cancellationToken)
     {
@@ -106,6 +105,7 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
         // Incremental reading: only the tickets whose closing event was modified since the last successful import (with a margin of one day: a ticket is never taken twice, the map ties it); the
         // first run, and one after "Recitește tot", read everything. Tickets that wait for their beneficiary come from the table of the tickets kept, not from ActivityApp.
         var read = await source.ReadTicketsAsync(connection, structure, [.. selected.Select(item => item.Id)], since.ToDateTime(TimeOnly.MinValue), settings.SourceWatermark?.AddDays(-1), settings.PageSize, cancellationToken).ConfigureAwait(false);
+        if (apply) await ActivityReviewStore.RemoveUnmatchedServiceAsync(configuration, cancellationToken).ConfigureAwait(false);
         var states = await ActivityTicketStore.StatesAsync(configuration, cancellationToken).ConfigureAwait(false);
         var tickets = read.ToDictionary(ticket => ticket.Id);
         foreach (var stored in await ActivityTicketStore.ReadAsync(configuration, TicketStates.WaitingBeneficiary, cancellationToken).ConfigureAwait(false)) tickets.TryAdd(stored.Ticket.Id, stored.Ticket);
@@ -139,20 +139,8 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
         var words = await ActivityKeywordStore.ActiveAsync(configuration, cancellationToken).ConfigureAwait(false);
         var keywords = new Dictionary<long, IReadOnlyList<string>>();
         if (words.Count > 0) foreach (var item in selected.Where(item => item.Destination != ActivityDestination.Maintenance)) keywords[item.Id] = words;
-        var decisions = await ActivityReviewStore.DecisionsAsync(configuration, cancellationToken).ConfigureAwait(false);
-        var plans = ActivityTicketPlanner.Plan([.. tickets.Values], destinations, map, locals, DateOnly.FromDateTime(DateTime.Now), keywords, decisions, ignoredPartners, waitingPartners, discarded);
-        var wanted = ActivityTicketPlanner.KeywordPoints(plans);
-        if (wanted.Count > 0)
-        {
-            var covered = new HashSet<(int, int)>();
-            try
-            {
-                foreach (var (beneficiary, point) in wanted)
-                    if (await interventions.IsCoveredAsync(beneficiary, point, cancellationToken).ConfigureAwait(false)) covered.Add((beneficiary, point));
-            }
-            catch (ModuleUnavailableException) { throw new ActivityImportException("Modulul Mentenanță este oprit: tichetele se preiau după ce pornește."); }
-            plans = ActivityTicketPlanner.WithCoverage(plans, covered);
-        }
+        var queued = states.Where(entry => entry.Value == TicketStates.PendingApproval).Select(entry => entry.Key).ToHashSet();
+        var plans = ActivityTicketPlanner.Plan([.. tickets.Values], destinations, map, locals, DateOnly.FromDateTime(DateTime.Now), keywords, ignoredPartners, waitingPartners, discarded, queued);
         // The next reading starts from the latest modification seen, but not after a ticket that could not be taken for a problem (it is read again until it is solved).
         var heldBack = plans.Where(plan => plan.Action == PlanAction.Problem && tickets.TryGetValue(plan.SourceId, out var held) && held.EventModified is not null).Select(plan => tickets[plan.SourceId].EventModified!.Value).DefaultIfEmpty().Min();
         var latest = read.Where(ticket => ticket.EventModified is not null).Select(ticket => ticket.EventModified!.Value).DefaultIfEmpty().Max();
@@ -178,20 +166,10 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
                 continue;
             }
             if (plan.Action != PlanAction.Create) { results.Add((plan, plan.Action, plan.Message)); continue; }
-            try
-            {
-                var interventionId = plan.Maintenance
-                    ? await interventions.RecordMaintenanceAsync(plan.BeneficiaryId!.Value, plan.WorkPointId!.Value, plan.PerformedOn!.Value, plan.Notes, cancellationToken).ConfigureAwait(false)
-                    : await interventions.RecordAsync(plan.BeneficiaryId!.Value, plan.WorkPointId!.Value, plan.PerformedOn!.Value, plan.Notes, cancellationToken).ConfigureAwait(false);
-                await ImportStore.WriteMapAsync(configuration, ActivityTicketPlanner.TicketEntity, plan.SourceId, interventionId, "created", plan.Hash, cancellationToken).ConfigureAwait(false);
-                await WriteSourceAsync(interventionId, plan.Source!, cancellationToken).ConfigureAwait(false);
-                if (loaded.Tickets.TryGetValue(plan.SourceId, out var takenTicket)) await ActivityTicketStore.SaveAsync(configuration, takenTicket, TicketStates.Imported, interventionId, cancellationToken).ConfigureAwait(false);
-                // A mention of maintenance at a point under contract: the intervention is already in the register (on demand); the operator says whether the maintenance was really done.
-                if (plan.NeedsValidation) await ActivityReviewStore.AddAsync(configuration, plan, interventionId, cancellationToken).ConfigureAwait(false);
-                results.Add((plan, PlanAction.Create, ""));
-            }
-            catch (OnDemandInterventionOperationException exception) { results.Add((plan, PlanAction.Problem, exception.Message)); }
-            catch (ModuleUnavailableException) { throw new ActivityImportException("Modulul Mentenanță este oprit: tichetele se preiau după ce pornește. Ce s-a preluat până acum rămâne."); }
+            // Nothing is recorded: the ticket is kept whole and put in the queue, where an operator decides.
+            if (loaded.Tickets.TryGetValue(plan.SourceId, out var queuedTicket)) await ActivityTicketStore.SaveAsync(configuration, queuedTicket, TicketStates.PendingApproval, null, cancellationToken).ConfigureAwait(false);
+            await ActivityReviewStore.AddAsync(configuration, plan, null, cancellationToken).ConfigureAwait(false);
+            results.Add((plan, PlanAction.Create, plan.Message));
         }
         var report = Report("tickets-apply", started, actor, true, loaded, results.Select(result => (result.Plan, result.Action, Item(result.Plan, result.Action) with { Message = result.Message })));
         // The next reading starts here (only a run that came to its end moves it).
@@ -200,31 +178,6 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
             results.Where(result => result.Action == PlanAction.Problem).Select(result => (ActivityTicketPlanner.TicketEntity, result.Plan.SourceId, result.Plan.Title, result.Message)), cancellationToken).ConfigureAwait(false);
         return report;
     }
-
-    private async Task WriteSourceAsync(int interventionId, TicketSource source, CancellationToken cancellationToken)
-    {
-        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("""
-            INSERT INTO service_intervention_source (intervention_id, source_ticket_id, source_type_id, source_event_id, ticket_number, title, problem, resolution, report, executor, imported_utc)
-            VALUES (@intervention, @ticket, @type, @event, @number, @title, @problem, @resolution, @report, @executor, @now)
-            ON DUPLICATE KEY UPDATE intervention_id=@intervention, source_type_id=@type, source_event_id=@event, ticket_number=@number, title=@title, problem=@problem, resolution=@resolution,
-                report=@report, executor=@executor, imported_utc=@now
-            """, connection);
-        command.Parameters.AddWithValue("@intervention", interventionId);
-        command.Parameters.AddWithValue("@ticket", source.TicketId);
-        command.Parameters.AddWithValue("@type", source.TypeId);
-        command.Parameters.AddWithValue("@event", source.EventId);
-        command.Parameters.AddWithValue("@number", Cut(source.Number, 100));
-        command.Parameters.AddWithValue("@title", Cut(source.Title, 500));
-        command.Parameters.AddWithValue("@problem", source.Problem);
-        command.Parameters.AddWithValue("@resolution", source.Resolution);
-        command.Parameters.AddWithValue("@report", source.Report);
-        command.Parameters.AddWithValue("@executor", Cut(source.Executor, 200));
-        command.Parameters.AddWithValue("@now", DateTime.UtcNow);
-        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-    }
-
-    private static string Cut(string value, int length) => value.Length > length ? value[..length] : value;
 }
 
 internal sealed class GuardedActivityTicketImportService(IActivityTicketImportService inner, ModuleRegistry modules) : IActivityTicketImportService

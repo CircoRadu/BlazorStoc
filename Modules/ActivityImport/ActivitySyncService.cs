@@ -158,7 +158,7 @@ public sealed class MariaActivitySyncService(IConfiguration configuration, IActi
             var newPoints = (ticketReport?.NewPoints ?? 0) + (partnerReport?.Points.Create ?? 0);
             var toVerify = (await ActivityPartnerCheckStore.ReadAsync(configuration, PartnerCheckStatus.Pending, cancellationToken).ConfigureAwait(false)).Count;
             var message = $"Beneficiari: {newBeneficiaries} noi" + (toVerify > 0 ? $" ({toVerify} de verificat)" : "") + $"; puncte de lucru: {newPoints} noi; tichete: " +
-                (ticketReport is null ? "niciun tip ales" : $"{ticketReport.Tickets.Create} preluate" + (ticketReport.Tickets.Waiting > 0 ? $", {ticketReport.Tickets.Waiting} în așteptare" : "")) + $"; probleme: {problems}; șterse în ActivityApp: {deleted.Total}" + (deleted.Note.Length > 0 ? $" ({deleted.Note})" : "") + ".";
+                (ticketReport is null ? "niciun tip ales" : $"{ticketReport.Tickets.Create} puse la validare" + (ticketReport.Tickets.Waiting > 0 ? $", {ticketReport.Tickets.Waiting} în așteptare" : "")) + $"; probleme: {problems}; șterse în ActivityApp: {deleted.Total}" + (deleted.Note.Length > 0 ? $" ({deleted.Note})" : "") + ".";
             result = new SyncResult(true, message, newBeneficiaries, newPoints, ticketReport?.Tickets.Create ?? 0, problems, deleted.Newly);
         }
         catch (ActivityImportException exception) when (exception.Message.StartsWith("O altă rulare", StringComparison.Ordinal))

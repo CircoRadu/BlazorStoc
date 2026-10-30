@@ -8,7 +8,7 @@ namespace BlazorStoc.Services;
 // follows the newest renewal. The expiry date is derived (LastRenewalDate + ValidityMonths), never stored. IsActive is the On/Off switch: a work
 // point has at most one active analysis and any number of Off ones (its previous analyses).
 public sealed record RiskAnalysis(int Id, int BeneficiaryId, int WorkPointId, string Number, string Author, DateOnly InitialDate,
-    DateOnly LastRenewalDate, int ValidityMonths, bool IsActive, string Notes, long Version)
+    DateOnly LastRenewalDate, int ValidityMonths, bool IsActive, string Notes, long Version, int? AnalyzerId = null)
 {
     public DateOnly ExpiryDate => RiskAnalysisRules.ExpiryDate(LastRenewalDate, ValidityMonths);
 }
@@ -19,7 +19,7 @@ public sealed record RiskAnalysisRenewal(int Id, int RiskAnalysisId, DateOnly Re
 
 // An analysis with the names it is shown with and its renewals (newest first).
 public sealed record RiskAnalysisView(RiskAnalysis Analysis, string BeneficiaryName, string WorkPointName, string WorkPointAddress,
-    bool WorkPointIsPrimary, IReadOnlyList<RiskAnalysisRenewal> Renewals);
+    bool WorkPointIsPrimary, IReadOnlyList<RiskAnalysisRenewal> Renewals, string AnalyzerName = "");
 
 public sealed class RiskAnalysisOperationException(string message) : Exception(message);
 
@@ -28,6 +28,8 @@ public sealed class RiskAnalysisInput : IValidatableObject
     public const int NotesMaximumLength = 1000;
 
     public int WorkPointId { get; set; }
+    // The analyzer chosen from the nomenclator (risk_analyzers); required for a new analysis, an older one may have none.
+    public int? AnalyzerId { get; set; }
 
     [StringLength(RiskAnalysisRules.NumberMaximumLength, ErrorMessage = "Numărul de înregistrare poate avea cel mult 30 de caractere.")]
     public string Number { get; set; } = "";
@@ -57,7 +59,7 @@ public sealed class RiskAnalysisInput : IValidatableObject
     {
         var normalized = new RiskAnalysisInput
         {
-            WorkPointId = WorkPointId,
+            WorkPointId = WorkPointId, AnalyzerId = AnalyzerId,
             Number = TextNormalization.ForObjectNameOrCode(Number).ToUpperInvariant(),
             Author = TextNormalization.ForObjectNameOrCode(Author),
             InitialDate = InitialDate,
@@ -72,7 +74,7 @@ public sealed class RiskAnalysisInput : IValidatableObject
 
     public static RiskAnalysisInput From(RiskAnalysis value) => new()
     {
-        WorkPointId = value.WorkPointId, Number = value.Number, Author = value.Author, InitialDate = value.InitialDate,
+        WorkPointId = value.WorkPointId, AnalyzerId = value.AnalyzerId, Number = value.Number, Author = value.Author, InitialDate = value.InitialDate,
         ValidityMonths = value.ValidityMonths, Notes = value.Notes
     };
 }
@@ -209,9 +211,9 @@ public static class RiskAnalysisRules
     public static string Target(int beneficiaryId, string beneficiaryName, string number) =>
         $"#{beneficiaryId} · {beneficiaryName} · analiză de risc «{number}»";
 
-    public static string Identification(RiskAnalysis value, string workPointName) => AuditDetails.Identification(new (string Field, string Value)[]
+    public static string Identification(RiskAnalysis value, string workPointName, string analyzerName = "") => AuditDetails.Identification(new (string Field, string Value)[]
     {
-        ("Punct de lucru", workPointName), ("Număr înregistrare", value.Number), ("Întocmită de", value.Author),
+        ("Punct de lucru", workPointName), ("Analizor", analyzerName), ("Număr înregistrare", value.Number), ("Întocmită de", value.Author),
         ("Data înregistrării", StockMovementRules.DisplayDate(value.InitialDate)), ("Valabilitate", ValidityText(value.ValidityMonths)),
         ("Expiră", StockMovementRules.DisplayDate(value.ExpiryDate)), ("Observații", value.Notes)
     }.Where(item => item.Value.Length > 0).ToArray());
@@ -229,7 +231,7 @@ public static class RiskAnalysisRules
     public static string EditAction(RiskAnalysis before, RiskAnalysis after)
     {
         var validityChanged = before.ValidityMonths != after.ValidityMonths;
-        var othersChanged = before.Number != after.Number || before.Author != after.Author || before.InitialDate != after.InitialDate || before.Notes != after.Notes;
+        var othersChanged = before.AnalyzerId != after.AnalyzerId || before.Number != after.Number || before.Author != after.Author || before.InitialDate != after.InitialDate || before.Notes != after.Notes;
         return validityChanged && !othersChanged ? AuditActions.EditRiskAnalysisValidity : AuditActions.EditRiskAnalysis;
     }
 

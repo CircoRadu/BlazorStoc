@@ -5,6 +5,7 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject IExpiryNotificationService Service
+@inject IValidationQueues Queues
 @inject ILogger<Notifications> Logger
 @inject IJSRuntime JS
 @implements IDisposable
@@ -18,13 +19,38 @@
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
 
+@if (queues.CanTickets && queues.Tickets > 0 && validationTab != "tickets")
+{
+    <div class="validation-banner" role="status" id="banner-tickets"><span>@(queues.Tickets == 1 ? "Este un tichet de validat" : $"Sunt {queues.Tickets} tichete de validat")</span><button type="button" class="refresh act-confirm" @onclick="() => OpenTickets()">Validează tichetele</button></div>
+}
+@if (queues.CanBeneficiaries && queues.Beneficiaries > 0 && validationTab != "beneficiaries")
+{
+    <div class="validation-banner" role="status" id="banner-beneficiaries"><span>@(queues.Beneficiaries == 1 ? "Este un beneficiar de validat" : $"Sunt {queues.Beneficiaries} beneficiari de validat")</span><button type="button" class="refresh act-confirm" @onclick="() => OpenBeneficiaries()">Validează beneficiarii</button></div>
+}
+
 <div class="settings-tabs" role="tablist" aria-label="Liste de notificări">
-    <button type="button" role="tab" id="tab-active" class="settings-tab @(showResolved ? "" : "active")" aria-selected="@(showResolved ? "false" : "true")" aria-controls="panel-notifications" @onclick="() => showResolved = false">Active <span class="count-badge">@views.Count</span></button>
-    <button type="button" role="tab" id="tab-resolved" class="settings-tab @(showResolved ? "active" : "")" aria-selected="@(showResolved ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => showResolved = true">Rezolvate <span class="count-badge">@resolved.Count</span></button>
+    <button type="button" role="tab" id="tab-active" class="settings-tab @(showResolved || validationTab != "" ? "" : "active")" aria-selected="@(showResolved || validationTab != "" ? "false" : "true")" aria-controls="panel-notifications" @onclick="() => OpenTab(null, false)">Active <span class="count-badge">@views.Count</span></button>
+    <button type="button" role="tab" id="tab-resolved" class="settings-tab @(showResolved && validationTab == "" ? "active" : "")" aria-selected="@(showResolved && validationTab == "" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenTab(null, true)">Rezolvate <span class="count-badge">@resolved.Count</span></button>
+    @if (queues.CanTickets)
+    {
+        <button type="button" role="tab" id="tab-tickets" class="settings-tab @(validationTab == "tickets" ? "active" : "") @(queues.Tickets > 0 ? "needs-attention" : "")" aria-selected="@(validationTab == "tickets" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenTickets()">Tichete de validat <span class="count-badge">@queues.Tickets</span></button>
+    }
+    @if (queues.CanBeneficiaries)
+    {
+        <button type="button" role="tab" id="tab-beneficiaries" class="settings-tab @(validationTab == "beneficiaries" ? "active" : "") @(queues.Beneficiaries > 0 ? "needs-attention" : "")" aria-selected="@(validationTab == "beneficiaries" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenBeneficiaries()">Beneficiari de validat <span class="count-badge">@queues.Beneficiaries</span></button>
+    }
 </div>
 
-<div id="panel-notifications" role="tabpanel" aria-labelledby="@(showResolved ? "tab-resolved" : "tab-active")">
-@if (loading && !loaded) { <section class="catalog"><div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă notificările</h3></div></section> }
+<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : showResolved ? "tab-resolved" : "tab-active")">
+@if (validationTab == "tickets")
+{
+    <ValidationQueuePanel Changed="RefreshQueuesAsync" />
+}
+else if (validationTab == "beneficiaries")
+{
+    <ValidationQueuePanel Beneficiaries="true" Changed="RefreshQueuesAsync" />
+}
+else if (loading && !loaded) { <section class="catalog"><div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă notificările</h3></div></section> }
 else if (loaded && !showResolved)
 {
     @if (views.Count == 0)
@@ -52,8 +78,9 @@ else if (loaded)
         @if (resolved.Count == 0) { <div class="empty-state"><span class="empty-icon">✓</span><h3>Nu există notificări rezolvate</h3><p>O notificare devine rezolvată când o marchezi tu sau când data obiectului se schimbă ori obiectul dispare.</p></div> }
         else
         {
+            <Paged Items="resolved" Id="notif-resolved-size" Context="pageRows">
             <div class="table-scroll"><table class="notification-table"><thead><tr><th>TITLU</th><th>OBIECT</th><th>SCADENȚĂ</th><th>REZOLVATĂ LA</th><th>REZOLVATĂ DE</th><th>MOTIV</th></tr></thead><tbody>
-            @foreach (var item in resolved)
+            @foreach (var item in pageRows)
             {
                 <tr @key="item.Notification.Id" class="notification-row" tabindex="0" role="button" aria-label="Deschide notificarea rezolvată @item.Subject"
                     @onclick="() => OpenResolved(item)" @onkeydown="args => ResolvedKeyDown(args, item)">
@@ -66,6 +93,7 @@ else if (loaded)
                 </tr>
             }
             </tbody></table></div>
+            </Paged>
         }
     </section>
 }
@@ -137,6 +165,27 @@ else if (loaded)
     private NotificationView? selected;
     private ResolvedNotificationView? selectedResolved;
     private bool loading, loaded, busy, showResolved, confirmingResolve;
+    private string validationTab = "";
+    private ValidationQueueCounts queues = ValidationQueueCounts.Empty;
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabQuery { get; set; }
+
+    private void OpenTab(string? validation, bool resolvedTab) { validationTab = validation ?? ""; showResolved = resolvedTab; }
+    private void OpenTickets() => OpenTab("tickets", false);
+    private void OpenBeneficiaries() => OpenTab("beneficiaries", false);
+
+    // The counts follow every decision taken in a validation tab (the banners, the red tabs and the notifications below reflect the real state).
+    private async Task RefreshQueuesAsync()
+    {
+        await ReadQueuesAsync();
+        await LoadAsync(true);
+    }
+
+    private async Task ReadQueuesAsync()
+    {
+        try { queues = await Queues.GetAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Validation queues loading failed ({ErrorType}).", exception.GetType().Name); queues = ValidationQueueCounts.Empty; }
+    }
     private string? error, notice, dialogError;
     private int snoozeDays = 1;
     private readonly CancellationTokenSource lifetime = new();
@@ -146,12 +195,15 @@ else if (loaded)
 
     protected override async Task OnInitializedAsync()
     {
+        await ReadQueuesAsync();
+        if (TabQuery == "tichete" && queues.CanTickets) validationTab = "tickets";
+        else if (TabQuery == "beneficiari" && queues.CanBeneficiaries) validationTab = "beneficiaries";
         await LoadAsync(true);
         RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");
     }
 
-    private RenderFragment NotificationTable(IReadOnlyList<NotificationView> items, bool overdue) => @<div class="table-scroll"><table class="notification-table"><thead><tr><th>STARE</th><th>TITLU</th><th>OBIECT</th><th>@(overdue ? "SCADENȚĂ" : "EXPIRĂ LA")</th><th class="number">@(overdue ? "DEPĂȘIT CU (ZILE)" : "ZILE RĂMASE")</th></tr></thead><tbody>
-        @foreach (var view in items)
+    private RenderFragment NotificationTable(IReadOnlyList<NotificationView> items, bool overdue) => @<Paged Items="items" Id="@(overdue ? "notif-overdue-size" : "notif-upcoming-size")" Context="pageRows"><div class="table-scroll"><table class="notification-table"><thead><tr><th>STARE</th><th>TITLU</th><th>OBIECT</th><th>@(overdue ? "SCADENȚĂ" : "EXPIRĂ LA")</th><th class="number">@(overdue ? "DEPĂȘIT CU (ZILE)" : "ZILE RĂMASE")</th></tr></thead><tbody>
+        @foreach (var view in pageRows)
         {
             <tr @key="view.Notification.Id" class="notification-row @(view.IsAlert ? "notification-unread" : "") @(overdue ? "notification-overdue" : "")" tabindex="0" role="button"
                 aria-label="Deschide notificarea @view.Subject" @onclick="() => Open(view)" @onkeydown="args => KeyDown(args, view)">
@@ -162,7 +214,7 @@ else if (loaded)
                 <td class="number">@(overdue ? -view.DaysLeft : view.DaysLeft)</td>
             </tr>
         }
-        </tbody></table></div>;
+        </tbody></table></div></Paged>;
 
     private async Task LoadAsync(bool evaluate)
     {
@@ -170,6 +222,7 @@ else if (loaded)
         try
         {
             if (evaluate) await Service.EvaluateAsync(null, lifetime.Token);
+            await ReadQueuesAsync();
             views = await Service.GetViewsAsync(lifetime.Token);
             resolved = await Service.GetResolvedViewsAsync(lifetime.Token);
             loaded = true;

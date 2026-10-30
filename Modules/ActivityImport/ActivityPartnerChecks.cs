@@ -85,8 +85,9 @@ internal static class ActivityPartnerCheckStore
 
 public sealed class MariaBeneficiaryCheckService(IConfiguration configuration, IAccessControl access, IAuditTrail audit, IBeneficiaryRepository beneficiaries, ICompanyDataLookup? lookup = null, IActivityPartnerImportService? partners = null) : IBeneficiaryCheckService
 {
-    private const string View = "beneficiari.view";
-    private const string Edit = "beneficiari.edit";
+    // The queue is seen and worked by the administrator and by the operators who hold the permission to validate the beneficiaries of ActivityApp.
+    private const string View = "beneficiari.validare";
+    private const string Edit = "beneficiari.validare";
 
     public async Task<IReadOnlyList<BeneficiaryCheck>> GetPendingAsync(CancellationToken cancellationToken = default)
     {

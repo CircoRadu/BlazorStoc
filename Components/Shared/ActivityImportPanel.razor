@@ -1,3 +1,4 @@
+@using BlazorStoc.Components.Pages
 @using BlazorStoc.Modules.ActivityImport
 @using BlazorStoc.Services
 @inject IActivityImportService Import
@@ -58,7 +59,7 @@
         </fieldset>
 
         <fieldset class="anaf-section"><legend>2. Tipuri de tichete</legend>
-            <p class="muted"><small>Alege tipurile de tichete din ActivityApp care se leagă de activitatea de service și mentenanță; importul folosește doar tipurile alese. „La cerere” nu atinge scadențele contractelor; „de mentenanță” cere un punct de lucru sub contract activ.</small></p>
+            <p class="muted"><small>Alege tipurile de tichete din ActivityApp care se leagă de activitatea de service și mentenanță; importul folosește doar tipurile alese. „La cerere” nu atinge scadențele contractelor; „de mentenanță”: tichetele tipului se preiau fără cuvânt cheie și, la un punct de lucru cu contract activ, intră în „Evenimente de validat” (operatorii cu permisiunea „Validare tichete ActivityApp” le pot valida și din pagina Mentenanță); la un punct fără contract se preiau la cerere.</small></p>
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadTypesAsync">Citește tipurile din ActivityApp</button>
                 <button type="button" class="primary" disabled="@(busy || types is null)" @onclick="SaveTypesAsync">Salvează alegerea</button>
@@ -158,7 +159,7 @@
             }
         </fieldset>
         <fieldset class="anaf-section"><legend>4. Tichete rezolvate</legend>
-            <p class="muted"><small>Tichetele rezolvate (cu eveniment de rezolvare) ale tipurilor alese în secțiunea 2, deschise de la data aleasă, care menționează un cuvânt cheie de mentenanță (Nomenclator) în ce s-a făcut, devin intervenții „la cerere” în Mentenanță, la beneficiarul clientului și la punctul de lucru al tichetului (altfel la cel principal). Problema și rezolvarea se despart din raportul lucrării. Se preiau numai după ce clientul a fost preluat (secțiunea 3). Tipurile cu destinația „de mentenanță” nu se preiau încă. Simularea nu scrie nimic.</small></p>
+            <p class="muted"><small>Tichetele rezolvate (cu eveniment de rezolvare) ale tipurilor alese în secțiunea 2, deschise de la data aleasă, intră în coada „Evenimente de validat” (secțiunea 7), la beneficiarul clientului și la punctul de lucru al tichetului (altfel la cel principal). Niciun tichet nu se înregistrează singur: un operator îl vede, îl preia ca atare sau îl modifică și îl preia, ca mentenanță (tipurile „de mentenanță” și cele cu un cuvânt cheie din Nomenclator sunt propuse așa, chiar dacă punctul nu are contract) sau ca service la cerere, ori îl discardează. Problema și rezolvarea se despart din raportul lucrării. Se preiau numai după ce clientul a fost preluat (secțiunea 3). Simularea nu scrie nimic.</small></p>
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="SimulateTicketsAsync">Simulează tichetele</button>
                 <button type="button" class="primary" disabled="@(busy || ticketReport is null || ticketReport.Applied)" @onclick="() => confirmTickets = true">Aplică tichetele</button>
@@ -166,7 +167,7 @@
             @if (confirmTickets && ticketReport is not null)
             {
                 <div class="success-banner" role="alert">
-                    Se vor înregistra @ticketReport.Tickets.Create intervenții în Mentenanță; @ticketReport.Tickets.Skipped tichete se ignoră, @ticketReport.Tickets.Problems rămân probleme de rezolvat.
+                    Se vor pune @ticketReport.Tickets.Create tichete în coada de validare (nicio intervenție nu se înregistrează singură); @ticketReport.Tickets.Skipped tichete se ignoră, @ticketReport.Tickets.Problems rămân probleme de rezolvat.
                     <div class="editor-actions">
                         <button type="button" class="primary" disabled="@busy" @onclick="ApplyTicketsAsync">Da, aplică</button>
                         <button type="button" class="refresh" disabled="@busy" @onclick="() => confirmTickets = false">Renunță</button>
@@ -175,15 +176,15 @@
             }
             @if (ticketReport is not null)
             {
-                <p class="muted" role="status" id="ai-tickets-title"><strong>@(ticketReport.Applied ? "Tichete preluate" : "Simulare tichete")</strong> la @ticketReport.AtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") de @ticketReport.By, tichete deschise de la @ticketReport.Since.ToString("dd.MM.yyyy"), tipuri: @string.Join(", ", ticketReport.Types).</p>
+                <p class="muted" role="status" id="ai-tickets-title"><strong>@(ticketReport.Applied ? "Tichete puse la validare" : "Simulare tichete")</strong> la @ticketReport.AtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") de @ticketReport.By, tichete deschise de la @ticketReport.Since.ToString("dd.MM.yyyy"), tipuri: @string.Join(", ", ticketReport.Types).</p>
                 @if (ticketReport.StoppedTypes.Count > 0) { <p class="muted"><small>Oprite până la confirmare (nume schimbat în ActivityApp): @string.Join(", ", ticketReport.StoppedTypes).</small></p> }
                 <div class="table-scroll"><table class="catalog-table" id="ai-tickets-summary">
-                    <thead><tr><th>Total</th><th>@(ticketReport.Applied ? "Preluate" : "De preluat")</th><th>Deja preluate</th><th>Probleme</th><th>Ignorate</th></tr></thead>
+                    <thead><tr><th>Total</th><th>@(ticketReport.Applied ? "Puse la validare" : "De pus la validare")</th><th>Deja preluate</th><th>Probleme</th><th>Ignorate</th></tr></thead>
                     <tbody><tr><td>@ticketReport.Tickets.Total</td><td>@ticketReport.Tickets.Create</td><td>@ticketReport.Tickets.AlreadyLinked</td><td>@ticketReport.Tickets.Problems</td><td>@ticketReport.Tickets.Skipped</td></tr></tbody>
                 </table></div>
-                @if (ticketReport.Maintenance > 0 || ticketReport.MentionedOnly > 0 || ticketReport.ToValidate > 0)
+                @if (ticketReport.ToValidate > 0)
                 {
-                    <p class="muted" id="ai-tickets-maintenance"><small>Cuvinte cheie de mentenanță (Nomenclator): @ticketReport.Maintenance @(ticketReport.Applied ? "înregistrate" : "de înregistrat") ca mentenanță (mută scadența), @ticketReport.MentionedOnly menționează mentenanța dar punctul nu are contract activ (rămân la cerere), @ticketReport.ToValidate așteaptă validarea (cuvânt scris greșit sau incomplet; vezi secțiunea 7).</small></p>
+                    <p class="muted" id="ai-tickets-maintenance"><small>@ticketReport.ToValidate @(ticketReport.Applied ? "tichete așteaptă" : "tichete vor aștepta") validarea în secțiunea 7: @ticketReport.Maintenance propuse ca mentenanță (tip de mentenanță sau cuvânt cheie), @ticketReport.Service ca service.</small></p>
                 }
                 @if (ticketReport.Items.Count > 0)
                 {
@@ -272,44 +273,7 @@
             }
         </fieldset>
         <fieldset class="anaf-section"><legend>7. Evenimente de validat</legend>
-            <p class="muted"><small>Tichete închise cu un cuvânt cheie de mentenanță (găsit exact sau scris greșit sau incomplet, de exemplu de pe aplicația mobilă) la un punct de lucru cu contract de mentenanță activ. Tichetul este deja în intervențiile beneficiarului, la cerere, dar un text cu cuvântul poate spune că mentenanța NU s-a putut face. „Mentenanța s-a făcut” transformă intervenția în mentenanță (scadența următoare se mută după ciclicitatea contractului); „Nu este mentenanță” o lasă la cerere; „Discard” șterge intervenția și tichetul nu se mai preia (poate fi reactivat mai jos). Decizia se păstrează și nu se mai cere.</small></p>
-            <div class="editor-actions">
-                <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadReviewsAsync">Actualizează lista</button>
-            </div>
-            @if (reviews is not null && reviews.Count == 0) { <p class="muted" id="ai-review-empty">Nu sunt evenimente de validat.</p> }
-            @if (reviews is { Count: > 0 })
-            {
-                <div class="table-scroll"><table class="catalog-table" id="ai-reviews">
-                    <thead><tr><th>Tichet</th><th>Beneficiar / punct de lucru</th><th>Data</th><th>Cuvânt cheie</th><th>Scris în tichet</th><th>Ce s-a făcut</th><th>Operații</th></tr></thead>
-                    <tbody>
-                    @foreach (var review in reviews)
-                    {
-                        <tr @key="review.Id">
-                            <td>@review.TicketNumber @review.Title</td>
-                            <td>@review.Beneficiary<br /><small class="muted">@review.WorkPoint</small></td>
-                            <td>@review.PerformedOn.ToString("dd.MM.yyyy")</td>
-                            <td>@review.Keyword</td>
-                            <td>@review.Found</td>
-                            <td>@(review.Resolution.Length > 300 ? review.Resolution[..300] + "…" : review.Resolution)</td>
-                            <td>
-                                @if (discardingReview == review.Id)
-                                {
-                                    <span class="muted">Discard? Intervenția se șterge și tichetul nu se mai preia.</span>
-                                    <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Confirmă discard: tichetul {review.TicketNumber}")" title="Da, discard" @onclick="() => DecideAsync(review.Id, ReviewDecision.Discard)"></button>
-                                    <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la discard" title="Renunță" @onclick="() => discardingReview = null"></button>
-                                }
-                                else
-                                {
-                                    <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Mentenanța s-a făcut: tichetul {review.TicketNumber}")" title="Mentenanța s-a făcut (intervenția devine mentenanță)" @onclick="() => DecideAsync(review.Id, ReviewDecision.Maintenance)"></button>
-                                    <button type="button" class="row-icon close" disabled="@busy" aria-label="@($"Nu este mentenanță: tichetul {review.TicketNumber}")" title="Nu este mentenanță (rămâne la cerere)" @onclick="() => DecideAsync(review.Id, ReviewDecision.OnDemand)"></button>
-                                    <button type="button" class="row-icon delete" disabled="@busy" aria-label="@($"Discard tichet: {review.TicketNumber}")" title="Discard tichet (nu se mai preia)" @onclick="() => discardingReview = review.Id"></button>
-                                }
-                            </td>
-                        </tr>
-                    }
-                    </tbody>
-                </table></div>
-            }
+            <ActivityReviewSection Decided="ReadDiscardedIfShownAsync" />
             <h3>Tichete discardate</h3>
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadDiscardedAsync">Arată tichetele discardate</button>
@@ -466,7 +430,6 @@
         {
             lastRun = await Partners.GetLastRunAsync(lifetime.Token);
             issues = [.. await Partners.GetOpenIssuesAsync(lifetime.Token)];
-            reviews = await Reviews.GetPendingAsync(lifetime.Token);
         }
         catch (AccessDeniedException) { }
     }
@@ -571,7 +534,7 @@
         var progress = new Progress<string>(text => { busyText = text; _ = InvokeAsync(StateHasChanged); });
         ticketReport = await Tickets.ApplyAsync(progress, lifetime.Token);
         await LoadImportStateAsync();
-        noticeOk = true; notice = $"Tichete preluate: {ticketReport.Tickets.Create} intervenții înregistrate, {ticketReport.Tickets.Problems} probleme.";
+        noticeOk = true; notice = $"Tichete puse la validare: {ticketReport.Tickets.Create} (secțiunea 7), {ticketReport.Tickets.Problems} probleme.";
     });
 
     private sealed class FieldRow(ActivityFieldChoice choice)
@@ -608,31 +571,15 @@
     }
 
 
-    private IReadOnlyList<ActivityReviewItem>? reviews;
-
-    private async Task ReadReviewsAsync() => reviews = await Reviews.GetPendingAsync(lifetime.Token);
-
-    private Task LoadReviewsAsync() => RunAsync("Se citește lista…", ReadReviewsAsync);
-
-    private long? discardingReview;
     private IReadOnlyList<ActivityDiscardedTicket>? discardedTickets;
 
     private async Task ReadDiscardedAsync() => discardedTickets = await Reviews.GetDiscardedAsync(lifetime.Token);
 
-    private Task DecideAsync(long id, ReviewDecision decision) => RunAsync("Se salvează decizia…", async () =>
+    // A ticket discarded from the queue appears in the list of the discarded ones below (when it is open).
+    private async Task ReadDiscardedIfShownAsync()
     {
-        discardingReview = null;
-        await Reviews.DecideAsync(id, decision, lifetime.Token);
-        await ReadReviewsAsync();
         if (discardedTickets is not null) await ReadDiscardedAsync();
-        noticeOk = true;
-        notice = decision switch
-        {
-            ReviewDecision.Maintenance => "Decizia a fost salvată: intervenția a devenit mentenanță (scadența următoare s-a mutat după ciclicitatea contractului).",
-            ReviewDecision.OnDemand => "Decizia a fost salvată: intervenția rămâne la cerere.",
-            _ => "Tichetul a fost discardat: intervenția a fost ștearsă și tichetul nu se mai preia."
-        };
-    });
+    }
 
     private Task LoadDiscardedAsync() => RunAsync("Se citește lista…", ReadDiscardedAsync);
 

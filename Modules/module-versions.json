@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.3.0",
-                                           "hash":  "f4de011ed7c755801a632d357a0f07484c127031c4e8fff8a1999a237d1380aa",
+                                           "version":  "0.6.2",
+                                           "hash":  "ece276d983872b2dc28dfbfe1be5cc7abba0f9844473b0b50abd435b21574c2b",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -18,6 +18,31 @@
                                                                "version":  "0.3.0",
                                                                "date":  "29.10.2026",
                                                                "note":  "Preluare automată a persoanelor fizice și a partenerilor fără tichete; coadă unică de verificare; notificare agregată; comutatoare pentru preluare și import automat"
+                                                           },
+                                                           {
+                                                               "version":  "0.4.0",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Tipul de mentenanta se preia (propus la validare), notificare agregata, lista de validare si pentru operatori"
+                                                           },
+                                                           {
+                                                               "version":  "0.5.0",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Cozi de validare agregate pentru operatori (permisiune beneficiari.validare)"
+                                                           },
+                                                           {
+                                                               "version":  "0.6.0",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Toate tichetele merg in coada de validare (nu se inregistreaza singure); popup pentru vizualizare, modificare si preluare, discard; mentenanta fara contract"
+                                                           },
+                                                           {
+                                                               "version":  "0.6.1",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Tichetele de service fara cuvant cheie din nomenclator nu mai intra in coada de validare; se scot cele ramase"
+                                                           },
+                                                           {
+                                                               "version":  "0.6.2",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Paginare la coada de tichete de validat"
                                                            }
                                                        ]
                                        },
@@ -91,8 +116,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.0",
-                                    "hash":  "81fa95c32e8604e261f6bea1c422bcb4a3c13c7b511c6378359863d5a1b323b2",
+                                    "version":  "1.4.4",
+                                    "hash":  "19a8d9974f5acb22052e4033eec913892dfae2d0d7d380c3cade8d26eb1edeae",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -133,12 +158,32 @@
                                                         "version":  "1.4.0",
                                                         "date":  "28.10.2026",
                                                         "note":  "Acțiune nouă în jurnal: promovare subcategorie în categorie"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.1",
+                                                        "date":  "30.10.2026",
+                                                        "note":  "Filtre pentru adaugarea/stergerea fisierelor atasate"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.2",
+                                                        "date":  "30.10.2026",
+                                                        "note":  "Filtru pentru redenumirea fisierelor atasate"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.3",
+                                                        "date":  "30.10.2026",
+                                                        "note":  "Filtrul jurnalului cunoaste analizorii de risc (entitate si actiuni)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.4",
+                                                        "date":  "30.10.2026",
+                                                        "note":  "Actiunea Schimbare fel interventie in filtrul jurnalului"
                                                     }
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.3.1",
-                                        "hash":  "8ba316cc74369679bd6ad70ee20cba2912db9001405104521221e4ee462d6da0",
+                                        "version":  "1.7.0",
+                                        "hash":  "15a1e4d7addef51f8da68255256a29dab2af1bfba8f4c9122d886cf525595096",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -199,17 +244,52 @@
                                                             "version":  "1.3.1",
                                                             "date":  "28.10.2026",
                                                             "note":  "Tabelul punctelor contractului este in container cu defilare orizontala"
+                                                        },
+                                                        {
+                                                            "version":  "1.4.0",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Editoare in popup; fisiere atasate la puncte de lucru, contracte si interventii"
+                                                        },
+                                                        {
+                                                            "version":  "1.5.0",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Tab Evenimente de validat (permisiunea Validare tichete ActivityApp)"
+                                                        },
+                                                        {
+                                                            "version":  "1.5.1",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Filtrul din registru lucreaza in timpul tastarii; tab rosu pentru evenimente de validat"
+                                                        },
+                                                        {
+                                                            "version":  "1.6.0",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Mentenanta inregistrata fara contract (migrarea 60)"
+                                                        },
+                                                        {
+                                                            "version":  "1.7.0",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Vizualizare intervenție în popup (cu tichetul ActivityApp) și schimbarea felului intervenției la editare"
                                                         }
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.0.0",
-                                          "hash":  "6d9722f673fb299b208788b496a7c7b407cb86b6305ca66c3b6fc55309d58eae",
+                                          "version":  "1.1.1",
+                                          "hash":  "88e736723315b9feb46463bbed63ae2fd355b96ef6e3272cb45643b8f20ba6df",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
                                                               "date":  "24.10.2026",
                                                               "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                          },
+                                                          {
+                                                              "version":  "1.1.0",
+                                                              "date":  "30.10.2026",
+                                                              "note":  "Taburi Tichete/Beneficiari de validat, bannere si taburi rosii"
+                                                          },
+                                                          {
+                                                              "version":  "1.1.1",
+                                                              "date":  "30.10.2026",
+                                                              "note":  "Paginare la tabelele de notificari"
                                                           }
                                                       ]
                                       },
@@ -263,8 +343,8 @@
                                                        ]
                                        },
                     "RiskAnalyses":  {
-                                         "version":  "1.0.2",
-                                         "hash":  "46230dff36438ae02309610b087bc0ac259c712764b20edf250459e682df39f2",
+                                         "version":  "1.2.1",
+                                         "hash":  "828e96dad412bdfa8f7218bc15a84000e1f82c3a9ffbcff38474c8efda5806d6",
                                          "history":  [
                                                          {
                                                              "version":  "1.0.0",
@@ -280,6 +360,21 @@
                                                              "version":  "1.0.2",
                                                              "date":  "28.10.2026",
                                                              "note":  "Tabelul istoricului analizei este in container cu defilare orizontala"
+                                                         },
+                                                         {
+                                                             "version":  "1.1.0",
+                                                             "date":  "30.10.2026",
+                                                             "note":  "Editor in popup; fisiere atasate analizelor de risc"
+                                                         },
+                                                         {
+                                                             "version":  "1.2.0",
+                                                             "date":  "30.10.2026",
+                                                             "note":  "Nomenclator Analizor de risc: lista analizorilor, alegerea analizorului la analiza de risc cu popup de adaugare"
+                                                         },
+                                                         {
+                                                             "version":  "1.2.1",
+                                                             "date":  "30.10.2026",
+                                                             "note":  "Analizor: citire blocata cu LOCK IN SHARE MODE (MariaDB)"
                                                          }
                                                      ]
                                      },

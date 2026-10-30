@@ -7,8 +7,47 @@
 
 @if (adding || editing is not null)
 {
-    <ServiceInterventionEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Interventions="interventions" Original="editing" InitialWorkPointId="initialWorkPointId"
-                               Saved="SavedAsync" Closed="CloseEditorAsync" PhotosChanged="ReloadCountsAsync" />
+    <div class="delete-overlay">
+        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="intervention-editor-title">
+            <ServiceInterventionEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Interventions="interventions" Original="editing" InitialWorkPointId="initialWorkPointId"
+                                       Saved="SavedAsync" Closed="CloseEditorAsync" PhotosChanged="ReloadCountsAsync" />
+        </div>
+    </div>
+}
+
+@if (viewing is not null)
+{
+    <div class="delete-overlay">
+        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="intervention-view-title">
+            <div class="catalog-heading"><h2 id="intervention-view-title">Intervenția @ServiceInterventionRules.KindText(viewing.Kind) din @StockMovementRules.DisplayDate(viewing.PerformedOn)</h2>
+                <span class="heading-actions"><button type="button" class="danger" @onclick="CloseView">Închide</button></span></div>
+            <dl class="review-facts">
+                <dt>Fel</dt><dd>@ServiceInterventionRules.KindLabel(viewing.Kind)</dd>
+                <dt>Punct de lucru</dt><dd>@viewing.WorkPointName<br /><small class="muted">@viewing.WorkPointAddress</small></dd>
+                <dt>Contract</dt><dd>@(viewing.ContractLabel ?? "—")</dd>
+                <dt>Efectuată la</dt><dd>@StockMovementRules.DisplayDate(viewing.PerformedOn)</dd>
+                @if (viewing.IsMaintenance)
+                {
+                    <dt>Scadență</dt><dd>@if (viewing.MovesDue) { <text>@StockMovementRules.DisplayDate(viewing.PlannedDue!.Value) → <strong>@StockMovementRules.DisplayDate(viewing.NextDueSet!.Value)</strong></text> } else { <text>Nu a modificat scadența</text> }</dd>
+                }
+                <dt>Observații</dt><dd class="review-text">@(viewing.Notes.Length > 0 ? viewing.Notes : "—")</dd>
+                <dt>Înregistrată de</dt><dd>@viewing.RecordedBy · @StockMovementRules.DisplayDate(DateOnly.FromDateTime(viewing.RecordedUtc.ToLocalTime()))</dd>
+            </dl>
+            @if (viewTicketLoading) { <p class="muted" role="status">Se citește tichetul…</p> }
+            else if (viewTicket is { } ticket)
+            {
+                <h3>Tichet ActivityApp</h3>
+                <dl class="review-facts">
+                    <dt>Tichet</dt><dd>@ticket.Number @ticket.Title</dd>
+                    @if (ticket.Problem.Length > 0) { <dt>Problema</dt><dd class="review-text">@ticket.Problem</dd> }
+                    @if (ticket.Resolution.Length > 0) { <dt>Rezolvarea</dt><dd class="review-text">@ticket.Resolution</dd> }
+                    @if (ticket.Report.Length > 0 && ticket.Report != ticket.Resolution) { <dt>Raport complet</dt><dd class="review-text">@ticket.Report</dd> }
+                    @if (ticket.Executor.Length > 0) { <dt>Executant</dt><dd>@ticket.Executor</dd> }
+                    <dt>Preluat la</dt><dd>@StockMovementRules.DisplayDate(DateOnly.FromDateTime(ticket.ImportedUtc.ToLocalTime()))</dd>
+                </dl>
+            }
+        </div>
+    </div>
 }
 
 <section class="catalog">
@@ -35,7 +74,7 @@
     }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>EFECTUATĂ LA</th><th>FEL</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>SCADENȚĂ</th><th>OBSERVAȚII</th><th class="number">FOTO</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th>EFECTUATĂ LA</th><th>FEL</th><th>PUNCT DE LUCRU</th><th>CONTRACT</th><th>SCADENȚĂ</th><th>OBSERVAȚII</th><th class="number">FOTO</th><th></th></tr></thead><tbody>
         @foreach (var item in Visible)
         {
             <tr @key="item.Id">
@@ -50,13 +89,14 @@
                 </td>
                 <td class="work-point-description" title="@item.Notes">@item.Notes</td>
                 <td class="number">@(photoCounts.TryGetValue(item.Id, out var count) ? count.ToString() : "")</td>
-                @if (CanManage)
-                {
-                    <td>
+                <td>
+                    <button class="row-icon view" aria-label="Vizualizează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" title="Vizualizează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" @onclick="() => OpenViewAsync(item)"></button>
+                    @if (CanManage)
+                    {
                         <button class="row-icon edit" disabled="@Locked" aria-label="Editează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" title="Editează intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" @onclick="() => OpenEdit(item)"></button>
                         <button class="row-icon delete" disabled="@Locked" aria-label="Șterge intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" title="Șterge intervenția din @StockMovementRules.DisplayDate(item.PerformedOn)" @onclick="() => OpenDelete(item)"></button>
-                    </td>
-                }
+                    }
+                </td>
             </tr>
         }
         </tbody></table></div>
@@ -84,7 +124,9 @@
     private IReadOnlyList<ServiceIntervention> interventions = Array.Empty<ServiceIntervention>();
     private IReadOnlyDictionary<int, int> photoCounts = new Dictionary<int, int>();
     private bool adding, busy, loading = true;
-    private ServiceIntervention? editing, deleting;
+    private ServiceIntervention? editing, deleting, viewing;
+    private InterventionTicket? viewTicket;
+    private bool viewTicketLoading;
     private Guid editorKey;
     private int initialWorkPointId;
     private string kindFilter = "";
@@ -126,6 +168,16 @@
         catch (OperationCanceledException) { }
         catch (Exception exception) { Logger.LogWarning("Intervention photo counts refresh failed ({ErrorType}).", exception.GetType().Name); }
     }
+
+    private async Task OpenViewAsync(ServiceIntervention item)
+    {
+        viewing = item; viewTicket = null; viewTicketLoading = true; notice = error = null;
+        try { viewTicket = await Repository.GetTicketAsync(item.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogWarning("Intervention ticket loading failed ({ErrorType}).", exception.GetType().Name); }
+        finally { viewTicketLoading = false; }
+    }
+    private void CloseView() { viewing = null; viewTicket = null; }
 
     private void OpenAdd() { adding = true; editing = null; editorKey = Guid.NewGuid(); notice = error = null; }
     private void OpenEdit(ServiceIntervention item) { initialWorkPointId = 0; adding = false; editing = item; editorKey = Guid.NewGuid(); notice = error = null; }

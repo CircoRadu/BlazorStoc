@@ -1,0 +1,214 @@
+@using BlazorStoc.Services
+@inject IEntityFileStore Store
+@inject IAccessControl Access
+@inject IJSRuntime JS
+@inject ILogger<BeneficiaryFilesSection> Logger
+@implements IDisposable
+
+@* The files of a beneficiary in one table: the free ones (added here, outside the sections of the page) and those of its work points, contracts, interventions
+   and risk analyses (each with a link to its section; they are changed in their own section). Collapsed by default. *@
+<section class="catalog" id="beneficiary-files-section">
+    <details class="catalog-collapse"><summary class="catalog-heading"><h2>Fișiere beneficiar <span>@items.Count</span></h2>
+        <span class="heading-actions"><HelpButton Topic="beneficiari-fisiere" About="Fișierele beneficiarului" />
+        @if (CanManage) { <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="OpenAdd">+ Adaugă fișier</button> }</span>
+    </summary>
+    @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+    @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+    @if (loading)
+    {
+        <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+    }
+    else if (items.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>Nu există fișiere</h3><p>Fișierele atașate punctelor de lucru, contractelor, intervențiilor și analizelor de risc apar aici; fișierele libere se adaugă cu butonul de mai sus.</p></div>
+    }
+    else
+    {
+        <Paged Items="items" Id="beneficiary-files-size" Context="pageRows">
+        <div class="table-scroll"><table id="beneficiary-files-table"><thead><tr><th>FIȘIER</th><th>SECȚIUNE</th><th>ÎNCĂRCAT</th><th></th></tr></thead><tbody>
+        @foreach (var item in pageRows)
+        {
+            var file = item.File;
+            <tr @key="file.Id">
+                @if (renamingId == file.Id)
+                {
+                    <td colspan="4"><FileNameEditor OriginalName="@file.OriginalName" Busy="busy" Submitted="name => RenameAsync(file, name)" Cancelled="CancelRename" /></td>
+                }
+                else
+                {
+                    <td><button type="button" class="link-button" @onclick="() => previewing = file">@file.OriginalName</button></td>
+                    <td>@if (item.IsFree) { <span>Liber</span> }
+                        else { <button type="button" class="link-button" title="@($"Deschide secțiunea {item.SectionTitle}")" @onclick="() => GoToSectionAsync(item)">@EntityFileOwners.Label(file.OwnerKind) «@item.OwnerName»</button> }</td>
+                    <td>@file.UploadedBy · @StockMovementRules.DisplayDate(DateOnly.FromDateTime(file.UploadedUtc.ToLocalTime()))</td>
+                    <td>
+                        <button type="button" class="row-icon view" aria-label="@($"Vizualizează fișierul {file.OriginalName}")" title="@($"Vizualizează fișierul {file.OriginalName}")" @onclick="() => previewing = file"></button>
+                        @if (item.IsFree && CanManage)
+                        {
+                            <button type="button" class="row-icon edit" disabled="@(busy || uploading)" aria-label="@($"Redenumește fișierul {file.OriginalName}")" title="@($"Redenumește fișierul {file.OriginalName}")" @onclick="() => { renamingId = file.Id; error = null; }"></button>
+                            <button type="button" class="row-icon delete" disabled="@(busy || uploading)" aria-label="@($"Șterge fișierul {file.OriginalName}")" title="@($"Șterge fișierul {file.OriginalName}")" @onclick="() => confirmingDelete = file"></button>
+                        }
+                    </td>
+                }
+            </tr>
+        }
+        </tbody></table></div>
+        </Paged>
+    }
+    </details>
+</section>
+
+@if (adding)
+{
+    <div class="delete-overlay">
+        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-file-add-title">
+            <section class="product-editor">
+                <div class="catalog-heading dialog-head"><h2 id="beneficiary-file-add-title">Adaugă fișiere beneficiar</h2><HelpButton Topic="beneficiari-fisiere" About="Fișierele beneficiarului" /></div>
+                @if (popupError is not null) { <div class="error-banner" role="alert">@popupError</div> }
+                <div class="image-inputs">
+                    <FileDropZone OnChange="SelectedAsync" Multiple="true" Accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" Text="Alege fișiere" Disabled="@uploading" />
+                    <small>JPG, PNG, WebP, GIF, PDF, Word, Excel, TXT sau CSV, cel mult 20 MB fiecare, cel mult @EntityFileRules.MaximumPerOwner de fișiere libere. Se salvează imediat.</small>
+                    @if (uploading) { <span role="status">Se încarcă…</span> }
+                </div>
+                <div class="editor-actions"><button type="button" class="danger" disabled="@uploading" @onclick="CloseAdd">Închide</button></div>
+            </section>
+        </div>
+    </div>
+}
+
+@if (confirmingDelete is { } doomed)
+{
+    <div class="delete-overlay">
+        <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-file-delete-title">
+            <h2 id="beneficiary-file-delete-title">Ștergi fișierul?</h2>
+            <p class="delete-object"><strong>@doomed.OriginalName</strong></p>
+            <p>Fișierul liber este șters definitiv de la beneficiar.</p>
+            <div class="editor-actions">
+                <button type="button" class="danger" disabled="@busy" @onclick="ConfirmDeleteAsync">@(busy ? "Se șterge…" : "Șterge")</button>
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => confirmingDelete = null">Anulează</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (previewing is { } shown)
+{
+    <EntityFilePreview File="shown" Closed="ClosePreview" />
+}
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    // Raised after a file was added, renamed or deleted here.
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private IReadOnlyList<BeneficiaryFileItem> items = Array.Empty<BeneficiaryFileItem>();
+    private bool loading = true, busy, uploading, adding;
+    private string? error, notice, popupError;
+    private int? renamingId;
+    private EntityFile? previewing, confirmingDelete;
+    private bool CanManage;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        CanManage = await Access.HasAsync("beneficiari.edit");
+        await LoadAsync();
+        loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        try { items = await Store.GetForBeneficiaryAsync(BeneficiaryId, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Beneficiary files loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Fișierele nu au putut fi încărcate.";
+        }
+    }
+
+    private void OpenAdd() { popupError = null; notice = null; adding = true; }
+    private void CloseAdd() => adding = false;
+    private void ClosePreview() => previewing = null;
+    private void CancelRename() => renamingId = null;
+
+    // Opens the section of the page the file belongs to and scrolls to it.
+    private async Task GoToSectionAsync(BeneficiaryFileItem item)
+    {
+        try { await JS.InvokeVoidAsync("blazorStocOpenSection", item.SectionTitle); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException) { }
+    }
+
+    private async Task SelectedAsync(InputFileChangeEventArgs eventArgs)
+    {
+        if (uploading) return;
+        uploading = true;
+        popupError = null;
+        var problems = new List<string>();
+        try
+        {
+            foreach (var file in eventArgs.GetMultipleFiles(EntityFileRules.MaximumPerOwner))
+            {
+                try
+                {
+                    await using var stream = file.OpenReadStream(EntityFileRules.MaximumBytes, lifetime.Token);
+                    using var buffer = new MemoryStream();
+                    await stream.CopyToAsync(buffer, lifetime.Token);
+                    await Store.AddAsync(EntityFileOwners.Beneficiary, BeneficiaryId, file.Name, file.ContentType, buffer.ToArray(), lifetime.Token);
+                }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+                catch (WorkPointOperationException exception) { problems.Add($"{file.Name}: {exception.Message}"); }
+                catch (AccessDeniedException exception) { problems.Add($"{file.Name}: {exception.Message}"); }
+                catch (IOException) { problems.Add($"{file.Name}: fișierul depășește 20 MB sau nu a putut fi citit."); }
+                catch (Exception exception)
+                {
+                    Logger.LogError("Beneficiary file upload failed ({ErrorType}).", exception.GetType().Name);
+                    problems.Add($"{file.Name}: fișierul nu a putut fi încărcat.");
+                }
+            }
+        }
+        finally { uploading = false; }
+        if (problems.Count > 0) popupError = string.Join(" ", problems);
+        else { adding = false; notice = "Fișierele au fost adăugate."; }
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private async Task RenameAsync(EntityFile file, string newName)
+    {
+        if (busy) return;
+        busy = true; error = null; notice = null;
+        try { await Store.RenameAsync(file.Id, newName, lifetime.Token); renamingId = null; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Beneficiary file renaming failed ({ErrorType}).", exception.GetType().Name);
+            error = "Fișierul nu a putut fi redenumit.";
+        }
+        finally { busy = false; }
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (confirmingDelete is not { } file || busy) return;
+        busy = true; error = null; notice = null;
+        try { await Store.DeleteAsync(file.Id, lifetime.Token); notice = "Fișierul a fost șters."; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Beneficiary file deletion failed ({ErrorType}).", exception.GetType().Name);
+            error = "Fișierul nu a putut fi șters.";
+        }
+        finally { busy = false; confirmingDelete = null; }
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -9,6 +9,7 @@
    missing). The tickets of their clients wait until they are clarified. The card shows only while there is something to verify. *@
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (items.Count == 0 && ShowEmpty && canEdit && error is null) { <section class="catalog"><div class="catalog-body"><p class="muted" id="checks-empty">Nu sunt beneficiari de validat.</p></div></section> }
 @if (items.Count > 0)
 {
     <section class="catalog" id="beneficiary-checks">
@@ -49,6 +50,8 @@
 
 @code {
     [Parameter] public EventCallback Changed { get; set; }
+    // True where the list is a page of its own (the Notifications tab): an empty queue says so instead of showing nothing.
+    [Parameter] public bool ShowEmpty { get; set; }
 
     private readonly CancellationTokenSource lifetime = new();
     private IReadOnlyList<BeneficiaryCheck> items = [];
@@ -58,7 +61,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        canEdit = await Access.HasAsync("beneficiari.edit");
+        canEdit = await Access.HasAsync("beneficiari.validare");
+        if (!canEdit) return;
         await RunAsync(async () => items = await Checks.GetPendingAsync(lifetime.Token), null);
     }
 

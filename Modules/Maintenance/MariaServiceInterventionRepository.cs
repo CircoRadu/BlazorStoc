@@ -104,11 +104,12 @@ public sealed class MariaServiceInterventionRepository(
             ServiceNextDueBasis? basis = null;
             if (value.Kind == ServiceInterventionKind.Maintenance)
             {
-                var coverage = await LockCoverageAsync(connection, transaction, value.WorkPointId, beneficiaryId, cancellationToken).ConfigureAwait(false)
-                    ?? throw ServiceInterventionRules.NotCovered(workPointName);
-                (contractId, contractLabel) = (coverage.ContractId, coverage.Label);
-                var latest = await LatestMovingAsync(connection, transaction, value.WorkPointId, null, cancellationToken).ConfigureAwait(false);
-                if (ServiceInterventionRules.Moves(performedOn, latest?.PerformedOn))
+                var coverage = await LockCoverageAsync(connection, transaction, value.WorkPointId, beneficiaryId, cancellationToken).ConfigureAwait(false);
+                if (coverage is null && !value.AllowUncovered) throw ServiceInterventionRules.NotCovered(workPointName);
+                // Without a contract (allowed only for an approved ActivityApp ticket): a maintenance with no contract and no due date to move.
+                if (coverage is not null) (contractId, contractLabel) = (coverage.ContractId, coverage.Label);
+                var latest = coverage is null ? null : await LatestMovingAsync(connection, transaction, value.WorkPointId, null, cancellationToken).ConfigureAwait(false);
+                if (coverage is not null && ServiceInterventionRules.Moves(performedOn, latest?.PerformedOn))
                 {
                     plannedDue = coverage.NextDue;
                     basis = value.Basis;
@@ -119,10 +120,10 @@ public sealed class MariaServiceInterventionRepository(
             }
             await using var insert = Command(connection, transaction, """
                 INSERT INTO service_interventions (kind, beneficiary_id, work_point_id, contract_id, work_point_name, work_point_address, contract_label,
-                    performed_on, planned_due, next_due_basis, next_due_set, notes, recorded_by, recorded_utc, version)
-                VALUES (@kind, @beneficiary, @workPoint, @contract, @pointName, @pointAddress, @contractLabel, @performed, @planned, @basis, @dueSet, @notes, @recordedBy, @recorded, 0)
+                    performed_on, planned_due, next_due_basis, next_due_set, notes, recorded_by, recorded_utc, version, without_contract)
+                VALUES (@kind, @beneficiary, @workPoint, @contract, @pointName, @pointAddress, @contractLabel, @performed, @planned, @basis, @dueSet, @notes, @recordedBy, @recorded, 0, @without)
                 """, ("@kind", ServiceInterventionRules.KindCode(value.Kind).ToString()), ("@beneficiary", beneficiaryId), ("@workPoint", value.WorkPointId),
-                ("@contract", contractId), ("@pointName", workPointName), ("@pointAddress", workPointAddress), ("@contractLabel", contractLabel),
+                ("@contract", contractId), ("@without", value.Kind == ServiceInterventionKind.Maintenance && contractId is null ? 1 : 0), ("@pointName", workPointName), ("@pointAddress", workPointAddress), ("@contractLabel", contractLabel),
                 ("@performed", SqlDate(performedOn)), ("@planned", plannedDue is { } planned ? SqlDate(planned) : null),
                 ("@basis", basis is { } chosen ? ServiceInterventionRules.BasisCode(chosen).ToString() : null),
                 ("@dueSet", newDue is { } set ? SqlDate(set) : null), ("@notes", value.Notes), ("@recordedBy", actor), ("@recorded", MariaTimeText.Format(recorded)));
@@ -166,9 +167,13 @@ public sealed class MariaServiceInterventionRepository(
             var dateChanged = performedOn != original.PerformedOn;
             var basisChanged = original.MovesDue && (value.Basis != original.Basis || (value.Basis == ServiceNextDueBasis.Chosen && value.ChosenDue != original.NextDueSet));
             if (dateChanged && ServiceInterventionRules.PerformedOnError(performedOn, Today) is { } dateError) throw new ServiceInterventionOperationException(dateError);
-            var after = original with { PerformedOn = performedOn, Notes = value.Notes };
+            // The kind can change only for an intervention that moved no due date (an on-demand one, or a maintenance recorded without a due move, e.g. from a ticket): a maintenance becomes on demand with no
+            // contract, an on-demand one becomes a maintenance without contract and without moving any due date.
+            var kindChanged = value.Kind != original.Kind;
+            if (kindChanged && original.MovesDue) throw new ServiceInterventionOperationException("O mentenanță care a mutat scadența punctului nu își poate schimba felul: șterge-o (scadența revine) și înregistreaz-o din nou.");
+            var after = kindChanged ? original with { Kind = value.Kind, ContractId = null, ContractLabel = null, PerformedOn = performedOn, Notes = value.Notes } : original with { PerformedOn = performedOn, Notes = value.Notes };
             DateOnly? newDue = original.NextDueSet;
-            if (original.IsMaintenance && (dateChanged || basisChanged))
+            if (!kindChanged && original.IsMaintenance && (dateChanged || basisChanged))
             {
                 // Only the latest due-moving maintenance intervention of the point can be corrected (its choice is reopened).
                 if (!original.MovesDue || await LatestMovingAsync(connection, transaction, original.WorkPointId, null, cancellationToken).ConfigureAwait(false) is not { } latest || latest.Id != original.Id)
@@ -185,18 +190,29 @@ public sealed class MariaServiceInterventionRepository(
             if (after == original) return new ServiceInterventionSaved(original, original.NextDueSet, original.NextDueSet);
             after = after with { Version = checked(original.Version + 1) };
             await using var update = Command(connection, transaction, """
-                UPDATE service_interventions SET performed_on=@performed, next_due_basis=@basis, next_due_set=@dueSet, notes=@notes, version=@version
+                UPDATE service_interventions SET kind=@kind, contract_id=@contract, contract_label=@contractLabel, without_contract=@without, performed_on=@performed, next_due_basis=@basis, next_due_set=@dueSet, notes=@notes, version=@version
                 WHERE id=@id AND version=@oldVersion
-                """, ("@performed", SqlDate(after.PerformedOn)), ("@basis", after.Basis is { } basis ? ServiceInterventionRules.BasisCode(basis).ToString() : null),
+                """, ("@kind", ServiceInterventionRules.KindCode(after.Kind).ToString()), ("@contract", after.ContractId), ("@contractLabel", after.ContractLabel),
+                ("@without", after.IsMaintenance && after.ContractId is null ? 1 : 0), ("@performed", SqlDate(after.PerformedOn)), ("@basis", after.Basis is { } basis ? ServiceInterventionRules.BasisCode(basis).ToString() : null),
                 ("@dueSet", after.NextDueSet is { } set ? SqlDate(set) : null), ("@notes", after.Notes), ("@version", after.Version), ("@id", original.Id), ("@oldVersion", original.Version));
             if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1) throw ServiceInterventionRules.Changed();
             var details = AuditDetails.Changes([.. ServiceInterventionRules.Changes(original, after)]);
-            pending.Add(new(original.IsMaintenance ? AuditActions.EditMaintenanceIntervention : AuditActions.EditOnDemandIntervention,
+            pending.Add(new(kindChanged ? AuditActions.ChangeInterventionKind : original.IsMaintenance ? AuditActions.EditMaintenanceIntervention : AuditActions.EditOnDemandIntervention,
                 ServiceInterventionRules.Target(after, ownerName), details, ServiceInterventionRules.GeneratedEditReason));
             return new ServiceInterventionSaved(after, original.NextDueSet, after.NextDueSet);
         }, cancellationToken).ConfigureAwait(false);
         await WriteJournalAsync(original.BeneficiaryId, pending, cancellationToken).ConfigureAwait(false);
         return saved;
+    }
+
+    public async Task<InterventionTicket?> GetTicketAsync(int interventionId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, null, "SELECT ticket_number, title, problem, resolution, report, executor, imported_utc FROM service_intervention_source WHERE intervention_id=@id", ("@id", interventionId));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return null;
+        string Text(int index) => reader.IsDBNull(index) ? "" : reader.GetString(index);
+        return new InterventionTicket(Text(0), Text(1), Text(2), Text(3), Text(4), Text(5), DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc));
     }
 
     // Archived deletion: the row goes to archive_service_interventions, its photos to archive_service_photos with their files moved to the

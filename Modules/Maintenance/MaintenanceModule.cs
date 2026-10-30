@@ -11,7 +11,7 @@ public sealed class MaintenanceModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Mentenanță";
-    public Version Version { get; } = new(1, 3, 1);
+    public Version Version { get; } = new(1, 7, 0);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [new("/mentenanta", "Mentenanță", "⚒", ModuleId)];
 
     public void Register(IServiceCollection services, IConfiguration configuration)

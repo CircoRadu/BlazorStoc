@@ -802,3 +802,10 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Toate problemele de partener (adresa, ANAF, CUI/nume repetat, date refuzate) merg in coada Beneficiari -> De verificat (motive noi `repeated_identity`, `invalid_data`, `awaiting_acceptance`; detaliul in `note`); notificarea `sistem.beneficiari-activityapp-de-verificat` este agregata
 - Migrarea 57: `take_partners`, `auto_accept_partners`; comutatoare in sectiunea 3 a panoului; import automat oprit = coada de acceptare manuala (`AcceptPartnerAsync`)
 - Module: ActivityImport 0.3.0; versiune 0.5.31
+
+## Finalizat la 30.10.2026 14:52 - Coada de validare tichete ActivityApp, fisiere atasate, analizor de risc, interventii (0.5.33-0.5.36)
+
+- Tichetele ActivityApp intra in coada de validare (tip mentenanta sau cuvant cheie din nomenclator), niciunul nu se inregistreaza singur; operatii in popup; mentenanta fara contract (migrarea 060); notificare agregata si taburi Tichete/Beneficiari de validat cu permisiuni noi; paginare la tabelele de notificari.
+- Fisiere atasate la puncte de lucru, contracte, interventii si analize de risc (previzualizare, redenumire, confirmare simpla).
+- Nomenclator: sectiunea Analizor de risc si alegerea analizorului la analiza de risc; fisa beneficiarului: vizualizare interventie in popup cu tichetul si schimbarea felului; script tools/reset-activity-tickets.ps1.
+- Verificari: suita completa 2153 PASS, sectiuni MariaDB, browser pe instanta separata. Pachete 0.5.34-0.5.36.

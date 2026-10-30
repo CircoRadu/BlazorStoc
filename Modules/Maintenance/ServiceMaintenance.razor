@@ -4,6 +4,8 @@
 @attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Maintenance.MaintenanceModule.ModuleId)]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
+@inject IAccessControl Access
+@inject IValidationQueues Queues
 @inject IServiceContractRepository Contracts
 @inject IServiceInterventionRepository Interventions
 @inject IExpiryNotificationService NotificationService
@@ -20,12 +22,20 @@
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 
 <div class="settings-tabs" role="tablist" aria-label="Mentenanță">
-    <button type="button" role="tab" id="tab-due" class="settings-tab @(showRegister ? "" : "active")" aria-selected="@(showRegister ? "false" : "true")" aria-controls="panel-maintenance" @onclick="ShowDue">Scadente <span class="count-badge">@dueRows.Count</span></button>
-    <button type="button" role="tab" id="tab-register" class="settings-tab @(showRegister ? "active" : "")" aria-selected="@(showRegister ? "true" : "false")" aria-controls="panel-maintenance" @onclick="ShowRegisterAsync">Registru intervenții @if (registerLoaded) { <text> </text><span class="count-badge">@register.TotalCount</span> }</button>
+    <button type="button" role="tab" id="tab-due" class="settings-tab @(showRegister || showValidation ? "" : "active")" aria-selected="@(showRegister || showValidation ? "false" : "true")" aria-controls="panel-maintenance" @onclick="ShowDue">Scadente <span class="count-badge">@dueRows.Count</span></button>
+    <button type="button" role="tab" id="tab-register" class="settings-tab @(showRegister && !showValidation ? "active" : "")" aria-selected="@(showRegister && !showValidation ? "true" : "false")" aria-controls="panel-maintenance" @onclick="ShowRegisterAsync">Registru intervenții @if (registerLoaded) { <text> </text><span class="count-badge">@register.TotalCount</span> }</button>
+    @if (canValidate)
+    {
+        <button type="button" role="tab" id="tab-validation" class="settings-tab @(showValidation ? "active" : "") @(waitingValidation > 0 ? "needs-attention" : "")" aria-selected="@(showValidation ? "true" : "false")" aria-controls="panel-maintenance" @onclick="ShowValidation">Evenimente de validat <span class="count-badge">@waitingValidation</span></button>
+    }
 </div>
 
-<div id="panel-maintenance" role="tabpanel" aria-labelledby="@(showRegister ? "tab-register" : "tab-due")">
-@if (!showRegister)
+<div id="panel-maintenance" role="tabpanel" aria-labelledby="@(showValidation ? "tab-validation" : showRegister ? "tab-register" : "tab-due")">
+@if (showValidation)
+{
+    <ValidationQueuePanel Changed="ReloadAfterDecisionAsync" />
+}
+else if (!showRegister)
 {
     <section class="catalog">
         <div class="catalog-heading"><h2>Scadențe pe puncte de lucru <span>@VisibleDue.Count</span></h2>
@@ -76,7 +86,7 @@ else
     <section class="catalog">
         <div class="catalog-heading"><h2>Registru intervenții <span>@register.TotalCount</span></h2></div>
         <div class="filters register-filters">
-            <label class="search-box"><span>⌕</span><input aria-label="Caută în registru" placeholder="Beneficiar, punct de lucru sau contract…" @bind="registerText" @bind:event="onchange" @bind:after="ApplyFiltersAsync" /></label>
+            <label class="search-box"><span>⌕</span><input aria-label="Caută în registru" placeholder="Beneficiar, punct de lucru sau contract…" @bind="registerText" @bind:event="oninput" @bind:after="ApplyTextFilterAsync" /></label>
             <select aria-label="Filtrează după felul intervenției" @bind="kindFilter" @bind:after="ApplyFiltersAsync">
                 <option value="">Toate felurile</option>
                 <option value="M">Mentenanță</option>
@@ -141,7 +151,8 @@ else
 
     private IReadOnlyList<ServiceDueRow> dueRows = Array.Empty<ServiceDueRow>();
     private ServiceInterventionPage register = new(Array.Empty<ServiceInterventionRow>(), 0);
-    private bool showRegister, showOff, loading, dueLoaded, registerLoaded;
+    private int waitingValidation;
+    private bool showRegister, showValidation, canValidate, showOff, loading, dueLoaded, registerLoaded;
     private int offCount, pageNumber = 1;
     private string dueText = "", dueState = "", registerText = "", kindFilter = "";
     private DateOnly? from, to;
@@ -168,7 +179,15 @@ else
     private static bool Contains(string value, string text) => System.Globalization.CultureInfo.InvariantCulture.CompareInfo
         .IndexOf(value, text, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace) >= 0;
 
-    protected override async Task OnInitializedAsync() => await LoadDueAsync();
+    [SupplyParameterFromQuery(Name = "tab")] public string? TabQuery { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { canValidate = await Access.HasAsync("mentenanta.validare"); } catch (Exception) { canValidate = false; }
+        showValidation = canValidate && string.Equals(TabQuery, "validare", StringComparison.Ordinal);
+        await ReadWaitingAsync();
+        await LoadDueAsync();
+    }
 
     private async Task LoadDueAsync()
     {
@@ -192,15 +211,20 @@ else
         finally { loading = false; }
     }
 
+    private int registerLoadVersion;
+
     private async Task LoadRegisterAsync()
     {
+        var loadVersion = ++registerLoadVersion;
         loading = true;
         error = null;
         try
         {
             var kind = kindFilter.Length == 0 ? (ServiceInterventionKind?)null : ServiceInterventionRules.ParseKind(kindFilter);
             var text = registerText.Trim();
-            register = await Interventions.GetPageAsync(new(Text: text.Length == 0 ? null : text, From: from, To: to, Kind: kind, Page: pageNumber, PageSize: PageSize), lifetime.Token);
+            var answer = await Interventions.GetPageAsync(new(Text: text.Length == 0 ? null : text, From: from, To: to, Kind: kind, Page: pageNumber, PageSize: PageSize), lifetime.Token);
+            if (loadVersion != registerLoadVersion) return;
+            register = answer;
             if (pageNumber > TotalPages) { pageNumber = TotalPages; register = await Interventions.GetPageAsync(new(Text: text.Length == 0 ? null : text, From: from, To: to, Kind: kind, Page: pageNumber, PageSize: PageSize), lifetime.Token); }
             registerLoaded = true;
         }
@@ -214,11 +238,26 @@ else
         finally { loading = false; }
     }
 
-    private void ShowDue() => showRegister = false;
+    private async Task ReadWaitingAsync()
+    {
+        try { waitingValidation = canValidate ? (await Queues.GetAsync()).Tickets : 0; } catch (Exception) { waitingValidation = 0; }
+    }
+
+    private void ShowDue() { showRegister = false; showValidation = false; }
+    private void ShowValidation() { showValidation = true; showRegister = false; }
+
+    // A maintenance confirmed in the validation list moved a due date and added to the register.
+    private async Task ReloadAfterDecisionAsync()
+    {
+        await ReadWaitingAsync();
+        registerLoaded = false;
+        await LoadDueAsync();
+    }
 
     private async Task ShowRegisterAsync()
     {
         showRegister = true;
+        showValidation = false;
         if (!registerLoaded) await LoadRegisterAsync();
     }
 
@@ -236,6 +275,17 @@ else
     }
 
     private async Task ApplyFiltersAsync() { pageNumber = 1; await LoadRegisterAsync(); }
+
+    // The text filter works while typing: a short pause after the last key, then one query; an answer that is no longer the latest is dropped.
+    private int textFilterVersion;
+    private async Task ApplyTextFilterAsync()
+    {
+        var version = ++textFilterVersion;
+        try { await Task.Delay(250, lifetime.Token); }
+        catch (OperationCanceledException) { return; }
+        if (version != textFilterVersion) return;
+        await ApplyFiltersAsync();
+    }
     private async Task ClearPeriodAsync() { from = to = null; await ApplyFiltersAsync(); }
     private async Task GoToPageAsync(int target) { pageNumber = Math.Clamp(target, 1, TotalPages); await LoadRegisterAsync(); }
 

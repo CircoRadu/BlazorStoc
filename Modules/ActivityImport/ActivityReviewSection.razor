@@ -1,0 +1,254 @@
+@using BlazorStoc.Services
+@using BlazorStoc.Modules.ActivityImport
+@namespace BlazorStoc.Components.Pages
+@inject IActivityReviewService Reviews
+@inject ILogger<ActivityReviewSection> Logger
+@implements IDisposable
+
+@* The queue of the tickets of ActivityApp that wait for a decision. Every operation on a ticket (view, edit + take, discard) opens in a popup; "take" records the intervention as the ticket
+   proposes it (maintenance or service on demand); nothing is recorded without one of these clicks. *@
+<section class="catalog" id="activity-review">
+    <div class="catalog-heading"><h2>Evenimente de validat <span class="count-badge">@(items?.Count ?? 0)</span></h2>
+        <span class="heading-actions"><button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadAsync">Actualizează lista</button></span></div>
+    <div class="catalog-body">
+        <p class="muted"><small>Toate tichetele rezolvate din ActivityApp (service și mentenanță) așteaptă aici; niciunul nu se înregistrează singur. Fiecare este propus ca <strong>mentenanță</strong> (tip de mentenanță sau cuvânt cheie în ce s-a făcut, chiar dacă punctul nu are încă un contract) sau ca <strong>service</strong>. Alege: <strong>ochiul</strong> = vizualizare, <strong>creionul</strong> = modifici și preiei, <strong>bifa</strong> = preiei așa cum este propus, <strong>coșul</strong> = discard (tichetul nu se mai preia).</small></p>
+        @if (notice is not null) { <div class="notice" role="status">@notice</div> }
+        @if (error is not null && popup == Popup.None) { <div class="error-banner" role="alert">@error</div> }
+        @if (items is null) { <p class="muted" role="status">Se citește lista…</p> }
+        else if (items.Count == 0) { <p class="muted" id="ai-review-empty">Nu sunt evenimente de validat.</p> }
+    </div>
+    @if (items is { Count: > 0 })
+    {
+        <Paged Items="items" Id="ai-reviews-size" Context="pageRows">
+        <div class="table-scroll"><table class="catalog-table" id="ai-reviews">
+            <thead><tr><th>Tichet</th><th>Beneficiar / punct de lucru</th><th>Data</th><th>Propus ca</th><th>De ce</th><th>Operații</th></tr></thead>
+            <tbody>
+            @foreach (var review in pageRows)
+            {
+                <tr @key="review.Id">
+                    <td>@review.TicketNumber @review.Title</td>
+                    <td>@review.Beneficiary<br /><small class="muted">@review.WorkPoint</small></td>
+                    <td>@StockMovementRules.DisplayDate(review.PerformedOn)</td>
+                    <td>@CategoryText(review)</td>
+                    <td>@Why(review)</td>
+                    <td>
+                        <button type="button" class="row-icon view" disabled="@busy" aria-label="@($"Vizualizează tichetul {review.TicketNumber}")" title="Vizualizează tichetul" @onclick="() => OpenViewAsync(review)"></button>
+                        <button type="button" class="row-icon edit" disabled="@busy" aria-label="@($"Modifică și preia tichetul {review.TicketNumber}")" title="Modifică și preia tichetul" @onclick="() => OpenEditAsync(review)"></button>
+                        <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Preia tichetul {review.TicketNumber} ca {CategoryText(review).ToLowerInvariant()}")" title="@($"Preia ca {CategoryText(review).ToLowerInvariant()} (așa cum este propus)")" @onclick="() => TakeAsProposedAsync(review)"></button>
+                        <button type="button" class="row-icon delete" disabled="@busy" aria-label="@($"Discard tichet: {review.TicketNumber}")" title="Discard tichet (nu se mai preia)" @onclick="() => OpenDiscard(review)"></button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+        </Paged>
+    }
+</section>
+
+@if (popup == Popup.View && detail is { } view)
+{
+    <div class="delete-overlay" @onkeydown="PopupKey">
+        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="review-view-title">
+            <div class="catalog-heading"><h2 id="review-view-title">Tichet @view.Item.TicketNumber @view.Item.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup">Închide</button></span></div>
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            <dl class="review-facts">
+                <dt>Beneficiar</dt><dd>@view.Item.Beneficiary</dd>
+                <dt>Punct de lucru</dt><dd>@view.Item.WorkPoint</dd>
+                <dt>Data efectuării</dt><dd>@StockMovementRules.DisplayDate(view.Item.PerformedOn)</dd>
+                <dt>Executant</dt><dd>@(view.Source.Executor.Length > 0 ? view.Source.Executor : "—")</dd>
+                <dt>Propus ca</dt><dd>@CategoryText(view.Item) · @Why(view.Item)</dd>
+                <dt>Problema</dt><dd class="review-text">@(view.Source.Problem.Length > 0 ? view.Source.Problem : "—")</dd>
+                <dt>Rezolvarea</dt><dd class="review-text">@(view.Source.Resolution.Length > 0 ? view.Source.Resolution : "—")</dd>
+                <dt>Raportul original</dt><dd class="review-text">@(view.Source.Report.Length > 0 ? view.Source.Report : "—")</dd>
+            </dl>
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@busy" @onclick="() => TakeAsProposedAsync(view.Item)">Preia ca @CategoryText(view.Item).ToLowerInvariant()</button>
+                <button type="button" class="refresh act-edit" disabled="@busy" @onclick="() => OpenEditAsync(view.Item)">Modifică și preia</button>
+                <button type="button" class="danger" disabled="@busy" @onclick="() => OpenDiscard(view.Item)">Discard</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (popup == Popup.Edit && detail is { } edit)
+{
+    <div class="delete-overlay" @onkeydown="PopupKey">
+        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="review-edit-title">
+            <div class="catalog-heading"><h2 id="review-edit-title">Modifică și preia tichetul @edit.Item.TicketNumber</h2><span class="heading-actions"><button type="button" class="danger" disabled="@busy" @onclick="ClosePopup">Închide</button></span></div>
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            <p class="muted"><small>@edit.Item.Title · @edit.Item.Beneficiary. Se înregistrează intervenția cu ce alegi aici; tichetul din ActivityApp nu se schimbă.</small></p>
+            <fieldset disabled="@busy">
+                <div class="editor-grid">
+                    <label for="review-category">Categorie<select id="review-category" value="@category" @onchange="CategoryChanged"><option value="@nameof(ReviewCategory.Maintenance)">Mentenanță</option><option value="@nameof(ReviewCategory.Service)">Service la cerere</option></select></label>
+                    <label for="review-point">Punct de lucru<select id="review-point" @bind="workPointId">@foreach (var point in edit.WorkPoints) { <option value="@point.Id">@point.Name · @point.Address</option> }</select></label>
+                    <label for="review-date">Data efectuării *<PickOnlyDate Id="review-date" @bind-Value="performedOn" Min="@MinDate" Disabled="busy" /></label>
+                    @if (category == nameof(ReviewCategory.Maintenance))
+                    {
+                        <p class="full-width muted"><small>@(edit.Covered ? "Punctul are un contract activ: mentenanța mută scadența următoare după ciclicitatea contractului." : "Dacă punctul nu are un contract de mentenanță activ, mentenanța se înregistrează fără contract și nu mută nicio scadență (contractul poate fi adăugat ulterior).")</small></p>
+                    }
+                    <label for="review-notes" class="full-width">Observații<textarea id="review-notes" rows="8" maxlength="@OnDemandInterventionRules.NotesMaximumLength" @bind="notes" @bind:event="oninput"></textarea></label>
+                </div>
+            </fieldset>
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@(busy || performedOn is null)" @onclick="SaveEditAsync">@(busy ? "Se salvează…" : "Preia")</button>
+                <button type="button" class="danger" disabled="@busy" @onclick="ClosePopup">Anulează</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (popup == Popup.Discard && target is { } doomed)
+{
+    <div class="delete-overlay" @onkeydown="PopupKey">
+        <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="review-discard-title">
+            <h2 id="review-discard-title">Discard tichet?</h2>
+            <p class="delete-object"><strong>@doomed.TicketNumber @doomed.Title</strong></p>
+            <p>Tichetul nu se mai preia din ActivityApp (poate fi reactivat din lista tichetelor discardate din Setări).@(doomed.InRegister ? " Intervenția deja înregistrată pentru el se șterge." : "")</p>
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            <div class="editor-actions">
+                <button type="button" class="danger" disabled="@busy" @onclick="DiscardAsync">@(busy ? "Se salvează…" : "Discard")</button>
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="ClosePopup">Anulează</button>
+            </div>
+        </section>
+    </div>
+}
+
+@code {
+    private enum Popup { None, View, Edit, Discard }
+
+    // Raised after a decision (the due list of the page, the counts and the notifications change).
+    [Parameter] public EventCallback Decided { get; set; }
+    private static readonly string MinDate = StockMovementRules.StorageDate(StockMovementRules.EarliestDate);
+    private IReadOnlyList<ActivityReviewItem>? items;
+    private Popup popup;
+    private ActivityReviewItem? target;
+    private ActivityReviewDetail? detail;
+    private string category = nameof(ReviewCategory.Maintenance), notes = "";
+    private bool notesTouched, busy;
+    private int workPointId;
+    private DateOnly? performedOn;
+    private string? notice, error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private static string CategoryText(ActivityReviewItem review) => review.Kind == ActivityTicketPlanner.ServiceKind ? "Service" : "Mentenanță";
+
+    private static string Why(ActivityReviewItem review) => review.Kind switch
+    {
+        ActivityTicketPlanner.ServiceKind => "Tichet de service (niciun cuvânt cheie de mentenanță)",
+        "type" => "Tichetul este de un tip de mentenanță",
+        "exact" => $"În tichet scrie «{review.Found}»",
+        _ => $"În tichet scrie «{review.Found}» (seamănă cu «{review.Keyword}»)"
+    };
+
+    private async Task LoadAsync()
+    {
+        busy = true;
+        error = null;
+        try { items = await Reviews.GetPendingAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ModuleUnavailableException) { items = []; error = "Modulul de preluare ActivityApp este oprit."; }
+        catch (AccessDeniedException exception) { items = []; error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Review list loading failed ({ErrorType}).", exception.GetType().Name);
+            items ??= [];
+            error = "Lista nu a putut fi citită.";
+        }
+        finally { busy = false; }
+    }
+
+    private async Task<bool> LoadDetailAsync(ActivityReviewItem review)
+    {
+        busy = true;
+        error = notice = null;
+        try { detail = await Reviews.GetDetailAsync(review.Id, lifetime.Token); return true; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return false; }
+        catch (ActivityImportException exception) { error = exception.Message; await LoadAsync(); return false; }
+        catch (ModuleUnavailableException) { error = "Modulul de preluare ActivityApp este oprit."; return false; }
+        catch (AccessDeniedException exception) { error = exception.Message; return false; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Review detail loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Tichetul nu a putut fi citit.";
+            return false;
+        }
+        finally { busy = false; }
+    }
+
+    private async Task OpenViewAsync(ActivityReviewItem review)
+    {
+        if (busy) return;
+        if (await LoadDetailAsync(review)) popup = Popup.View;
+    }
+
+    private async Task OpenEditAsync(ActivityReviewItem review)
+    {
+        if (busy) return;
+        if (detail is null || detail.Item.Id != review.Id) { if (!await LoadDetailAsync(review)) return; }
+        var loaded = detail!;
+        category = loaded.Proposed == ReviewCategory.Service ? nameof(ReviewCategory.Service) : nameof(ReviewCategory.Maintenance);
+        workPointId = loaded.WorkPointId;
+        performedOn = loaded.Item.PerformedOn;
+        notes = category == nameof(ReviewCategory.Maintenance) ? loaded.NotesMaintenance : loaded.NotesService;
+        notesTouched = false;
+        error = null;
+        popup = Popup.Edit;
+    }
+
+    // The notes follow the category until the operator types in them.
+    private void CategoryChanged(ChangeEventArgs args)
+    {
+        category = args.Value?.ToString() ?? category;
+        if (!notesTouched && detail is { } loaded) notes = category == nameof(ReviewCategory.Maintenance) ? loaded.NotesMaintenance : loaded.NotesService;
+    }
+
+    private void OpenDiscard(ActivityReviewItem review) { target = review; error = null; popup = Popup.Discard; }
+
+    private void ClosePopup() { if (busy) return; popup = Popup.None; detail = null; target = null; error = null; }
+
+    private void PopupKey(KeyboardEventArgs args) { if (args.Key == "Escape") ClosePopup(); }
+
+    private Task TakeAsProposedAsync(ActivityReviewItem review) =>
+        RunAsync(() => Reviews.DecideAsync(review.Id, review.Kind == ActivityTicketPlanner.ServiceKind ? ReviewDecision.OnDemand : ReviewDecision.Maintenance, lifetime.Token),
+            $"Tichetul {review.TicketNumber} a fost preluat ca {CategoryText(review).ToLowerInvariant()}: intervenția este înregistrată.");
+
+    private Task SaveEditAsync()
+    {
+        var loaded = detail!;
+        return RunAsync(() => Reviews.TakeAsync(loaded.Item.Id, new ReviewTakeInput(category == nameof(ReviewCategory.Maintenance) ? ReviewCategory.Maintenance : ReviewCategory.Service, workPointId, performedOn!.Value, notes), lifetime.Token),
+            $"Tichetul {loaded.Item.TicketNumber} a fost preluat: intervenția este înregistrată cu ce ai ales.");
+    }
+
+    private Task DiscardAsync()
+    {
+        var review = target!;
+        return RunAsync(() => Reviews.DecideAsync(review.Id, ReviewDecision.Discard, lifetime.Token), $"Tichetul {review.TicketNumber} a fost discardat: nu se mai preia.");
+    }
+
+    // One decision: the popup stays open with the message when it fails, closes and refreshes the list when it succeeds.
+    private async Task RunAsync(Func<Task> operation, string success)
+    {
+        if (busy) return;
+        busy = true;
+        error = notice = null;
+        var ok = false;
+        try { await operation(); ok = true; notice = success; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+        catch (ActivityImportException exception) { error = exception.Message; }
+        catch (ModuleUnavailableException) { error = "Un modul necesar (Mentenanță sau Preluare ActivityApp) este oprit: decizia se poate lua după ce pornește."; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Review decision failed ({ErrorType}).", exception.GetType().Name);
+            error = "Decizia nu a putut fi salvată. Actualizează lista și reîncearcă.";
+        }
+        finally { busy = false; }
+        if (ok) { popup = Popup.None; detail = null; target = null; }
+        await LoadAsync();
+        if (ok) await Decided.InvokeAsync();
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

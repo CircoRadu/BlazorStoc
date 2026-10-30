@@ -1,3 +1,29 @@
+## 0.5.36 | 30.10.2026
+- Fișa beneficiarului, Intervenții: iconiță de vizualizare în fereastră (datele intervenției și tichetul ActivityApp din care provine) și posibilitatea de a schimba felul intervenției (Mentenanță / La cerere) la editare, dacă nu a mutat o scadență; operația apare în jurnal ca „Schimbare fel intervenție”.
+- Notificări: paginare la tabelele de notificări (restante, viitoare, rezolvate) și la coada de tichete de validat.
+
+## 0.5.35 | 30.10.2026
+- Coada de validare: intră doar tichetele de un tip de mentenanță și cele din categoriile alese care conțin un cuvânt cheie din nomenclator; tichetele de service fără cuvânt cheie nu se mai preiau, iar cele rămase în coadă din regula veche se scot la următoarea rulare a importului.
+
+## 0.5.34 | 30.10.2026
+- Preluare ActivityApp: toate tichetele de service și de mentenanță intră în coada de validare; niciun tichet nu se înregistrează automat, fără decizia unui utilizator.
+- Coada de validare: vizualizare, editare + preluare, doar preluare sau renunțare, toate în ferestre (popup).
+- Mentenanța se poate înregistra și la un punct de lucru fără contract de mentenanță (categoria rămâne mentenanță, fără mutarea scadențelor); schimbare de schemă 60.
+- Nomenclator: secțiunea „Analizor de risc”; la analiza de risc analizorul se alege din nomenclator, cu iconiță de adăugare în fereastră, iar lista se reîncarcă la închidere.
+- Analizorii de risc intră în copia de siguranță și în restaurare.
+
+## 0.5.33 | 30.10.2026
+- Fișiere atașate (puncte de lucru, contracte, intervenții, analize de risc): vizualizare în fereastră (imagini, PDF, TXT, CSV), redenumire (extensia rămâne), confirmare simplă la ștergere; redenumirea apare în jurnal.
+- Preluare ActivityApp: tichetele unui tip „de mentenanță” se preiau fără cuvânt cheie și, la un punct de lucru cu contract activ, intră în „Evenimente de validat”; la un punct fără contract se preiau la cerere. ActivityImport 0.5.0.
+- Notificare agregată unică pentru evenimentele de validat (nu una pe tichet). Notificări: taburi „Tichete de validat” și „Beneficiari de validat”, bannere „Sunt X tichete / Y beneficiari de validat” și taburi roșii când există ceva nevalidat; numărătoarea și textul se actualizează după fiecare validare.
+- Permisiuni noi, neacordate implicit: „Validare tichete ActivityApp” (Mentenanță) și „Validare beneficiari ActivityApp” (Beneficiari). Operatorii cu aceste drepturi validează din Notificări și Mentenanță; cardul „De verificat” din Beneficiari apare numai celor cu dreptul de validare beneficiari.
+- Mentenanță: filtrul din registrul de intervenții lucrează în timpul tastării.
+
+## 0.5.32 | 30.10.2026
+- Beneficiar: adăugarea și editarea punctelor de lucru, a contractelor de mentenanță, a intervențiilor, a analizelor de risc și adăugarea proiectelor se fac într-o fereastră (popup), nu în pagină.
+- Fișiere atașate (imagini, PDF, Word, Excel, TXT, CSV, până la 20 MB, cel mult 20 per obiect) la punctele de lucru, contractele de mentenanță, intervențiile și analizele de risc; descărcare, ștergere cu iconiță, jurnal („Adăugare fișier atașat”, „Ștergere fișier atașat”) și incluse în pachetele de backup. Un contract sau o analiză nouă rămâne deschisă după salvare, ca să primească imediat fișiere. Migrarea 58. Maintenance 1.4.0, RiskAnalyses 1.1.0, Journal 1.4.1.
+- Produse: eticheta unui parametru este împărțită în parametru și valoare, iar ambele filtrează (parametrul – produsele care au o valoare pentru el, valoarea – valoarea exactă); un parametru cu valoare fixă dintr-o familie arată numele familiei ca parametru.
+
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
 ## 0.5.31 | 29.10.2026

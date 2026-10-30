@@ -53,6 +53,9 @@ internal sealed class GuardedServiceInterventionRepository(IServiceInterventionR
 
     public Task DeleteAsync(ServiceIntervention original, string reason, CancellationToken cancellationToken = default) =>
         modules.RunAsync(Id, () => inner.DeleteAsync(original, reason, cancellationToken));
+
+    public Task<InterventionTicket?> GetTicketAsync(int interventionId, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.GetTicketAsync(interventionId, cancellationToken));
 }
 
 // The notification engine treats an exception of a source as "unknown" (it keeps the notifications it has); through the circuit breaker the failures of the
@@ -114,6 +117,7 @@ internal sealed class UnavailableServiceInterventionRepository : IServiceInterve
     public Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) => Out<bool>();
     public Task<ServiceInterventionSaved> UpdateAsync(ServiceIntervention original, ServiceInterventionInput input, CancellationToken cancellationToken = default) => Out<ServiceInterventionSaved>();
     public Task DeleteAsync(ServiceIntervention original, string reason, CancellationToken cancellationToken = default) => Out<object>();
+    public Task<InterventionTicket?> GetTicketAsync(int interventionId, CancellationToken cancellationToken = default) => Out<InterventionTicket?>();
 }
 
 internal sealed class UnavailableMapConfigurationService : IMapConfigurationService

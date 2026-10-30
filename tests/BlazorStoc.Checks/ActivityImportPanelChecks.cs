@@ -57,9 +57,18 @@ public static class ActivityImportPanelChecks
     {
         public List<ActivityReviewItem> Pending = [new(1, 9001, "T-77", "Revizie centrala", "Alfa SRL", "Sediu", "am facut mentenat la centrala", "mentenanță", "mentenat", new DateOnly(2026, 10, 1), DateTime.UtcNow)];
         public List<(long Id, ReviewDecision Decision)> Decisions = [];
+        public List<(long Id, ReviewTakeInput Input)> Takes = [];
         public List<ActivityDiscardedTicket> Discarded = [];
         public List<long> Reactivated = [];
         public Task<IReadOnlyList<ActivityReviewItem>> GetPendingAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ActivityReviewItem>>([.. Pending]);
+        public Task<ActivityReviewDetail> GetDetailAsync(long id, CancellationToken cancellationToken = default)
+        {
+            var item = Pending.Single(entry => entry.Id == id);
+            var source = new TicketSource(item.TicketId, 4, 1, item.TicketNumber, item.Title, "Nu merge centrala", item.Resolution, "Nu merge centrala\n" + item.Resolution, "Ion Popescu");
+            return Task.FromResult(new ActivityReviewDetail(item, 5, 50, source, [new ReviewWorkPoint(50, "Sediu", "Str. 1"), new ReviewWorkPoint(51, "Depozit", "Str. 2")], true, "Note service", "Note mentenanta",
+                item.Kind == ActivityTicketPlanner.ServiceKind ? ReviewCategory.Service : ReviewCategory.Maintenance, false));
+        }
+        public Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default) { Takes.Add((id, input)); Pending.RemoveAll(item => item.Id == id); return Task.CompletedTask; }
         public Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default)
         {
             Decisions.Add((id, decision));
@@ -142,37 +151,55 @@ public static class ActivityImportPanelChecks
             && cut.FindAll("#ai-tickets-items-page-size").Count == 1, "Activity import panel: the tickets of the simulation are in collapsible, paged groups (problems, waiting, ignored collapsed; selected open)");
         check(ticketService.Applies == 0, "Activity import panel: the simulation of the tickets applies nothing");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Aplică tichetele").Click();
-        check(cut.Markup.Contains("Se vor înregistra 3 intervenții în Mentenanță", StringComparison.Ordinal) && ticketService.Applies == 0, "Activity import panel: the application of the tickets asks for confirmation first");
+        check(cut.Markup.Contains("Se vor pune 3 tichete în coada de validare", StringComparison.Ordinal) && ticketService.Applies == 0, "Activity import panel: the application of the tickets asks for confirmation first");
         cut.FindAll("button").Where(button => button.TextContent.Trim() == "Da, aplică").Last().Click();
-        cut.WaitForAssertion(() => { if (!cut.Find("#ai-tickets-title").TextContent.Contains("Tichete preluate", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        cut.WaitForAssertion(() => { if (!cut.Find("#ai-tickets-title").TextContent.Contains("Tichete puse la validare", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(ticketService.Applies == 1, "Activity import panel: after the confirmation the tickets are applied once");
         check(cut.Find("#ai-sync-status").TextContent.Contains("Nicio sincronizare încă", StringComparison.Ordinal) && cut.FindAll("#ai-sync-hours").Count == 1, "Activity import panel: the synchronization section shows the interval and that none has run yet");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Importă acum").Click();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Sincronizare terminată. Beneficiari: 1 noi.", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(syncService.Runs == 1, "Activity import panel: \"Importă acum\" runs one synchronization and shows its result");
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.FindAll("#ai-reviews tbody tr").Count == 1 && cut.Find("#ai-reviews").TextContent.Contains("mentenat", StringComparison.Ordinal) && cut.Find("#ai-reviews").TextContent.Contains("Alfa SRL", StringComparison.Ordinal),
             "Activity import panel: the events to validate are listed with the ticket, the beneficiary, the keyword and what was written");
-        // Three decisions: the maintenance was done, it is not maintenance, discard (asked to confirm first); a discarded ticket can be reactivated.
-        reviewService.Pending.Add(new(2, 9002, "T-78", "Alt tichet", "Beta SRL", "Sediu", "mentenanța nu s-a putut face", "mentenanță", "mentenanța", new DateOnly(2026, 10, 2), DateTime.UtcNow, "exact", true));
-        reviewService.Pending.Add(new(3, 9003, "T-79", "Al treilea", "Beta SRL", "Sediu", "verificat centrala", "revizie", "revizie", new DateOnly(2026, 10, 3), DateTime.UtcNow, "exact", true));
+        // Every operation on a ticket: take as proposed (maintenance, service), view and edit + take (popup), discard (asked to confirm in a popup); a discarded ticket can be reactivated.
+        reviewService.Pending.Add(new(2, 9002, "T-78", "Alt tichet", "Beta SRL", "Sediu", "am schimbat routerul", "", "", new DateOnly(2026, 10, 2), DateTime.UtcNow, ActivityTicketPlanner.ServiceKind));
+        reviewService.Pending.Add(new(3, 9003, "T-79", "Al treilea", "Beta SRL", "Sediu", "verificat centrala", "revizie", "revizie", new DateOnly(2026, 10, 3), DateTime.UtcNow, "exact"));
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Actualizează lista").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 3) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        cut.Find("#ai-reviews button[aria-label^='Mentenanța s-a făcut: tichetul T-77']").Click();
+        check(cut.Find("#ai-reviews").TextContent.Contains("Service", StringComparison.Ordinal) && cut.Find("#ai-reviews").TextContent.Contains("Mentenanță", StringComparison.Ordinal),
+            "Activity import panel: every ticket in the queue says what it is proposed as (maintenance or service)");
+        cut.Find("#ai-reviews button[aria-label^='Preia tichetul T-77 ca mentenanță']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 2) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(reviewService.Decisions.SequenceEqual([(1L, ReviewDecision.Maintenance)]) && cut.Markup.Contains("intervenția a devenit mentenanță", StringComparison.Ordinal), "Activity import panel: confirming that the maintenance was done sends the decision and the ticket leaves the list");
-        cut.Find("#ai-reviews button[aria-label^='Nu este mentenanță: tichetul T-78']").Click();
+        check(reviewService.Decisions.SequenceEqual([(1L, ReviewDecision.Maintenance)]) && cut.Markup.Contains("a fost preluat ca mentenanță", StringComparison.Ordinal), "Activity import panel: taking a ticket as proposed sends the decision and the ticket leaves the list");
+        cut.Find("#ai-reviews button[aria-label^='Preia tichetul T-78 ca service']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(reviewService.Decisions.Last() == (2L, ReviewDecision.OnDemand) && cut.Markup.Contains("rămâne la cerere", StringComparison.Ordinal), "Activity import panel: \"not maintenance\" keeps the intervention on demand");
-        cut.Find("#ai-reviews button[aria-label^='Discard tichet: T-79']").Click();
-        check(reviewService.Decisions.Count == 2 && cut.Markup.Contains("Intervenția se șterge și tichetul nu se mai preia", StringComparison.Ordinal), "Activity import panel: discard asks for a confirmation first");
-        cut.Find("#ai-reviews button[aria-label^='Confirmă discard: tichetul T-79']").Click();
+        check(reviewService.Decisions.Last() == (2L, ReviewDecision.OnDemand) && cut.Markup.Contains("a fost preluat ca service", StringComparison.Ordinal), "Activity import panel: a service ticket is taken on demand");
+        cut.Find("#ai-reviews button[aria-label^='Vizualizează tichetul T-79']").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#review-view-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("[role=dialog]").TextContent.Contains("Raportul original", StringComparison.Ordinal) && cut.Find("[role=dialog]").TextContent.Contains("Ion Popescu", StringComparison.Ordinal) && cut.Find("[role=dialog]").TextContent.Contains("Nu merge centrala", StringComparison.Ordinal),
+            "Activity import panel: a ticket is viewed in a popup with the problem, the resolution, the report and the executor");
+        cut.FindAll("[role=dialog] button").Single(button => button.TextContent.Trim() == "Modifică și preia").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#review-edit-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        cut.Find("#review-point").Change("51");
+        cut.Find("#review-category").Change(nameof(ReviewCategory.Service));
+        cut.FindAll("[role=dialog] button").Single(button => button.TextContent.Trim() == "Preia").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(reviewService.Takes is [{ Id: 3, Input: { Category: ReviewCategory.Service, WorkPointId: 51 } }] && reviewService.Takes[0].Input.Notes == "Note service" && cut.FindAll("[role=dialog]").Count == 0,
+            "Activity import panel: edit + take sends the category, the point and the notes the operator chose (the notes follow the category) and closes the popup");
+        reviewService.Pending.Add(new(4, 9004, "T-80", "Ultimul", "Beta SRL", "Sediu", "nimic", "", "", new DateOnly(2026, 10, 4), DateTime.UtcNow, ActivityTicketPlanner.ServiceKind));
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Actualizează lista").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        cut.Find("#ai-reviews button[aria-label^='Discard tichet: T-80']").Click();
+        check(reviewService.Decisions.Count == 2 && cut.Find("[role=alertdialog]").TextContent.Contains("nu se mai preia", StringComparison.Ordinal), "Activity import panel: discard asks for a confirmation in a popup first");
+        cut.FindAll("[role=alertdialog] button").Single(button => button.TextContent.Trim() == "Discard").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-review-empty").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(reviewService.Decisions.Last() == (3L, ReviewDecision.Discard) && cut.Markup.Contains("a fost discardat", StringComparison.Ordinal), "Activity import panel: after the confirmation the ticket is discarded and the list is empty");
+        check(reviewService.Decisions.Last() == (4L, ReviewDecision.Discard) && cut.Markup.Contains("a fost discardat", StringComparison.Ordinal), "Activity import panel: after the confirmation the ticket is discarded and the list is empty");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Arată tichetele discardate").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-discarded tbody tr").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        cut.Find("#ai-discarded button[aria-label^='Reactivează tichetul T-79']").Click();
+        cut.Find("#ai-discarded button[aria-label^='Reactivează tichetul T-80']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-discarded-empty").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(reviewService.Reactivated.SequenceEqual([9003L]), "Activity import panel: a discarded ticket is listed and can be reactivated");
+        check(reviewService.Reactivated.SequenceEqual([9004L]), "Activity import panel: a discarded ticket is listed and can be reactivated");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Recitește tot").Click();
         cut.WaitForAssertion(() => { if (syncService.Resets == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(syncService.Resets == 1 && cut.Markup.Contains("citește din nou toate tichetele", StringComparison.Ordinal), "Activity import panel: \"Recitește tot\" makes the next synchronization read every ticket again");

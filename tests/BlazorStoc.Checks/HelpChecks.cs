@@ -214,7 +214,9 @@ public static class HelpChecks
     private static readonly HashSet<string> WithoutCapture = new(StringComparer.OrdinalIgnoreCase)
     {
         // The window was restructured on 27.10.2026 (three sections); the old picture was removed and is made again on request (docs/HELP_DE_REGENERAT.md), then the key leaves this list.
-        "categorii-parametri"
+        "categorii-parametri",
+        // New 30.10.2026: the pictures are made on request (docs/HELP_DE_REGENERAT.md).
+        "nomenclator-analizor-risc", "analizor-risc-editor", "beneficiari-fisiere"
     };
 
     // Elements that the demo environment cannot show in the state they describe (topic key|element name); the list only shrinks.
@@ -225,7 +227,8 @@ public static class HelpChecks
     {
         "setari-facturi-generare|Selectează zona CUI",
         "setari-backup|Copiază pe NAS",
-        "setari-baza-conexiune|Rezultatul ultimei operații"
+        "setari-baza-conexiune|Rezultatul ultimei operații",
+        "analize-risc-editor|Anulează, Închide"
     };
 
     // The pictures shipped with the topics (tools/help-capture.mjs): every "Captura:" has its picture and map, the maps point to real elements, the size stays small.
@@ -344,7 +347,11 @@ public static class HelpChecks
     {
         "MainLayout.razor", "AdminOperationDialog.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor",
         "ParameterValueEditDialog.razor", "BackupSettingsPanel.razor", "ProjectComponentsSection.razor",
-        "Home.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor"
+        "Home.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor",
+        // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.
+        "EntityFilePreview.razor", "BeneficiaryDetail.razor", "ServiceContractsSection.razor", "ServiceInterventionsSection.razor", "RiskAnalysesSection.razor", "EntityFilesPanel.razor",
+        // The popups of the validation queue of the tickets (view, edit + take, discard confirmation): their topic is to be written (listed in docs/HELP_DE_REGENERAT.md).
+        "ActivityReviewSection.razor"
     };
 
     private static string? FindRoot()

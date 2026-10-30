@@ -1,0 +1,20 @@
+# Nomenclator · Analizor de risc
+Ruta: /nomenclator
+Tab: Analizor de risc
+Cautare: nomenclator analizor de risc analizori persoana firma analiza adauga modifica sterge
+
+Lista analizorilor de risc: persoanele sau firmele care întocmesc analizele de risc la securitate. La o analiză de risc nouă, analizorul se alege din această listă.
+
+## Elemente
+### Lista analizorilor
+- Adaugă analizor | buton | Deschide formularul unui analizor nou.
+- Denumire | coloană | Denumirea analizorului; nu pot exista două cu aceeași denumire (literele mari sau mici, diacriticele și separatorii nu contează).
+- Observații | coloană | Note libere despre analizor.
+- Analize | coloană | Câte analize de risc folosesc analizorul.
+- Editează | iconita:edit | Deschide formularul analizorului pentru modificare.
+- Șterge | iconita:delete | Cere motivul și șterge analizorul; dezactivat cât timp o analiză îl folosește.
+
+## Flux: Cum adaug un analizor
+1. Apasă „Adaugă analizor”.
+2. Completează denumirea (și observațiile, dacă ai).
+3. Apasă „Adaugă analizorul”; apare în listă și poate fi ales la analizele de risc.

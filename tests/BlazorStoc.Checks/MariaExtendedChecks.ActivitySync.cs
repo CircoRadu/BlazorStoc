@@ -30,7 +30,7 @@ public static partial class MariaExtendedChecks
         var cui = Random.Shared.Next(90000000, 99999999).ToString();
         var anaf = new FakeAnafLookup(new Dictionary<string, CompanyLookupResult> { [cui] = new("Str. Florilor 5, Timisoara", "0722111222") });
         var partners = new MariaActivityPartnerImportService(configuration, settings, fake, beneficiaries, workPoints, admin, audit, anaf);
-        var tickets = new MariaActivityTicketImportService(configuration, settings, fake, recorder, workPoints, admin, audit, partners);
+        var tickets = new MariaActivityTicketImportService(configuration, settings, fake, workPoints, admin, audit, partners);
         var sync = new MariaActivitySyncService(configuration, settings, fake, partners, tickets, admin, audit);
         async Task<long> Count(string sql) => await Scalar<long>(probe, sql);
         async Task<long> Events(string action) => (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 300)).Events.Count(entry => entry.TimestampUtc >= started && entry.Action == action);
@@ -55,7 +55,7 @@ public static partial class MariaExtendedChecks
 
             var result = await sync.RunNowAsync();
             var after = await settings.GetSettingsAsync();
-            Check(result is { Ok: true, PartnersCreated: 1, PointsCreated: 0, TicketsCreated: 1, NewlyDeleted: 0 } && result.Message.Contains("Beneficiari: 1 noi", StringComparison.Ordinal) && result.Message.Contains("tichete: 1 preluate", StringComparison.Ordinal),
+            Check(result is { Ok: true, PartnersCreated: 1, PointsCreated: 0, TicketsCreated: 1, NewlyDeleted: 0 } && result.Message.Contains("Beneficiari: 1 noi", StringComparison.Ordinal) && result.Message.Contains("tichete: 1 puse la validare", StringComparison.Ordinal),
                 "Activity sync: a synchronization applies the partners and the tickets (the main point is the one created with the beneficiary)");
             Check(after.LastSyncOk == true && after.SyncFailures == 0 && after.LastSyncUtc is not null && after.LastSyncMessage == result.Message && await Events(AuditActions.SyncActivityImport) == 1, "Activity sync: the result is remembered and the run is in the journal");
             var beneficiary = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == $"Ext Sync {suffix} SRL");
@@ -90,6 +90,9 @@ public static partial class MariaExtendedChecks
             await sync.RunScheduledAsync(DateTime.Now);
             Check(await Count("SELECT COUNT(*) FROM activity_import_issues WHERE entity='partner-deleted' AND resolved=0") == 0 && await Count("SELECT COUNT(*) FROM activity_import_issues WHERE entity='partner-deleted' AND resolved=1") == 1,
                 "Activity sync: a deletion the administrator marked resolved is not listed again");
+            // The ticket waits in the queue until an operator takes it (nothing is recorded by the synchronization); a taken ticket is the one whose deletion is signalled.
+            var queueReview = new MariaActivityReviewService(configuration, admin, audit, recorder);
+            foreach (var waiting in (await queueReview.GetPendingAsync()).Where(item => item.TicketId == 7501)) await queueReview.DecideAsync(waiting.Id, ReviewDecision.OnDemand);
             fake.Live.Remove(LiveKinds.Partners);
             fake.Live[LiveKinds.Tickets] = [];
             await MakeDue();

@@ -5,6 +5,8 @@
 @inject IRiskAnalysisRepository Repository
 @inject IWorkPointRepository WorkPointStore
 @inject IBeneficiaryRepository BeneficiaryStore
+@inject IRiskAnalyzerRepository AnalyzerStore
+@inject IAccessControl Access
 @inject TimeProvider Clock
 @inject ILogger<RiskAnalysisEditor> Logger
 @implements IDisposable
@@ -37,6 +39,12 @@
                 {
                     <div class="form-note">Punct de lucru: <strong>@Original.WorkPointName</strong> · @Original.WorkPointAddress</div>
                 }
+                <div class="full-width analyzer-field"><label for="risk-analyzer">Analizor de risc *
+                    <select id="risk-analyzer" value="@(input.AnalyzerId ?? 0)" @onchange="AnalyzerChanged">
+                        <option value="0">@(analyzers.Count == 0 ? "Nu există analizori - adaugă unul" : "Alege analizorul")</option>
+                        @foreach (var analyzer in analyzers) { <option value="@analyzer.Id">@analyzer.Name</option> }
+                    </select><small>Se alege din nomenclatorul „Analizor de risc”.</small></label>
+                    @if (canAddAnalyzer) { <button type="button" class="row-icon add" aria-label="Adaugă analizor de risc" title="Adaugă analizor de risc în nomenclator" disabled="@saving" @onclick="() => addingAnalyzer = true"></button> }</div>
                 <label for="risk-number">Număr de înregistrare *<InputTextLive id="risk-number" @bind-Value="input.Number" maxlength="@RiskAnalysisRules.NumberMaximumLength" autocomplete="off" /><small>Rămâne același la reviziile analizei (folosește «Reînnoiește»); o analiză nouă are un număr nou.</small></label>
                 <label for="risk-author">Întocmită de *<InputTextLive id="risk-author" @bind-Value="input.Author" maxlength="@RiskAnalysisRules.AuthorMaximumLength" autocomplete="off" placeholder="Numele persoanei abilitate" /><small>Persoana abilitată să întocmească analize de risc la securitate.</small></label>
                 <label for="risk-initial-date">Data înregistrării *<PickOnlyDate Id="risk-initial-date" @bind-Value="input.InitialDate" Max="@TodayText" Disabled="@(saving || InitialLocked)" /><small>@(InitialLocked ? "Nu se mai poate modifica după ce analiza a fost reînnoită." : "Ultima reînnoire a unei analize noi este chiar data înregistrării.")</small></label>
@@ -51,6 +59,11 @@
             <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : Original is null ? "Adaugă analiza" : "Salvează analiza")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
         </fieldset>
     </EditForm>
+    @if (addingAnalyzer)
+    {
+        <RiskAnalyzerDialog Saved="AnalyzerSavedAsync" Closed="AnalyzerDialogClosedAsync" />
+    }
+    <EntityFilesPanel OwnerKind="@EntityFileOwners.Risk" OwnerId="@(Original?.Analysis.Id ?? 0)" />
 </section>
 
 @code {
@@ -68,7 +81,8 @@
     private IReadOnlyList<WorkPoint> workPoints = Array.Empty<WorkPoint>();
     private IReadOnlyList<RiskAnalysisView> existing = Array.Empty<RiskAnalysisView>();
     private int? beneficiaryId;
-    private bool deactivateExisting = true, saving, loading;
+    private IReadOnlyList<RiskAnalyzer> analyzers = Array.Empty<RiskAnalyzer>();
+    private bool deactivateExisting = true, saving, loading, addingAnalyzer, canAddAnalyzer;
     private string? error;
     private List<string> errors = [];
     private readonly CancellationTokenSource lifetime = new();
@@ -89,6 +103,8 @@
     protected override async Task OnInitializedAsync()
     {
         input = Original is null ? new() { InitialDate = Today, WorkPointId = PresetWorkPointId } : RiskAnalysisInput.From(Original.Analysis);
+        canAddAnalyzer = await Access.HasAsync("nomenclator.add");
+        await LoadAnalyzersAsync();
         if (Original is not null) return;
         loading = true;
         try
@@ -104,6 +120,39 @@
             error = "Datele beneficiarului nu au putut fi încărcate.";
         }
         finally { loading = false; }
+    }
+
+    // The analyzers of the nomenclator; a chosen analyzer that is no longer there is dropped from the choice.
+    private async Task LoadAnalyzersAsync()
+    {
+        try
+        {
+            analyzers = await AnalyzerStore.GetAllAsync(lifetime.Token);
+            if (input.AnalyzerId is { } chosen && !analyzers.Any(item => item.Id == chosen)) input.AnalyzerId = null;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogError("Risk analyzers loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Lista analizorilor de risc nu a putut fi încărcată.";
+        }
+    }
+
+    private void AnalyzerChanged(ChangeEventArgs args) =>
+        input.AnalyzerId = int.TryParse(args.Value?.ToString(), CultureInfo.InvariantCulture, out var id) && id > 0 ? id : null;
+
+    // A new analyzer is chosen at once; the nomenclator is read again when the popup closes, whichever way it closes.
+    private async Task AnalyzerSavedAsync(RiskAnalyzer saved)
+    {
+        addingAnalyzer = false;
+        await LoadAnalyzersAsync();
+        input.AnalyzerId = saved.Id;
+    }
+
+    private async Task AnalyzerDialogClosedAsync()
+    {
+        addingAnalyzer = false;
+        await LoadAnalyzersAsync();
     }
 
     private async Task LoadBeneficiaryAsync(int id)
@@ -141,7 +190,8 @@
         error = null;
         errors = [];
         var results = new List<ValidationResult>();
-        if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
+        if (Original is null && input.AnalyzerId is not > 0) results.Add(new ValidationResult(RiskAnalyzerRules.MissingMessage));
+        if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true) || results.Count > 0)
         {
             errors = results.Select(result => result.ErrorMessage ?? string.Empty).Where(message => message.Length > 0).Distinct().ToList();
             return;

@@ -148,6 +148,7 @@ internal static class ServiceRegistration
     {
         services.AddScoped<IWorkPointRepository, MariaWorkPointRepository>();
         services.AddScoped<IServicePhotoStore, MariaServicePhotoStore>();
+        services.AddScoped<IEntityFileStore, MariaEntityFileStore>();
         return services;
     }
 

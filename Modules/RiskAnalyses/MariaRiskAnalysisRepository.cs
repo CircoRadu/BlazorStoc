@@ -15,9 +15,10 @@ public sealed class MariaRiskAnalysisRepository(
     TimeProvider? timeProvider = null) : IRiskAnalysisRepository
 {
     private const string AnalysisColumns = "a.id, a.beneficiary_id, a.work_point_id, a.registration_number, a.author, a.initial_date, a.last_renewal_date, " +
-        "a.validity_months, a.is_active, a.notes, a.version";
+        "a.validity_months, a.is_active, a.notes, a.version, a.analyzer_id";
     private const string ViewFrom = """
         FROM risk_analyses a JOIN beneficiaries b ON b.id = a.beneficiary_id JOIN beneficiary_work_points w ON w.id = a.work_point_id
+        LEFT JOIN risk_analyzers z ON z.id = a.analyzer_id
         """;
     private const string RenewalColumns = "r.id, r.risk_analysis_id, r.renewal_date, r.previous_renewal_date, r.recorded_by, r.recorded_utc, r.notes";
     private readonly IArchiveService archiver = archiveService ?? new ArchiveService(accessControl);
@@ -57,6 +58,8 @@ public sealed class MariaRiskAnalysisRepository(
             var ownerName = await LockBeneficiaryAsync(connection, transaction, beneficiaryId, cancellationToken).ConfigureAwait(false);
             var workPointName = await WorkPointNameAsync(connection, transaction, beneficiaryId, value.WorkPointId, cancellationToken).ConfigureAwait(false);
             await EnsureUniqueNumberAsync(connection, transaction, beneficiaryId, value.Number, null, cancellationToken).ConfigureAwait(false);
+            if (value.AnalyzerId is not > 0) throw new RiskAnalysisOperationException(RiskAnalyzerRules.MissingMessage);
+            var analyzerName = await AnalyzerNameAsync(connection, transaction, value.AnalyzerId.Value, cancellationToken).ConfigureAwait(false);
             if (await FindActiveAsync(connection, transaction, value.WorkPointId, 0, cancellationToken).ConfigureAwait(false) is { } other)
             {
                 if (!deactivateExisting) throw RiskAnalysisRules.ActiveExists(workPointName, other.Number);
@@ -67,15 +70,15 @@ public sealed class MariaRiskAnalysisRepository(
             }
             await using var insert = Command(connection, transaction, """
                 INSERT INTO risk_analyses (beneficiary_id, work_point_id, registration_number, author, initial_date, last_renewal_date, validity_months,
-                                           is_active, active_work_point_id, notes, version)
-                VALUES (@beneficiary, @workPoint, @number, @author, @initial, @initial, @validity, 1, @workPoint, @notes, 0)
-                """, ("@beneficiary", beneficiaryId), ("@workPoint", value.WorkPointId), ("@number", value.Number), ("@author", value.Author),
+                                           is_active, active_work_point_id, notes, version, analyzer_id)
+                VALUES (@beneficiary, @workPoint, @number, @author, @initial, @initial, @validity, 1, @workPoint, @notes, 0, @analyzer)
+                """, ("@analyzer", value.AnalyzerId), ("@beneficiary", beneficiaryId), ("@workPoint", value.WorkPointId), ("@number", value.Number), ("@author", value.Author),
                 ("@initial", SqlDate(initial)), ("@validity", value.ValidityMonths), ("@notes", value.Notes));
             await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             var created = new RiskAnalysis(checked((int)insert.LastInsertedId), beneficiaryId, value.WorkPointId, value.Number, value.Author, initial, initial,
-                value.ValidityMonths, true, value.Notes, 0);
+                value.ValidityMonths, true, value.Notes, 0, value.AnalyzerId);
             pending.Add(new(AuditActions.CreateRiskAnalysis, RiskAnalysisRules.Target(beneficiaryId, ownerName, created.Number),
-                RiskAnalysisRules.Identification(created, workPointName), string.Empty));
+                RiskAnalysisRules.Identification(created, workPointName, analyzerName), string.Empty));
             return await LoadViewAsync(connection, transaction, created.Id, cancellationToken).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
         await RecordAsync(beneficiaryId, pending, cancellationToken).ConfigureAwait(false);
@@ -100,24 +103,28 @@ public sealed class MariaRiskAnalysisRepository(
                 if (RiskAnalysisRules.InitialDateError(initial, Today) is { } dateError) throw new RiskAnalysisOperationException(dateError);
             }
             // Without renewals the last renewal is the registration date, so it follows a changed registration date.
+            // An analyzer is only changed when one is chosen (an analysis made before the nomenclator may have none).
+            var oldAnalyzer = original.AnalyzerId is { } oldId ? await AnalyzerNameAsync(connection, transaction, oldId, cancellationToken).ConfigureAwait(false) : "";
+            var newAnalyzer = value.AnalyzerId is > 0 and var newId && newId != original.AnalyzerId
+                ? await AnalyzerNameAsync(connection, transaction, newId, cancellationToken).ConfigureAwait(false) : oldAnalyzer;
             var after = original with
             {
-                Number = value.Number, Author = value.Author, InitialDate = initial, ValidityMonths = value.ValidityMonths, Notes = value.Notes,
+                AnalyzerId = value.AnalyzerId is > 0 ? value.AnalyzerId : original.AnalyzerId, Number = value.Number, Author = value.Author, InitialDate = initial, ValidityMonths = value.ValidityMonths, Notes = value.Notes,
                 LastRenewalDate = initial != original.InitialDate ? initial : original.LastRenewalDate
             };
             if (after != original)
             {
                 await using var update = Command(connection, transaction, """
                     UPDATE risk_analyses SET registration_number=@number, author=@author, initial_date=@initial, last_renewal_date=@renewal,
-                                             validity_months=@validity, notes=@notes, version=@version
+                                             validity_months=@validity, notes=@notes, version=@version, analyzer_id=@analyzer
                     WHERE id=@id AND version=@oldVersion
-                    """, ("@number", after.Number), ("@author", after.Author), ("@initial", SqlDate(after.InitialDate)), ("@renewal", SqlDate(after.LastRenewalDate)),
+                    """, ("@analyzer", after.AnalyzerId), ("@number", after.Number), ("@author", after.Author), ("@initial", SqlDate(after.InitialDate)), ("@renewal", SqlDate(after.LastRenewalDate)),
                     ("@validity", after.ValidityMonths), ("@notes", after.Notes), ("@version", checked(original.Version + 1)),
                     ("@id", original.Id), ("@oldVersion", original.Version));
                 if (await update.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1) throw RiskAnalysisRules.Changed();
                 var workPointName = await WorkPointNameAsync(connection, transaction, original.BeneficiaryId, original.WorkPointId, cancellationToken).ConfigureAwait(false);
                 pending.Add(new(RiskAnalysisRules.EditAction(original, after), RiskAnalysisRules.Target(original.BeneficiaryId, ownerName, after.Number),
-                    $"Punct de lucru: {workPointName}; " + AuditDetails.Changes([.. RiskAnalysisRules.Changes(original, after)]), RiskAnalysisRules.GeneratedEditReason));
+                    $"Punct de lucru: {workPointName}; " + AuditDetails.Changes([.. RiskAnalysisRules.Changes(original, after), new AuditChange("Analizor", oldAnalyzer, newAnalyzer)]), RiskAnalysisRules.GeneratedEditReason));
             }
             return await LoadViewAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
@@ -353,18 +360,19 @@ public sealed class MariaRiskAnalysisRepository(
     private static async Task<IReadOnlyList<RiskAnalysisView>> ReadViewsAsync(MySqlConnection connection, MySqlTransaction? transaction, string where,
         (string Name, object? Value)[] parameters, CancellationToken token)
     {
-        var analyses = new List<(RiskAnalysis Analysis, string Beneficiary, string WorkPoint, string Address, bool Primary)>();
-        await using (var command = Command(connection, transaction, $"SELECT {AnalysisColumns}, b.name, w.name, w.address, w.is_primary {ViewFrom} {where}", parameters))
+        var analyses = new List<(RiskAnalysis Analysis, string Beneficiary, string WorkPoint, string Address, bool Primary, string Analyzer)>();
+        await using (var command = Command(connection, transaction, $"SELECT {AnalysisColumns}, b.name, w.name, w.address, w.is_primary, z.name {ViewFrom} {where}", parameters))
         await using (var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false))
             while (await reader.ReadAsync(token).ConfigureAwait(false))
-                analyses.Add((ReadAnalysis(reader), reader.GetString(11), reader.GetString(12), reader.GetString(13), reader.GetInt32(14) != 0));
+                analyses.Add((ReadAnalysis(reader), reader.GetString(12), reader.GetString(13), reader.GetString(14), reader.GetInt32(15) != 0,
+                    reader.IsDBNull(16) ? "" : reader.GetString(16)));
         var renewals = new List<RiskAnalysisRenewal>();
         await using (var command = Command(connection, transaction,
             $"SELECT {RenewalColumns} FROM risk_analysis_renewals r WHERE r.risk_analysis_id IN (SELECT a.id {ViewFrom} {where}) ORDER BY r.renewal_date DESC, r.id DESC", parameters))
         await using (var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false))
             while (await reader.ReadAsync(token).ConfigureAwait(false)) renewals.Add(ReadRenewal(reader));
         return analyses.Select(item => new RiskAnalysisView(item.Analysis, item.Beneficiary, item.WorkPoint, item.Address, item.Primary,
-            renewals.Where(renewal => renewal.RiskAnalysisId == item.Analysis.Id).ToArray())).ToArray();
+            renewals.Where(renewal => renewal.RiskAnalysisId == item.Analysis.Id).ToArray(), item.Analyzer)).ToArray();
     }
 
     private async Task<string> ActorAsync(CancellationToken token) =>
@@ -392,7 +400,15 @@ public sealed class MariaRiskAnalysisRepository(
 
     private static RiskAnalysis ReadAnalysis(MySqlDataReader reader) =>
         new(checked((int)reader.GetInt64(0)), checked((int)reader.GetInt64(1)), checked((int)reader.GetInt64(2)), reader.GetString(3), reader.GetString(4),
-            ReadDate(reader, 5), ReadDate(reader, 6), reader.GetInt32(7), reader.GetInt32(8) != 0, reader.GetString(9), reader.GetInt64(10));
+            ReadDate(reader, 5), ReadDate(reader, 6), reader.GetInt32(7), reader.GetInt32(8) != 0, reader.GetString(9), reader.GetInt64(10),
+            reader.IsDBNull(11) ? null : checked((int)reader.GetInt64(11)));
+
+    // The name of the analyzer (locked while the analysis is written), refused when it does not exist (deleted meanwhile).
+    private static async Task<string> AnalyzerNameAsync(MySqlConnection connection, MySqlTransaction transaction, int analyzerId, CancellationToken token)
+    {
+        await using var command = Command(connection, transaction, "SELECT name FROM risk_analyzers WHERE id=@id LOCK IN SHARE MODE", ("@id", analyzerId));
+        return await command.ExecuteScalarAsync(token).ConfigureAwait(false) as string ?? throw new RiskAnalysisOperationException(RiskAnalyzerRules.UnknownMessage);
+    }
 
     private static RiskAnalysisRenewal ReadRenewal(MySqlDataReader reader) =>
         new(checked((int)reader.GetInt64(0)), checked((int)reader.GetInt64(1)), ReadDate(reader, 2), ReadDate(reader, 3), reader.GetString(4),

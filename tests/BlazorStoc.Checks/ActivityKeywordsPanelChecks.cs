@@ -91,7 +91,7 @@ public static class ActivityKeywordsPanelChecks
         cut.Find("#keyword-try").Input("am schimbat routerul");
         check(cut.Find("#keyword-try-result").TextContent.Contains("Niciun cuvânt cheie", StringComparison.Ordinal), "Maintenance keywords panel: the text to try without a word says it is taken on demand");
 
-        // The page: two tabs, the types of systems first, the keywords in the second.
+        // The page: three tabs, the types of systems first, the keywords in the second, the risk analyzers in the third.
         var registry = new ModuleRegistry();
         registry.Add(new ActivityImportModule(), new ServiceCollection(), new ConfigurationBuilder().Build());
         using var page = new BunitContext();
@@ -102,7 +102,7 @@ public static class ActivityKeywordsPanelChecks
         page.Services.AddSingleton<ISystemTypeRepository>(new FakeSystemTypes());
         var nomenclator = page.Render<SystemTypes>();
         nomenclator.WaitForAssertion(() => { if (nomenclator.FindAll("table.system-types").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(nomenclator.FindAll("[role=tab]").Select(tab => tab.TextContent.Trim()).SequenceEqual(["Tipuri de sisteme", "Cuvinte cheie mentenanță"]) && nomenclator.Find("#tab-sisteme").GetAttribute("aria-selected") == "true"
+        check(nomenclator.FindAll("[role=tab]").Select(tab => tab.TextContent.Trim()).SequenceEqual(["Tipuri de sisteme", "Cuvinte cheie mentenanță", "Analizor de risc"]) && nomenclator.Find("#tab-sisteme").GetAttribute("aria-selected") == "true"
             && nomenclator.Markup.Contains("TVCI", StringComparison.Ordinal) && nomenclator.FindAll("#keywords-table").Count == 0, "Nomenclator page: the types of systems are the first tab and the keywords are not shown yet");
         nomenclator.Find("#tab-cuvinte-mentenanta").Click();
         nomenclator.WaitForAssertion(() => { if (nomenclator.FindAll("#keywords-table").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));

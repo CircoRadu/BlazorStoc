@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- The version of the application as a whole (shown in Setari -> Module and in /health); tools
 elease.ps1 sets it for a release. -->
-    <Version>0.5.31</Version>
+    <Version>0.5.36</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**;keys/**;keys-test/**</DefaultItemExcludes>
   </PropertyGroup>
 

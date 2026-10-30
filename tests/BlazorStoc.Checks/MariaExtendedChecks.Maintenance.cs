@@ -481,6 +481,20 @@ public static partial class MariaExtendedChecks
                 "The date and the notes of an on-demand intervention can be corrected without touching the due date");
             var noChange = await interventions.UpdateAsync(onDemandSaved.Intervention, ServiceInterventionInput.From(onDemandSaved.Intervention));
             Check(noChange.Intervention.Version == onDemandSaved.Intervention.Version, "A correction that changes nothing is not saved");
+            // The kind: an on-demand intervention becomes a maintenance without contract (no due moved) and back; a maintenance that moved a due date keeps its kind.
+            var toMaintenance = ServiceInterventionInput.From(onDemandSaved.Intervention); toMaintenance.Kind = ServiceInterventionKind.Maintenance; toMaintenance.Notes = "Devenita mentenanta";
+            var becameMaintenance = await interventions.UpdateAsync(onDemandSaved.Intervention, toMaintenance);
+            Check(becameMaintenance.Intervention is { Kind: ServiceInterventionKind.Maintenance, ContractId: null, Basis: null } && await Due(owner.Id, c1.Contract.Id, main.Id) == new DateOnly(2027, 1, 15)
+                  && await Count("SELECT COUNT(*) FROM service_interventions WHERE id = " + onDemand.Intervention.Id + " AND kind = 'M' AND without_contract = 1 AND contract_id IS NULL") == 1
+                  && await Events(AuditActions.ChangeInterventionKind) == 1,
+                "An on-demand intervention can become a maintenance without contract (no due date moves) and the journal names \"Schimbare fel intervenție\"");
+            var backToOnDemand = ServiceInterventionInput.From(becameMaintenance.Intervention); backToOnDemand.Kind = ServiceInterventionKind.OnDemand;
+            var backSaved = await interventions.UpdateAsync(becameMaintenance.Intervention, backToOnDemand);
+            Check(backSaved.Intervention.Kind == ServiceInterventionKind.OnDemand && await Count("SELECT COUNT(*) FROM service_interventions WHERE id = " + onDemand.Intervention.Id + " AND kind = 'C' AND without_contract = 0") == 1,
+                "A maintenance that moved no due date can become on demand again");
+            var movingToDemand = ServiceInterventionInput.From(i4Chosen.Intervention); movingToDemand.Kind = ServiceInterventionKind.OnDemand;
+            await Rejects<ServiceInterventionOperationException>(() => interventions.UpdateAsync(i4Chosen.Intervention, movingToDemand), "A maintenance that moved a due date cannot change its kind");
+            onDemandSaved = backSaved;
             Check(await Events(AuditActions.EditMaintenanceIntervention) == 3 && await Events(AuditActions.EditOnDemandIntervention) == 1 &&
                   (await audit.GetEventsAsync()).Any(item => item.TimestampUtc > since && item.Action == AuditActions.EditMaintenanceIntervention && item.Details.Contains("Efectuată la: 20.09.2026 → 22.09.2026")),
                 "The journal names \"Modificare intervenție mentenanță\" and \"Modificare intervenție la cerere\" with the old and the new values");

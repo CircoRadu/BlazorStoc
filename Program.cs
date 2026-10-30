@@ -252,6 +252,17 @@ app.MapGet("/media/service-photos/{photoId:int}", async (int photoId, IServicePh
     var photo = await photos.GetContentAsync(photoId, token);
     return photo is null ? Results.NotFound() : Results.File(photo.Content, photo.ContentType, photo.OriginalName, enableRangeProcessing: true);
 }).RequireAuthorization(PermissionPolicy.For("mentenanta.view"));
+app.MapGet("/media/entity-files/{fileId:int}", async (int fileId, HttpContext context, IEntityFileStore files, CancellationToken token) =>
+{
+    var file = await files.GetContentAsync(fileId, token);
+    // "?inline=1" shows the file in the preview window (no download name, so the browser displays it); the type is always one sniffed from the bytes.
+    if (file is not null && context.Request.Query["inline"] == "1")
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return Results.File(file.Content, file.ContentType, enableRangeProcessing: true);
+    }
+    return file is null ? Results.NotFound() : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
+}).RequireAuthorization(PermissionPolicy.For("mentenanta.view", "analize-risc.view"));
 app.MapHub<ChangesHub>(ChangesHub.Path);
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();

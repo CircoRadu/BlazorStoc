@@ -123,7 +123,7 @@ Pagina `/proiecte/{id}/situatie` (link in pagina proiectului: "Situatia proiectu
 | 3 | Bifeaza 2 sisteme si salveaza proiectul | Pe pagina proiectului sectiunea „Componente 2”, ambele „Ofertată” | |
 | 4 | Creeaza un alt proiect fara nicio componenta | Sectiunea arata „Proiectul nu are componente” si lista de adaugare | |
 | 5 | Adauga un sistem din lista „Adaugă un sistem” | Apare in tabel „Ofertată”, dispare din lista de adaugare; mesaj „Componenta a fost adăugată.” | |
-| 6 | Schimba starea unei componente (Ofertată -> În execuție -> Predată -> Închisă) | Mesaj „Starea a fost modificată.”; la reincarcarea paginii starea ramane | |
+| 6 | Schimba starea unei componente (Ofertată -> În executie -> Predată -> Închisă) | Mesaj „Starea a fost modificată.”; la reincarcarea paginii starea ramane | |
 | 7 | „Scoate” o componenta: fara motiv, apoi cu motiv | Fara motiv: eroare in dialog; cu motiv: dispare din lista activa, mesaj „…scoasă (arhivată)” | |
 | 8 | Comutatorul „Arată și arhivate” | Componenta apare estompata cu „arhivată: <motiv>”, fara selector de stare, cu buton „Reactivează” | |
 | 9 | „Reactivează” | Revine in lista activa cu starea pe care o avea | |
@@ -202,7 +202,7 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 ## Modificari de testat - telefon optional (23.10.2026)
 
 **Ce s-a adaugat:** campul „Numar de telefon” al beneficiarului nu mai este obligatoriu (ANAF nu il are intotdeauna; preluarea din ActivityApp creeaza beneficiari si fara telefon).
-**Ce face acum:** formularul se salveaza cu telefonul gol; daca este completat, trebuie sa aiba 7-15 cifre (opțional cu +).
+**Ce face acum:** formularul se salveaza cu telefonul gol; daca este completat, trebuie sa aiba 7-15 cifre (optional cu +).
 
 | Nr | Pas | Rezultat asteptat | Rezultat |
 |----|-----|-------------------|----------|
@@ -243,3 +243,15 @@ Cunoscut: daca adaugarea componentelor alese la creare esueaza (de ex. tipul a f
 | 1 | Deschide un beneficiar | Toate sectiunile pliate, cu numarul in antet | |
 | 2 | Desfa o sectiune, apoi navigheaza in alta pagina si revino | Sectiunile sunt din nou pliate | |
 | 3 | Deschide Analize de risc si echipamentele unui proiect | Sectiunile Analize de risc / Consum net sunt desfasurate | |
+
+## Modificari de testat - interventiile din fisa beneficiarului (30.10.2026, versiunea 0.5.36)
+
+**Ce s-a adaugat:** iconita de vizualizare pe fiecare interventie si alegerea felului (Mentenanta / La cerere) la editare. Fisierele atasate la puncte de lucru, contracte, interventii si analize de risc se pot previzualiza, redenumi si sterge cu confirmare simpla.
+**Ce face acum:** ochiul deschide un popup cu datele interventiei si, daca provine din ActivityApp, cu tichetul; la editare, o interventie care nu a mutat scadenta isi poate schimba felul (jurnal: "Schimbare fel interventie").
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Fisa beneficiar -> Interventii -> ochi pe un rand | Popup cu datele interventiei (si tichetul, daca exista) | |
+| 2 | Creion pe o interventie la cerere, alege "Mentenanta", salveaza | Devine mentenanta fara contract; scadenta punctului neschimbata | |
+| 3 | Creion pe o mentenanta care a mutat scadenta | Felul nu se poate schimba (mesaj in editor) | |
+| 4 | Jurnal activitate | Apare "Schimbare fel interventie" cu valoarea veche si noua | |

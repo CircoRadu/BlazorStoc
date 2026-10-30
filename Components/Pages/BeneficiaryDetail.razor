@@ -61,14 +61,22 @@ else if (beneficiary is not null)
 
     @if (addingProject)
     {
-        <ProjectEditor @key="editorKey" Original="null" FixedBeneficiaryId="Id" FixedBeneficiaryName="@beneficiary.Name"
-                       Saved="ProjectSavedAsync" Closed="CloseAddProjectAsync" />
+        <div class="delete-overlay">
+            <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="project-editor-title">
+                <ProjectEditor @key="editorKey" Original="null" FixedBeneficiaryId="Id" FixedBeneficiaryName="@beneficiary.Name"
+                               Saved="ProjectSavedAsync" Closed="CloseAddProjectAsync" />
+            </div>
+        </div>
     }
 
     @if (addingWorkPoint || editingWorkPoint is not null)
     {
-        <WorkPointEditor @key="workPointEditorKey" BeneficiaryId="Id" Original="editingWorkPoint"
-                         Saved="WorkPointSavedAsync" Closed="CloseWorkPointEditorAsync" PhotosChanged="ReloadPhotoCountsAsync" />
+        <div class="delete-overlay">
+            <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="work-point-editor-title">
+                <WorkPointEditor @key="workPointEditorKey" BeneficiaryId="Id" Original="editingWorkPoint"
+                                 Saved="WorkPointSavedAsync" Closed="CloseWorkPointEditorAsync" PhotosChanged="ReloadPhotoCountsAsync" />
+            </div>
+        </div>
     }
 
     <section class="catalog">
@@ -121,6 +129,8 @@ else if (beneficiary is not null)
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" /></ModuleGate>
 
     <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" StartOpen="false" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
+
+    <BeneficiaryFilesSection BeneficiaryId="Id" />
 
     <section class="catalog">
         <details class="catalog-collapse"><summary class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2>

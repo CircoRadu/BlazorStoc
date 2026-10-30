@@ -29,7 +29,7 @@ public static partial class MariaExtendedChecks
         // ANAF knows the company (the beneficiary is made verified); the tickets service takes the clients it needs through the partners service.
         var anaf = new FakeAnafLookup(new Dictionary<string, CompanyLookupResult> { [cui] = new("Str. Florilor 5, Timisoara", "0722111222") });
         var partners = new MariaActivityPartnerImportService(configuration, settings, fake, beneficiaries, workPoints, admin, audit, anaf);
-        var tickets = new MariaActivityTicketImportService(configuration, settings, fake, recorder, workPoints, admin, audit, partners);
+        var tickets = new MariaActivityTicketImportService(configuration, settings, fake, workPoints, admin, audit, partners);
         var keywords = new MariaActivityKeywordService(configuration, admin, audit);
         var review = new MariaActivityReviewService(configuration, admin, audit, recorder);
         async Task<long> Count(string sql) => await Scalar<long>(probe, sql);
@@ -74,7 +74,7 @@ public static partial class MariaExtendedChecks
             fake.Points = [new(7611, 7601, "Str. Florilor 5", "Timisoara", "Timis", "", "Sediu", "", true, null), new(7612, 7601, "Bd. Libertatii 9", "Timisoara", "Timis", "", "Depozit", "", true, null)];
             fake.Types = [new(4, "Service", "S", true, false, 8, 0, 0), new(13, "Mentenanță", "M", true, false, 1, 0, 0)];
             await settings.SaveSettingsAsync(new ActivityImportInput(true, "SERVER-" + suffix, 1433, "TIPActivity", "citire", "parola-" + suffix, new DateOnly(2026, 1, 1), 0, 24, 200, false));
-            await settings.SaveTypesAsync([new(4, "Service", true, ActivityDestination.OnDemand), new(13, "Mentenanță", true, ActivityDestination.Maintenance)]);
+            await settings.SaveTypesAsync([new(4, "Service", true, ActivityDestination.OnDemand), new(13, "Mentenanță", false, ActivityDestination.Maintenance)]);
             await partners.ApplyAsync();
             var owner = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == $"Ext Mentenanta {suffix} SRL");
             var points = await workPoints.GetAsync(owner.Id);
@@ -92,74 +92,80 @@ public static partial class MariaExtendedChecks
                 Ticket(9001, 0, new DateTime(2026, 3, 2, 10, 0, 0), "Am facut MENTENANȚA, curatat filtre."),         // exact (case, diacritics, punctuation): maintenance
                 Ticket(9002, 0, new DateTime(2026, 4, 5, 10, 0, 0), "S-a facut mentenata la sistem"),                // cut short: proposed
                 Ticket(9003, 0, new DateTime(2026, 4, 6, 10, 0, 0), "verificat si m3ntenan@a completa"),             // digits and a symbol typed for letters: proposed
-                Ticket(9004, 0, new DateTime(2026, 4, 7, 10, 0, 0), "Am schimbat routerul"),                         // no word: not taken
-                Ticket(9005, 7612, new DateTime(2026, 4, 8, 10, 0, 0), "Mentenanta anuala"),                         // exact, but the point has no contract: on demand
-                Ticket(9006, 7612, new DateTime(2026, 4, 9, 10, 0, 0), "mentenata"),                                 // approximate, no contract: nothing to validate, on demand
-                Ticket(9007, 0, new DateTime(2026, 4, 10, 10, 0, 0), "mentenanta facuta", type: 13)                  // a type taken as maintenance is skipped as before
+                Ticket(9004, 0, new DateTime(2026, 4, 7, 10, 0, 0), "Am schimbat routerul, mentenanta curenta"),   // a word, chosen by the operator as service
+                Ticket(9005, 7612, new DateTime(2026, 4, 8, 10, 0, 0), "Mentenanta anuala"),                         // exact, the point has no contract: still proposed as maintenance
+                Ticket(9006, 7612, new DateTime(2026, 4, 9, 10, 0, 0), "mentenata"),                                 // approximate, no contract: queued
+                Ticket(9007, 0, new DateTime(2026, 4, 10, 10, 0, 0), "mentenanta facuta", type: 13),   // of a type that is not chosen: never read (the tickets of a chosen maintenance type are covered by the planner and tickets checks)
+                Ticket(9008, 0, new DateTime(2026, 4, 11, 10, 0, 0), "Am schimbat routerul")                         // service without a word: not taken
             ];
 
             var interventionsBefore = await Count("SELECT COUNT(*) FROM service_interventions");
             var simulation = await tickets.SimulateAsync();
-            Check(simulation.Tickets is { Create: 5, Skipped: 2 } && simulation.Maintenance == 0 && simulation.MentionedOnly == 1 && simulation.ToValidate == 3,
-                "Activity maintenance: the simulation takes 5 tickets (3 of them to validate: any word at a point under contract), 1 mentions it without a contract, 1 is skipped");
+            Check(simulation.Tickets is { Create: 6, Skipped: 1 } && simulation.ToValidate == 6 && simulation.Maintenance == 6 && simulation.Service == 0,
+                "Activity maintenance: the simulation puts 6 tickets in the queue to validate (each with a word), a service ticket without a word is not taken");
             Check(await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore && await Count("SELECT COUNT(*) FROM activity_import_suggestions") == 0,
                 "Activity maintenance: the simulation records no intervention and no proposal");
 
             var applied = await tickets.ApplyAsync();
-            Check(applied.Tickets.Create == 5 && applied.ToValidate == 3 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 5
-                && await Count("SELECT COUNT(*) FROM service_interventions si JOIN service_intervention_source s ON s.intervention_id = si.id WHERE s.source_ticket_id IN (9001, 9002, 9003, 9005, 9006) AND si.kind = 'C'") == 5,
-                "Activity maintenance: every ticket is added at once to the interventions of the beneficiary, on demand (3 of them waiting for the operator)");
+            Check(applied.Tickets.Create == 6 && applied.ToValidate == 6 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore
+                && await Count("SELECT COUNT(*) FROM activity_import_suggestions WHERE status = 'pending' AND intervention_id IS NULL AND ticket_id IN (9001, 9002, 9003, 9004, 9005, 9006)") == 6
+                && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity = 'ticket'") == 0 && await Count("SELECT COUNT(*) FROM activity_import_tickets WHERE state = 'pending_approval'") == 6,
+                "Activity maintenance: no ticket is recorded by itself, with or without a contract: all wait whole in the queue to validate");
             Check(await Count($"SELECT COUNT(*) FROM service_contract_points WHERE contract_id = {contract.Contract.Id} AND next_due = '2026-02-01'") == 1,
-                "Activity maintenance: nothing moves the next due date before the operator confirms");
-            Check(await Count("SELECT COUNT(*) FROM service_interventions si JOIN service_intervention_source s ON s.intervention_id = si.id WHERE s.source_ticket_id = 9005 AND si.notes LIKE '%dar punctul nu are un contract%'") == 1,
-                "Activity maintenance: the notes say that the point has no contract");
-            Check(await Count("SELECT COUNT(*) FROM activity_import_suggestions WHERE status = 'pending' AND intervention_id IS NOT NULL AND ticket_id IN (9001, 9002, 9003)") == 3
-                && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity = 'ticket' AND source_id IN (9001, 9002, 9003)") == 3
-                && await Count("SELECT COUNT(*) FROM activity_import_tickets WHERE state = 'imported'") == 5, "Activity maintenance: the three proposals point at their interventions and the tickets are kept as taken");
+                "Activity maintenance: nothing moves the next due date before the operator decides");
 
             var pending = await review.GetPendingAsync();
-            Check(pending.Count == 3 && pending.Any(item => item is { TicketId: 9001, Kind: "exact", InRegister: true }) && pending.Any(item => item.TicketId == 9002 && item.Found == "mentenata" && item.Kind == "approximate" && item.Keyword == "mentenanță" && item.Beneficiary.Contains("Ext Mentenanta", StringComparison.Ordinal))
-                && pending.Any(item => item.TicketId == 9003 && item.Found.Contains("m3ntenan@a", StringComparison.Ordinal)), "Activity maintenance: the tickets to validate carry what was written, the keyword, how it matched and the beneficiary");
+            Check(pending.Count == 6 && pending.Any(item => item is { TicketId: 9001, Kind: "exact", InRegister: false }) && pending.Any(item => item.TicketId == 9002 && item.Found == "mentenata" && item.Kind == "approximate" && item.Keyword == "mentenanță" && item.Beneficiary.Contains("Ext Mentenanta", StringComparison.Ordinal))
+                && pending.Any(item => item.TicketId == 9003 && item.Found.Contains("m3ntenan@a", StringComparison.Ordinal)) && pending.Single(item => item.TicketId == 9004).Kind == "exact"
+                && pending.Any(item => item is { TicketId: 9005, Kind: "exact" }),
+                "Activity maintenance: the tickets in the queue carry what was written, the keyword, how it matched (or that it is a service) and the beneficiary");
             var instances = ActivityReviewSource.Instances(pending);
             var source = new ActivityReviewSource(configuration);
-            Check(instances.Count == 3 && (await source.GetInstancesAsync()).Count == 3 && instances.All(item => item.Url == "/setari?tab=preluare-activityapp") && instances.Any(item => item.Values[ActivityReviewSource.DetailsName].Contains("seamănă cu", StringComparison.Ordinal))
-                && instances.Any(item => item.Values[ActivityReviewSource.DetailsName].Contains("verifică dacă mentenanța s-a făcut", StringComparison.Ordinal)),
-                "Activity maintenance: each ticket waiting is a notification for the administrator, with the link to the settings");
+            Check(instances.Count == 1 && (await source.GetInstancesAsync()).Count == 1 && instances[0].Url == ActivityReviewSource.Url && instances[0].Values[ActivityReviewSource.TicketName] == "6 tichete"
+                && instances[0].Values[ActivityReviewSource.DetailsName].Contains("6 evenimente", StringComparison.Ordinal) && instances[0].Values[ActivityReviewSource.DetailsName].Contains("0 ca service", StringComparison.Ordinal),
+                "Activity maintenance: the tickets waiting are ONE aggregated notification, with the link to the validation list of the maintenance page");
             var again = await tickets.ApplyAsync();
-            Check(again.Tickets.Create == 0 && again.ToValidate == 0 && await Count("SELECT COUNT(*) FROM activity_import_suggestions") == 3 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 5,
+            Check(again.Tickets.Create == 0 && again.ToValidate == 0 && await Count("SELECT COUNT(*) FROM activity_import_suggestions") == 6 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore,
                 "Activity maintenance: running again neither takes the tickets again nor proposes them twice");
 
-            // The operator: the maintenance was done (9001), it was not (9002), discard (9003).
+            // The operator: maintenance at a covered point (9001), a service as proposed (9002, 9004, 9006), a maintenance edited at a point without a contract (9005), discard (9003).
             await review.DecideAsync(pending.Single(item => item.TicketId == 9001).Id, ReviewDecision.Maintenance);
             await review.DecideAsync(pending.Single(item => item.TicketId == 9002).Id, ReviewDecision.OnDemand);
             await review.DecideAsync(pending.Single(item => item.TicketId == 9003).Id, ReviewDecision.Discard);
+            await review.DecideAsync(pending.Single(item => item.TicketId == 9004).Id, ReviewDecision.OnDemand);
+            var uncovered = await review.GetDetailAsync(pending.Single(item => item.TicketId == 9005).Id);
+            await review.TakeAsync(uncovered.Item.Id, new ReviewTakeInput(ReviewCategory.Maintenance, uncovered.WorkPointId, uncovered.Item.PerformedOn, uncovered.NotesMaintenance));
+            await review.DecideAsync(pending.Single(item => item.TicketId == 9006).Id, ReviewDecision.OnDemand);
             var twice = 0;
             try { await review.DecideAsync(pending.Single(item => item.TicketId == 9002).Id, ReviewDecision.Maintenance); } catch (ActivityImportException) { twice++; }
             Check(twice == 1 && (await review.GetPendingAsync()).Count == 0 && (await source.GetInstancesAsync()).Count == 0, "Activity maintenance: a decision is taken once and the notification goes away");
             Check(await Count("SELECT COUNT(*) FROM service_interventions si JOIN service_intervention_source s ON s.intervention_id = si.id WHERE s.source_ticket_id = 9001 AND si.kind = 'M' AND si.contract_id IS NOT NULL") == 1
-                && await Count("SELECT COUNT(*) FROM service_interventions si JOIN service_intervention_source s ON s.intervention_id = si.id WHERE s.source_ticket_id = 9002 AND si.kind = 'C'") == 1
-                && await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id = 9003") == 0 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 4,
-                "Activity maintenance: the confirmed ticket became a maintenance intervention (replacing the on-demand one), the rejected stays on demand, the discarded one lost its intervention");
+                && await Count("SELECT COUNT(*) FROM service_interventions si JOIN service_intervention_source s ON s.intervention_id = si.id WHERE s.source_ticket_id IN (9002, 9004, 9006) AND si.kind = 'C'") == 3
+                && await Count("SELECT COUNT(*) FROM service_interventions si JOIN service_intervention_source s ON s.intervention_id = si.id WHERE s.source_ticket_id = 9005 AND si.kind = 'M' AND si.contract_id IS NULL AND si.next_due_set IS NULL AND si.notes LIKE '%nu are un contract%'") == 1
+                && await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id = 9003") == 0 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 5,
+                "Activity maintenance: only now the interventions exist: a maintenance with its contract, services on demand, a maintenance without a contract (no contract, no due date moved), none for the discarded ticket");
             Check(await Count($"SELECT COUNT(*) FROM service_contract_points WHERE contract_id = {contract.Contract.Id} AND next_due = '2026-09-02'") == 1,
-                "Activity maintenance: the confirmed maintenance moves the next due date (the date performed plus the cycle of the contract)");
+                "Activity maintenance: the confirmed maintenance moves the next due date (the date performed plus the cycle of the contract); the one without a contract moves nothing");
             Check(await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity = 'ticket' AND source_id = 9003") == 0 && await Count("SELECT COUNT(*) FROM activity_import_tickets WHERE ticket_id = 9003 AND state = 'discarded'") == 1
-                && (await review.GetDiscardedAsync()).Any(item => item.TicketId == 9003), "Activity maintenance: the discarded ticket is marked in the database and listed");
+                && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity = 'ticket' AND source_id IN (9001, 9002, 9004, 9005, 9006)") == 5 && (await review.GetDiscardedAsync()).Any(item => item.TicketId == 9003),
+                "Activity maintenance: the discarded ticket is marked in the database and listed; the taken ones are tied to their interventions");
             var deniedReview = new MariaActivityReviewService(configuration, new TestAccessControl(false, "operator.ext"), audit);
             var deniedCount = 0;
             try { await deniedReview.DecideAsync(1, ReviewDecision.Maintenance); } catch (AccessDeniedException) { deniedCount++; }
             try { await deniedReview.GetPendingAsync(); } catch (AccessDeniedException) { deniedCount++; }
             try { await deniedReview.ReactivateAsync(9003); } catch (AccessDeniedException) { deniedCount++; }
-            Check(deniedCount == 3, "Activity maintenance: only who may run the import decides, discards, reactivates or sees the tickets to validate");
+            try { await deniedReview.TakeAsync(1, new ReviewTakeInput(ReviewCategory.Service, 1, new DateOnly(2026, 1, 1), "")); } catch (AccessDeniedException) { deniedCount++; }
+            Check(deniedCount == 4, "Activity maintenance: only who may run the import, or holds the permission to validate tickets, decides, takes, reactivates or sees the tickets to validate");
 
             var decided = await tickets.ApplyAsync();
-            Check(decided.Tickets.Create == 0 && decided.ToValidate == 0 && decided.Items.Any(item => item.SourceId == 9003 && item.Message == ActivityTicketPlanner.TicketDiscarded) && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 4,
+            Check(decided.Tickets.Create == 0 && decided.ToValidate == 0 && decided.Items.Any(item => item.SourceId == 9003 && item.Message == ActivityTicketPlanner.TicketDiscarded) && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 5,
                 "Activity maintenance: a discarded ticket is not taken again by a new synchronization");
             await review.ReactivateAsync(9003);
             var reactivated = await tickets.ApplyAsync();
-            Check(reactivated.Tickets.Create == 1 && reactivated.ToValidate == 1 && (await review.GetPendingAsync()).Single().TicketId == 9003 && (await review.GetDiscardedAsync()).Count == 0,
-                "Activity maintenance: a reactivated ticket is taken at the next synchronization and proposed again");
+            Check(reactivated.Tickets.Create == 1 && reactivated.ToValidate == 1 && (await review.GetPendingAsync()).Single().TicketId == 9003 && (await review.GetDiscardedAsync()).Count == 0 && await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore + 5,
+                "Activity maintenance: a reactivated ticket is taken at the next synchronization and proposed again, still without an intervention");
             var last = await tickets.ApplyAsync();
-            Check(last.Tickets.Create == 0 && last.ToValidate == 0, "Activity maintenance: once taken, the tickets are not proposed again");
+            Check(last.Tickets.Create == 0 && last.ToValidate == 0, "Activity maintenance: once in the queue, the tickets are not proposed again");
 
             await keywords.SetActiveAsync((await keywords.GetAllAsync()).Single(item => item.Id == word.Id), false);
             Check((await keywords.GetAllAsync()).Single(item => item.Id == word.Id).Active == false, "Activity keywords: deactivated again");
@@ -168,7 +174,7 @@ public static partial class MariaExtendedChecks
 
             var events = (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 400)).Events.Where(entry => entry.TimestampUtc >= started).ToList();
             Check(events.Any(entry => entry.Action == AuditActions.AddActivityKeyword && entry.Details.Contains("mentenanță", StringComparison.Ordinal)) && events.Any(entry => entry.Action == AuditActions.EditActivityKeyword && entry.Details.Contains("revizie", StringComparison.Ordinal))
-                && events.Any(entry => entry.Action == AuditActions.DeleteActivityKeyword) && events.Count(entry => entry.Action == AuditActions.DecideActivityMaintenance) == 2
+                && events.Any(entry => entry.Action == AuditActions.DeleteActivityKeyword) && events.Count(entry => entry.Action == AuditActions.DecideActivityMaintenance && entry.Details.Contains("Ext Mentenanta", StringComparison.Ordinal)) == 5
                 && events.Any(entry => entry.Action == AuditActions.DecideActivityMaintenance && entry.Details.Contains("este mentenanță", StringComparison.Ordinal))
                 && events.Count(entry => entry.Action == AuditActions.DiscardActivityTicket) == 1 && events.Count(entry => entry.Action == AuditActions.ReactivateActivityTicket) == 1,
                 "Activity maintenance: keywords, decisions, discard and reactivation are in the journal by their exact action, with the old and the new value");

@@ -8,6 +8,7 @@ Formularul pentru o analiză de risc nouă sau pentru editarea uneia existente. 
 ### Câmpuri
 - Beneficiar * | listă | Doar în pagina Analize de risc, la o analiză nouă.
 - Punct de lucru * | listă | Punctul analizat. La editare nu se mai schimbă.
+- Analizor de risc * | listă | Se alege din nomenclatorul „Analizor de risc”; iconita de adăugare de lângă listă deschide formularul unui analizor nou, iar la închidere lista se reîncarcă și analizorul nou este ales.
 - Număr de înregistrare * | câmp | Rămâne același la reviziile analizei (folosește „Reînnoiește”); o analiză nouă are un număr nou.
 - Întocmită de * | câmp | Persoana abilitată să întocmească analize de risc la securitate.
 - Data înregistrării * | câmp | Din calendar; nu poate fi în viitor. Nu se mai modifică după ce analiza a fost reînnoită. Ultima reînnoire a unei analize noi este chiar data înregistrării.

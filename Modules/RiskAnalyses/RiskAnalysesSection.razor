@@ -7,7 +7,11 @@
 
 @if (adding || editing is not null)
 {
-    <RiskAnalysisEditor @key="editorKey" BeneficiaryId="BeneficiaryId" Original="editing" PresetWorkPointId="presetWorkPointId" Saved="SavedAsync" Closed="CloseEditorAsync" />
+    <div class="delete-overlay">
+        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="risk-analysis-editor-title">
+            <RiskAnalysisEditor @key="editorKey" BeneficiaryId="BeneficiaryId" Original="editing" PresetWorkPointId="presetWorkPointId" Saved="SavedAsync" Closed="CloseEditorAsync" />
+        </div>
+    </div>
 }
 
 @if (renewing is not null)
@@ -142,8 +146,11 @@
     private async Task SavedAsync(RiskAnalysisView saved)
     {
         notice = adding ? $"Analiza de risc {saved.Analysis.Number} a fost adăugată." : $"Analiza de risc {saved.Analysis.Number} a fost actualizată.";
+        // A new analysis stays open for editing, so its files can be added right away.
+        var wasNew = adding;
         adding = false;
-        editing = null;
+        editing = wasNew ? saved : null;
+        if (wasNew) editorKey = Guid.NewGuid();
         await Changed.InvokeAsync();
     }
 

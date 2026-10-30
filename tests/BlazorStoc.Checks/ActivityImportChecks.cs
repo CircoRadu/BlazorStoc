@@ -342,18 +342,24 @@ public static class ActivityImportChecks
         var tickets = new[]
         {
             Ticket(10), Ticket(11, point: 500), Ticket(12, partner: 3), Ticket(13, type: 13), Ticket(14, point: 501), Ticket(15),
-            Ticket(16, end: new DateTime(2999, 1, 1)), Ticket(17, end: DateTime.MinValue.AddYears(1)), Ticket(18, partner: 4), Ticket(19, type: 99), Ticket(20, partner: 2, point: 500)
+            Ticket(16, end: new DateTime(2999, 1, 1)), Ticket(17, end: DateTime.MinValue.AddYears(1)), Ticket(18, partner: 4), Ticket(19, type: 99), Ticket(20, partner: 2, point: 500),
+            Ticket(21, report: "Nu merge internetul\nAm reinstalat tot")
         };
-        // Only the tickets whose text mentions a keyword of their type are taken.
+        // Every ticket of a chosen type goes to the queue to validate; the keywords of the type only say what it is proposed as (maintenance or service).
         var routerWords = new Dictionary<long, IReadOnlyList<string>> { [4] = ["router"] };
         var plans = ActivityTicketPlanner.Plan(tickets, destinations, map, locals, new DateOnly(2026, 10, 23), routerWords);
         TicketPlan T(long id) => plans.Single(plan => plan.SourceId == id);
         check(T(10) is { Action: PlanAction.Create, BeneficiaryId: 7, WorkPointId: 70 } && T(10).PerformedOn == new DateOnly(2026, 3, 2) && T(10).Notes.Contains("Rezolvare: S-a schimbat routerul", StringComparison.Ordinal),
-            "Activity import (tickets): a resolved ticket becomes an intervention at the main point of its client's beneficiary, dated by the end of the event");
+            "Activity import (tickets): a resolved ticket goes to the queue to validate, for the main point of its client's beneficiary, dated by the end of the event");
         check(T(11) is { Action: PlanAction.Create, WorkPointId: 71 }, "Activity import (tickets): the work point of the ticket is used when it was tied and belongs to the beneficiary");
         check(T(14).WorkPointId == 70 && T(20).WorkPointId == 80, "Activity import (tickets): a tied point of another beneficiary is not used; the main point is");
         check(T(12).Action == PlanAction.Waiting && T(12).Message.Contains("așteaptă", StringComparison.Ordinal), "Activity import (tickets): a ticket whose client was not imported waits (it is kept and taken when the client is), not an error");
-        check(T(13).Action == PlanAction.Skipped && T(13).Message.Contains("mentenanță", StringComparison.Ordinal), "Activity import (tickets): a type with the maintenance destination is said not to be imported yet");
+        check(T(13) is { Action: PlanAction.Create, Keyword: ActivityTicketPlanner.TypeKeyword, MatchKind: "type", NeedsValidation: true } && T(10) is { MatchKind: "exact", NeedsValidation: true, Keyword: "router" }
+            && T(21) is { Action: PlanAction.Skipped, Message: ActivityTicketPlanner.NoKeyword },
+            "Activity import (tickets): a ticket of a maintenance type or with a keyword goes to the queue, any other (no keyword) is not taken, and none is recorded by itself");
+        var queuedPlans = ActivityTicketPlanner.Plan(tickets, destinations, map, locals, new DateOnly(2026, 10, 23), routerWords, queued: new HashSet<long> { 10, 21 });
+        check(queuedPlans.Single(plan => plan.SourceId == 10).Action == PlanAction.AlreadyLinked && queuedPlans.Single(plan => plan.SourceId == 21).Message == ActivityTicketPlanner.AwaitingApproval && queuedPlans.Single(plan => plan.SourceId == 11).Action == PlanAction.Create,
+            "Activity import (tickets): a ticket already waiting in the queue is not put there twice");
         check(T(15).Action == PlanAction.AlreadyLinked && T(19).Action == PlanAction.Skipped, "Activity import (tickets): a ticket taken before is not taken again; a type that is not chosen is not imported");
         check(T(16).Action == PlanAction.Problem && T(16).Message.Contains("viitor", StringComparison.Ordinal) && T(17).Action == PlanAction.Problem, "Activity import (tickets): a date in the future or out of range is a problem");
         check(T(18).Action == PlanAction.Problem && T(18).Message.Contains("nu mai există", StringComparison.Ordinal), "Activity import (tickets): a client tied to a beneficiary deleted since is a problem");
@@ -394,7 +400,7 @@ public static class ActivityImportChecks
         check(parseError is null && parsed.SequenceEqual(["mentenanță", "revizie", "service anual"]) && ActivityKeywords.Parse("ab", out var tooShort).Count == 0 && tooShort is not null,
             "Activity keywords: a typed list is split by comma, semicolon or line, without repeats (compared normalized)");
 
-        // The planner: the words apply to the chosen types, an exact word counts, an approximate one waits unless it was decided, a point without a contract changes nothing.
+        // The planner: the words apply to the chosen types and say what the ticket is proposed as; every ticket of a chosen type goes to the queue.
         var locals = new Dictionary<int, IReadOnlyList<WorkPoint>> { [7] = [new WorkPoint(70, 7, "Punct de lucru principal", "Str. A 1", IsPrimary: true), new WorkPoint(71, 7, "Depozit", "Str. B 2")] };
         var map = new List<ImportMapEntry> { new("partner", 1, 7), new("workpoint", 500, 71) };
         var destinations = new Dictionary<long, string> { [4] = ActivityDestination.OnDemand };
@@ -409,31 +415,23 @@ public static class ActivityImportChecks
         TicketPlan P(IEnumerable<TicketPlan> list, long id) => list.Single(plan => plan.SourceId == id);
         check(P(planned, 10).Keyword == "mentenanță" && P(planned, 11).Approximate == "mentenanță" && P(planned, 11).Found == "mentenata" && P(planned, 11).Keyword == "" && P(planned, 12).Keyword == "" && P(planned, 12).Approximate == "",
             "Activity maintenance (planner): the exact word, the resembling word and no word are told apart in what was done");
-        check(ActivityTicketPlanner.KeywordPoints(planned).OrderBy(pair => pair.WorkPointId).SequenceEqual([(7, 70), (7, 71)]), "Activity maintenance (planner): only the tickets that mention it ask for the coverage of their point, each point once");
-        var covered = new HashSet<(int, int)> { (7, 70) };
-        var withCoverage = ActivityTicketPlanner.WithCoverage(planned, covered);
-        check(P(withCoverage, 10) is { Action: PlanAction.Create, Maintenance: false, NeedsValidation: true, MatchKind: "exact" } && P(withCoverage, 10).Message.Contains("Verificare mentenanță", StringComparison.Ordinal)
-            && P(withCoverage, 13) is { Action: PlanAction.Create, Maintenance: false, NeedsValidation: false } && ActivityKeywords.Normalize(P(withCoverage, 13).Notes).Contains("nu are un contract de mentenanta activ", StringComparison.Ordinal),
-            "Activity maintenance (planner): an exact word at a covered point is taken on demand and proposed to the operator (it may say that the maintenance was not done); without a contract it is only noted");
-        check(P(withCoverage, 11) is { Action: PlanAction.Create, NeedsValidation: true, MatchKind: "approximate" } && P(withCoverage, 14) is { Action: PlanAction.Create, NeedsValidation: false, Approximate: "" }
-            && P(withCoverage, 15) is { Action: PlanAction.Create, NeedsValidation: true },
-            "Activity maintenance (planner): a resembling word at a covered point is taken and proposed too; at an uncovered point it changes nothing");
-        var decided = ActivityTicketPlanner.WithCoverage(ActivityTicketPlanner.Plan(batch, destinations, map, locals, today, typeWords,
-            new Dictionary<long, KeywordDecision> { [11] = KeywordDecision.Confirmed, [15] = KeywordDecision.Rejected }), covered);
-        check(P(decided, 11) is { Action: PlanAction.Create, Maintenance: true, NeedsValidation: false } && P(decided, 15) is { Action: PlanAction.Create, Maintenance: false, Keyword: "" },
-            "Activity maintenance (planner): a confirmed event is taken as maintenance, a rejected one on demand, and neither is proposed again");
+        check(planned.Where(plan => plan.SourceId != 12).All(plan => plan is { Action: PlanAction.Create, NeedsValidation: true }) && P(planned, 10).MatchKind == "exact" && P(planned, 11).MatchKind == "approximate" && P(planned, 12) is { Action: PlanAction.Skipped, Message: ActivityTicketPlanner.NoKeyword },
+            "Activity maintenance (planner): a ticket with a keyword goes to the queue to validate, whatever the point's contract; one without a keyword is not taken");
+        check(ActivityKeywords.Normalize(ActivityTicketPlanner.Notes("T-1", "t", "p", "r", "e", "mentenanță", true, uncovered: true)).Contains("nu are un contract de mentenanta activ", StringComparison.Ordinal)
+            && ActivityKeywords.Normalize(ActivityTicketPlanner.Notes("T-1", "t", "p", "r", "e", "mentenanță", false)).Contains("validat ca service", StringComparison.Ordinal)
+            && ActivityKeywords.Normalize(ActivityTicketPlanner.Notes("T-1", "t", "p", "r", "e", ActivityTicketPlanner.TypeKeyword, true)).Contains("tip de mentenanta", StringComparison.Ordinal),
+            "Activity maintenance (planner): the notes tell how the ticket was validated (maintenance with or without a contract, service)");
         // The client states: a person (or discarded) client is never taken, a client to verify makes the ticket wait, a discarded ticket is skipped for good.
-        var states = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, null, null, new HashSet<long> { 1 }, null, null);
-        var holding = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, null, null, null, new HashSet<long> { 1 }, null);
-        var dropped = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, typeWords, null, null, null, new HashSet<long> { 10 });
+        var states = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, null, new HashSet<long> { 1 }, null, null);
+        var holding = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, null, null, new HashSet<long> { 1 }, null);
+        var dropped = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, typeWords, null, null, new HashSet<long> { 10 });
         check(states.All(plan => plan.Action == PlanAction.Skipped && plan.Message == ActivityTicketPlanner.ClientNotTaken) && holding.All(plan => plan.Action == PlanAction.Waiting && plan.Message == ActivityTicketPlanner.ClientToVerify)
             && P(dropped, 10) is { Action: PlanAction.Skipped } && P(dropped, 10).Message == ActivityTicketPlanner.TicketDiscarded && P(dropped, 11).Action == PlanAction.Create,
             "Activity maintenance (planner): the tickets of a person are skipped for good, those of a beneficiary to verify wait, a discarded ticket is not taken");
         var none = ActivityTicketPlanner.Plan(batch, destinations, map, locals, today);
-        check(none.All(plan => plan.Keyword == "" && plan.Approximate == "") && ActivityTicketPlanner.Plan(batch, destinations, map, locals, today, new Dictionary<long, IReadOnlyList<string>> { [13] = ["mentenanță"] }).All(plan => plan.Keyword == ""),
-            "Activity maintenance (planner): without words, or for a type that is not the ticket's, nothing is searched");
-        check(P(planned, 12) is { Action: PlanAction.Skipped } && P(planned, 12).Message == ActivityTicketPlanner.NoKeyword && ActivityTicketPlanner.Plan(batch, destinations, map, locals, today).All(plan => plan.Action == PlanAction.Skipped),
-            "Activity maintenance (planner): a ticket that mentions no keyword of its type (or a type without keywords) is not taken");
+        check(none.All(plan => plan.Action == PlanAction.Skipped && plan.Message == ActivityTicketPlanner.NoKeyword)
+            && ActivityTicketPlanner.Plan(batch, destinations, map, locals, today, new Dictionary<long, IReadOnlyList<string>> { [13] = ["mentenanță"] }).All(plan => plan.Action == PlanAction.Skipped),
+            "Activity maintenance (planner): without words, or for a type that is not the ticket's, a service ticket is not taken");
         var problem = ActivityTicketPlanner.Plan([Ticket(20, problem: "Cere mentenanta", report: "Cere mentenanta\nAm schimbat routerul")], destinations, map, locals, today, typeWords);
         check(problem[0].Keyword == "" && problem[0].Approximate == "", "Activity maintenance (planner): the word is searched in what was done, not in the problem (which may only ask for it)");
 

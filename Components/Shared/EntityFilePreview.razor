@@ -1,0 +1,25 @@
+@using BlazorStoc.Services
+<div class="delete-overlay" @onkeydown="KeyAsync">
+    <div class="delete-dialog template-popup file-preview" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="file-preview-title">
+        <div class="catalog-heading"><h2 id="file-preview-title">@File.OriginalName</h2><span class="heading-actions"><a class="refresh act-export" href="@($"/media/entity-files/{File.Id}")" download="@File.OriginalName">Descarcă</a><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+        @if (File.ContentType.StartsWith("image/", StringComparison.Ordinal))
+        {
+            <div class="file-preview-body"><img src="@($"/media/entity-files/{File.Id}?inline=1")" alt="@File.OriginalName" /></div>
+        }
+        else if (File.ContentType is "application/pdf" or "text/plain" or "text/csv")
+        {
+            <iframe class="file-preview-frame" title="@File.OriginalName" src="@($"/media/entity-files/{File.Id}?inline=1")"></iframe>
+        }
+        else
+        {
+            <p class="muted">Acest tip de fișier (Word, Excel) nu se poate afișa în fereastră; folosește „Descarcă”.</p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public EntityFile File { get; set; } = default!;
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private Task KeyAsync(KeyboardEventArgs e) => e.Key == "Escape" ? Closed.InvokeAsync() : Task.CompletedTask;
+}

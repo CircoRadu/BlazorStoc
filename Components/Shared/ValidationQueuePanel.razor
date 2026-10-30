@@ -1,0 +1,15 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Components.Pages
+
+@* The lists of the events that wait for a decision from ActivityApp (tickets proposed as maintenance, beneficiaries to verify). They belong to the ActivityApp import module; the pages of
+   other modules (Maintenance, Notifications) show them through this wrapper, because modules do not refer to each other. *@
+<ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId">
+    @if (Beneficiaries) { <BeneficiaryChecksSection ShowEmpty="true" Changed="Changed" /> }
+    else { <ActivityReviewSection Decided="Changed" /> }
+</ModuleGate>
+
+@code {
+    /// <summary>False: the tickets proposed as maintenance; true: the beneficiaries to verify.</summary>
+    [Parameter] public bool Beneficiaries { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+}
