@@ -173,6 +173,17 @@ app.MapPost("/api/actualizare/pachet", async (HttpContext context, BlazorStoc.Se
     catch (BlazorStoc.Services.Update.UpdateOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For(BlazorStoc.Services.Update.ApplicationUpdateService.ApplyPermission));
+// The Elcomtur backup (Administrare -> Preluare date Elcomtur, hundreds of MB) arrives as one raw HTTP body, like the update package; same header against a cross-site post.
+app.MapPost("/api/elcomtur/incarcare", async (HttpContext context, BlazorStoc.Modules.Elcomtur.IElcomturImportService import, CancellationToken token) =>
+{
+    if (context.Request.Headers["X-Requested-With"] != "BlazorStoc") return Results.BadRequest(new { error = "Cerere nevalidă." });
+    if (context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit) limit.MaxRequestBodySize = BlazorStoc.Modules.Elcomtur.ElcomturImportService.MaximumBytes + 1024;
+    var name = Path.GetFileName(Uri.UnescapeDataString(context.Request.Headers["X-File-Name"].ToString()));
+    try { return Results.Ok(new { id = await import.UploadAsync(context.Request.Body, name, token) }); }
+    catch (BlazorStoc.Modules.Elcomtur.ElcomturOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For(BlazorStoc.Modules.Elcomtur.ElcomturImportService.ImportKey));
 app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, string? pana, IConsumptionReader reader, CancellationToken token) =>
 {
     try

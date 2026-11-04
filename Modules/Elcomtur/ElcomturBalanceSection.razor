@@ -1,0 +1,110 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Modules.Elcomtur
+@using BlazorStoc.Services
+@inject IElcomturBalanceRepository Balances
+@inject TimeProvider Clock
+@inject IJSRuntime Js
+@inject ILogger<ElcomturBalanceSection> Logger
+
+@* The balance of a beneficiary from the last import of an Elcomtur backup (Administrare -> Preluare date Elcomtur): green header "Nu sunt plati restante" for a balance of zero or less, reddish header
+   with the amount due and the numbers of invoices (term passed / still in term) for a positive balance; below, the two tables of the invoices still marked unpaid in Elcomtur. Nothing is shown when
+   the beneficiary has no client in the import or the user may not see balances. *@
+@if (balance is not null)
+{
+    var today = Today;
+    var overdue = balance.Overdue(today);
+    var inTerm = balance.InTerm(today);
+    <section class="catalog" id="elcomtur-balance-section">
+        <details class="catalog-collapse elcomtur-balance @(balance.IsOwed ? "balance-due" : "balance-ok")" id="balanta-elcomtur" open="@StartOpen">
+            <summary class="catalog-heading">
+                <h2>Balanță Elcomtur <span class="balance-date" id="elcomtur-balance-date">la @StockMovementRules.DisplayDate(balance.DataDate)</span></h2>
+                @if (balance.IsOwed)
+                {
+                    <span class="balance-summary" id="elcomtur-balance-summary"><strong>Plăți restante: @ElcomturFormat.Money(balance.Balance)</strong>
+                        <span class="balance-count" id="elcomtur-overdue-count">@Invoices(overdue.Count) cu termen depășit</span>
+                        <span class="balance-count" id="elcomtur-interm-count">@Invoices(inTerm.Count) în termen</span></span>
+                }
+                else
+                {
+                    <span class="balance-summary" id="elcomtur-balance-summary"><strong>Balanță: @ElcomturFormat.Money(balance.Balance)</strong> <span class="balance-count">Nu sunt plăți restante</span></span>
+                }
+            </summary>
+            <div class="catalog-body">
+                <p class="muted"><small>Date din backup-ul Elcomtur de la @StockMovementRules.DisplayDate(balance.DataDate) (firma @balance.Firm); se actualizează la fiecare preluare din Administrare → Preluare date Elcomtur. Balanța este facturat minus încasat; facturile sunt cele pe care Elcomtur le marchează neachitate.</small></p>
+            </div>
+            @if (balance.IsOwed)
+            {
+                <div class="catalog-body"><h3>Facturi cu termen depășit <span class="count-badge">@overdue.Count</span></h3></div>
+                @if (overdue.Count == 0) { <div class="catalog-body"><p class="muted" id="elcomtur-overdue-empty">Nicio factură cu termenul depășit.</p></div> }
+                else
+                {
+                    <Paged Items="overdue" Id="elcomtur-overdue-size" Context="pageRows">
+                        <div class="table-scroll"><table class="catalog-table" id="elcomtur-overdue">
+                            <thead><tr><th>Factura</th><th>Data</th><th>Scadența</th><th>Întârziere</th><th>Total</th><th>Plătit</th><th>Rest de plată</th></tr></thead>
+                            <tbody>
+                            @foreach (var invoice in pageRows)
+                            {
+                                <tr><td><strong>@invoice.Number</strong></td><td>@StockMovementRules.DisplayDate(invoice.Date)</td><td>@StockMovementRules.DisplayDate(invoice.DueDate)</td><td>@invoice.DaysLate(today) zile</td>
+                                    <td>@ElcomturFormat.Money(invoice.Total)</td><td>@ElcomturFormat.Money(invoice.Paid)</td><td><strong>@ElcomturFormat.Money(invoice.Rest)</strong>@(invoice.Paid > 0 ? " (plătită parțial)" : "")</td></tr>
+                            }
+                            </tbody>
+                        </table></div>
+                    </Paged>
+                }
+                <div class="catalog-body"><h3>Facturi încă în termen <span class="count-badge">@inTerm.Count</span></h3></div>
+                @if (inTerm.Count == 0) { <div class="catalog-body"><p class="muted" id="elcomtur-interm-empty">Nicio factură în termen.</p></div> }
+                else
+                {
+                    <Paged Items="inTerm" Id="elcomtur-interm-size" Context="pageRows">
+                        <div class="table-scroll"><table class="catalog-table" id="elcomtur-interm">
+                            <thead><tr><th>Factura</th><th>Data</th><th>Scadența</th><th>Scadentă în</th><th>Total</th><th>Plătit</th><th>Rest de plată</th></tr></thead>
+                            <tbody>
+                            @foreach (var invoice in pageRows)
+                            {
+                                <tr><td><strong>@invoice.Number</strong></td><td>@StockMovementRules.DisplayDate(invoice.Date)</td><td>@StockMovementRules.DisplayDate(invoice.DueDate)</td><td>@(invoice.DueDate.DayNumber - today.DayNumber) zile</td>
+                                    <td>@ElcomturFormat.Money(invoice.Total)</td><td>@ElcomturFormat.Money(invoice.Paid)</td><td><strong>@ElcomturFormat.Money(invoice.Rest)</strong>@(invoice.Paid > 0 ? " (plătită parțial)" : "")</td></tr>
+                            }
+                            </tbody>
+                        </table></div>
+                    </Paged>
+                }
+                @if (balance.Difference != 0m)
+                {
+                    <div class="catalog-body"><p class="muted" id="elcomtur-difference"><small>Diferență față de sold (încasări nealocate pe facturi sau regularizări): <strong>@ElcomturFormat.Money(balance.Difference)</strong>. Restul facturilor de mai sus însumează @ElcomturFormat.Money(balance.Invoices.Sum(invoice => invoice.Rest)); împreună cu diferența dau balanța.</small></p></div>
+                }
+            }
+        </details>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
+    /// <summary>The section is opened and brought into view (the link from the Notifications tab).</summary>
+    [Parameter] public bool StartOpen { get; set; }
+
+    private BeneficiaryBalance? balance;
+    private bool scrolled;
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    private static string Invoices(int count) => count == 1 ? "1 factură" : $"{count} facturi";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try { balance = await Balances.GetAsync(BeneficiaryId); }
+        catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { balance = null; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError("Elcomtur balance loading failed ({ErrorType}).", exception.GetType().Name);
+            balance = null;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!StartOpen || scrolled || balance is null) return;
+        scrolled = true;
+        try { await Js.InvokeVoidAsync("blazorStocScrollTo", "balanta-elcomtur"); }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }
+    }
+}

@@ -1504,3 +1504,15 @@ tr[data-depth="0"] > td { border-top: 4px solid var(--c-d6e4df); }
 .file-name-editor { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .file-name-editor input { flex:1 1 360px; min-width:24ch; max-width:100%; }
 .file-name-editor .file-extension { font-weight:600; color:var(--muted); }
+
+/* Balanta Elcomtur (fisa beneficiarului): antet verde fara plati restante, rosiatic cu plati restante */
+.elcomtur-balance > summary.catalog-heading { border-radius: 10px 10px 0 0; flex-wrap: wrap; }
+.elcomtur-balance.balance-ok > summary.catalog-heading { background: var(--c-eaf5ee); color: var(--c-27684b); }
+.elcomtur-balance.balance-due > summary.catalog-heading { background: var(--c-fff0eb); color: var(--c-a3332c); }
+.elcomtur-balance > summary .balance-summary { display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.elcomtur-balance > summary .balance-count { padding: 3px 10px; border-radius: 12px; background: var(--c-ffffff); border: 1px solid currentColor; font-weight: 600; }
+.elcomtur-balance h3 { margin: 18px 0 8px; font-size: 14px; }
+.balance-date { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 8px; }
+.elcomtur-balance > summary .balance-date { color: inherit; }
+/* The coloured header spans the whole card (the generic rule gives the direct children of a card a side margin; on a white header it does not show, on a coloured one it does) */
+.catalog > details.catalog-collapse.elcomtur-balance { margin-left: 0 !important; margin-right: 0 !important; }

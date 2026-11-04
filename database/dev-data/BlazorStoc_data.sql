@@ -248,6 +248,16 @@ REPLACE INTO `categories` (`id`, `name`, `normalized_name`, `sort_order`) VALUES
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `elcomtur_balances` WRITE;
+/*!40000 ALTER TABLE `elcomtur_balances` DISABLE KEYS */;
+/*!40000 ALTER TABLE `elcomtur_balances` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `elcomtur_invoices` WRITE;
+/*!40000 ALTER TABLE `elcomtur_invoices` DISABLE KEYS */;
+/*!40000 ALTER TABLE `elcomtur_invoices` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `entity_files` WRITE;
 /*!40000 ALTER TABLE `entity_files` DISABLE KEYS */;
 /*!40000 ALTER TABLE `entity_files` ENABLE KEYS */;
@@ -911,7 +921,9 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (57,'Preluare ActivityApp: preluarea beneficiarilor (si a celor fara tichete) si importul automat sau punerea in coada pentru acceptare manuala','81780d8d6223dfcfd6e474e2eecbd9505b4c8af6def57009a013b0f61a2be573','applied','2026-10-30 08:47:57','0.5.31'),
 (58,'Fisiere atasate punctelor de lucru, contractelor de mentenanta, interventiilor si analizelor de risc (entity_files)','3b0a959e7162d08d93fa8a2f70abaadc539eaa4ef4273a456946651d2ef0ad64','applied','2026-10-30 08:47:57','0.5.31'),
 (59,'Nomenclator Analizor de risc (risk_analyzers) si analizorul ales la analiza de risc (risk_analyses.analyzer_id)','a94e59f2f6f574a24a904d1607ebbdfb70991f8771234557dfca417932ec01f2','applied','2026-10-30 10:37:04','0.5.33'),
-(60,'Mentenanta inregistrata fara contract (tichet ActivityApp validat ca mentenanta la un punct fara contract activ): service_interventions.without_contract','5fdbd178fbdf9e339274f908cf84854b95f3e9cef2d85a4c62d2a20993ef504d','applied','2026-10-30 10:37:04','0.5.33');
+(60,'Mentenanta inregistrata fara contract (tichet ActivityApp validat ca mentenanta la un punct fara contract activ): service_interventions.without_contract','5fdbd178fbdf9e339274f908cf84854b95f3e9cef2d85a4c62d2a20993ef504d','applied','2026-10-30 10:37:04','0.5.33'),
+(61,'Coordonatele GPS ale evenimentului de rezolvare al unui tichet ActivityApp: activity_import_tickets.gps','afc2e69fefc77a36801c7ad29e2e203c93a3ac26bd4da7dc2b37fcb4ee8ec9b7','applied','2026-11-04 13:11:00','0.5.37'),
+(62,'Balantele de plata din Elcomtur pe beneficiar (elcomtur_balances) si facturile lor neachitate (elcomtur_invoices)','cb2649052d51c173d931f9233088f194ccd9719815e5adc13c394934e7de124e','applied','2026-11-04 13:11:00','0.5.37');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1495,6 +1507,8 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'categorii.delete'),
 (1,'categorii.edit'),
 (1,'categorii.view'),
+(1,'elcomtur.import'),
+(1,'elcomtur.view'),
 (1,'export-consum.export'),
 (1,'export-consum.view'),
 (1,'facturi.add'),

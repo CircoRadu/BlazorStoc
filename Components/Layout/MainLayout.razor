@@ -71,7 +71,7 @@
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
             }
-            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|nomenclator.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
+            <AuthorizeView Policy="perm:categorii.view|beneficiari.view|furnizori.view|facturi.view|vehicule.view|elcomtur.import|nomenclator.view"><Authorized Context="menuSection"><CollapsibleSection Id="administration-menu"
                                 RootClass="administration-menu"
                                 HeaderRowClass="collapsible-header"
                                 ToggleClass="@($"nav-item administration-parent {(administrationSection ? "active" : "")}")"
@@ -87,6 +87,7 @@
                         <AuthorizeView Policy="perm:facturi.view"><Authorized><NavLink href="/facturi" Match="NavLinkMatch.Prefix">Facturi</NavLink></Authorized></AuthorizeView>
                     }
                     @if (Modules.IsAvailable(BlazorStoc.Modules.Vehicles.VehiclesModule.ModuleId)) { <AuthorizeView Policy="perm:vehicule.view"><Authorized><NavLink href="/vehicule" Match="NavLinkMatch.Prefix">Vehicule</NavLink></Authorized></AuthorizeView> }
+                    @if (Modules.IsAvailable(BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId)) { <AuthorizeView Policy="perm:elcomtur.import"><Authorized><NavLink href="/preluare-elcomtur" Match="NavLinkMatch.Prefix">Preluare Elcomtur</NavLink></Authorized></AuthorizeView> }
                     <AuthorizeView Policy="perm:nomenclator.view"><Authorized><NavLink href="/nomenclator" Match="NavLinkMatch.Prefix">Nomenclator</NavLink></Authorized></AuthorizeView>
                 </ChildContent>
             </CollapsibleSection></Authorized></AuthorizeView>
@@ -235,6 +236,7 @@
             uri.AbsolutePath.StartsWith("/furnizori", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/facturi", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/vehicule", StringComparison.OrdinalIgnoreCase) ||
+            uri.AbsolutePath.StartsWith("/preluare-elcomtur", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/nomenclator", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/proiecte", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.StartsWith("/observatii", StringComparison.OrdinalIgnoreCase);

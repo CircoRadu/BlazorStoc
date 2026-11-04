@@ -313,3 +313,5 @@ Actualizare 28.10.2026: butoanele de actiune raman cu text (scriptul de iconite 
 Actualizare 30.10.2026: versiunea 0.5.36. Tichetele ActivityApp trec prin coada de validare (nimic nu se inregistreaza singur), schema 60 (mentenanta fara contract), Nomenclator cu Analizor de risc, fisiere atasate, interventii cu vizualizare/schimbare fel, paginare la Notificari. Teste: 2153 PASS. Help de regenerat: vezi docs/HELP_DE_REGENERAT.md.
 
 Actualizare 04.11.2026: schema 61 (`activity_import_tickets.gps`). Import tichete: executanti din agentii atasati, doar Finalizat (Label 2 - ipoteza confirmata de utilizator pe culoarea starii; de urmarit pe live), GPS la punct; cozile ActivityApp sunt taburi in Notificari. Adaugarea beneficiar/furnizor/vehicul in popup. Teste: 1615 + 280 + 3400 PASS. Help de regenerat: vezi docs/HELP_DE_REGENERAT.md.
+
+Actualizare 04.11.2026 (branch Elcomtur): versiunea 0.5.38, schema 62. Modul nou Elcomtur (balante de plata din backup-ul `.elc`, sectiune in beneficiar, tab in Notificari); detalii in docs/PROPUNERE_ELCOMTUR.md sectiunea 9 si IMPLEMENTED.md. Help de generat la cerere (pagina `/preluare-elcomtur` e in `Pending` din HelpChecks).

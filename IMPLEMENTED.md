@@ -818,3 +818,10 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Module oprite: `ModuleGate` la panourile Backup/Jurnal din Setari; mesaje dedicate la ANAF si la legarea intrarii de factura.
 - Sablon factura: CUI-ul corectat manual nu mai e rescris la salvare; CUI citit prin OCR cu cifra dubla se corecteaza dupa cifra de control.
 - Module: ActivityImport 0.8.0, Notifications 1.2.0, RiskAnalyses 1.3.0, Invoices 1.1.3, Suppliers 1.0.1, Vehicles 1.0.2, Maintenance 1.7.1. Teste: componente 1615, facturi 280, MariaDB 3400 PASS.
+
+## Finalizat la 04.11.2026 - Modul Elcomtur: balante de plata pe beneficiar (0.5.38)
+
+- Administrare -> Preluare Elcomtur (`/preluare-elcomtur`): incarcare HTTP directa a backup-ului `.elc` (ZIP cu tabele dBase), simulare si aplicare; citeste doar `clienti`, `vinzari` si `casa` ale firmei alese (folderele `firma<N>`, implicit firma1); potrivire dupa CUI cu beneficiarii persoane juridice, fara beneficiari noi.
+- Balanta = facturat - incasat (casa, FEL 1, conturi 4111*); verificata pe Spitalul Zam (118.077,60 la 30.09.2026) si pe tot fisierul (coincide cu restul de pe facturi la 96% dintre clienti).
+- Fisa beneficiarului: sectiunea "Balanta Elcomtur" (verde "Nu sunt plati restante" / rosiatic cu suma si numarul facturilor cu termen depasit si in termen, doua tabele); Notificari: tab "Balante restante" cu sortare dupa sold; migrarea 62; permisiuni `elcomtur.view` / `elcomtur.import`; jurnal "Preluare date Elcomtur".
+- Module: Elcomtur 1.0.0, Notifications 1.3.0, Journal 1.4.5. Help nescris (la cerere, vezi docs/HELP_DE_REGENERAT.md). Teste: 1630 componente, 3408 MariaDB, citire pe fisierul real.

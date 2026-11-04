@@ -21,6 +21,8 @@ public static class HelpChecks
     // its topic (the check below then asks to take it out as soon as the topic exists).
     private static readonly HashSet<string> Pending = new(StringComparer.OrdinalIgnoreCase)
     {
+        // Elcomtur (branch Elcomtur): the help is written on request (user's rule of 04.11.2026), see docs/HELP_DE_REGENERAT.md.
+        "/preluare-elcomtur"
     };
 
     private const string Sample = """

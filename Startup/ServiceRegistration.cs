@@ -4,6 +4,7 @@ using BlazorStoc.Modules;
 using BlazorStoc.Modules.ActivityImport;
 using BlazorStoc.Modules.Anaf;
 using BlazorStoc.Modules.Backup;
+using BlazorStoc.Modules.Elcomtur;
 using BlazorStoc.Modules.Inventory;
 using BlazorStoc.Modules.Invoices;
 using BlazorStoc.Modules.Journal;
@@ -138,6 +139,7 @@ internal static class ServiceRegistration
         registry.Add(new NotificationsModule(), services, configuration);
         registry.Add(new MaintenanceModule(), services, configuration);
         registry.Add(new RiskAnalysesModule(), services, configuration);
+        registry.Add(new ElcomturModule(), services, configuration);
         registry.Add(new JournalModule(), services, configuration);
         registry.Add(new ProjectObservationsModule(), services, configuration);
         return services;

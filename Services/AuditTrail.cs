@@ -18,6 +18,7 @@ public static class AuditEntities
     public const string Inventory = "Inventar";
     public const string DatabaseBackup = "CopieSiguranta";
     public const string ActivityImport = "PreluareActivityApp";
+    public const string Elcomtur = "PreluareElcomtur";
     public const string JournalSettings = "SetariJurnal";
     public const string NotificationTemplate = "SablonNotificare";
     public const string Notification = "Notificare";
@@ -249,6 +250,7 @@ public static class AuditActions
     public const string SetActivityImportTypes = "Modificare tipuri tichete preluate ActivityApp";
     public const string SetActivityFieldMap = "Modificare corespondență câmpuri ActivityApp";
     public const string DecideActivityMaintenance = "Validare mentenanță ActivityApp";
+    public const string ImportElcomtur = "Preluare date Elcomtur";
     public const string AddActivityKeyword = "Adăugare cuvânt cheie mentenanță ActivityApp";
     public const string EditActivityKeyword = "Modificare cuvânt cheie mentenanță ActivityApp";
     public const string DeleteActivityKeyword = "Ștergere cuvânt cheie mentenanță ActivityApp";

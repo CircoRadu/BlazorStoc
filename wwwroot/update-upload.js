@@ -3,14 +3,14 @@
     // connection of the page, which moves a file in small round trips and takes many minutes over a mobile network. The file is the one
     // chosen in the <input type=file> of the FileDropZone; the page is told the progress and the result through the .NET reference.
     window.updateUpload = {
-        send(inputId, reference, name) {
+        send(inputId, reference, name, url, nameHeader) {
             const file = document.getElementById(inputId)?.files?.[0];
             if (!file) { reference.invokeMethodAsync("UploadFinished", null, "Nu s-a găsit fișierul ales. Alege-l din nou."); return; }
             const request = new XMLHttpRequest();
             let last = -1;
-            request.open("POST", "/api/actualizare/pachet");
+            request.open("POST", url || "/api/actualizare/pachet");
             request.setRequestHeader("X-Requested-With", "BlazorStoc");
-            request.setRequestHeader("X-Package-Name", encodeURIComponent(name || file.name));
+            request.setRequestHeader(nameHeader || "X-Package-Name", encodeURIComponent(name || file.name));
             request.setRequestHeader("Content-Type", "application/octet-stream");
             request.upload.onprogress = event => {
                 if (!event.lengthComputable) return;

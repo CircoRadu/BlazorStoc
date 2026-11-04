@@ -6,6 +6,7 @@
 @using BlazorStoc.Services
 @inject IExpiryNotificationService Service
 @inject IValidationQueues Queues
+@inject BlazorStoc.Modules.ModuleRegistry Modules
 @inject ILogger<Notifications> Logger
 @inject IJSRuntime JS
 @implements IDisposable
@@ -43,12 +44,20 @@
     {
         <button type="button" role="tab" id="tab-issues" class="settings-tab @(validationTab == "issues" ? "active" : "")" aria-selected="@(validationTab == "issues" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenIssues()">Probleme import</button>
     }
+    @if (Modules.IsAvailable(ElcomturModuleId))
+    {
+        <AuthorizeView Policy="perm:elcomtur.view"><Authorized><button type="button" role="tab" id="tab-balances" class="settings-tab @(validationTab == "balances" ? "active" : "")" aria-selected="@(validationTab == "balances" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenBalances()">Balanțe restante</button></Authorized></AuthorizeView>
+    }
 </div>
 
-<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : showResolved ? "tab-resolved" : "tab-active")">
+<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : showResolved ? "tab-resolved" : "tab-active")">
 @if (validationTab == "tickets")
 {
     <ValidationQueuePanel ShowDiscarded="true" Changed="RefreshQueuesAsync" />
+}
+else if (validationTab == "balances")
+{
+    <ElcomturBalancesPanel />
 }
 else if (validationTab == "issues")
 {
@@ -181,6 +190,9 @@ else if (loaded)
     private void OpenTickets() => OpenTab("tickets", false);
     private void OpenBeneficiaries() => OpenTab("beneficiaries", false);
     private void OpenIssues() => OpenTab("issues", false);
+    private void OpenBalances() => OpenTab("balances", false);
+    // The id of the Elcomtur module (a module does not refer to another: the tab is shown only while that module runs; its content comes through ElcomturBalancesPanel).
+    private const string ElcomturModuleId = "elcomtur";
 
     // The counts follow every decision taken in a validation tab (the banners, the red tabs and the notifications below reflect the real state).
     private async Task RefreshQueuesAsync()
@@ -208,6 +220,7 @@ else if (loaded)
         if (TabQuery == "tichete" && queues.CanTickets) validationTab = "tickets";
         else if (TabQuery == "beneficiari" && queues.CanBeneficiaries) validationTab = "beneficiaries";
         else if (TabQuery == "probleme" && (queues.CanTickets || queues.CanBeneficiaries)) validationTab = "issues";
+        else if (TabQuery == "balante" && Modules.IsAvailable(ElcomturModuleId)) validationTab = "balances";
         await LoadAsync(true);
         RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");
     }

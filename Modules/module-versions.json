@@ -136,8 +136,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.4",
-                                    "hash":  "19a8d9974f5acb22052e4033eec913892dfae2d0d7d380c3cade8d26eb1edeae",
+                                    "version":  "1.4.5",
+                                    "hash":  "e850ad4dfc9eb18db7107bf4c006c7c4af208ae79aefdc8c1298e9049c373410",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -198,6 +198,11 @@
                                                         "version":  "1.4.4",
                                                         "date":  "30.10.2026",
                                                         "note":  "Actiunea Schimbare fel interventie in filtrul jurnalului"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.5",
+                                                        "date":  "04.11.2026",
+                                                        "note":  "Filtrul jurnalului: entitatea Preluare Elcomtur si actiunea Preluare date Elcomtur"
                                                     }
                                                 ]
                                 },
@@ -298,8 +303,8 @@
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.2.0",
-                                          "hash":  "c430bc4327f2241f8cfc077dab7811619e9ddc91765e34911f3a921704398f97",
+                                          "version":  "1.3.0",
+                                          "hash":  "b8343be192d5ea40f48c5a8c8905887534d1e2e3c391323be440cb6601953f60",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -320,6 +325,11 @@
                                                               "version":  "1.2.0",
                                                               "date":  "04.11.2026",
                                                               "note":  "Coada de validat cu tichetele discardate si problemele importului ca taburi in Notificari (scoase din Setari -\u003e Import ActivityApp)"
+                                                          },
+                                                          {
+                                                              "version":  "1.3.0",
+                                                              "date":  "04.11.2026",
+                                                              "note":  "Tab Balante restante (beneficiari cu plati restante din Elcomtur)"
                                                           }
                                                       ]
                                       },
@@ -452,6 +462,17 @@
                                                          "version":  "1.0.2",
                                                          "date":  "04.11.2026",
                                                          "note":  "Adaugarea unui vehicul se face in popup"
+                                                     }
+                                                 ]
+                                 },
+                    "Elcomtur":  {
+                                     "version":  "1.0.0",
+                                     "hash":  "b763480821f3feabaea961a0ecd4eefb28b6305331804fbfedfac1fb6fbb6569",
+                                     "history":  [
+                                                     {
+                                                         "version":  "1.0.0",
+                                                         "date":  "04.11.2026",
+                                                         "note":  "Versiune de pornire (inceputul versionarii modulelor)"
                                                      }
                                                  ]
                                  }

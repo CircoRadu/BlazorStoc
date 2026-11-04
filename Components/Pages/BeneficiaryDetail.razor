@@ -128,6 +128,8 @@ else if (beneficiary is not null)
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" /></ModuleGate>
 
+    <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId" Notice="false"><ElcomturBalanceSection BeneficiaryId="Id" StartOpen="BalanceRequested" /></ModuleGate>
+
     <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" StartOpen="false" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
 
     <BeneficiaryFilesSection BeneficiaryId="Id" />
@@ -174,6 +176,9 @@ else if (beneficiary is not null)
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
     // /beneficiari/<id>?adauga-proiect=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
     [SupplyParameterFromQuery(Name = "adauga-proiect")] public string? AddProjectFlag { get; set; }
+    // ?balanta=1: opened from the Balante restante tab of the Notifications page; the Elcomtur balance section opens and is brought into view.
+    [SupplyParameterFromQuery(Name = "balanta")] public string? BalanceFlag { get; set; }
+    private bool BalanceRequested => BalanceFlag == "1";
     // /beneficiari/<id>?adauga-interventie=<work point id>: opened from the maintenance map, with the form of a new intervention on that point.
     [SupplyParameterFromQuery(Name = MaintenanceMapRules.AddInterventionQuery)] public int? AddInterventionPoint { get; set; }
     [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnParameter { get; set; }

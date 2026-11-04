@@ -1,3 +1,9 @@
+## 0.5.38 | 04.11.2026
+- Modul nou Elcomtur: Administrare, Preluare Elcomtur încarcă un backup al programului Elcomtur (.elc) și calculează balanța de plată (facturat minus încasat) a fiecărui client persoană juridică care este beneficiar (potrivire după CUI); simulare înainte de aplicare; schimbare de schemă 62.
+- Fișa beneficiarului: secțiunea „Balanță Elcomtur" (antet verde „Nu sunt plăți restante" sau roșiatic cu suma și numărul de facturi cu termen depășit și în termen), cu tabelele facturilor neachitate și data backup-ului.
+- Notificări: tab nou „Balanțe restante", cu beneficiarii cu sold pozitiv, ordonare după sold și iconiță spre secțiunea din beneficiar; nu se generează notificări.
+- Permisiuni noi: elcomtur.view (vezi balanțele) și elcomtur.import (preluare); jurnalul înregistrează „Preluare date Elcomtur".
+
 ## 0.5.37 | 04.11.2026
 - Preluare tichete ActivityApp: executantul este format din agenții atașați evenimentului; se preiau doar evenimentele în starea Finalizat; coordonatele GPS ale evenimentului completează punctul de lucru fără coordonate (schimbare de schemă 61); tichetul din coada de validare se actualizează dacă raportul sau executanții se schimbă în ActivityApp.
 - Notificări: coada de tichete de validat (cu tichetele discardate) și problemele importului sunt taburi în Notificări, nu mai sunt în Setări, Import ActivityApp.

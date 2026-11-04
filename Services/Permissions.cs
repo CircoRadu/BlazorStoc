@@ -52,6 +52,7 @@ public static class Permissions
         new("oferte", "Oferte", "Oferte", Plus(Crud(export: true), new PermissionAction("sabloane", "Sabloane de oferta"))),
         new("mentenanta", "Mentenanta", "Mentenanta", Plus(Plus(Crud(export: true), new PermissionAction("contracte", "Activare contracte")), new PermissionAction("validare", "Validare tichete ActivityApp", false))),
         new("analize-risc", "Analize de risc", "Analize de risc", Crud()),
+        new("elcomtur", "Balante Elcomtur", "Administrare", [new(View, "Vizualizare balante", false), new("import", "Preluare date Elcomtur", false)]),
         new("notificari", "Notificari", "Notificari", [new(View, "Vizualizare"), new(Edit, "Marcare / rezolvare")]),
         new("setari-facturi", "Setari: Facturi (sabloane)", "Setari", [new(View, "Vizualizare"), new(Add, "Creare sablon"), new(Edit, "Modificare sablon"), new(Delete, "Stergere sablon", false)]),
         new("setari-import-activityapp", "Setari: Preluare tichete ActivityApp", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare setari si tipuri", false), new("run", "Rulare import", false), new("reset", "Resetare import", false)]),
@@ -87,7 +88,9 @@ public static class Permissions
         // The validation of a ticket records or removes interventions of the register.
         ["mentenanta.validare"] = ["mentenanta.add", "mentenanta.delete"],
         // Accepting a beneficiary of ActivityApp creates or changes the beneficiary.
-        ["beneficiari.validare"] = ["beneficiari.add", "beneficiari.edit"]
+        ["beneficiari.validare"] = ["beneficiari.add", "beneficiari.edit"],
+        // The import shows its result (the balances) to who runs it.
+        ["elcomtur.import"] = ["elcomtur.view", "beneficiari.view"]
     };
 
     private static string Label(string key)
