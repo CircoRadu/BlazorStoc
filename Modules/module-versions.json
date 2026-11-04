@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.6.2",
-                                           "hash":  "ece276d983872b2dc28dfbfe1be5cc7abba0f9844473b0b50abd435b21574c2b",
+                                           "version":  "0.8.0",
+                                           "hash":  "2b4303276130510ef00e76e3df2c56e6ad38d74c8094284a25205dcd8dc96197",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -43,6 +43,21 @@
                                                                "version":  "0.6.2",
                                                                "date":  "30.10.2026",
                                                                "note":  "Paginare la coada de tichete de validat"
+                                                           },
+                                                           {
+                                                               "version":  "0.6.3",
+                                                               "date":  "04.11.2026",
+                                                               "note":  "Executantul tichetului = agentii atasati evenimentului (nu ProcesatDe); tichetul din coada de validare se actualizeaza cand raportul sau executantii se schimba in ActivityApp"
+                                                           },
+                                                           {
+                                                               "version":  "0.7.0",
+                                                               "date":  "04.11.2026",
+                                                               "note":  "Preluare tichete: coordonatele GPS ale evenimentului completeaza punctul de lucru fara coordonate (0,0 ignorat; 45,88 22,90 cu virgule devine 45.88, 22.90)"
+                                                           },
+                                                           {
+                                                               "version":  "0.8.0",
+                                                               "date":  "04.11.2026",
+                                                               "note":  "Coada de validat cu tichetele discardate si problemele importului ca taburi in Notificari (scoase din Setari -\u003e Import ActivityApp)"
                                                            }
                                                        ]
                                        },
@@ -90,8 +105,8 @@
                                                   ]
                                   },
                     "Invoices":  {
-                                     "version":  "1.1.2",
-                                     "hash":  "eedbd2a67b797da9ebb2ba8b32d1693964711734dbaa08d01be6c943d4b0be6c",
+                                     "version":  "1.1.3",
+                                     "hash":  "f3e11612edd65ce1a5b43388dd804587b759170c83df6640b08e6708db8bd6ec",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -112,6 +127,11 @@
                                                          "version":  "1.1.2",
                                                          "date":  "28.10.2026",
                                                          "note":  "Tabelele preluarii facturii sunt in containere cu defilare orizontala"
+                                                     },
+                                                     {
+                                                         "version":  "1.1.3",
+                                                         "date":  "04.11.2026",
+                                                         "note":  "CUI furnizor corectat manual in sablon ramane la salvare (nu mai e rescris cu valoarea citita prin OCR)"
                                                      }
                                                  ]
                                  },
@@ -182,8 +202,8 @@
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.7.0",
-                                        "hash":  "15a1e4d7addef51f8da68255256a29dab2af1bfba8f4c9122d886cf525595096",
+                                        "version":  "1.7.1",
+                                        "hash":  "b5c8c54ed410eb09d464d8c35440bc87b857933b8b5241eb892a6d79f94c6687",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -269,12 +289,17 @@
                                                             "version":  "1.7.0",
                                                             "date":  "30.10.2026",
                                                             "note":  "Vizualizare intervenție în popup (cu tichetul ActivityApp) și schimbarea felului intervenției la editare"
+                                                        },
+                                                        {
+                                                            "version":  "1.7.1",
+                                                            "date":  "04.11.2026",
+                                                            "note":  "Modificari ale interventiilor de mentenanta din 30.10.2026, inregistrate in evidenta de versiuni"
                                                         }
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.1.1",
-                                          "hash":  "88e736723315b9feb46463bbed63ae2fd355b96ef6e3272cb45643b8f20ba6df",
+                                          "version":  "1.2.0",
+                                          "hash":  "c430bc4327f2241f8cfc077dab7811619e9ddc91765e34911f3a921704398f97",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -290,6 +315,11 @@
                                                               "version":  "1.1.1",
                                                               "date":  "30.10.2026",
                                                               "note":  "Paginare la tabelele de notificari"
+                                                          },
+                                                          {
+                                                              "version":  "1.2.0",
+                                                              "date":  "04.11.2026",
+                                                              "note":  "Coada de validat cu tichetele discardate si problemele importului ca taburi in Notificari (scoase din Setari -\u003e Import ActivityApp)"
                                                           }
                                                       ]
                                       },
@@ -343,8 +373,8 @@
                                                        ]
                                        },
                     "RiskAnalyses":  {
-                                         "version":  "1.2.1",
-                                         "hash":  "828e96dad412bdfa8f7218bc15a84000e1f82c3a9ffbcff38474c8efda5806d6",
+                                         "version":  "1.3.0",
+                                         "hash":  "3277fd6713009b1b1d7ef6211ab92766d9727c782a50ba0360685f89a107d897",
                                          "history":  [
                                                          {
                                                              "version":  "1.0.0",
@@ -375,23 +405,38 @@
                                                              "version":  "1.2.1",
                                                              "date":  "30.10.2026",
                                                              "note":  "Analizor: citire blocata cu LOCK IN SHARE MODE (MariaDB)"
+                                                         },
+                                                         {
+                                                             "version":  "1.2.2",
+                                                             "date":  "04.11.2026",
+                                                             "note":  "Butoanele Inchide/Anuleaza din formularul de adaugare functioneaza pe pagina Analize de risc (lipsea gazda avertizarii de modificari nesalvate)"
+                                                         },
+                                                         {
+                                                             "version":  "1.3.0",
+                                                             "date":  "04.11.2026",
+                                                             "note":  "Formularul analizei de risc: fara campul Intocmita de; Data inregistrarii devine Data intocmirii"
                                                          }
                                                      ]
                                      },
                     "Suppliers":  {
-                                      "version":  "1.0.0",
-                                      "hash":  "3b01368653f5c562307a7df71cfaf3844c65766d9b06f146e4838472b6f491ae",
+                                      "version":  "1.0.1",
+                                      "hash":  "7238f057e17c2ca25b62b43c64e78bd2e40955da092c99a80702fc8add350c88",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
                                                           "date":  "24.10.2026",
                                                           "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                      },
+                                                      {
+                                                          "version":  "1.0.1",
+                                                          "date":  "04.11.2026",
+                                                          "note":  "Adaugarea unui furnizor se face in popup"
                                                       }
                                                   ]
                                   },
                     "Vehicles":  {
-                                     "version":  "1.0.1",
-                                     "hash":  "b3e354374d9f19fa6efcee97a5d279dc9e71d2b85379cfa4c3ebb19b812f57c1",
+                                     "version":  "1.0.2",
+                                     "hash":  "a1d5687e2b3c5d69896ee09c0048efeea41b0701fc6556a0581c52c616ac8aa9",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -402,6 +447,11 @@
                                                          "version":  "1.0.1",
                                                          "date":  "28.10.2026",
                                                          "note":  "Registrul vehiculelor are iconita de deschidere a paginii vehiculului pe fiecare rand"
+                                                     },
+                                                     {
+                                                         "version":  "1.0.2",
+                                                         "date":  "04.11.2026",
+                                                         "note":  "Adaugarea unui vehicul se face in popup"
                                                      }
                                                  ]
                                  }

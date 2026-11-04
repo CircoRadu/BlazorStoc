@@ -72,8 +72,8 @@ public sealed class RiskAnalysisExpirySource(IRiskAnalysisNotificationReader rea
         new(WorkPointName, "Numele punctului de lucru", "Sediu central"),
         new(AddressName, "Adresa punctului de lucru", "Strada Demo 10, Timișoara"),
         new(NumberName, "Numărul de înregistrare al analizei", "AR-14"),
-        new(InitialDateName, "Data la care a fost înregistrată analiza, dd.mm.yyyy", "12.03.2023"),
-        new(LastRenewalName, "Data ultimei reînnoiri (la o analiză nereînnoită, data înregistrării), dd.mm.yyyy", "12.03.2023"),
+        new(InitialDateName, "Data la care a fost întocmită analiza, dd.mm.yyyy", "12.03.2023"),
+        new(LastRenewalName, "Data ultimei reînnoiri (la o analiză nereînnoită, data întocmirii), dd.mm.yyyy", "12.03.2023"),
         new(ValidityName, "Valabilitatea analizei, în luni", "36"),
         new(AuthorName, "Numele persoanei care a întocmit analiza", "Ion Popescu")
     ];

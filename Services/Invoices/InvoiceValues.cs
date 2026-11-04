@@ -177,9 +177,32 @@ public static partial class InvoiceValues
     // after the code is cut off ("ROZ2460883, sediu social:" -> "RO2460883"). Text that is not a tax id is returned as it is.
     public static string CleanCui(string? text)
     {
-        var digits = NormalizeCui(text);
+        var digits = RepairDoubledDigit(NormalizeCui(text));
         if (digits.Length == 0) return text ?? "";
         return (text!.TrimStart().StartsWith("RO", StringComparison.OrdinalIgnoreCase) ? "RO" : "") + digits;
+    }
+
+    // Control digit of a Romanian tax id (weights 753217532 over the digits before the last one, right aligned).
+    private static bool CheckDigitOk(string digits)
+    {
+        if (digits.Length is < 2 or > 10 || !digits.All(char.IsAsciiDigit)) return false;
+        const string weights = "753217532";
+        var body = digits[..^1].PadLeft(9, '0');
+        var sum = 0;
+        for (var index = 0; index < 9; index++) sum += (body[index] - '0') * (weights[index] - '0');
+        var check = sum * 10 % 11;
+        return (check == 10 ? 0 : check) == digits[^1] - '0';
+    }
+
+    // OCR may double a digit ("22460883" read as "222460883", an extra 2 in front): a code whose control digit is wrong, and that becomes right by dropping one digit of a doubled pair, is that
+    // code. Only when exactly one result is right; a code that is right as read, or that no single drop mends, is left as it is.
+    private static string RepairDoubledDigit(string digits)
+    {
+        if (digits.Length < 3 || CheckDigitOk(digits)) return digits;
+        var mended = new HashSet<string>();
+        for (var index = 0; index < digits.Length - 1; index++)
+            if (digits[index] == digits[index + 1] && digits.Remove(index, 1) is var shorter && CheckDigitOk(shorter)) mended.Add(shorter);
+        return mended.Count == 1 ? mended.First() : digits;
     }
 
     // A tax code read by OCR may carry a letter where a digit is ("RO2Z2460883"): in a code that is otherwise digits, the look-alike letters

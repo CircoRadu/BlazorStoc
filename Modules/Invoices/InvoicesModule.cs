@@ -12,7 +12,7 @@ public sealed class InvoicesModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Preluare factură";
-    public Version Version { get; } = new(1, 1, 2);
+    public Version Version { get; } = new(1, 1, 3);
     // The entry sits in the Products menu (MainLayout), which is shown only while the module works; no item of its own here.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

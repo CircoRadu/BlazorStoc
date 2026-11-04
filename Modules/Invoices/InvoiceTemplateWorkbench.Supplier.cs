@@ -71,6 +71,17 @@ public partial class InvoiceTemplateWorkbench
         Refresh();
     }
 
+    // The tax id typed by hand (a misreading of the invoice corrected): the fields read from the invoice take it too, else Refresh() -> SyncSupplierCui() writes the misread value back
+    // over it (and the saving would look for the supplier by the wrong CUI).
+    private void SupplierCuiInput(ChangeEventArgs args) => SupplierCuiTyped(args.Value?.ToString() ?? "");
+
+    private void SupplierCuiTyped(string value)
+    {
+        supplierCui = value;
+        if (draft is null) return;
+        foreach (var field in draft.Fields.Where(item => item.Meaning == InvoiceFieldMeanings.SupplierCui && item.Value.Trim().Length > 0)) field.Value = value;
+    }
+
     private void SyncSupplierCui()
     {
         var field = draft!.Fields.FirstOrDefault(item => item.Meaning == InvoiceFieldMeanings.SupplierCui && item.Use && item.Value.Trim().Length > 0)

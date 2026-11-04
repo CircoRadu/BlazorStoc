@@ -18,7 +18,11 @@
 <div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Furnizori</h1><p class="muted">Registrul furnizorilor ale căror facturi se preiau în stoc. Un furnizor se identifică prin CUI (sau codul de TVA al unui stat UE) și nu poate apărea de două ori.</p></div><div class="heading-actions">@if (permAdd) { <button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă furnizor</button> }</div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
-@if (editing) { <SupplierEditor @key="editorKey" Original="editingSupplier" Saved="SupplierSavedAsync" Closed="CloseEditorAsync" /> }
+@if (editing && editingSupplier is null)
+{
+    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="supplier-editor-title"><SupplierEditor @key="editorKey" Original="editingSupplier" Saved="SupplierSavedAsync" Closed="CloseEditorAsync" /></div></div>
+}
+else if (editing) { <SupplierEditor @key="editorKey" Original="editingSupplier" Saved="SupplierSavedAsync" Closed="CloseEditorAsync" /> }
 
 <section class="metrics users-metrics" aria-label="Rezumat furnizori">
     <article><span>Total furnizori</span><strong>@(loaded ? suppliers.Count.ToString() : "—")</strong><small>În registrul disponibil</small><i>⌂</i></article>

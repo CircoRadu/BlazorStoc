@@ -1,0 +1,67 @@
+@using BlazorStoc.Services
+@using BlazorStoc.Modules.ActivityImport
+@namespace BlazorStoc.Components.Pages
+@inject IActivityPartnerImportService Partners
+@inject ILogger<ActivityIssuesSection> Logger
+@implements IDisposable
+
+@* The problems the import of ActivityApp found (a ticket with a date in the future, a work point without address, ...): each one says what it is about and what to do; marking it solved removes it from the list. *@
+<section class="catalog" id="activity-issues">
+    <div class="catalog-heading"><h2>Probleme deschise <span class="count-badge">@(issues?.Count ?? 0)</span></h2>
+        <span class="heading-actions"><button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadAsync">Actualizează lista</button></span></div>
+    <div class="catalog-body">
+        <p class="muted"><small>Aici apar tichetele, beneficiarii și punctele de lucru pe care importul din ActivityApp nu le-a putut prelua, cu motivul. Majoritatea dispar singure la importul următor, după ce corectezi datele în ActivityApp; „Marchează rezolvată” scoate din listă o problemă pe care ai tratat-o.</small></p>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (issues is null) { <p class="muted" role="status">Se citește lista…</p> }
+        else if (issues.Count == 0) { <p class="muted" id="ai-issues-empty">Nu sunt probleme deschise.</p> }
+    </div>
+    @if (issues is { Count: > 0 })
+    {
+        <Paged Items="issues" Id="ai-issues-size" Context="pageRows">
+        <div class="table-scroll"><table class="catalog-table" id="ai-issues">
+            <thead><tr><th>Ce</th><th>Cod ActivityApp</th><th>Denumire</th><th>Problemă</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var issue in pageRows)
+            {
+                <tr @key="issue.Id"><td>@EntityLabel(issue.Entity)</td><td>@issue.SourceId</td><td>@issue.SourceName</td><td>@issue.Message</td>
+                    <td><button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => ResolveAsync(issue.Id)">Marchează rezolvată</button></td></tr>
+            }
+            </tbody>
+        </table></div>
+        </Paged>
+    }
+</section>
+
+@code {
+    // Raised after an issue is marked solved (the counts of the page).
+    [Parameter] public EventCallback Changed { get; set; }
+    private IReadOnlyList<ImportIssue>? issues;
+    private bool busy;
+    private string? error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private static string EntityLabel(string entity) => entity switch { "partner" => "Partener", "ticket" => "Tichet", "partner-deleted" => "Partener șters în ActivityApp", "workpoint-deleted" => "Punct de lucru șters în ActivityApp", "ticket-deleted" => "Tichet șters în ActivityApp", _ => "Punct de lucru" };
+
+    private async Task LoadAsync() => await RunAsync(async () => issues = await Partners.GetOpenIssuesAsync(lifetime.Token));
+
+    private async Task ResolveAsync(long id)
+    {
+        await RunAsync(async () => { await Partners.ResolveIssueAsync(id, lifetime.Token); issues = await Partners.GetOpenIssuesAsync(lifetime.Token); });
+        await Changed.InvokeAsync();
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ActivityImportException or AccessDeniedException) { error = exception.Message; issues ??= []; }
+        catch (Exception exception) { Logger.LogError("Import issues action failed ({ErrorType}).", exception.GetType().Name); error = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; issues ??= []; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

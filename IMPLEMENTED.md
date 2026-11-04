@@ -809,3 +809,12 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Fisiere atasate la puncte de lucru, contracte, interventii si analize de risc (previzualizare, redenumire, confirmare simpla).
 - Nomenclator: sectiunea Analizor de risc si alegerea analizorului la analiza de risc; fisa beneficiarului: vizualizare interventie in popup cu tichetul si schimbarea felului; script tools/reset-activity-tickets.ps1.
 - Verificari: suita completa 2153 PASS, sectiuni MariaDB, browser pe instanta separata. Pachete 0.5.34-0.5.36.
+
+## Finalizat la 04.11.2026 - Import tichete (executanti, GPS, Finalizat), taburi in Notificari, popup la adaugare, analiza de risc, CUI sablon
+
+- Import ActivityApp: executantul = agentii atasati evenimentului (`AgentiAtasatiEvenimente`, `Agenti`); se preiau doar evenimentele Finalizat (Label = 2); GPS-ul evenimentului completeaza punctul de lucru fara coordonate (0,0 ignorat, virgule zecimale acceptate, 6 zecimale; migrarea 61, coloana `gps`); tichetul din coada se actualizeaza cand se schimba raportul/executantii; mesaj explicit la data in viitor.
+- Notificari: taburile "Tichete de validat" (cu "Tichete discardate") si "Probleme import" (scoase din Setari -> Import ActivityApp).
+- Adaugarea de beneficiar, furnizor si vehicul in popup; analiza de risc fara "Intocmita de", "Data intocmirii"; butoanele Inchide/Anuleaza functioneaza pe /analize-risc (lipsea UnsavedChangesHost).
+- Module oprite: `ModuleGate` la panourile Backup/Jurnal din Setari; mesaje dedicate la ANAF si la legarea intrarii de factura.
+- Sablon factura: CUI-ul corectat manual nu mai e rescris la salvare; CUI citit prin OCR cu cifra dubla se corecteaza dupa cifra de control.
+- Module: ActivityImport 0.8.0, Notifications 1.2.0, RiskAnalyses 1.3.0, Invoices 1.1.3, Suppliers 1.0.1, Vehicles 1.0.2, Maintenance 1.7.1. Teste: componente 1615, facturi 280, MariaDB 3400 PASS.

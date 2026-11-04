@@ -5,7 +5,6 @@
 @inject IActivityPartnerImportService Partners
 @inject IActivityTicketImportService Tickets
 @inject IActivitySyncService Sync
-@inject IActivityReviewService Reviews
 @inject ILogger<ActivityImportPanel> Logger
 @implements IDisposable
 @* Setari -> Preluare ActivityApp (administrator only): the connection of the read-only account, the check of the ActivityApp structure and the ticket types linked to service and
@@ -143,23 +142,9 @@
             {
                 <p class="muted" role="status">Ultima rulare: <strong>@KindLabel(lastRun.Kind)</strong>, @lastRun.StartedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), @lastRun.StartedBy — @lastRun.Status.</p>
             }
-            @if (issues.Count > 0)
-            {
-                <h3>Probleme deschise (@issues.Count)</h3>
-                <div class="table-scroll"><table class="catalog-table" id="ai-issues">
-                    <thead><tr><th>Ce</th><th>Cod ActivityApp</th><th>Denumire</th><th>Problemă</th><th></th></tr></thead>
-                    <tbody>
-                    @foreach (var issue in issues)
-                    {
-                        <tr><td>@EntityLabel(issue.Entity)</td><td>@issue.SourceId</td><td>@issue.SourceName</td><td>@issue.Message</td>
-                            <td><button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => ResolveAsync(issue.Id)">Marchează rezolvată</button></td></tr>
-                    }
-                    </tbody>
-                </table></div>
-            }
         </fieldset>
         <fieldset class="anaf-section"><legend>4. Tichete rezolvate</legend>
-            <p class="muted"><small>Tichetele rezolvate (cu eveniment de rezolvare) ale tipurilor alese în secțiunea 2, deschise de la data aleasă, intră în coada „Evenimente de validat” (secțiunea 7), la beneficiarul clientului și la punctul de lucru al tichetului (altfel la cel principal). Niciun tichet nu se înregistrează singur: un operator îl vede, îl preia ca atare sau îl modifică și îl preia, ca mentenanță (tipurile „de mentenanță” și cele cu un cuvânt cheie din Nomenclator sunt propuse așa, chiar dacă punctul nu are contract) sau ca service la cerere, ori îl discardează. Problema și rezolvarea se despart din raportul lucrării. Se preiau numai după ce clientul a fost preluat (secțiunea 3). Simularea nu scrie nimic.</small></p>
+            <p class="muted"><small>Tichetele rezolvate (cu eveniment de rezolvare) ale tipurilor alese în secțiunea 2, deschise de la data aleasă, intră în coada „Evenimente de validat” (Notificări, „Tichete de validat”), la beneficiarul clientului și la punctul de lucru al tichetului (altfel la cel principal). Niciun tichet nu se înregistrează singur: un operator îl vede, îl preia ca atare sau îl modifică și îl preia, ca mentenanță (tipurile „de mentenanță” și cele cu un cuvânt cheie din Nomenclator sunt propuse așa, chiar dacă punctul nu are contract) sau ca service la cerere, ori îl discardează. Problema și rezolvarea se despart din raportul lucrării. Se preiau numai după ce clientul a fost preluat (secțiunea 3). Simularea nu scrie nimic.</small></p>
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="SimulateTicketsAsync">Simulează tichetele</button>
                 <button type="button" class="primary" disabled="@(busy || ticketReport is null || ticketReport.Applied)" @onclick="() => confirmTickets = true">Aplică tichetele</button>
@@ -184,7 +169,7 @@
                 </table></div>
                 @if (ticketReport.ToValidate > 0)
                 {
-                    <p class="muted" id="ai-tickets-maintenance"><small>@ticketReport.ToValidate @(ticketReport.Applied ? "tichete așteaptă" : "tichete vor aștepta") validarea în secțiunea 7: @ticketReport.Maintenance propuse ca mentenanță (tip de mentenanță sau cuvânt cheie), @ticketReport.Service ca service.</small></p>
+                    <p class="muted" id="ai-tickets-maintenance"><small>@ticketReport.ToValidate @(ticketReport.Applied ? "tichete așteaptă" : "tichete vor aștepta") validarea în Notificări, „Tichete de validat”: @ticketReport.Maintenance propuse ca mentenanță (tip de mentenanță sau cuvânt cheie), @ticketReport.Service ca service.</small></p>
                 }
                 @if (ticketReport.Items.Count > 0)
                 {
@@ -266,31 +251,6 @@
                                 @if (row.Missing) { <small class="muted"> coloana aleasă nu mai există în ActivityApp</small> }
                             </td>
                             <td>@row.Field.Purpose</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table></div>
-            }
-        </fieldset>
-        <fieldset class="anaf-section"><legend>7. Evenimente de validat</legend>
-            <ActivityReviewSection Decided="ReadDiscardedIfShownAsync" />
-            <h3>Tichete discardate</h3>
-            <div class="editor-actions">
-                <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadDiscardedAsync">Arată tichetele discardate</button>
-            </div>
-            @if (discardedTickets is not null && discardedTickets.Count == 0) { <p class="muted" id="ai-discarded-empty">Nu sunt tichete discardate.</p> }
-            @if (discardedTickets is { Count: > 0 })
-            {
-                <div class="table-scroll"><table class="catalog-table" id="ai-discarded">
-                    <thead><tr><th>Tichet</th><th>Discardat de</th><th>La data</th><th>Operații</th></tr></thead>
-                    <tbody>
-                    @foreach (var discarded in discardedTickets)
-                    {
-                        <tr @key="discarded.TicketId">
-                            <td>@discarded.TicketNumber @discarded.Title</td>
-                            <td>@discarded.DiscardedBy</td>
-                            <td>@discarded.DiscardedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
-                            <td><button type="button" class="row-icon undo" disabled="@busy" aria-label="@($"Reactivează tichetul {discarded.TicketNumber}")" title="Reactivează tichetul (se preia la următoarea sincronizare)" @onclick="() => ReactivateAsync(discarded.TicketId)"></button></td>
                         </tr>
                     }
                     </tbody>
@@ -421,7 +381,6 @@
 
     private ImportReport? report;
     private ImportRunInfo? lastRun;
-    private List<ImportIssue> issues = [];
     private bool confirmApply;
 
     private async Task LoadImportStateAsync()
@@ -429,7 +388,6 @@
         try
         {
             lastRun = await Partners.GetLastRunAsync(lifetime.Token);
-            issues = [.. await Partners.GetOpenIssuesAsync(lifetime.Token)];
         }
         catch (AccessDeniedException) { }
     }
@@ -458,12 +416,6 @@
         report = await Partners.SimulateAsync(lifetime.Token);
         await LoadImportStateAsync();
         noticeOk = true; notice = "Partenerul a fost inclus în preluare (neverificat, preluat manual); apare în lista de preluat. Tichetele lui se preiau după „Recitește tot”.";
-    }, "partners");
-
-    private Task ResolveAsync(long id) => RunAsync("Se marchează…", async () =>
-    {
-        await Partners.ResolveIssueAsync(id, lifetime.Token);
-        await LoadImportStateAsync();
     }, "partners");
 
     private TicketReport? ticketReport;
@@ -534,7 +486,7 @@
         var progress = new Progress<string>(text => { busyText = text; _ = InvokeAsync(StateHasChanged); });
         ticketReport = await Tickets.ApplyAsync(progress, lifetime.Token);
         await LoadImportStateAsync();
-        noticeOk = true; notice = $"Tichete puse la validare: {ticketReport.Tickets.Create} (secțiunea 7), {ticketReport.Tickets.Problems} probleme.";
+        noticeOk = true; notice = $"Tichete puse la validare: {ticketReport.Tickets.Create} (Notificări, „Tichete de validat”), {ticketReport.Tickets.Problems} probleme.";
     });
 
     private sealed class FieldRow(ActivityFieldChoice choice)
@@ -570,25 +522,6 @@
         foreach (var row in fields!) row.Column = row.Field.Column;
     }
 
-
-    private IReadOnlyList<ActivityDiscardedTicket>? discardedTickets;
-
-    private async Task ReadDiscardedAsync() => discardedTickets = await Reviews.GetDiscardedAsync(lifetime.Token);
-
-    // A ticket discarded from the queue appears in the list of the discarded ones below (when it is open).
-    private async Task ReadDiscardedIfShownAsync()
-    {
-        if (discardedTickets is not null) await ReadDiscardedAsync();
-    }
-
-    private Task LoadDiscardedAsync() => RunAsync("Se citește lista…", ReadDiscardedAsync);
-
-    private Task ReactivateAsync(long ticketId) => RunAsync("Se reactivează…", async () =>
-    {
-        await Reviews.ReactivateAsync(ticketId, lifetime.Token);
-        await ReadDiscardedAsync();
-        noticeOk = true; notice = "Tichetul a fost reactivat: se preia la următoarea sincronizare sau la „Importă acum”.";
-    });
 
     private Task ResetReadingAsync() => RunAsync("Se salvează…", async () =>
     {

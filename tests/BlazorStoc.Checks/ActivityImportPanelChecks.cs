@@ -105,7 +105,14 @@ public static class ActivityImportPanelChecks
         context.Services.AddSingleton<IActivityReviewService>(reviewService);
         // The types saved before are shown at once when the panel opens (the choice is not lost from sight); reading ActivityApp only refreshes them.
         settingsService.Saved = [new(4, "Service", "", null, null, null, null, null, true, ActivityDestination.OnDemand, ActivityImportRules.StateSelected)];
-        var cut = context.Render<ActivityImportPanel>();
+        // The queue, the discarded tickets and the open problems moved to the Notifications page (tabs); here they are rendered next to the panel so that the flow of the import stays checked end to end.
+        var cut = context.Render(builder =>
+        {
+            builder.OpenComponent<ActivityImportPanel>(0); builder.CloseComponent();
+            builder.OpenComponent<BlazorStoc.Components.Pages.ActivityReviewSection>(1); builder.CloseComponent();
+            builder.OpenComponent<BlazorStoc.Components.Pages.ActivityDiscardedSection>(2); builder.CloseComponent();
+            builder.OpenComponent<BlazorStoc.Components.Pages.ActivityIssuesSection>(3); builder.CloseComponent();
+        });
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-issues").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.FindAll("#ai-types tbody tr").Count == 1 && cut.Find("#ai-types").TextContent.Contains("Service", StringComparison.Ordinal) && cut.Find("#ai-types input[role=switch]").HasAttribute("checked") && cut.Find("#ai-types-used").HasAttribute("open"),
             "Activity import panel: the types saved are shown, selected, as soon as the panel opens");
@@ -165,7 +172,7 @@ public static class ActivityImportPanelChecks
         // Every operation on a ticket: take as proposed (maintenance, service), view and edit + take (popup), discard (asked to confirm in a popup); a discarded ticket can be reactivated.
         reviewService.Pending.Add(new(2, 9002, "T-78", "Alt tichet", "Beta SRL", "Sediu", "am schimbat routerul", "", "", new DateOnly(2026, 10, 2), DateTime.UtcNow, ActivityTicketPlanner.ServiceKind));
         reviewService.Pending.Add(new(3, 9003, "T-79", "Al treilea", "Beta SRL", "Sediu", "verificat centrala", "revizie", "revizie", new DateOnly(2026, 10, 3), DateTime.UtcNow, "exact"));
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Actualizează lista").Click();
+        cut.Find("#activity-review .heading-actions button").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 3) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.Find("#ai-reviews").TextContent.Contains("Service", StringComparison.Ordinal) && cut.Find("#ai-reviews").TextContent.Contains("Mentenanță", StringComparison.Ordinal),
             "Activity import panel: every ticket in the queue says what it is proposed as (maintenance or service)");
@@ -188,7 +195,7 @@ public static class ActivityImportPanelChecks
         check(reviewService.Takes is [{ Id: 3, Input: { Category: ReviewCategory.Service, WorkPointId: 51 } }] && reviewService.Takes[0].Input.Notes == "Note service" && cut.FindAll("[role=dialog]").Count == 0,
             "Activity import panel: edit + take sends the category, the point and the notes the operator chose (the notes follow the category) and closes the popup");
         reviewService.Pending.Add(new(4, 9004, "T-80", "Ultimul", "Beta SRL", "Sediu", "nimic", "", "", new DateOnly(2026, 10, 4), DateTime.UtcNow, ActivityTicketPlanner.ServiceKind));
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Actualizează lista").Click();
+        cut.Find("#activity-review .heading-actions button").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         cut.Find("#ai-reviews button[aria-label^='Discard tichet: T-80']").Click();
         check(reviewService.Decisions.Count == 2 && cut.Find("[role=alertdialog]").TextContent.Contains("nu se mai preia", StringComparison.Ordinal), "Activity import panel: discard asks for a confirmation in a popup first");

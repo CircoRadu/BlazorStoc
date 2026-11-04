@@ -365,6 +365,8 @@ public static class ActivityImportChecks
         check(T(18).Action == PlanAction.Problem && T(18).Message.Contains("nu mai există", StringComparison.Ordinal), "Activity import (tickets): a client tied to a beneficiary deleted since is a problem");
         var noEnd = ActivityTicketPlanner.Plan([Ticket(30, end: null) with { EventEnd = null, TicketDate = new DateTime(2026, 2, 5) }], destinations, map, locals, new DateOnly(2026, 10, 23), routerWords);
         check(noEnd[0] is { Action: PlanAction.Create } && noEnd[0].PerformedOn == new DateOnly(2026, 2, 5), "Activity import (tickets): without the end of the event the date of the ticket is used");
+        var notFinished = ActivityTicketPlanner.Plan([Ticket(31, end: new DateTime(2026, 10, 20)) with { EventLabel = 3 }, Ticket(32, end: new DateTime(2026, 10, 20)) with { EventLabel = ActivityTicketPlanner.FinalizedLabel }], destinations, map, locals, new DateOnly(2026, 10, 23), routerWords);
+        check(notFinished[0] is { Action: PlanAction.Skipped } && notFinished[0].Message == ActivityTicketPlanner.NotFinished && notFinished[1].Action != PlanAction.Skipped, "Activity import (tickets): only an event in the state Finalizat is taken; one in another state waits (skipped, read again later)");
         check(plans.Select(plan => plan.Hash).Distinct().Count() == plans.Count, "Activity import (tickets): every ticket has its own content hash");
     }
 

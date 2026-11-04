@@ -23,14 +23,18 @@ public static class ActivityContract
     public const string Partners = "Beneficiari";
     public const string WorkPoints = "Puncte de lucru";
     public const string Events = "Evenimente de rezolvare";
-    public const string Version = "Versiune ActivityApp";
+    /// <summary>The agents attached to an event (who did the work): optional, the executor then stays the person who processed the ticket.</summary>
+    public const string EventAgents = "Agenți atașați evenimentelor";
+    public const string Version ="Versiune ActivityApp";
 
     public static IReadOnlyList<ContractTable> Tables { get; } =
     [
         new("ActivitatiContracte", TicketTypes, [Num("ID", true), Txt("Denumire", true), Txt("TipActivitate"), Flag("SeAtasaeazaLaContractService"), Flag("GenerareEvenimentAutomat")]),
         new("Tickete", Tickets, [Num("ID", true), Num("IDActivitate", true), Flag("Sters", true), Num("IDEveniment", true), Dat("DataTicket", true), Num("IDClient", true), Num("IDPunctDeLucru"),
             Txt("Subject"), Txt("Description"), Txt("DescriptionInternal"), Txt("NumeTicket"), Txt("ProcesatDe")]),
-        new("EvenimenteAgent", Events, [Num("ID", true), Num("IDTicket", true), Dat("EndTime"), Num("Status"), Txt("DescriptionInternal"), Dat("DataModificareEveniment")]),
+        new("EvenimenteAgent", Events, [Num("ID", true), Num("IDTicket", true), Dat("EndTime"), Num("Status"), Txt("DescriptionInternal"), Dat("DataModificareEveniment"), Txt("LocatieGPS"), Num("Label")]),
+        new("AgentiAtasatiEvenimente", EventAgents, [Num("IDEvenimentAgent"), Num("IDAgent")]),
+        new("Agenti", EventAgents, [Num("ID"), Txt("NumeSiPrenume")]),
         new("NomenclatorParteneri", Partners, [Num("ID", true), Txt("Denumire", true), Txt("CodFiscal", true), Txt("Adresa"), Txt("Localitate"), Txt("Judet"), Txt("Telefon"), Txt("Email")]),
         new("PuncteDeLucruParteneri", WorkPoints, [Num("ID", true), Num("IDPartener", true), Txt("Adresa"), Txt("Localitate"), Txt("Judet"), Txt("Telefon"), Txt("Obiectiv"), Txt("LocatieGPS"), Flag("Activ"), Flag("Sistat")]),
         new("Versiuni", Version, [Num("Id"), Txt("Desktop")])

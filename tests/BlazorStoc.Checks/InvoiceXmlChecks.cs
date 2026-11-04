@@ -186,6 +186,8 @@ public static class InvoiceXmlChecks
 
         check(InvoiceValues.NormalizeCui("ROZ2460883, sediu social:") == "22460883" && InvoiceValues.NormalizeCui("RO 2246088, Str. X") == "2246088" && InvoiceValues.NormalizeCui("J40/1/2020, sediu") == "",
             "Tax id: a code followed by the rest of the line ('RO..., sediu social:') is still read, a registry number is not");
+        check(InvoiceValues.CleanCui("RO222460883") == "RO22460883" && InvoiceValues.CleanCui("222460883") == "22460883" && InvoiceValues.CleanCui("RO22460883") == "RO22460883" && InvoiceValues.CleanCui("RO9178894") == "RO9178894",
+            "Tax id read by OCR: an extra (doubled) digit that makes the control digit wrong is dropped; a correct code is left as it is");
         check(InvoiceValues.CleanCui("ROZ2460883, sediu social:") == "RO22460883" && InvoiceValues.CleanCui("Z2460883") == "22460883" && InvoiceValues.CleanCui("J40/1/2020") == "J40/1/2020",
             "Tax id: OCR letters are turned into digits (Z is 2) and the rest of the line is cut when the field is read");
         check(InvoiceValues.CleanCui("ROi2460o83") == "RO12460083" && InvoiceValues.CleanCui("RO|246O883") == "RO12460883" && InvoiceValues.CleanCui("l24608O3") == "12460803" && InvoiceValues.NormalizeCui("O2460883") == "",

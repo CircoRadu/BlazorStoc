@@ -72,3 +72,15 @@ Pregatire: un beneficiar cu cel putin doua puncte de lucru (numele sa inceapa cu
 |----|-----|-------------------|----------|
 | 1 | Adauga analiza de risc, apasa iconita de adaugare de langa Analizor | Popup cu formularul analizorului | |
 | 2 | Salveaza analizorul si inchide popup-ul | Lista se reincarca si analizorul nou este ales | |
+
+## Modificari de testat - formular fara "Intocmita de" (04.11.2026, RiskAnalyses 1.3.0)
+
+**Ce s-a adaugat:** in formularul analizei de risc dispare campul "Intocmita de"; "Data inregistrarii" devine "Data intocmirii". Butoanele "Inchide" si "Anuleaza" din formularul de adaugare de pe /analize-risc cer confirmare cand formularul e modificat (lipsea gazda avertizarii).
+**Ce face acum:** formularul are doar analizorul, numarul, data intocmirii, valabilitatea si observatiile; tabelul are coloana "Intocmita" (data); cautarea nu mai cauta dupa autor.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | /analize-risc -> "+ Adauga analiza de risc" | Nu exista campul "Intocmita de"; eticheta datei este "Data intocmirii" | |
+| 2 | Completeaza analizorul, numarul, salveaza | Se salveaza fara autor | |
+| 3 | Deschide formularul, scrie ceva, apasa "Inchide" sau "Anuleaza" | Apare intrebarea "Parasesti editarea?"; fara modificari se inchide direct | |
+| 4 | Editeaza o analiza veche (cu autor) | Se salveaza; autorul vechi nu se pierde | |

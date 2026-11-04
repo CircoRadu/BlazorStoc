@@ -91,15 +91,15 @@
             @SubtabBar(BackupSubtabs, "Secțiuni backup")
             @if (backupSubtab == NasTab)
             {
-                <div role="tabpanel" id="subpanel-@NasTab" aria-labelledby="subtab-@NasTab"><BackupNasSettings /></div>
+                <div role="tabpanel" id="subpanel-@NasTab" aria-labelledby="subtab-@NasTab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId"><BackupNasSettings /></ModuleGate></div>
             }
             else if (backupSubtab == BackupTimeSubtab)
             {
-                <div role="tabpanel" id="subpanel-@BackupTimeSubtab" aria-labelledby="subtab-@BackupTimeSubtab"><BackupSettingsPanel Section="@BackupSettingsPanel.TimeSection" /></div>
+                <div role="tabpanel" id="subpanel-@BackupTimeSubtab" aria-labelledby="subtab-@BackupTimeSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId"><BackupSettingsPanel Section="@BackupSettingsPanel.TimeSection" /></ModuleGate></div>
             }
             else
             {
-                <div role="tabpanel" id="subpanel-@BackupMainSubtab" aria-labelledby="subtab-@BackupMainSubtab"><BackupSettingsPanel Section="@BackupSettingsPanel.BackupSection" /></div>
+                <div role="tabpanel" id="subpanel-@BackupMainSubtab" aria-labelledby="subtab-@BackupMainSubtab"><ModuleGate ModuleId="@BlazorStoc.Modules.Backup.BackupWorkerRules.ModuleId"><BackupSettingsPanel Section="@BackupSettingsPanel.BackupSection" /></ModuleGate></div>
             }
         </div>
     }
@@ -140,7 +140,7 @@
     else if (activeTab == JournalTab && allowedTabs.Contains(JournalTab))
     {
         <div role="tabpanel" id="panel-@JournalTab" aria-labelledby="tab-@JournalTab" class="settings-body">
-            <JournalSettingsPanel />
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Journal.JournalModule.ModuleId"><JournalSettingsPanel /></ModuleGate>
         </div>
     }
     else if (activeTab == ModulesTab && allowedTabs.Contains(ModulesTab))

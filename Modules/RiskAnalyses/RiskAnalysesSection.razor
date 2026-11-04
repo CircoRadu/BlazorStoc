@@ -46,7 +46,7 @@
     }
     else
     {
-        <div class="table-scroll"><table><thead><tr><th>NR. ÎNREGISTRARE</th>@if (ShowBeneficiary) { <th>BENEFICIAR</th> }<th>PUNCT DE LUCRU</th><th>ÎNTOCMITĂ DE</th><th>ÎNREGISTRATĂ</th><th>ULTIMA REÎNNOIRE</th><th>VALABILITATE</th><th>EXPIRĂ</th><th>STARE</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
+        <div class="table-scroll"><table><thead><tr><th>NR. ÎNREGISTRARE</th>@if (ShowBeneficiary) { <th>BENEFICIAR</th> }<th>PUNCT DE LUCRU</th><th>ÎNTOCMITĂ</th><th>ULTIMA REÎNNOIRE</th><th>VALABILITATE</th><th>EXPIRĂ</th><th>STARE</th>@if (CanManage) { <th></th> }</tr></thead><tbody>
         @foreach (var view in Visible)
         {
             var analysis = view.Analysis;
@@ -55,7 +55,6 @@
                 <td><strong>@analysis.Number</strong>@if (analysis.Notes.Length > 0) { <br /><small class="muted" title="@analysis.Notes">@Shorten(analysis.Notes)</small> }</td>
                 @if (ShowBeneficiary) { <td><a class="category-table-link" href="@($"/beneficiari/{analysis.BeneficiaryId}")">@view.BeneficiaryName</a></td> }
                 <td><strong>@view.WorkPointName</strong>@if (view.WorkPointIsPrimary) { <text> <span class="anaf-source ok">Principal</span></text> }<br /><small class="muted">@view.WorkPointAddress</small></td>
-                <td>@analysis.Author</td>
                 <td>@StockMovementRules.DisplayDate(analysis.InitialDate)</td>
                 <td>@StockMovementRules.DisplayDate(analysis.LastRenewalDate)<br /><button type="button" class="link-button" aria-expanded="@expanded.Contains(analysis.Id)" @onclick="() => Toggle(analysis.Id)">Istoric (@view.Renewals.Count) @(expanded.Contains(analysis.Id) ? "▴" : "▾")</button></td>
                 <td>@RiskAnalysisRules.ValidityText(analysis.ValidityMonths)</td>
@@ -84,7 +83,7 @@
                             @if (CanManage) { <td>@if (index == 0) { <button class="row-icon undo" disabled="@Locked" aria-label="@($"Anulează reînnoirea din {StockMovementRules.DisplayDate(renewal.RenewalDate)}")" title="@($"Anulează reînnoirea din {StockMovementRules.DisplayDate(renewal.RenewalDate)}")" @onclick="() => UndoAsync(analysis)"></button> }</td> }
                         </tr>
                     }
-                    <tr><td>Înregistrare inițială</td><td>@StockMovementRules.DisplayDate(analysis.InitialDate)</td><td>@analysis.Author <small class="muted">(întocmită de)</small></td><td></td>@if (CanManage) { <td></td> }</tr>
+                    <tr><td>Întocmire inițială</td><td>@StockMovementRules.DisplayDate(analysis.InitialDate)</td><td></td><td></td>@if (CanManage) { <td></td> }</tr>
                     </tbody></table>
                     </div>
                 </td></tr>
@@ -125,7 +124,7 @@
     private readonly CancellationTokenSource lifetime = new();
 
     private bool ShowBeneficiary => BeneficiaryId == 0;
-    private int ColumnCount => 9 + (ShowBeneficiary ? 1 : 0) + (CanManage ? 1 : 0);
+    private int ColumnCount => 8 + (ShowBeneficiary ? 1 : 0) + (CanManage ? 1 : 0);
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
     private int OffCount => Views.Count(item => !item.Analysis.IsActive);
     private IReadOnlyList<RiskAnalysisView> Visible => Views.Where(item => item.Analysis.IsActive || showOff).ToList();

@@ -197,3 +197,19 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 | 5 | Cos pe un tichet | Dupa confirmare tichetul nu se mai preia | |
 | 6 | Cu peste 10 tichete in coada | Apare selectorul de randuri pe pagina | |
 | 7 | `reset-activity-tickets.ps1` fara `-Apply` | Doar numara; cu `-Apply` goleste coada si reseteaza punctul de citire | |
+
+## Modificari de testat - executanti, GPS, stare Finalizat, taburi in Notificari (04.11.2026, ActivityImport 0.8.0)
+
+**Ce s-a adaugat:** executantul vine din agentii atasati evenimentului; coordonatele GPS ale evenimentului completeaza punctul de lucru; se preiau doar evenimentele in starea Finalizat (culoarea Label = 2); coada de validare si problemele importului sunt in Notificari (taburi), nu in Setari.
+**Ce face acum:** vezi pasii; un tichet din coada se actualizeaza cand se schimba raportul sau executantii in ActivityApp; migrarea 61 adauga coloana `gps`.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Tichet finalizat cu doi agenti atasati | Executant = cei doi agenti (nu "ProcesatDe") | |
+| 2 | Tichet cu eveniment Alocat / In lucru | Nu intra in coada; reapare dupa Finalizat | |
+| 3 | Tichet cu eveniment programat in viitor | Nu mai e problema; daca apare, mesajul explica ce se intampla | |
+| 4 | Preia un tichet cu GPS "45,8827287, 22,9065762" la un punct fara coordonate | Punctul primeste 45.882729, 22.906576 (rotunjit la 6 zecimale, cat memoreaza baza); jurnalul "Preluare tichet" arata completarea | |
+| 5 | Acelasi, GPS "0, 0" sau punct cu coordonate | Coordonatele punctului raman neschimbate | |
+| 6 | Notificari -> "Tichete de validat" | Coada + sectiunea "Tichete discardate" (reactivare) | |
+| 7 | Notificari -> "Probleme import" | Lista cu "Marchează rezolvata"; Setari -> Import ActivityApp nu o mai are | |
+| 8 | Tichet in coada al carui raport s-a completat dupa prima citire | Dupa urmatorul import apare raportul complet | |

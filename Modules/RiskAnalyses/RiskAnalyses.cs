@@ -47,9 +47,8 @@ public sealed class RiskAnalysisInput : IValidatableObject
     {
         if (WorkPointId <= 0) yield return new("Alege punctul de lucru.", [nameof(WorkPointId)]);
         if (TextNormalization.ForObjectNameOrCode(Number).Length == 0) yield return new("Completează numărul de înregistrare.", [nameof(Number)]);
-        if (TextNormalization.ForObjectNameOrCode(Author).Length == 0) yield return new("Completează numele persoanei care a întocmit analiza.", [nameof(Author)]);
-        if (InitialDate is not { } initial) yield return new("Completează data înregistrării.", [nameof(InitialDate)]);
-        else if (!ServiceContractRules.InRange(initial)) yield return new("Data înregistrării nu este o dată validă.", [nameof(InitialDate)]);
+        if (InitialDate is not { } initial) yield return new("Completează data întocmirii.", [nameof(InitialDate)]);
+        else if (!ServiceContractRules.InRange(initial)) yield return new("Data întocmirii nu este o dată validă.", [nameof(InitialDate)]);
         if (ValidityMonths is < RiskAnalysisRules.MinimumValidityMonths or > RiskAnalysisRules.MaximumValidityMonths)
             yield return new($"Valabilitatea trebuie să fie între {RiskAnalysisRules.MinimumValidityMonths} și {RiskAnalysisRules.MaximumValidityMonths} de luni.", [nameof(ValidityMonths)]);
     }
@@ -177,7 +176,7 @@ public static class RiskAnalysisRules
     }
 
     // The registration date cannot be in the future.
-    public static string? InitialDateError(DateOnly date, DateOnly today) => date > today ? "Data înregistrării nu poate fi în viitor." : null;
+    public static string? InitialDateError(DateOnly date, DateOnly today) => date > today ? "Data întocmirii nu poate fi în viitor." : null;
 
     public static RiskAnalysisOperationException Changed() =>
         new("Analiza de risc s-a schimbat între timp. Actualizează pagina și reia operația.");
@@ -195,7 +194,7 @@ public static class RiskAnalysisRules
         new("Beneficiarul nu mai există. Actualizează lista.");
 
     public static RiskAnalysisOperationException InitialDateLocked() =>
-        new("Data înregistrării nu se mai poate modifica după ce analiza a fost reînnoită. Anulează mai întâi reînnoirile.");
+        new("Data întocmirii nu se mai poate modifica după ce analiza a fost reînnoită. Anulează mai întâi reînnoirile.");
 
     public static RiskAnalysisOperationException NoRenewal() =>
         new("Analiza nu are nicio reînnoire de anulat.");
@@ -214,14 +213,14 @@ public static class RiskAnalysisRules
     public static string Identification(RiskAnalysis value, string workPointName, string analyzerName = "") => AuditDetails.Identification(new (string Field, string Value)[]
     {
         ("Punct de lucru", workPointName), ("Analizor", analyzerName), ("Număr înregistrare", value.Number), ("Întocmită de", value.Author),
-        ("Data înregistrării", StockMovementRules.DisplayDate(value.InitialDate)), ("Valabilitate", ValidityText(value.ValidityMonths)),
+        ("Data întocmirii", StockMovementRules.DisplayDate(value.InitialDate)), ("Valabilitate", ValidityText(value.ValidityMonths)),
         ("Expiră", StockMovementRules.DisplayDate(value.ExpiryDate)), ("Observații", value.Notes)
     }.Where(item => item.Value.Length > 0).ToArray());
 
     public static IReadOnlyList<AuditChange> Changes(RiskAnalysis before, RiskAnalysis after) =>
     [
         new("Număr înregistrare", before.Number, after.Number), new("Întocmită de", before.Author, after.Author),
-        new("Data înregistrării", StockMovementRules.DisplayDate(before.InitialDate), StockMovementRules.DisplayDate(after.InitialDate)),
+        new("Data întocmirii", StockMovementRules.DisplayDate(before.InitialDate), StockMovementRules.DisplayDate(after.InitialDate)),
         new("Valabilitate", ValidityText(before.ValidityMonths), ValidityText(after.ValidityMonths)),
         new("Expiră", StockMovementRules.DisplayDate(before.ExpiryDate), StockMovementRules.DisplayDate(after.ExpiryDate)),
         new("Observații", before.Notes, after.Notes)

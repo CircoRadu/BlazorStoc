@@ -12,6 +12,7 @@
 @implements IDisposable
 <PageBoundary>
 
+<UnsavedChangesHost />
 <PageTitle>Analize de risc · BlazorStoc</PageTitle>
 <div class="page-heading">
     <div><p class="eyebrow">SERVICE</p><h1>Analize de risc</h1><p class="muted">Analizele de risc la securitate ale punctelor de lucru, cu data ultimei reînnoiri și expirarea. Un punct de lucru are o singură analiză activă; notificarea de expirare pornește din data ultimei reînnoiri.</p></div>
@@ -59,8 +60,7 @@ else
             var trimmed = text.Trim();
             return all.Where(view =>
                 (trimmed.Length == 0 || view.BeneficiaryName.Contains(trimmed, StringComparison.OrdinalIgnoreCase) ||
-                    view.WorkPointName.Contains(trimmed, StringComparison.OrdinalIgnoreCase) || view.Analysis.Number.Contains(trimmed, StringComparison.OrdinalIgnoreCase) ||
-                    view.Analysis.Author.Contains(trimmed, StringComparison.OrdinalIgnoreCase)) &&
+                    view.WorkPointName.Contains(trimmed, StringComparison.OrdinalIgnoreCase) || view.Analysis.Number.Contains(trimmed, StringComparison.OrdinalIgnoreCase)) &&
                 (stateFilter.Length == 0 || !view.Analysis.IsActive ||
                     RiskAnalysisRules.State(view.Analysis, Today, thresholdDays).ToString() == stateFilter)).ToList();
         }

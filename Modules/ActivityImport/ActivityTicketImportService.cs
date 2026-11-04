@@ -165,6 +165,11 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
                 results.Add((plan, plan.Action, plan.Message));
                 continue;
             }
+            // A ticket already in the queue is kept as the operator will see it: when ActivityApp changed meanwhile (the report finished after the first reading, other executors) the copy is renewed.
+            if (plan.Action == PlanAction.AlreadyLinked && plan.Message == ActivityTicketPlanner.AwaitingApproval && loaded.Tickets.TryGetValue(plan.SourceId, out var current)
+                && await ActivityTicketStore.FindAsync(configuration, plan.SourceId, cancellationToken).ConfigureAwait(false) is { State: TicketStates.PendingApproval } kept
+                && ActivityTicketPlanner.HashOf(kept.Ticket) != plan.Hash)
+                await ActivityTicketStore.SaveAsync(configuration, current, TicketStates.PendingApproval, null, cancellationToken).ConfigureAwait(false);
             if (plan.Action != PlanAction.Create) { results.Add((plan, plan.Action, plan.Message)); continue; }
             // Nothing is recorded: the ticket is kept whole and put in the queue, where an operator decides.
             if (loaded.Tickets.TryGetValue(plan.SourceId, out var queuedTicket)) await ActivityTicketStore.SaveAsync(configuration, queuedTicket, TicketStates.PendingApproval, null, cancellationToken).ConfigureAwait(false);

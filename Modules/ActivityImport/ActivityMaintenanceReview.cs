@@ -193,6 +193,7 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         var maintenance = input.Category == ReviewCategory.Maintenance;
         var edited = input.WorkPointId != row.WorkPointId || input.PerformedOn != row.PerformedOn;
         int interventionId;
+        var gpsNote = "";
         try
         {
             if (row.InterventionId is { } existing)
@@ -209,6 +210,7 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
                 if (stored is not null)
                 {
                     await WriteSourceAsync(interventionId, ActivityTicketPlanner.SourceOf(stored.Ticket), cancellationToken).ConfigureAwait(false);
+                    gpsNote = await CompleteCoordinatesAsync(input.WorkPointId, stored.Ticket.Gps, cancellationToken).ConfigureAwait(false);
                     await ActivityTicketStore.SaveAsync(configuration, stored.Ticket, TicketStates.Imported, interventionId, cancellationToken).ConfigureAwait(false);
                     await ImportStore.WriteMapAsync(configuration, ActivityTicketPlanner.TicketEntity, row.TicketId, interventionId, "created", ActivityTicketPlanner.HashOf(stored.Ticket), cancellationToken).ConfigureAwait(false);
                 }
@@ -227,7 +229,20 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.DecideActivityMaintenance, id.ToString(),
             maintenance ? "Preluare tichet ActivityApp ca mentenanță" : "Preluare tichet ActivityApp ca service la cerere",
             AuditDetails.Identification(("Tichet", $"{item.TicketNumber} {item.Title}".Trim()), ("Beneficiar", item.Beneficiary.Length > 0 ? item.Beneficiary : "—"), ("Propus ca", item.Kind == ActivityTicketPlanner.ServiceKind ? "service" : "mentenanță"),
-                ("Decizie", maintenance ? "este mentenanță (intervenția devine mentenanță)" : "este service la cerere"), ("Modificat de operator", edited || notes.Length == 0 ? "da" : "nu")), "", cancellationToken).ConfigureAwait(false);
+                ("Decizie", maintenance ? "este mentenanță (intervenția devine mentenanță)" : "este service la cerere"), ("Modificat de operator", edited || notes.Length == 0 ? "da" : "nu"), ("Coordonate GPS punct de lucru", gpsNote.Length > 0 ? gpsNote : "neschimbate")), "", cancellationToken).ConfigureAwait(false);
+    }
+
+    // The GPS location of the event completes the work point when the point has none (a point that already has coordinates keeps them); 0, 0 and text that is not a pair are ignored.
+    // Returns what was written, for the journal ("" when nothing changed).
+    private async Task<string> CompleteCoordinatesAsync(int workPointId, string gps, CancellationToken cancellationToken)
+    {
+        if (!WorkPointCoordinates.TryParseLocated(gps, out var latitude, out var longitude)) return "";
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("UPDATE beneficiary_work_points SET latitude=@latitude, longitude=@longitude WHERE id=@id AND (latitude IS NULL OR longitude IS NULL OR (latitude=0 AND longitude=0))", connection);
+        command.Parameters.AddWithValue("@latitude", latitude);
+        command.Parameters.AddWithValue("@longitude", longitude);
+        command.Parameters.AddWithValue("@id", workPointId);
+        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) > 0 ? $"completate din eveniment: {WorkPointCoordinates.Format(latitude, longitude)}" : "";
     }
 
     public async Task DiscardAsync(long id, CancellationToken cancellationToken = default)

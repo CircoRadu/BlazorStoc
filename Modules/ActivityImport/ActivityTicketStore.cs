@@ -16,11 +16,11 @@ public sealed record StoredTicket(ActivityTicket Ticket, string State, int? Inte
 
 internal static class ActivityTicketStore
 {
-    private const string Columns = "ticket_id, type_id, partner_id, work_point_id, event_id, event_status, ticket_date, event_end, event_modified, ticket_number, title, problem, executor, report, state, intervention_id";
+    private const string Columns = "ticket_id, type_id, partner_id, work_point_id, event_id, event_status, ticket_date, event_end, event_modified, ticket_number, title, problem, executor, report, state, intervention_id, gps";
 
     private static StoredTicket Read(MySqlDataReader reader) => new(new ActivityTicket(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3),
         reader.IsDBNull(6) ? null : reader.GetDateTime(6), reader.GetString(9), reader.GetString(10), reader.IsDBNull(11) ? "" : reader.GetString(11), reader.GetString(12), reader.GetInt64(4),
-        reader.IsDBNull(7) ? null : reader.GetDateTime(7), reader.IsDBNull(5) ? null : reader.GetInt64(5), reader.IsDBNull(13) ? "" : reader.GetString(13), reader.IsDBNull(8) ? null : reader.GetDateTime(8)),
+        reader.IsDBNull(7) ? null : reader.GetDateTime(7), reader.IsDBNull(5) ? null : reader.GetInt64(5), reader.IsDBNull(13) ? "" : reader.GetString(13), reader.IsDBNull(8) ? null : reader.GetDateTime(8), reader.IsDBNull(16) ? "" : reader.GetString(16)),
         reader.GetString(14), reader.IsDBNull(15) ? null : reader.GetInt32(15));
 
     /// <summary>The tickets kept in the given state.</summary>
@@ -62,9 +62,9 @@ internal static class ActivityTicketStore
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand($"""
             INSERT INTO activity_import_tickets ({Columns}, created_utc, updated_utc)
-            VALUES (@id, @type, @partner, @point, @event, @status, @date, @end, @modified, @number, @title, @problem, @executor, @report, @state, @intervention, @now, @now)
+            VALUES (@id, @type, @partner, @point, @event, @status, @date, @end, @modified, @number, @title, @problem, @executor, @report, @state, @intervention, @gps, @now, @now)
             ON DUPLICATE KEY UPDATE type_id=@type, partner_id=@partner, work_point_id=@point, event_id=@event, event_status=@status, ticket_date=@date, event_end=@end, event_modified=@modified,
-                ticket_number=@number, title=@title, problem=@problem, executor=@executor, report=@report, updated_utc=@now,
+                ticket_number=@number, title=@title, problem=@problem, executor=@executor, report=@report, gps=@gps, updated_utc=@now,
                 state=IF(state='discarded', state, @state), intervention_id=IF(state='discarded', intervention_id, COALESCE(@intervention, intervention_id))
             """, connection);
         command.Parameters.AddWithValue("@id", ticket.Id);
@@ -81,6 +81,7 @@ internal static class ActivityTicketStore
         command.Parameters.AddWithValue("@problem", ticket.Problem);
         command.Parameters.AddWithValue("@executor", Cut(ticket.Executor, 200));
         command.Parameters.AddWithValue("@report", ticket.Report);
+        command.Parameters.AddWithValue("@gps", Cut(ticket.Gps, 100));
         command.Parameters.AddWithValue("@state", state);
         command.Parameters.AddWithValue("@intervention", (object?)interventionId ?? DBNull.Value);
         command.Parameters.AddWithValue("@now", DateTime.UtcNow);

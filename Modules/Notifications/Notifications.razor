@@ -39,12 +39,20 @@
     {
         <button type="button" role="tab" id="tab-beneficiaries" class="settings-tab @(validationTab == "beneficiaries" ? "active" : "") @(queues.Beneficiaries > 0 ? "needs-attention" : "")" aria-selected="@(validationTab == "beneficiaries" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenBeneficiaries()">Beneficiari de validat <span class="count-badge">@queues.Beneficiaries</span></button>
     }
+    @if (queues.CanTickets || queues.CanBeneficiaries)
+    {
+        <button type="button" role="tab" id="tab-issues" class="settings-tab @(validationTab == "issues" ? "active" : "")" aria-selected="@(validationTab == "issues" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenIssues()">Probleme import</button>
+    }
 </div>
 
-<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : showResolved ? "tab-resolved" : "tab-active")">
+<div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : showResolved ? "tab-resolved" : "tab-active")">
 @if (validationTab == "tickets")
 {
-    <ValidationQueuePanel Changed="RefreshQueuesAsync" />
+    <ValidationQueuePanel ShowDiscarded="true" Changed="RefreshQueuesAsync" />
+}
+else if (validationTab == "issues")
+{
+    <ValidationQueuePanel Issues="true" Changed="RefreshQueuesAsync" />
 }
 else if (validationTab == "beneficiaries")
 {
@@ -172,6 +180,7 @@ else if (loaded)
     private void OpenTab(string? validation, bool resolvedTab) { validationTab = validation ?? ""; showResolved = resolvedTab; }
     private void OpenTickets() => OpenTab("tickets", false);
     private void OpenBeneficiaries() => OpenTab("beneficiaries", false);
+    private void OpenIssues() => OpenTab("issues", false);
 
     // The counts follow every decision taken in a validation tab (the banners, the red tabs and the notifications below reflect the real state).
     private async Task RefreshQueuesAsync()
@@ -198,6 +207,7 @@ else if (loaded)
         await ReadQueuesAsync();
         if (TabQuery == "tichete" && queues.CanTickets) validationTab = "tickets";
         else if (TabQuery == "beneficiari" && queues.CanBeneficiaries) validationTab = "beneficiaries";
+        else if (TabQuery == "probleme" && (queues.CanTickets || queues.CanBeneficiaries)) validationTab = "issues";
         await LoadAsync(true);
         RefreshPeriodicallyAsync().FireAndForget(Logger, "periodic refresh");
     }

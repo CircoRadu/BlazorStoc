@@ -78,3 +78,15 @@ Pasi:
 
 1. Vehicul nou -> expirari -> salvare.
 2. Intrare in depozit -> iesire spre vehicul -> pagina vehiculului -> restituire.
+
+## Modificari de testat - adaugarea in popup (04.11.2026)
+
+**Ce s-a adaugat:** adaugarea unui vehicul se face intr-un popup peste pagina; editarea ramane in pagina.
+**Ce face acum:** butonul de adaugare deschide popup-ul; salvarea si inchiderea functioneaza ca inainte.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Apasa "Adauga vehicul" | Se deschide popup-ul cu formularul | |
+| 2 | Scrie ceva si apasa "Inchide" | Intrebarea "Parasesti editarea?" | |
+| 3 | Salveaza | vehicul apare in lista | |
+| 4 | Creion pe un rand existent | Editarea se deschide in pagina (nu in popup) | |

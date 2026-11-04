@@ -28,6 +28,9 @@ public static class ActivityTicketPlanner
     public const string AwaitingApproval = "Tichetul așteaptă validarea în „Evenimente de validat”.";
     public const string NoKeyword = "Tichet fără cuvânt cheie din nomenclator (și de un tip care nu e de mentenanță): nu se preia.";
     public const string ServiceKind = "service";
+    /// <summary>The colour (Label) of an event in the state "Finalizat" in ActivityApp (light blue; Alocat, In lucru and Incident have other colours).</summary>
+    public const long FinalizedLabel = 2;
+    public const string NotFinished = "Evenimentul nu este în starea Finalizat în ActivityApp: tichetul se preia după ce este finalizat.";
     /// <summary>The keyword shown for a ticket taken because its TYPE is a maintenance one (no word is searched in the text).</summary>
     public const string TypeKeyword = "tip de mentenanță";
 
@@ -68,7 +71,7 @@ public static class ActivityTicketPlanner
     public static string HashOf(ActivityTicket ticket)
     {
         var source = SourceOf(ticket);
-        return ActivityPartnerPlanner.Hash(ticket.Id.ToString(), ticket.EventId.ToString(), source.Title, source.Problem, source.Resolution, source.Executor, (ticket.EventEnd ?? ticket.TicketDate)?.ToString("O") ?? "");
+        return ActivityPartnerPlanner.Hash(ticket.Id.ToString(), ticket.EventId.ToString(), source.Title, source.Problem, source.Resolution, source.Executor, (ticket.EventEnd ?? ticket.TicketDate)?.ToString("O") ?? "", ticket.Gps);
     }
 
     public static string Notes(string number, string title, string problem, string resolution, string executor, string keyword = "", bool maintenance = false, bool uncovered = false)
@@ -111,6 +114,8 @@ public static class ActivityTicketPlanner
             if (tied.ContainsKey(ticket.Id)) { plans.Add(Make(PlanAction.AlreadyLinked, "")); continue; }
             if (queued is not null && queued.Contains(ticket.Id)) { plans.Add(Make(PlanAction.AlreadyLinked, AwaitingApproval)); continue; }
             if (discarded is not null && discarded.Contains(ticket.Id)) { plans.Add(Make(PlanAction.Skipped, TicketDiscarded)); continue; }
+            // Only a finished event is taken: in ActivityApp the state of the event (Alocat, In lucru, Finalizat, Incident) is its colour (Label). Without the column the state is not known and the ticket is not held back.
+            if (ticket.EventLabel is { } label && label != FinalizedLabel) { plans.Add(Make(PlanAction.Skipped, NotFinished)); continue; }
             if (!destinations.TryGetValue(ticket.TypeId, out var destination)) { plans.Add(Make(PlanAction.Skipped, "Tipul tichetului nu este între cele alese.")); continue; }
             // A client that is a person (or one the operator discarded) is never taken: neither are its tickets. A client still to be verified, or that could not be taken yet, makes the ticket wait.
             if (ignoredPartners is not null && ignoredPartners.Contains(ticket.PartnerId)) { plans.Add(Make(PlanAction.Skipped, ClientNotTaken)); continue; }
@@ -121,7 +126,7 @@ public static class ActivityTicketPlanner
             if (point is null) { plans.Add(Make(PlanAction.Problem, "Beneficiarul nu are punct de lucru principal.")); continue; }
             if (performed is null) { plans.Add(Make(PlanAction.Problem, "Tichetul nu are nicio dată (nici a evenimentului, nici a tichetului).")); continue; }
             var date = DateOnly.FromDateTime(performed.Value);
-            if (OnDemandInterventionRules.DateError(date, today) is { } dateError) { plans.Add(Make(PlanAction.Problem, dateError)); continue; }
+            if (OnDemandInterventionRules.DateError(date, today) is { } dateError) { plans.Add(Make(PlanAction.Problem, date > today ? $"Evenimentul din ActivityApp este programat pentru {StockMovementRules.DisplayDate(date)} (în viitor), deci lucrarea nu a fost încă efectuată. Nu trebuie făcut nimic aici: tichetul se preia singur la un import de după această dată; dacă lucrarea s-a făcut mai devreme, corectează data evenimentului în ActivityApp." : dateError)); continue; }
             // What was done (not the problem, which may only name the maintenance as a wish) is searched for the words of the type. A type taken as maintenance needs no word. The result only
             // says what to propose in the queue (maintenance or service); the operator decides.
             var byType = destination == ActivityDestination.Maintenance;

@@ -422,3 +422,16 @@ Pasi:
 | 2 | Valideaza un tichet | Numarul si textul bannerului scad | |
 | 3 | Operator cu permisiunea de validare | Vede tabul si poate valida | |
 | 4 | Lista cu peste 10 notificari | Selector rand pe pagina sub tabel | |
+
+## Modificari de testat - taburi ActivityApp si module oprite (04.11.2026, Notifications 1.2.0)
+
+**Ce s-a adaugat:** tab nou "Probleme import" in Notificari; "Tichete de validat" arata si tichetele discardate. Panourile de backup si de jurnal din Setari, cautarea ANAF din formularele de beneficiar/furnizor si legarea intrarii de factura au mesaje clare cand modulul lor e oprit.
+**Ce face acum:** vezi pasii.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Notificari -> "Probleme import" | Se vad problemele deschise | |
+| 2 | Opreste modulul Preluare ActivityApp (Setari -> Module), deschide taburile | "Secțiunea nu este disponibila momentan (modul indisponibil)" | |
+| 3 | Opreste ANAF, adauga beneficiar si apasa preluarea din ANAF | Mesaj "Modulul ANAF este oprit..."; formularul ramane utilizabil manual | |
+| 4 | Opreste Backup, deschide Setari -> Backup | Mesaj de modul indisponibil | |
+| 5 | Porneste la loc toate modulele | Totul revine | |

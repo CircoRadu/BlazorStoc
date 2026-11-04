@@ -61,8 +61,6 @@ public static partial class MariaExtendedChecks
             await Rejects<RiskAnalysisOperationException>(() => analyses.CreateAsync(owner.Id, Input(depozit, "AR-21", today.AddDays(1)), false), "The registration date cannot be in the future");
             await Rejects<RiskAnalysisOperationException>(() => analyses.CreateAsync(owner.Id, Input(depozit, "AR-22", initial, 0), false), "The validity must be at least one month");
             await Rejects<RiskAnalysisOperationException>(() => analyses.CreateAsync(owner.Id, Input(depozit, "AR-23", initial, 121), false), "The validity cannot exceed 120 months");
-            var noAuthor = Input(depozit, "AR-24", initial); noAuthor.Author = "  ";
-            await Rejects<RiskAnalysisOperationException>(() => analyses.CreateAsync(owner.Id, noAuthor, false), "The author is required");
             Check((await analyses.GetForBeneficiaryAsync(owner.Id)).Count == 1, "Refused analyses leave nothing behind");
             await Rejects<MySqlException>(() => ExecuteAsync(probe, "INSERT INTO risk_analyses (beneficiary_id, work_point_id, registration_number, author, initial_date, last_renewal_date, validity_months, active_work_point_id) VALUES (@b, @w, 'DB-1', 'x', '2025-01-01', '2025-01-01', 36, @w)",
                 ("@b", owner.Id), ("@w", main.Id)), "The database refuses a second active analysis for a work point (unique active key)");
