@@ -321,6 +321,7 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
             var report = ActivityStructureChecker.Check(await source.ReadStructureAsync(connection, cancellationToken).ConfigureAwait(false));
             var rows = await source.ReadTypesAsync(connection, report, cancellationToken).ConfigureAwait(false);
             if (report.Fingerprint != settings.StructureFingerprint) await SaveStructureAsync(report, cancellationToken).ConfigureAwait(false);
+            await SaveKnownTypesAsync(rows, cancellationToken).ConfigureAwait(false);
             return new ActivityTypesView(Merge(rows, chosen), report.Status, null);
         }
         catch (ActivitySourceException exception) { return new ActivityTypesView(Merge([], chosen), settings.StructureStatus, exception.Message); }
@@ -331,6 +332,8 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         await access.EnsureAsync(View, cancellationToken).ConfigureAwait(false);
         var (settings, _) = await ReadAsync(cancellationToken).ConfigureAwait(false);
         var chosen = await ReadChosenAsync(cancellationToken).ConfigureAwait(false);
+        // The last list read from ActivityApp (chosen or not) is kept, so the unused types are there too when the page opens; before the first reading only the chosen ones are known.
+        if (await ReadKnownTypesAsync(cancellationToken).ConfigureAwait(false) is { Count: > 0 } known) return new ActivityTypesView(Merge(known, chosen), settings.StructureStatus, null);
         return new ActivityTypesView([.. chosen.Select(item => new ActivityTypeItem(item.Id, item.Name, "", null, null, null, null, null, item.Active, item.Destination, item.Active ? ActivityImportRules.StateSelected : ""))],
             settings.StructureStatus, null);
     }
@@ -344,6 +347,25 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         command.Parameters.AddWithValue("@report", JsonSerializer.Serialize(report.Issues));
         command.Parameters.AddWithValue("@now", DateTime.UtcNow);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    // The types of the last reading of ActivityApp (all of them, chosen or not), kept as JSON in the settings row.
+    private async Task SaveKnownTypesAsync(IReadOnlyList<ActivityTypeRow> rows, CancellationToken cancellationToken)
+    {
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("UPDATE activity_import_settings SET known_types=@types, known_types_utc=@now WHERE id = 1", connection);
+        command.Parameters.AddWithValue("@types", JsonSerializer.Serialize(rows));
+        command.Parameters.AddWithValue("@now", MariaTimeText.Format(DateTime.UtcNow));
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<ActivityTypeRow>?> ReadKnownTypesAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("SELECT known_types FROM activity_import_settings WHERE id = 1", connection);
+        if (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not string json || json.Length == 0) return null;
+        try { return JsonSerializer.Deserialize<List<ActivityTypeRow>>(json); }
+        catch (JsonException) { return null; }
     }
 
     private sealed record Chosen(long Id, string Name, bool Active, string Destination);

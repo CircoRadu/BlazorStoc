@@ -213,3 +213,13 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 | 6 | Notificari -> "Tichete de validat" | Coada + sectiunea "Tichete discardate" (reactivare) | |
 | 7 | Notificari -> "Probleme import" | Lista cu "Marchează rezolvata"; Setari -> Import ActivityApp nu o mai are | |
 | 8 | Tichet in coada al carui raport s-a completat dupa prima citire | Dupa urmatorul import apare raportul complet | |
+
+## Modificari de testat - tipurile de tichete se pastreaza si link-ul alertei (04.11.2026, ActivityImport 0.9.0)
+
+**Ce s-a adaugat:** lista tipurilor citite din ActivityApp se pastreaza (migrarea 63); notificarea "Probleme de preluare" duce la tabul "Probleme import" din Notificari.
+**Ce face acum:** la deschiderea Setari -> Preluare ActivityApp, "Tipuri nefolosite" contine si tipurile necitite alese; "Deschide obiectul" pe notificare merge in Notificari.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Setari -> Preluare ActivityApp -> "Citeste tipurile din ActivityApp", apoi iesi si reintra in pagina | Tipurile nefolosite apar fara sa mai apesi "Citeste" | |
+| 2 | Notificari -> notificarea "Probleme de preluare" -> Deschide obiectul | Se deschide Notificari, tabul "Probleme import" | |

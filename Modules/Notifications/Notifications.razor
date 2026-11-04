@@ -44,10 +44,7 @@
     {
         <button type="button" role="tab" id="tab-issues" class="settings-tab @(validationTab == "issues" ? "active" : "")" aria-selected="@(validationTab == "issues" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenIssues()">Probleme import</button>
     }
-    @if (Modules.IsAvailable(ElcomturModuleId))
-    {
-        <AuthorizeView Policy="perm:elcomtur.view"><Authorized><button type="button" role="tab" id="tab-balances" class="settings-tab @(validationTab == "balances" ? "active" : "")" aria-selected="@(validationTab == "balances" ? "true" : "false")" aria-controls="panel-notifications" @onclick="() => OpenBalances()">Balanțe restante</button></Authorized></AuthorizeView>
-    }
+    <ElcomturBalancesTab Active="@(validationTab == "balances")" Selected="OpenBalances" />
 </div>
 
 <div id="panel-notifications" role="tabpanel" aria-labelledby="@(validationTab == "tickets" ? "tab-tickets" : validationTab == "beneficiaries" ? "tab-beneficiaries" : validationTab == "issues" ? "tab-issues" : validationTab == "balances" ? "tab-balances" : showResolved ? "tab-resolved" : "tab-active")">

@@ -30,6 +30,8 @@ public interface IElcomturBalanceRepository
     Task<BeneficiaryBalance?> GetAsync(int beneficiaryId, CancellationToken cancellationToken = default);
     /// <summary>The beneficiaries with a positive balance, the largest first.</summary>
     Task<IReadOnlyList<BeneficiaryBalance>> GetOwedAsync(CancellationToken cancellationToken = default);
+    /// <summary>How many beneficiaries have a positive balance (the number on the tab of the Notifications page).</summary>
+    Task<int> CountOwedAsync(CancellationToken cancellationToken = default);
     Task<ElcomturImportInfo?> GetInfoAsync(CancellationToken cancellationToken = default);
     /// <summary>Replaces every balance by the ones of a new import.</summary>
     Task ReplaceAsync(string firm, DateOnly dataDate, IReadOnlyList<BeneficiaryBalance> balances, CancellationToken cancellationToken = default);

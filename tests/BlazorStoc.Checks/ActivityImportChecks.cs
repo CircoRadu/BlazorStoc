@@ -484,7 +484,7 @@ public static class ActivityImportChecks
         var alerts = ActivityImportAlertSource.Instances(new ActivityImportAlertState(since, "ActivityApp nu a răspuns la timp.", 4, since, 2, since, 5, since));
         check(alerts.Select(item => item.ObjectId).SequenceEqual([1, 2, 3, 4]) && alerts[0].Values[ActivityImportAlertSource.DetailsName].Contains("Ultimele 4 sincronizări", StringComparison.Ordinal)
             && alerts[0].Values[ActivityImportAlertSource.DetailsName].Contains("nu a răspuns", StringComparison.Ordinal) && alerts[1].Values[ActivityImportAlertSource.DetailsName].Contains("2 coloane", StringComparison.Ordinal)
-            && alerts[2].Values[ActivityImportAlertSource.DetailsName].Contains("5 probleme", StringComparison.Ordinal) && alerts.All(item => item.Url == "/setari?tab=preluare-activityapp" && item.Expiry == DateOnly.FromDateTime(since.ToLocalTime())),
+            && alerts[2].Values[ActivityImportAlertSource.DetailsName].Contains("5 probleme", StringComparison.Ordinal) && alerts.All(item => item.Url == (item.ObjectId == ActivityImportAlertSource.IssuesId ? ActivityImportAlertSource.IssuesUrl : "/setari?tab=preluare-activityapp") && item.Expiry == DateOnly.FromDateTime(since.ToLocalTime())),
             "Activity alerts: one notification per lasting condition (sync failing, structure changed, open problems, new types), on the day it began, with the cause");
         check(ActivityImportAlertSource.Instances(new ActivityImportAlertState(null, "", 0, null, 0, since, 0, null)).Count == 0, "Activity alerts: open problems that were all resolved no longer raise the notification");
         var source = new ActivityImportAlertSource(null!);

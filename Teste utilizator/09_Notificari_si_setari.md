@@ -435,3 +435,10 @@ Pasi:
 | 3 | Opreste ANAF, adauga beneficiar si apasa preluarea din ANAF | Mesaj "Modulul ANAF este oprit..."; formularul ramane utilizabil manual | |
 | 4 | Opreste Backup, deschide Setari -> Backup | Mesaj de modul indisponibil | |
 | 5 | Porneste la loc toate modulele | Totul revine | |
+
+## Modificari de testat - tabul Balante restante rosu cu numar (04.11.2026, Elcomtur 1.1.0)
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Dupa o preluare Elcomtur cu beneficiari cu sold pozitiv, deschide Notificari | Tabul "Balante restante" este rosu si arata numarul de beneficiari restanti | |
+| 2 | Fara beneficiari restanti | Tabul nu e rosu si arata 0 | |

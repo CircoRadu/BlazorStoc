@@ -33,6 +33,7 @@ public static partial class MariaExtendedChecks
                 "Elcomtur: the application saves the balance of the beneficiary with its unpaid invoices (the one paid in part with its rest)");
             Check((await balances.GetOwedAsync()).Any(item => item.BeneficiaryId == owner.Id) && (await balances.GetInfoAsync()) is { Firm: "firma1" } info && info.DataDate == new DateOnly(2026, 10, 30) && info.Beneficiaries >= 1,
                 "Elcomtur: the beneficiary with a positive balance is in the list of the owed ones, and the last import is told (date of the backup, firm)");
+            Check(await balances.CountOwedAsync() == (await balances.GetOwedAsync()).Count && await balances.CountOwedAsync() >= 1, "Elcomtur: the number on the tab of the Notifications page is the number of beneficiaries with a positive balance");
             Check(await Events() == 1, "Elcomtur: the journal names the operation \"Preluare date Elcomtur\"");
             await service.DiscardAsync(id);
             await Rejects<ElcomturOperationException>(() => service.RunAsync(id, "firma1", apply: false), "Elcomtur: an uploaded file that was discarded is refused with a message");

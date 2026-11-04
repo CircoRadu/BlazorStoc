@@ -21,6 +21,14 @@ public sealed class MariaElcomturBalanceRepository(IConfiguration configuration,
         return [.. (await ReadAsync("WHERE b.balance > 0", [], cancellationToken).ConfigureAwait(false)).OrderByDescending(item => item.Balance).ThenBy(item => item.BeneficiaryName, StringComparer.CurrentCultureIgnoreCase)];
     }
 
+    public async Task<int> CountOwedAsync(CancellationToken cancellationToken = default)
+    {
+        if (accessControl is not null) await accessControl.EnsureAsync(ViewKey, cancellationToken).ConfigureAwait(false);
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = Command(connection, "SELECT COUNT(*) FROM elcomtur_balances WHERE balance > 0");
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     public async Task<ElcomturImportInfo?> GetInfoAsync(CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureAsync(ViewKey, cancellationToken).ConfigureAwait(false);

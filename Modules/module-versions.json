@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.8.0",
-                                           "hash":  "2b4303276130510ef00e76e3df2c56e6ad38d74c8094284a25205dcd8dc96197",
+                                           "version":  "0.9.0",
+                                           "hash":  "085f5b0e49aa49cfc5a6287965259577550b593deb31c7675e79bb6d63d3f452",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -58,6 +58,11 @@
                                                                "version":  "0.8.0",
                                                                "date":  "04.11.2026",
                                                                "note":  "Coada de validat cu tichetele discardate si problemele importului ca taburi in Notificari (scoase din Setari -\u003e Import ActivityApp)"
+                                                           },
+                                                           {
+                                                               "version":  "0.9.0",
+                                                               "date":  "04.11.2026",
+                                                               "note":  "Lista tipurilor de tichete citite din ActivityApp se pastreaza (migrarea 63); alerta Probleme de preluare duce la tabul Probleme import din Notificari"
                                                            }
                                                        ]
                                        },
@@ -303,8 +308,8 @@
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.3.0",
-                                          "hash":  "b8343be192d5ea40f48c5a8c8905887534d1e2e3c391323be440cb6601953f60",
+                                          "version":  "1.3.1",
+                                          "hash":  "1ba4cade0745bb4aaa5d4666101c8f2777e800aa8f8be0f4b3b314ba359e964f",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -330,6 +335,11 @@
                                                               "version":  "1.3.0",
                                                               "date":  "04.11.2026",
                                                               "note":  "Tab Balante restante (beneficiari cu plati restante din Elcomtur)"
+                                                          },
+                                                          {
+                                                              "version":  "1.3.1",
+                                                              "date":  "04.11.2026",
+                                                              "note":  "Tabul Balante restante vine dintr-o componenta a modulului Elcomtur (rosu cu numarul de beneficiari restanti)"
                                                           }
                                                       ]
                                       },
@@ -466,13 +476,18 @@
                                                  ]
                                  },
                     "Elcomtur":  {
-                                     "version":  "1.0.0",
-                                     "hash":  "b763480821f3feabaea961a0ecd4eefb28b6305331804fbfedfac1fb6fbb6569",
+                                     "version":  "1.1.0",
+                                     "hash":  "21ea4ab08b3a253ecec9a8dfff32ea5d3944684b5a8474705e1da6745fb91846",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
                                                          "date":  "04.11.2026",
                                                          "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                     },
+                                                     {
+                                                         "version":  "1.1.0",
+                                                         "date":  "04.11.2026",
+                                                         "note":  "Numarul de beneficiari cu plati restante pentru tabul din Notificari (CountOwedAsync)"
                                                      }
                                                  ]
                                  }

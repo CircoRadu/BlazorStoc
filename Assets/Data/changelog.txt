@@ -1,3 +1,7 @@
+## 0.5.39 | 04.11.2026
+- Setări, Preluare ActivityApp, Tipuri de tichete: lista tipurilor citite din ActivityApp se păstrează (și tipurile nefolosite), nu doar cele alese; schimbare de schemă 63.
+- Notificări: tabul „Balanțe restante” devine roșu și arată numărul de beneficiari cu plăți restante; notificarea „Probleme de preluare” duce la tabul „Probleme import”, nu la Setări.
+
 ## 0.5.38 | 04.11.2026
 - Modul nou Elcomtur: Administrare, Preluare Elcomtur încarcă un backup al programului Elcomtur (.elc) și calculează balanța de plată (facturat minus încasat) a fiecărui client persoană juridică care este beneficiar (potrivire după CUI); simulare înainte de aplicare; schimbare de schemă 62.
 - Fișa beneficiarului: secțiunea „Balanță Elcomtur" (antet verde „Nu sunt plăți restante" sau roșiatic cu suma și numărul de facturi cu termen depășit și în termen), cu tabelele facturilor neachitate și data backup-ului.

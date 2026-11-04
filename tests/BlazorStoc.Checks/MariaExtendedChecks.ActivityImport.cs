@@ -118,6 +118,8 @@ public static partial class MariaExtendedChecks
             var chosen = await service.GetTypesAsync();
             Check(chosen.Items.Single(item => item.Id == 4) is { Selected: true, Destination: ActivityDestination.OnDemand } && chosen.Items.Single(item => item.Id == 13) is { Selected: true, Destination: ActivityDestination.Maintenance }
                 && chosen.Items.Single(item => item.Id == 25) is { Selected: false, State: ActivityImportRules.StateNew }, "Activity import: the chosen types and their destinations are saved by the ID of the type; a type not chosen shows as new");
+            var keptTypes = await service.GetSavedTypesAsync();
+            Check(keptTypes.Items.Count == 3 && keptTypes.Items.Single(item => item.Id == 25) is { Selected: false, Name: "Intervenție la cerere" } && keptTypes.Items.Single(item => item.Id == 4).Selected, "Activity import: the list of types read from ActivityApp is keptTypes, so the unused types are there when the settings open (not only the chosen ones)");
 
             fake.Types = [new(4, "Service tehnic", "S", true, false, 293, 79, 6), fake.Types[1], fake.Types[2]];
             var renamed = await service.GetTypesAsync();

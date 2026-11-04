@@ -37,6 +37,8 @@ public sealed class ActivityImportAlertSource(IActivityImportAlertReader reader,
     public const string ProblemName = "problema preluare";
     public const string DetailsName = "detalii preluare";
     public const int FailingId = 1, StructureId = 2, IssuesId = 3, TypesId = 4;
+    // The open problems of the import are listed in the tab "Probleme import" of the Notifications page (not in the settings).
+    public const string IssuesUrl = "/notificari?tab=probleme";
     public string Key => key;
     public string Category => "Sistem";
     public string EventName => "Preluare ActivityApp cu probleme";
@@ -61,8 +63,8 @@ public sealed class ActivityImportAlertSource(IActivityImportAlertReader reader,
     {
         const string url = "/setari?tab=preluare-activityapp";
         var result = new List<ExpiryInstance>();
-        ExpiryInstance Make(int id, string label, DateTime since, string problem, string details) =>
-            new(id, label, Day(since), new Dictionary<string, string> { [ProblemName] = problem, [DetailsName] = details }, url);
+        ExpiryInstance Make(int id, string label, DateTime since, string problem, string details, string? link = null) =>
+            new(id, label, Day(since), new Dictionary<string, string> { [ProblemName] = problem, [DetailsName] = details }, link ?? url);
         if (state.FailingSince is { } failing)
             result.Add(Make(FailingId, "Sincronizarea cu ActivityApp", failing, "sincronizarea eșuează",
                 $"Ultimele {Math.Max(state.Failures, ActivitySyncSchedule.FailuresBeforeAlert)} sincronizări au eșuat. Cauza: {(state.FailureMessage.Length > 0 ? state.FailureMessage : "necunoscută")}"));
@@ -70,7 +72,7 @@ public sealed class ActivityImportAlertSource(IActivityImportAlertReader reader,
             result.Add(Make(StructureId, "Structura ActivityApp", structure, "structura ActivityApp s-a schimbat",
                 $"După o actualizare a ActivityApp, {(state.StructureIssues > 0 ? state.StructureIssues + " coloane necesare lipsesc sau au alt tip" : "structura nu mai corespunde")}; datele afectate nu se preiau. Poate fi nevoie de o actualizare a modulului de preluare."));
         if (state.IssuesSince is { } issues && state.OpenIssues > 0)
-            result.Add(Make(IssuesId, "Probleme de preluare", issues, "probleme de preluare deschise", $"Sunt {state.OpenIssues} probleme de preluare deschise (elemente care nu s-au putut prelua sau au fost șterse în ActivityApp)."));
+            result.Add(Make(IssuesId, "Probleme de preluare", issues, "probleme de preluare deschise", $"Sunt {state.OpenIssues} probleme de preluare deschise (elemente care nu s-au putut prelua sau au fost șterse în ActivityApp).", IssuesUrl));
         if (state.TypesSince is { } types)
             result.Add(Make(TypesId, "Tipuri de tichete", types, "tipuri de tichete noi sau schimbate", "ActivityApp are tipuri de tichete noi sau cu alt nume decât cele alese; tipurile schimbate nu se preiau până le confirmi."));
         return result;
