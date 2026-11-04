@@ -1,3 +1,10 @@
+## 0.5.37 | 04.11.2026
+- Preluare tichete ActivityApp: executantul este format din agenții atașați evenimentului; se preiau doar evenimentele în starea Finalizat; coordonatele GPS ale evenimentului completează punctul de lucru fără coordonate (schimbare de schemă 61); tichetul din coada de validare se actualizează dacă raportul sau executanții se schimbă în ActivityApp.
+- Notificări: coada de tichete de validat (cu tichetele discardate) și problemele importului sunt taburi în Notificări, nu mai sunt în Setări, Import ActivityApp.
+- Adăugarea unui beneficiar, furnizor sau vehicul se face într-o fereastră (popup); în analiza de risc dispare câmpul „Întocmită de”, iar data devine „Data întocmirii”; butoanele Închide și Anulează din formularul de adăugare funcționează.
+- Șabloane de facturi: CUI-ul furnizorului corectat manual rămâne la salvare, iar un CUI citit prin OCR cu o cifră dublată se corectează după cifra de control.
+- Module oprite: panourile Backup și Jurnal din Setări, căutarea ANAF și legarea intrării de factură arată mesaje clare când modulul lor este oprit.
+
 ## 0.5.36 | 30.10.2026
 - Fișa beneficiarului, Intervenții: iconiță de vizualizare în fereastră (datele intervenției și tichetul ActivityApp din care provine) și posibilitatea de a schimba felul intervenției (Mentenanță / La cerere) la editare, dacă nu a mutat o scadență; operația apare în jurnal ca „Schimbare fel intervenție”.
 - Notificări: paginare la tabelele de notificări (restante, viitoare, rezolvate) și la coada de tichete de validat.
