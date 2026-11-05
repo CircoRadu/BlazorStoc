@@ -352,8 +352,8 @@ public static class HelpChecks
         "Home.razor", "Beneficiaries.razor", "Suppliers.razor", "Vehicles.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor",
         // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.
         "EntityFilePreview.razor", "BeneficiaryDetail.razor", "ServiceContractsSection.razor", "ServiceInterventionsSection.razor", "RiskAnalysesSection.razor", "EntityFilesPanel.razor",
-        // The popups of the validation queue of the tickets (view, edit + take, discard confirmation): their topic is to be written (listed in docs/HELP_DE_REGENERAT.md).
-        "ActivityReviewSection.razor"
+        // The popups of the validation queue of the tickets (view, edit + take, discard confirmation) and the view of a discarded ticket: their topic is to be written (listed in docs/HELP_DE_REGENERAT.md).
+        "ActivityReviewSection.razor", "ActivityDiscardedSection.razor"
     };
 
     private static string? FindRoot()

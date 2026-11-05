@@ -251,6 +251,11 @@ public static class AuditActions
     public const string SetActivityFieldMap = "Modificare corespondență câmpuri ActivityApp";
     public const string DecideActivityMaintenance = "Validare mentenanță ActivityApp";
     public const string ImportElcomtur = "Preluare date Elcomtur";
+    public const string SetElcomturAuto = "Modificare setări preluare automată Elcomtur";
+    public const string TestElcomturAuto = "Testare director backup Elcomtur";
+    public const string CheckElcomturAuto = "Verificare backup Elcomtur";
+    public const string ImportElcomturAuto = "Preluare automată backup Elcomtur";
+    public const string FailElcomturAuto = "Eșec preluare automată Elcomtur";
     public const string AddActivityKeyword = "Adăugare cuvânt cheie mentenanță ActivityApp";
     public const string EditActivityKeyword = "Modificare cuvânt cheie mentenanță ActivityApp";
     public const string DeleteActivityKeyword = "Ștergere cuvânt cheie mentenanță ActivityApp";

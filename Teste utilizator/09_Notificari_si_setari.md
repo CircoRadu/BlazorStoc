@@ -1,8 +1,18 @@
-# Notificari si Setari (/notificari, /setari)
+﻿# Notificari si Setari (/notificari, /setari)
 
 Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de notificari -> /notificari arata alertele active, rezolvate si ordonate dupa urgenta; meniul are un contor.
 
 ## Modificari de testat
+
+### 05.11.2026 - Setari -> Preluare Elcomtur: preluare automata a backup-ului Elcomtur
+**Ce s-a adaugat:** tab nou "Preluare Elcomtur" in Setari (langa "Preluare ActivityApp", doar administrator): comutator On/Off "Preluare automata", directorul cu backup-urile Elcomtur (cale de retea \\server\partajare\folder cu cont si parola, sau director local), masca numelui de fisier (ex. *elcomtur*), firma de preluat (aleasa din firmele backup-ului, cu numele: "firma1 - Electric Standard Prest SRL"), pragul de alerta in zile, butoanele Salveaza, Testeaza conexiunea, Citeste firmele din backup, Verifica acum si Preia ultimul backup acum. In fiecare zi la 04:00 se cauta in director cel mai recent fisier care corespunde mastii; daca e mai nou decat ultima preluare se copiaza pe server, se verifica integritatea tuturor fisierelor din arhiva si se preiau balantele. Pe server raman ultimele 2 backup-uri preluate. Operatiile sunt jurnalizate (Modificare setari preluare automata Elcomtur, Testare director backup Elcomtur, Verificare backup Elcomtur, Preluare automata backup Elcomtur, Esec preluare automata Elcomtur) si au notificari: "Elcomtur: backup preluat" (ramane 3 zile), "Elcomtur: preluare esuata" (cu cauza, se inchide la prima verificare reusita) si "Elcomtur: backup lipsa" (cand de pragul de zile nu a aparut un backup nou; se inchide la urmatoarea preluare, si cea manuala).
+**Ce face acum:** o singura incercare pe zi (la 04:00 sau la prima pornire a serverului dupa aceea); "Verifica acum" face aceeasi verificare oricand (preia numai un fisier mai nou decat ultima preluare), iar "Preia ultimul backup acum" preia cel mai recent fisier chiar daca nu e mai nou. Un fisier modificat acum mai putin de 5 minute nu se preia (programul Elcomtur il scrie inca). Un fisier corupt nu se preia: balantele raman cele vechi si apare notificarea de esec.
+Pasi: Setari -> Preluare Elcomtur -> completeaza directorul, contul si parola (pentru NAS), masca -> Testeaza conexiunea -> Citeste firmele din backup si alege firma -> pune Preluare automata pe Activ -> Salveaza -> Verifica acum: backup-ul se preia, apare "Elcomtur: backup preluat" in Notificari; Verifica acum a doua oara: "Nu exista un backup mai nou"; schimba masca in una fara potrivire -> Verifica acum: mesaj de eroare + notificarea de esec; revino la masca buna -> notificarea de esec se inchide singura. Pentru alerta de lipsa: pune pragul la 1 zi si asteapta sa treaca o zi fara backup nou (sau ruleaza pe o instanta de test cu data schimbata).
+
+### 05.11.2026 - Backup NAS: fiecare backup in subdirector propriu
+**Ce s-a adaugat:** copierea pe NAS pune fiecare pachet de backup intr-un subdirector al partajarii, numit ca pachetul fara extensie (ex. \\nas\backup\Pachet-X\Pachet-X.zip cu Pachet-X.zip.sha256 alaturi).
+**Ce face acum:** la urmatorul backup (sau "Copiaza pachetele lipsa") apare un subdirector nou pe NAS pentru fiecare pachet. Pachetele copiate inainte de aceasta schimbare raman in radacina partajarii, nu se copiaza a doua oara si nu se muta; lista pachetelor de pe NAS si aducerea unui pachet de pe NAS le gasesc si pe ele, si pe cele din subdirectoare.
+Pasi: Setari -> Backup NAS -> fa un backup manual -> pe partajare apare subdirectorul pachetului cu .zip si .sha256 in el; repeta copierea: nu se mai copiaza nimic; din lista de pe NAS adu un pachet vechi (din radacina) si unul nou (din subdirector).
 
 ### 24.10.2026 - Tema intunecata, iconite pe tile-urile Setarilor, bara verde pe meniuri si taburi
 

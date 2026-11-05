@@ -42,6 +42,8 @@ public interface IActivityReviewService
     Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default);
     /// <summary>The tickets discarded, newest first.</summary>
     Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default);
+    /// <summary>The ticket as read from ActivityApp, to view a discarded one (read only).</summary>
+    Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default);
     /// <summary>A discarded ticket is taken again by the next synchronization.</summary>
     Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default);
 }
@@ -328,6 +330,14 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         return items;
     }
 
+    public async Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync("setari-import-activityapp.view", cancellationToken).ConfigureAwait(false);
+        var stored = await ActivityTicketStore.FindAsync(configuration, ticketId, cancellationToken).ConfigureAwait(false);
+        if (stored is null || stored.State != TicketStates.Discarded) throw new ActivityImportException("Tichetul nu mai este discardat. Actualizează lista.");
+        return ActivityTicketPlanner.SourceOf(stored.Ticket);
+    }
+
     public async Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync("setari-import-activityapp.run", cancellationToken).ConfigureAwait(false);
@@ -353,7 +363,44 @@ public sealed class ActivityReviewSource(IConfiguration configuration, string ke
     public string EventName => "Evenimente ActivityApp de validat ca mentenanță";
     public string DateLabel => "constatării";
     public int DefaultThresholdDays => 0;
-    public string RemovedReason => "Evenimentul a fost validat, respins sau discardat.";
+    public string RemovedReason => "Nu mai așteaptă niciun eveniment ActivityApp să fie validat.";
+
+    // What really happened: the decisions taken since the notification appeared (taken as maintenance, taken as service on demand, discarded), by whom and when;
+    // when none is recorded, the queue was emptied otherwise (events reactivated or the import reset), and the reason says so.
+    public async Task<string> RemovedReasonAsync(ExpiryNotification notification, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+            await using var command = new MySqlCommand("SELECT status, COUNT(*), MAX(decided_utc), GROUP_CONCAT(DISTINCT decided_by ORDER BY decided_by SEPARATOR ', ') FROM activity_import_suggestions WHERE status <> 'pending' AND decided_utc >= @since GROUP BY status", connection);
+            command.Parameters.AddWithValue("@since", notification.CreatedUtc);
+            int maintenance = 0, service = 0, discarded = 0;
+            DateTime? last = null;
+            var people = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var count = (int)reader.GetInt64(1);
+                switch (reader.GetString(0))
+                {
+                    case ActivityReviewStore.Confirmed: maintenance = count; break;
+                    case ActivityReviewStore.Rejected: service = count; break;
+                    case ActivityReviewStore.Discarded: discarded = count; break;
+                    default: continue;
+                }
+                if (!reader.IsDBNull(2) && (last is null || reader.GetDateTime(2) > last)) last = reader.GetDateTime(2);
+                if (!reader.IsDBNull(3)) foreach (var person in reader.GetString(3).Split(", ", StringSplitOptions.RemoveEmptyEntries)) people.Add(person);
+            }
+            var parts = new List<string>();
+            if (maintenance > 0) parts.Add($"{maintenance} preluate ca mentenanță");
+            if (service > 0) parts.Add($"{service} preluate ca service la cerere");
+            if (discarded > 0) parts.Add($"{discarded} discardate");
+            if (parts.Count == 0)
+                return $"Coada de validare s-a golit fără nicio decizie înregistrată după apariția notificării ({notification.CreatedUtc.ToLocalTime():dd.MM.yyyy HH:mm}): evenimentele au fost scoase din coadă altfel (de exemplu reactivare sau resetarea preluării).";
+            return $"Coada de validare s-a golit: de la {notification.CreatedUtc.ToLocalTime():dd.MM.yyyy HH:mm} s-au decis {maintenance + service + discarded} evenimente ({string.Join(", ", parts)}) de {string.Join(", ", people)}; ultima decizie la {last!.Value.ToLocalTime():dd.MM.yyyy HH:mm}.";
+        }
+        catch (Exception exception) when (exception is MySqlException or InvalidOperationException) { return RemovedReason; }
+    }
     public string DefaultSubject => "Validează mentenanța: <tichet de validat>";
     public string DefaultBody => "<detalii validare> Vezi Mentenanță, secțiunea „Evenimente de validat”.";
     public IReadOnlyList<ExpiryPlaceholder> Placeholders { get; } =
@@ -403,6 +450,7 @@ internal sealed class GuardedActivityReviewService(IActivityReviewService inner,
     public Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DecideAsync(id, decision, cancellationToken));
     public Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.TakeAsync(id, input, cancellationToken));
     public Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDiscardedAsync(cancellationToken));
+    public Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDiscardedDetailAsync(ticketId, cancellationToken));
     public Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ReactivateAsync(ticketId, cancellationToken));
 }
 
@@ -413,5 +461,6 @@ internal sealed class UnavailableActivityReviewService : IActivityReviewService
     public Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(ActivityImportModule.ModuleId));
     public Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(ActivityImportModule.ModuleId));
     public Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default) => Task.FromException<IReadOnlyList<ActivityDiscardedTicket>>(new ModuleUnavailableException(ActivityImportModule.ModuleId));
+    public Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default) => Task.FromException<TicketSource>(new ModuleUnavailableException(ActivityImportModule.ModuleId));
     public Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(ActivityImportModule.ModuleId));
 }

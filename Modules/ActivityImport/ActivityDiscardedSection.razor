@@ -28,7 +28,7 @@
                     <td>@discarded.TicketNumber @discarded.Title</td>
                     <td>@discarded.DiscardedBy</td>
                     <td>@discarded.DiscardedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
-                    <td><button type="button" class="row-icon undo" disabled="@(busy || !discarded.CanReactivate)" aria-label="@($"Reactivează tichetul {discarded.TicketNumber}")" title="@(discarded.CanReactivate ? "Reactivează tichetul (se preia la următoarea sincronizare)" : "Tichetul nu mai poate fi reactivat")" @onclick="() => ReactivateAsync(discarded.TicketId)"></button></td>
+                    <td><button type="button" class="row-icon view" disabled="@busy" aria-label="@($"Vizualizează tichetul {discarded.TicketNumber}")" title="Vizualizează tichetul" @onclick="() => OpenViewAsync(discarded)"></button><button type="button" class="row-icon undo" disabled="@(busy || !discarded.CanReactivate)" aria-label="@($"Reactivează tichetul {discarded.TicketNumber}")" title="@(discarded.CanReactivate ? "Reactivează tichetul (se preia la următoarea sincronizare)" : "Tichetul nu mai poate fi reactivat")" @onclick="() => ReactivateAsync(discarded.TicketId)"></button></td>
                 </tr>
             }
             </tbody>
@@ -37,8 +37,38 @@
     }
 </section>
 
+@if (viewed is { } shown && viewedSource is { } source)
+{
+    <div class="delete-overlay" @onkeydown="PopupKey">
+        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="discarded-view-title">
+            <div class="catalog-heading"><h2 id="discarded-view-title">Tichet @shown.TicketNumber @shown.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup">Închide</button></span></div>
+            <dl class="review-facts">
+                <dt>Discardat de</dt><dd>@shown.DiscardedBy</dd>
+                <dt>La data</dt><dd>@shown.DiscardedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd>
+                <dt>Executant</dt><dd>@(source.Executor.Length > 0 ? source.Executor : "—")</dd>
+                <dt>Problema</dt><dd class="review-text">@(source.Problem.Length > 0 ? source.Problem : "—")</dd>
+                <dt>Rezolvarea</dt><dd class="review-text">@(source.Resolution.Length > 0 ? source.Resolution : "—")</dd>
+                <dt>Raportul original</dt><dd class="review-text">@(source.Report.Length > 0 ? source.Report : "—")</dd>
+            </dl>
+        </div>
+    </div>
+}
+
 @code {
     private IReadOnlyList<ActivityDiscardedTicket>? items;
+    // The ticket opened for viewing (read only) and what ActivityApp has on it.
+    private ActivityDiscardedTicket? viewed;
+    private TicketSource? viewedSource;
+
+    private Task OpenViewAsync(ActivityDiscardedTicket ticket) => RunAsync(async () =>
+    {
+        viewedSource = await Reviews.GetDiscardedDetailAsync(ticket.TicketId, lifetime.Token);
+        viewed = ticket;
+    });
+
+    private void ClosePopup() { if (busy) return; viewed = null; viewedSource = null; }
+    private void PopupKey(KeyboardEventArgs args) { if (args.Key == "Escape") ClosePopup(); }
+
     private bool busy;
     private string? notice, error;
     private readonly CancellationTokenSource lifetime = new();

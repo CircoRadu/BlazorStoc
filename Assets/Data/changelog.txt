@@ -1,3 +1,14 @@
+## 0.5.42 | 05.11.2026
+- Setări, Preluare Elcomtur (tab nou): preluare automată a backup-ului Elcomtur dintr-un director local sau NAS (cu cont și parolă), verificare zilnică la 04:00 după o mască de nume, firma aleasă cu nume, verificarea integrității arhivei, ultimele 2 backup-uri păstrate pe server, butoanele „Verifică acum” și „Preia ultimul backup acum”; schimbare de schemă 64.
+- Notificări: „Elcomtur: backup preluat”, „preluare eșuată” (cu cauza) și „backup lipsă” după pragul de zile setat.
+- Backup NAS: fiecare backup se face în subdirector propriu.
+- Preluare ActivityApp: tichetele discardate pot fi vizualizate; motivul notificărilor indică exact ce s-a întâmplat.
+
+## 0.5.41 | 05.11.2026
+- Adaugă produs: categoria și subcategoria se aleg dintr-un selector arborescent cu toată structura (orice adâncime; produsul se pune numai pe frunze), în locul celor două liste; parametrii și etichetele frunzei apar sub selector.
+- Intrări/ieșiri produs: comutatorul „Arată operator” afișează coloana Operator (ultimul operator care a modificat mișcarea, altfel cel care a creat-o).
+- Categorii și subcategorii: corectat textul rezidual „if (isAdministrator) { }” de sub listă; zona de plasare de la sfârșitul listei de categorii apare din nou pentru administrator.
+
 ## 0.5.40 | 05.11.2026
 - Beneficiari: secțiunea „Balanță Elcomtur” apare la toți beneficiarii; fără balanță importată, antetul spune „Nu există balanță importată pentru acest beneficiar”.
 - Meniul lateral se actualizează imediat când un modul este oprit sau pornit din Setări, Module (înainte, după următoarea navigare).

@@ -106,8 +106,8 @@ public static class PickupWizardChecks
 
         // A product prepared for row 0, then back to step 1 and forward again: the corrections and the prepared product are still there.
         cut.FindAll("button").First(button => button.TextContent.Contains("Pregătește un produs nou")).Click();
-        cut.WaitForAssertion(() => cut.Find("#product-category"), TimeSpan.FromSeconds(10));
-        cut.WaitForAssertion(() => { if (cut.FindAll("#product-subcategory option").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+        cut.WaitForAssertion(() => cut.Find("#product-group-trigger"), TimeSpan.FromSeconds(10));
+        cut.WaitForAssertion(() => { if (cut.Find("#product-group-trigger").GetAttribute("data-subcategory") is null or "") throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         cut.Find("form").Submit();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Produs nou pregătit")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         check(cut.Markup.Contains("Produs nou pregătit"), "Pickup wizard: a product can be prepared for a row of step 2");

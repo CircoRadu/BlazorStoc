@@ -56,6 +56,7 @@ public static class Permissions
         new("notificari", "Notificari", "Notificari", [new(View, "Vizualizare"), new(Edit, "Marcare / rezolvare")]),
         new("setari-facturi", "Setari: Facturi (sabloane)", "Setari", [new(View, "Vizualizare"), new(Add, "Creare sablon"), new(Edit, "Modificare sablon"), new(Delete, "Stergere sablon", false)]),
         new("setari-import-activityapp", "Setari: Preluare tichete ActivityApp", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare setari si tipuri", false), new("run", "Rulare import", false), new("reset", "Resetare import", false)]),
+        new("setari-import-elcomtur", "Setari: Preluare automata Elcomtur", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare setari", false), new("run", "Verificare / preluare la cerere", false)]),
         new("setari-anaf", "Setari: Preluare date ANAF", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
         new("setari-notificari", "Setari: Notificari", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
         new("setari-harta", "Setari: Harta", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
@@ -112,7 +113,7 @@ public static class Permissions
     public static bool IsKnown(string key) => AllKeys.Contains(key, StringComparer.Ordinal);
 
     // Modules reserved to the administrator: never offered to, saved for, or honoured for any other user type.
-    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module", "setari-actualizare", "setari-import-activityapp", "setari-jurnal" };
+    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module", "setari-actualizare", "setari-import-activityapp", "setari-import-elcomtur", "setari-jurnal" };
 
     public static bool IsAdminOnly(string key) => AdminOnlyModules.Contains(key[..Math.Max(key.IndexOf('.'), 0)]);
 

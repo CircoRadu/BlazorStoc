@@ -136,6 +136,11 @@ public static partial class MariaExtendedChecks
             var uncovered = await review.GetDetailAsync(pending.Single(item => item.TicketId == 9005).Id);
             await review.TakeAsync(uncovered.Item.Id, new ReviewTakeInput(ReviewCategory.Maintenance, uncovered.WorkPointId, uncovered.Item.PerformedOn, uncovered.NotesMaintenance));
             await review.DecideAsync(pending.Single(item => item.TicketId == 9006).Id, ReviewDecision.OnDemand);
+            var emptiedReason = await source.RemovedReasonAsync(new ExpiryNotification(1, 1, ActivityReviewSource.SourceKey, ActivityReviewSource.AggregateId, DateOnly.FromDateTime(DateTime.Today), DateTime.UtcNow.AddHours(-1), null, null, null, null, 0));
+            var untouchedReason = await source.RemovedReasonAsync(new ExpiryNotification(1, 1, ActivityReviewSource.SourceKey, ActivityReviewSource.AggregateId, DateOnly.FromDateTime(DateTime.Today), DateTime.UtcNow.AddHours(1), null, null, null, null, 0));
+            Check(emptiedReason.Contains("2 preluate ca mentenanță") && emptiedReason.Contains("3 preluate ca service la cerere") && emptiedReason.Contains("1 discardate") && emptiedReason.Contains("6 evenimente") && !emptiedReason.Contains("respins")
+                  && untouchedReason.Contains("fără nicio decizie"),
+                "Activity validation notification: the reason of a resolved notification says what was decided (how many taken as maintenance, as service, discarded, by whom and when), or that the queue was emptied without decisions");
             var twice = 0;
             try { await review.DecideAsync(pending.Single(item => item.TicketId == 9002).Id, ReviewDecision.Maintenance); } catch (ActivityImportException) { twice++; }
             Check(twice == 1 && (await review.GetPendingAsync()).Count == 0 && (await source.GetInstancesAsync()).Count == 0, "Activity maintenance: a decision is taken once and the notification goes away");

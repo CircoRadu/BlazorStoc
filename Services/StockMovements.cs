@@ -36,7 +36,7 @@ public sealed record StockMovement(int Id, int ProductId, StockMovementKind Kind
     int? InvoiceId = null, string? InvoiceNumber = null, string? SupplierName = null, int? SupplierId = null,
     FreeEntryType? FreeType = null, int? FreeSupplierId = null, string? FreeSupplierName = null, string? Reference = null,
     OverStockCause? OverStockCause = null, int? OperationId = null,
-    string? VoidedUtc = null, string? VoidReason = null, string? VoidedBy = null, int? ReturnOfMovementId = null)
+    string? VoidedUtc = null, string? VoidReason = null, string? VoidedBy = null, int? ReturnOfMovementId = null, string? LastOperator = null)
 {
     // The exit operation it belonged to was voided (storno): the row stays as a trace but no longer counts in any stock.
     [JsonIgnore] public bool IsVoided => VoidedUtc is not null;

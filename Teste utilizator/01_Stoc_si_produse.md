@@ -1,8 +1,24 @@
-# Stoc, produse si categorii (/produse, /categorii)
+﻿# Stoc, produse si categorii (/produse, /categorii)
 
 Fluxul: meniul Stoc -> lista de produse (cautare, categorii in stanga) -> adaugi/editezi un produs -> imagine, cod, categorie -> sterge cu motiv. Categoriile si subcategoriile se gestioneaza din Administrare -> Categorii.
 
 ## Modificari de testat
+
+
+
+### 05.11.2026 - Intrari/iesiri produs: comutatorul "Arata operator"
+**Ce s-a adaugat:** sub filtrele de pe pagina de intrari/iesiri a produsului, comutatorul On/Off "Arata operator".
+**Ce face acum:** pe On apare, intre DATA si INTRARE/IESIRE, coloana OPERATOR cu ultimul operator al miscarii (cel care a modificat-o, daca a fost modificata; altfel cel care a creat-o); mouse-ul pe celula arata "Creat de X; modificat ultima data de Y". Pe Off coloana dispare. Implicit Off, starea se pierde la reincarcarea paginii.
+Pasi: Produse -> un produs -> Intrari/iesiri -> porneste "Arata operator" -> apare coloana; modifica o miscare cu alt utilizator -> coloana arata utilizatorul care a modificat; opreste comutatorul -> coloana dispare.
+
+### 05.11.2026 - Adauga produs: selector arborescent de categorie
+**Ce s-a adaugat:** in dialogul "Adauga produs" (si la editarea / pregatirea unui produs) cele doua liste Categorie si Subcategorie sunt inlocuite de un singur camp "Categorie si subcategorie" care deschide arborele intreg de categorii.
+**Ce face acum:** apasa campul, extinde categoriile si ramurile (orice adancime) si alege o frunza; campul arata calea (ex. "Supraveghere Video > Camere Video > Camere Video IP"). Categoriile si subcategoriile care au copii doar se extind, produsul se pune numai pe frunze. La deschidere se vede frunza aleasa curent. Dupa alegerea unei frunze cu parametri apar campurile de valori (si etichetele, daca exista); salvarea fara valoarea unui parametru obligatoriu este refuzata. Butonul "Adauga categorie / subcategorie" ramane.
+Pasi: Produse -> Adauga produs -> alege "Supraveghere Video > Camere Video > Camere Video IP" -> apare parametrul Lentila -> scrie un cod, apasa Salveaza fara valoare -> mesaj de refuz.
+
+### 05.11.2026 - Categorii: text rezidual sub lista
+**Ce s-a adaugat:** corectie de afisare.
+**Ce face acum:** pagina /categorii nu mai arata sub lista textul "if (isAdministrator) { }".
 
 ### 27.10.2026 - Parametri: stergerea unui parametru care are produse
 

@@ -10,7 +10,7 @@ public sealed class ElcomturModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Elcomtur";
-    public Version Version { get; } = new(1, 1, 1);
+    public Version Version { get; } = new(1, 2, 0);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)
@@ -20,11 +20,22 @@ public sealed class ElcomturModule : IModule
         services.AddScoped<IElcomturImportService>(provider => new GuardedElcomturImportService(
             new ElcomturImportService(provider.GetRequiredService<IBeneficiaryRepository>(), provider.GetRequiredService<IElcomturBalanceRepository>(),
                 provider.GetService<IAccessControl>(), provider.GetService<IAuditTrail>()), provider.GetRequiredService<ModuleRegistry>()));
+        services.AddScoped<IElcomturAutoService>(provider => new ElcomturAutoService(provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>(),
+            provider.GetRequiredService<IBeneficiaryRepository>(), provider.GetRequiredService<IElcomturBalanceRepository>(), provider.GetService<IAccessControl>(), provider.GetService<IAuditTrail>(),
+            provider.GetRequiredService<ILogger<ElcomturAutoService>>()));
+        services.AddScoped<IElcomturAutoAlertReader>(provider => new MariaElcomturAutoAlertReader(provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<Microsoft.AspNetCore.DataProtection.IDataProtectionProvider>()));
+        services.AddHostedService<ElcomturAutoWorker>();
+    }
+
+    public void RegisterNotificationSources(IServiceCollection services)
+    {
+        services.AddScoped<IExpirySource>(provider => new ElcomturAutoAlertSource(provider.GetRequiredService<IElcomturAutoAlertReader>()));
     }
 
     public void RegisterUnavailable(IServiceCollection services)
     {
         services.AddScoped<IElcomturBalanceRepository, UnavailableElcomturBalanceRepository>();
         services.AddScoped<IElcomturImportService, UnavailableElcomturImportService>();
+        services.AddScoped<IElcomturAutoService, UnavailableElcomturAutoService>();
     }
 }

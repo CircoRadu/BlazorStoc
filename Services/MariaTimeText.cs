@@ -72,6 +72,10 @@ internal static class MariaAssetPaths
 
     // Subtask 2.1/2.2 (Task 2): database backup packages (.zip + manifest) and the shared operation lock file live
     // here, outside wwwroot and outside every path served as a static file, like every other asset directory above.
+    // The Elcomtur backups taken from the NAS by the automatic import (the last two used ones are kept).
+    public static string ElcomturBackups(IConfiguration configuration) => Path.GetFullPath(
+        configuration["Database:MariaElcomturBackupsPath"] ?? Path.Combine(AssetsRoot(configuration), "elcomtur-backups"));
+
     public static string DatabaseBackups(IConfiguration configuration) => Path.GetFullPath(
         configuration["Database:MariaBackupFilesPath"] ?? Path.Combine(AssetsRoot(configuration), "database-backups"));
 

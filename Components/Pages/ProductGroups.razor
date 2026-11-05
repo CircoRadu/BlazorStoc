@@ -151,7 +151,7 @@ else
             </CollapsibleSection>
             </div>
         }
-        if (isAdministrator) { <div class="category-drop-strip" data-new-category-at="@Categories.Count" aria-hidden="true"></div> }
+        @if (isAdministrator) { <div class="category-drop-strip" data-new-category-at="@Categories.Count" aria-hidden="true"></div> }
     </div>
 }
 

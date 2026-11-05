@@ -1,10 +1,16 @@
-# Preluare tichete ActivityApp (Setari -> Preluare ActivityApp)
+﻿# Preluare tichete ActivityApp (Setari -> Preluare ActivityApp)
 
 Fluxul: administratorul introduce contul doar-citire al bazei ActivityApp, testeaza conexiunea (se verifica si structura bazei), citeste lista tipurilor de tichete si alege cele care se leaga de service/mentenanta. Etapa 1: nu se preia nimic inca (beneficiari, puncte de lucru si tichete urmeaza). Ferestrei nu i s-a scris help (decizie: doar la cerere).
 
 Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza ActivityApp (nu `sa`) si de adresa serverului. Migrarea 044 se aplica la pornirea aplicatiei.
 
 ## Modificari de testat
+
+
+### 05.11.2026 - Tichete discardate: vizualizare tichet; motiv concret la notificarea de validare
+**Ce s-a adaugat:** (1) pe fiecare rand din "Tichete discardate" o iconita de vizualizare (langa cea de reactivare); (2) motivul de rezolvare al notificarii "Validează mentenanta" nu mai e generic.
+**Ce face acum:** (1) iconita deschide un popup doar pentru citire cu numarul si titlul tichetului, cine l-a discardat si cand, executantul, problema, rezolvarea si raportul original; Inchide sau Escape il inchid. (2) cand coada de validare se goleste, notificarea rezolvata scrie, de ex.: "Coada de validare s-a golit: de la 30.10.2026 14:36 s-au decis 922 evenimente (900 preluate ca mentenanta, 20 preluate ca service la cerere, 2 discardate) de ion; ultima decizie la 05.11.2026 10:12." Daca nu e nicio decizie inregistrata, spune ca evenimentele au fost scoase din coada altfel (reactivare sau resetarea preluarii). Notificarile deja rezolvate pastreaza motivul vechi.
+Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita de vizualizare pe un rand; decide cateva tichete din coada pana se goleste si deschide notificarea din tabul Rezolvate: motivul numara deciziile.
 
 ### 29.10.2026 - Preluare automata a persoanelor fizice si a partenerilor fara tichete, coada unica, comutatoare (0.5.31)
 

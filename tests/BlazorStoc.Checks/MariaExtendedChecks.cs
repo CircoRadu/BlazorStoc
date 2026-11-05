@@ -40,6 +40,7 @@ public static partial class MariaExtendedChecks
             await Section("Risk analyses: one active per point, renewals and history, notification, replace, guards, archive", () => RiskAnalysesAsync(configuration, admin, audit, probe));
             await Section("Risk analyzers: nomenclator, unique name, used analyzers, journal", () => RiskAnalyzersAsync(configuration, admin, audit, probe));
             await Section("Elcomtur: import of the backup, balances of the beneficiaries, journal", () => ElcomturAsync(configuration, admin, audit, probe));
+            await Section("Elcomtur automatic import: directory, mask, firm, integrity, retention, schedule, notifications", () => ElcomturAutoAsync(configuration, admin, audit, probe));
             await Section("Beneficiary files: free files, listing with sections, rename without extension, delete, journal", () => BeneficiaryFilesAsync(configuration, admin, audit, probe));
             await Section("User types: system types, catalog permissions, seeding, assignment", () => UserTypesAsync(configuration, admin, audit, probe));
             await Section("Stock permissions: each kind of movement asks for its own key", () => StockPermissionsAsync(configuration, admin, audit));

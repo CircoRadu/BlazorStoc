@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.9.0",
-                                           "hash":  "085f5b0e49aa49cfc5a6287965259577550b593deb31c7675e79bb6d63d3f452",
+                                           "version":  "0.10.0",
+                                           "hash":  "0deb63a271baf65d209fd46e40886cc78d9eb2d1380ab2409862aa54c9c5ca5e",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -63,6 +63,11 @@
                                                                "version":  "0.9.0",
                                                                "date":  "04.11.2026",
                                                                "note":  "Lista tipurilor de tichete citite din ActivityApp se pastreaza (migrarea 63); alerta Probleme de preluare duce la tabul Probleme import din Notificari"
+                                                           },
+                                                           {
+                                                               "version":  "0.10.0",
+                                                               "date":  "05.11.2026",
+                                                               "note":  "Tichete discardate: vizualizare tichet (popup doar pentru citire); motivul notificarii de validare spune ce s-a decis efectiv"
                                                            }
                                                        ]
                                        },
@@ -141,8 +146,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.5",
-                                    "hash":  "e850ad4dfc9eb18db7107bf4c006c7c4af208ae79aefdc8c1298e9049c373410",
+                                    "version":  "1.4.6",
+                                    "hash":  "0d81222852d24792bca2dc08b95b9e08fc316cbe69705490362c3189ea813b47",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -208,6 +213,11 @@
                                                         "version":  "1.4.5",
                                                         "date":  "04.11.2026",
                                                         "note":  "Filtrul jurnalului: entitatea Preluare Elcomtur si actiunea Preluare date Elcomtur"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.6",
+                                                        "date":  "05.11.2026",
+                                                        "note":  "Filtrul de actiuni cunoaste operatiile preluarii automate Elcomtur (setari, testare, verificare, preluare, esec)"
                                                     }
                                                 ]
                                 },
@@ -308,8 +318,8 @@
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.3.1",
-                                          "hash":  "1ba4cade0745bb4aaa5d4666101c8f2777e800aa8f8be0f4b3b314ba359e964f",
+                                          "version":  "1.3.2",
+                                          "hash":  "ea4c39fdc33e3bad0bdbb4824ad916a56214194858f8d1eb1eb82d5059e54a8d",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
@@ -340,6 +350,11 @@
                                                               "version":  "1.3.1",
                                                               "date":  "04.11.2026",
                                                               "note":  "Tabul Balante restante vine dintr-o componenta a modulului Elcomtur (rosu cu numarul de beneficiari restanti)"
+                                                          },
+                                                          {
+                                                              "version":  "1.3.2",
+                                                              "date":  "05.11.2026",
+                                                              "note":  "Motivul rezolvarii automate poate fi compus de sursa notificarii (RemovedReasonAsync)"
                                                           }
                                                       ]
                                       },
@@ -476,8 +491,8 @@
                                                  ]
                                  },
                     "Elcomtur":  {
-                                     "version":  "1.1.1",
-                                     "hash":  "e66fb15feb54ee8dcc49314408a6e60580ba8a80ad7be74db664be2b77fadce8",
+                                     "version":  "1.2.0",
+                                     "hash":  "386dd1974638daf611d384cbc67a8a851d8fa64133a8dce81eb5c8095182ee8d",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -493,6 +508,11 @@
                                                          "version":  "1.1.1",
                                                          "date":  "05.11.2026",
                                                          "note":  "Sectiunea de balanta apare la toti beneficiarii; fara balanta importata, antetul spune asta"
+                                                     },
+                                                     {
+                                                         "version":  "1.2.0",
+                                                         "date":  "05.11.2026",
+                                                         "note":  "Preluare automata zilnica a backup-ului Elcomtur de pe un director/NAS (04:00): masca, firma cu nume, verificare integritate, ultimele 2 fisiere pe server, notificari (lipsa, esec, preluat), Setari -\u003e Preluare Elcomtur"
                                                      }
                                                  ]
                                  }

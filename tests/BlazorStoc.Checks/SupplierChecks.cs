@@ -477,8 +477,8 @@ public static class SupplierChecks
         if (cut.FindAll("button").FirstOrDefault(button => button.TextContent.Contains("Pregătește un produs nou")) is { } prepare)
         {
             prepare.Click();
-            cut.WaitForAssertion(() => cut.Find("#product-category"), TimeSpan.FromSeconds(10));
-            cut.WaitForAssertion(() => { if (cut.FindAll("#product-subcategory option").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+            cut.WaitForAssertion(() => cut.Find("#product-group-trigger"), TimeSpan.FromSeconds(10));
+            cut.WaitForAssertion(() => { if (cut.Find("#product-group-trigger").GetAttribute("data-subcategory") is null or "") throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
             cut.Find("form").Submit();
             cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Produs nou pregătit")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         }

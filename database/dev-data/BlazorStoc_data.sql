@@ -248,6 +248,12 @@ REPLACE INTO `categories` (`id`, `name`, `normalized_name`, `sort_order`) VALUES
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `elcomtur_auto_settings` WRITE;
+/*!40000 ALTER TABLE `elcomtur_auto_settings` DISABLE KEYS */;
+REPLACE INTO `elcomtur_auto_settings` (`id`, `enabled`, `directory_path`, `username`, `password_protected`, `file_mask`, `firm_folder`, `firm_name`, `alert_days`, `last_scheduled_date`, `last_check_utc`, `last_check_ok`, `last_message`, `failing_since_utc`, `last_file_name`, `last_file_modified_utc`, `last_import_utc`, `last_data_date`, `last_summary`, `updated_by`, `updated_utc`) VALUES (1,0,'','',NULL,'','firma3','KS TEST ENERGY SRL',2,'2026-11-05','2026-11-05T11:55:24.515Z',1,'Nu există un backup mai nou decât ultima preluare (cel mai recent fișier: Backup_elcomtur_sintetic.elc, modificat 05.11.2026 10:54).',NULL,'Backup_elcomtur_sintetic.elc','2026-11-05T08:54:12.000Z','2026-11-05T11:54:45.904Z','2026-10-30','0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON)','claude.dev','2026-11-05T11:55:46.729Z');
+/*!40000 ALTER TABLE `elcomtur_auto_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `elcomtur_balances` WRITE;
 /*!40000 ALTER TABLE `elcomtur_balances` DISABLE KEYS */;
 /*!40000 ALTER TABLE `elcomtur_balances` ENABLE KEYS */;
@@ -275,7 +281,9 @@ REPLACE INTO `expiry_notifications` (`id`, `template_id`, `source_key`, `object_
 (8,12,'sistem.copie-nas-lipsa',1,'2026-10-19','2026-10-19T05:34:21.535Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-19T05:44:36.960Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 19.10.2026 la 23.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"15.10.2026 13:20\",\"cauza copiere\":\"Copiate 2, deja pe NAS 4.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 19.10.2026 08:44. Cauza: Pachetul nou a fost copiat pe NAS: Copie siguranta la cerere 19.10.2026 08-44-01 Administrator administrator demo.zip.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
 (9,11,'sistem.backup-lipsa',1,'2026-10-27','2026-10-26T07:09:23.059Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-26T08:00:44.262Z','S-a făcut un backup nou: termenul s-a mutat de la 27.10.2026 la 30.10.2026.',1,'Backup-ul bazei de date','{\"ultimul backup\":\"23.10.2026 10:00\",\"ultima eroare backup\":\"15.10.2026 13:06 \\u2014 Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).\",\"vechime maxima\":\"4\"}','Backup lipsă – ultimul: 26.10.2026 10:00','Nu s-a făcut niciun backup de peste 4 zile. Ultimul backup: 26.10.2026 10:00. Ultima eroare: 15.10.2026 13:06 — Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).. Verifică Setări → Backup NAS și programarea zilnică.','Sistem · Backup lipsă'),
 (10,12,'sistem.copie-nas-lipsa',1,'2026-10-27','2026-10-26T07:09:23.062Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-26T08:00:44.264Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 27.10.2026 la 30.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"23.10.2026 10:00\",\"cauza copiere\":\"Copiate 1, deja pe NAS 22.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 26.10.2026 10:00. Cauza: Copiate 1, deja pe NAS 8.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
-(11,16,'sistem.mentenanta-activityapp-de-validat',1,'2026-10-30','2026-10-30T10:41:51.991Z',NULL,NULL,NULL,NULL,3,'sistem','2026-10-30T10:43:06.108Z','Evenimentul a fost validat, respins sau discardat.',1,'2 evenimente ActivityApp de validat','{\"tichet de validat\":\"2 tichete\",\"detalii validare\":\"2 evenimente ActivityApp a\\u0219teapt\\u0103 validarea (1 propuse ca mentenan\\u021B\\u0103, 1 ca service); cel mai vechi este din 30.10.2026.\"}','Validează mentenanța: 2 tichete','2 evenimente ActivityApp așteaptă validarea (1 propuse ca mentenanță, 1 ca service); cel mai vechi este din 30.10.2026. Vezi Setări → Preluare ActivityApp, „Evenimente de validat”.','Sistem · Evenimente ActivityApp de validat ca mentenanță');
+(11,16,'sistem.mentenanta-activityapp-de-validat',1,'2026-10-30','2026-10-30T10:41:51.991Z',NULL,NULL,NULL,NULL,3,'sistem','2026-10-30T10:43:06.108Z','Evenimentul a fost validat, respins sau discardat.',1,'2 evenimente ActivityApp de validat','{\"tichet de validat\":\"2 tichete\",\"detalii validare\":\"2 evenimente ActivityApp a\\u0219teapt\\u0103 validarea (1 propuse ca mentenan\\u021B\\u0103, 1 ca service); cel mai vechi este din 30.10.2026.\"}','Validează mentenanța: 2 tichete','2 evenimente ActivityApp așteaptă validarea (1 propuse ca mentenanță, 1 ca service); cel mai vechi este din 30.10.2026. Vezi Setări → Preluare ActivityApp, „Evenimente de validat”.','Sistem · Evenimente ActivityApp de validat ca mentenanță'),
+(12,18,'sistem.preluare-elcomtur',2,'2026-11-05','2026-11-05T11:55:09.854Z',NULL,NULL,NULL,NULL,1,'sistem','2026-11-05T11:55:32.527Z','O verificare ulterioară a reușit sau preluarea automată a fost oprită.',1,'Preluarea automată Elcomtur','{\"situatie elcomtur\":\"preluare e\\u0219uat\\u0103\",\"detalii elcomtur\":\"Ultima verificare (05.11.2026 13:55) a e\\u0219uat: \\u00CEn directorul C:\\\\Users\\\\Alex\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\695cbb0e11510863\\\\d9628788-3100-4729-ac9c-61812c76bcbf\\\\scratchpad\\\\elc-nas nu exist\\u0103 niciun fi\\u0219ier care s\\u0103 corespund\\u0103 m\\u0103\\u0219tii \\u201E*lipsa*\\u201D. Verific\\u0103 masca \\u0219i dac\\u0103 backup-ul Elcomtur se salveaz\\u0103 \\u00EEn acel director.\"}','Elcomtur: preluare eșuată','Ultima verificare (05.11.2026 13:55) a eșuat: În directorul C:\\Users\\Alex\\AppData\\Local\\Temp\\claude\\695cbb0e11510863\\d9628788-3100-4729-ac9c-61812c76bcbf\\scratchpad\\elc-nas nu există niciun fișier care să corespundă măștii „*lipsa*”. Verifică masca și dacă backup-ul Elcomtur se salvează în acel director. Vezi Setări → Preluare Elcomtur.','Sistem · Preluare automată backup Elcomtur'),
+(13,18,'sistem.preluare-elcomtur',3,'2026-11-05','2026-11-05T11:55:09.858Z',NULL,NULL,NULL,NULL,1,'claude.dev','2026-11-05T11:56:10.241Z','Marcată manual ca rezolvată.',0,'Backup Elcomtur preluat','{\"situatie elcomtur\":\"backup preluat\",\"detalii elcomtur\":\"Backup-ul Backup_elcomtur_sintetic.elc a fost preluat la 05.11.2026 13:54 pentru firma3 \\u2014 KS TEST ENERGY SRL, date din 30.10.2026: 0 beneficiari cu balan\\u021B\\u0103, 0 cu pl\\u0103\\u021Bi restante (total 0,00 RON).\"}','Elcomtur: backup preluat','Backup-ul Backup_elcomtur_sintetic.elc a fost preluat la 05.11.2026 13:54 pentru firma3 — KS TEST ENERGY SRL, date din 30.10.2026: 0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON). Vezi Setări → Preluare Elcomtur.','Sistem · Preluare automată backup Elcomtur');
 /*!40000 ALTER TABLE `expiry_notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -332,6 +340,7 @@ REPLACE INTO `notification_template_seeds` (`source_key`, `seeded_utc`) VALUES (
 ('sistem.copie-nas-lipsa','2026-10-08T08:47:08.991Z'),
 ('sistem.mentenanta-activityapp-de-validat','2026-10-24T11:46:00.937Z'),
 ('sistem.preluare-activityapp','2026-10-24T11:46:00.933Z'),
+('sistem.preluare-elcomtur','2026-11-05T11:53:01.460Z'),
 ('stoc.iesiri-peste-stoc','2026-10-08T08:47:08.971Z'),
 ('stoc.rezervare-fara-miscare','2026-10-08T08:47:08.981Z'),
 ('stoc.sub-minim','2026-10-08T08:47:08.975Z'),
@@ -359,7 +368,8 @@ REPLACE INTO `notification_templates` (`id`, `source_key`, `subject`, `body`, `t
 (14,'analiza-risc.expirare','Expirare analiză de risc – <beneficiar>, <punct de lucru>','Analiza de risc nr. <numar inregistrare> a punctului de lucru <punct de lucru> (<adresa punct de lucru>) al beneficiarului <beneficiar>, întocmită de <intocmit de>, expiră la data de <data expirare> (ultima reînnoire: <data ultima reinnoire>; valabilitate: <valabilitate luni> luni; zile rămase: <zile ramase>; zile de depășire: <zile depasire>).',60,1,0,'analiza-risc.expirare'),
 (15,'sistem.preluare-activityapp','Preluare ActivityApp: <problema preluare>','<detalii preluare> Vezi Setări → Preluare ActivityApp.',1,1,0,'sistem.preluare-activityapp'),
 (16,'sistem.mentenanta-activityapp-de-validat','Validează mentenanța: <tichet de validat>','<detalii validare> Vezi Setări → Preluare ActivityApp, „Evenimente de validat”.',1,1,0,'sistem.mentenanta-activityapp-de-validat'),
-(17,'sistem.beneficiari-activityapp-de-verificat','Verifică beneficiarul: <beneficiar de verificat>','<detalii verificare> Vezi Beneficiari → De verificat.',1,1,0,'sistem.beneficiari-activityapp-de-verificat');
+(17,'sistem.beneficiari-activityapp-de-verificat','Verifică beneficiarul: <beneficiar de verificat>','<detalii verificare> Vezi Beneficiari → De verificat.',1,1,0,'sistem.beneficiari-activityapp-de-verificat'),
+(18,'sistem.preluare-elcomtur','Elcomtur: <situatie elcomtur>','<detalii elcomtur> Vezi Setări → Preluare Elcomtur.',1,1,0,'sistem.preluare-elcomtur');
 /*!40000 ALTER TABLE `notification_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -923,7 +933,9 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (59,'Nomenclator Analizor de risc (risk_analyzers) si analizorul ales la analiza de risc (risk_analyses.analyzer_id)','a94e59f2f6f574a24a904d1607ebbdfb70991f8771234557dfca417932ec01f2','applied','2026-10-30 10:37:04','0.5.33'),
 (60,'Mentenanta inregistrata fara contract (tichet ActivityApp validat ca mentenanta la un punct fara contract activ): service_interventions.without_contract','5fdbd178fbdf9e339274f908cf84854b95f3e9cef2d85a4c62d2a20993ef504d','applied','2026-10-30 10:37:04','0.5.33'),
 (61,'Coordonatele GPS ale evenimentului de rezolvare al unui tichet ActivityApp: activity_import_tickets.gps','afc2e69fefc77a36801c7ad29e2e203c93a3ac26bd4da7dc2b37fcb4ee8ec9b7','applied','2026-11-04 13:11:00','0.5.37'),
-(62,'Balantele de plata din Elcomtur pe beneficiar (elcomtur_balances) si facturile lor neachitate (elcomtur_invoices)','cb2649052d51c173d931f9233088f194ccd9719815e5adc13c394934e7de124e','applied','2026-11-04 13:11:00','0.5.37');
+(62,'Balantele de plata din Elcomtur pe beneficiar (elcomtur_balances) si facturile lor neachitate (elcomtur_invoices)','cb2649052d51c173d931f9233088f194ccd9719815e5adc13c394934e7de124e','applied','2026-11-04 13:11:00','0.5.37'),
+(63,'Lista tipurilor de tichete citita din ActivityApp se pastreaza (activity_import_settings.known_types)','14ea226bd3cc99901dc54c847eab07e5eede2d8f49fd7fb5eb58bfc1a6b0cf8b','applied','2026-11-05 09:21:38','0.5.40'),
+(64,'Preluarea automata a backup-ului Elcomtur de pe un director (NAS): setari si rezultatul ultimei verificari (elcomtur_auto_settings)','ffbf9952023b6c424d220671bcea682984a3ecf40771ffc313b7d44c7c1381b9','applied','2026-11-05 11:53:01','0.5.41');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1507,6 +1519,8 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'categorii.delete'),
 (1,'categorii.edit'),
 (1,'categorii.view'),
+(1,'elcomtur.import'),
+(1,'elcomtur.view'),
 (1,'export-consum.export'),
 (1,'export-consum.view'),
 (1,'facturi.add'),
@@ -1569,6 +1583,9 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-import-activityapp.reset'),
 (1,'setari-import-activityapp.run'),
 (1,'setari-import-activityapp.view'),
+(1,'setari-import-elcomtur.edit'),
+(1,'setari-import-elcomtur.run'),
+(1,'setari-import-elcomtur.view'),
 (1,'setari-jurnal.edit'),
 (1,'setari-jurnal.view'),
 (1,'setari-module.retry'),

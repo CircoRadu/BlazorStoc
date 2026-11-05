@@ -63,16 +63,27 @@ public sealed class ElcomturImportService(IBeneficiaryRepository beneficiaries, 
     public async Task<ElcomturReport> RunAsync(string fileId, string firm, bool apply, CancellationToken cancellationToken = default)
     {
         if (accessControl is not null) await accessControl.EnsureAsync(ImportKey, cancellationToken).ConfigureAwait(false);
-        var path = PathOf(fileId);
+        return await RunFileAsync(PathOf(fileId), firm, apply, AuditActions.ImportElcomtur, null, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads a backup file already on the server and, when asked, replaces the balances by its data (the same work as the manual import, also used by the automatic one, which passes its own
+    /// journal action and the name of the file). No permission is checked here: the callers do (the user's key, or the system for the scheduled run).
+    /// </summary>
+    public async Task<ElcomturReport> RunFileAsync(string path, string firm, bool apply, string action, string? fileName, CancellationToken cancellationToken = default)
+    {
         var data = await Task.Run(() => ElcomturArchive.Read(path, firm), cancellationToken).ConfigureAwait(false);
         var plan = ElcomturPlanner.Plan(data, await beneficiaries.GetBeneficiariesAsync(cancellationToken).ConfigureAwait(false));
         if (!apply) return plan.Report;
         await balances.ReplaceAsync(data.Firm, data.DataDate, plan.Balances, cancellationToken).ConfigureAwait(false);
         var report = plan.Report with { Applied = true };
-        await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Elcomtur, AuditActions.ImportElcomtur, data.Firm, $"Elcomtur {data.Firm}",
-            AuditDetails.Identification(("Firmă", data.Firm), ("Data backup-ului", StockMovementRules.DisplayDate(data.DataDate)), ("Beneficiari cu balanță", report.Matched.ToString()),
-                ("Cu plăți restante", report.MatchedOwed.ToString()), ("Total plăți restante", report.OwedTotal.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("ro-RO"))),
-                ("Clienți fără beneficiar (cu sold pozitiv)", report.UnmatchedOwed.ToString())), string.Empty, cancellationToken).ConfigureAwait(false);
+        var fields = new List<(string, string)> { ("Firmă", data.Firm) };
+        if (fileName is not null) fields.Add(("Fișier", fileName));
+        fields.AddRange([("Data backup-ului", StockMovementRules.DisplayDate(data.DataDate)), ("Beneficiari cu balanță", report.Matched.ToString()),
+            ("Cu plăți restante", report.MatchedOwed.ToString()), ("Total plăți restante", report.OwedTotal.ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("ro-RO"))),
+            ("Clienți fără beneficiar (cu sold pozitiv)", report.UnmatchedOwed.ToString())]);
+        await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Elcomtur, action, data.Firm, $"Elcomtur {data.Firm}",
+            AuditDetails.Identification([.. fields]), string.Empty, cancellationToken).ConfigureAwait(false);
         return report;
     }
 

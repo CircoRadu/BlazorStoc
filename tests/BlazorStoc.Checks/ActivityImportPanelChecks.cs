@@ -77,6 +77,11 @@ public static class ActivityImportPanelChecks
             return Task.CompletedTask;
         }
         public Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ActivityDiscardedTicket>>([.. Discarded]);
+        public Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default)
+        {
+            var gone = Discarded.Single(item => item.TicketId == ticketId);
+            return Task.FromResult(new TicketSource(ticketId, 4, 1, gone.TicketNumber, gone.Title, "Problema discardat", "Rezolvare discardat", "Raport discardat", "Ion Popescu"));
+        }
         public Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default) { Reactivated.Add(ticketId); Discarded.RemoveAll(item => item.TicketId == ticketId); return Task.CompletedTask; }
     }
 
@@ -204,6 +209,12 @@ public static class ActivityImportPanelChecks
         check(reviewService.Decisions.Last() == (4L, ReviewDecision.Discard) && cut.Markup.Contains("a fost discardat", StringComparison.Ordinal), "Activity import panel: after the confirmation the ticket is discarded and the list is empty");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Arată tichetele discardate").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-discarded tbody tr").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        cut.Find("#ai-discarded button[aria-label^='Vizualizează tichetul T-80']").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#discarded-view-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Markup.Contains("Problema discardat") && cut.Markup.Contains("Rezolvare discardat") && cut.Markup.Contains("Ion Popescu") && cut.Markup.Contains("Discardat de"),
+            "Activity import panel: a discarded ticket can be viewed (read only) with its problem, resolution, report and executor");
+        cut.FindAll("[aria-labelledby='discarded-view-title'] button").First(button => button.TextContent.Contains("Închide")).Click();
+        check(cut.FindAll("#discarded-view-title").Count == 0, "Activity import panel: the view of a discarded ticket closes");
         cut.Find("#ai-discarded button[aria-label^='Reactivează tichetul T-80']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-discarded-empty").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(reviewService.Reactivated.SequenceEqual([9004L]), "Activity import panel: a discarded ticket is listed and can be reactivated");

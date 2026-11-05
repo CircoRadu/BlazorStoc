@@ -1,3 +1,5 @@
+using Bunit;
+using Microsoft.Extensions.DependencyInjection;
 using System.IO.Compression;
 using System.Text;
 using BlazorStoc.Modules.Elcomtur;
@@ -66,6 +68,7 @@ public static class ElcomturChecks
                 [" ", "20260926", "999.00", "5121", "77", "1"],
                 [" ", "20260927", "50.00", "4111", "77", "2"],
                 [" ", "20260928", "100.00", "4111", "5", "1"]));
+            Add("firma1/FIRMA.DBF", Dbf(updated, [("DEN", (char)67, 30)], [" ", "ELECTRIC TEST SRL"]));
             Add("firma2/clienti.dbf", Dbf(updated, ClientColumns));
             Add("readme.txt", "x"u8.ToArray());
         }
@@ -164,6 +167,148 @@ public static class ElcomturChecks
         check(Permissions.AllKeys.Contains("elcomtur.view") && Permissions.AllKeys.Contains("elcomtur.import") && !Permissions.DefaultUserKeys.Contains("elcomtur.view")
             && Permissions.Requires["elcomtur.import"].SequenceEqual(["elcomtur.view", "beneficiari.view"]),
             "Elcomtur: the permissions to see the balances and to import are not given to the ordinary user type, and the import needs to see the balances and the beneficiaries");
+        AutoChecks(check);
+        AutoPanelChecks(check);
         return Task.CompletedTask;
+    }
+
+    // The automatic import: the mask, the choice of the newest file, the schedule, the integrity check of an archive, the firms with their names, the notification instances.
+    private static void AutoChecks(Action<bool, string> check)
+    {
+        var plain = new[] { new ElcomturShareFile("Backup_ELCOMTUR_2026-11-01.elc", 100, new DateTime(2026, 11, 1, 3, 0, 0, DateTimeKind.Utc)), new ElcomturShareFile("backup_elcomtur_2026-11-03.elc", 100, new DateTime(2026, 11, 3, 3, 0, 0, DateTimeKind.Utc)),
+            new ElcomturShareFile("alt.elc", 100, new DateTime(2026, 11, 4, 3, 0, 0, DateTimeKind.Utc)), new ElcomturShareFile(".tmp-elcomtur.elc", 100, new DateTime(2026, 11, 5, 3, 0, 0, DateTimeKind.Utc)),
+            new ElcomturShareFile("~elcomtur.elc", 100, new DateTime(2026, 11, 6, 3, 0, 0, DateTimeKind.Utc)) };
+        check(ElcomturAutoRules.Newest(plain, "*elcomtur*")?.Name == "backup_elcomtur_2026-11-03.elc" && ElcomturAutoRules.Newest(plain, "alt.elc")?.Name == "alt.elc" && ElcomturAutoRules.Newest(plain, "alt")?.Name is null
+            && ElcomturAutoRules.Newest(plain, "backup_elcomtur_2026-11-0?.elc")?.Name == "backup_elcomtur_2026-11-03.elc" && ElcomturAutoRules.Newest(plain, "*nimic*") is null,
+            "Elcomtur automatic: the newest file that fits the mask is chosen (capitals do not matter, * and ? work, a mask without them is the whole name, temporary and hidden files are skipped)");
+        var moment = new DateTime(2026, 11, 3, 3, 0, 0, 500, DateTimeKind.Utc);
+        check(!ElcomturAutoRules.IsNewer(moment, moment.AddMilliseconds(-400)) && ElcomturAutoRules.IsNewer(moment.AddSeconds(2), moment) && !ElcomturAutoRules.IsNewer(moment.AddHours(-1), moment),
+            "Elcomtur automatic: a file is new only when modified after the last import (compared by the second)");
+        check(!ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 3, 59, 0), null) && ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 4, 0, 0), null) && ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 15, 0, 0), new DateOnly(2026, 11, 4))
+            && !ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 4, 30, 0), new DateOnly(2026, 11, 5)), "Elcomtur automatic: the check is due from 04:00, once a day");
+        var input = new ElcomturAutoInput(true, @"\\nas\backup\elcomtur", "user", null, "*elcomtur*", "firma1", "X SRL", 3);
+        check(ElcomturAutoRules.Validate(input) is null && ElcomturAutoRules.Validate(input with { Path = @"D:\Elcomtur", UserName = "" }) is null && ElcomturAutoRules.Validate(input with { Path = "relativ\\dir" }) is not null
+            && ElcomturAutoRules.Validate(input with { UserName = " " }) is not null && ElcomturAutoRules.Validate(input with { Mask = "*" }) is not null && ElcomturAutoRules.Validate(input with { Mask = "a/b" }) is not null
+            && ElcomturAutoRules.Validate(input with { FirmFolder = "" }) is not null && ElcomturAutoRules.Validate(input with { AlertDays = 0 }) is not null && ElcomturAutoRules.Validate(input with { Enabled = false, Path = "", Mask = "", FirmFolder = "" }) is null,
+            "Elcomtur automatic: the settings are checked (network path with account, or local directory; mask; firm; threshold 1-365), nothing is required while the import is off");
+
+        // The integrity of the archive: a good one passes, one with a damaged byte is refused with the file named.
+        var good = CreateArchive(new DateOnly(2026, 10, 30));
+        var damaged = good + ".bad";
+        try
+        {
+            check(ElcomturArchive.Verify(good) >= 6, "Elcomtur automatic: every file of a good archive is read and its CRC matches");
+            var bytes = File.ReadAllBytes(good);
+            var at = 30 + "firma1/clienti.dbf".Length + 3;
+            bytes[at] ^= 0xFF;
+            File.WriteAllBytes(damaged, bytes);
+            string? message = null;
+            try { ElcomturArchive.Verify(damaged); } catch (ElcomturOperationException exception) { message = exception.Message; }
+            check(message is not null && message.Contains("corupt") && message.Contains("firma1/clienti.dbf"), "Elcomtur automatic: an archive with a damaged byte is refused, naming the damaged file");
+            var choices = ElcomturArchive.FirmChoices(good);
+            check(choices.Count == 1 && choices[0].Folder == "firma1" && choices[0].Name == "ELECTRIC TEST SRL" && choices[0].Label == "firma1 — ELECTRIC TEST SRL" && new ElcomturFirmChoice("firma2", "").Label == "firma2",
+                "Elcomtur automatic: the firms of a backup are told with their names (the FIRMA table), the folder alone when the name is missing");
+        }
+        finally { File.Delete(good); File.Delete(damaged); }
+
+        // Only the last two imported backups stay on the server.
+        var folder = Path.Combine(Path.GetTempPath(), "elcomtur-retention-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            for (var index = 1; index <= 4; index++) { var file = Path.Combine(folder, $"b{index}.elc"); File.WriteAllText(file, "x"); File.SetLastWriteTimeUtc(file, new DateTime(2026, 11, index, 4, 0, 0, DateTimeKind.Utc)); }
+            File.WriteAllText(Path.Combine(folder, ".tmp-run.elc"), "x"); File.SetLastWriteTimeUtc(Path.Combine(folder, ".tmp-run.elc"), new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            ElcomturAutoService.Retention(folder);
+            check(Directory.GetFiles(folder).Select(Path.GetFileName).Order().SequenceEqual([".tmp-run.elc", "b3.elc", "b4.elc"]), "Elcomtur automatic: the last two imported backups stay on the server, a temporary file of a running import is not touched");
+        }
+        finally { Directory.Delete(folder, true); }
+
+        // The notification instances.
+        var now = new DateOnly(2026, 11, 5);
+        ElcomturAutoSettings Settings(bool enabled, DateTime? imported, DateTime? failing = null) => ElcomturAutoSettings.Empty with
+        {
+            Enabled = enabled, Path = @"\\nas\bk", Mask = "*elcomtur*", FirmFolder = "firma1", FirmName = "Electric", AlertDays = 3, LastImportUtc = imported, FailingSinceUtc = failing, LastCheckUtc = failing, LastMessage = "Fișier corupt",
+            LastFileName = "b.elc", LastSummary = "10 beneficiari", UpdatedUtc = new DateTime(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc)
+        };
+        var old = ElcomturAutoAlertSource.Instances(new ElcomturAutoAlertState(Settings(true, new DateTime(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc)), null), now);
+        check(old.Count == 1 && old[0].ObjectId == ElcomturAutoAlertSource.MissingId && old[0].Expiry == new DateOnly(2026, 11, 4) && old[0].Values[ElcomturAutoAlertSource.DetailsName].Contains("de 3 zile"),
+            "Elcomtur automatic: no new backup for the threshold days gives the \"backup lipsă\" notification, dated the day the threshold passed");
+        var manual = ElcomturAutoAlertSource.Instances(new ElcomturAutoAlertState(Settings(true, new DateTime(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc)), new DateTime(2026, 11, 4, 12, 0, 0, DateTimeKind.Utc)), now);
+        check(manual.Single(item => item.ObjectId == ElcomturAutoAlertSource.MissingId).Expiry == new DateOnly(2026, 11, 7), "Elcomtur automatic: a manual import also moves the date of the missing backup");
+        var fresh = ElcomturAutoAlertSource.Instances(new ElcomturAutoAlertState(Settings(true, new DateTime(2026, 11, 5, 4, 0, 0, DateTimeKind.Utc), new DateTime(2026, 11, 5, 4, 1, 0, DateTimeKind.Utc)), null), now);
+        check(fresh.Select(item => item.ObjectId).Order().SequenceEqual([1, 2, 3]) && fresh.Single(item => item.ObjectId == ElcomturAutoAlertSource.FailedId).Values[ElcomturAutoAlertSource.DetailsName].Contains("Fișier corupt"),
+            "Elcomtur automatic: a failed check and a taken backup are their own notifications, with the cause and the result");
+        var off = ElcomturAutoAlertSource.Instances(new ElcomturAutoAlertState(Settings(false, new DateTime(2026, 11, 4, 12, 0, 0, DateTimeKind.Utc), new DateTime(2026, 11, 5, 4, 1, 0, DateTimeKind.Utc)), null), now);
+        var past = ElcomturAutoAlertSource.Instances(new ElcomturAutoAlertState(Settings(true, new DateTime(2026, 11, 5, 4, 0, 0, DateTimeKind.Utc).AddDays(-4)), null), now);
+        check(off.Select(item => item.ObjectId).SequenceEqual([ElcomturAutoAlertSource.DoneId]) && !past.Any(item => item.ObjectId == ElcomturAutoAlertSource.DoneId),
+            "Elcomtur automatic: with the import off only the information about a taken backup remains, and that one closes after a few days");
+    }
+
+    private sealed class FakeAuto : IElcomturAutoService
+    {
+        public ElcomturAutoSettings Current = ElcomturAutoSettings.Empty;
+        public ElcomturAutoInput? LastSaved;
+        public readonly List<bool> Checks = [];
+        public Task<ElcomturAutoSettings> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult(Current);
+        public Task SaveAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default)
+        {
+            LastSaved = input;
+            Current = Current with { Enabled = input.Enabled, Path = input.Path, Mask = input.Mask, FirmFolder = input.FirmFolder, FirmName = input.FirmName, AlertDays = input.AlertDays, UserName = input.UserName, HasPassword = input.Password is not null || Current.HasPassword };
+            return Task.CompletedTask;
+        }
+        public Task<ElcomturAutoResult> TestAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default) => Task.FromResult(new ElcomturAutoResult(true, "Conexiunea funcționează."));
+        public Task<ElcomturAutoFirms> ReadFirmsAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ElcomturAutoFirms(true, "Firmele din b.elc.", [new("firma1", "ELECTRIC STANDARD PREST SRL"), new("firma3", "KS DIGITAL ENERGY SRL")], "b.elc"));
+        public Task<ElcomturAutoResult> CheckNowAsync(bool force, CancellationToken cancellationToken = default)
+        {
+            Checks.Add(force);
+            Current = Current with { LastCheckUtc = DateTime.UtcNow, LastCheckOk = true, LastMessage = "Backup preluat.", LastFileName = "b.elc", LastImportUtc = DateTime.UtcNow, LastSummary = "3 beneficiari", LastDataDate = new DateOnly(2026, 10, 30) };
+            return Task.FromResult(new ElcomturAutoResult(true, "Backup preluat.", true));
+        }
+        public Task<ElcomturAutoResult?> RunScheduledAsync(DateTime localNow, CancellationToken cancellationToken = default) => Task.FromResult<ElcomturAutoResult?>(null);
+    }
+
+    private sealed class FakeAutoAlerts(FakeAuto auto) : IElcomturAutoAlertReader
+    {
+        public Task<ElcomturAutoAlertState> GetAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ElcomturAutoAlertState(auto.Current, null));
+    }
+
+    // Setari -> Preluare Elcomtur: the fields, the firms with their names, the save, the manual check.
+    private static void AutoPanelChecks(Action<bool, string> check)
+    {
+        var auto = new FakeAuto();
+        using var context = new Bunit.BunitContext();
+        context.JSInterop.Mode = Bunit.JSRuntimeMode.Loose;
+        context.Services.AddLogging();
+        context.Services.AddSingleton<IElcomturAutoService>(auto);
+        context.Services.AddSingleton<IElcomturAutoAlertReader>(new FakeAutoAlerts(auto));
+        var cut = context.Render<BlazorStoc.Components.Pages.ElcomturAutoPanel>();
+        check(cut.FindAll("#elcomtur-auto-path").Count == 1 && cut.FindAll("#elcomtur-auto-user").Count == 1 && cut.FindAll("#elcomtur-auto-password").Count == 1 && cut.FindAll("#elcomtur-auto-mask").Count == 1
+            && cut.FindAll("#elcomtur-auto-days").Count == 1 && cut.FindAll("input[role=switch]").Count == 1 && !cut.Find("input[role=switch]").HasAttribute("checked") && cut.Find("#elcomtur-auto-status").TextContent.Contains("Nicio verificare"),
+            "Elcomtur automatic panel: the directory, account, password, mask, firm and threshold fields and the On/Off switch are shown (off at first), with no check yet");
+        cut.Find("#elcomtur-auto-path").Change(@"\\nas\backup\elcomtur");
+        cut.Find("#elcomtur-auto-user").Change("elcomtur");
+        cut.Find("#elcomtur-auto-password").Change("secret-1");
+        cut.Find("#elcomtur-auto-mask").Change("*elcomtur*");
+        cut.Find("#elcomtur-auto-firms").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#elcomtur-auto-firm option").Count != 2) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        var options = cut.FindAll("#elcomtur-auto-firm option").Select(option => option.TextContent.Trim()).ToList();
+        check(options.SequenceEqual(["firma1 — ELECTRIC STANDARD PREST SRL", "firma3 — KS DIGITAL ENERGY SRL"]) && cut.Find("#elcomtur-auto-notice").TextContent.Contains("Firmele din b.elc"),
+            "Elcomtur automatic panel: the firms read from the newest backup are listed with their names, not only as firma1, firma3");
+        cut.Find("#elcomtur-auto-firm").Change("firma3");
+        cut.Find("input[role=switch]").Change(true);
+        cut.Find("#elcomtur-auto-days").Change("5");
+        cut.Find("#elcomtur-auto-save").Click();
+        cut.WaitForAssertion(() => { if (auto.LastSaved is null) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(auto.LastSaved is { Enabled: true, FirmFolder: "firma3", FirmName: "KS DIGITAL ENERGY SRL", Mask: "*elcomtur*", AlertDays: 5, UserName: "elcomtur", Password: "secret-1" } && auto.LastSaved.Path == @"\\nas\backup\elcomtur",
+            "Elcomtur automatic panel: the save sends the switch, directory, account, password, mask, the chosen firm with its name and the threshold");
+        cut.WaitForAssertion(() => { if (!cut.Find("#elcomtur-auto-password").GetAttribute("placeholder")!.Contains("salvată")) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#elcomtur-auto-password").GetAttribute("value") is null or "" && cut.Find("#elcomtur-auto-notice").TextContent.Contains("salvată"), "Elcomtur automatic panel: after the save the password is not shown again (only that one is saved)");
+        cut.Find("#elcomtur-auto-check").Click();
+        cut.WaitForAssertion(() => { if (auto.Checks.Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        cut.Find("#elcomtur-auto-force").Click();
+        cut.WaitForAssertion(() => { if (auto.Checks.Count != 2) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(auto.Checks.SequenceEqual([false, true]) && cut.Find("#elcomtur-auto-status").TextContent.Contains("reușită") && cut.Find("#elcomtur-auto-last-import").TextContent.Contains("b.elc") && cut.Find("#elcomtur-auto-last-import").TextContent.Contains("firma3 — KS DIGITAL ENERGY SRL"),
+            "Elcomtur automatic panel: \"Verifică acum\" and \"Preia ultimul backup acum\" run the check (the second forced) and show the result and the last backup taken");
     }
 }

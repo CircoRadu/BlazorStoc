@@ -1,5 +1,6 @@
 using AngleSharp.Html.Dom;
 using BlazorStoc.Components.Pages;
+using BlazorStoc.Components.Shared;
 using BlazorStoc.Services;
 using Bunit;
 using Microsoft.Extensions.Configuration;
@@ -32,9 +33,21 @@ public static class ComponentChecks
         context.Services.AddSingleton<IProductImageStore>(new DemoProductImageStore());
         context.Services.AddScoped<UnsavedChanges>();
 
-        string[] Options(IRenderedComponent<ProductEditor> cut, string id) =>
-            cut.FindAll($"#{id} option").Select(option => option.GetAttribute("value") ?? "").ToArray();
-        string Selected(IRenderedComponent<ProductEditor> cut, string id) => ((IHtmlSelectElement)cut.Find($"#{id}")).Value;
+        string[] Options(IRenderedComponent<ProductEditor> cut, string id) => id == "product-category" ? OpenTree(cut).FindAll("#product-group-tree .group-tree-category").Select(item => item.GetAttribute("data-value") ?? "").ToArray() : LeafNames(cut);
+        IRenderedComponent<ProductEditor> OpenTree(IRenderedComponent<ProductEditor> cut) { if (cut.FindAll("#product-group-tree").Count == 0) cut.Find("#product-group-trigger").Click(); return cut; }
+        void ExpandCategory(IRenderedComponent<ProductEditor> cut, string category)
+        {
+            OpenTree(cut);
+            var toggle = cut.FindAll("#product-group-tree .group-tree-category").First(item => item.GetAttribute("data-value") == category);
+            if (toggle.GetAttribute("aria-expanded") != "true") toggle.Click();
+        }
+        string[] LeafNames(IRenderedComponent<ProductEditor> cut)
+        {
+            ExpandCategory(cut, cut.Find("#product-group-trigger").GetAttribute("data-category") ?? "");
+            return cut.FindAll("#product-group-tree .group-tree-leaf").Select(item => item.GetAttribute("data-value") ?? "").ToArray();
+        }
+        void PickFirstLeaf(IRenderedComponent<ProductEditor> cut, string category) { ExpandCategory(cut, category); cut.Find($"#product-group-tree .group-tree-leaf[data-category='{category}']").Click(); }
+        string Selected(IRenderedComponent<ProductEditor> cut, string id) => cut.Find("#product-group-trigger").GetAttribute(id == "product-category" ? "data-category" : "data-subcategory") ?? "";
 
         // A new product prepared after a category was created in the popup of the previous form.
         var created = context.Render<ProductEditor>(parameters => parameters
@@ -42,7 +55,7 @@ public static class ComponentChecks
         created.WaitForAssertion(() => { if (!Options(created, "product-category").Contains("TVCI")) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(Options(created, "product-category").Contains("TVCI"),
             "Product form of the invoice pickup lists a category created after the page read its list");
-        created.Find("#product-category").Change("TVCI");
+        PickFirstLeaf(created, "TVCI");
         check(Options(created, "product-subcategory").Contains("Generice") && Selected(created, "product-subcategory") == "Generice",
             "Product form of the invoice pickup offers the subcategory of a category created after the page read its list");
 
@@ -139,6 +152,22 @@ public static class ComponentChecks
         check(otherSubcategory.FindAll("#product-composed-code").Count == 0 && otherSubcategory.Find("label[for=product-code]").TextContent.Contains(ProductCode.Label),
             "Product form: a subcategory without parameters keeps the single code field");
 
+        // The tree picker: the whole structure can be walked (any depth), only leaves are chosen, the chosen leaf is shown as a path.
+        {
+            ProductGroup? pickedGroup = null;
+            var nodes = new List<SubcategoryNode> { new(1, "Control Acces", "Bariere", null, 0, false, 0), new(2, "Control Acces", "Amortizor hidraulic", "Bariere", 1, true, 3), new(3, "Control Acces", "Cititoare", null, 0, true, 1), new(4, "Cabluri", "Mufe", null, 0, false, 0), new(5, "Cabluri", "RJ45", "Mufe", 1, false, 0), new(6, "Cabluri", "Cat6", "RJ45", 2, true, 0) };
+            var tree = context.Render<GroupTreePicker>(parameters => parameters.Add(p => p.Categories, new[] { "Cabluri", "Control Acces" }).Add(p => p.Nodes, nodes)
+                .Add(p => p.Category, "Control Acces").Add(p => p.Subcategory, "Amortizor hidraulic").Add(p => p.Picked, (ProductGroup group) => { pickedGroup = group; }));
+            check(tree.Find("#product-group-trigger").TextContent.Contains("Control Acces › Bariere › Amortizor hidraulic"), "Group picker: the chosen leaf is shown as its path through the tree");
+            tree.Find("#product-group-trigger").Click();
+            check(tree.FindAll(".group-tree-leaf.selected").Count == 1 && tree.FindAll(".group-tree-leaf[data-value='Cat6']").Count == 0, "Group picker: opening shows the chosen leaf, other branches stay collapsed");
+            tree.FindAll(".group-tree-category").First(item => item.GetAttribute("data-value") == "Cabluri").Click();
+            tree.FindAll(".group-tree-toggle").First(item => item.GetAttribute("data-value") == "Mufe").Click();
+            tree.FindAll(".group-tree-toggle").First(item => item.GetAttribute("data-value") == "RJ45").Click();
+            check(tree.FindAll(".group-tree-leaf[data-value='Cat6']").Count == 1 && tree.FindAll(".group-tree-leaf[data-value='Mufe']").Count == 0, "Group picker: a branch of any depth can be walked and only leaves are choosable");
+            tree.Find(".group-tree-leaf[data-value='Cat6']").Click();
+            check(pickedGroup == new ProductGroup("Cabluri", "Cat6") && tree.FindAll("#product-group-tree").Count == 0, "Group picker: choosing a leaf returns its category and subcategory and closes the tree");
+        }
         // A family of parameters (Fixed or Varifocal lens): the form asks for one member of the family and its value, plus the parameters of their own.
         await repository.CreateSubcategoryAsync("Camere video", "Camere cu familie");
         var familyGroup = new ProductGroup("Camere video", "Camere cu familie");

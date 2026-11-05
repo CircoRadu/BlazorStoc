@@ -311,11 +311,16 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
             await connection.RunAsync(() =>
             {
                 if (Directory.Exists(credentials.Path))
+                {
+                    // The backups are in a subfolder each; packages copied before the subfolders are still in the root.
+                    var found = new Dictionary<string, FileInfo>(StringComparer.OrdinalIgnoreCase);
                     foreach (var file in Directory.EnumerateFiles(credentials.Path, "*.zip").Where(item => item.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        var info = new FileInfo(file);
-                        files.Add(new NasShareFile(info.Name, info.Length, info.LastWriteTimeUtc));
-                    }
+                        found[Path.GetFileName(file)] = new FileInfo(file);
+                    foreach (var folder in Directory.EnumerateDirectories(credentials.Path))
+                        foreach (var file in Directory.EnumerateFiles(folder, "*.zip").Where(item => item.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
+                            found[Path.GetFileName(file)] = new FileInfo(file);
+                    foreach (var info in found.Values) files.Add(new NasShareFile(info.Name, info.Length, info.LastWriteTimeUtc));
+                }
                 return Task.CompletedTask;
             });
         }
@@ -346,7 +351,7 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
             using var connection = await NetworkShareConnection.OpenAsync(credentials.Path, credentials.UserName, credentials.Password, cancellationToken).ConfigureAwait(false);
             await connection.RunAsync(async () =>
             {
-                var source = Path.Combine(credentials.Path, fileName);
+                var source = FindOnShare(credentials.Path, fileName) ?? Path.Combine(credentials.Path, fileName);
                 if (!File.Exists(source)) { result = new(false, 0, 0, 1, "Pachetul nu mai este pe NAS."); return; }
                 await using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, useAsync: true))
                 await using (var output = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true))
@@ -436,13 +441,30 @@ public sealed class NasBackupCopier(IConfiguration configuration, IDataProtectio
         return result;
     }
 
+    /// <summary>The subfolder of the share that holds one backup: the name of the package without its extension.</summary>
+    internal static string ShareFolder(string shareRoot, string packageName) => Path.Combine(shareRoot, Path.GetFileNameWithoutExtension(packageName));
+
+    /// <summary>Where a package is on the share: in its own subfolder, or (copied before the subfolders) in the root; null when it is not there.</summary>
+    internal static string? FindOnShare(string shareRoot, string packageName)
+    {
+        var inFolder = Path.Combine(ShareFolder(shareRoot, packageName), packageName);
+        if (File.Exists(inFolder)) return inFolder;
+        var flat = Path.Combine(shareRoot, packageName);
+        return File.Exists(flat) ? flat : null;
+    }
+
     /// <summary>True when the package was copied now; false when it was already on the share (same size).</summary>
     internal static async Task<bool> CopyOneAsync(string package, string destination, CancellationToken cancellationToken)
     {
         var name = Path.GetFileName(package);
-        var target = Path.Combine(destination, name);
         var length = new FileInfo(package).Length;
+        // Every backup has a subfolder of its own on the share, named like the package; a package copied before the subfolders existed (flat, in the root) counts as already there.
+        var legacy = Path.Combine(destination, name);
+        if (File.Exists(legacy) && new FileInfo(legacy).Length == length) return false;
+        var folder = ShareFolder(destination, name);
+        var target = Path.Combine(folder, name);
         if (File.Exists(target) && new FileInfo(target).Length == length) return false;
+        Directory.CreateDirectory(folder);
         var partial = target + ".partial";
         await using (var source = new FileStream(package, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, useAsync: true))
         await using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true))

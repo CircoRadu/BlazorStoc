@@ -250,6 +250,7 @@ else
                     </select></label>
             }
         </div>
+        <div class="catalog-body movement-options"><ToggleSwitch Id="movement-show-operator" @bind-Value="showOperator" AriaLabel="Arată operator">Arată operator</ToggleSwitch></div>
         @if (ActiveFilters.Count > 0)
         {
             <div class="audit-active-filters" role="status">
@@ -276,6 +277,7 @@ else
                 <table class="movement-table">
                     <thead><tr>
                         <th aria-sort="@(descending ? "descending" : "ascending")"><button class="sort-header" @onclick="ToggleSortAsync" aria-label="Sortează după dată @(descending ? "crescător" : "descrescător")">DATA <span aria-hidden="true">@(descending ? "▼" : "▲")</span></button></th>
+                        @if (showOperator) { <th>OPERATOR</th> }
                         <th>INTRARE/IEȘIRE</th><th class="number">NUMĂR BUCĂȚI</th><th>DESCRIERE</th><th>FURNIZOR / FACTURĂ</th><th>BENEFICIAR/PROIECT</th><th>VEHICUL</th>
                         @if (canManage) { <th><span class="sr-only">Acțiuni</span></th> }
                     </tr></thead>
@@ -284,7 +286,8 @@ else
                         {
                             <tr @key="m.Id" class="@(m.Modified ? "modified" : "") @(m.IsVoided ? "voided" : "")" @oncontextmenu="() => OpenHistoryAsync(m)" @oncontextmenu:preventDefault="@m.Modified">
                                 <td><button type="button" class="audit-filter-link" title="Filtrează după această dată" @onclick="() => FilterByDateAsync(m.Date)">@StockMovementRules.DisplayDate(m.Date)</button></td>
-                                <td><button type="button" class="audit-filter-link kind-label @(m.Kind == StockMovementKind.Entry ? "in" : "out")" title="Filtrează după acest tip de mișcare" @onclick="() => FilterByKindAsync(m.Kind)">@StockMovementRules.KindLabel(m.Kind)@(m.Modified ? "[*]" : "")</button></td>
+                                @if (showOperator) { <td class="movement-operator" title="@(m.Modified && m.LastOperator is { Length: > 0 } && m.LastOperator != m.Operator ? $"Creat de {m.Operator}; modificat ultima dată de {m.LastOperator}" : $"Creat de {m.Operator}")">@(m.LastOperator is { Length: > 0 } ? m.LastOperator : m.Operator)</td> }
+                                <td><button type="button" class="audit-filter-link kind-label@(m.Kind == StockMovementKind.Entry ? "in" : "out")" title="Filtrează după acest tip de mișcare" @onclick="() => FilterByKindAsync(m.Kind)">@StockMovementRules.KindLabel(m.Kind)@(m.Modified ? "[*]" : "")</button></td>
                                 <td class="number">@m.Quantity</td>
                                 <td class="movement-text">@m.Description@if (m.IsVoided) { <span class="stock-badge negative" title="@($"Stornat de {m.VoidedBy}: {m.VoidReason}")"> stornat</span> }@if (m.ReturnOfMovementId is { } returnOf) { <small class="movement-project"> · retur al ieșirii #@returnOf</small> }@if (m.Kind == StockMovementKind.Exit && m.Reference is not null) { <small class="movement-project"> · ref. @m.Reference</small> }@if (pageData.OverStockIds?.Contains(m.Id) == true) { <span class="stock-badge negative" title="Ieșirea a depășit stocul din depozit (sau din mașină) la data ei"> peste stoc</span>@if (m.OverStockCause is { } overCause) { <small class="movement-project"> · @StockMovementRules.CauseLabel(overCause)</small> } }</td>
                                 <td>
@@ -488,6 +491,8 @@ else
 </PageBoundary>
 
 @code {
+    // "Arată operator": the column with the last operator of each movement (the one that modified it, else the one that created it); only the state of the page.
+    private bool showOperator;
     private RenderFragment CauseChoice(StockMovementInput target, string name) => @<fieldset class="cause-choice full-width">
         <legend>Cauza ieșirii peste stoc (opțional)</legend>
         <label><input type="radio" name="@name" checked="@(target.OverStockCause is null)" @onchange="() => target.OverStockCause = null" /> Necunoscută</label>

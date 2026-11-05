@@ -40,3 +40,14 @@ internal sealed class UnavailableElcomturImportService : IElcomturImportService
     public Task<ElcomturReport> RunAsync(string fileId, string firm, bool apply, CancellationToken cancellationToken = default) => Out<ElcomturReport>();
     public Task DiscardAsync(string fileId, CancellationToken cancellationToken = default) => Out<object>();
 }
+
+internal sealed class UnavailableElcomturAutoService : IElcomturAutoService
+{
+    private static Task<T> Out<T>() => Task.FromException<T>(new ModuleUnavailableException(ElcomturModule.ModuleId));
+    public Task<ElcomturAutoSettings> GetAsync(CancellationToken cancellationToken = default) => Out<ElcomturAutoSettings>();
+    public Task SaveAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default) => Out<object>();
+    public Task<ElcomturAutoResult> TestAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default) => Out<ElcomturAutoResult>();
+    public Task<ElcomturAutoFirms> ReadFirmsAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default) => Out<ElcomturAutoFirms>();
+    public Task<ElcomturAutoResult> CheckNowAsync(bool force, CancellationToken cancellationToken = default) => Out<ElcomturAutoResult>();
+    public Task<ElcomturAutoResult?> RunScheduledAsync(DateTime localNow, CancellationToken cancellationToken = default) => Out<ElcomturAutoResult?>();
+}

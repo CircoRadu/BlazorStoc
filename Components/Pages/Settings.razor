@@ -1,5 +1,5 @@
 ﻿@page "/setari"
-@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-actualizare.view|setari-import-activityapp.view|utilizatori.view|tipuri-utilizatori.view")]
+@attribute [Authorize(Policy = "perm:setari-facturi.view|setari-anaf.view|setari-notificari.view|setari-harta.view|setari-backup.view|setari-module.view|setari-jurnal.view|setari-actualizare.view|setari-import-activityapp.view|setari-import-elcomtur.view|utilizatori.view|tipuri-utilizatori.view")]
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @using BlazorStoc.Services
 @inject BlazorStoc.Services.IDatabaseAccountService DatabaseAccountsGate
@@ -67,6 +67,12 @@
     {
         <div role="tabpanel" id="panel-@ActivityImportTab" aria-labelledby="tab-@ActivityImportTab" class="settings-body">
             <ModuleGate ModuleId="@BlazorStoc.Modules.ActivityImport.ActivityImportModule.ModuleId"><ActivityImportPanel /></ModuleGate>
+        </div>
+    }
+    else if (activeTab == ElcomturTab && allowedTabs.Contains(ElcomturTab))
+    {
+        <div role="tabpanel" id="panel-@ElcomturTab" aria-labelledby="tab-@ElcomturTab" class="settings-body">
+            <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId"><ElcomturAutoPanel /></ModuleGate>
         </div>
     }
     else if (activeTab == NotificationsTab && allowedTabs.Contains(NotificationsTab))
@@ -180,6 +186,7 @@
 
     private const string AnafTab = "anaf";
     private const string ActivityImportTab = "preluare-activityapp";
+    private const string ElcomturTab = "preluare-elcomtur";
     private const string NotificationsTab = SettingsNavigation.NotificationsTab;
     private const string MapTab = SettingsNavigation.MapTab;
     private const string InvoicesTab = SettingsNavigation.InvoicesTab;
@@ -213,11 +220,11 @@
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare ActivityApp"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare ActivityApp"), (ElcomturTab, "Preluare Elcomtur"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
-        [AnafTab] = "setari-anaf.view", [ActivityImportTab] = "setari-import-activityapp.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
+        [AnafTab] = "setari-anaf.view", [ActivityImportTab] = "setari-import-activityapp.view", [ElcomturTab] = "setari-import-elcomtur.view", [NotificationsTab] = "setari-notificari.view", [MapTab] = "setari-harta.view",
         [InvoicesTab] = "setari-facturi.view", [BackupTab] = "setari-backup.view", [ModulesTab] = "setari-module.view", [JournalTab] = "setari-jurnal.view", [UpdateTab] = "setari-actualizare.view"
     };
     private readonly HashSet<string> allowedTabs = [];
@@ -229,6 +236,7 @@
     {
         AnafTab => "⌕",
         ActivityImportTab => "⇅",
+        ElcomturTab => "⇩",
         NotificationsTab => "✉",
         MapTab => "⌖",
         InvoicesTab => "▤",
@@ -246,6 +254,7 @@
     {
         AnafTab => "Interogarea serviciului public ANAF pentru datele firmelor.",
         ActivityImportTab => "Conexiunea la ActivityApp, tichetele preluate, corespondența câmpurilor și programarea importului.",
+        ElcomturTab => "Preluarea automată, zilnică, a backup-ului Elcomtur de pe un director (NAS), firma preluată și alerta de backup lipsă.",
         NotificationsTab => "Șabloanele de notificări și setările lor.",
         MapTab => "Furnizorul și aspectul hărții de mentenanță.",
         InvoicesTab => "Șabloanele de citire a facturilor.",

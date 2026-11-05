@@ -119,7 +119,7 @@ public sealed class ExpiryNotificationService(IExpiryNotificationRepository repo
                 var source = Find(notification.SourceKey)!;
                 byId.TryGetValue(notification.ObjectId, out var current);
                 if (current is not null && current.Expiry == notification.ExpiryDate) continue;
-                var reason = current is null ? source.RemovedReason : source.DateChangedReason(notification.ExpiryDate, current.Expiry, current);
+                var reason = current is null ? await source.RemovedReasonAsync(notification, cancellationToken).ConfigureAwait(false) :source.DateChangedReason(notification.ExpiryDate, current.Expiry, current);
                 var resolution = BuildResolution(SystemUser, reason, true, notification, templateById.GetValueOrDefault(notification.TemplateId), source, current, today);
                 if (await repository.ResolveAsync(notification, resolution, cancellationToken).ConfigureAwait(false) is not null)
                     journal.Add((AuditActions.AutoResolveNotification, notification, resolution.ObjectLabel, reason));

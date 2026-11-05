@@ -65,17 +65,23 @@ public static class NasBackupChecks
             await File.WriteAllTextAsync(package + ".sha256", "abc");
             var first = await NasBackupCopier.CopyOneAsync(package, share, CancellationToken.None);
             var again = await NasBackupCopier.CopyOneAsync(package, share, CancellationToken.None);
-            var target = Path.Combine(share, "Copie siguranta test.zip");
+            var target = Path.Combine(share, "Copie siguranta test", "Copie siguranta test.zip");
             check(first && !again && File.ReadAllBytes(target).SequenceEqual(File.ReadAllBytes(package)) && File.ReadAllText(target + ".sha256") == "abc"
-                  && Directory.GetFiles(share, "*.partial").Length == 0,
-                "NAS backup: a package is copied once, byte for byte with its checksum file, no temporary file is left, a second pass skips it");
-            await File.WriteAllBytesAsync(Path.Combine(share, "Copie siguranta test2.zip"), [1]);
+                  && Directory.GetFiles(share, "*.partial", SearchOption.AllDirectories).Length == 0 && !File.Exists(Path.Combine(share, "Copie siguranta test.zip")),
+                "NAS backup: a package is copied once, into a subfolder of its own, byte for byte with its checksum file, no temporary file is left, a second pass skips it");
+            Directory.CreateDirectory(Path.Combine(share, "Copie siguranta test2")); await File.WriteAllBytesAsync(Path.Combine(share, "Copie siguranta test2", "Copie siguranta test2.zip"), [1]);
             var changed = Path.Combine(local, "Copie siguranta test2.zip");
             await File.WriteAllBytesAsync(changed, [1, 2, 3]);
             var threw = false;
             try { await NasBackupCopier.CopyOneAsync(changed, share, CancellationToken.None); } catch (Exception exception) when (exception is IOException or NasBackupException) { threw = true; }
-            check(threw && File.ReadAllBytes(Path.Combine(share, "Copie siguranta test2.zip")).Length == 1,
+            check(threw && File.ReadAllBytes(Path.Combine(share, "Copie siguranta test2", "Copie siguranta test2.zip")).Length == 1,
                 "NAS backup: a different file with the same name on the share is never overwritten (the failure is reported)");
+            // A package copied before the subfolders (flat, in the root) counts as already there and is still found; a package in its subfolder is found there.
+            var oldOne = Path.Combine(local, "Copie veche.zip");
+            await File.WriteAllBytesAsync(oldOne, [9, 9, 9]); await File.WriteAllBytesAsync(Path.Combine(share, "Copie veche.zip"), [9, 9, 9]);
+            check(!await NasBackupCopier.CopyOneAsync(oldOne, share, CancellationToken.None) && !Directory.Exists(Path.Combine(share, "Copie veche"))
+                  && NasBackupCopier.FindOnShare(share, "Copie veche.zip") == Path.Combine(share, "Copie veche.zip") && NasBackupCopier.FindOnShare(share, "Copie siguranta test.zip") == target && NasBackupCopier.FindOnShare(share, "Lipsa.zip") is null,
+                "NAS backup: a package copied before the subfolders counts as already on the share, and a package is found in its subfolder or in the root");
         }
         finally { try { Directory.Delete(root, true); } catch (IOException) { } }
 

@@ -29,6 +29,8 @@ public interface IExpirySource
     string DateLabel => "expirării";
     // The reason written when the object is no longer among the instances (deleted or taken out of the records).
     string RemovedReason => "Obiectul nu mai este urmărit (a fost șters sau scos din evidență).";
+    // The reason for a notification whose object is gone, when the source can say what really happened (it reads its own records); by default the general RemovedReason.
+    Task<string> RemovedReasonAsync(ExpiryNotification notification, CancellationToken cancellationToken = default) => Task.FromResult(RemovedReason);
     // The reason written when the date of an object changed (current is the object with its new date).
     string DateChangedReason(DateOnly from, DateOnly to, ExpiryInstance current) =>
         $"Data {DateLabel} {EventName} s-a modificat de la {StockMovementRules.DisplayDate(from)} la {StockMovementRules.DisplayDate(to)}.";

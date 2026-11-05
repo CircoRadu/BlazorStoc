@@ -20,7 +20,8 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                EXISTS(SELECT 1 FROM stock_movement_history h WHERE h.movement_id=m.id),
                m.destination,m.vehicle_id,dv.plate_number,m.source_vehicle_id,sv.plate_number,
                m.invoice_id,si.`number`,su.name,si.supplier_id,
-               m.free_entry_type,m.free_supplier_id,fs.name,m.reference,m.over_stock_cause,m.operation_id,m.voided_utc,m.void_reason,m.voided_by,m.return_of_movement_id
+               m.free_entry_type,m.free_supplier_id,fs.name,m.reference,m.over_stock_cause,m.operation_id,m.voided_utc,m.void_reason,m.voided_by,m.return_of_movement_id,
+               (SELECT h.actor FROM stock_movement_history h WHERE h.movement_id=m.id ORDER BY h.id DESC LIMIT 1)
         FROM stock_movements m
         LEFT JOIN beneficiaries b ON b.id=m.beneficiary_id
         LEFT JOIN projects p ON p.id=m.project_id
@@ -1387,7 +1388,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             reader.IsDBNull(28) ? null : (OverStockCause)ToInt32(reader.GetInt64(28)),
             reader.IsDBNull(29) ? null : ToInt32(reader.GetInt64(29)),
             reader.IsDBNull(30) ? null : reader.GetString(30), reader.IsDBNull(31) ? null : reader.GetString(31), reader.IsDBNull(32) ? null : reader.GetString(32),
-            reader.IsDBNull(33) ? null : ToInt32(reader.GetInt64(33)));
+            reader.IsDBNull(33) ? null : ToInt32(reader.GetInt64(33)), reader.IsDBNull(34) ? null : reader.GetString(34));
     }
 
     private static DateTime ReadUpdated(MySqlDataReader reader, DateTime fallback)

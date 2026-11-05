@@ -1516,3 +1516,20 @@ tr[data-depth="0"] > td { border-top: 4px solid var(--c-d6e4df); }
 .elcomtur-balance > summary .balance-date { color: inherit; }
 /* The coloured header spans the whole card (the generic rule gives the direct children of a card a side margin; on a white header it does not show, on a coloured one it does) */
 .catalog > details.catalog-collapse.elcomtur-balance { margin-left: 0 !important; margin-right: 0 !important; }
+
+/* Group picker of the product form: the whole category tree, products go on leaves */
+.editor-grid .group-picker { grid-column:1 / -1; position:relative; }
+.group-picker-label { display:block; font-size:13px; font-weight:600; }
+.group-picker-trigger { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; margin-top:8px; min-height:39px; padding:8px 12px; border:1px solid var(--c-e0e7e3); border-radius:6px; background:var(--c-ffffff); color:var(--ink); font-size:13px; text-align:left; }
+.group-picker-trigger:focus-visible { outline:0; border-color:var(--green); box-shadow:0 0 0 1px var(--green); }
+.group-picker-caret { color:var(--muted); }
+.group-tree { margin-top:8px; max-height:340px; overflow:auto; border:1px solid var(--c-e0e7e3); border-radius:6px; background:var(--c-ffffff); padding:8px; }
+.group-tree-node { display:block; }
+.group-tree-children { display:grid; gap:2px; margin:2px 0 4px 12px; padding-left:9px; border-left:1px solid var(--c-d6e4df); }
+.group-tree-toggle, .group-tree-leaf { display:flex; align-items:center; gap:8px; width:100%; padding:7px 10px; border:0; border-radius:6px; background:transparent; color:var(--ink); font-size:13px; text-align:left; }
+.group-tree-category { font-weight:650; }
+.group-tree-caret { width:12px; color:var(--c-62766f); }
+.group-tree-toggle:hover, .group-tree-leaf:hover { background:var(--c-edf5f1); }
+.group-tree-leaf { padding-left:30px; }
+.group-tree-leaf.selected { background:var(--c-edf5f1); color:var(--green); font-weight:650; box-shadow:inset 4px 0 0 var(--green); }
+.group-tree-empty { margin:4px 10px 8px 30px; }

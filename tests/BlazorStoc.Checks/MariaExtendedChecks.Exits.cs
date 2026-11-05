@@ -299,6 +299,9 @@ public static partial class MariaExtendedChecks
             var edited = StockMovementInput.From(stored); edited.Reference = "Aviz 78"; edited.Reason = "Ext corectare referinta";
             var afterEdit = await movements.UpdateAsync(stored, edited);
             Check(stored.Reference == "Aviz 77" && afterEdit.Movement.Reference == "Aviz 78" && (await movements.GetAsync(stored.Id))!.Reference == "Aviz 78", "An exit keeps its reference and the reference can be corrected");
+            var editedRow = (await movements.GetAsync(stored.Id))!; var untouchedRow = (await movements.GetAsync(sale.Movement.Id))!;
+            Check(editedRow.LastOperator is { Length: > 0 } && untouchedRow.LastOperator is null && editedRow.Operator.Length > 0,
+                "A movement carries the last operator from its history (the one that modified it); an unmodified movement has none, so the creator is shown");
 
             // Filters on exits.
             var all = await movements.GetPageAsync(product.Id, new StockMovementQuery(StockMovementKind.Exit, PageSize: 50));
