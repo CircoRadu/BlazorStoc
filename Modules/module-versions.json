@@ -476,8 +476,8 @@
                                                  ]
                                  },
                     "Elcomtur":  {
-                                     "version":  "1.1.0",
-                                     "hash":  "21ea4ab08b3a253ecec9a8dfff32ea5d3944684b5a8474705e1da6745fb91846",
+                                     "version":  "1.1.1",
+                                     "hash":  "e66fb15feb54ee8dcc49314408a6e60580ba8a80ad7be74db664be2b77fadce8",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -488,6 +488,11 @@
                                                          "version":  "1.1.0",
                                                          "date":  "04.11.2026",
                                                          "note":  "Numarul de beneficiari cu plati restante pentru tabul din Notificari (CountOwedAsync)"
+                                                     },
+                                                     {
+                                                         "version":  "1.1.1",
+                                                         "date":  "05.11.2026",
+                                                         "note":  "Sectiunea de balanta apare la toti beneficiarii; fara balanta importata, antetul spune asta"
                                                      }
                                                  ]
                                  }

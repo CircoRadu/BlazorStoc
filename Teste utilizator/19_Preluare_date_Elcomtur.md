@@ -23,3 +23,5 @@ Modul nou `Elcomtur` (branch `Elcomtur`). Balanta unui beneficiar persoana jurid
 | 12 | Iconita de vizualizare de pe un rand | Deschide fisa beneficiarului cu sectiunea Balanta Elcomtur deschisa si adusa in vedere | |
 | 13 | Spitalul Zam (CUI 4373967) dupa preluare | Balanta 24.118,05 la 30.10.2026 (la 30.09.2026 formula da 118.077,60) | |
 | 14 | Opreste modulul Elcomtur (Setari -> Module) | Meniul si tabul dispar; sectiunea din beneficiar dispare; pagina spune "modul indisponibil" | |
+| 15 | Fisa unui beneficiar fara client Elcomtur (05.11.2026) | Sectiunea "Balanta Elcomtur" apare, cu antetul "Nu exista balanta importata pentru acest beneficiar" | |
+| 16 | Opreste apoi porneste modulul Elcomtur din Setari -> Module, fara sa navighezi | Intrarea "Preluare Elcomtur" din meniu dispare si reapare imediat (la fel la alte module) | |

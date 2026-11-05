@@ -7,8 +7,8 @@
 @inject ILogger<ElcomturBalanceSection> Logger
 
 @* The balance of a beneficiary from the last import of an Elcomtur backup (Administrare -> Preluare date Elcomtur): green header "Nu sunt plati restante" for a balance of zero or less, reddish header
-   with the amount due and the numbers of invoices (term passed / still in term) for a positive balance; below, the two tables of the invoices still marked unpaid in Elcomtur. Nothing is shown when
-   the beneficiary has no client in the import or the user may not see balances. *@
+   with the amount due and the numbers of invoices (term passed / still in term) for a positive balance; below, the two tables of the invoices still marked unpaid in Elcomtur. A beneficiary with no
+   client in the import still gets the section, with a header saying no balance was imported; nothing is shown only when the user may not see balances. *@
 @if (balance is not null)
 {
     var today = Today;
@@ -76,6 +76,20 @@
         </details>
     </section>
 }
+else if (allowed)
+{
+    <section class="catalog" id="elcomtur-balance-section">
+        <details class="catalog-collapse elcomtur-balance balance-none" id="balanta-elcomtur" open="@StartOpen">
+            <summary class="catalog-heading">
+                <h2>Balanță Elcomtur</h2>
+                <span class="balance-summary" id="elcomtur-balance-summary"><span class="balance-count" id="elcomtur-balance-none">Nu există balanță importată pentru acest beneficiar</span></span>
+            </summary>
+            <div class="catalog-body">
+                <p class="muted"><small>Beneficiarul nu are un client potrivit (după cifrele CUI) în ultima preluare Elcomtur sau nu s-a făcut încă nicio preluare. Se completează la următoarea preluare din Administrare → Preluare date Elcomtur.</small></p>
+            </div>
+        </details>
+    </section>
+}
 
 @code {
     [Parameter, EditorRequired] public int BeneficiaryId { get; set; }
@@ -84,6 +98,8 @@
 
     private BeneficiaryBalance? balance;
     private bool scrolled;
+    // False when the user may not see balances or the module fails: then nothing is shown. True with no balance: the section says none was imported.
+    private bool allowed;
 
     private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
@@ -91,18 +107,20 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        allowed = true;
         try { balance = await Balances.GetAsync(BeneficiaryId); }
-        catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { balance = null; }
+        catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { balance = null; allowed = false; }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             Logger.LogError("Elcomtur balance loading failed ({ErrorType}).", exception.GetType().Name);
             balance = null;
+            allowed = false;
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!StartOpen || scrolled || balance is null) return;
+        if (!StartOpen || scrolled || !allowed) return;
         scrolled = true;
         try { await Js.InvokeVoidAsync("blazorStocScrollTo", "balanta-elcomtur"); }
         catch (Exception exception) when (exception is JSException or InvalidOperationException or TaskCanceledException) { }

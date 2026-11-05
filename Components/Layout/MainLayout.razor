@@ -141,6 +141,8 @@
     protected override async Task OnInitializedAsync()
     {
         Navigation.LocationChanged += LocationChanged;
+        // A module stopped or started again (Setări -> Module) changes the menu at once, not at the next navigation.
+        Modules.Changed += ModulesChanged;
         ReadLocation();
         await LoadOpenedProductAsync();
         if (productSection) await LoadGroupsAsync();
@@ -174,6 +176,11 @@
     private void LocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs args)
     {
         RefreshNavigationAsync().FireAndForget(Logger, "layout navigation refresh");
+    }
+
+    private void ModulesChanged()
+    {
+        InvokeAsync(StateHasChanged).FireAndForget(Logger, "layout module refresh");
     }
 
     private async Task RefreshNavigationAsync()
@@ -350,6 +357,7 @@
     public void Dispose()
     {
         Navigation.LocationChanged -= LocationChanged;
+        Modules.Changed -= ModulesChanged;
         lifetime.Cancel();
         lifetime.Dispose();
     }

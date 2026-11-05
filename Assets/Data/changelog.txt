@@ -1,3 +1,7 @@
+## 0.5.40 | 05.11.2026
+- Beneficiari: secțiunea „Balanță Elcomtur” apare la toți beneficiarii; fără balanță importată, antetul spune „Nu există balanță importată pentru acest beneficiar”.
+- Meniul lateral se actualizează imediat când un modul este oprit sau pornit din Setări, Module (înainte, după următoarea navigare).
+
 ## 0.5.39 | 04.11.2026
 - Setări, Preluare ActivityApp, Tipuri de tichete: lista tipurilor citite din ActivityApp se păstrează (și tipurile nefolosite), nu doar cele alese; schimbare de schemă 63.
 - Notificări: tabul „Balanțe restante” devine roșu și arată numărul de beneficiari cu plăți restante; notificarea „Probleme de preluare” duce la tabul „Probleme import”, nu la Setări.
