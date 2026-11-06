@@ -1,0 +1,113 @@
+@using BlazorStoc.Services
+
+@* Picks the group (category + leaf subcategory) of a product from the whole tree: the user opens the tree, expands the branches and chooses a leaf.
+   Categories and subcategories with children only expand; products go on leaves. The structure is created in the "Categorii si subcategorii" page. *@
+<div class="group-picker" id="@Id">
+    <span id="@($"{Id}-label")" class="group-picker-label">Categorie și subcategorie *</span>
+    <button type="button" id="@($"{Id}-trigger")" class="group-picker-trigger" aria-haspopup="tree" aria-expanded="@open.ToString().ToLowerInvariant()" aria-labelledby="@($"{Id}-label {Id}-trigger")"
+            data-category="@Category" data-subcategory="@Subcategory" disabled="@Disabled" @onclick="Toggle">
+        <span class="group-picker-path">@PathText</span><span class="group-picker-caret" aria-hidden="true">@(open ? "▴" : "▾")</span>
+    </button>
+    @if (open)
+    {
+        <div class="group-tree" id="@($"{Id}-tree")" role="tree" aria-labelledby="@($"{Id}-label")">
+            @foreach (var category in Categories)
+            {
+                var key = Key(category, null);
+                <div class="group-tree-node" role="none" @key="key">
+                    <button type="button" class="group-tree-toggle group-tree-category" role="treeitem" aria-expanded="@expanded.Contains(key).ToString().ToLowerInvariant()" data-value="@category" @onclick="() => ToggleNode(key)">
+                        <span class="group-tree-caret" aria-hidden="true">@(expanded.Contains(key) ? "▾" : "▸")</span>@category
+                    </button>
+                    @if (expanded.Contains(key))
+                    {
+                        @if (Children(category, null).Count > 0) { <div class="group-tree-children" role="group">@NodesOf(category, null)</div> }
+                        else { <p class="form-note group-tree-empty">Categoria nu are subcategorii.</p> }
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Id { get; set; } = "product-group";
+    [Parameter] public IReadOnlyList<string> Categories { get; set; } = [];
+    // Every subcategory of every category (category, name, parent); a category with no node here has its subcategories listed flat, from Flat.
+    [Parameter] public IReadOnlyList<SubcategoryNode> Nodes { get; set; } = [];
+    [Parameter] public IReadOnlyList<ProductGroup> Flat { get; set; } = [];
+    [Parameter] public string Category { get; set; } = "";
+    [Parameter] public string Subcategory { get; set; } = "";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<ProductGroup> Picked { get; set; }
+
+    private bool open;
+    private readonly HashSet<string> expanded = [];
+    private static string Key(string category, string? name) => name is null ? "c:" + category.ToLowerInvariant() : "n:" + category.ToLowerInvariant() + "/" + name.ToLowerInvariant();
+    private string PathText => Subcategory.Length == 0 ? "Alege categoria și subcategoria…" : string.Join(" › ", new[] { Category }.Concat(Path(Category, Subcategory)));
+
+    private static bool Same(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+    private IEnumerable<SubcategoryNode> CategoryNodes(string category) => Nodes.Where(node => Same(node.Category, category));
+
+    // The children of a node (null parent = the first level); a category the tree does not know is listed flat, from the groups.
+    private IReadOnlyList<(string Name, bool IsLeaf)> Children(string category, string? parent)
+    {
+        var tree = CategoryNodes(category).ToList();
+        if (tree.Count == 0)
+            return parent is not null ? [] : Flat.Where(group => Same(group.Category, category) && group.Subcategory.Length > 0).Select(group => group.Subcategory)
+                .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase).Select(name => (name, true)).ToList();
+        return tree.Where(node => parent is null ? string.IsNullOrEmpty(node.Parent) : Same(node.Parent, parent)).Select(node => (node.Name, node.IsLeaf)).ToList();
+    }
+
+    // The names from the first level down to the subcategory.
+    private List<string> Path(string category, string subcategory)
+    {
+        var names = new List<string>();
+        var node = CategoryNodes(category).FirstOrDefault(item => Same(item.Name, subcategory));
+        if (node is null) return [subcategory];
+        while (node is not null)
+        {
+            names.Insert(0, node.Name);
+            var parent = node.Parent;
+            node = string.IsNullOrEmpty(parent) ? null : CategoryNodes(category).FirstOrDefault(item => Same(item.Name, parent));
+        }
+        return names;
+    }
+
+    private void Toggle()
+    {
+        open = !open;
+        if (!open) return;
+        // Opening shows the chosen leaf: its category and every ancestor are expanded.
+        if (Category.Length > 0) expanded.Add(Key(Category, null));
+        if (Subcategory.Length > 0) foreach (var name in Path(Category, Subcategory).SkipLast(1)) expanded.Add(Key(Category, name));
+    }
+
+    private void ToggleNode(string key) { if (!expanded.Remove(key)) expanded.Add(key); }
+
+    private RenderFragment NodesOf(string category, string? parent) => @<text>
+        @foreach (var (name, isLeaf) in Children(category, parent))
+        {
+            var key = Key(category, name);
+            var nodeName = name;
+            <div class="group-tree-node" role="none" @key="key">
+                @if (isLeaf)
+                {
+                    var selected = Same(category, Category) && Same(name, Subcategory);
+                    <button type="button" role="treeitem" class="@("group-tree-leaf" + (selected ? " selected" : ""))" aria-selected="@(selected ? "true" : "false")" data-category="@category" data-value="@name" @onclick="() => PickAsync(category, nodeName)">@name</button>
+                }
+                else
+                {
+                    var isOpen = expanded.Contains(key);
+                    <button type="button" role="treeitem" class="group-tree-toggle" aria-expanded="@(isOpen ? "true" : "false")" data-category="@category" data-value="@name" @onclick="() => ToggleNode(key)"><span class="group-tree-caret" aria-hidden="true">@(isOpen ? "▾" : "▸")</span>@name</button>
+                    @if (isOpen) { <div class="group-tree-children" role="group">@NodesOf(category, name)</div> }
+                }
+            </div>
+        }
+    </text>;
+
+    private async Task PickAsync(string category, string name)
+    {
+        open = false;
+        await Picked.InvokeAsync(new ProductGroup(category, name));
+    }
+}

@@ -7,7 +7,8 @@ namespace BlazorStoc.Modules.ActivityImport;
 // with one instance for each condition that lasts: the synchronization failing (three attempts in a row), the structure of ActivityApp changed, open problems waiting, ticket types that are
 // new or changed in ActivityApp. Each condition starts on the day it began and goes away by itself when it is gone (the engine then closes the notification).
 
-public sealed record ActivityImportAlertState(DateTime? FailingSince, string FailureMessage, int Failures, DateTime? StructureSince, int StructureIssues, DateTime? IssuesSince, int OpenIssues, DateTime? TypesSince);
+public sealed record ActivityImportAlertState(DateTime? FailingSince, string FailureMessage, int Failures, DateTime? StructureSince, int StructureIssues, DateTime? IssuesSince, int OpenIssues, DateTime? TypesSince,
+    DateTime? TicketStructureSince = null, string TicketStructureChange = "");
 
 public interface IActivityImportAlertReader
 {
@@ -21,13 +22,14 @@ public sealed class MariaActivityImportAlertReader(IConfiguration configuration)
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         long openIssues;
         await using (var count = new MySqlCommand("SELECT COUNT(*) FROM activity_import_issues WHERE resolved = 0", connection)) openIssues = Convert.ToInt64(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
-        await using var command = new MySqlCommand("SELECT alert_failing_since, last_sync_message, sync_failures, alert_structure_since, structure_report, alert_issues_since, alert_types_since FROM activity_import_settings WHERE id = 1", connection);
+        await using var command = new MySqlCommand("SELECT alert_failing_since, last_sync_message, sync_failures, alert_structure_since, structure_report, alert_issues_since, alert_types_since, alert_ticket_structure_since, ticket_structure_diff FROM activity_import_settings WHERE id = 1", connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return new ActivityImportAlertState(null, "", 0, null, 0, null, 0, null);
         DateTime? At(int ordinal) => reader.IsDBNull(ordinal) ? null : DateTime.SpecifyKind(reader.GetDateTime(ordinal), DateTimeKind.Utc);
         var report = reader.IsDBNull(4) ? "" : reader.GetString(4);
         var structureIssues = report.Length == 0 ? 0 : System.Text.Json.JsonSerializer.Deserialize<List<StructureIssue>>(report)?.Count(issue => issue.Required) ?? 0;
-        return new ActivityImportAlertState(At(0), reader.GetString(1), reader.GetInt32(2), At(3), structureIssues, At(5), (int)openIssues, At(6));
+        var ticketChange = reader.IsDBNull(8) ? TicketStructureDiff.None : ActivityTicketStructureRules.ParseDiff(reader.GetString(8));
+        return new ActivityImportAlertState(At(0), reader.GetString(1), reader.GetInt32(2), At(3), structureIssues, At(5), (int)openIssues, At(6), At(7), ticketChange.Any ? ticketChange.Describe() : "");
     }
 }
 
@@ -36,7 +38,9 @@ public sealed class ActivityImportAlertSource(IActivityImportAlertReader reader,
     public const string SourceKey = "sistem.preluare-activityapp";
     public const string ProblemName = "problema preluare";
     public const string DetailsName = "detalii preluare";
-    public const int FailingId = 1, StructureId = 2, IssuesId = 3, TypesId = 4;
+    public const int FailingId = 1, StructureId = 2, IssuesId = 3, TypesId = 4, TicketStructureId = 5;
+    // The open problems of the import are listed in the tab "Probleme import" of the Notifications page (not in the settings).
+    public const string IssuesUrl = "/notificari?tab=probleme";
     public string Key => key;
     public string Category => "Sistem";
     public string EventName => "Preluare ActivityApp cu probleme";
@@ -61,8 +65,8 @@ public sealed class ActivityImportAlertSource(IActivityImportAlertReader reader,
     {
         const string url = "/setari?tab=preluare-activityapp";
         var result = new List<ExpiryInstance>();
-        ExpiryInstance Make(int id, string label, DateTime since, string problem, string details) =>
-            new(id, label, Day(since), new Dictionary<string, string> { [ProblemName] = problem, [DetailsName] = details }, url);
+        ExpiryInstance Make(int id, string label, DateTime since, string problem, string details, string? link = null) =>
+            new(id, label, Day(since), new Dictionary<string, string> { [ProblemName] = problem, [DetailsName] = details }, link ?? url);
         if (state.FailingSince is { } failing)
             result.Add(Make(FailingId, "Sincronizarea cu ActivityApp", failing, "sincronizarea eșuează",
                 $"Ultimele {Math.Max(state.Failures, ActivitySyncSchedule.FailuresBeforeAlert)} sincronizări au eșuat. Cauza: {(state.FailureMessage.Length > 0 ? state.FailureMessage : "necunoscută")}"));
@@ -70,7 +74,10 @@ public sealed class ActivityImportAlertSource(IActivityImportAlertReader reader,
             result.Add(Make(StructureId, "Structura ActivityApp", structure, "structura ActivityApp s-a schimbat",
                 $"După o actualizare a ActivityApp, {(state.StructureIssues > 0 ? state.StructureIssues + " coloane necesare lipsesc sau au alt tip" : "structura nu mai corespunde")}; datele afectate nu se preiau. Poate fi nevoie de o actualizare a modulului de preluare."));
         if (state.IssuesSince is { } issues && state.OpenIssues > 0)
-            result.Add(Make(IssuesId, "Probleme de preluare", issues, "probleme de preluare deschise", $"Sunt {state.OpenIssues} probleme de preluare deschise (elemente care nu s-au putut prelua sau au fost șterse în ActivityApp)."));
+            result.Add(Make(IssuesId, "Probleme de preluare", issues, "probleme de preluare deschise", $"Sunt {state.OpenIssues} probleme de preluare deschise (elemente care nu s-au putut prelua sau au fost șterse în ActivityApp).", IssuesUrl));
+        if (state.TicketStructureSince is { } ticketStructure)
+            result.Add(Make(TicketStructureId, "Structura tichetelor", ticketStructure, "structura tichetelor din ActivityApp s-a modificat",
+                $"Structura tichetelor din ActivityApp nu mai este cea față de care ai verificat corespondența câmpurilor ({(state.TicketStructureChange.Length > 0 ? state.TicketStructureChange : "coloane schimbate")}). Preluarea continuă cu corespondența actuală; verific-o în Setări → Preluare date ActivityApp, secțiunea 6 (poți deschide un tichet exemplu), adaptează-o noii scheme și apasă „Corespondența verificată”."));
         if (state.TypesSince is { } types)
             result.Add(Make(TypesId, "Tipuri de tichete", types, "tipuri de tichete noi sau schimbate", "ActivityApp are tipuri de tichete noi sau cu alt nume decât cele alese; tipurile schimbate nu se preiau până le confirmi."));
         return result;

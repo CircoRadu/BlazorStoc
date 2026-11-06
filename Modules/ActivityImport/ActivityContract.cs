@@ -23,14 +23,18 @@ public static class ActivityContract
     public const string Partners = "Beneficiari";
     public const string WorkPoints = "Puncte de lucru";
     public const string Events = "Evenimente de rezolvare";
-    public const string Version = "Versiune ActivityApp";
+    /// <summary>The agents attached to an event (who did the work): optional, the executor then stays the person who processed the ticket.</summary>
+    public const string EventAgents = "Agenți atașați evenimentelor";
+    public const string Version ="Versiune ActivityApp";
 
     public static IReadOnlyList<ContractTable> Tables { get; } =
     [
         new("ActivitatiContracte", TicketTypes, [Num("ID", true), Txt("Denumire", true), Txt("TipActivitate"), Flag("SeAtasaeazaLaContractService"), Flag("GenerareEvenimentAutomat")]),
         new("Tickete", Tickets, [Num("ID", true), Num("IDActivitate", true), Flag("Sters", true), Num("IDEveniment", true), Dat("DataTicket", true), Num("IDClient", true), Num("IDPunctDeLucru"),
             Txt("Subject"), Txt("Description"), Txt("DescriptionInternal"), Txt("NumeTicket"), Txt("ProcesatDe")]),
-        new("EvenimenteAgent", Events, [Num("ID", true), Num("IDTicket", true), Dat("EndTime"), Num("Status"), Txt("DescriptionInternal"), Dat("DataModificareEveniment")]),
+        new("EvenimenteAgent", Events, [Num("ID", true), Num("IDTicket", true), Dat("EndTime"), Num("Status"), Txt("DescriptionInternal"), Dat("DataModificareEveniment"), Txt("LocatieGPS"), Num("Label")]),
+        new("AgentiAtasatiEvenimente", EventAgents, [Num("IDEvenimentAgent"), Num("IDAgent")]),
+        new("Agenti", EventAgents, [Num("ID"), Txt("NumeSiPrenume")]),
         new("NomenclatorParteneri", Partners, [Num("ID", true), Txt("Denumire", true), Txt("CodFiscal", true), Txt("Adresa"), Txt("Localitate"), Txt("Judet"), Txt("Telefon"), Txt("Email")]),
         new("PuncteDeLucruParteneri", WorkPoints, [Num("ID", true), Num("IDPartener", true), Txt("Adresa"), Txt("Localitate"), Txt("Judet"), Txt("Telefon"), Txt("Obiectiv"), Txt("LocatieGPS"), Flag("Activ"), Flag("Sistat")]),
         new("Versiuni", Version, [Num("Id"), Txt("Desktop")])
@@ -66,14 +70,21 @@ public enum StructureStatus { Unchecked, Ok, Partial, Changed }
 /// <summary>One difference between the contract and ActivityApp. Required: the entity cannot be imported while it lasts.</summary>
 public sealed record StructureIssue(string Table, string Column, string Entity, string Problem, string Expected, string Found, bool Required);
 
+/// <summary>An extra field of the ticket settings as the structure of ActivityApp has it: its key, the table (Tickete or EvenimenteAgent) and the real column.</summary>
+public sealed record ResolvedExtra(string Key, string Table, string Column);
+
 public sealed class StructureReport
 {
     private readonly Dictionary<string, string> usable;
 
-    internal StructureReport(StructureStatus status, string fingerprint, IReadOnlyList<StructureIssue> issues, int newColumns, Dictionary<string, string> usable, IReadOnlySet<string> blockedEntities)
+    internal StructureReport(StructureStatus status, string fingerprint, IReadOnlyList<StructureIssue> issues, int newColumns, Dictionary<string, string> usable, IReadOnlySet<string> blockedEntities,
+        IReadOnlyList<ResolvedExtra>? extras = null)
     {
-        Status = status; Fingerprint = fingerprint; Issues = issues; NewColumns = newColumns; this.usable = usable; BlockedEntities = blockedEntities;
+        Status = status; Fingerprint = fingerprint; Issues = issues; NewColumns = newColumns; this.usable = usable; BlockedEntities = blockedEntities; Extras = extras ?? [];
     }
+
+    /// <summary>The extra fields of the ticket settings whose column exists in ActivityApp and holds text, with the real name of the column.</summary>
+    public IReadOnlyList<ResolvedExtra> Extras { get; }
 
     public StructureStatus Status { get; }
     /// <summary>SHA-256 of the contract tables' real columns and types: a change (also a new column) is noticed by comparing it with the last saved one.</summary>
@@ -135,9 +146,20 @@ public static class ActivityStructureChecker
                 issues.Add(new(field.Table, field.Column, table.Entity, match is null ? "coloana aleasă pentru „" + field.Label + "” lipsește" : "coloana aleasă pentru „" + field.Label + "” nu are text",
                     "text", match?.DataType ?? "—", false));
         }
+        // The extra fields: a column of the tickets or of their events, read as text. One that is gone (or no longer text) stops the run like a chosen column does.
+        var extras = new List<ResolvedExtra>();
+        foreach (var extra in fields?.Extras ?? [])
+        {
+            var table = contract.FirstOrDefault(item => item.Name == extra.Table);
+            var match = actual.FirstOrDefault(item => item.Table.Equals(extra.Table, StringComparison.OrdinalIgnoreCase) && item.Column.Equals(extra.Column, StringComparison.OrdinalIgnoreCase));
+            if (table is not null && match is not null && ActivityContract.KindOf(match.DataType) == ColumnKind.Text) extras.Add(new ResolvedExtra(extra.Key, extra.Table, match.Column));
+            else if (table is not null)
+                issues.Add(new(extra.Table, extra.Column, table.Entity, match is null ? "coloana aleasă pentru „" + extra.Label + "” lipsește" : "coloana aleasă pentru „" + extra.Label + "” nu are text",
+                    "text", match?.DataType ?? "—", false));
+        }
         var blocked = issues.Where(issue => issue.Required).Select(issue => issue.Entity).ToHashSet(StringComparer.Ordinal);
         var status = blocked.Count > 0 ? StructureStatus.Changed : issues.Count > 0 ? StructureStatus.Partial : StructureStatus.Ok;
-        return new StructureReport(status, Fingerprint(actual, contract), issues, newColumns, usable, blocked);
+        return new StructureReport(status, Fingerprint(actual, contract), issues, newColumns, usable, blocked, extras);
     }
 
     // The columns of the contract tables only, in a fixed order: the same structure always gives the same value.

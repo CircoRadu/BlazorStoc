@@ -61,14 +61,22 @@ else if (beneficiary is not null)
 
     @if (addingProject)
     {
-        <ProjectEditor @key="editorKey" Original="null" FixedBeneficiaryId="Id" FixedBeneficiaryName="@beneficiary.Name"
-                       Saved="ProjectSavedAsync" Closed="CloseAddProjectAsync" />
+        <div class="delete-overlay">
+            <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="project-editor-title">
+                <ProjectEditor @key="editorKey" Original="null" FixedBeneficiaryId="Id" FixedBeneficiaryName="@beneficiary.Name"
+                               Saved="ProjectSavedAsync" Closed="CloseAddProjectAsync" />
+            </div>
+        </div>
     }
 
     @if (addingWorkPoint || editingWorkPoint is not null)
     {
-        <WorkPointEditor @key="workPointEditorKey" BeneficiaryId="Id" Original="editingWorkPoint"
-                         Saved="WorkPointSavedAsync" Closed="CloseWorkPointEditorAsync" PhotosChanged="ReloadPhotoCountsAsync" />
+        <div class="delete-overlay">
+            <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="work-point-editor-title">
+                <WorkPointEditor @key="workPointEditorKey" BeneficiaryId="Id" Original="editingWorkPoint"
+                                 Saved="WorkPointSavedAsync" Closed="CloseWorkPointEditorAsync" PhotosChanged="ReloadPhotoCountsAsync" />
+            </div>
+        </div>
     }
 
     <section class="catalog">
@@ -120,7 +128,11 @@ else if (beneficiary is not null)
 
     <ServiceInterventionsSection BeneficiaryId="Id" BeneficiaryName="@beneficiary.Name" WorkPoints="workPoints" Contracts="contracts" CanManage="canMaintenance" OpenForWorkPointId="AddInterventionPoint ?? 0" Changed="ReloadContractsAsync" /></ModuleGate>
 
+    <ModuleGate ModuleId="@BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId" Notice="false"><ElcomturBalanceSection BeneficiaryId="Id" StartOpen="BalanceRequested" /></ModuleGate>
+
     <ModuleGate ModuleId="@RiskAnalysesModule.ModuleId"><RiskAnalysesSection BeneficiaryId="Id" StartOpen="false" Views="riskAnalyses" WorkPoints="workPoints" CanManage="canRisk" ThresholdDays="riskThresholdDays" Changed="ReloadRiskAnalysesAsync" /></ModuleGate>
+
+    <BeneficiaryFilesSection BeneficiaryId="Id" />
 
     <section class="catalog">
         <details class="catalog-collapse"><summary class="catalog-heading"><h2>Proiecte <span>@FilteredProjects.Count</span></h2>
@@ -164,6 +176,9 @@ else if (beneficiary is not null)
     [SupplyParameterFromQuery(Name = BeneficiaryProjectListState.PageParameter)] public int? PageParameter { get; set; }
     // /beneficiari/<id>?adauga-proiect=1&inapoi=<page>: opened from a form (the exit form of a product) that continues afterwards.
     [SupplyParameterFromQuery(Name = "adauga-proiect")] public string? AddProjectFlag { get; set; }
+    // ?balanta=1: opened from the Balante restante tab of the Notifications page; the Elcomtur balance section opens and is brought into view.
+    [SupplyParameterFromQuery(Name = "balanta")] public string? BalanceFlag { get; set; }
+    private bool BalanceRequested => BalanceFlag == "1";
     // /beneficiari/<id>?adauga-interventie=<work point id>: opened from the maintenance map, with the form of a new intervention on that point.
     [SupplyParameterFromQuery(Name = MaintenanceMapRules.AddInterventionQuery)] public int? AddInterventionPoint { get; set; }
     [SupplyParameterFromQuery(Name = ReturnNavigation.QueryName)] public string? ReturnParameter { get; set; }

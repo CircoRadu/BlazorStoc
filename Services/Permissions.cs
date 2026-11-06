@@ -45,16 +45,18 @@ public static class Permissions
         new("inventar", "Generare situatie inventar", "Inventar", [new(View, "Vizualizare"), new(Export, "Export")]),
         new("inventar-preluare", "Preluare inventar", "Inventar", [new(View, "Vizualizare"), new(Add, "Preluare inventar")]),
         new("categorii", "Categorii", "Administrare", Crud()),
-        new("beneficiari", "Beneficiari", "Administrare", Crud(export: true)),
+        new("beneficiari", "Beneficiari", "Administrare", Plus(Crud(export: true), new PermissionAction("validare", "Validare beneficiari ActivityApp", false))),
         new("furnizori", "Furnizori", "Administrare", Crud()),
         new("facturi", "Facturi", "Administrare", Crud(export: true)),
         new("vehicule", "Vehicule", "Administrare", Crud()),
         new("oferte", "Oferte", "Oferte", Plus(Crud(export: true), new PermissionAction("sabloane", "Sabloane de oferta"))),
-        new("mentenanta", "Mentenanta", "Mentenanta", Plus(Crud(export: true), new PermissionAction("contracte", "Activare contracte"))),
+        new("mentenanta", "Mentenanta", "Mentenanta", Plus(Plus(Crud(export: true), new PermissionAction("contracte", "Activare contracte")), new PermissionAction("validare", "Validare tichete ActivityApp", false))),
         new("analize-risc", "Analize de risc", "Analize de risc", Crud()),
+        new("elcomtur", "Balante Elcomtur", "Administrare", [new(View, "Vizualizare balante", false), new("import", "Preluare date Elcomtur", false)]),
         new("notificari", "Notificari", "Notificari", [new(View, "Vizualizare"), new(Edit, "Marcare / rezolvare")]),
         new("setari-facturi", "Setari: Facturi (sabloane)", "Setari", [new(View, "Vizualizare"), new(Add, "Creare sablon"), new(Edit, "Modificare sablon"), new(Delete, "Stergere sablon", false)]),
         new("setari-import-activityapp", "Setari: Preluare tichete ActivityApp", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare setari si tipuri", false), new("run", "Rulare import", false), new("reset", "Resetare import", false)]),
+        new("setari-import-elcomtur", "Setari: Preluare automata Elcomtur", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare setari", false), new("run", "Verificare / preluare la cerere", false)]),
         new("setari-anaf", "Setari: Preluare date ANAF", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
         new("setari-notificari", "Setari: Notificari", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
         new("setari-harta", "Setari: Harta", "Setari", [new(View, "Vizualizare", false), new(Edit, "Modificare", false)]),
@@ -83,7 +85,13 @@ public static class Permissions
     public static readonly IReadOnlyDictionary<string, string[]> Requires = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
         ["preluare-factura.add"] = ["facturi.add"],
-        ["facturi.add"] = ["furnizori.view"]
+        ["facturi.add"] = ["furnizori.view"],
+        // The validation of a ticket records or removes interventions of the register.
+        ["mentenanta.validare"] = ["mentenanta.add", "mentenanta.delete"],
+        // Accepting a beneficiary of ActivityApp creates or changes the beneficiary.
+        ["beneficiari.validare"] = ["beneficiari.add", "beneficiari.edit"],
+        // The import shows its result (the balances) to who runs it.
+        ["elcomtur.import"] = ["elcomtur.view", "beneficiari.view"]
     };
 
     private static string Label(string key)
@@ -105,7 +113,7 @@ public static class Permissions
     public static bool IsKnown(string key) => AllKeys.Contains(key, StringComparer.Ordinal);
 
     // Modules reserved to the administrator: never offered to, saved for, or honoured for any other user type.
-    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module", "setari-actualizare", "setari-import-activityapp", "setari-jurnal" };
+    public static readonly IReadOnlySet<string> AdminOnlyModules = new HashSet<string>(StringComparer.Ordinal) { "setari-anaf", "setari-backup", "setari-module", "setari-actualizare", "setari-import-activityapp", "setari-import-elcomtur", "setari-jurnal" };
 
     public static bool IsAdminOnly(string key) => AdminOnlyModules.Contains(key[..Math.Max(key.IndexOf('.'), 0)]);
 

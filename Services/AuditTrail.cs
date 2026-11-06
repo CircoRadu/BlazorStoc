@@ -18,6 +18,7 @@ public static class AuditEntities
     public const string Inventory = "Inventar";
     public const string DatabaseBackup = "CopieSiguranta";
     public const string ActivityImport = "PreluareActivityApp";
+    public const string Elcomtur = "PreluareElcomtur";
     public const string JournalSettings = "SetariJurnal";
     public const string NotificationTemplate = "SablonNotificare";
     public const string Notification = "Notificare";
@@ -47,6 +48,8 @@ public static class AuditEntities
     public const string SupplierInvoice = "FacturaFurnizor";
     // Nomenclator -> Tipuri de sisteme.
     public const string SystemType = "TipSistem";
+    // Nomenclator -> Analizor de risc.
+    public const string RiskAnalyzer = "AnalizorRisc";
     // Oferte -> Sabloane: the templates of offer sheets (.xlsx).
     public const string OfferTemplate = "SablonOferta";
     // Setari -> Baza de date: the connection of the application to MariaDB and the port it listens on (administrator configured in the private file only).
@@ -109,6 +112,10 @@ public static class AuditActions
     public const string EditWorkPointDescription = "Modificare descriere punct de lucru";
     public const string EditWorkPointCoordinates = "Modificare coordonate punct de lucru";
     public const string AddWorkPointPhoto = "Adăugare fotografie punct de lucru";
+    // Files attached to a work point, maintenance contract, intervention or risk analysis (entity_files).
+    public const string AddAttachedFile = "Adăugare fișier atașat";
+    public const string DeleteAttachedFile = "Ștergere fișier atașat";
+    public const string RenameAttachedFile = "Redenumire fișier atașat";
     // Maintenance contracts and their coverage: each kind of change is named exactly. Deleting a contract is the archived "Ștergere".
     public const string CreateServiceContract = "Adăugare contract mentenanță";
     public const string EditServiceContract = "Modificare contract mentenanță";
@@ -133,6 +140,7 @@ public static class AuditActions
     public const string EditMaintenanceIntervention = "Modificare intervenție mentenanță";
     public const string RecordOnDemand = "Înregistrare intervenție la cerere";
     public const string EditOnDemandIntervention = "Modificare intervenție la cerere";
+    public const string ChangeInterventionKind = "Schimbare fel intervenție";
     public const string AddInterventionPhoto = "Adăugare fotografie intervenție";
     // Invoice templates: a new version of the layout and a change of only the name/supplier are different operations. A deleted
     // template has no page to link to (see IsDeletion).
@@ -167,11 +175,29 @@ public static class AuditActions
     public const string AddParameterFamily = "Adăugare familie de parametri";
     public const string EditParameterFamily = "Modificare familie de parametri";
     public const string DeleteParameterFamily = "Desfacere familie de parametri";
+    // Archive (migration 56): a used definition is archived and restored (the products renamed back) or its restore is given up; an unused one is deleted for good.
+    public const string ArchiveSubcategoryParameter = "Arhivare parametru obligatoriu subcategorie";
+    public const string RestoreSubcategoryParameter = "Restaurare parametru obligatoriu subcategorie";
+    public const string GiveUpParameterRestore = "Renunțare definitivă la restaurare parametru";
+    public const string DeleteUnusedParameter = "Ștergere parametru nefolosit";
+    public const string ArchiveParameterFamily = "Arhivare familie de parametri";
+    public const string RestoreParameterFamily = "Restaurare familie de parametri";
+    public const string GiveUpFamilyRestore = "Renunțare definitivă la restaurare familie";
+    public const string DeleteUnusedFamily = "Ștergere familie nefolosită";
+    public const string ArchiveSubcategoryTag = "Arhivare etichetă subcategorie";
+    public const string RestoreSubcategoryTag = "Restaurare etichetă subcategorie";
+    public const string GiveUpTagRestore = "Renunțare definitivă la restaurare etichetă";
+    public const string DeleteUnusedTag = "Ștergere etichetă nefolosită";
+    public const string SetRestoreRetention = "Modificare perioadă de păstrare pentru restaurare";
+    // Relocation of definitions inside the tree (stage 4): a plain move, or a merge with the definitions of the same name met at the target.
+    public const string RelocateDefinition = "Mutare definiție (parametru, familie, etichetă) în arbore";
+    public const string MergeDefinitions = "Îmbinare definiții (parametri, familii, etichete) la mutare";
     // Tree of subcategories (migration 54): a child under a subcategory, and the products that move into it when the parent was a leaf.
     public const string AddChildSubcategory = "Adăugare subcategorie copil";
     public const string MoveProductsToChildSubcategory = "Mutare produse în subcategorie copil";
     public const string SetMaxSubcategoryDepth = "Modificare adâncime maximă subcategorii";
     public const string MoveSubcategory = "Mutare subcategorie (cu structura de sub ea)";
+    public const string PromoteSubcategory = "Promovare subcategorie în categorie";
     // Tags of a subcategory (On/Off on each product, never required): one action for each kind of change.
     public const string AddSubcategoryTag = "Adăugare etichetă subcategorie";
     public const string RenameSubcategoryTag = "Redenumire etichetă subcategorie";
@@ -224,6 +250,12 @@ public static class AuditActions
     public const string SetActivityImportTypes = "Modificare tipuri tichete preluate ActivityApp";
     public const string SetActivityFieldMap = "Modificare corespondență câmpuri ActivityApp";
     public const string DecideActivityMaintenance = "Validare mentenanță ActivityApp";
+    public const string ImportElcomtur = "Preluare date Elcomtur";
+    public const string SetElcomturAuto = "Modificare setări preluare automată Elcomtur";
+    public const string TestElcomturAuto = "Testare director backup Elcomtur";
+    public const string CheckElcomturAuto = "Verificare backup Elcomtur";
+    public const string ImportElcomturAuto = "Preluare automată backup Elcomtur";
+    public const string FailElcomturAuto = "Eșec preluare automată Elcomtur";
     public const string AddActivityKeyword = "Adăugare cuvânt cheie mentenanță ActivityApp";
     public const string EditActivityKeyword = "Modificare cuvânt cheie mentenanță ActivityApp";
     public const string DeleteActivityKeyword = "Ștergere cuvânt cheie mentenanță ActivityApp";
@@ -244,6 +276,10 @@ public static class AuditActions
     public const string RevertDatabaseConnection = "Revenire la configurația anterioară a conexiunii bazei de date";
     public const string ResetDatabaseConnection = "Resetare conexiune bază de date la configurația de bază";
     public const string SetAppPort = "Modificare port aplicație";
+    public const string SetReverseProxy = "Modificare HTTPS prin proxy";
+    public const string RefreshActivityTickets = "Actualizare tichete ActivityApp preluate";
+    public const string ViewActivityTicketSample = "Vizualizare tichet exemplu ActivityApp";
+    public const string ConfirmActivityTicketStructure = "Confirmare structură tichete ActivityApp";
     // Setari -> Baza de date -> Conexiune: the server of the database (Windows service) and the application itself.
     public const string StopDatabaseServer = "Oprire server bază de date";
     public const string StartDatabaseServer = "Pornire server bază de date";
@@ -282,6 +318,9 @@ public static class AuditActions
     public const string CreateInstallerAdministrator = "Creare cont administrator la instalare";
     public const string AccessDenied = "Acces refuzat";
     public const string ReorderSubcategories = "Reordonare subcategorii";
+    public const string AddRiskAnalyzer = "Adăugare analizor de risc";
+    public const string EditRiskAnalyzer = "Modificare analizor de risc";
+    public const string DeleteRiskAnalyzer = "Ștergere analizor de risc";
     public const string AddSystemType = "Adăugare tip de sistem";
     public const string RenameSystemType = "Modificare denumire tip de sistem";
     public const string ActivateSystemType = "Activare tip de sistem";
@@ -321,11 +360,11 @@ public static class AuditActions
         action is Create or Edit or EditProductTags or ExpiryItp or ExpiryInsurance or ExpiryRovinieta or MoveEquipment or ReturnEquipment
             or CreateNotificationTemplate or EditNotificationTemplate or NotificationCreated or AcknowledgeNotification or SnoozeNotification
             or ResolveNotification or AutoResolveNotification or ReopenNotification or EditNotificationSettings
-            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto
+            or CreateWorkPoint or EditWorkPoint or EditWorkPointDescription or EditWorkPointCoordinates or AddWorkPointPhoto or AddAttachedFile or DeleteAttachedFile or RenameAttachedFile
             or CreateServiceContract or EditServiceContract or EditServiceContractExpiry or ActivateServiceContract or DeactivateServiceContract
             or AddContractPoint or RemoveContractPoint or EditMaintenanceCycle or RescheduleMaintenance or MoveContractPoint
             or CreateRiskAnalysis or EditRiskAnalysis or EditRiskAnalysisValidity or RenewRiskAnalysis or UndoRiskAnalysisRenewal or ActivateRiskAnalysis or DeactivateRiskAnalysis
-            or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or AddInterventionPhoto
+            or RecordMaintenance or EditMaintenanceIntervention or RecordOnDemand or EditOnDemandIntervention or ChangeInterventionKind or AddInterventionPhoto
             or EditMapEngine or ResetMapEngine or EditMapGeocoding or CreateMapPinType or EditMapPinType
             or CreateInvoiceTemplate or EditInvoiceTemplate or EditInvoiceTemplateDetails or ActivateInvoiceTemplate or DeactivateInvoiceTemplate or RenameInvoiceTemplateSupplier or LinkInvoiceTemplateSupplier
             or CreateSupplier or EditSupplier or RecheckSupplier or RecordSupplierInvoice or EditSupplierInvoiceNumber or EditSupplierInvoiceDate or MoveSupplierInvoice or AddSupplierAlias or RemoveSupplierAlias or LinkSupplierProductCode or ChangeSupplierProductCode
@@ -334,7 +373,7 @@ public static class AuditActions
             or ImportOffer or ReviseOffer or LinkOfferLine or AddBeneficiaryAlias
             or CreateOfferTemplate or EditOfferTemplate or ActivateOfferTemplate or DeactivateOfferTemplate
             or AddProjectComponent or ChangeProjectComponentState or ArchiveProjectComponent or ReactivateProjectComponent or SetVehicleTarget or RemoveVehicleTarget or SetMinStock or RemoveMinStock or SetProjectDeadline or RemoveProjectDeadline or ReserveStock or ReduceReservation or ReleaseReservation or ReservationConsumed or ReservationReducedByExit or ReservationReleasedByComponent or ComponentExitReturned or ComponentExitLeft or ComponentExitMoved or ComponentExitConsumed
-            or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion;
+            or AddRiskAnalyzer or EditRiskAnalyzer or CreateInstallerAdministrator or AddSystemType or RenameSystemType or ActivateSystemType or DeactivateSystemType or MoveSystemType or AddSystemTypeAlias or RemoveSystemTypeAlias or DeleteAnafVersion or ActivateAnafVersion;
 
     public static string Normalize(string? action) =>
         string.Equals(action, "Modificare", StringComparison.OrdinalIgnoreCase) ? Edit : action ?? string.Empty;
@@ -399,6 +438,7 @@ public static class AuditNavigation
         // The supplier page (its data and invoices). An invoice event stores the invoice id, which has no page of its own: plain text.
         [AuditEntities.Supplier] = SupplierNavigation.SupplierUrl,
         [AuditEntities.SystemType] = SystemTypeNavigation.PageUrl,
+        [AuditEntities.RiskAnalyzer] = RiskAnalyzerNavigation.PageUrl,
         [AuditEntities.OfferTemplate] = OfferNavigation.TemplateUrl
     };
 

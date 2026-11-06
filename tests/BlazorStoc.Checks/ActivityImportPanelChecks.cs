@@ -13,7 +13,8 @@ public static class ActivityImportPanelChecks
     {
         public Task<ActivityImportSettings> GetSettingsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(new ActivityImportSettings(true, "srv", 1433, "TIPActivity", "citire", true, null, 0, 24, 200, false, null, null, "", StructureStatus.Ok, "", [], null, "", null));
-        public Task SaveSettingsAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public ActivityImportInput? LastSaved;
+        public Task SaveSettingsAsync(ActivityImportInput input, CancellationToken cancellationToken = default) { LastSaved = input; return Task.CompletedTask; }
         public Task<ActivityTestResult> TestAsync(ActivityImportInput input, CancellationToken cancellationToken = default) => Task.FromResult(new ActivityTestResult(true, "ok", StructureStatus.Ok, false, false));
         public List<ActivityTypeItem> Types = [];
         public Task<ActivityTypesView> GetTypesAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ActivityTypesView([.. Types], StructureStatus.Ok, null));
@@ -22,11 +23,27 @@ public static class ActivityImportPanelChecks
         public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => Task.FromResult<ActivityConnection?>(null);
         public Dictionary<string, string>? SavedMap;
-        public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Task.FromResult(ActivityFieldMap.Empty);
+        public ActivityFieldMap Map = ActivityFieldMap.Empty;
+        public ActivityFieldMap? SavedSettings;
+        public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Task.FromResult(Map);
         public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ActivityFieldMapView([.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, SavedMap?.GetValueOrDefault(field.Key) ?? field.Column,
-                field.Table == "Tickete" ? ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject"] : ["DescriptionInternal", "Rezumat"], false))], null));
+            Task.FromResult(new ActivityFieldMapView([.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, Map.ColumnOf(field),
+                field.Table == "Tickete" ? ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject"] : ["DescriptionInternal", "Rezumat"], false))], null, Map,
+                readSource ? new Dictionary<string, IReadOnlyList<string>> { ["Tickete"] = ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject", "Observatii"], ["EvenimenteAgent"] = ["DescriptionInternal", "Rezumat"] } : null, Change));
         public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) { SavedMap = new(chosen); return Task.CompletedTask; }
+        public Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default) { SavedSettings = settings; SavedMap = new(settings.Columns); Map = settings; return Task.CompletedTask; }
+        // The tickets the window of the example ticket can show, newest first; each call with an id gives the next older one.
+        public List<TicketSample> Samples = [];
+        public readonly List<long?> SampleCalls = [];
+        public int Confirmations;
+        public Task<ActivityTicketSampleView> GetTicketSampleAsync(long? beforeTicketId, CancellationToken cancellationToken = default)
+        {
+            SampleCalls.Add(beforeTicketId);
+            var next = Samples.Where(sample => beforeTicketId is null || sample.TicketId < beforeTicketId).OrderByDescending(sample => sample.TicketId).FirstOrDefault();
+            return Task.FromResult(new ActivityTicketSampleView(next, next is null ? "Nu există un tichet finalizat mai vechi." : null));
+        }
+        public Task ConfirmTicketStructureAsync(CancellationToken cancellationToken = default) { Confirmations++; Change = null; return Task.CompletedTask; }
+        public TicketStructureDiff? Change;
     }
 
     private sealed class FakePartners : IActivityPartnerImportService
@@ -44,6 +61,19 @@ public static class ActivityImportPanelChecks
         public Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default) { Resolved++; Issues.RemoveAll(issue => issue.Id == issueId); return Task.CompletedTask; }
     }
 
+    private sealed class FakeRefresh : IActivityTicketRefreshService
+    {
+        public int Outdated, Refreshes;
+        public Task<int> CountOutdatedAsync(CancellationToken cancellationToken = default) => Task.FromResult(Outdated);
+        public Task<TicketRefreshReport> RefreshAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+        {
+            Refreshes++;
+            var report = new TicketRefreshReport(Outdated, Outdated, 0, 2, 1, 1, []);
+            Outdated = 0;
+            return Task.FromResult(report);
+        }
+    }
+
     private sealed class FakeTickets : IActivityTicketImportService
     {
         public int Applies;
@@ -56,9 +86,18 @@ public static class ActivityImportPanelChecks
     {
         public List<ActivityReviewItem> Pending = [new(1, 9001, "T-77", "Revizie centrala", "Alfa SRL", "Sediu", "am facut mentenat la centrala", "mentenanță", "mentenat", new DateOnly(2026, 10, 1), DateTime.UtcNow)];
         public List<(long Id, ReviewDecision Decision)> Decisions = [];
+        public List<(long Id, ReviewTakeInput Input)> Takes = [];
         public List<ActivityDiscardedTicket> Discarded = [];
         public List<long> Reactivated = [];
         public Task<IReadOnlyList<ActivityReviewItem>> GetPendingAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ActivityReviewItem>>([.. Pending]);
+        public Task<ActivityReviewDetail> GetDetailAsync(long id, CancellationToken cancellationToken = default)
+        {
+            var item = Pending.Single(entry => entry.Id == id);
+            var source = new TicketSource(item.TicketId, 4, 1, item.TicketNumber, item.Title, "Nu merge centrala", item.Resolution, "Nu merge centrala\n" + item.Resolution, "Ion Popescu");
+            return Task.FromResult(new ActivityReviewDetail(item, 5, 50, source, [new ReviewWorkPoint(50, "Sediu", "Str. 1"), new ReviewWorkPoint(51, "Depozit", "Str. 2")], true, "Note service", "Note mentenanta",
+                item.Kind == ActivityTicketPlanner.ServiceKind ? ReviewCategory.Service : ReviewCategory.Maintenance, false));
+        }
+        public Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default) { Takes.Add((id, input)); Pending.RemoveAll(item => item.Id == id); return Task.CompletedTask; }
         public Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default)
         {
             Decisions.Add((id, decision));
@@ -67,6 +106,11 @@ public static class ActivityImportPanelChecks
             return Task.CompletedTask;
         }
         public Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ActivityDiscardedTicket>>([.. Discarded]);
+        public Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default)
+        {
+            var gone = Discarded.Single(item => item.TicketId == ticketId);
+            return Task.FromResult(new TicketSource(ticketId, 4, 1, gone.TicketNumber, gone.Title, "Problema discardat", "Rezolvare discardat", "Raport discardat", "Ion Popescu"));
+        }
         public Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default) { Reactivated.Add(ticketId); Discarded.RemoveAll(item => item.TicketId == ticketId); return Task.CompletedTask; }
     }
 
@@ -89,13 +133,22 @@ public static class ActivityImportPanelChecks
         context.Services.AddSingleton<IActivityPartnerImportService>(partners);
         var ticketService = new FakeTickets();
         context.Services.AddSingleton<IActivityTicketImportService>(ticketService);
+        var refresh = new FakeRefresh();
+        context.Services.AddSingleton<IActivityTicketRefreshService>(refresh);
         var syncService = new FakeSync();
         context.Services.AddSingleton<IActivitySyncService>(syncService);
         var reviewService = new FakeReviews();
         context.Services.AddSingleton<IActivityReviewService>(reviewService);
         // The types saved before are shown at once when the panel opens (the choice is not lost from sight); reading ActivityApp only refreshes them.
         settingsService.Saved = [new(4, "Service", "", null, null, null, null, null, true, ActivityDestination.OnDemand, ActivityImportRules.StateSelected)];
-        var cut = context.Render<ActivityImportPanel>();
+        // The queue, the discarded tickets and the open problems moved to the Notifications page (tabs); here they are rendered next to the panel so that the flow of the import stays checked end to end.
+        var cut = context.Render(builder =>
+        {
+            builder.OpenComponent<ActivityImportPanel>(0); builder.CloseComponent();
+            builder.OpenComponent<BlazorStoc.Components.Pages.ActivityReviewSection>(1); builder.CloseComponent();
+            builder.OpenComponent<BlazorStoc.Components.Pages.ActivityDiscardedSection>(2); builder.CloseComponent();
+            builder.OpenComponent<BlazorStoc.Components.Pages.ActivityIssuesSection>(3); builder.CloseComponent();
+        });
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-issues").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.FindAll("#ai-types tbody tr").Count == 1 && cut.Find("#ai-types").TextContent.Contains("Service", StringComparison.Ordinal) && cut.Find("#ai-types input[role=switch]").HasAttribute("checked") && cut.Find("#ai-types-used").HasAttribute("open"),
             "Activity import panel: the types saved are shown, selected, as soon as the panel opens");
@@ -115,6 +168,13 @@ public static class ActivityImportPanelChecks
         check(cut.FindAll("#ai-plan-items-page-size").Count == 1 && cut.FindAll("#ai-plan-ignored-page-size").Count == 1, "Activity import panel: the lists of the simulation are paged, with a choice of rows per page");
         check(cut.FindAll("#ai-plan-ignored button").Count == 2, "Activity import panel: an ignored partner can be included as a person or as a company (a work point cannot)");
         cut.FindAll("#ai-plan-ignored button").Single(button => button.TextContent.Trim() == "Ca persoană fizică").Click();
+        // The two choices about the beneficiaries (migration 57): both start On; the automatic import is turned Off and saved with the rest of the settings.
+        var toggles = cut.FindAll(".anaf-toggles input[role=switch]");
+        check(toggles.Count == 2 && toggles.All(toggle => toggle.HasAttribute("checked")), "Activity import panel: the choices \"preia și beneficiarii fără tichete\" and \"import automat\" are shown, both On by default");
+        toggles[1].Change(false);
+        cut.Find(".anaf-toggles .editor-actions button.primary").Click();
+        cut.WaitForAssertion(() => { if (settingsService.LastSaved is null) throw new InvalidOperationException("not saved yet"); });
+        check(settingsService.LastSaved is { TakePartners: true, AutoAcceptPartners: false }, "Activity import panel: the automatic import turned Off is saved with the settings (new beneficiaries then wait for a manual acceptance)");
         cut.WaitForAssertion(() => { if (partners.Included.Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(partners.Included.Single() == (9200, false) && cut.Markup.Contains("neverificat, preluat manual", StringComparison.Ordinal), "Activity import panel: including an ignored partner asks the service, then shows the message in the section");
         check(partners.Applies == 0, "Activity import panel: the simulation applies nothing");
@@ -134,37 +194,61 @@ public static class ActivityImportPanelChecks
             && cut.FindAll("#ai-tickets-items-page-size").Count == 1, "Activity import panel: the tickets of the simulation are in collapsible, paged groups (problems, waiting, ignored collapsed; selected open)");
         check(ticketService.Applies == 0, "Activity import panel: the simulation of the tickets applies nothing");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Aplică tichetele").Click();
-        check(cut.Markup.Contains("Se vor înregistra 3 intervenții în Mentenanță", StringComparison.Ordinal) && ticketService.Applies == 0, "Activity import panel: the application of the tickets asks for confirmation first");
+        check(cut.Markup.Contains("Se vor pune 3 tichete în coada de validare", StringComparison.Ordinal) && ticketService.Applies == 0, "Activity import panel: the application of the tickets asks for confirmation first");
         cut.FindAll("button").Where(button => button.TextContent.Trim() == "Da, aplică").Last().Click();
-        cut.WaitForAssertion(() => { if (!cut.Find("#ai-tickets-title").TextContent.Contains("Tichete preluate", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        cut.WaitForAssertion(() => { if (!cut.Find("#ai-tickets-title").TextContent.Contains("Tichete puse la validare", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(ticketService.Applies == 1, "Activity import panel: after the confirmation the tickets are applied once");
         check(cut.Find("#ai-sync-status").TextContent.Contains("Nicio sincronizare încă", StringComparison.Ordinal) && cut.FindAll("#ai-sync-hours").Count == 1, "Activity import panel: the synchronization section shows the interval and that none has run yet");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Importă acum").Click();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Sincronizare terminată. Beneficiari: 1 noi.", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(syncService.Runs == 1, "Activity import panel: \"Importă acum\" runs one synchronization and shows its result");
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.FindAll("#ai-reviews tbody tr").Count == 1 && cut.Find("#ai-reviews").TextContent.Contains("mentenat", StringComparison.Ordinal) && cut.Find("#ai-reviews").TextContent.Contains("Alfa SRL", StringComparison.Ordinal),
             "Activity import panel: the events to validate are listed with the ticket, the beneficiary, the keyword and what was written");
-        // Three decisions: the maintenance was done, it is not maintenance, discard (asked to confirm first); a discarded ticket can be reactivated.
-        reviewService.Pending.Add(new(2, 9002, "T-78", "Alt tichet", "Beta SRL", "Sediu", "mentenanța nu s-a putut face", "mentenanță", "mentenanța", new DateOnly(2026, 10, 2), DateTime.UtcNow, "exact", true));
-        reviewService.Pending.Add(new(3, 9003, "T-79", "Al treilea", "Beta SRL", "Sediu", "verificat centrala", "revizie", "revizie", new DateOnly(2026, 10, 3), DateTime.UtcNow, "exact", true));
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Actualizează lista").Click();
+        // Every operation on a ticket: take as proposed (maintenance, service), view and edit + take (popup), discard (asked to confirm in a popup); a discarded ticket can be reactivated.
+        reviewService.Pending.Add(new(2, 9002, "T-78", "Alt tichet", "Beta SRL", "Sediu", "am schimbat routerul", "", "", new DateOnly(2026, 10, 2), DateTime.UtcNow, ActivityTicketPlanner.ServiceKind));
+        reviewService.Pending.Add(new(3, 9003, "T-79", "Al treilea", "Beta SRL", "Sediu", "verificat centrala", "revizie", "revizie", new DateOnly(2026, 10, 3), DateTime.UtcNow, "exact"));
+        cut.Find("#activity-review .heading-actions button").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 3) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        cut.Find("#ai-reviews button[aria-label^='Mentenanța s-a făcut: tichetul T-77']").Click();
+        check(cut.Find("#ai-reviews").TextContent.Contains("Service", StringComparison.Ordinal) && cut.Find("#ai-reviews").TextContent.Contains("Mentenanță", StringComparison.Ordinal),
+            "Activity import panel: every ticket in the queue says what it is proposed as (maintenance or service)");
+        cut.Find("#ai-reviews button[aria-label^='Preia tichetul T-77 ca mentenanță']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 2) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(reviewService.Decisions.SequenceEqual([(1L, ReviewDecision.Maintenance)]) && cut.Markup.Contains("intervenția a devenit mentenanță", StringComparison.Ordinal), "Activity import panel: confirming that the maintenance was done sends the decision and the ticket leaves the list");
-        cut.Find("#ai-reviews button[aria-label^='Nu este mentenanță: tichetul T-78']").Click();
+        check(reviewService.Decisions.SequenceEqual([(1L, ReviewDecision.Maintenance)]) && cut.Markup.Contains("a fost preluat ca mentenanță", StringComparison.Ordinal), "Activity import panel: taking a ticket as proposed sends the decision and the ticket leaves the list");
+        cut.Find("#ai-reviews button[aria-label^='Preia tichetul T-78 ca service']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(reviewService.Decisions.Last() == (2L, ReviewDecision.OnDemand) && cut.Markup.Contains("rămâne la cerere", StringComparison.Ordinal), "Activity import panel: \"not maintenance\" keeps the intervention on demand");
-        cut.Find("#ai-reviews button[aria-label^='Discard tichet: T-79']").Click();
-        check(reviewService.Decisions.Count == 2 && cut.Markup.Contains("Intervenția se șterge și tichetul nu se mai preia", StringComparison.Ordinal), "Activity import panel: discard asks for a confirmation first");
-        cut.Find("#ai-reviews button[aria-label^='Confirmă discard: tichetul T-79']").Click();
+        check(reviewService.Decisions.Last() == (2L, ReviewDecision.OnDemand) && cut.Markup.Contains("a fost preluat ca service", StringComparison.Ordinal), "Activity import panel: a service ticket is taken on demand");
+        cut.Find("#ai-reviews button[aria-label^='Vizualizează tichetul T-79']").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#review-view-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("[role=dialog]").TextContent.Contains("Raportul original", StringComparison.Ordinal) && cut.Find("[role=dialog]").TextContent.Contains("Ion Popescu", StringComparison.Ordinal) && cut.Find("[role=dialog]").TextContent.Contains("Nu merge centrala", StringComparison.Ordinal),
+            "Activity import panel: a ticket is viewed in a popup with the problem, the resolution, the report and the executor");
+        cut.FindAll("[role=dialog] button").Single(button => button.TextContent.Trim() == "Modifică și preia").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#review-edit-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        cut.Find("#review-point").Change("51");
+        cut.Find("#review-category").Change(nameof(ReviewCategory.Service));
+        cut.FindAll("[role=dialog] button").Single(button => button.TextContent.Trim() == "Preia").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(reviewService.Takes is [{ Id: 3, Input: { Category: ReviewCategory.Service, WorkPointId: 51 } }] && reviewService.Takes[0].Input.Notes == "Note service" && cut.FindAll("[role=dialog]").Count == 0,
+            "Activity import panel: edit + take sends the category, the point and the notes the operator chose (the notes follow the category) and closes the popup");
+        reviewService.Pending.Add(new(4, 9004, "T-80", "Ultimul", "Beta SRL", "Sediu", "nimic", "", "", new DateOnly(2026, 10, 4), DateTime.UtcNow, ActivityTicketPlanner.ServiceKind));
+        cut.Find("#activity-review .heading-actions button").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-reviews tbody tr").Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        cut.Find("#ai-reviews button[aria-label^='Discard tichet: T-80']").Click();
+        check(reviewService.Decisions.Count == 2 && cut.Find("[role=alertdialog]").TextContent.Contains("nu se mai preia", StringComparison.Ordinal), "Activity import panel: discard asks for a confirmation in a popup first");
+        cut.FindAll("[role=alertdialog] button").Single(button => button.TextContent.Trim() == "Discard").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-review-empty").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(reviewService.Decisions.Last() == (3L, ReviewDecision.Discard) && cut.Markup.Contains("a fost discardat", StringComparison.Ordinal), "Activity import panel: after the confirmation the ticket is discarded and the list is empty");
+        check(reviewService.Decisions.Last() == (4L, ReviewDecision.Discard) && cut.Markup.Contains("a fost discardat", StringComparison.Ordinal), "Activity import panel: after the confirmation the ticket is discarded and the list is empty");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Arată tichetele discardate").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-discarded tbody tr").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        cut.Find("#ai-discarded button[aria-label^='Reactivează tichetul T-79']").Click();
+        cut.Find("#ai-discarded button[aria-label^='Vizualizează tichetul T-80']").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#discarded-view-title").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Markup.Contains("Problema discardat") && cut.Markup.Contains("Rezolvare discardat") && cut.Markup.Contains("Ion Popescu") && cut.Markup.Contains("Discardat de"),
+            "Activity import panel: a discarded ticket can be viewed (read only) with its problem, resolution, report and executor");
+        cut.FindAll("[aria-labelledby='discarded-view-title'] button").First(button => button.TextContent.Contains("Închide")).Click();
+        check(cut.FindAll("#discarded-view-title").Count == 0, "Activity import panel: the view of a discarded ticket closes");
+        cut.Find("#ai-discarded button[aria-label^='Reactivează tichetul T-80']").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-discarded-empty").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(reviewService.Reactivated.SequenceEqual([9003L]), "Activity import panel: a discarded ticket is listed and can be reactivated");
+        check(reviewService.Reactivated.SequenceEqual([9004L]), "Activity import panel: a discarded ticket is listed and can be reactivated");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Recitește tot").Click();
         cut.WaitForAssertion(() => { if (syncService.Resets == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(syncService.Resets == 1 && cut.Markup.Contains("citește din nou toate tichetele", StringComparison.Ordinal), "Activity import panel: \"Recitește tot\" makes the next synchronization read every ticket again");
@@ -182,18 +266,73 @@ public static class ActivityImportPanelChecks
         cut.Find("#ai-types-unused input[role=switch]").Change(true);
         check(cut.FindAll("#ai-types-unused tbody tr").Count == 1 && cut.FindAll("#ai-types tbody tr").Count == 2, "Activity import panel: a type whose switch is turned on moves to the used group");
         // Since 0.5.19 the saved correspondence is shown at once (with the default columns), before the columns are read from ActivityApp.
-        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Fields.Count && !cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").HasAttribute("disabled"), "Activity import panel: the saved correspondence of the fields is shown at once, before the columns are read");
+        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Info.Count && !cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").HasAttribute("disabled"), "Activity import panel: the saved correspondence of the fields is shown at once, before the columns are read");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Citește coloanele din ActivityApp").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-fields tbody tr").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Fields.Count && cut.Find("#ai-fields").TextContent.Contains("Detalii", StringComparison.Ordinal) && cut.Find("#ai-fields").TextContent.Contains("DescriptionInternal (implicit)", StringComparison.Ordinal),
-            "Activity import panel: every mappable field is listed with its default column and the text columns found in ActivityApp");
-        cut.FindAll("#ai-fields select")[1].Change("Detalii");
+        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Info.Count && cut.Find("#ai-fields").TextContent.Contains("Detalii", StringComparison.Ordinal) && cut.Find("#ai-fields").TextContent.Contains("DescriptionInternal (implicit)", StringComparison.Ordinal),
+            "Activity import panel: every piece of information of the ticket is listed with its default column and the text columns found in ActivityApp");
+        // Title and number are always taken (no switch); the other four have a switch, and the destination can be chosen.
+        check(cut.FindAll("#ai-fields input[role=switch]").Count == 4 && cut.Find("#ai-fields tbody tr:nth-child(1)").TextContent.Contains("Mereu", StringComparison.Ordinal) && cut.Find("#ai-fields tbody tr:nth-child(2)").TextContent.Contains("Mereu", StringComparison.Ordinal),
+            "Activity import panel: the title and the number are always taken (no switch), the other pieces of information have a switch");
+        cut.FindAll("#ai-fields select")[2].Change("Detalii");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").Click();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Corespondența câmpurilor a fost salvată", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(settingsService.SavedMap is { } saved && saved["Tickete.DescriptionInternal"] == "Detalii" && saved["Tickete.Subject"] == "Subject", "Activity import panel: saving sends the column chosen for each field");
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Revino la coloanele implicite").Click();
-        check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[1].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
+        check(settingsService.SavedMap is { } saved && saved.Count == 1 && saved["Tickete.DescriptionInternal"] == "Detalii", "Activity import panel: saving sends the column chosen (only the ones that differ from the default are kept)");
+        // A piece switched off and a destination chosen are saved; an extra field is added from the columns read; saving with something missing from the tickets kept refreshes them.
+        cut.FindAll("#ai-fields input[role=switch]")[2].Change(false);
+        cut.FindAll("#ai-fields select").Single(select => select.GetAttribute("aria-label") == "Se atașează ca: Executantul").Change(ActivityFieldMap.Separate);
+        cut.Find("#ai-extra-add select[aria-label='Coloana câmpului suplimentar']").Change("Observatii");
+        cut.Find("#ai-extra-add input").Change("Observații client");
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Adaugă câmp").Click();
+        check(cut.FindAll("#ai-extras tbody tr").Count == 1 && cut.Find("#ai-extras input").GetAttribute("value") == "Observații client", "Activity import panel: an extra field is added from the text columns read, under a name chosen by the administrator");
+        refresh.Outdated = 3;
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").Click();
+        cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Tichete actualizate", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SavedSettings is { } savedSettings && !savedSettings.IsEnabled(ActivityFieldMap.Report) && savedSettings.TargetOf(ActivityFieldMap.Executor) == ActivityFieldMap.Separate
+              && savedSettings.Extras.Count == 1 && savedSettings.Extras[0].Column == "Observatii" && savedSettings.Extras[0].Label == "Observații client" && refresh.Refreshes == 1,
+            "Activity import panel: the switch, the destination and the extra field are saved, and the tickets kept that lack something are read again after the save");
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Revino la valorile implicite").Click();
+        check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[2].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
             "Activity import panel: the selects of the fields are named for the field");
+        // The example ticket: the newest finished ticket opens, "Tichet anterior" loads the one before it, "Tichet mai nou" comes back to the one shown before; a column chosen in the window fills the table.
+        TicketSample Example(long id, string problem) => new(id, "T-" + id, "Titlu " + id, new DateTime(2026, 10, 1), [
+            new("Tickete", [new("NumeTicket", "nvarchar", "T-" + id, true), new("Subject", "nvarchar", "Titlu " + id, true), new("DescriptionInternal", "nvarchar", problem, true), new("Detalii", "nvarchar", "Detalii " + id, true), new("Observatii", "nvarchar", "Obs " + id, true)]),
+            new("EvenimenteAgent", [new("DescriptionInternal", "nvarchar", problem + " apoi rezolvat", true)])], "Ion", id > 10);
+        settingsService.Samples = [Example(30, "Prea putin"), Example(20, "Nu merge aerul"), Example(10, "Alt tichet")];
+        cut.Find("#ai-open-sample").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ticket-sample-preview").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 30", StringComparison.Ordinal) && !cut.Find("#ticket-sample-older").HasAttribute("disabled") && cut.Find("#ticket-sample-newer").HasAttribute("disabled")
+              && settingsService.SampleCalls.SequenceEqual(new long?[] { null }), "Activity import panel: the button opens the newest finished ticket, with the previous one available");
+        cut.Find("#ticket-sample-older").Click();
+        cut.WaitForAssertion(() => { if (!cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 20", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SampleCalls.SequenceEqual(new long?[] { null, 30 }) && !cut.Find("#ticket-sample-newer").HasAttribute("disabled") && cut.Find("#ticket-sample-preview").TextContent.Contains("Nu merge aerul", StringComparison.Ordinal),
+            "Activity import panel: \"Tichet anterior\" loads the ticket before the one shown");
+        cut.Find("#ticket-sample-newer").Click();
+        check(cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 30", StringComparison.Ordinal) && settingsService.SampleCalls.Count == 2, "Activity import panel: \"Tichet mai nou\" comes back to the ticket shown before without reading it again");
+        cut.Find("select[aria-label='Folosește coloana Detalii pentru']").Change("problem");
+        cut.Find("select[aria-label='Folosește coloana Observatii pentru']").Change("extra");
+        check(cut.Find("#ticket-sample-preview").TextContent.Contains("Detalii 30", StringComparison.Ordinal) && cut.Find("#ticket-sample-preview").TextContent.Contains("Obs 30", StringComparison.Ordinal) && cut.FindAll("#ai-extras tbody tr").Count == 1,
+            "Activity import panel: a column chosen in the window becomes the column of the piece (or an extra field) and the preview follows at once");
+        cut.Find("#ticket-sample-older").Click();
+        cut.Find("#ticket-sample-older").Click();
+        cut.WaitForAssertion(() => { if (!cut.Find("#ticket-sample-info").TextContent.Contains("Tichet 10", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#ticket-sample-older").HasAttribute("disabled"), "Activity import panel: when there is no older finished ticket the button is disabled");
+        cut.Find(".ticket-sample .heading-actions button.danger").Click();
+        check(cut.FindAll("#ticket-sample-preview").Count == 0, "Activity import panel: closing the window shows nothing of the ticket any more");
+        // The names of the pieces are edited in the table and saved with the correspondence.
+        cut.Find("#ai-fields input[aria-label='Numele informației Problema']").Change("Defect");
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").Click();
+        cut.WaitForAssertion(() => { if (settingsService.SavedSettings?.Labels.Count != 1) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SavedSettings!.LabelOf(ActivityFieldMap.Problem) == "Defect" && cut.FindAll("#ai-fields input[aria-label='Numele informației Titlul tichetului']").Count == 0,
+            "Activity import panel: the name of an optional piece is edited in the table and saved (the title and the number cannot be renamed)");
+        // A change of the structure of the tickets: the banner names it and one button confirms the correspondence for the structure now.
+        settingsService.Change = new TicketStructureDiff(["Tickete.NumarMasina"], [], []);
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Citește coloanele din ActivityApp").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-structure-change").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(cut.Find("#ai-structure-change").TextContent.Contains("Tickete.NumarMasina", StringComparison.Ordinal), "Activity import panel: a change of the structure of the tickets is shown with the correspondence");
+        cut.Find("#ai-structure-confirm").Click();
+        cut.WaitForAssertion(() => { if (cut.FindAll("#ai-structure-change").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.Confirmations == 1 && cut.Markup.Contains("confirmată pentru structura actuală", StringComparison.Ordinal), "Activity import panel: \"Corespondența verificată\" confirms the correspondence for the structure now and the banner goes away");
         cut.Find("#ai-issues button").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-issues").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(partners.Resolved == 1, "Activity import panel: marking a problem resolved removes it from the list");

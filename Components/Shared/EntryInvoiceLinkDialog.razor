@@ -68,6 +68,7 @@
             var same = Entries.Select(entry => entry.FreeSupplierId).Distinct().ToList();
             if (same.Count == 1 && same[0] is { } id) await SupplierChangedAsync(id);
         }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { error = "Modulul Furnizori este oprit sau indisponibil momentan: facturile nu se pot lega acum."; }
         catch (Exception) { error = "Lista furnizorilor nu a putut fi încărcată."; }
     }
 
@@ -76,6 +77,7 @@
         supplierId = id; invoiceId = null; invoices = [];
         if (id is { } value)
             try { invoices = await InvoiceRepository.GetForSupplierAsync(value); }
+            catch (BlazorStoc.Modules.ModuleUnavailableException) { error = "Modulul Furnizori este oprit sau indisponibil momentan: facturile nu se pot lega acum."; }
             catch (Exception) { error = "Facturile furnizorului nu au putut fi încărcate."; }
     }
 
@@ -93,6 +95,7 @@
             await Done.InvokeAsync(Detach ? "Intrarea a fost detașată de la factură." : Entries.Count == 1 ? "Intrarea a fost atașată la factură." : $"{Entries.Count} intrări au fost atașate la factură.");
         }
         catch (Exception exception) when (exception is StockMovementOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { error = "Un modul necesar (Furnizori sau Facturi) este oprit sau indisponibil momentan: operația nu s-a salvat."; }
         catch (Exception) { error = "Operația nu a putut fi salvată. Verifică și reîncearcă."; }
         finally { busy = false; }
     }

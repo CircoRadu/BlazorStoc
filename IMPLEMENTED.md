@@ -783,8 +783,45 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 
 ## Finalizat la 28.10.2026 12:07 - Interfata: iconite, reflow, popup categorii, descriere produs
 
-- Butoane de actiune ca iconite prin wwwroot/icon-buttons.js (exceptie: pagina produsului); reguli de reflow si defilare orizontala in app.css; tabele infasurate in table-scroll (6 fisiere)
+- Butoanele de actiune au revenit la text (script de iconite scos 28.10.2026, la cererea utilizatorului); reguli de reflow si defilare orizontala in app.css; tabele infasurate in table-scroll (6 fisiere)
 - Pagina produsului: card Descriere sub Produs, spatiu 5px; meniul Stoc nu se mai restrange la clic pe nume (collapsible.js)
 - Categorii: adaugare/editare in popup, doar numele la subcategorie, culori pe nivel si linii de separare
 - Module: Invoices 1.1.2, Maintenance 1.3.1, RiskAnalyses 1.0.2
 - Verificari: build Release, browser pe instanta de test; suita completa inainte de commit
+## Finalizat la 28.10.2026 - Catalog: arhivare, definitii pe categorie, relocare, mutare cu pastrarea definitiilor, tragere pe niveluri (0.5.29)
+
+- Arhivare: parametri, familii si etichete folosite nu se sterg; textul valorii se coace la sfarsitul `products.base_model`, legatura ramane cu `archived=1`; restaurare cu probleme listate si redenumire; fila "Nefolosite" cu stergere definitiva si istoric (`parameter_usage_log`); retentie 30-360 zile in Setari -> Catalog (migrarea 056)
+- Definitii pe categorie (`category_id`), mostenite de toate subcategoriile; `IDefinitionRelocation` (planificator pur + executie in tranzactie, previzualizare = rulare anulata); "Preia de la copil" (`TakeFromChildDialog`)
+- Mutarea unei ramuri pastreaza definitiile mostenite (`BranchMovePlanner`, `BranchMoveDialog`, `MoveNeedsVerificationException`); refuzurile vechi dispar
+- Tragere pe niveluri: explicatie dinamica (`category-order.js`), fasii intre categorii, frunza -> categorie (`PreviewPromotionAsync` / `PromoteAsync`, mod `Promote` in `BranchMoveDialog`), jurnal "Promovare subcategorie in categorie"; nedeschis: retrogradarea categorie -> subcategorie si scurtaturile Ctrl+sageti
+- Module: Journal 1.4.0; versiunea aplicatiei 0.5.29 (changelog completat); butoanele de actiune raman cu text (scriptul de iconite scos la cererea utilizatorului)
+- Verificari: suitele tintite pe fiecare etapa, browser pe instanta 5099 cu contul claude.dev (date de test sterse); suita completa inainte de commit
+## Finalizat la 29.10.2026 - Preluare ActivityApp: persoane fizice, parteneri fara tichete, coada unica, notificare agregata, comutatoare (0.5.31)
+
+- Persoanele fizice se preiau automat (dupa nume, fara ANAF); sincronizarea preia si partenerii fara tichete (`ApplyNewAsync`, la rulare manuala sau cel mult o data la 6 ore); tie-urile "ignorat" ale versiunilor vechi se replanifica
+- Toate problemele de partener (adresa, ANAF, CUI/nume repetat, date refuzate) merg in coada Beneficiari -> De verificat (motive noi `repeated_identity`, `invalid_data`, `awaiting_acceptance`; detaliul in `note`); notificarea `sistem.beneficiari-activityapp-de-verificat` este agregata
+- Migrarea 57: `take_partners`, `auto_accept_partners`; comutatoare in sectiunea 3 a panoului; import automat oprit = coada de acceptare manuala (`AcceptPartnerAsync`)
+- Module: ActivityImport 0.3.0; versiune 0.5.31
+
+## Finalizat la 30.10.2026 14:52 - Coada de validare tichete ActivityApp, fisiere atasate, analizor de risc, interventii (0.5.33-0.5.36)
+
+- Tichetele ActivityApp intra in coada de validare (tip mentenanta sau cuvant cheie din nomenclator), niciunul nu se inregistreaza singur; operatii in popup; mentenanta fara contract (migrarea 060); notificare agregata si taburi Tichete/Beneficiari de validat cu permisiuni noi; paginare la tabelele de notificari.
+- Fisiere atasate la puncte de lucru, contracte, interventii si analize de risc (previzualizare, redenumire, confirmare simpla).
+- Nomenclator: sectiunea Analizor de risc si alegerea analizorului la analiza de risc; fisa beneficiarului: vizualizare interventie in popup cu tichetul si schimbarea felului; script tools/reset-activity-tickets.ps1.
+- Verificari: suita completa 2153 PASS, sectiuni MariaDB, browser pe instanta separata. Pachete 0.5.34-0.5.36.
+
+## Finalizat la 04.11.2026 - Import tichete (executanti, GPS, Finalizat), taburi in Notificari, popup la adaugare, analiza de risc, CUI sablon
+
+- Import ActivityApp: executantul = agentii atasati evenimentului (`AgentiAtasatiEvenimente`, `Agenti`); se preiau doar evenimentele Finalizat (Label = 2); GPS-ul evenimentului completeaza punctul de lucru fara coordonate (0,0 ignorat, virgule zecimale acceptate, 6 zecimale; migrarea 61, coloana `gps`); tichetul din coada se actualizeaza cand se schimba raportul/executantii; mesaj explicit la data in viitor.
+- Notificari: taburile "Tichete de validat" (cu "Tichete discardate") si "Probleme import" (scoase din Setari -> Import ActivityApp).
+- Adaugarea de beneficiar, furnizor si vehicul in popup; analiza de risc fara "Intocmita de", "Data intocmirii"; butoanele Inchide/Anuleaza functioneaza pe /analize-risc (lipsea UnsavedChangesHost).
+- Module oprite: `ModuleGate` la panourile Backup/Jurnal din Setari; mesaje dedicate la ANAF si la legarea intrarii de factura.
+- Sablon factura: CUI-ul corectat manual nu mai e rescris la salvare; CUI citit prin OCR cu cifra dubla se corecteaza dupa cifra de control.
+- Module: ActivityImport 0.8.0, Notifications 1.2.0, RiskAnalyses 1.3.0, Invoices 1.1.3, Suppliers 1.0.1, Vehicles 1.0.2, Maintenance 1.7.1. Teste: componente 1615, facturi 280, MariaDB 3400 PASS.
+
+## Finalizat la 04.11.2026 - Modul Elcomtur: balante de plata pe beneficiar (0.5.38)
+
+- Administrare -> Preluare Elcomtur (`/preluare-elcomtur`): incarcare HTTP directa a backup-ului `.elc` (ZIP cu tabele dBase), simulare si aplicare; citeste doar `clienti`, `vinzari` si `casa` ale firmei alese (folderele `firma<N>`, implicit firma1); potrivire dupa CUI cu beneficiarii persoane juridice, fara beneficiari noi.
+- Balanta = facturat - incasat (casa, FEL 1, conturi 4111*); verificata pe Spitalul Zam (118.077,60 la 30.09.2026) si pe tot fisierul (coincide cu restul de pe facturi la 96% dintre clienti).
+- Fisa beneficiarului: sectiunea "Balanta Elcomtur" (verde "Nu sunt plati restante" / rosiatic cu suma si numarul facturilor cu termen depasit si in termen, doua tabele); Notificari: tab "Balante restante" cu sortare dupa sold; migrarea 62; permisiuni `elcomtur.view` / `elcomtur.import`; jurnal "Preluare date Elcomtur".
+- Module: Elcomtur 1.0.0, Notifications 1.3.0, Journal 1.4.5. Help nescris (la cerere, vezi docs/HELP_DE_REGENERAT.md). Teste: 1630 componente, 3408 MariaDB, citire pe fisierul real.

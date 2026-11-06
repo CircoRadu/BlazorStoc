@@ -62,3 +62,25 @@ Pregatire: un beneficiar cu cel putin doua puncte de lucru (numele sa inceapa cu
 | 23 | Pagina principala | Card „Analize de risc" dupa „Mentenanta"; cu analize aproape de expirare apare „N analize expira" | |
 | 24 | Contracte, intervenții, puncte de lucru (fisa beneficiarului), miscari produs, versiuni ANAF, tipuri de sisteme, rezervari proiect | Fara butoane cu text pe randuri, doar iconite (si comutatoare) | |
 | 25 | Intra in Produse -> Iesire multipla, apoi Nomenclator, un proiect | Submeniul parintelui ramane deschis, linkul curent evidentiat | |
+
+## Modificari de testat - alegerea analizorului (30.10.2026, versiunea 0.5.34)
+
+**Ce s-a adaugat:** campul „Analizor de risc" la analiza de risc se alege din nomenclator, cu iconita de adaugare langa lista.
+**Ce face acum:** iconita deschide formularul unui analizor nou in popup; la inchidere lista se reincarca si analizorul nou este ales.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Adauga analiza de risc, apasa iconita de adaugare de langa Analizor | Popup cu formularul analizorului | |
+| 2 | Salveaza analizorul si inchide popup-ul | Lista se reincarca si analizorul nou este ales | |
+
+## Modificari de testat - formular fara "Intocmita de" (04.11.2026, RiskAnalyses 1.3.0)
+
+**Ce s-a adaugat:** in formularul analizei de risc dispare campul "Intocmita de"; "Data inregistrarii" devine "Data intocmirii". Butoanele "Inchide" si "Anuleaza" din formularul de adaugare de pe /analize-risc cer confirmare cand formularul e modificat (lipsea gazda avertizarii).
+**Ce face acum:** formularul are doar analizorul, numarul, data intocmirii, valabilitatea si observatiile; tabelul are coloana "Intocmita" (data); cautarea nu mai cauta dupa autor.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | /analize-risc -> "+ Adauga analiza de risc" | Nu exista campul "Intocmita de"; eticheta datei este "Data intocmirii" | |
+| 2 | Completeaza analizorul, numarul, salveaza | Se salveaza fara autor | |
+| 3 | Deschide formularul, scrie ceva, apasa "Inchide" sau "Anuleaza" | Apare intrebarea "Parasesti editarea?"; fara modificari se inchide direct | |
+| 4 | Editeaza o analiza veche (cu autor) | Se salveaza; autorul vechi nu se pierde | |

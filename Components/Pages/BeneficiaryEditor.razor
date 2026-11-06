@@ -170,6 +170,7 @@
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException exception) { anafMessageIsError = true; anafMessage = exception.Message; }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { anafMessageIsError = true; anafMessage = "Modulul ANAF este oprit sau indisponibil momentan: datele nu se pot prelua din ANAF. Le poți introduce manual."; }
         catch (Exception exception)
         {
             Logger.LogError("ANAF lookup for a beneficiary failed ({ErrorType}).", exception.GetType().Name);

@@ -31,6 +31,7 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Database:Password"]) ||
 var modules = new BlazorStoc.Modules.ModuleRegistry();
 builder.Services
     .AddWebAndSecurity(builder.Configuration)
+    .AddReverseProxy(builder.Configuration)
     .AddCoreServices()
     .AddModules(builder.Configuration, modules)
     .AddUserServices()
@@ -69,6 +70,8 @@ try
 }
 catch (Exception exception) when (exception is MySqlConnector.MySqlException or InvalidOperationException or MaintenanceInProgressException)
 { app.Logger.LogWarning("The default notification templates were not created ({ErrorType}).", exception.GetType().Name); }
+// First in the pipeline: the forwarded headers of the trusted proxy (when HTTPS through a proxy is on) and the security headers.
+app.UseReverseProxy();
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/Error", createScopeForErrors: true);
 // Romanian culture for every request and circuit: framework texts and number formats follow it (Task 1).
 app.UseRequestLocalization(new RequestLocalizationOptions
@@ -173,6 +176,17 @@ app.MapPost("/api/actualizare/pachet", async (HttpContext context, BlazorStoc.Se
     catch (BlazorStoc.Services.Update.UpdateOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
     catch (AccessDeniedException) { return Results.Forbid(); }
 }).RequireAuthorization(PermissionPolicy.For(BlazorStoc.Services.Update.ApplicationUpdateService.ApplyPermission));
+// The Elcomtur backup (Administrare -> Preluare date Elcomtur, hundreds of MB) arrives as one raw HTTP body, like the update package; same header against a cross-site post.
+app.MapPost("/api/elcomtur/incarcare", async (HttpContext context, BlazorStoc.Modules.Elcomtur.IElcomturImportService import, CancellationToken token) =>
+{
+    if (context.Request.Headers["X-Requested-With"] != "BlazorStoc") return Results.BadRequest(new { error = "Cerere nevalidă." });
+    if (context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit) limit.MaxRequestBodySize = BlazorStoc.Modules.Elcomtur.ElcomturImportService.MaximumBytes + 1024;
+    var name = Path.GetFileName(Uri.UnescapeDataString(context.Request.Headers["X-File-Name"].ToString()));
+    try { return Results.Ok(new { id = await import.UploadAsync(context.Request.Body, name, token) }); }
+    catch (BlazorStoc.Modules.Elcomtur.ElcomturOperationException exception) { return Results.BadRequest(new { error = exception.Message }); }
+    catch (BlazorStoc.Modules.ModuleUnavailableException) { return Results.StatusCode(StatusCodes.Status503ServiceUnavailable); }
+    catch (AccessDeniedException) { return Results.Forbid(); }
+}).RequireAuthorization(PermissionPolicy.For(BlazorStoc.Modules.Elcomtur.ElcomturImportService.ImportKey));
 app.MapGet("/api/consum.csv", async (int? beneficiar, int? proiect, string? de, string? pana, IConsumptionReader reader, CancellationToken token) =>
 {
     try
@@ -252,6 +266,17 @@ app.MapGet("/media/service-photos/{photoId:int}", async (int photoId, IServicePh
     var photo = await photos.GetContentAsync(photoId, token);
     return photo is null ? Results.NotFound() : Results.File(photo.Content, photo.ContentType, photo.OriginalName, enableRangeProcessing: true);
 }).RequireAuthorization(PermissionPolicy.For("mentenanta.view"));
+app.MapGet("/media/entity-files/{fileId:int}", async (int fileId, HttpContext context, IEntityFileStore files, CancellationToken token) =>
+{
+    var file = await files.GetContentAsync(fileId, token);
+    // "?inline=1" shows the file in the preview window (no download name, so the browser displays it); the type is always one sniffed from the bytes.
+    if (file is not null && context.Request.Query["inline"] == "1")
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return Results.File(file.Content, file.ContentType, enableRangeProcessing: true);
+    }
+    return file is null ? Results.NotFound() : Results.File(file.Content, file.ContentType, file.OriginalName, enableRangeProcessing: true);
+}).RequireAuthorization(PermissionPolicy.For("mentenanta.view", "analize-risc.view"));
 app.MapHub<ChangesHub>(ChangesHub.Path);
 app.MapRazorPages().RequireRateLimiting("login");
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();

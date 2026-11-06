@@ -1,10 +1,28 @@
-# Preluare tichete ActivityApp (Setari -> Preluare ActivityApp)
+﻿# Preluare tichete ActivityApp (Setari -> Preluare ActivityApp)
 
 Fluxul: administratorul introduce contul doar-citire al bazei ActivityApp, testeaza conexiunea (se verifica si structura bazei), citeste lista tipurilor de tichete si alege cele care se leaga de service/mentenanta. Etapa 1: nu se preia nimic inca (beneficiari, puncte de lucru si tichete urmeaza). Ferestrei nu i s-a scris help (decizie: doar la cerere).
 
 Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza ActivityApp (nu `sa`) si de adresa serverului. Migrarea 044 se aplica la pornirea aplicatiei.
 
 ## Modificari de testat
+
+
+### 05.11.2026 - Tichete discardate: vizualizare tichet; motiv concret la notificarea de validare
+**Ce s-a adaugat:** (1) pe fiecare rand din "Tichete discardate" o iconita de vizualizare (langa cea de reactivare); (2) motivul de rezolvare al notificarii "Validează mentenanta" nu mai e generic.
+**Ce face acum:** (1) iconita deschide un popup doar pentru citire cu numarul si titlul tichetului, cine l-a discardat si cand, executantul, problema, rezolvarea si raportul original; Inchide sau Escape il inchid. (2) cand coada de validare se goleste, notificarea rezolvata scrie, de ex.: "Coada de validare s-a golit: de la 30.10.2026 14:36 s-au decis 922 evenimente (900 preluate ca mentenanta, 20 preluate ca service la cerere, 2 discardate) de ion; ultima decizie la 05.11.2026 10:12." Daca nu e nicio decizie inregistrata, spune ca evenimentele au fost scoase din coada altfel (reactivare sau resetarea preluarii). Notificarile deja rezolvate pastreaza motivul vechi.
+Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita de vizualizare pe un rand; decide cateva tichete din coada pana se goleste si deschide notificarea din tabul Rezolvate: motivul numara deciziile.
+
+### 29.10.2026 - Preluare automata a persoanelor fizice si a partenerilor fara tichete, coada unica, comutatoare (0.5.31)
+
+**Ce s-a adaugat:** sincronizarea preia si persoanele fizice si partenerii fara tichete; ce are probleme merge intr-o singura coada (Beneficiari -> De verificat), cu o singura notificare pentru administratori; doua comutatoare in Setari.
+
+**Ce face acum:**
+1. Setari -> Preluare ActivityApp -> sectiunea 3: doua comutatoare, ambele pornite implicit: "Preia si beneficiarii fara tichete" si "Import automat al beneficiarilor curati"; "Salveaza" le pastreaza (Jurnal: "Preluare beneficiari fara tichete", "Import automat beneficiari").
+2. "Rulează acum" (sectiunea 5) sau sincronizarea programata: partenerii noi din ActivityApp devin beneficiari; firmele (CUI cu cifre) se verifica in ANAF, persoanele fizice (fara CUI, cod personal sau nume in campul CUI) devin persoane fizice dupa nume, fara ANAF. Mesajul sincronizarii spune cati beneficiari noi si cati sunt "de verificat". Persoanele ignorate de versiunile vechi se preiau acum.
+3. Fara adresa, ANAF fara raspuns sau CUI necunoscut, CUI sau nume repetat la mai multi parteneri, date refuzate de BlazorStoc: partenerul intra in Beneficiari -> De verificat cu motivul (la repetari si date refuzate, cu detaliul), iar tichetele lui asteapta. Nu mai apare in lista de probleme din Setari.
+4. Notificarea (Setari -> Notificari) este una singura: "N beneficiari din ActivityApp de verificat", cu motivele si numarul tichetelor care asteapta; dispare cand coada e goala.
+5. Comutatorul "Import automat" oprit: fiecare partener nou intra in coada cu motivul "asteapta acceptarea manuala" (nu se creeaza beneficiar si nici punct de lucru); "Accepta" il creeaza atunci, cu punctele lui, si il scoate din coada; "Discard" ca inainte. "Reincearca ANAF" nu se aplica acestor randuri.
+6. Comutatorul "Preia si beneficiarii fara tichete" oprit: se preiau numai clientii tichetelor citite (la fel, automat sau in coada, dupa comutatorul de import automat).
 
 ### 23.10.2026 - Fundatia modulului de preluare tichete
 
@@ -170,3 +188,76 @@ Pregatire: ai nevoie de un cont SQL Server cu drept doar de citire pe baza Activ
 | 1 | Citeste coloanele, alege o coloana diferita, „Salveaza corespondenta” | Mesaj de salvare | |
 | 2 | Paraseste pagina si intra din nou in Setari -> Preluare ActivityApp | Tabelul de la sectiunea 6 este afisat imediat, cu coloana salvata | |
 | 3 | „Citeste coloanele din ActivityApp” | Apar listele de coloane; alegerea ramane | |
+
+## Modificari de testat - coada de validare a tichetelor (30.10.2026, versiunile 0.5.34-0.5.36)
+
+**Ce s-a adaugat:** tichetele rezolvate din ActivityApp nu se mai inregistreaza singure: intra in coada „Tichete de validat" (Notificari / Mentenanta). Intra tichetele de un tip de mentenanta si cele din categoriile alese care contin un cuvant cheie din nomenclator; un tichet de service fara cuvant cheie nu se preia. Mentenanta se poate inregistra si la un punct fara contract (fara mutarea scadentei). Operatiile sunt in ferestre (popup), iar tabelul are paginare.
+**Ce face acum:** pe fiecare rand: ochi (vizualizare), creion (modifici si preiei), bifa (preiei ca la propunere), cos (discard). Scriptul `tools\reset-activity-tickets.ps1` goleste coada si reia citirea.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Ruleaza importul de tichete | Tichetele cu cuvant cheie sau de tip mentenanta apar in coada; cele de service fara cuvant cheie nu | |
+| 2 | Ochi pe un tichet | Popup cu datele tichetului | |
+| 3 | Creion: schimba categoria/punctul/data si preia | Intrare in registrul de interventii cu categoria aleasa | |
+| 4 | Bifa pe un tichet de mentenanta la un punct fara contract | Mentenanta fara contract, scadenta neschimbata | |
+| 5 | Cos pe un tichet | Dupa confirmare tichetul nu se mai preia | |
+| 6 | Cu peste 10 tichete in coada | Apare selectorul de randuri pe pagina | |
+| 7 | `reset-activity-tickets.ps1` fara `-Apply` | Doar numara; cu `-Apply` goleste coada si reseteaza punctul de citire | |
+
+## Modificari de testat - executanti, GPS, stare Finalizat, taburi in Notificari (04.11.2026, ActivityImport 0.8.0)
+
+**Ce s-a adaugat:** executantul vine din agentii atasati evenimentului; coordonatele GPS ale evenimentului completeaza punctul de lucru; se preiau doar evenimentele in starea Finalizat (culoarea Label = 2); coada de validare si problemele importului sunt in Notificari (taburi), nu in Setari.
+**Ce face acum:** vezi pasii; un tichet din coada se actualizeaza cand se schimba raportul sau executantii in ActivityApp; migrarea 61 adauga coloana `gps`.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Tichet finalizat cu doi agenti atasati | Executant = cei doi agenti (nu "ProcesatDe") | |
+| 2 | Tichet cu eveniment Alocat / In lucru | Nu intra in coada; reapare dupa Finalizat | |
+| 3 | Tichet cu eveniment programat in viitor | Nu mai e problema; daca apare, mesajul explica ce se intampla | |
+| 4 | Preia un tichet cu GPS "45,8827287, 22,9065762" la un punct fara coordonate | Punctul primeste 45.882729, 22.906576 (rotunjit la 6 zecimale, cat memoreaza baza); jurnalul "Preluare tichet" arata completarea | |
+| 5 | Acelasi, GPS "0, 0" sau punct cu coordonate | Coordonatele punctului raman neschimbate | |
+| 6 | Notificari -> "Tichete de validat" | Coada + sectiunea "Tichete discardate" (reactivare) | |
+| 7 | Notificari -> "Probleme import" | Lista cu "Marchează rezolvata"; Setari -> Import ActivityApp nu o mai are | |
+| 8 | Tichet in coada al carui raport s-a completat dupa prima citire | Dupa urmatorul import apare raportul complet | |
+
+## Modificari de testat - tipurile de tichete se pastreaza si link-ul alertei (04.11.2026, ActivityImport 0.9.0)
+
+**Ce s-a adaugat:** lista tipurilor citite din ActivityApp se pastreaza (migrarea 63); notificarea "Probleme de preluare" duce la tabul "Probleme import" din Notificari.
+**Ce face acum:** la deschiderea Setari -> Preluare ActivityApp, "Tipuri nefolosite" contine si tipurile necitite alese; "Deschide obiectul" pe notificare merge in Notificari.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Setari -> Preluare ActivityApp -> "Citeste tipurile din ActivityApp", apoi iesi si reintra in pagina | Tipurile nefolosite apar fara sa mai apesi "Citeste" | |
+| 2 | Notificari -> notificarea "Probleme de preluare" -> Deschide obiectul | Se deschide Notificari, tabul "Probleme import" | |
+
+## Modificari de testat - informatiile din tichet (06.11.2026, versiunea 0.5.44)
+
+**Ce s-a adaugat:** Setari -> Preluare ActivityApp, sectiunea 6 "Informatiile din tichet": comutator Pornit/Oprit pe problema, rezolvare, raport original si executant (titlul si numarul sunt mereu preluate), coloana sursa, destinatia (in observatii / camp separat / ambele) si campuri suplimentare (orice coloana text din Tickete sau EvenimenteAgent, cu nume ales).
+**Ce face acum:** ce e Oprit nu se mai citeste, nu se mai scrie si nu apare in ferestrele tichetului (validare, discardate, interventie). Cand pornesti o informatie sau adaugi un camp, tichetele deja preluate care nu il au se citesc din nou din ActivityApp si se actualizeaza (copia pastrata, inregistrarea sursa si observatiile); observatiile modificate de un operator raman neatinse.
+
+| Pas | Ce faci | Rezultat asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Deschide sectiunea 6 | 6 randuri; titlul si numarul au "Mereu", celelalte au comutator | |
+| 2 | Opreste "Executantul", salveaza | Dupa salvare un tichet nou nu mai are executant in observatii; fereastra tichetului nu mai arata Executant | |
+| 3 | Alege pentru "Raportul original" destinatia "Observatii si camp separat", salveaza | Tichetele noi au "Raport original: ..." in observatii | |
+| 4 | "Citeste coloanele din ActivityApp", adauga un camp suplimentar (alege coloana, scrie un nume), salveaza | Mesaj cu numarul de tichete actualizate, de inregistrari sursa rescrise si de observatii actualizate | |
+| 5 | Deschide o interventie preluata inainte | In fereastra tichetului apare campul suplimentar cu numele ales; observatiile au linia noua daca nu fusesera modificate | |
+| 6 | Modifica manual observatiile unei interventii preluate, apoi adauga alt camp suplimentar | Observatiile modificate manual raman neatinse; mesajul le numara ("modificate de operator") | |
+| 7 | Scoate campul suplimentar cu iconita de stergere, salveaza | Campul dispare din ferestre; datele ramase pe tichete nu se sterg | |
+| 8 | Journal activitate | Intrari "Modificare corespondenta campuri" si "Actualizare tichete ActivityApp preluate" cu valorile vechi/noi si numerele | |
+
+## Modificari de testat - tichet exemplu, nume editabile, structura tichetelor (06.11.2026, versiunea 0.5.45)
+
+**Ce s-a adaugat:** in Setari -> Preluare date ActivityApp, sectiunea 6: butonul "Deschide un tichet exemplu", numele editabile ale informatiilor, bannerul si notificarea cand structura tichetelor din ActivityApp se schimba.
+**Ce face acum:** fereastra arata cel mai recent tichet finalizat cu toate coloanele si valorile lui, ce primeste fiecare informatie si observatiile rezultate; "Tichet anterior" incarca tichetul dinaintea celui afisat. Numele din coloana "Informatie" se pot schimba. La preluare se compara structura tichetelor cu cea verificata; o schimbare da notificarea "Structura tichetelor" pana apesi "Corespondenta verificata".
+
+| Pas | Ce faci | Rezultat asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Sectiunea 6 -> "Deschide un tichet exemplu" | Se deschide cel mai recent tichet finalizat: tabelul "Ce primeste fiecare informatie", observatiile si doua tabele (Tickete, EvenimenteAgent) cu toate coloanele si valorile | |
+| 2 | Apasa "Tichet anterior" de cateva ori, apoi "Tichet mai nou" | Se incarca tichetul dinaintea celui afisat; "Tichet mai nou" revine fara sa citeasca din nou; "Tichet anterior" se dezactiveaza la cel mai vechi | |
+| 3 | La o coloana cu text alege "Folosește pentru" -> o informatie | Coloana devine sursa informatiei; previzualizarea se schimba pe loc; salveaza corespondenta ca sa ramana | |
+| 4 | La alta coloana alege "Camp suplimentar nou" | In tabelul de campuri suplimentare apare un rand cu numele coloanei (il poti redenumi) | |
+| 5 | Schimba numele "Problema" in "Defect", salveaza | In ferestrele tichetului si in observatiile noi apare "Defect"; observatiile vechi raman neatinse | |
+| 6 | Journal activitate | "Vizualizare tichet exemplu ActivityApp" pentru fiecare tichet deschis, cu numarul tichetului (fara continut) | |
+| 7 | In ActivityApp se adauga/scoate o coloana din Tickete sau EvenimenteAgent, apoi ruleaza o sincronizare | Notificarea "Structura tichetelor" cu lista modificarilor; in sectiunea 6 apare bannerul cu aceeasi lista | |
+| 8 | Verifica corespondenta (cu tichetul exemplu), apasa "Corespondenta verificata" | Bannerul si notificarea dispar; Jurnal: "Confirmare structura tichete ActivityApp" | |

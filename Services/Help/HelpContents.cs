@@ -17,7 +17,7 @@ public static class HelpContents
         ("Oferte", ["oferte"]),
         ("Proiecte, beneficiari și puncte de lucru", ["proiecte", "beneficiari", "puncte-de-lucru"]),
         ("Mentenanță", ["mentenanta"]),
-        ("Analize de risc", ["analize-risc"]),
+        ("Analize de risc", ["analize-risc", "analizor-risc"]),
         ("Vehicule", ["vehicule"]),
         ("Notificări și jurnal", ["notificari", "jurnal"]),
         ("Categorii și nomenclator", ["categorii", "nomenclator"]),

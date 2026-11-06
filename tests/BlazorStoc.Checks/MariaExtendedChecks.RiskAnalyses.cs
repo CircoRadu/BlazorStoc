@@ -20,8 +20,10 @@ public static partial class MariaExtendedChecks
         var source = new RiskAnalysisExpirySource(new MariaRiskAnalysisNotificationReader(configuration), "analiza-risc.expirare.e" + suffix);
         var boss = new ExpiryNotificationService(repository, [source], admin, audit, clock);
         async Task<long> Count(string sql, params (string, object)[] parameters) => await ScalarLongAsync(probe, sql, parameters);
+        var analyzerRepository = new MariaRiskAnalyzerRepository(configuration, admin, audit);
+        var analyzer = await analyzerRepository.CreateAsync($"Ext analizor {suffix}", "");
         RiskAnalysisInput Input(WorkPoint point, string number, DateOnly initial, int months = 36) =>
-            new() { WorkPointId = point.Id, Number = number, Author = "Ion Popescu", InitialDate = initial, ValidityMonths = months };
+            new() { WorkPointId = point.Id, AnalyzerId = analyzer.Id, Number = number, Author = "Ion Popescu", InitialDate = initial, ValidityMonths = months };
         var since = DateTime.UtcNow;
         await Task.Delay(30);
         var owner = await beneficiaries.CreateAsync(Legal($"Ext Analize risc {suffix} SRL", "RO" + Random.Shared.Next(40000000, 49999999)));
@@ -59,8 +61,6 @@ public static partial class MariaExtendedChecks
             await Rejects<RiskAnalysisOperationException>(() => analyses.CreateAsync(owner.Id, Input(depozit, "AR-21", today.AddDays(1)), false), "The registration date cannot be in the future");
             await Rejects<RiskAnalysisOperationException>(() => analyses.CreateAsync(owner.Id, Input(depozit, "AR-22", initial, 0), false), "The validity must be at least one month");
             await Rejects<RiskAnalysisOperationException>(() => analyses.CreateAsync(owner.Id, Input(depozit, "AR-23", initial, 121), false), "The validity cannot exceed 120 months");
-            var noAuthor = Input(depozit, "AR-24", initial); noAuthor.Author = "  ";
-            await Rejects<RiskAnalysisOperationException>(() => analyses.CreateAsync(owner.Id, noAuthor, false), "The author is required");
             Check((await analyses.GetForBeneficiaryAsync(owner.Id)).Count == 1, "Refused analyses leave nothing behind");
             await Rejects<MySqlException>(() => ExecuteAsync(probe, "INSERT INTO risk_analyses (beneficiary_id, work_point_id, registration_number, author, initial_date, last_renewal_date, validity_months, active_work_point_id) VALUES (@b, @w, 'DB-1', 'x', '2025-01-01', '2025-01-01', 36, @w)",
                 ("@b", owner.Id), ("@w", main.Id)), "The database refuses a second active analysis for a work point (unique active key)");
@@ -171,6 +171,7 @@ public static partial class MariaExtendedChecks
                 foreach (var view in await analyses.GetForBeneficiaryAsync(item.Id)) await analyses.DeleteAsync(view.Analysis, "Ext curatare");
                 if ((await beneficiaries.GetBeneficiariesAsync()).FirstOrDefault(current => current.Id == item.Id) is { } live) await beneficiaries.DeleteAsync(live, "Ext curatare");
             }
+            await ExecuteAsync(probe, "DELETE FROM risk_analyzers WHERE id=@id", ("@id", analyzer.Id));
         }
     }
 }

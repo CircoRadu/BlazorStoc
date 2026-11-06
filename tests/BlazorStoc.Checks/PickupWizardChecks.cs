@@ -106,8 +106,8 @@ public static class PickupWizardChecks
 
         // A product prepared for row 0, then back to step 1 and forward again: the corrections and the prepared product are still there.
         cut.FindAll("button").First(button => button.TextContent.Contains("Pregătește un produs nou")).Click();
-        cut.WaitForAssertion(() => cut.Find("#product-category"), TimeSpan.FromSeconds(10));
-        cut.WaitForAssertion(() => { if (cut.FindAll("#product-subcategory option").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
+        cut.WaitForAssertion(() => cut.Find("#product-group-trigger"), TimeSpan.FromSeconds(10));
+        cut.WaitForAssertion(() => { if (cut.Find("#product-group-trigger").GetAttribute("data-subcategory") is null or "") throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         cut.Find("form").Submit();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Produs nou pregătit")) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         check(cut.Markup.Contains("Produs nou pregătit"), "Pickup wizard: a product can be prepared for a row of step 2");
@@ -327,9 +327,12 @@ public static class PickupWizardChecks
         check(again.FindAll(".template-popup .invoice-modal #supplier-name, .template-popup .invoice-modal input").Count > 3 && again.Markup.Contains("Adaugă furnizor", StringComparison.Ordinal),
             "Pickup template flow: the add-supplier window opened from the template is filled in (the supplier form with the name and CUI of the invoice)");
         again.Find(".template-popup .invoice-modal .catalog-heading button.danger").Click();
+        // The tax id corrected by hand (the invoice was misread) must survive the saving: it is not written back over by the value read from the invoice.
+        again.FindAll(".template-popup label").First(label => label.TextContent.Contains("CUI/CIF furnizor", StringComparison.Ordinal)).QuerySelector("input")!.Input("999888777");
         again.FindAll(".template-popup button.primary").First(button => button.TextContent.Contains("Salvează șablonul", StringComparison.Ordinal)).Click();
         check(again.Markup.Contains("Furnizorul nu este în baza de date", StringComparison.Ordinal),
             "Pickup template flow: a template cannot be saved for a supplier that is not in the database");
+        check(again.Markup.Contains("CUI reținut: 999888777", StringComparison.Ordinal), "Pickup template flow: a tax id corrected by hand stays after pressing Save (the value read from the invoice does not replace it)");
         again.FindAll(".template-popup button").First(button => button.TextContent.Contains("Închide fără să creezi", StringComparison.Ordinal)).Click();
         again.WaitForAssertion(() => { if (again.FindAll(".template-popup").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(10));
         check(again.FindAll(".no-template-warning").Count == 1 && again.FindAll("tbody tr").Count == invoice.Rows.Count && store.Count > 0,

@@ -32,6 +32,9 @@ public static class DatabaseSettingsRegistration
             provider.GetRequiredService<IAuditTrail>(), provider.GetRequiredService<IOperationLockService>(), provider.GetRequiredService<IDatabaseSettingsService>(),
             provider.GetRequiredService<IServerServices>(), provider.GetRequiredService<IPortInspector>(), provider.GetRequiredService<IApplicationRestart>(),
             provider.GetRequiredService<ILogger<DatabaseServerService>>(), provider.GetService<IUserAuthenticator>()));
+        services.AddScoped<IReverseProxySettingsService>(provider => new ReverseProxySettingsService(provider.GetRequiredService<IConfiguration>(),
+            provider.GetRequiredService<IAccessControl>(), provider.GetRequiredService<IAuditTrail>(), provider.GetRequiredService<ILogger<ReverseProxySettingsService>>(),
+            provider.GetService<IUserAuthenticator>()));
         services.AddHostedService<DatabaseAccountRecovery>();
         return services;
     }

@@ -59,3 +59,31 @@ internal sealed class UnavailableRiskAnalysisRepository : IRiskAnalysisRepositor
     public Task<RiskAnalysisView> DeactivateAsync(RiskAnalysis original, CancellationToken cancellationToken = default) => Out<RiskAnalysisView>();
     public Task DeleteAsync(RiskAnalysis original, string reason, CancellationToken cancellationToken = default) => Out<object>();
 }
+
+internal sealed class GuardedRiskAnalyzerRepository(IRiskAnalyzerRepository inner, ModuleRegistry modules) : IRiskAnalyzerRepository
+{
+    private const string Id = RiskAnalysesModule.ModuleId;
+
+    public Task<IReadOnlyList<RiskAnalyzer>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.GetAllAsync(cancellationToken));
+
+    public Task<RiskAnalyzer> CreateAsync(string name, string notes, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.CreateAsync(name, notes, cancellationToken));
+
+    public Task<RiskAnalyzer> UpdateAsync(RiskAnalyzer original, string name, string notes, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.UpdateAsync(original, name, notes, cancellationToken));
+
+    public Task DeleteAsync(RiskAnalyzer original, string reason, CancellationToken cancellationToken = default) =>
+        modules.RunAsync(Id, () => inner.DeleteAsync(original, reason, cancellationToken));
+}
+
+// The stand-in of the analyzer repository while the module is switched off or did not start.
+internal sealed class UnavailableRiskAnalyzerRepository : IRiskAnalyzerRepository
+{
+    private static Task<T> Out<T>() => Task.FromException<T>(new ModuleUnavailableException(RiskAnalysesModule.ModuleId));
+
+    public Task<IReadOnlyList<RiskAnalyzer>> GetAllAsync(CancellationToken cancellationToken = default) => Out<IReadOnlyList<RiskAnalyzer>>();
+    public Task<RiskAnalyzer> CreateAsync(string name, string notes, CancellationToken cancellationToken = default) => Out<RiskAnalyzer>();
+    public Task<RiskAnalyzer> UpdateAsync(RiskAnalyzer original, string name, string notes, CancellationToken cancellationToken = default) => Out<RiskAnalyzer>();
+    public Task DeleteAsync(RiskAnalyzer original, string reason, CancellationToken cancellationToken = default) => Out<object>();
+}

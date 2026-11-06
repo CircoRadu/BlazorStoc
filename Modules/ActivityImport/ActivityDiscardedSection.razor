@@ -1,0 +1,104 @@
+@using BlazorStoc.Services
+@using BlazorStoc.Modules.ActivityImport
+@namespace BlazorStoc.Components.Pages
+@inject IActivityReviewService Reviews
+@inject ILogger<ActivityDiscardedSection> Logger
+@implements IDisposable
+
+@* The tickets an operator discarded from the queue (never read again unless reactivated). The list is read when asked for and renewed after every decision taken in the queue above it. *@
+<section class="catalog" id="activity-discarded">
+    <div class="catalog-heading"><h2>Tichete discardate @if (items is not null) { <span class="count-badge">@items.Count</span> }</h2></div>
+    <div class="catalog-body">
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="notice" role="status">@notice</div> }
+        <div class="editor-actions">
+            <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadAsync">@(items is null ? "Arată tichetele discardate" : "Actualizează lista")</button>
+        </div>
+        @if (items is not null && items.Count == 0) { <p class="muted" id="ai-discarded-empty">Nu sunt tichete discardate.</p> }
+    </div>
+    @if (items is { Count: > 0 })
+    {
+        <Paged Items="items" Id="ai-discarded-size" Context="pageRows">
+        <div class="table-scroll"><table class="catalog-table" id="ai-discarded">
+            <thead><tr><th>Tichet</th><th>Discardat de</th><th>La data</th><th>Operații</th></tr></thead>
+            <tbody>
+            @foreach (var discarded in pageRows)
+            {
+                <tr @key="discarded.TicketId">
+                    <td>@discarded.TicketNumber @discarded.Title</td>
+                    <td>@discarded.DiscardedBy</td>
+                    <td>@discarded.DiscardedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                    <td><button type="button" class="row-icon view" disabled="@busy" aria-label="@($"Vizualizează tichetul {discarded.TicketNumber}")" title="Vizualizează tichetul" @onclick="() => OpenViewAsync(discarded)"></button><button type="button" class="row-icon undo" disabled="@(busy || !discarded.CanReactivate)" aria-label="@($"Reactivează tichetul {discarded.TicketNumber}")" title="@(discarded.CanReactivate ? "Reactivează tichetul (se preia la următoarea sincronizare)" : "Tichetul nu mai poate fi reactivat")" @onclick="() => ReactivateAsync(discarded.TicketId)"></button></td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+        </Paged>
+    }
+</section>
+
+@if (viewed is { } shown && viewedSource is { } source)
+{
+    <div class="delete-overlay" @onkeydown="PopupKey">
+        <div class="delete-dialog template-popup review-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="discarded-view-title">
+            <div class="catalog-heading"><h2 id="discarded-view-title">Tichet @shown.TicketNumber @shown.Title</h2><span class="heading-actions"><button type="button" class="danger" @onclick="ClosePopup">Închide</button></span></div>
+            <dl class="review-facts">
+                <dt>Discardat de</dt><dd>@shown.DiscardedBy</dd>
+                <dt>La data</dt><dd>@shown.DiscardedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd>
+                <TicketInfoRows ShowEmpty Problem="@source.Problem" Resolution="@source.Resolution" Report="@source.Report" Executor="@source.Executor" Extras="@source.Extras" />
+            </dl>
+        </div>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ActivityDiscardedTicket>? items;
+    // The ticket opened for viewing (read only) and what ActivityApp has on it.
+    private ActivityDiscardedTicket? viewed;
+    private TicketSource? viewedSource;
+
+    private Task OpenViewAsync(ActivityDiscardedTicket ticket) => RunAsync(async () =>
+    {
+        viewedSource = await Reviews.GetDiscardedDetailAsync(ticket.TicketId, lifetime.Token);
+        viewed = ticket;
+    });
+
+    private void ClosePopup() { if (busy) return; viewed = null; viewedSource = null; }
+    private void PopupKey(KeyboardEventArgs args) { if (args.Key == "Escape") ClosePopup(); }
+
+    private bool busy;
+    private string? notice, error;
+    private readonly CancellationTokenSource lifetime = new();
+
+    /// <summary>Renews the list after a decision in the queue, when it is already open.</summary>
+    public async Task RefreshIfShownAsync()
+    {
+        if (items is null) return;
+        await RunAsync(ReadAsync);
+        StateHasChanged();
+    }
+
+    private async Task ReadAsync() => items = await Reviews.GetDiscardedAsync(lifetime.Token);
+
+    private Task LoadAsync() => RunAsync(ReadAsync);
+
+    private Task ReactivateAsync(long ticketId) => RunAsync(async () =>
+    {
+        await Reviews.ReactivateAsync(ticketId, lifetime.Token);
+        await ReadAsync();
+        notice = "Tichetul a fost reactivat: se preia la următoarea sincronizare sau la „Importă acum”.";
+    });
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; error = notice = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ActivityImportException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Discarded tickets action failed ({ErrorType}).", exception.GetType().Name); error = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

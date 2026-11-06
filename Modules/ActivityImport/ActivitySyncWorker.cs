@@ -58,7 +58,7 @@ public sealed record ActivityImportSystem(IActivitySyncService Sync)
         // The company lookup (ANAF) as the system too; without the module that provides it (not started) the companies are taken as not verified.
         var lookup = provider.GetService<ICompanyDataLookupFactory>()?.For(system);
         var partners = new MariaActivityPartnerImportService(configuration, import, source, new MariaBeneficiaryRepository(configuration, system, audit), new MariaWorkPointRepository(configuration, system, audit), system, audit, lookup);
-        var tickets = new MariaActivityTicketImportService(configuration, import, source, provider.GetRequiredService<IOnDemandInterventionRecorderFactory>().For(system), new MariaWorkPointRepository(configuration, system, audit), system, audit, partners);
+        var tickets = new MariaActivityTicketImportService(configuration, import, source, new MariaWorkPointRepository(configuration, system, audit), system, audit, partners);
         return new ActivityImportSystem(new MariaActivitySyncService(configuration, import, source, partners, tickets, system, audit));
     }
 }

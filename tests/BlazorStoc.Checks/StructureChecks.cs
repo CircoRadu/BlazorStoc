@@ -201,5 +201,8 @@ public static class StructureChecks
         check(Permissions.MissingRequirements(["preluare-factura.add"]).Count == 1 && Permissions.MissingRequirements(["facturi.add"]).Count == 1 && Permissions.MissingRequirements(["preluare-factura.add", "facturi.add", "furnizori.view"]).Count == 0
               && Permissions.MissingRequirements(Permissions.DefaultUserKeys).Count == 0 && Permissions.Requires.All(pair => Permissions.IsKnown(pair.Key) && pair.Value.All(Permissions.IsKnown)),
             "Permissions: a right without its prerequisites is reported, the default type is consistent and every prerequisite key exists");
+        check(Permissions.IsKnown("mentenanta.validare") && !Permissions.IsAdminOnly("mentenanta.validare") && !Permissions.DefaultUserKeys.Contains("mentenanta.validare") && Permissions.MissingRequirements(["mentenanta.validare"]).Count == 2
+              && Permissions.MissingRequirements(["mentenanta.validare", "mentenanta.add", "mentenanta.delete"]).Count == 0 && Permissions.Normalize(["mentenanta.validare"]).Contains("mentenanta.view"),
+            "Permissions: validating ActivityApp tickets is grantable to an operator, never a default, and needs adding and deleting maintenance interventions");
     }
 }

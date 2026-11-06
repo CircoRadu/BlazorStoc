@@ -47,8 +47,8 @@ public static class BackupAssetsChecks
         var (stores, folder) = Rig();
         try
         {
-            check(stores.Select(store => store.Key).SequenceEqual(["product-images", "project-files", "service-photos", "archive-files"]) && stores[0].Root.EndsWith("images", StringComparison.Ordinal),
-                "Backup files: the four asset folders of the application are the ones in the package, under the configured paths");
+            check(stores.Select(store => store.Key).SequenceEqual(["product-images", "project-files", "service-photos", "archive-files", "entity-files"]) && stores[0].Root.EndsWith("images", StringComparison.Ordinal),
+                "Backup files: the five asset folders of the application are the ones in the package, under the configured paths");
             var defaults = BackupAssets.Stores(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["App:DataRoot"] = Path.Combine(folder, "data") }).Build());
             check(defaults.All(store => store.Root.Contains(Path.Combine("assets", store.Key), StringComparison.OrdinalIgnoreCase)) && defaults.All(store => !store.Root.Contains("data-protection-keys")),
                 "Backup files: by default the folders are assets/<name> of the data root, and the keys that protect the saved passwords are not among them");
@@ -129,7 +129,7 @@ public static class BackupAssetsChecks
         File.Delete(Path.Combine(stores[3].Root, "empty.bin"));
         StagedAssets staged;
         using (var archive = ZipFile.OpenRead(packageZip)) staged = await BackupAssets.StageAsync(archive, entries, stores, CancellationToken.None);
-        check(staged.Items.Count == 4 && staged.Items.All(item => Directory.Exists(item.Staging) && item.Staging.Contains(".restore-")) && File.Exists(Path.Combine(staged.Items[0].Staging, "sub", "dir", "product-2.jpg"))
+        check(staged.Items.Count == 5 && staged.Items.All(item => Directory.Exists(item.Staging) && item.Staging.Contains(".restore-")) && File.Exists(Path.Combine(staged.Items[0].Staging, "sub", "dir", "product-2.jpg"))
             && new FileInfo(Path.Combine(staged.Items[0].Staging, "product-2.jpg")).Exists == false && Read(stores[0], "only-here.png").Length > 0 && File.ReadAllBytes(Path.Combine(stores[0].Root, "product-1.png")).Length == 2
             && Directory.GetFiles(staged.Items[2].Staging).Length == 0,
             "Restoration: the files of the package are taken out beside the folders; the folders that run are not touched, and a folder the package has no files for is prepared empty");

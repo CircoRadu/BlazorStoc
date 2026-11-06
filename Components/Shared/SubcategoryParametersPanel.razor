@@ -2,12 +2,14 @@
 @inject IProductParameterRepository Parameters
 @inject IProductTagRepository Tags
 @inject IAccessControl Access
+@inject ICatalogSettings Settings
 @inject ILogger<SubcategoryParametersPanel> Logger
 @implements IDisposable
 
 <div class="delete-overlay">
 <section class="delete-dialog subcategory-parameters-dialog subcategory-parameters" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
-    <div class="catalog-heading"><h2 id="@TitleId">Parametri și etichete · @Group.Subcategory<span class="count-badge">@(parameters.Count + families.Count + tags.Count)</span></h2><span class="heading-actions"><HelpButton Topic="categorii-parametri" About="Parametrii și etichetele subcategoriei" /><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+    <div class="catalog-heading"><h2 id="@TitleId">Parametri și etichete · @NodeName<span class="count-badge">@(parameters.Count + families.Count + tags.Count)</span></h2><span class="heading-actions"><HelpButton Topic="categorii-parametri" About="Parametrii și etichetele subcategoriei" /><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></span></div>
+    @if (ForCategory) { <p class="form-note category-inheritance-note">Parametrii, familiile și etichetele categoriei se moștenesc de toate subcategoriile ei, pe toate nivelurile: produsele lor au nevoie de valorile lor, iar codul începe cu ele.</p> }
     <p class="form-note">Parametrii sunt obligatorii: un produs din această subcategorie nu poate fi salvat sau mișcat în stoc fără model și fără o valoare pentru fiecare parametru, iar codul lui devine „model - valoare - valoare”. Etichetele sunt opționale (On/Off pe produs) și devin filtre în catalog.</p>
     @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
     @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
@@ -43,7 +45,7 @@
                                 @if (isAdministrator)
                                 {
                                     <button class="row-icon edit" disabled="@busy" aria-label="@($"Redenumește eticheta {tag.Name}")" title="@($"Redenumește eticheta {tag.Name}")" @onclick="() => BeginRenameTag(tag)"></button>
-                                    <button class="row-icon delete" disabled="@busy" aria-label="@($"Șterge eticheta {tag.Name}")" title="@($"Șterge eticheta {tag.Name}")" @onclick="() => { deletingTag = tag; deleteError = null; }"></button>
+                                    <button class="row-icon archive" disabled="@busy" aria-label="@($"Arhivează eticheta {tag.Name}")" title="@($"Arhivează eticheta {tag.Name}")" @onclick="() => BeginArchiveTag(tag)"></button>
                                 }
                             </td></tr>
                         @if (renamingTag?.Id == tag.Id)
@@ -57,7 +59,7 @@
                     }
                     </tbody></table></div>
                 }
-                @if (!isAdministrator) { <p class="form-note">Redenumirea și ștergerea etichetelor o face administratorul.</p> }
+                @if (!isAdministrator) { <p class="form-note">Redenumirea și arhivarea etichetelor o face administratorul.</p> }
             </div>
         </details>
 
@@ -101,6 +103,7 @@
                                     @if (isAdministrator)
                                     {
                                         <button class="row-icon edit" disabled="@busy" aria-label="@($"Editează familia {family.Name}")" title="@($"Editează familia {family.Name}")" @onclick="() => EditFamily(family)"></button>
+                                        <button class="row-icon archive" disabled="@busy" aria-label="@($"Arhivează familia {family.Name}")" title="@($"Arhivează familia {family.Name} împreună cu parametrii ei")" @onclick="() => BeginArchiveFamilyAsync(family)"></button>
                                         <button class="row-icon delete" disabled="@busy" aria-label="@($"Desfă familia {family.Name}")" title="@($"Desfă familia {family.Name} (parametrii rămân, fiecare obligatoriu separat)")" @onclick="() => { deletingFamily = family; deleteError = null; }"></button>
                                     }
                                 </td></tr>
@@ -169,7 +172,8 @@
                                 @if (isAdministrator)
                                 {
                                     <button class="row-icon edit" disabled="@busy" aria-label="@($"Editează parametrul {parameter.Name}")" title="@($"Editează parametrul {parameter.Name}")" @onclick="() => EditParameter(parameter)"></button>
-                                    <button class="row-icon delete" disabled="@busy" aria-label="@($"Șterge parametrul {parameter.Name}")" title="@($"Șterge parametrul {parameter.Name}")" @onclick="() => BeginDeleteParameterAsync(parameter)"></button>
+                                    <button class="row-icon archive" disabled="@(busy || parameter.FamilyId is not null)" aria-label="@($"Arhivează parametrul {parameter.Name}")"
+                                            title="@(parameter.FamilyId is not null ? "Face parte dintr-o familie: arhivează familia sau scoate parametrul din ea." : $"Arhivează parametrul {parameter.Name}")" @onclick="() => BeginArchiveParameterAsync(parameter)"></button>
                                 }
                             </td>
                         </tr>
@@ -243,35 +247,112 @@
                 @if (!isAdministrator) { <p class="form-note">Valorile se pot adăuga și șterge (dacă nu sunt folosite) de orice utilizator; editarea valorilor și a parametrilor o face administratorul.</p> }
             </div>
         </details>
+
+        @* ---- Arhivă (migration 56): archived parameters, families and tags; the unused ones can be deleted for good ---- *@
+        <details class="def-section" id="section-archive">
+            <summary><span>Arhivă</span><span class="count-badge">@archiveRows.Count</span></summary>
+            <div class="def-body">
+                <p class="form-note">Un parametru, o familie sau o etichetă folosită de produse nu se șterge: se arhivează. Valorile parametrilor arhivați rămân în numele produselor, iar la restaurare numele se refac. Ce nu mai este folosit de niciun produs poate fi șters definitiv din fila „Nefolosite”.</p>
+                <div class="settings-subtabs" role="tablist" aria-label="Arhivă">
+                    <button type="button" role="tab" id="archive-tab-used" class="settings-subtab @(!showUnused ? "active" : "")" aria-selected="@(!showUnused)" @onclick="() => showUnused = false">Arhivă (@archiveRows.Count(row => !row.Unused))</button>
+                    <button type="button" role="tab" id="archive-tab-unused" class="settings-subtab @(showUnused ? "active" : "")" aria-selected="@showUnused" @onclick="() => showUnused = true">Nefolosite (@archiveRows.Count(row => row.Unused))</button>
+                </div>
+                @{ var shown = archiveRows.Where(row => row.Unused == showUnused).ToList(); }
+                @if (shown.Count == 0) { <div class="empty-state compact"><p>@(showUnused ? "Nicio definiție arhivată nu este nefolosită." : "Nicio definiție folosită de produse nu este arhivată.")</p></div> }
+                else
+                {
+                    <Paged Items="shown" Id="@($"archive-rows-{(showUnused ? "unused" : "used")}")" Label="Rânduri pe pagină" DefaultSize="10" Sizes="@pageSizes">
+                        <div class="table-scroll"><table class="def-table archive-table"><thead><tr><th>TIP</th><th>DENUMIRE</th><th>ARHIVAT</th><th>DE</th><th>PRODUSE</th><th><span class="sr-only">Acțiuni</span></th></tr></thead><tbody>
+                        @foreach (var row in context)
+                        {
+                            <tr @key="@row.Key"><td>@row.Kind</td><td><strong>@row.Name</strong>@if (row.Detail.Length > 0) { <small class="muted"> · @row.Detail</small> }</td>
+                                <td>@(row.ArchivedAt is { } at ? at.ToLocalTime().ToString("dd.MM.yyyy", System.Globalization.CultureInfo.InvariantCulture) : "—")</td><td>@(row.By.Length > 0 ? row.By : "—")</td><td>@row.Products produse</td>
+                                <td class="row-actions">
+                                    @if (row.HasHistory)
+                                    {
+                                        <button class="row-icon history" disabled="@busy" aria-label="@($"Unde a fost folosit {row.Name}")" title="@($"Unde a fost folosit {row.Name}")" @onclick="() => ShowUsageAsync(row)"></button>
+                                    }
+                                    @if (isAdministrator)
+                                    {
+                                        @if (!row.Unused)
+                                        {
+                                            <button class="row-icon restore" disabled="@busy" aria-label="@($"Restaurează {row.Name}")" title="@($"Restaurează {row.Name} (produsele își recapătă numele)")" @onclick="() => BeginRestoreAsync(row)"></button>
+                                            <button class="row-icon close giveup" disabled="@(busy || !GiveUpAllowed(row))" aria-label="@($"Renunță definitiv la restaurarea {row.Name}")"
+                                                    title="@GiveUpTitle(row)" @onclick="() => { givingUp = row; deleteError = null; }"></button>
+                                        }
+                                        else
+                                        {
+                                            <button class="row-icon delete" disabled="@busy" aria-label="@($"Șterge definitiv {row.Name}")" title="@($"Șterge definitiv {row.Name}")" @onclick="() => { deletingArchived = row; deleteError = null; }"></button>
+                                        }
+                                    }
+                                </td></tr>
+                        }
+                        </tbody></table></div>
+                    </Paged>
+                }
+                @if (!isAdministrator) { <p class="form-note">Restaurarea, renunțarea la restaurare și ștergerea definitivă le face administratorul.</p> }
+                else { <p class="form-note">Renunțarea definitivă la restaurare devine posibilă după @retentionDays de zile de la arhivare (se setează în Setări → Catalog); produsele rămân cu numele pe care le au.</p> }
+            </div>
+        </details>
     }
 </section>
 </div>
 
 @if (pendingChanges is not null && editingParameter is not null)
 {
-    <SaveConfirmationDialog Title="Salvezi modificările parametrului?" ObjectLabel="@($"{Group.Subcategory} / {editingParameter.Name}")" Changes="pendingChanges"
+    <SaveConfirmationDialog Title="Salvezi modificările parametrului?" ObjectLabel="@($"{NodeName} / {editingParameter.Name}")" Changes="pendingChanges"
                             Reason="@editReasonChosen" Confirmed="ConfirmSaveParameterAsync" Cancelled="() => { pendingChanges = null; return Task.CompletedTask; }" />
 }
 @if (deletingTag is not null)
 {
-    <DeleteConfirmationDialog @key="@($"tag:{deletingTag.Id}")" Title="Ștergi eticheta?" Subject="Eticheta" ObjectLabel="@($"{Group.Subcategory} / {deletingTag.Name}")"
+    <DeleteConfirmationDialog @key="@($"tag:{deletingTag.Id}")" Title="Ștergi eticheta?" Subject="Eticheta" ObjectLabel="@($"{NodeName} / {deletingTag.Name}")"
                               Description="@(deletingTag.ProductCount > 0 ? $"{deletingTag.ProductCount} produse au eticheta activă și o pierd; produsele rămân neschimbate în rest." : "Niciun produs nu are eticheta activă.")"
                               ConfirmationNote="Eticheta se șterge definitiv; operația se înregistrează în jurnal."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteTagAsync" Cancelled="CancelDelete" />
 }
 @if (deletingFamily is not null)
 {
-    <DeleteConfirmationDialog @key="@($"family:{deletingFamily.Id}")" Title="Desfaci familia?" Subject="Familia" ObjectLabel="@($"{Group.Subcategory} / {deletingFamily.Name}")"
+    <DeleteConfirmationDialog @key="@($"family:{deletingFamily.Id}")" Title="Desfaci familia?" Subject="Familia" ObjectLabel="@($"{NodeName} / {deletingFamily.Name}")"
                               Description="Parametrii familiei rămân, dar fiecare devine obligatoriu separat: produsele care nu au valori pentru toți devin incomplete până li se aleg."
                               ConfirmationNote="Familia se desface; operația se înregistrează în jurnal."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteFamilyAsync" Cancelled="CancelDelete" />
 }
 @if (deletingParameter is not null)
 {
-    <DeleteConfirmationDialog @key="@($"param:{deletingParameter.Id}")" Title="Ștergi parametrul?" Subject="Parametrul" ObjectLabel="@($"{Group.Subcategory} / {deletingParameter.Name}")"
-                              Description="@DeleteParameterDescription" Details="DeleteParameterDetails"
-                              ConfirmationNote="Parametrul, valorile lui și valorile de pe produse se șterg definitiv, iar codurile produselor se rescriu; operația se înregistrează în jurnal."
+    <DeleteConfirmationDialog @key="@($"param:{deletingParameter.Id}")" Title="Ștergi parametrul?" Subject="Parametrul" ObjectLabel="@($"{NodeName} / {deletingParameter.Name}")"
+                              Description="Se șterge parametrul cu toate valorile lui. Niciun produs nu are o valoare pentru el."
+                              ConfirmationNote="Parametrul și valorile lui se șterg definitiv; operația se înregistrează în jurnal."
                               Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteParameterAsync" Cancelled="CancelDelete" />
+}
+@if (archivingParameter is not null || archivingFamily is not null || archivingTag is not null)
+{
+    <ParameterArchiveDialog Title="@ArchiveTitle" ObjectLabel="@ArchiveLabel" Description="@ArchiveDescription" Affected="@(archivePreview?.Affected ?? [])" Conflicts="@(archivePreview?.Conflicts ?? [])"
+                            Unused="@ArchiveUnused" CanDelete="@(archivingFamily is null && isAdministrator)" Busy="@archiveBusy" Error="@archiveError"
+                            Archived="ConfirmArchiveAsync" DeleteRequested="RequestDeleteFromArchive" Cancelled="CancelArchive" />
+}
+@if (restoring is not null && restorePreview is not null)
+{
+    <ParameterRestoreDialog Title="@RestoreTitle" EmptyText="@(restoring.Tag is not null ? $"Eticheta o au {restoring.Products} produse; își recapătă On/Off-ul." : "Niciun produs nu are valori arhivate pentru această definiție.")" ObjectLabel="@($"{NodeName} / {restoring.Name}")"
+                            Description="@(restoring.Tag is not null ? "Eticheta revine în lista subcategoriei, cu On/Off-ul produselor care o aveau." : "Valorile copte în modelul produselor ies din nume, iar definiția redevine obligatorie. Produsele create între timp rămân incomplete până li se aleg valorile.")"
+                            Preview="restorePreview" Busy="@restoreBusy" Error="@restoreError" Confirmed="ConfirmRestoreAsync" Cancelled="CancelRestore" />
+}
+@if (usageRow is not null)
+{
+    <ParameterUsageDialog Title="Unde a fost folosit" ObjectLabel="@($"{NodeName} / {usageRow.Name}")" Entries="usageEntries" Closed="CloseUsage" />
+}
+@if (givingUp is not null)
+{
+    <DeleteConfirmationDialog @key="@($"giveup:{givingUp.Key}")" Title="Renunți definitiv la restaurare?" Subject="Definiția" ObjectLabel="@($"{NodeName} / {givingUp.Name}")"
+                              Description="@($"Legăturile arhivate cu cele {givingUp.Products} produse se șterg, iar produsele rămân cu numele pe care îl au acum. Definiția ajunge în fila „Nefolosite”.")"
+                              ConfirmationNote="Restaurarea nu va mai fi posibilă; operația se înregistrează în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="GiveUpAsync" Cancelled="CancelDelete" />
+}
+@if (deletingArchived is not null)
+{
+    <DeleteConfirmationDialog @key="@($"purge:{deletingArchived.Key}")" Title="Ștergi definitiv?" Subject="Definiția" ObjectLabel="@($"{NodeName} / {deletingArchived.Name}")"
+                              Description="Niciun produs nu mai folosește această definiție. Se șterge cu toate valorile ei; istoricul de utilizare rămâne în jurnal."
+                              ConfirmationNote="Definiția se șterge definitiv; operația se înregistrează în jurnal."
+                              Busy="@deleteBusy" Error="@deleteError" Confirmed="DeleteArchivedAsync" Cancelled="CancelDelete" />
 }
 @if (deletingValue is not null)
 {
@@ -297,6 +378,9 @@
     private readonly CancellationTokenSource lifetime = new();
     private readonly string instanceId = Guid.NewGuid().ToString("N");
     private string TitleId => $"parameters-title-{instanceId}";
+    // A group with no subcategory is a category: its parameters, families and tags are inherited by every subcategory under it.
+    private bool ForCategory => Group.Subcategory.Length == 0;
+    private string NodeName => ForCategory ? Group.Category : Group.Subcategory;
     private IReadOnlyList<SubcategoryParameter> parameters = [];
     private bool loading = true, busy, deleteBusy, isAdministrator, canEdit;
     private string? error, notice, deleteError;
@@ -416,6 +500,7 @@
             families = (await Parameters.GetFamiliesAsync(lifetime.Token))
                 .Where(family => string.Equals(family.Category, Group.Category, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(family.Subcategory, Group.Subcategory, StringComparison.OrdinalIgnoreCase)).ToList();
+            await LoadArchiveAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) { Logger.LogError("Parameter loading failed ({ErrorType}).", exception.GetType().Name); error = "Parametrii nu au putut fi încărcați."; }
@@ -487,44 +572,7 @@
         }, "Parametrul nu a putut fi actualizat.");
     }
 
-    private ParameterDeletionPreview? deletionPreview;
-    private string DeleteParameterDescription => deletingParameter is null ? "" : deletionPreview is { Affected.Count: > 0 }
-        ? $"Se șterge parametrul cu toate valorile lui. {deletionPreview.Affected.Count} produse au o valoare pentru el: o pierd, iar codul lor se rescrie fără ea."
-        : "Se șterge parametrul cu toate valorile lui. Niciun produs nu are o valoare pentru el.";
-    private async Task BeginDeleteParameterAsync(SubcategoryParameter parameter)
-    {
-        deleteError = null; deletionPreview = null;
-        try { deletionPreview = await Parameters.PreviewParameterDeletionAsync(parameter, lifetime.Token); }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
-        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; return; }
-        catch (Exception) { error = "Efectul ștergerii nu a putut fi calculat. Reîncearcă."; return; }
-        deletingParameter = parameter;
-    }
-    private RenderFragment DeleteParameterDetails => builder =>
-    {
-        if (deletionPreview is null) return;
-        var seq = 0;
-        if (deletionPreview.Conflicts.Count > 0)
-        {
-            builder.OpenElement(seq++, "div"); builder.AddAttribute(seq++, "class", "error-banner"); builder.AddAttribute(seq++, "role", "alert");
-            builder.AddContent(seq++, ProductParameterRules.ConflictMessage(deletionPreview.Conflicts)); builder.CloseElement();
-        }
-        if (deletionPreview.Affected.Count == 0) return;
-        builder.OpenElement(seq++, "div"); builder.AddAttribute(seq++, "class", "table-scroll");
-        builder.OpenElement(seq++, "table"); builder.AddAttribute(seq++, "class", "save-summary");
-        builder.AddMarkupContent(seq++, "<thead><tr><th scope=\"col\">Cod actual</th><th scope=\"col\">Cod nou</th><th scope=\"col\">Stoc</th></tr></thead>");
-        builder.OpenElement(seq++, "tbody");
-        foreach (var product in deletionPreview.Affected)
-        {
-            builder.OpenElement(seq++, "tr"); builder.SetKey(product.ProductId);
-            builder.OpenElement(seq++, "td"); builder.AddContent(seq++, product.OldName); builder.CloseElement();
-            builder.OpenElement(seq++, "td"); builder.OpenElement(seq++, "strong"); builder.AddContent(seq++, product.NewName); builder.CloseElement(); builder.CloseElement();
-            builder.OpenElement(seq++, "td"); builder.AddContent(seq++, $"{product.Quantity} buc."); builder.CloseElement();
-            builder.CloseElement();
-        }
-        builder.CloseElement(); builder.CloseElement(); builder.CloseElement();
-    };
-    private Task CancelDelete() { deletionPreview = null; deletingParameter = null; deletingValue = null; deletingFamily = null; deletingTag = null; deleteError = null; return Task.CompletedTask; }
+    private Task CancelDelete() { deletingParameter = null; deletingValue = null; deletingFamily = null; deletingTag = null; givingUp = null; deletingArchived = null; deleteError = null; return Task.CompletedTask; }
 
     private Task DeleteParameterAsync(string reason) => RunDeleteAsync(async () =>
     {
@@ -545,7 +593,7 @@
         try
         {
             var message = await delete();
-            deletingParameter = null; deletingValue = null; deletingFamily = null; deletingTag = null;
+            deletingParameter = null; deletingValue = null; deletingFamily = null; deletingTag = null; givingUp = null; deletingArchived = null;
             await LoadAsync();
             notice = message;
             await Changed.InvokeAsync();
@@ -557,6 +605,187 @@
         finally { deleteBusy = false; }
     }
 
+    // ---- archive (migration 56): used definitions are archived, not deleted; the archive lists them for restoring, giving up or deleting when unused ----
+    private readonly IReadOnlyList<int> pageSizes = [10, 25, 50, 0];
+    private bool showUnused;
+    private int retentionDays = ParameterArchiveRules.DefaultRetentionDays;
+
+    private sealed record ArchiveRow(string Key, string Kind, string Name, string Detail, DateTime? ArchivedAt, string By, int Products,
+        ArchivedParameter? Parameter, ArchivedFamily? Family, ArchivedTag? Tag)
+    {
+        public bool Unused => Products == 0;
+        public bool HasHistory => Tag is null;
+    }
+
+    private IReadOnlyList<ArchiveRow> archiveRows = [];
+    private SubcategoryParameter? archivingParameter;
+    private ParameterFamily? archivingFamily;
+    private SubcategoryTag? archivingTag;
+    private ParameterArchivePreview? archivePreview;
+    private bool archiveBusy, restoreBusy;
+    private string? archiveError, restoreError;
+    private ArchiveRow? restoring, usageRow, givingUp, deletingArchived;
+    private ParameterRestorePreview? restorePreview;
+    private IReadOnlyList<ParameterUsageEntry> usageEntries = [];
+
+    private string ArchiveTitle => archivingFamily is not null ? "Arhivezi familia?" : archivingTag is not null ? "Arhivezi eticheta?" : "Arhivezi parametrul?";
+    private string ArchiveLabel => $"{NodeName} / {archivingParameter?.Name ?? archivingFamily?.Name ?? archivingTag?.Name}";
+    private bool ArchiveUnused => archivingTag is not null ? archivingTag.ProductCount == 0 : archivePreview?.Unused ?? true;
+    private string ArchiveDescription => archivingTag is not null
+        ? (archivingTag.ProductCount > 0
+            ? $"{archivingTag.ProductCount} produse au eticheta activă. Eticheta dispare din liste și filtre, dar produsele o păstrează în arhivă și o recapătă la restaurare."
+            : "Niciun produs nu are eticheta activă.")
+        : ArchiveUnused
+            ? string.Empty
+            : "Valoarea fiecărui produs se mută în modelul lui (numele se rescrie, cum arată tabelul), iar definiția cu valorile ei rămâne în arhivă. O poți restaura oricând; la restaurare numele se refac.";
+    private string RestoreTitle => restoring?.Tag is not null ? "Restaurezi eticheta?" : restoring?.Family is not null ? "Restaurezi familia?" : "Restaurezi parametrul?";
+
+    private static bool Mine(string category, string subcategory, ProductGroup group) =>
+        string.Equals(category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(subcategory, group.Subcategory, StringComparison.OrdinalIgnoreCase);
+
+    private async Task LoadArchiveAsync()
+    {
+        var all = await Parameters.GetArchivedAsync(lifetime.Token);
+        var archivedTags = await Tags.GetArchivedTagsAsync(lifetime.Token);
+        retentionDays = await Settings.GetRestoreRetentionDaysAsync(lifetime.Token);
+        var rows = new List<ArchiveRow>();
+        foreach (var item in all.Parameters.Where(item => item.FamilyId is null && Mine(item.Category, item.Subcategory, Group)))
+            rows.Add(new($"parameter:{item.Id}", "Parametru", item.Name, item.Unit, MariaTimeText.ParseOrNull(item.ArchivedUtc), item.ArchivedBy, item.ProductCount, item, null, null));
+        foreach (var item in all.Families.Where(item => Mine(item.Category, item.Subcategory, Group)))
+            rows.Add(new($"family:{item.Id}", "Familie", item.Name, string.Join(" · ", all.Parameters.Where(member => item.ParameterIds.Contains(member.Id)).Select(member => member.Name)),
+                MariaTimeText.ParseOrNull(item.ArchivedUtc), item.ArchivedBy, item.ProductCount, null, item, null));
+        foreach (var item in archivedTags.Where(item => Mine(item.Category, item.Subcategory, Group)))
+            rows.Add(new($"tag:{item.Id}", "Etichetă", item.Name, "", MariaTimeText.ParseOrNull(item.ArchivedUtc), item.ArchivedBy, item.ProductCount, null, null, item));
+        archiveRows = rows.OrderBy(row => row.Kind, StringComparer.CurrentCultureIgnoreCase).ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    private bool GiveUpAllowed(ArchiveRow row) => row.ArchivedAt is { } at && ParameterArchiveRules.GiveUpAllowedFrom(at, retentionDays) <= DateTime.UtcNow;
+    private string GiveUpTitle(ArchiveRow row) => row.ArchivedAt is { } at && !GiveUpAllowed(row)
+        ? $"Renunțarea definitivă devine posibilă din {ParameterArchiveRules.GiveUpAllowedFrom(at, retentionDays).ToLocalTime():dd.MM.yyyy}."
+        : $"Renunță definitiv la restaurarea {row.Name} (produsele rămân cu numele actual)";
+
+    private async Task BeginArchiveAsync(Func<Task> load)
+    {
+        error = notice = archiveError = null;
+        try { await load(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Archive preview failed ({ErrorType}).", exception.GetType().Name); error = "Efectul arhivării nu a putut fi calculat. Reîncearcă."; }
+    }
+
+    private Task BeginArchiveParameterAsync(SubcategoryParameter parameter) => BeginArchiveAsync(async () =>
+    {
+        archivePreview = await Parameters.PreviewParameterArchiveAsync(parameter, lifetime.Token);
+        archivingParameter = parameter;
+    });
+
+    private Task BeginArchiveFamilyAsync(ParameterFamily family) => BeginArchiveAsync(async () =>
+    {
+        archivePreview = await Parameters.PreviewFamilyArchiveAsync(family, lifetime.Token);
+        archivingFamily = family;
+    });
+
+    private void BeginArchiveTag(SubcategoryTag tag) { error = notice = archiveError = null; archivePreview = null; archivingTag = tag; }
+
+    private Task CancelArchive() { archivingParameter = null; archivingFamily = null; archivingTag = null; archivePreview = null; archiveError = null; return Task.CompletedTask; }
+
+    // An unused definition can be deleted for good instead: the deletion dialog (with its own reason and confirmation word) takes over.
+    private Task RequestDeleteFromArchive()
+    {
+        var (parameter, tag) = (archivingParameter, archivingTag);
+        CancelArchive();
+        deletingParameter = parameter; deletingTag = tag; deleteError = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmArchiveAsync(string reason)
+    {
+        if (archiveBusy) return;
+        archiveBusy = true; archiveError = null;
+        try
+        {
+            if (archivingParameter is { } parameter) { await Parameters.ArchiveParameterAsync(parameter, reason, lifetime.Token); notice = $"Parametrul „{parameter.Name}” a fost arhivat."; }
+            else if (archivingFamily is { } family) { await Parameters.ArchiveFamilyAsync(family, reason, lifetime.Token); notice = $"Familia „{family.Name}” a fost arhivată împreună cu parametrii ei."; }
+            else if (archivingTag is { } tag) { await Tags.ArchiveTagAsync(tag, reason, lifetime.Token); notice = $"Eticheta „{tag.Name}” a fost arhivată."; }
+            await CancelArchive();
+            await LoadAsync();
+            await Changed.InvokeAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { archiveError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Archiving failed ({ErrorType}).", exception.GetType().Name); archiveError = "Arhivarea nu a reușit. Actualizează lista și reîncearcă."; }
+        finally { archiveBusy = false; }
+    }
+
+    private async Task BeginRestoreAsync(ArchiveRow row)
+    {
+        error = notice = restoreError = null;
+        try
+        {
+            restorePreview = row.Parameter is { } parameter ? await Parameters.PreviewParameterRestoreAsync(parameter, lifetime.Token)
+                : row.Family is { } family ? await Parameters.PreviewFamilyRestoreAsync(family, lifetime.Token)
+                : new ParameterRestorePreview([]);
+            restoring = row;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Restore preview failed ({ErrorType}).", exception.GetType().Name); error = "Efectul restaurării nu a putut fi calculat. Reîncearcă."; }
+    }
+
+    private Task CancelRestore() { restoring = null; restorePreview = null; restoreError = null; return Task.CompletedTask; }
+
+    private async Task ConfirmRestoreAsync(ParameterRestoreDialog.Decision decision)
+    {
+        if (restoreBusy || restoring is not { } row) return;
+        restoreBusy = true; restoreError = null;
+        try
+        {
+            if (row.Parameter is { } parameter) await Parameters.RestoreParameterAsync(parameter, decision.BaseModels, decision.Reason, lifetime.Token);
+            else if (row.Family is { } family) await Parameters.RestoreFamilyAsync(family, decision.BaseModels, decision.Reason, lifetime.Token);
+            else if (row.Tag is { } tag) await Tags.RestoreTagAsync(tag, decision.Reason, lifetime.Token);
+            notice = $"„{row.Name}” a fost restaurat.";
+            await CancelRestore();
+            await LoadAsync();
+            await Changed.InvokeAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { restoreError = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Restore failed ({ErrorType}).", exception.GetType().Name); restoreError = "Restaurarea nu a reușit. Actualizează lista și reîncearcă."; }
+        finally { restoreBusy = false; }
+    }
+
+    private async Task ShowUsageAsync(ArchiveRow row)
+    {
+        error = notice = null;
+        try
+        {
+            var ids = row.Parameter is { } parameter ? new[] { parameter.Id } : row.Family?.ParameterIds.ToArray() ?? [];
+            usageEntries = await Parameters.GetUsageAsync(ids, lifetime.Token);
+            usageRow = row;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Usage history failed ({ErrorType}).", exception.GetType().Name); error = "Istoricul de utilizare nu a putut fi citit."; }
+    }
+
+    private Task CloseUsage() { usageRow = null; usageEntries = []; return Task.CompletedTask; }
+
+    private Task GiveUpAsync(string reason) => RunDeleteAsync(async () =>
+    {
+        var row = givingUp!;
+        if (row.Parameter is { } parameter) await Parameters.GiveUpParameterRestoreAsync(parameter, reason, lifetime.Token);
+        else if (row.Family is { } family) await Parameters.GiveUpFamilyRestoreAsync(family, reason, lifetime.Token);
+        else if (row.Tag is { } tag) await Tags.GiveUpTagRestoreAsync(tag, reason, lifetime.Token);
+        return $"S-a renunțat definitiv la restaurarea „{row.Name}”.";
+    });
+
+    private Task DeleteArchivedAsync(string reason) => RunDeleteAsync(async () =>
+    {
+        var row = deletingArchived!;
+        if (row.Parameter is { } parameter) await Parameters.DeleteArchivedParameterAsync(parameter, reason, lifetime.Token);
+        else if (row.Family is { } family) await Parameters.DeleteArchivedFamilyAsync(family, reason, lifetime.Token);
+        else if (row.Tag is { } tag) await Tags.DeleteArchivedTagAsync(tag, reason, lifetime.Token);
+        return $"„{row.Name}” a fost ștearsă definitiv.";
+    });
     private Task CloseValueEditAsync() { editingValue = null; return Task.CompletedTask; }
 
     private async Task ValueChangedAsync(string message)

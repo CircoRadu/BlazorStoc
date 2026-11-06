@@ -35,6 +35,7 @@ public static class ActivityImportChecks
         Keywords(check);
         SqlScan(check);
         Wiring(check);
+        ActivityFieldSettingsChecks.Run(check);
         await ActivityImportPanelChecks.RunAsync(check);
         await ActivityKeywordsPanelChecks.RunAsync(check);
         await BeneficiaryChecksSectionChecks.RunAsync(check);
@@ -230,9 +231,19 @@ public static class ActivityImportChecks
         check(Of(1) is { Action: PlanAction.Create, Input: { Cui: "1234567", Kind: BeneficiaryKinds.Legal } } && Of(1).Input!.Address == "Str. Florilor 5, Timisoara, Timis" && Of(1).Input!.Phone == "0722111222",
             "Activity import (partners): a company with a valid tax id is created with the CUI without RO, the address put together and the first phone number");
         check(Of(2) is { Action: PlanAction.Link, LocalId: 7 }, "Activity import (partners): a company that exists in BlazorStoc (same CUI, with or without RO) is only linked");
-        check(Of(3) is { Action: PlanAction.Skipped, Input: null } && Of(4).Action == PlanAction.Skipped && Of(12).Action == PlanAction.Skipped && Of(3).Message == ActivityPartnerPlanner.PersonNotTaken,
-            "Activity import (partners): a partner without tax id, or with a name in the tax id field, is a person and is not imported (only companies with a CUI are)");
-        check(Of(5).Action == PlanAction.Skipped && Of(5).Message == ActivityPartnerPlanner.PersonNotTaken, "Activity import (partners): a tax id with letters (other than RO) is not a CUI: the partner is not imported");
+        check(Of(3) is { Action: PlanAction.Create, Input: { Kind: BeneficiaryKinds.Individual, Cui: "", AnafVerified: false }, Check: "" } && Of(3).Input!.Name == "Maria Ionescu" && Of(3).Message.Contains(ActivityPartnerPlanner.PersonNote, StringComparison.Ordinal)
+              && Of(4) is { Action: PlanAction.Link, LocalId: 8 } && Of(12) is { Action: PlanAction.Create, Input.Kind: BeneficiaryKinds.Individual },
+            "Activity import (partners): a partner without tax id, or with a name in the tax id field, is a person: taken automatically as an individual by name, without ANAF; one that exists by name is only linked");
+        check(Of(5) is { Action: PlanAction.Create, Input.Kind: BeneficiaryKinds.Individual } && Of(10) is { Action: PlanAction.Create, Input: { Kind: BeneficiaryKinds.Individual, Cui: "" } },
+            "Activity import (partners): a tax id with letters (other than RO), or a 13-digit personal code, is not a CUI: the partner is a person and the code is never stored");
+        // A map entry with no beneficiary (what an earlier version left for a person it did not take) does not stop the person from being taken now.
+        var oldIgnored = ActivityPartnerPlanner.PlanPartners(partners, existing, [new(ActivityPartnerPlanner.PartnerEntity, 3, 0)]);
+        check(oldIgnored.Single(plan => plan.SourceId == 3).Action == PlanAction.Create, "Activity import (partners): a person ignored by an earlier version is planned again and taken");
+        // The same name on two partners is ambiguous: neither is taken, both wait in the queue with the reason.
+        var twins = ActivityPartnerPlanner.PlanPartners([Partner(40, "Pop Vasile", ""), Partner(41, "Pop Vasile", "-")], existing, []);
+        check(twins.All(plan => plan is { Action: PlanAction.Problem, Check: BeneficiaryCheckReasons.RepeatedIdentity }), "Activity import (partners): a person's name repeated in ActivityApp is a case for the queue, not a guess");
+        var personWithoutAddress = ActivityPartnerPlanner.PlanPartners([Partner(42, "Pop Maria", "", address: "", city: "")], existing, []).Single();
+        check(personWithoutAddress is { Action: PlanAction.Problem, Check: BeneficiaryCheckReasons.MissingAddress }, "Activity import (partners): a person without an address waits in the queue with the reason \"adresă lipsă\"");
         // Ignored partners included by hand: as a person (identity = the name) or as a company (needs a CUI with digits); taken without ANAF, with the note of the manual take.
         var included = ActivityPartnerPlanner.PlanPartners(partners, existing, [new(ActivityPartnerPlanner.IncludeEntity, 3, ActivityPartnerPlanner.IncludeAsPerson), new(ActivityPartnerPlanner.IncludeEntity, 4, ActivityPartnerPlanner.IncludeAsPerson),
             new(ActivityPartnerPlanner.IncludeEntity, 5, ActivityPartnerPlanner.IncludeAsCompany), new(ActivityPartnerPlanner.IncludeEntity, 12, ActivityPartnerPlanner.IncludeAsPerson), new(ActivityPartnerPlanner.PartnerEntity, 12, 0)],
@@ -245,7 +256,7 @@ public static class ActivityImportChecks
             "Activity import (partners): a partner without a CUI with digits cannot be included as a company; an included one is never asked of ANAF");
         check(Of(13) is { Action: PlanAction.Create, Check: "cui_invalid_form", Input.NeedsCheck: true } && Of(13).Input!.Cui == "123456789012",
             "Activity import (partners): a CUI of only digits but of the wrong form is still taken, to be verified by a human (the CUI as typed, cut to the field)");
-        check(Of(6).Action == PlanAction.Problem && Of(7).Action == PlanAction.Problem && Of(6).Message.Contains("repetat", StringComparison.Ordinal), "Activity import (partners): a tax id repeated in ActivityApp makes every partner with it a problem");
+        check(Of(6).Action == PlanAction.Problem && Of(7).Action == PlanAction.Problem && Of(6).Message.Contains("repetat", StringComparison.Ordinal) && Of(6).Check == BeneficiaryCheckReasons.RepeatedIdentity, "Activity import (partners): a tax id repeated in ActivityApp makes every partner with it a problem, for the queue of the ones to verify");
         check(Of(8).Action == PlanAction.Problem && Of(8).Message.Contains("adres", StringComparison.Ordinal) && Of(9) is { Action: PlanAction.Create, Input.Phone: "" },
             "Activity import (partners): no address is a problem; no valid phone is not (the phone is optional)");
         // ANAF: a company that lacks the address or the phone is asked of ANAF (never a person); its answer completes the plan.
@@ -260,14 +271,14 @@ public static class ActivityImportChecks
         check(Checked(1) is { Action: PlanAction.Create, Input.AnafVerified: true, Message: "", Check: "" } && Checked(9) is { Action: PlanAction.Create, Input.AnafVerified: false, Check: "anaf_unavailable" } && Checked(9).Message.Contains("De verificat", StringComparison.Ordinal)
                 && Checked(11) is { Action: PlanAction.Create, Check: "cui_unknown", Input.AnafVerified: false },
             "Activity import (partners): a company ANAF knows is created as verified; one that ANAF does not know, or when ANAF cannot answer, is created to be verified by a human");
-        check(ActivityPartnerPlanner.PlanPartners(partners, existing, []).Where(plan => plan.Action == PlanAction.Create && plan.Check.Length == 0).All(plan => !plan.Input!.AnafVerified && plan.Message == ""), "Activity import (partners): without any lookup nothing is marked verified and nothing is said about ANAF");
+        check(ActivityPartnerPlanner.PlanPartners(partners, existing, []).Where(plan => plan.Action == PlanAction.Create && plan.Check.Length == 0 && plan.Input!.Kind == BeneficiaryKinds.Legal).All(plan => !plan.Input!.AnafVerified && plan.Message == ""), "Activity import (partners): without any lookup nothing is marked verified and nothing is said about ANAF");
         var viaAnaf = ActivityPartnerPlanner.PlanPartners(partners, existing, [], new Dictionary<string, CompanyData> { ["7777777"] = new("Str. ANAF 1, Cluj", ""), ["8888888"] = new("", "+40 744 100 200") });
         PartnerPlan Filled(long id) => viaAnaf.Single(plan => plan.SourceId == id);
         check(Filled(8) is { Action: PlanAction.Create } && Filled(8).Input!.Address == "Str. ANAF 1, Cluj" && Filled(8).Message.StartsWith(ActivityPartnerPlanner.AnafFilledPrefix, StringComparison.Ordinal) && Filled(9).Input!.Phone == "+40744100200",
             "Activity import (partners): the address and the phone that ANAF gives complete the plan, and the plan says so");
         check(ActivityPartnerPlanner.PlanPartners(partners, existing, [], new Dictionary<string, CompanyData> { ["7777777"] = new("", "", "ANAF nu răspunde.") }).Single(plan => plan.SourceId == 8) is { Action: PlanAction.Problem, Check: "anaf_unavailable" } noAddress && noAddress.Message.Contains("(ANAF nu a putut răspunde)", StringComparison.Ordinal),
             "Activity import (partners): a company without address that ANAF cannot answer for stays out, in the queue to verify, with the reason");
-        check(Of(10) is { Action: PlanAction.Skipped, Input: null }, "Activity import (partners): a 13-digit personal code is not a CUI: the partner is a person and is not imported");
+
         check(Of(11).Input!.Phone == "0256123456", "Activity import (partners): of several phone numbers the first valid one is taken");
         var tied = ActivityPartnerPlanner.PlanPartners(partners.Take(2).ToList(), existing, [new ImportMapEntry("partner", 1, 7), new ImportMapEntry("partner", 2, 999)]);
         check(tied.Single(plan => plan.SourceId == 1).Action == PlanAction.AlreadyLinked && tied.Single(plan => plan.SourceId == 2) is { Action: PlanAction.Problem } p && p.Message.Contains("nu mai există", StringComparison.Ordinal),
@@ -282,7 +293,7 @@ public static class ActivityImportChecks
             Point(102, 1, "Bulevardul Libertatii nr. 9"),
             Point(103, 2, "Str. Veche 1"),
             Point(104, 2, "Str. Noua 3", closed: true),
-            Point(105, 5, "Str. Oarecare 1"),
+            Point(105, 6, "Str. Oarecare 1"),
             Point(106, 999, "Str. Orfana 1"),
             Point(107, 1, "", "Fara adresa")
         };
@@ -332,23 +343,31 @@ public static class ActivityImportChecks
         var tickets = new[]
         {
             Ticket(10), Ticket(11, point: 500), Ticket(12, partner: 3), Ticket(13, type: 13), Ticket(14, point: 501), Ticket(15),
-            Ticket(16, end: new DateTime(2999, 1, 1)), Ticket(17, end: DateTime.MinValue.AddYears(1)), Ticket(18, partner: 4), Ticket(19, type: 99), Ticket(20, partner: 2, point: 500)
+            Ticket(16, end: new DateTime(2999, 1, 1)), Ticket(17, end: DateTime.MinValue.AddYears(1)), Ticket(18, partner: 4), Ticket(19, type: 99), Ticket(20, partner: 2, point: 500),
+            Ticket(21, report: "Nu merge internetul\nAm reinstalat tot")
         };
-        // Only the tickets whose text mentions a keyword of their type are taken.
+        // Every ticket of a chosen type goes to the queue to validate; the keywords of the type only say what it is proposed as (maintenance or service).
         var routerWords = new Dictionary<long, IReadOnlyList<string>> { [4] = ["router"] };
         var plans = ActivityTicketPlanner.Plan(tickets, destinations, map, locals, new DateOnly(2026, 10, 23), routerWords);
         TicketPlan T(long id) => plans.Single(plan => plan.SourceId == id);
         check(T(10) is { Action: PlanAction.Create, BeneficiaryId: 7, WorkPointId: 70 } && T(10).PerformedOn == new DateOnly(2026, 3, 2) && T(10).Notes.Contains("Rezolvare: S-a schimbat routerul", StringComparison.Ordinal),
-            "Activity import (tickets): a resolved ticket becomes an intervention at the main point of its client's beneficiary, dated by the end of the event");
+            "Activity import (tickets): a resolved ticket goes to the queue to validate, for the main point of its client's beneficiary, dated by the end of the event");
         check(T(11) is { Action: PlanAction.Create, WorkPointId: 71 }, "Activity import (tickets): the work point of the ticket is used when it was tied and belongs to the beneficiary");
         check(T(14).WorkPointId == 70 && T(20).WorkPointId == 80, "Activity import (tickets): a tied point of another beneficiary is not used; the main point is");
         check(T(12).Action == PlanAction.Waiting && T(12).Message.Contains("așteaptă", StringComparison.Ordinal), "Activity import (tickets): a ticket whose client was not imported waits (it is kept and taken when the client is), not an error");
-        check(T(13).Action == PlanAction.Skipped && T(13).Message.Contains("mentenanță", StringComparison.Ordinal), "Activity import (tickets): a type with the maintenance destination is said not to be imported yet");
+        check(T(13) is { Action: PlanAction.Create, Keyword: ActivityTicketPlanner.TypeKeyword, MatchKind: "type", NeedsValidation: true } && T(10) is { MatchKind: "exact", NeedsValidation: true, Keyword: "router" }
+            && T(21) is { Action: PlanAction.Skipped, Message: ActivityTicketPlanner.NoKeyword },
+            "Activity import (tickets): a ticket of a maintenance type or with a keyword goes to the queue, any other (no keyword) is not taken, and none is recorded by itself");
+        var queuedPlans = ActivityTicketPlanner.Plan(tickets, destinations, map, locals, new DateOnly(2026, 10, 23), routerWords, queued: new HashSet<long> { 10, 21 });
+        check(queuedPlans.Single(plan => plan.SourceId == 10).Action == PlanAction.AlreadyLinked && queuedPlans.Single(plan => plan.SourceId == 21).Message == ActivityTicketPlanner.AwaitingApproval && queuedPlans.Single(plan => plan.SourceId == 11).Action == PlanAction.Create,
+            "Activity import (tickets): a ticket already waiting in the queue is not put there twice");
         check(T(15).Action == PlanAction.AlreadyLinked && T(19).Action == PlanAction.Skipped, "Activity import (tickets): a ticket taken before is not taken again; a type that is not chosen is not imported");
         check(T(16).Action == PlanAction.Problem && T(16).Message.Contains("viitor", StringComparison.Ordinal) && T(17).Action == PlanAction.Problem, "Activity import (tickets): a date in the future or out of range is a problem");
         check(T(18).Action == PlanAction.Problem && T(18).Message.Contains("nu mai există", StringComparison.Ordinal), "Activity import (tickets): a client tied to a beneficiary deleted since is a problem");
         var noEnd = ActivityTicketPlanner.Plan([Ticket(30, end: null) with { EventEnd = null, TicketDate = new DateTime(2026, 2, 5) }], destinations, map, locals, new DateOnly(2026, 10, 23), routerWords);
         check(noEnd[0] is { Action: PlanAction.Create } && noEnd[0].PerformedOn == new DateOnly(2026, 2, 5), "Activity import (tickets): without the end of the event the date of the ticket is used");
+        var notFinished = ActivityTicketPlanner.Plan([Ticket(31, end: new DateTime(2026, 10, 20)) with { EventLabel = 3 }, Ticket(32, end: new DateTime(2026, 10, 20)) with { EventLabel = ActivityTicketPlanner.FinalizedLabel }], destinations, map, locals, new DateOnly(2026, 10, 23), routerWords);
+        check(notFinished[0] is { Action: PlanAction.Skipped } && notFinished[0].Message == ActivityTicketPlanner.NotFinished && notFinished[1].Action != PlanAction.Skipped, "Activity import (tickets): only an event in the state Finalizat is taken; one in another state waits (skipped, read again later)");
         check(plans.Select(plan => plan.Hash).Distinct().Count() == plans.Count, "Activity import (tickets): every ticket has its own content hash");
     }
 
@@ -384,7 +403,7 @@ public static class ActivityImportChecks
         check(parseError is null && parsed.SequenceEqual(["mentenanță", "revizie", "service anual"]) && ActivityKeywords.Parse("ab", out var tooShort).Count == 0 && tooShort is not null,
             "Activity keywords: a typed list is split by comma, semicolon or line, without repeats (compared normalized)");
 
-        // The planner: the words apply to the chosen types, an exact word counts, an approximate one waits unless it was decided, a point without a contract changes nothing.
+        // The planner: the words apply to the chosen types and say what the ticket is proposed as; every ticket of a chosen type goes to the queue.
         var locals = new Dictionary<int, IReadOnlyList<WorkPoint>> { [7] = [new WorkPoint(70, 7, "Punct de lucru principal", "Str. A 1", IsPrimary: true), new WorkPoint(71, 7, "Depozit", "Str. B 2")] };
         var map = new List<ImportMapEntry> { new("partner", 1, 7), new("workpoint", 500, 71) };
         var destinations = new Dictionary<long, string> { [4] = ActivityDestination.OnDemand };
@@ -399,31 +418,23 @@ public static class ActivityImportChecks
         TicketPlan P(IEnumerable<TicketPlan> list, long id) => list.Single(plan => plan.SourceId == id);
         check(P(planned, 10).Keyword == "mentenanță" && P(planned, 11).Approximate == "mentenanță" && P(planned, 11).Found == "mentenata" && P(planned, 11).Keyword == "" && P(planned, 12).Keyword == "" && P(planned, 12).Approximate == "",
             "Activity maintenance (planner): the exact word, the resembling word and no word are told apart in what was done");
-        check(ActivityTicketPlanner.KeywordPoints(planned).OrderBy(pair => pair.WorkPointId).SequenceEqual([(7, 70), (7, 71)]), "Activity maintenance (planner): only the tickets that mention it ask for the coverage of their point, each point once");
-        var covered = new HashSet<(int, int)> { (7, 70) };
-        var withCoverage = ActivityTicketPlanner.WithCoverage(planned, covered);
-        check(P(withCoverage, 10) is { Action: PlanAction.Create, Maintenance: false, NeedsValidation: true, MatchKind: "exact" } && P(withCoverage, 10).Message.Contains("Verificare mentenanță", StringComparison.Ordinal)
-            && P(withCoverage, 13) is { Action: PlanAction.Create, Maintenance: false, NeedsValidation: false } && ActivityKeywords.Normalize(P(withCoverage, 13).Notes).Contains("nu are un contract de mentenanta activ", StringComparison.Ordinal),
-            "Activity maintenance (planner): an exact word at a covered point is taken on demand and proposed to the operator (it may say that the maintenance was not done); without a contract it is only noted");
-        check(P(withCoverage, 11) is { Action: PlanAction.Create, NeedsValidation: true, MatchKind: "approximate" } && P(withCoverage, 14) is { Action: PlanAction.Create, NeedsValidation: false, Approximate: "" }
-            && P(withCoverage, 15) is { Action: PlanAction.Create, NeedsValidation: true },
-            "Activity maintenance (planner): a resembling word at a covered point is taken and proposed too; at an uncovered point it changes nothing");
-        var decided = ActivityTicketPlanner.WithCoverage(ActivityTicketPlanner.Plan(batch, destinations, map, locals, today, typeWords,
-            new Dictionary<long, KeywordDecision> { [11] = KeywordDecision.Confirmed, [15] = KeywordDecision.Rejected }), covered);
-        check(P(decided, 11) is { Action: PlanAction.Create, Maintenance: true, NeedsValidation: false } && P(decided, 15) is { Action: PlanAction.Create, Maintenance: false, Keyword: "" },
-            "Activity maintenance (planner): a confirmed event is taken as maintenance, a rejected one on demand, and neither is proposed again");
+        check(planned.Where(plan => plan.SourceId != 12).All(plan => plan is { Action: PlanAction.Create, NeedsValidation: true }) && P(planned, 10).MatchKind == "exact" && P(planned, 11).MatchKind == "approximate" && P(planned, 12) is { Action: PlanAction.Skipped, Message: ActivityTicketPlanner.NoKeyword },
+            "Activity maintenance (planner): a ticket with a keyword goes to the queue to validate, whatever the point's contract; one without a keyword is not taken");
+        check(ActivityKeywords.Normalize(ActivityTicketPlanner.Notes("T-1", "t", "p", "r", "e", "mentenanță", true, uncovered: true)).Contains("nu are un contract de mentenanta activ", StringComparison.Ordinal)
+            && ActivityKeywords.Normalize(ActivityTicketPlanner.Notes("T-1", "t", "p", "r", "e", "mentenanță", false)).Contains("validat ca service", StringComparison.Ordinal)
+            && ActivityKeywords.Normalize(ActivityTicketPlanner.Notes("T-1", "t", "p", "r", "e", ActivityTicketPlanner.TypeKeyword, true)).Contains("tip de mentenanta", StringComparison.Ordinal),
+            "Activity maintenance (planner): the notes tell how the ticket was validated (maintenance with or without a contract, service)");
         // The client states: a person (or discarded) client is never taken, a client to verify makes the ticket wait, a discarded ticket is skipped for good.
-        var states = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, null, null, new HashSet<long> { 1 }, null, null);
-        var holding = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, null, null, null, new HashSet<long> { 1 }, null);
-        var dropped = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, typeWords, null, null, null, new HashSet<long> { 10 });
+        var states = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, null, new HashSet<long> { 1 }, null, null);
+        var holding = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, null, null, new HashSet<long> { 1 }, null);
+        var dropped = ActivityTicketPlanner.Plan(batch.Take(3).ToList(), destinations, map, locals, today, typeWords, null, null, new HashSet<long> { 10 });
         check(states.All(plan => plan.Action == PlanAction.Skipped && plan.Message == ActivityTicketPlanner.ClientNotTaken) && holding.All(plan => plan.Action == PlanAction.Waiting && plan.Message == ActivityTicketPlanner.ClientToVerify)
             && P(dropped, 10) is { Action: PlanAction.Skipped } && P(dropped, 10).Message == ActivityTicketPlanner.TicketDiscarded && P(dropped, 11).Action == PlanAction.Create,
             "Activity maintenance (planner): the tickets of a person are skipped for good, those of a beneficiary to verify wait, a discarded ticket is not taken");
         var none = ActivityTicketPlanner.Plan(batch, destinations, map, locals, today);
-        check(none.All(plan => plan.Keyword == "" && plan.Approximate == "") && ActivityTicketPlanner.Plan(batch, destinations, map, locals, today, new Dictionary<long, IReadOnlyList<string>> { [13] = ["mentenanță"] }).All(plan => plan.Keyword == ""),
-            "Activity maintenance (planner): without words, or for a type that is not the ticket's, nothing is searched");
-        check(P(planned, 12) is { Action: PlanAction.Skipped } && P(planned, 12).Message == ActivityTicketPlanner.NoKeyword && ActivityTicketPlanner.Plan(batch, destinations, map, locals, today).All(plan => plan.Action == PlanAction.Skipped),
-            "Activity maintenance (planner): a ticket that mentions no keyword of its type (or a type without keywords) is not taken");
+        check(none.All(plan => plan.Action == PlanAction.Skipped && plan.Message == ActivityTicketPlanner.NoKeyword)
+            && ActivityTicketPlanner.Plan(batch, destinations, map, locals, today, new Dictionary<long, IReadOnlyList<string>> { [13] = ["mentenanță"] }).All(plan => plan.Action == PlanAction.Skipped),
+            "Activity maintenance (planner): without words, or for a type that is not the ticket's, a service ticket is not taken");
         var problem = ActivityTicketPlanner.Plan([Ticket(20, problem: "Cere mentenanta", report: "Cere mentenanta\nAm schimbat routerul")], destinations, map, locals, today, typeWords);
         check(problem[0].Keyword == "" && problem[0].Approximate == "", "Activity maintenance (planner): the word is searched in what was done, not in the problem (which may only ask for it)");
 
@@ -474,7 +485,7 @@ public static class ActivityImportChecks
         var alerts = ActivityImportAlertSource.Instances(new ActivityImportAlertState(since, "ActivityApp nu a răspuns la timp.", 4, since, 2, since, 5, since));
         check(alerts.Select(item => item.ObjectId).SequenceEqual([1, 2, 3, 4]) && alerts[0].Values[ActivityImportAlertSource.DetailsName].Contains("Ultimele 4 sincronizări", StringComparison.Ordinal)
             && alerts[0].Values[ActivityImportAlertSource.DetailsName].Contains("nu a răspuns", StringComparison.Ordinal) && alerts[1].Values[ActivityImportAlertSource.DetailsName].Contains("2 coloane", StringComparison.Ordinal)
-            && alerts[2].Values[ActivityImportAlertSource.DetailsName].Contains("5 probleme", StringComparison.Ordinal) && alerts.All(item => item.Url == "/setari?tab=preluare-activityapp" && item.Expiry == DateOnly.FromDateTime(since.ToLocalTime())),
+            && alerts[2].Values[ActivityImportAlertSource.DetailsName].Contains("5 probleme", StringComparison.Ordinal) && alerts.All(item => item.Url == (item.ObjectId == ActivityImportAlertSource.IssuesId ? ActivityImportAlertSource.IssuesUrl : "/setari?tab=preluare-activityapp") && item.Expiry == DateOnly.FromDateTime(since.ToLocalTime())),
             "Activity alerts: one notification per lasting condition (sync failing, structure changed, open problems, new types), on the day it began, with the cause");
         check(ActivityImportAlertSource.Instances(new ActivityImportAlertState(null, "", 0, null, 0, since, 0, null)).Count == 0, "Activity alerts: open problems that were all resolved no longer raise the notification");
         var source = new ActivityImportAlertSource(null!);

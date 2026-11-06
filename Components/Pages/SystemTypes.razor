@@ -83,6 +83,12 @@
 </section>
 </div>
 }
+else if (tab == AnalyzerTab)
+{
+<div role="tabpanel" id="panel-@AnalyzerTab" aria-labelledby="tab-@AnalyzerTab">
+    <ModuleGate ModuleId="@BlazorStoc.Modules.RiskAnalyses.RiskAnalysesModule.ModuleId" Notice="true"><RiskAnalyzersPanel /></ModuleGate>
+</div>
+}
 else
 {
 <div role="tabpanel" id="panel-@KeywordsTab" aria-labelledby="tab-@KeywordsTab">
@@ -95,7 +101,8 @@ else
 @code {
     private const string SystemsTab = "sisteme";
     private const string KeywordsTab = "cuvinte-mentenanta";
-    private static readonly (string Id, string Title)[] Tabs = [(SystemsTab, "Tipuri de sisteme"), (KeywordsTab, "Cuvinte cheie mentenanță")];
+    private const string AnalyzerTab = "analizor-risc";
+    private static readonly (string Id, string Title)[] Tabs = [(SystemsTab, "Tipuri de sisteme"), (KeywordsTab, "Cuvinte cheie mentenanță"), (AnalyzerTab, "Analizor de risc")];
     private string tab = SystemsTab;
 
     [SupplyParameterFromQuery(Name = "tab")] public string? TabQuery { get; set; }

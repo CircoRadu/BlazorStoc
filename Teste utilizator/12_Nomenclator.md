@@ -39,3 +39,13 @@ Decizie: tipurile nu se sterg niciodata (se dezactiveaza), ca sa nu se piarda le
 | 1 | Nomenclator | Doua taburi; primul arata tipurile de sisteme ca inainte | OK - Doua taburi, primul arata tipurile (24.10.2026) |
 | 2 | Tabul „Cuvinte cheie mentenanta” | Lista, campul de adaugare si „Incearca un text” | OK - Lista, camp de adaugare si Incearca un text; cuvant adaugat, text exact gasit, m3ntenan@a asemanator (24.10.2026) |
 | 3 | Un cont fara dreptul de modificare la nomenclator | Nu poate adauga, modifica sau sterge | |
+
+## Modificari de testat - sectiunea Analizor de risc (30.10.2026, versiunea 0.5.34)
+
+**Ce s-a adaugat:** al treilea tab din Nomenclator, „Analizor de risc" (adaugare, editare, stergere).
+**Ce face acum:** analizorii din nomenclator se aleg la analiza de risc; actiunile apar in jurnal pe analizor.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Nomenclator -> Analizor de risc -> adauga un analizor | Apare in lista; jurnalul il noteaza | |
+| 2 | Editeaza / sterge analizorul | Jurnalul noteaza operatia | |

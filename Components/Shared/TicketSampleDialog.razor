@@ -1,0 +1,118 @@
+@using BlazorStoc.Modules.ActivityImport
+@* Setari -> Preluare ActivityApp, secțiunea 6: un tichet real din ActivityApp cu toate coloanele lui și valorile, ca să se vadă ce conține fiecare coloană. Deasupra: ce primește fiecare informație
+   (și cum ar arăta observațiile) cu setările de pe ecran, chiar nesalvate. Fiecare coloană cu text se poate alege direct pentru o informație sau ca nou câmp suplimentar. Nimic din tichet nu se
+   păstrează: se citește la cerere și se arată. *@
+<div class="delete-overlay" @onkeydown="Key">
+    <div class="delete-dialog template-popup review-popup ticket-sample" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="ticket-sample-title">
+        <div class="catalog-heading"><h2 id="ticket-sample-title">Tichet exemplu @Sample.Number @Sample.Title</h2><span class="heading-actions"><HelpButton Topic="setari-tichet-exemplu" About="Tichetul exemplu" /><button type="button" class="danger" @onclick="() => Close.InvokeAsync()">Închide</button></span></div>
+        @if (Error is not null) { <div class="error-banner" role="alert">@Error</div> }
+        <div class="editor-actions">
+            <button type="button" class="refresh act-nav" id="ticket-sample-older" disabled="@(Busy || !Sample.HasOlder)" title="Încarcă tichetul finalizat dinaintea celui afișat" @onclick="() => Older.InvokeAsync()">Tichet anterior</button>
+            <button type="button" class="refresh act-nav" id="ticket-sample-newer" disabled="@(Busy || !HasNewer)" title="Înapoi la tichetul afișat înainte" @onclick="() => Newer.InvokeAsync()">Tichet mai nou</button>
+            <span class="muted" id="ticket-sample-info">Tichet @Sample.TicketId@(Sample.TicketDate is { } date ? " din " + date.ToString("dd.MM.yyyy HH:mm") : "")@(Busy ? " · se încarcă…" : "")</span>
+        </div>
+        <p class="muted"><small>Dacă acest tichet are puține date, apasă „Tichet anterior”. Valorile sunt cele din ActivityApp; nimic din acest tichet nu se păstrează în BlazorStoc.</small></p>
+
+        <h3>Ce primește fiecare informație</h3>
+        @if (preview is null) { <p class="muted" role="status">Setările de pe ecran nu sunt valide: @Problem</p> }
+        else
+        {
+            <div class="table-scroll"><table class="catalog-table" id="ticket-sample-preview">
+                <thead><tr><th>Informație</th><th>Valoare din acest tichet</th><th>Merge în</th></tr></thead>
+                <tbody>
+                @foreach (var item in preview.Items)
+                {
+                    <tr>
+                        <td>@item.Label</td>
+                        <td class="review-text">@(item.Target == "oprit" ? "—" : item.Value.Length > 0 ? item.Value : "—")</td>
+                        <td>@TargetText(item.Target)</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+            <h3>Observațiile intervenției</h3>
+            <pre class="review-text" id="ticket-sample-notes">@preview.Notes</pre>
+        }
+
+        @foreach (var table in Sample.Tables)
+        {
+            <h3>@table.Table</h3>
+            <div class="table-scroll"><table class="catalog-table" id="@($"ticket-sample-{table.Table}")">
+                <thead><tr><th>Coloana</th><th>Tip</th><th>Valoare</th><th>Folosit pentru</th><th>Folosește pentru</th></tr></thead>
+                <tbody>
+                @foreach (var column in table.Columns)
+                {
+                    <tr>
+                        <td>@column.Column</td>
+                        <td>@column.DataType</td>
+                        <td class="review-text">@(column.Value is { Length: > 0 } value ? value : "—")</td>
+                        <td>@UsedBy(table.Table, column.Column)</td>
+                        <td>
+                            @if (column.IsText)
+                            {
+                                <select aria-label="@($"Folosește coloana {column.Column} pentru")" value="" disabled="@Busy" @onchange="args => Choose(table.Table, column.Column, args.Value?.ToString())">
+                                    <option value="">— alege —</option>
+                                    @foreach (var target in Targets.Where(item => item.Table == table.Table)) { <option value="@target.Key">@target.Label</option> }
+                                    <option value="extra">Câmp suplimentar nou</option>
+                                </select>
+                            }
+                            else { <span class="muted">nu are text</span> }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>An information that is read from a column: its key, its name and the table the column is in.</summary>
+    public sealed record SampleTarget(string Key, string Label, string Table);
+
+    /// <summary>The column chosen in the window: the table, the column and what it is chosen for (the key of an information, or "extra" for a new extra field).</summary>
+    public sealed record SampleAssignment(string Table, string Column, string For);
+
+    [Parameter, EditorRequired] public TicketSample Sample { get; set; } = null!;
+    [Parameter] public ActivityFieldMap? Map { get; set; }
+    [Parameter] public string? Problem { get; set; }
+    [Parameter] public IReadOnlyList<SampleTarget> Targets { get; set; } = [];
+    [Parameter] public bool HasNewer { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback Older { get; set; }
+    [Parameter] public EventCallback Newer { get; set; }
+    [Parameter] public EventCallback Close { get; set; }
+    [Parameter] public EventCallback<SampleAssignment> Assign { get; set; }
+
+    private SamplePreview? preview;
+
+    protected override void OnParametersSet() => preview = Map is null ? null : ActivityTicketSampleRules.Preview(Sample, Map);
+
+    private static string TargetText(string target) => target switch
+    {
+        "oprit" => "oprit",
+        ActivityFieldMap.Notes => "observații",
+        ActivityFieldMap.Separate => "câmp separat",
+        _ => "observații și câmp separat"
+    };
+
+    // The pieces of information (and extra fields) that read this column with the settings on the screen.
+    private string UsedBy(string table, string column)
+    {
+        if (Map is null) return "—";
+        var names = new List<string>();
+        foreach (var target in Targets.Where(item => item.Table == table))
+        {
+            var field = ActivityFieldMap.Fields.FirstOrDefault(item => item.Table == table && ActivityFieldMap.ItemOf(target.Key)?.FieldKey == item.Key);
+            if (field is not null && Map.ColumnOf(field).Equals(column, StringComparison.OrdinalIgnoreCase) && Map.IsEnabled(target.Key)) names.Add(Map.LabelOf(target.Key));
+        }
+        names.AddRange(Map.Extras.Where(extra => extra.Table == table && extra.Column.Equals(column, StringComparison.OrdinalIgnoreCase)).Select(extra => extra.Label));
+        return names.Count == 0 ? "—" : string.Join(", ", names);
+    }
+
+    private Task Choose(string table, string column, string? value) =>
+        string.IsNullOrEmpty(value) ? Task.CompletedTask : Assign.InvokeAsync(new SampleAssignment(table, column, value));
+
+    private Task Key(KeyboardEventArgs args) => args.Key == "Escape" ? Close.InvokeAsync() : Task.CompletedTask;
+}

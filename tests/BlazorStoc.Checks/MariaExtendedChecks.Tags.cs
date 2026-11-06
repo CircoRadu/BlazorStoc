@@ -60,14 +60,37 @@ public static partial class MariaExtendedChecks
         Check(renamed.Name == "PoE+" && renamed.Version == poe.Version + 1 && (await tags.GetTagsAsync()).Any(item => item.Id == poe.Id && item.Name == "PoE+"), "A tag is renamed with a new version");
         await Rejects<ProductOperationException>(() => tags.RenameTagAsync(poe, "Alta", "Ext versiune veche"), "An outdated tag version is refused");
         await Rejects<ProductOperationException>(() => tags.RenameTagAsync(renamed, "Audio", "Ext duplicat"), "A tag cannot take the name of another tag");
-        await tags.DeleteTagAsync(renamed, "Ext stergere eticheta");
-        Check((await tags.GetTagsAsync()).All(item => item.Id != poe.Id) && (await tags.GetProductTagIdsAsync(plain.Id)).Count == 0 && (await tags.GetProductTagIdsAsync(camera.Id)).SequenceEqual([audio.Id]),
-            "Deleting a tag that products have On removes it from them and leaves the rest");
+        await Rejects<ProductOperationException>(() => tags.DeleteTagAsync(renamed, "Ext stergere folosita"), "A tag some product has On is not deleted");
+
+        // Archive: the tag leaves every list and filter, the products keep it hidden, and saving a product does not drop it; restoring brings it back.
+        await Rejects<AccessDeniedException>(() => userTags.ArchiveTagAsync(renamed, "Ext arhivare"), "Only an administrator archives a tag");
+        await tags.ArchiveTagAsync(renamed, "Ext arhivare eticheta");
+        Check((await tags.GetTagsAsync()).All(item => item.Id != poe.Id) && (await tags.GetProductTagIdsAsync(plain.Id)).Count == 0 && (await tags.GetAllProductTagsAsync()).GetValueOrDefault(plain.Id) is null,
+            "An archived tag is no longer listed, offered or counted on the products");
+        var archivedTag = (await tags.GetArchivedTagsAsync()).Single(item => item.Id == poe.Id);
+        Check(archivedTag.ProductCount == 1 && !archivedTag.Unused, "The archive lists the tag with the products that still have it");
+        await tags.SetProductTagsAsync(plain.Id, []);
+        Check((await tags.GetArchivedTagsAsync()).Single(item => item.Id == poe.Id).ProductCount == 1, "Saving a product keeps the links to its archived tags");
+        await Rejects<ProductOperationException>(() => tags.DeleteArchivedTagAsync(archivedTag, "Ext stergere"), "An archived tag some product still has is not deleted");
+        await Rejects<ProductOperationException>(() => tags.GiveUpTagRestoreAsync(archivedTag, "Ext renuntare devreme"), "The restore of a tag is not given up before the retention period passes");
+        await Rejects<ProductOperationException>(() => tags.AddTagAsync(group, "PoE+"), "The name of an archived tag stays reserved");
+        await tags.RestoreTagAsync(archivedTag, "Ext restaurare eticheta");
+        Check((await tags.GetProductTagIdsAsync(plain.Id)).SequenceEqual([poe.Id]) && (await tags.GetArchivedTagsAsync()).All(item => item.Id != poe.Id), "Restoring a tag gives it back to the products that had it");
+
+        // Archived with no product left, the tag is deleted for good.
+        await tags.SetProductTagsAsync(plain.Id, []);
+        renamed = (await tags.GetTagsAsync()).Single(item => item.Id == poe.Id);
+        await tags.ArchiveTagAsync(renamed, "Ext arhivare nefolosita");
+        archivedTag = (await tags.GetArchivedTagsAsync()).Single(item => item.Id == poe.Id);
+        Check(archivedTag.Unused, "An archived tag no product has is unused");
+        await tags.DeleteArchivedTagAsync(archivedTag, "Ext stergere eticheta");
+        Check((await tags.GetArchivedTagsAsync()).All(item => item.Id != poe.Id) && (await tags.GetProductTagIdsAsync(camera.Id)).SequenceEqual([audio.Id]), "An unused archived tag is deleted for good and the other tags stay");
 
         var events = (await audit.GetEventsAsync()).Where(item => item.TimestampUtc >= started).ToList();
         Check(events.Count(item => item.Action == AuditActions.AddSubcategoryTag) == 3 && events.Any(item => item.Action == AuditActions.RenameSubcategoryTag && item.Motif == "Ext redenumire" && item.Details.Contains("PoE+"))
-              && events.Any(item => item.Action == AuditActions.DeleteSubcategoryTag && item.Motif == "Ext stergere eticheta" && item.Details.Contains("Produse care o aveau: 1"))
-              && events.Count(item => item.Action == AuditActions.EditProductTags) == 3,
+              && events.Any(item => item.Action == AuditActions.ArchiveSubcategoryTag && item.Motif == "Ext arhivare eticheta" && item.Details.Contains("Produse care o au: 1"))
+              && events.Any(item => item.Action == AuditActions.RestoreSubcategoryTag && item.Motif == "Ext restaurare eticheta") && events.Any(item => item.Action == AuditActions.DeleteUnusedTag && item.Motif == "Ext stergere eticheta")
+              && events.Count(item => item.Action == AuditActions.EditProductTags) == 4,
             "The journal names each tag operation");
     }
 }

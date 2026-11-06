@@ -37,6 +37,8 @@ internal static class PrivateConfiguration
         var applicationFile = builder.AddPrivateAccountFiles();
         builder.AddFirstRunAccounts();
         builder.Configuration.AddDatabaseOverride(DatabaseOverrideFile.PathFor(builder.Configuration), DatabaseOverrideFile.KeysPath(builder.Configuration));
+        // HTTPS through a reverse proxy (Setari -> Baza de date -> Aplicatia): a small JSON file, off when it does not exist.
+        builder.Configuration.AddJsonFile(Path.GetFullPath(ReverseProxyRules.PathFor(builder.Configuration)), optional: true, reloadOnChange: false);
         return applicationFile;
     }
 

@@ -25,13 +25,14 @@ public sealed partial class MariaProductRepository
     {
         if (accessControl is not null) await accessControl.EnsureAnyAsync(["produse.add", "preluare-factura.add"], cancellationToken).ConfigureAwait(false);
         var value = input.Validated();
+        var actor = accessControl is null ? "" : await accessControl.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "";
         (Product Product, GroupResolution Group, string Parameters) result;
         try
         {
             result = await WriteAsync(async (connection, transaction) =>
             {
                 var group = await ResolveGroupAsync(connection, transaction, value.Category, value.Subcategory, cancellationToken).ConfigureAwait(false);
-                var parameters = await ResolveParametersAsync(connection, transaction, group.SubcategoryId, group.Subcategory, value, cancellationToken).ConfigureAwait(false);
+                var parameters = await ResolveParametersAsync(connection, transaction, group.CategoryId, group.SubcategoryId, group.Subcategory, value, cancellationToken).ConfigureAwait(false);
                 await EnsureUniqueProductNameAsync(connection, transaction, parameters.Name, null, cancellationToken).ConfigureAwait(false);
                 await using var insert = Command(connection, transaction, """
                     INSERT INTO products(category_id,subcategory_id,name,normalized_name,description,quantity,version)
@@ -41,7 +42,7 @@ public sealed partial class MariaProductRepository
                     ("@description", value.Description), ("@quantity", 0));
                 await insert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                 var product = new Product(checked((int)insert.LastInsertedId), group.Category, group.Subcategory, parameters.Name, value.Description, 0);
-                if (parameters.BaseModel is not null) await StoreParametersAsync(connection, transaction, product.Id, parameters, cancellationToken).ConfigureAwait(false);
+                if (parameters.BaseModel is not null) await StoreParametersAsync(connection, transaction, product.Id, parameters, actor, cancellationToken).ConfigureAwait(false);
                 return (Product: product, Group: group, Parameters: parameters.Summary);
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -61,6 +62,7 @@ public sealed partial class MariaProductRepository
     {
         await EnsureKeyAsync("produse.edit", cancellationToken).ConfigureAwait(false);
         var value = input.Validated(original);
+        var actor = accessControl is null ? "" : await accessControl.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "";
         (Product Product, GroupResolution Group, string Parameters) result;
         try
         {
@@ -69,7 +71,7 @@ public sealed partial class MariaProductRepository
                 var current = await GetLocked(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
                 ProductRules.CheckCurrent(current, original);
                 var group = await ResolveGroupAsync(connection, transaction, value.Category, value.Subcategory, cancellationToken).ConfigureAwait(false);
-                var parameters = await ResolveParametersAsync(connection, transaction, group.SubcategoryId, group.Subcategory, value, cancellationToken).ConfigureAwait(false);
+                var parameters = await ResolveParametersAsync(connection, transaction, group.CategoryId, group.SubcategoryId, group.Subcategory, value, cancellationToken).ConfigureAwait(false);
                 await EnsureUniqueProductNameAsync(connection, transaction, parameters.Name, original.Id, cancellationToken).ConfigureAwait(false);
                 var oldParameters = await ParameterSummaryAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
                 var version = checked(original.Version + 1);
@@ -82,7 +84,7 @@ public sealed partial class MariaProductRepository
                     ("@version", version), ("@id", original.Id), ("@oldVersion", original.Version));
                 if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                     throw new ProductOperationException("Produsul s-a schimbat între timp. Actualizează catalogul.");
-                await StoreParametersAsync(connection, transaction, original.Id, parameters, cancellationToken).ConfigureAwait(false);
+                await StoreParametersAsync(connection, transaction, original.Id, parameters, actor, cancellationToken).ConfigureAwait(false);
                 var product = new Product(original.Id, group.Category, group.Subcategory, parameters.Name, value.Description, current!.Quantity, version);
                 return (Product: product, Group: group, Parameters: oldParameters + "\u001f" + parameters.Summary);
             }, cancellationToken).ConfigureAwait(false);
@@ -106,6 +108,7 @@ public sealed partial class MariaProductRepository
         var motif = ChangeReasonRules.Normalize(reason);
         if (ChangeReasonRules.ValidationError(motif) is { } reasonError)
             throw new ProductOperationException(reasonError);
+        var actor = accessControl is null ? "" : await accessControl.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "";
         await archiver.ExecuteAsync(ArchiveRequests.Product(original, motif), async (operation, token) =>
         {
             async Task CommitDatabaseAsync(ArchiveFileRecord? file, CancellationToken archiveToken)
@@ -120,6 +123,8 @@ public sealed partial class MariaProductRepository
                         await relations.ExecuteScalarAsync(archiveToken).ConfigureAwait(false)));
                     await MariaArchivePersistence.InsertAsync(connection, transaction, operation, file is null ? [] : [file], archiveToken)
                         .ConfigureAwait(false);
+                    // The links to parameter values go with the product; the usage log keeps where each parameter was used.
+                    await ParameterUsageLog.WriteProductDeletionAsync(connection, transaction, original.Id, actor, motif, archiveToken).ConfigureAwait(false);
                     await using var command = Command(connection, transaction,
                         "DELETE FROM products WHERE id=@id AND version=@version",
                         ("@id", original.Id), ("@version", original.Version));

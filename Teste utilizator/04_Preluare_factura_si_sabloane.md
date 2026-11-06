@@ -151,3 +151,14 @@ Pasi:
 1. Factura noua -> sablon -> pasul 2 cu confirmari -> pasul 3 -> intrari in stoc legate de factura.
 2. Aceeasi factura din nou -> preluare partiala.
 3. Verifica pe /facturi si pe pagina produsului ca intrarile exista.
+
+## Modificari de testat - CUI furnizor la sablon (04.11.2026, Invoices 1.1.3)
+
+**Ce s-a adaugat:** CUI-ul corectat de mana in fereastra de sablon ramane la "Salveaza sablonul"; un CUI citit prin OCR cu o cifra dublata (RO222460883 in loc de RO22460883) se corecteaza singur daca astfel cifra de control devine corecta.
+**Ce face acum:** furnizorul se cauta dupa CUI-ul din formular, nu dupa cel citit initial.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Sablon nou din factura 682100.pdf (Telesystem) | CUI-ul pornit este RO22460883 si furnizorul e recunoscut | |
+| 2 | Scrie manual alt CUI in campul "CUI/CIF furnizor", apasa "Salveaza sablonul" | "CUI retinut" ramane valoarea scrisa; mesajele nu mai rescriu CUI-ul | |
+| 3 | CUI al unui furnizor care nu exista | Mesajul propune "+ Adauga furnizorul" | |

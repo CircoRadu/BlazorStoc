@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using MySqlConnector;
 using BlazorStoc.Services;
@@ -38,6 +38,10 @@ public static partial class MariaExtendedChecks
             await Section("Maintenance interventions: register, due date choices, corrections, photos, archive, guards", () => ServiceInterventionsAsync(configuration, admin, audit, probe, assets));
             await Section("Maintenance notifications: due dates and contract expiry sources, automatic close and reopen, threshold", () => MaintenanceNotificationsAsync(configuration, admin, audit, probe));
             await Section("Risk analyses: one active per point, renewals and history, notification, replace, guards, archive", () => RiskAnalysesAsync(configuration, admin, audit, probe));
+            await Section("Risk analyzers: nomenclator, unique name, used analyzers, journal", () => RiskAnalyzersAsync(configuration, admin, audit, probe));
+            await Section("Elcomtur: import of the backup, balances of the beneficiaries, journal", () => ElcomturAsync(configuration, admin, audit, probe));
+            await Section("Elcomtur automatic import: directory, mask, firm, integrity, retention, schedule, notifications", () => ElcomturAutoAsync(configuration, admin, audit, probe));
+            await Section("Beneficiary files: free files, listing with sections, rename without extension, delete, journal", () => BeneficiaryFilesAsync(configuration, admin, audit, probe));
             await Section("User types: system types, catalog permissions, seeding, assignment", () => UserTypesAsync(configuration, admin, audit, probe));
             await Section("Stock permissions: each kind of movement asks for its own key", () => StockPermissionsAsync(configuration, admin, audit));
             await Section("Module state: modules stopped by hand are saved, put back at restart, journal", () => ModuleStateAsync(configuration, admin, audit, probe));
@@ -50,8 +54,13 @@ public static partial class MariaExtendedChecks
             await Section("Module permissions: registers are read by anyone with a permission, add/edit/delete each ask for their key", () => ModulePermissionsAsync(configuration, admin, audit));
             await Section("Subcategory order: arranged by the administrator, new ones at the end, journal", () => SubcategoryOrderAsync(configuration, admin, audit));
             await Section("Subcategory tree: children, inherited parameters and tags, leaf-only products, leaf turning into a parent, journal", () => SubcategoryTreeAsync(configuration, admin, audit, probe));
+            await Section("Category parameters: parameters, families and tags of a category, inherited by its tree, archive, unique names", () => CategoryParametersAsync(configuration, admin, audit));
+            await Section("Definition relocation: merge, preview as rolled-back run, incomplete products, families, blocks", () => DefinitionRelocationAsync(configuration, admin, audit));
             await Section("Subcategory move: drag and drop of nodes, whole branch moves, conflicts refused, journal", () => SubcategoryMoveAsync(configuration, admin, audit));
             await Section("Subcategory inventory: a node stands for its leaves, leaves titled with their path", () => SubcategoryInventoryAsync(configuration, admin, audit));
+            await Section("Branch move keeps definitions: copy, merge, verification, incomplete products", () => BranchMoveKeepsDefinitionsAsync(configuration, admin, audit));
+            await Section("Family return: a branch with its own family under the parent that has it, merged on decision", () => FamilyReturnsUnderParentAsync(configuration, admin, audit));
+            await Section("Leaf promotion: a leaf becomes a category, the new name is checked first, definitions stay, journal", () => LeafPromotionAsync(configuration, admin, audit));
             await Section("Journal: server-side filtering, paging, window, ranges, removals, summary", () => AuditQueryAsync(configuration, audit, probe));
             await Section("Change events", () => ChangeEventsAsync(configuration, admin, audit));
             await Section("Expiry notifications: templates, engine, take over, reminder", () => NotificationsAsync(configuration, admin, audit, probe));

@@ -1,0 +1,31 @@
+@namespace BlazorStoc.Components.Shared
+@using BlazorStoc.Modules.Elcomtur
+@using BlazorStoc.Services
+@inject IElcomturBalanceRepository Balances
+
+@* The tab "Balante restante" of the Notifications page: red with the number of beneficiaries that owe something, like the tabs of the validation queues. It belongs to the Elcomtur module; the page
+   of another module (Notifications) shows it through this wrapper, because modules do not refer to each other. Shown only to who may see the balances and while the module runs. *@
+<AuthorizeView Policy="perm:elcomtur.view">
+    <Authorized>
+        <ModuleGate ModuleId="@ElcomturModule.ModuleId" Notice="false">
+            <button type="button" role="tab" id="tab-balances" class="settings-tab @(Active ? "active" : "") @(owed > 0 ? "needs-attention" : "")" aria-selected="@(Active ? "true" : "false")" aria-controls="panel-notifications" @onclick="Select">Balanțe restante <span class="count-badge" id="elcomtur-tab-count">@owed</span></button>
+        </ModuleGate>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public EventCallback Selected { get; set; }
+
+    private int owed;
+
+    private Task Select() => Selected.InvokeAsync();
+
+    // Read again each time the page renders the tab for a new visit; a failure only leaves the number at zero.
+    protected override async Task OnInitializedAsync()
+    {
+        try { owed = await Balances.CountOwedAsync(); }
+        catch (Exception exception) when (exception is AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException or OperationCanceledException) { owed = 0; }
+        catch (Exception) { owed = 0; }
+    }
+}

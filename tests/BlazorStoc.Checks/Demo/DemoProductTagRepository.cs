@@ -44,8 +44,62 @@ public sealed class DemoProductTagRepository : IProductTagRepository
     {
         lock (gate)
         {
+            if (CountOf(original.Id) > 0) throw new ProductOperationException(ParameterArchiveRules.UsedCannotDeleteMessage);
             tags.RemoveAll(item => item.Id == original.Id);
+        }
+        return Task.CompletedTask;
+    }
+
+    // ---- archive (migration 56): an archived tag leaves the list but its links stay.
+    private readonly List<ArchivedTag> archivedTags = [];
+    private readonly List<SubcategoryTag> archivedSource = [];
+
+    public Task<IReadOnlyList<ArchivedTag>> GetArchivedTagsAsync(CancellationToken cancellationToken = default)
+    {
+        lock (gate) return Task.FromResult<IReadOnlyList<ArchivedTag>>(archivedTags.Select(tag => tag with { ProductCount = CountOf(tag.Id) }).ToArray());
+    }
+
+    public Task ArchiveTagAsync(SubcategoryTag original, string reason, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var tag = tags.FirstOrDefault(item => item.Id == original.Id) ?? throw new ProductOperationException("Eticheta nu mai există. Actualizează lista și reia operația.");
+            archivedTags.Add(new ArchivedTag(tag.Id, tag.Category, tag.Subcategory, tag.Name, tag.Version + 1, MariaTimeText.Format(DateTime.UtcNow), "demo", CountOf(tag.Id)));
+            archivedSource.Add(tag);
+            tags.Remove(tag);
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task RestoreTagAsync(ArchivedTag original, string reason, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            tags.Add(archivedSource.First(item => item.Id == original.Id));
+            archivedSource.RemoveAll(item => item.Id == original.Id);
+            archivedTags.RemoveAll(item => item.Id == original.Id);
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task GiveUpTagRestoreAsync(ArchivedTag original, string reason, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            var allowed = ParameterArchiveRules.GiveUpAllowedFrom(MariaTimeText.Parse(archivedTags.First(item => item.Id == original.Id).ArchivedUtc), ParameterArchiveRules.DefaultRetentionDays);
+            if (DateTime.UtcNow < allowed) throw new ProductOperationException(ParameterArchiveRules.GiveUpTooEarlyMessage(allowed));
             foreach (var set in byProduct.Values) set.Remove(original.Id);
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteArchivedTagAsync(ArchivedTag original, string reason, CancellationToken cancellationToken = default)
+    {
+        lock (gate)
+        {
+            if (CountOf(original.Id) > 0) throw new ProductOperationException(ParameterArchiveRules.StillLinkedMessage);
+            archivedSource.RemoveAll(item => item.Id == original.Id);
+            archivedTags.RemoveAll(item => item.Id == original.Id);
         }
         return Task.CompletedTask;
     }

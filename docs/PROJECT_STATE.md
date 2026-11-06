@@ -9,6 +9,21 @@ Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (06.11.2026): versiunea 0.5.45 (tichet exemplu, nume editabile, structura tichetelor, branch claude/tichet-exemplu-activityapp)
+- Tichet exemplu: `ActivityTicketSample.cs` (modele, `Preview`, `ToTicket`), `IActivitySource.ReadTicketSampleAsync` (cel mai recent tichet finalizat al tipurilor alese, apoi cel mai vechi urmator; toate coloanele din Tickete/EvenimenteAgent), `IActivityImportService.GetTicketSampleAsync` (drept de rulare, jurnal pe numarul tichetului), `Components/Shared/TicketSampleDialog.razor` (tabele, previzualizare, "Tichet anterior"/"Tichet mai nou", alegerea coloanei pentru o informatie sau camp suplimentar).
+- Nume editabile (`ActivityFieldMap.Labels`, `LabelOf`/`NoteLabelOf`); numele cu care au intrat in observatii se pastreaza pe inregistrarea sursa (`notes_labels`, migrarea 67) ca recitirea sa recunoasca textul generat.
+- Structura tichetelor: `ActivityTicketStructure.cs` (instantaneu al coloanelor Tickete/EvenimenteAgent, comparatie), verificare la fiecare Apply al importului de tichete, notificarea "Structura tichetelor" (`ActivityImportAlertSource.TicketStructureId`), banner si butonul "Corespondenta verificata" (`ConfirmTicketStructureAsync`, migrarea 68). Prima data se memoreaza structura fara alerta.
+- Verificat: grupul activityimport (245) si sectiunile MariaDB "Activity" (165) fara esecuri. Neverificat pe un ActivityApp real; fereastra nu are topic .help (vezi docs/HELP_DE_REGENERAT.md).
+
+## Ultimul lucru facut (06.11.2026): versiunea 0.5.44 (informatiile din tichet ActivityApp, branch claude/campuri-tichete-activityapp)
+- Setari -> Preluare ActivityApp, sectiunea 6: On/Off pe informatie (`ActivityFieldMap` v2: `Off`, `Targets`, `Extras`, JSON compatibil cu formatul vechi), destinatie (observatii / separat / ambele), campuri suplimentare (coloane text din Tickete/EvenimenteAgent, `StructureReport.Extras`, `ActivityTicket.Extras`). Titlu si numar mereu On. Off = nu se citeste/scrie/arata (`ActivityTicketFields.Collect`, `TicketInfoRows` in cele 3 ferestre, `IActivityTicketVisibility`).
+- Migrarea 65: `fields_read`/`extras` pe `activity_import_tickets`, `fields_read`/`extras`/`notes_items` pe `service_intervention_source`. Recitirea tichetelor care nu au ce cer setarile: `IActivityTicketRefreshService` (citire dupa ID `ReadTicketsByIdAsync`, la salvare, buton, sincronizare); observatiile se rescriu doar daca sunt inca cele generate (`RebuildNotes`), restul raman neatinse si se numara; `IOnDemandInterventionRecorder.GetNotesAsync/UpdateNotesAsync`. Observatiile se pastreaza fara diacritice (`TextNormalization.ForStorage`).
+- Verificat: grupul activityimport (217) si sectiunea MariaDB "Activity import" (156) fara esecuri; Journal 1.4.8, Maintenance 1.7.2, ActivityImport 0.11.0. Neverificat pe un ActivityApp real (coloana suplimentara reala); fara topic .help pentru sectiune (vezi docs/HELP_DE_REGENERAT.md).
+
+## Ultimul lucru facut (06.11.2026): versiunea 0.5.43 (HTTPS prin proxy, branch claude/https)
+- Card nou Setari -> Baza de date -> Conexiune: "HTTPS prin proxy" (`Components/Shared/ReverseProxyPanel.razor`, `Services/ReverseProxySettings.cs`, `Startup/ReverseProxyStartup.cs`). Comutator implicit Oprit + lista IP/CIDR ale proxy-ului, in `reverse-proxy.json` (radacina de date, sursa de configurare `Hosting:Https`). Pornit: forwarded headers doar de la proxy-urile listate, cookie Secure, HSTS, acces direct pe HTTP din retea refuzat cu mesaj (loopback si /health permise). Antete de securitate mereu. Jurnal: "Modificare HTTPS prin proxy". Journal 1.4.7.
+- Verificat: teste tintite (dbsettings, help, pickup) 0 esecuri, card verificat in browser pe instanta separata. Neverificat cu un nginx real (pasii in Teste utilizator/09). Cardul nu are topic .help (vezi docs/HELP_DE_REGENERAT.md).
+
 ## Ultimul lucru facut (27.10.2026): versiunile 0.5.24 - 0.5.27 (parametri, familii, etichete, popup produs)
 - Catalog: coloana PARAMETRI cu etichete de filtrare, filtru "Doar incomplete", iconita de editare pe rand; editarea unui produs se face intr-un popup (`Components/Pages/Home.razor`, `ProductEditor.razor`).
 - Parametri obligatori: tip Valoare fixa (`ParameterKind.Fixed`, doar in familie), schimbarea tipului la editare, stergerea unui parametru cu produse (codurile se rescriu), produsele incomplete sunt blocate in toate operatiile de stoc (storno permis, banner pe pagina produsului).
@@ -89,6 +104,17 @@ Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Schimbari de comportament voite: retry la deadlock si pentru Project, ProjectComponent, Offer, OfferTemplate, SystemType; Project verifica `IsAllowedDatabase`; anularea se verifica inainte de deschiderea conexiunii.
 - Teste noi `StructureChecks` (grupul `structure`, 23): rutele (`@page` din .razor = rutele compilate; prinde un `@` pierdut), `SettleNumbers`, `OverStockOf`. Verificat pe 30 de PDF-uri reale (raport identic) si pe fixturile OCR (identic).
 - Suita in memorie 1089 trecute, MariaDB 1744 trecute, 0 esecuri; migrarea 38 aplicata acum si pe `blazorstoc_test`. Paginile impartite verificate in browser de agent (miscari produs, preluare factura PDF/ZIP, sabloane, categorii, vehicule, harta, nomenclator, inventar); raman de verificat de utilizator pasul 3 al preluarii facturii si salvarea unui sablon (`Teste utilizator/` 02 si 04).
+## Ultimul lucru facut (29.10.2026, preluare ActivityApp: persoane fizice, parteneri fara tichete, coada unica)
+
+- Necomis: 0.5.31, migrarea 57 (`take_partners`, `auto_accept_partners`), ActivityImport 0.3.0. Vezi `IMPLEMENTED.md` (29.10.2026) si `Teste utilizator/18_Preluare_tichete_ActivityApp.md`. Pista paralela (asistent de curatare produse) incepe acum cu migrarea 58.
+
+## Ultimul lucru facut (28.10.2026, catalog: arhivare, definitii pe categorie, relocare, tragere pe niveluri)
+
+- Ramura `claude/arhivare-parametri-categorii` (necomisa): etapele 0-8 gata. Migrarea 056; servicii `ParameterArchive`, `DefinitionRelocation`/`MariaDefinitionRelocation`, `DefinitionOwner`; `SubcategoryTree` cu `PreviewMoveAsync`/`MoveAsync(choices)` si `PreviewPromotionAsync`/`PromoteAsync`; ferestre `ParameterArchive/Restore/UsageDialog`, `TakeFromChildDialog`, `BranchMoveDialog`.
+- Reguli: definitiile folosite se arhiveaza, nu se sterg; categoria are definitii proprii (cheia negativa = categorie); mutarea copiaza ce se mostenea; frunza devine categorie numai dupa redenumirea subcategoriei si verificari.
+- Versiune 0.5.29, Journal 1.4.0. Help/capturi de refacut: `docs/HELP_DE_REGENERAT.md`. Teste de urmarit de utilizator: `Teste utilizator/01_Stoc_si_produse.md`.
+- Nefacut: retrogradarea categorie -> subcategorie, scurtaturi Ctrl+sageti; pista paralela (asistent de curatare produse si export pachet) incepe cu migrarea 57.
+
 ## Ultimul lucru facut (10.10.2026, catalog si preluare factura)
 
 - Ordinea categoriilor prin drag and drop (administrator; migrarea 38 `categories.sort_order`, `ReorderCategoriesAsync`, `wwwroot/category-order.js`), aceeasi ordine in meniul lateral; jurnal "Reordonare categorii".
@@ -296,4 +322,11 @@ Il stabileste utilizatorul.
 - Verificat: suita completa in memorie, sectiunile MariaDB, browser pe instanta de test (vezi IMPLEMENTED.md).
 - Help cu capturi (19.10.2026, necomis, branch `feature/help`): 89 de capturi 1920x1080, una pe topic (9 MB), chenar pulsatil la clic pe un rand din tabel, "Arata pe pagina", marire; toate topicurile au captura (lista `WithoutCapture` din `HelpChecks.cs` este goala; fereastra ANAF se fotografiaza cu CUI-ul real RO9178894, cerut de utilizator, si cere internet). Fisiere demo pentru incarcare: `dotnet run --project tests/BlazorStoc.HelpDemo -- --files artifacts/help-demo-files`. Regenerare: vezi antetul `tools/help-capture.mjs` (baza demo + `--prepare` + `--all`); la schimbarea unei ferestre se reruleaza `--topic cheie`. Teste `-Group help`: 61 PASS.
 
-Actualizare 28.10.2026: iconite pe butoane (icon-buttons.js), reflow la ingustare, popup categorii/subcategorii, card Descriere pe pagina produsului. Urmeaza pe ramura noua: arhivarea parametrilor/etichetelor, categorii cu parametri, mutare cu pastrare, drag&drop pe niveluri (plan etapele 0-8 discutat 28.10.2026).
+Actualizare 28.10.2026: butoanele de actiune raman cu text (scriptul de iconite a fost scos), reflow la ingustare, popup categorii/subcategorii, card Descriere pe pagina produsului. Urmeaza pe ramura noua: arhivarea parametrilor/etichetelor, categorii cu parametri, mutare cu pastrare, drag&drop pe niveluri (plan etapele 0-8 discutat 28.10.2026).
+
+
+Actualizare 30.10.2026: versiunea 0.5.36. Tichetele ActivityApp trec prin coada de validare (nimic nu se inregistreaza singur), schema 60 (mentenanta fara contract), Nomenclator cu Analizor de risc, fisiere atasate, interventii cu vizualizare/schimbare fel, paginare la Notificari. Teste: 2153 PASS. Help de regenerat: vezi docs/HELP_DE_REGENERAT.md.
+
+Actualizare 04.11.2026: schema 61 (`activity_import_tickets.gps`). Import tichete: executanti din agentii atasati, doar Finalizat (Label 2 - ipoteza confirmata de utilizator pe culoarea starii; de urmarit pe live), GPS la punct; cozile ActivityApp sunt taburi in Notificari. Adaugarea beneficiar/furnizor/vehicul in popup. Teste: 1615 + 280 + 3400 PASS. Help de regenerat: vezi docs/HELP_DE_REGENERAT.md.
+
+Actualizare 04.11.2026 (branch Elcomtur): versiunea 0.5.38, schema 62. Modul nou Elcomtur (balante de plata din backup-ul `.elc`, sectiune in beneficiar, tab in Notificari); detalii in docs/PROPUNERE_ELCOMTUR.md sectiunea 9 si IMPLEMENTED.md. Help de generat la cerere (pagina `/preluare-elcomtur` e in `Pending` din HelpChecks).

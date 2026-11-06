@@ -32,11 +32,11 @@ public static partial class MariaExtendedChecks
             [cui] = new("Str. Florilor 5, Timisoara", "0722111222"), [(long.Parse(cui) + 1).ToString()] = new("Str. Noua 2, Arad", "0733111222")
         });
         var partners = new MariaActivityPartnerImportService(configuration, settings, fake, beneficiaries, workPoints, admin, audit, anaf);
-        var tickets = new MariaActivityTicketImportService(configuration, settings, fake, recorder, workPoints, admin, audit, partners);
+        var tickets = new MariaActivityTicketImportService(configuration, settings, fake, workPoints, admin, audit, partners);
         async Task<long> Count(string sql) => await Scalar<long>(probe, sql);
         try
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords", "service_intervention_source" }) await Exec(probe, "DELETE FROM " + table);
             fake.Partners = [new(7001, $"Ext Tichete {suffix} SRL", "RO" + cui, "Str. Florilor 5", "Timisoara", "Timis", "0722111222", "")];
             fake.Points = [new(7101, 7001, "Str. Florilor 5", "Timisoara", "Timis", "", "Sediu", "", true, null), new(7102, 7001, "Bd. Libertatii 9", "Timisoara", "Timis", "", "Depozit", "", true, null)];
             fake.Types = [new(4, "Service", "S", true, false, 3, 0, 0), new(13, "Mentenanță", "M", true, false, 1, 0, 0), new(25, "Intervenție la cerere", "I", false, false, 0, 0, 0)];
@@ -69,10 +69,10 @@ public static partial class MariaExtendedChecks
 
             var interventionsBefore = await Count("SELECT COUNT(*) FROM service_interventions");
             var simulation = await tickets.SimulateAsync();
-            Check(!simulation.Applied && simulation.Since == new DateOnly(2026, 1, 1) && simulation.Tickets is { Total: 5, Create: 2, Skipped: 1, Waiting: 1, Problems: 1 } && simulation.Types.SequenceEqual(["4 Service", "13 Mentenanță"]),
-                "Activity tickets: the simulation counts the tickets of the chosen types from the chosen date (2 to take, 1 skipped, 1 waiting for its client, 1 problem; the ticket before the date is not read)");
-            Check(simulation.Items.Any(item => item.SourceId == 8003 && item.Message.Contains("mentenanță", StringComparison.Ordinal)) && simulation.Items.Any(item => item.SourceId == 8005 && item.Action == "Problem"),
-                "Activity tickets: the skipped and the problem tickets are listed with the reason");
+            Check(!simulation.Applied && simulation.Since == new DateOnly(2026, 1, 1) && simulation.Tickets is { Total: 5, Create: 3, Skipped: 0, Waiting: 1, Problems: 1 } && simulation.Types.SequenceEqual(["4 Service", "13 Mentenanță"]),
+                "Activity tickets: the simulation counts the tickets of the chosen types from the chosen date (3 to take - one of a maintenance type -, 1 waiting for its client, 1 problem; the ticket before the date is not read)");
+            Check(simulation.Items.Any(item => item.SourceId == 8003 && item.Action == "Create") && simulation.Items.Any(item => item.SourceId == 8005 && item.Action == "Problem"),
+                "Activity tickets: the ticket of a maintenance type is taken (no keyword needed; no contract here, so on demand) and the problem ticket is listed with the reason");
             Check(await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='ticket'") == 0
                 && await Count("SELECT COUNT(*) FROM activity_import_runs WHERE kind='tickets-simulation' AND status='completed'") == 1, "Activity tickets: the simulation writes nothing but its run record");
 
@@ -83,20 +83,38 @@ public static partial class MariaExtendedChecks
             await settings.SaveSettingsAsync(new ActivityImportInput(true, "SERVER-" + suffix, 1433, "TIPActivity", "citire", null, new DateOnly(2026, 1, 1), 0, 24, 200, false));
 
             var applied = await tickets.ApplyAsync();
-            Check(applied.Applied && applied.Tickets is { Create: 2, Skipped: 1, Waiting: 1, Problems: 1 }, "Activity tickets: the application does what the simulation showed");
+            Check(applied.Applied && applied.Tickets is { Create: 3, Skipped: 0, Waiting: 1, Problems: 1 }, "Activity tickets: the application does what the simulation showed");
+            // The import records NOTHING: the three tickets wait whole in the queue; an operator takes them (as proposed, edited, maintenance without a contract).
+            Check(await Count("SELECT COUNT(*) FROM service_interventions") == interventionsBefore && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='ticket'") == 0
+                && await Count("SELECT COUNT(*) FROM activity_import_suggestions WHERE status='pending' AND intervention_id IS NULL AND ticket_id IN (8001, 8002, 8003)") == 3
+                && await Count("SELECT COUNT(*) FROM activity_import_tickets WHERE state='pending_approval' AND ticket_id IN (8001, 8002, 8003)") == 3,
+                "Activity tickets: the application records no intervention; the tickets wait in the queue to validate, kept whole");
+            var review = new MariaActivityReviewService(configuration, admin, audit, recorder);
+            var queue = await review.GetPendingAsync();
+            Check(queue.Count == 3 && queue.Single(item => item.TicketId == 8003).Kind == "type" && queue.All(item => item.Kind is "type" or "exact" or "approximate" or ActivityTicketPlanner.ServiceKind),
+                "Activity tickets: a ticket of a maintenance type is proposed as maintenance (no contract needed) and every ticket says what it is proposed as");
+            var again0 = await tickets.ApplyAsync();
+            Check(again0.Tickets.Create == 0 && await Count("SELECT COUNT(*) FROM activity_import_suggestions WHERE ticket_id IN (8001, 8002, 8003)") == 3,
+                "Activity tickets: a ticket waiting in the queue is not put there twice");
+            var detail = await review.GetDetailAsync(queue.Single(item => item.TicketId == 8002).Id);
+            Check(detail.Source.Problem == "Nu merge internetul" && detail.Source.Resolution == "Am reinstalat tot" && detail.Source.Executor == "Ion Popescu" && detail.WorkPoints.Count >= 2 && !detail.Covered,
+                "Activity tickets: the detail of a ticket in the queue tells its problem, resolution, executor, the points of the beneficiary and what it is proposed as");
+            await review.DecideAsync(queue.Single(item => item.TicketId == 8001).Id, ReviewDecision.OnDemand);
+            await review.TakeAsync(detail.Item.Id, new ReviewTakeInput(ReviewCategory.Service, main.Id, new DateOnly(2026, 4, 5), detail.NotesService));
+            await review.DecideAsync(queue.Single(item => item.TicketId == 8003).Id, ReviewDecision.Maintenance);
             var recorded = (await interventions.GetForBeneficiaryAsync(beneficiary.Id)).OrderBy(item => item.PerformedOn).ToList();
-            Check(recorded.Count == 2 && recorded.All(item => item.Kind == ServiceInterventionKind.OnDemand && !item.MovesDue) && recorded[0].PerformedOn == new DateOnly(2026, 3, 2) && recorded[0].WorkPointId == depot.Id && recorded[1].WorkPointId == main.Id,
-                "Activity tickets: each resolved ticket is an on-demand intervention (moves no due date), dated by its event, at the ticket's point or the main one");
+            Check(recorded.Count == 3 && recorded[0].Kind == ServiceInterventionKind.OnDemand && recorded[1].Kind == ServiceInterventionKind.OnDemand && recorded.All(item => !item.MovesDue) && recorded[0].PerformedOn == new DateOnly(2026, 3, 2) && recorded[0].WorkPointId == depot.Id && recorded[1].WorkPointId == main.Id && recorded[2].WorkPointId == main.Id && recorded[2].Kind == ServiceInterventionKind.Maintenance && recorded[2].ContractId is null && recorded[2].Notes.Contains("nu are un contract de mentenanta activ", StringComparison.Ordinal),
+                "Activity tickets: once taken, a ticket is a service on demand or a maintenance (without a contract here: no contract, no due date moved), dated by its event, at the ticket's point or the one chosen");
             Check(recorded[0].Notes.Contains("Problema: Nu merge internetul", StringComparison.Ordinal) && recorded[0].Notes.Contains("Rezolvare: S-a schimbat routerul", StringComparison.Ordinal) && recorded[0].Notes.Contains("Executant: Ion Popescu", StringComparison.Ordinal)
                 && recorded[1].Notes.Contains("Rezolvare: Am reinstalat tot", StringComparison.Ordinal), "Activity tickets: the notes tell the problem, the resolution (what was added, or the whole rewritten report) and the executor");
-            Check(await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id IN (8001, 8002)") == 2
+            Check(await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id IN (8001, 8002, 8003)") == 3
                 && await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id=8001 AND problem='Nu merge internetul' AND resolution='S-a schimbat routerul' AND report='Nu merge internetul\nS-a schimbat routerul' AND executor='Ion Popescu' AND ticket_number='T-8001'") == 1
-                && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='ticket'") == 2, "Activity tickets: the problem, the resolution, the original report and the executor are kept apart, and the ties are remembered");
+                && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='ticket'") == 3, "Activity tickets: the problem, the resolution, the original report and the executor are kept apart, and the ties are remembered");
             var issues = await partners.GetOpenIssuesAsync();
             Check(issues.Count(issue => issue.Entity == "ticket") == 1 && issues.Single(issue => issue.Entity == "ticket").SourceId == 8005, "Activity tickets: the ticket with a date in the future is an open problem");
 
             var again = await tickets.ApplyAsync();
-            Check(again.Tickets is { Create: 0, AlreadyLinked: 2 } && (await interventions.GetForBeneficiaryAsync(beneficiary.Id)).Count == 2 && (await partners.GetOpenIssuesAsync()).Count(issue => issue.Entity == "ticket") == 1,
+            Check(again.Tickets is { Create: 0, AlreadyLinked: 3 } && (await interventions.GetForBeneficiaryAsync(beneficiary.Id)).Count == 3 && (await partners.GetOpenIssuesAsync()).Count(issue => issue.Entity == "ticket") == 1,
                 "Activity tickets: a second application takes nothing again and does not duplicate the problem");
 
             // The client of a skipped ticket is imported later: the ticket is taken at the next application.
@@ -104,12 +122,94 @@ public static partial class MariaExtendedChecks
             fake.Points = [.. fake.Points, new(7103, 7002, "Str. Noua 2", "Arad", "Arad", "", "", "", true, null)];
             fake.TicketRows = [.. fake.TicketRows, Ticket(8007, 4, 7002, 7103, new DateTime(2026, 5, 1), "Nu merge internetul\nrezolvat")];
             var skipped = await tickets.SimulateAsync();
-            Check(skipped.Tickets is { Skipped: 1, Waiting: 2 } && skipped.Items.Any(item => item.SourceId == 8007 && item.Action == "Waiting" && item.Message.Contains("așteaptă", StringComparison.Ordinal)), "Activity tickets: a ticket whose client is not imported yet waits, not an error");
+            Check(skipped.Tickets is { Skipped: 0, Waiting: 2 } && skipped.Items.Any(item => item.SourceId == 8007 && item.Action == "Waiting" && item.Message.Contains("așteaptă", StringComparison.Ordinal)), "Activity tickets: a ticket whose client is not imported yet waits, not an error");
             Check(await Count("SELECT COUNT(*) FROM activity_import_tickets WHERE ticket_id=8004 AND state='waiting_beneficiary'") == 1, "Activity tickets: a ticket that waits is kept with its data until its client can be taken");
             // The application takes the client of the ticket by itself (no pass over the whole table of partners), verified in ANAF.
             var later = await tickets.ApplyAsync();
-            Check(later.Tickets.Create == 1 && later.NewBeneficiaries == 1 && later.BeneficiariesToVerify == 0 && await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id=8007") == 1
+            Check(later.Tickets.Create == 1 && later.NewBeneficiaries == 1 && later.BeneficiariesToVerify == 0 && await Count("SELECT COUNT(*) FROM activity_import_suggestions WHERE ticket_id=8007 AND status='pending'") == 1
                 && (await beneficiaries.GetBeneficiariesAsync()).Any(item => item.Name == $"Ext Tichete Doi {suffix} SRL" && item.AnafVerified), "Activity tickets: the application takes the client of the ticket on demand and the ticket is taken");
+
+            // Section 6: an extra field is added after the tickets were kept; they are read again, the source records are written again and the notes follow unless an operator edited them.
+            fake.Columns = [.. fake.Columns, new ActivityColumn("Tickete", "Observatii", "nvarchar")];
+            fake.ExtraValues[(8001, "x:Tickete.Observatii")] = "Poarta e inchisa";
+            fake.ExtraValues[(8003, "x:Tickete.Observatii")] = "Cod 4412";
+            var refresh = new MariaActivityTicketRefreshService(configuration, settings, fake, admin, audit, recorder);
+            var lacking = await refresh.CountOutdatedAsync();
+            Check(lacking == 0, "Activity ticket fields: with the default settings no ticket kept lacks anything (" + lacking + ": " + await Scalar<string>(probe, "SELECT COALESCE(GROUP_CONCAT(CONCAT(t.ticket_id, '/', t.state, '/', t.fields_read, '/', COALESCE(s.fields_read, '-'), '/', COALESCE(s.intervention_id, '-')) SEPARATOR ' ; '), '') FROM activity_import_tickets t LEFT JOIN service_intervention_source s ON s.source_ticket_id = t.ticket_id") + ")");
+            var fieldMap = ActivityFieldMap.Create(new Dictionary<string, string>(), [ActivityFieldMap.Executor], new Dictionary<string, string> { [ActivityFieldMap.Report] = ActivityFieldMap.Both },
+                [new ActivityExtraField("Tickete", "Observatii", "Observatii client", ActivityFieldMap.Both)], out _)!;
+            await settings.SaveFieldSettingsAsync(fieldMap);
+            var kept = await Count("SELECT COUNT(*) FROM activity_import_tickets");
+            Check(await refresh.CountOutdatedAsync() == kept && kept >= 5, "Activity ticket fields: after an extra field is added every ticket kept lacks it (the ones kept before the settings existed hold the five usual ones)");
+            await using (var edit = new MySqlCommand("UPDATE service_interventions SET notes = CONCAT(notes, '\nAm sunat clientul') WHERE id = (SELECT intervention_id FROM activity_import_tickets WHERE ticket_id = 8002)", probe)) await edit.ExecuteNonQueryAsync();
+            var taken = await Count("SELECT COUNT(*) FROM service_intervention_source");
+            var refreshed = await refresh.RefreshAsync();
+            Check(refreshed.Outdated == kept && refreshed.Updated == kept && refreshed.NotFound == 0 && refreshed.SourceRecords == taken && refreshed.NotesUpdated == taken - 1 && refreshed.NotesEdited == 1 && refreshed.Problems.Count == 0,
+                $"Activity ticket fields: the tickets kept are read again, the source records of the tickets taken are written again and their notes are updated while the edited one is left ({refreshed.Updated}/{refreshed.SourceRecords}/{refreshed.NotesUpdated}/{refreshed.NotesEdited} of {taken})");
+            async Task<string> NotesOf(long ticket) => await Scalar<string>(probe, $"SELECT notes FROM service_interventions WHERE id = (SELECT intervention_id FROM activity_import_tickets WHERE ticket_id = {ticket})");
+            var notes8001 = await NotesOf(8001);
+            Check(notes8001.Contains("Observatii client: Poarta e inchisa", StringComparison.Ordinal) && notes8001.Contains("Problema: Nu merge internetul", StringComparison.Ordinal) && !notes8001.Contains("Executant", StringComparison.Ordinal)
+                && (await NotesOf(8002)).EndsWith("Am sunat clientul", StringComparison.Ordinal) && !(await NotesOf(8002)).Contains("Observatii client", StringComparison.Ordinal),
+                "Activity ticket fields: the notes that were still the generated ones get the new field (and lose the executor that was switched off); the notes an operator edited are left as they were");
+            Check(await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id=8001 AND extras LIKE '%Poarta e inchisa%' AND fields_read LIKE '%x:Tickete.Observatii%' AND executor=''") == 1
+                && await Count("SELECT COUNT(*) FROM activity_import_tickets WHERE ticket_id=8001 AND extras LIKE '%Poarta e inchisa%' AND fields_read LIKE '%x:Tickete.Observatii%' AND executor=''") == 1,
+                "Activity ticket fields: the extra field is kept with the ticket and with the source record, and the executor switched off is no longer kept");
+            Check(await refresh.CountOutdatedAsync() == 0 && (await refresh.RefreshAsync()).Outdated == 0, "Activity ticket fields: once the tickets hold what the settings ask for nothing is read again");
+            var visible = await new MariaActivityTicketVisibility(configuration).GetAsync();
+            Check(!visible.Executor && visible.Problem && visible.Extras.Single().Label == "Observatii client", "Activity ticket fields: the windows are told what is switched off and the names of the extra fields");
+            var shown = await interventions.GetTicketAsync((int)await Count("SELECT intervention_id FROM activity_import_tickets WHERE ticket_id = 8001"));
+            Check(shown is { Extras: { Count: 1 } } && shown.Extras.Values.Single() == "Poarta e inchisa", "Activity ticket fields: the window of the intervention gets the extra field of the source record");
+            var refreshEvents = (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 200)).Events.Where(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.RefreshActivityTickets).ToList();
+            Check(refreshEvents.Count == 1 && refreshEvents[0].Details.Contains("Observații modificate de operator", StringComparison.Ordinal), "Activity ticket fields: the refresh is in the journal with what it did");
+            await settings.SaveFieldSettingsAsync(ActivityFieldMap.Empty);
+
+            // The example ticket: the newest finished ticket of the chosen types, then the ones before it; every view is in the journal by the number of the ticket (not its content).
+            var newestId = fake.TicketRows.Where(ticket => ticket.TypeId is 4 or 13).Max(ticket => ticket.Id);
+            var newest = await settings.GetTicketSampleAsync(null);
+            var before = newest.Sample is null ? null : await settings.GetTicketSampleAsync(newest.Sample.TicketId);
+            var none = await settings.GetTicketSampleAsync(1);
+            Check(newest.Sample is { } sampleNow && sampleNow.TicketId == newestId && sampleNow.Number == "T-" + newestId && sampleNow.Tables.Select(table => table.Table).SequenceEqual(["Tickete", "EvenimenteAgent"]) && sampleNow.Executor == "Ion Popescu" && sampleNow.HasOlder
+                  && before?.Sample is { } sampleBefore && sampleBefore.TicketId < newestId && none.Sample is null && none.Error!.Contains("mai vechi", StringComparison.Ordinal),
+                "Activity example ticket: the newest finished ticket of the chosen types opens, the previous one is the next older, and there is a message when there is none older");
+            var sampleEvents = (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 200)).Events.Where(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.ViewActivityTicketSample).ToList();
+            Check(sampleEvents.Count >= 2 && sampleEvents.Any(entry => entry.Details.Contains("T-" + newestId, StringComparison.Ordinal)), "Activity example ticket: every view is in the journal by the number of the ticket");
+
+            // The structure of the tickets: a new column notifies, the confirmation of the correspondence ends the notification, a column that goes away notifies and the same structure again ends it.
+            fake.Columns = [.. fake.Columns, new ActivityColumn("Tickete", "Descriere2", "nvarchar")];
+            await tickets.ApplyAsync();
+            var pending = await ActivityTicketStructureStore.PendingAsync(configuration, CancellationToken.None);
+            var alertState = await new MariaActivityImportAlertReader(configuration).GetAsync();
+            var alertInstance = ActivityImportAlertSource.Instances(alertState).SingleOrDefault(instance => instance.ObjectId == ActivityImportAlertSource.TicketStructureId);
+            Check(pending.Added.SequenceEqual(["Tickete.Descriere2", "Tickete.Observatii"]) && alertState.TicketStructureSince is not null && alertInstance is not null && alertInstance.Values[ActivityImportAlertSource.DetailsName].Contains("Tickete.Descriere2", StringComparison.Ordinal),
+                "Activity ticket structure: new columns in the tickets of ActivityApp start a notification that names them");
+            Check((await settings.GetFieldChoicesAsync(false)).StructureChange is { } shownChange && shownChange.Added.Contains("Tickete.Descriere2"), "Activity ticket structure: the correspondence of the fields is shown with what changed");
+            await settings.ConfirmTicketStructureAsync();
+            await tickets.ApplyAsync();
+            Check(!(await ActivityTicketStructureStore.PendingAsync(configuration, CancellationToken.None)).Any && (await new MariaActivityImportAlertReader(configuration).GetAsync()).TicketStructureSince is null
+                  && (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 200)).Events.Any(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.ConfirmActivityTicketStructure),
+                "Activity ticket structure: confirming the correspondence ends the notification (journaled) and the next application finds nothing new");
+            var withoutColumn = fake.Columns;
+            fake.Columns = [.. fake.Columns.Where(column => column.Column != "Descriere2")];
+            await tickets.ApplyAsync();
+            Check((await ActivityTicketStructureStore.PendingAsync(configuration, CancellationToken.None)).Removed.SequenceEqual(["Tickete.Descriere2"]) && (await new MariaActivityImportAlertReader(configuration).GetAsync()).TicketStructureSince is not null,
+                "Activity ticket structure: a column that is gone from the tickets starts the notification");
+            fake.Columns = withoutColumn;
+            await tickets.ApplyAsync();
+            Check(!(await ActivityTicketStructureStore.PendingAsync(configuration, CancellationToken.None)).Any && (await new MariaActivityImportAlertReader(configuration).GetAsync()).TicketStructureSince is null,
+                "Activity ticket structure: when the structure is the same again the notification ends by itself");
+
+            // A piece renamed together with a new extra field: the notes the import wrote (with the old names, kept with the source record) are rebuilt with the new ones; the edited ones stay.
+            fake.ExtraValues[(8001, "x:Tickete.Descriere2")] = "Urgent";
+            var renamed = ActivityFieldMap.Create(new Dictionary<string, string>(), null, null, [new ActivityExtraField("Tickete", "Descriere2", "Descriere client", ActivityFieldMap.Both)], new Dictionary<string, string> { [ActivityFieldMap.Problem] = "Defect" }, out _)!;
+            await settings.SaveFieldSettingsAsync(renamed);
+            var renamedRefresh = await refresh.RefreshAsync();
+            var renamedNotes = await NotesOf(8001);
+            Check(renamedRefresh.Updated > 0 && renamedRefresh.NotesUpdated >= 1 && renamedRefresh.NotesEdited == 1 && renamedNotes.Contains("Defect: Nu merge internetul", StringComparison.Ordinal) && renamedNotes.Contains("Descriere client: Urgent", StringComparison.Ordinal)
+                  && !renamedNotes.Contains("Problema:", StringComparison.Ordinal) && (await NotesOf(8002)).EndsWith("Am sunat clientul", StringComparison.Ordinal),
+                $"Activity ticket fields: a renamed piece and a new extra field are written in the notes the import wrote (the old names are recognised), the edited notes stay ({renamedRefresh.NotesUpdated}/{renamedRefresh.NotesEdited})");
+            Check(await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id=8001 AND notes_labels LIKE '%Defect%' AND notes_labels LIKE '%Descriere client%'") == 1, "Activity ticket fields: the names written in the notes are kept with the source record");
+            await settings.SaveFieldSettingsAsync(ActivityFieldMap.Empty);
+            await settings.ConfirmTicketStructureAsync();
 
             fake.Failure = new ActivitySourceException("ActivityApp nu a răspuns la timp.");
             var down = 0;
@@ -118,8 +218,8 @@ public static partial class MariaExtendedChecks
             Check(down == 1 && await Count("SELECT COUNT(*) FROM activity_import_runs WHERE status='running'") == 0 && (await partners.GetLastRunAsync()) is { Status: "failed" }, "Activity tickets: a source that does not answer ends the run as failed and recorded");
 
             var events = (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 200)).Events.Where(entry => entry.TimestampUtc >= started).ToList();
-            Check(events.Any(entry => entry.Action == AuditActions.SimulateActivityImport && entry.Details.Contains("Tichete rezolvate", StringComparison.Ordinal)) && events.Count(entry => entry.Action == AuditActions.ImportActivityTickets) == 3
-                && events.Any(entry => entry.Action == AuditActions.ImportActivityTickets && entry.Details.Contains("2 preluate", StringComparison.Ordinal)), "Activity tickets: the simulation and each application are in the journal by their exact action, with the counts");
+            Check(events.Any(entry => entry.Action == AuditActions.SimulateActivityImport && entry.Details.Contains("Tichete rezolvate", StringComparison.Ordinal)) && events.Count(entry => entry.Action == AuditActions.ImportActivityTickets) >= 4
+                && events.Any(entry => entry.Action == AuditActions.ImportActivityTickets && entry.Details.Contains("3 puse la validare", StringComparison.Ordinal)), "Activity tickets: the simulation and each application are in the journal by their exact action, with the counts");
             var register = (await audit.QueryAsync(new AuditQuery(Text: $"Ext Tichete {suffix}"), 1, 100)).Events;
             Check(register.Any(entry => entry.Action == AuditActions.RecordOnDemand && entry.ActorUsername == "integration.tester"), "Activity tickets: each intervention is in the journal as a recorded on-demand intervention under the administrator who ran the import");
 
@@ -136,9 +236,10 @@ public static partial class MariaExtendedChecks
                 "Activity tickets: the next run reads only the tickets modified since (one day before the mark), takes the new one and moves the mark; the older one is not read at all");
             await ActivityTicketStore.SetWatermarkAsync(configuration, null, CancellationToken.None);
             var everything = await tickets.ApplyAsync();
-            Check(everything.Tickets is { Create: 0, AlreadyLinked: 3 } && (await Count("SELECT COUNT(*) FROM service_intervention_source WHERE source_ticket_id IN (8100, 8101, 8102)")) == 3, "Activity tickets: after the mark is cleared everything is read again and nothing is taken twice");
+            Check(everything.Tickets is { Create: 0, AlreadyLinked: 3 } && await Count("SELECT COUNT(*) FROM activity_import_suggestions WHERE ticket_id IN (8100, 8101, 8102)") == 3 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='ticket' AND source_id IN (8100, 8101, 8102)") == 0,
+                "Activity tickets: after the mark is cleared everything is read again and nothing is put in the queue twice");
 
-            var denied = new MariaActivityTicketImportService(configuration, settings, fake, recorder, workPoints, new TestAccessControl(false, "operator.ext"), audit);
+            var denied = new MariaActivityTicketImportService(configuration, settings, fake, workPoints, new TestAccessControl(false, "operator.ext"), audit);
             var refusals = 0;
             foreach (var operation in new Func<Task>[] { () => denied.SimulateAsync(), () => denied.ApplyAsync() })
                 try { await operation(); } catch (AccessDeniedException) { refusals++; }
@@ -157,9 +258,9 @@ public static partial class MariaExtendedChecks
                 && (await settings.GetFieldMapAsync()).Columns.Single().Value == "Detalii" && await Scalar<string>(probe, "SELECT field_map FROM activity_import_settings WHERE id = 1") == "{\"Tickete.DescriptionInternal\":\"Detalii\"}",
                 "Activity field map: the saved choice is stored (only what differs from the default) and the reading of the tickets uses the chosen column");
             var mapEvents = (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 200)).Events.Where(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.SetActivityFieldMap).ToList();
-            Check(mapEvents.Count == 1 && mapEvents[0].Details.Contains("Detalii", StringComparison.Ordinal), "Activity field map: the change is journaled by name with the old and the new value");
+            Check(mapEvents.Count(entry => entry.Details.Contains("Detalii", StringComparison.Ordinal)) == 1 , "Activity field map: the change is journaled by name with the old and the new value");
             await settings.SaveFieldMapAsync(new Dictionary<string, string> { ["Tickete.DescriptionInternal"] = "Detalii" });
-            Check((await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 200)).Events.Count(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.SetActivityFieldMap) == 1, "Activity field map: saving the same choice again journals nothing");
+            Check((await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 200)).Events.Count(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.SetActivityFieldMap) == mapEvents.Count, "Activity field map: saving the same choice again journals nothing");
             var refused = 0;
             try { await settings.SaveFieldMapAsync(new Dictionary<string, string> { ["Tickete.Subject"] = "x; DROP" }); } catch (ActivityImportException) { refused++; }
             try { await settings.SaveFieldMapAsync(new Dictionary<string, string> { ["Tickete.Nimic"] = "Subject" }); } catch (ActivityImportException) { refused++; }
@@ -181,7 +282,7 @@ public static partial class MariaExtendedChecks
         }
         finally
         {
-            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords" }) await Exec(probe, "DELETE FROM " + table);
+            foreach (var table in new[] { "activity_import_map", "activity_import_issues", "activity_import_runs", "activity_import_types", "activity_import_settings", "activity_import_partner_checks", "activity_import_tickets", "activity_import_suggestions", "activity_import_keywords", "service_intervention_source" }) await Exec(probe, "DELETE FROM " + table);
         }
     }
 }

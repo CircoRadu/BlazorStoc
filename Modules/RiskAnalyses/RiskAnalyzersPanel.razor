@@ -1,0 +1,109 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Services
+@inject IRiskAnalyzerRepository Repository
+@inject IAccessControl Access
+@inject ILogger<RiskAnalyzersPanel> Logger
+@implements IDisposable
+
+<p class="muted" style="margin:16px 0 8px">Analizorii de risc: persoanele sau firmele care întocmesc analizele de risc la securitate. Analiza de risc nouă își alege analizorul din această listă. Un analizor folosit de o analiză nu se poate șterge.</p>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Analizori de risc <span class="count-badge">@items.Count</span></h2>
+        <span class="heading-actions"><HelpButton Topic="nomenclator-analizor-risc" About="Nomenclatorul analizorilor de risc" />
+        @if (canAdd) { <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="OpenAdd">+ Adaugă analizor</button> }</span></div>
+    @if (loading)
+    {
+        <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div>
+    }
+    else if (items.Count == 0)
+    {
+        <div class="empty-state"><span class="empty-icon">▦</span><h3>Nu există analizori de risc</h3><p>Adaugă primul analizor cu butonul de mai sus.</p></div>
+    }
+    else
+    {
+        <Paged Items="items" Id="risk-analyzers-size" Context="pageRows">
+        <div class="table-scroll"><table id="risk-analyzers-table"><thead><tr><th>DENUMIRE</th><th>OBSERVAȚII</th><th>ANALIZE</th><th></th></tr></thead><tbody>
+        @foreach (var item in pageRows)
+        {
+            <tr @key="item.Id" id="@($"risk-analyzer-{item.Id}")">
+                <td><strong>@item.Name</strong></td>
+                <td>@item.Notes</td>
+                <td>@item.UsedBy</td>
+                <td>
+                    @if (canEdit) { <button type="button" class="row-icon edit" aria-label="@($"Editează analizorul {item.Name}")" title="@($"Editează analizorul {item.Name}")" disabled="@busy" @onclick="() => editing = item"></button> }
+                    @if (canDelete) { <button type="button" class="row-icon delete" aria-label="@($"Șterge analizorul {item.Name}")" title="@(item.UsedBy > 0 ? $"Analizorul {item.Name} este folosit de {item.UsedBy} analize și nu poate fi șters" : $"Șterge analizorul {item.Name}")" disabled="@(busy || item.UsedBy > 0)" @onclick="() => { deleteError = null; deleting = item; }"></button> }
+                </td>
+            </tr>
+        }
+        </tbody></table></div>
+        </Paged>
+    }
+</section>
+
+@if (adding || editing is not null)
+{
+    <RiskAnalyzerDialog @key="editing?.Id ?? 0" Original="editing" Saved="SavedAsync" Closed="CloseDialog" />
+}
+@if (deleting is not null)
+{
+    <DeleteConfirmationDialog Title="Ștergi analizorul de risc?" Subject="Analizorul de risc" ObjectLabel="@deleting.Name" Busy="busy" Error="@deleteError"
+                              ConfirmationNote="Operația va șterge analizorul din nomenclator și va fi înregistrată în jurnal."
+                              Confirmed="DeleteAsync" Cancelled="CancelDelete" />
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private List<RiskAnalyzer> items = [];
+    private bool loading = true, busy, adding, canAdd, canEdit, canDelete;
+    private string? error, notice, deleteError;
+    private RiskAnalyzer? editing, deleting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        canAdd = await Access.HasAsync("nomenclator.add");
+        canEdit = await Access.HasAsync("nomenclator.edit");
+        canDelete = await Access.HasAsync("nomenclator.delete");
+        await LoadAsync();
+        loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        try { items = [.. await Repository.GetAllAsync(lifetime.Token)]; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is RiskAnalyzerOperationException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Risk analyzers loading failed ({ErrorType}).", ex.GetType().Name); error = "Lista analizorilor nu a putut fi încărcată. Reîncarcă pagina."; }
+    }
+
+    private void OpenAdd() { notice = error = null; editing = null; adding = true; }
+    private void CloseDialog() { adding = false; editing = null; }
+    private Task CancelDelete() { deleting = null; return Task.CompletedTask; }
+
+    private async Task SavedAsync(RiskAnalyzer saved)
+    {
+        var added = adding;
+        CloseDialog();
+        error = null; notice = added ? "Analizorul a fost adăugat." : "Analizorul a fost modificat.";
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(string reason)
+    {
+        if (deleting is not { } target || busy) return;
+        busy = true; deleteError = null;
+        try
+        {
+            await Repository.DeleteAsync(target, reason, lifetime.Token);
+            deleting = null; error = null; notice = "Analizorul a fost șters.";
+            await LoadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is RiskAnalyzerOperationException or AccessDeniedException) { deleteError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Risk analyzer deleting failed ({ErrorType}).", ex.GetType().Name); deleteError = "Analizorul nu a putut fi șters."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

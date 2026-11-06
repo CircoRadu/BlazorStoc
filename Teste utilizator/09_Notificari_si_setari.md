@@ -1,8 +1,18 @@
-# Notificari si Setari (/notificari, /setari)
+﻿# Notificari si Setari (/notificari, /setari)
 
 Fluxul: Setari (administrator: ANAF, notificari, harta, Facturi) -> sabloane de notificari -> /notificari arata alertele active, rezolvate si ordonate dupa urgenta; meniul are un contor.
 
 ## Modificari de testat
+
+### 05.11.2026 - Setari -> Preluare Elcomtur: preluare automata a backup-ului Elcomtur
+**Ce s-a adaugat:** tab nou "Preluare Elcomtur" in Setari (langa "Preluare ActivityApp", doar administrator): comutator On/Off "Preluare automata", directorul cu backup-urile Elcomtur (cale de retea \\server\partajare\folder cu cont si parola, sau director local), masca numelui de fisier (ex. *elcomtur*), firma de preluat (aleasa din firmele backup-ului, cu numele: "firma1 - Electric Standard Prest SRL"), pragul de alerta in zile, butoanele Salveaza, Testeaza conexiunea, Citeste firmele din backup, Verifica acum si Preia ultimul backup acum. In fiecare zi la 04:00 se cauta in director cel mai recent fisier care corespunde mastii; daca e mai nou decat ultima preluare se copiaza pe server, se verifica integritatea tuturor fisierelor din arhiva si se preiau balantele. Pe server raman ultimele 2 backup-uri preluate. Operatiile sunt jurnalizate (Modificare setari preluare automata Elcomtur, Testare director backup Elcomtur, Verificare backup Elcomtur, Preluare automata backup Elcomtur, Esec preluare automata Elcomtur) si au notificari: "Elcomtur: backup preluat" (ramane 3 zile), "Elcomtur: preluare esuata" (cu cauza, se inchide la prima verificare reusita) si "Elcomtur: backup lipsa" (cand de pragul de zile nu a aparut un backup nou; se inchide la urmatoarea preluare, si cea manuala).
+**Ce face acum:** o singura incercare pe zi (la 04:00 sau la prima pornire a serverului dupa aceea); "Verifica acum" face aceeasi verificare oricand (preia numai un fisier mai nou decat ultima preluare), iar "Preia ultimul backup acum" preia cel mai recent fisier chiar daca nu e mai nou. Un fisier modificat acum mai putin de 5 minute nu se preia (programul Elcomtur il scrie inca). Un fisier corupt nu se preia: balantele raman cele vechi si apare notificarea de esec.
+Pasi: Setari -> Preluare Elcomtur -> completeaza directorul, contul si parola (pentru NAS), masca -> Testeaza conexiunea -> Citeste firmele din backup si alege firma -> pune Preluare automata pe Activ -> Salveaza -> Verifica acum: backup-ul se preia, apare "Elcomtur: backup preluat" in Notificari; Verifica acum a doua oara: "Nu exista un backup mai nou"; schimba masca in una fara potrivire -> Verifica acum: mesaj de eroare + notificarea de esec; revino la masca buna -> notificarea de esec se inchide singura. Pentru alerta de lipsa: pune pragul la 1 zi si asteapta sa treaca o zi fara backup nou (sau ruleaza pe o instanta de test cu data schimbata).
+
+### 05.11.2026 - Backup NAS: fiecare backup in subdirector propriu
+**Ce s-a adaugat:** copierea pe NAS pune fiecare pachet de backup intr-un subdirector al partajarii, numit ca pachetul fara extensie (ex. \\nas\backup\Pachet-X\Pachet-X.zip cu Pachet-X.zip.sha256 alaturi).
+**Ce face acum:** la urmatorul backup (sau "Copiaza pachetele lipsa") apare un subdirector nou pe NAS pentru fiecare pachet. Pachetele copiate inainte de aceasta schimbare raman in radacina partajarii, nu se copiaza a doua oara si nu se muta; lista pachetelor de pe NAS si aducerea unui pachet de pe NAS le gasesc si pe ele, si pe cele din subdirectoare.
+Pasi: Setari -> Backup NAS -> fa un backup manual -> pe partajare apare subdirectorul pachetului cu .zip si .sha256 in el; repeta copierea: nu se mai copiaza nimic; din lista de pe NAS adu un pachet vechi (din radacina) si unul nou (din subdirector).
 
 ### 24.10.2026 - Tema intunecata, iconite pe tile-urile Setarilor, bara verde pe meniuri si taburi
 
@@ -324,7 +334,7 @@ Pasi:
 |---|---|---|
 | 1 | Deschide Setari -> Notificari -> Sabloane notificari | Taburile de categorii; fiecare cu cel putin un sablon activ |
 | 2 | Tabul "Stoc" -> Editeaza un sablon, schimba textul, salveaza | Modificarea apare in lista tabului |
-| 3 | Sterge un sablon, repornește aplicatia | Sablonul sters nu reapare |
+| 3 | Sterge un sablon, reporneste aplicatia | Sablonul sters nu reapare |
 | 4 | Deschide Jurnal, filtreaza "Adaugare sablon notificare" | Sabloanele de pornire apar create de "sistem" |
 
 ### 08.10.2026 - Trei notificari noi de stoc
@@ -410,3 +420,51 @@ Pasi:
 | 1 | Setari -> Actualizare, alege un .bsu de pe telefon | Procentul creste pana la 100%, apoi apare raportul pachetului | |
 | 2 | Alege un fisier care nu este .bsu | Mesaj de eroare clar, fara blocare | |
 | 3 | Fara dreptul de aplicare a actualizarilor | Mesaj ca nu ai dreptul | |
+
+## Modificari de testat - notificari agregate, taburi de validare si paginare (30.10.2026, versiunile 0.5.33-0.5.36)
+
+**Ce s-a adaugat:** o singura notificare agregata pentru tichetele de validat si una pentru beneficiarii de verificat; taburile „Tichete de validat" si „Beneficiari de validat" (rosii cand sunt elemente de rezolvat, vizibile pe baza permisiunilor `mentenanta.validare` / `beneficiari.validare`); paginare la tabelele de notificari.
+**Ce face acum:** bannerele de sus arata cate elemente asteapta si se actualizeaza dupa rezolvare; tabelele (active, rezolvate) au selector de rand pe pagina.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Notificari cu tichete in coada | Tab rosu cu numarul si banner „Sunt X tichete de validat" | |
+| 2 | Valideaza un tichet | Numarul si textul bannerului scad | |
+| 3 | Operator cu permisiunea de validare | Vede tabul si poate valida | |
+| 4 | Lista cu peste 10 notificari | Selector rand pe pagina sub tabel | |
+
+## Modificari de testat - taburi ActivityApp si module oprite (04.11.2026, Notifications 1.2.0)
+
+**Ce s-a adaugat:** tab nou "Probleme import" in Notificari; "Tichete de validat" arata si tichetele discardate. Panourile de backup si de jurnal din Setari, cautarea ANAF din formularele de beneficiar/furnizor si legarea intrarii de factura au mesaje clare cand modulul lor e oprit.
+**Ce face acum:** vezi pasii.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Notificari -> "Probleme import" | Se vad problemele deschise | |
+| 2 | Opreste modulul Preluare ActivityApp (Setari -> Module), deschide taburile | "Secțiunea nu este disponibila momentan (modul indisponibil)" | |
+| 3 | Opreste ANAF, adauga beneficiar si apasa preluarea din ANAF | Mesaj "Modulul ANAF este oprit..."; formularul ramane utilizabil manual | |
+| 4 | Opreste Backup, deschide Setari -> Backup | Mesaj de modul indisponibil | |
+| 5 | Porneste la loc toate modulele | Totul revine | |
+
+## Modificari de testat - tabul Balante restante rosu cu numar (04.11.2026, Elcomtur 1.1.0)
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Dupa o preluare Elcomtur cu beneficiari cu sold pozitiv, deschide Notificari | Tabul "Balante restante" este rosu si arata numarul de beneficiari restanti | |
+| 2 | Fara beneficiari restanti | Tabul nu e rosu si arata 0 | |
+
+## Modificari de testat - HTTPS prin proxy (06.11.2026, branch claude/https)
+
+**Ce s-a adaugat:** card nou "HTTPS prin proxy" in Setari -> Baza de date -> Conexiune (sub cardul Aplicatia): comutator Pornit/Oprit (implicit Oprit) si lista IP-urilor sau retelelor proxy-ului (nginx). Antete de securitate (nosniff, X-Frame-Options, frame-ancestors) pe toate raspunsurile.
+**Ce face acum:** cu comutatorul Oprit aplicatia merge pe HTTP exact ca pana acum. Pornit, aplicatia accepta antetele X-Forwarded-For si X-Forwarded-Proto doar de la IP-urile listate, cookie-urile devin Secure (autentificarea directa pe HTTP la portul aplicatiei nu mai merge) si trimite HSTS pe raspunsurile https. Setarea se aplica la urmatoarea pornire.
+
+| Pas | Ce faci | Rezultat asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Baza de date, deruleaza la cardul "HTTPS prin proxy" | Comutator Oprit, caseta de IP goala | |
+| 2 | Porneste comutatorul si apasa Salveaza fara IP | Eroare: scrie cel putin un IP | |
+| 3 | Scrie `abc` si Salveaza | Eroare: nu este o adresa IP valida | |
+| 4 | Scrie IP-ul proxy-ului (cum il vede VM-ul), Salveaza, parola de administrator | Mesaj ca se aplica la urmatoarea pornire; in Jurnal apare "Modificare HTTPS prin proxy" cu valorile vechi si noi | |
+| 5 | Apasa "Reporneste aplicația" din cardul Aplicatia | Aplicatia revine; deschide adresa https a proxy-ului (nginx) | |
+| 6 | Autentifica-te prin adresa https | Login reuseste, sesiunea se pastreaza, paginile se incarca fara reconectari | |
+| 7 | Deschide direct `http://ip-vm:port` din alt calculator | Autentificarea nu reuseste (cookie Secure): accesul se face doar prin proxy | |
+| 8 | Opreste comutatorul, salveaza, reporneste | Aplicatia functioneaza din nou pe HTTP direct | |

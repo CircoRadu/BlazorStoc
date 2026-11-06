@@ -3,19 +3,29 @@ using MySqlConnector;
 
 namespace BlazorStoc.Modules.ActivityImport;
 
-// A ticket whose closing text mentions a maintenance keyword (a word found exactly, or one that only resembles it: tickets are also closed from the mobile application) at a point under an
-// active maintenance contract is added at once to the interventions of the beneficiary, on demand, and proposed to the operator: a text with the word may say that the maintenance could NOT be
-// done ("mentenanța nu s-a putut face pentru că..."), which no program can read. The administrator is told by a notification and, in Setari -> Preluare ActivityApp, says for each ticket:
-//   - the maintenance was done: the intervention becomes a maintenance one (the next due date moves by the cycle of the contract);
-//   - it was not (or not the maintenance): it stays on demand;
-//   - discard: the intervention is deleted and the ticket is never taken again (it is marked in the database so that a new synchronization does not read it; it can be reactivated).
-// A decision is kept and never asked again.
+// The queue of the events to validate: EVERY resolved ticket of the chosen types waits here (nothing is recorded by itself). The ticket shows what it looks like (a type taken as maintenance, a
+// maintenance keyword in what was done - exact, or one that only resembles it, as tickets are also closed from the mobile application - or a plain service). An operator (the administrator, or who
+// holds the permission to validate tickets) opens it, takes it as it is, or edits it first (category, work point, date, notes) and takes it; only then the intervention is recorded: maintenance (even
+// when the point has no active contract yet: it then has no contract and moves no due date) or a service on demand. Or discards it: the ticket is marked in the database and never read again
+// (it can be reactivated). A decision is kept and never asked again.
 
 public sealed record ActivityReviewItem(long Id, long TicketId, string TicketNumber, string Title, string Beneficiary, string WorkPoint, string Resolution, string Keyword, string Found,
     DateOnly PerformedOn, DateTime CreatedUtc, string Kind = "approximate", bool InRegister = false);
 
-/// <summary>What the operator decides about a ticket proposed for validation.</summary>
+/// <summary>What the operator decides about a ticket in the queue (taking it as it is: maintenance or service on demand, or discarding it).</summary>
 public enum ReviewDecision { Maintenance, OnDemand, Discard }
+
+/// <summary>The category an operator gives a ticket when taking it.</summary>
+public enum ReviewCategory { Maintenance, Service }
+
+public sealed record ReviewWorkPoint(int Id, string Name, string Address);
+
+/// <summary>Everything the popup of a ticket shows and the editor starts from: the ticket as read from ActivityApp, the points of the beneficiary, the notes each category would get.</summary>
+public sealed record ActivityReviewDetail(ActivityReviewItem Item, int BeneficiaryId, int WorkPointId, TicketSource Source, IReadOnlyList<ReviewWorkPoint> WorkPoints, bool Covered,
+    string NotesService, string NotesMaintenance, ReviewCategory Proposed, bool Legacy);
+
+/// <summary>An edit + take: what the operator chose for the intervention that is recorded.</summary>
+public sealed record ReviewTakeInput(ReviewCategory Category, int WorkPointId, DateOnly PerformedOn, string? Notes);
 
 /// <summary>A ticket discarded by the operator (never read again unless it is reactivated).</summary>
 public sealed record ActivityDiscardedTicket(long TicketId, string TicketNumber, string Title, string DiscardedBy, DateTime DiscardedUtc, bool CanReactivate);
@@ -24,29 +34,24 @@ public interface IActivityReviewService
 {
     /// <summary>The tickets waiting for the decision, oldest first.</summary>
     Task<IReadOnlyList<ActivityReviewItem>> GetPendingAsync(CancellationToken cancellationToken = default);
-    /// <summary>The decision on one ticket. Journaled by name; a decision already taken is an <see cref="ActivityImportException"/>.</summary>
+    /// <summary>One ticket of the queue with what the popup needs.</summary>
+    Task<ActivityReviewDetail> GetDetailAsync(long id, CancellationToken cancellationToken = default);
+    /// <summary>"Preluare" as it is (maintenance or service on demand) or a discard. Journaled by name; a decision already taken is an <see cref="ActivityImportException"/>.</summary>
     Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default);
+    /// <summary>Edit + take: records the intervention with what the operator chose.</summary>
+    Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default);
     /// <summary>The tickets discarded, newest first.</summary>
     Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default);
+    /// <summary>The ticket as read from ActivityApp, to view a discarded one (read only).</summary>
+    Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default);
     /// <summary>A discarded ticket is taken again by the next synchronization.</summary>
     Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default);
 }
 
-/// <summary>What the import keeps about the tickets to validate (the decisions are read by the planner; the proposals are written by the application of the tickets).</summary>
+/// <summary>What the import keeps about the tickets to validate (the proposals are written by the application of the tickets).</summary>
 public static class ActivityReviewStore
 {
     public const string Pending = "pending", Confirmed = "confirmed", Rejected = "rejected", Discarded = "discarded";
-
-    /// <summary>The decisions taken, by ticket (a pending or a discarded one is not a decision: a discarded ticket is left out by its own state).</summary>
-    public static async Task<IReadOnlyDictionary<long, KeywordDecision>> DecisionsAsync(IConfiguration configuration, CancellationToken cancellationToken)
-    {
-        var result = new Dictionary<long, KeywordDecision>();
-        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("SELECT ticket_id, status FROM activity_import_suggestions WHERE status IN ('confirmed', 'rejected')", connection);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) result[reader.GetInt64(0)] = reader.GetString(1) == Confirmed ? KeywordDecision.Confirmed : KeywordDecision.Rejected;
-        return result;
-    }
 
     /// <summary>Stores the proposal for a ticket (once: a ticket already proposed or decided is left as it is, only its intervention is completed). Returns whether a row was written.</summary>
     public static async Task<bool> AddAsync(IConfiguration configuration, TicketPlan plan, int? interventionId, CancellationToken cancellationToken)
@@ -74,14 +79,31 @@ public static class ActivityReviewStore
         return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) > 0;
     }
 
+    /// <summary>Takes out of the queue the tickets proposed as service without any keyword (an earlier rule put them there): they are not tickets to validate. Returns how many.</summary>
+    public static async Task<int> RemoveUnmatchedServiceAsync(IConfiguration configuration, CancellationToken cancellationToken)
+    {
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var tickets = new MySqlCommand("""
+            DELETE t FROM activity_import_tickets t JOIN activity_import_suggestions s ON s.ticket_id = t.ticket_id
+            WHERE s.status = 'pending' AND s.kind = 'service' AND s.intervention_id IS NULL AND t.state = 'pending_approval'
+            """, connection);
+        await tickets.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await using var suggestions = new MySqlCommand("DELETE FROM activity_import_suggestions WHERE status = 'pending' AND kind = 'service' AND intervention_id IS NULL", connection);
+        return await suggestions.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private static string Cut(string value, int length) => value.Length > length ? value[..length] : value;
 }
 
 public sealed class MariaActivityReviewService(IConfiguration configuration, IAccessControl access, IAuditTrail audit, IOnDemandInterventionRecorder? interventions = null) : IActivityReviewService
 {
+    // The administrator (Setari -> Preluare ActivityApp) or an operator who holds the permission to validate tickets (Mentenanta -> Validare tichete ActivityApp).
+    private static readonly string[] ViewKeys = ["setari-import-activityapp.view", "mentenanta.validare"];
+    private static readonly string[] DecideKeys = ["setari-import-activityapp.run", "mentenanta.validare"];
+
     public async Task<IReadOnlyList<ActivityReviewItem>> GetPendingAsync(CancellationToken cancellationToken = default)
     {
-        await access.EnsureAsync("setari-import-activityapp.view", cancellationToken).ConfigureAwait(false);
+        await access.EnsureAnyAsync(ViewKeys, cancellationToken).ConfigureAwait(false);
         return await ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false);
     }
 
@@ -103,16 +125,16 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         return items;
     }
 
-    private sealed record Row(long Id, long TicketId, int BeneficiaryId, int WorkPointId, DateOnly PerformedOn, string Keyword, int? InterventionId, string Status);
+    private sealed record Row(long Id, long TicketId, int BeneficiaryId, int WorkPointId, DateOnly PerformedOn, string Keyword, int? InterventionId, string Status, string Kind);
 
     private async Task<Row?> FindAsync(long id, CancellationToken cancellationToken)
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("SELECT id, ticket_id, beneficiary_id, work_point_id, performed_on, keyword, intervention_id, status FROM activity_import_suggestions WHERE id=@id", connection);
+        await using var command = new MySqlCommand("SELECT id, ticket_id, beneficiary_id, work_point_id, performed_on, keyword, intervention_id, status, kind FROM activity_import_suggestions WHERE id=@id", connection);
         command.Parameters.AddWithValue("@id", id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         return await reader.ReadAsync(cancellationToken).ConfigureAwait(false)
-            ? new Row(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt32(2), reader.GetInt32(3), DateOnly.FromDateTime(reader.GetDateTime(4)), reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetInt32(6), reader.GetString(7))
+            ? new Row(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt32(2), reader.GetInt32(3), DateOnly.FromDateTime(reader.GetDateTime(4)), reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetInt32(6), reader.GetString(7), reader.GetString(8))
             : null;
     }
 
@@ -124,65 +146,159 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<ActivityReviewDetail> GetDetailAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAnyAsync(ViewKeys, cancellationToken).ConfigureAwait(false);
+        var item = (await ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false)).FirstOrDefault(entry => entry.Id == id)
+            ?? throw new ActivityImportException("Tichetul nu mai așteaptă validarea (a fost decis între timp). Actualizează lista.");
+        var row = await FindAsync(id, cancellationToken).ConfigureAwait(false) ?? throw new ActivityImportException("Tichetul nu mai așteaptă validarea. Actualizează lista.");
+        var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
+        var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+        // The window shows what the ticket holds (hiding what the settings switch off); the notes are made with the settings.
+        var source = stored is null ? new TicketSource(row.TicketId, 0, 0, item.TicketNumber, item.Title, "", item.Resolution, item.Resolution, "") : ActivityTicketPlanner.SourceOf(stored.Ticket);
+        var forNotes = stored is null ? source : ActivityTicketPlanner.SourceOf(stored.Ticket, map);
+        var points = new List<ReviewWorkPoint>();
+        await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
+        await using (var command = new MySqlCommand("SELECT id, name, address FROM beneficiary_work_points WHERE beneficiary_id=@id ORDER BY is_primary DESC, name", connection))
+        {
+            command.Parameters.AddWithValue("@id", row.BeneficiaryId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) points.Add(new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+        }
+        var covered = false;
+        try { covered = interventions is not null && await interventions.IsCoveredAsync(row.BeneficiaryId, row.WorkPointId, cancellationToken).ConfigureAwait(false); }
+        catch (ModuleUnavailableException) { }
+        var keyword = item.Keyword;
+        return new ActivityReviewDetail(item, row.BeneficiaryId, row.WorkPointId, source, points, covered,
+            ActivityTicketPlanner.Notes(forNotes, map, keyword, false),
+            ActivityTicketPlanner.Notes(forNotes, map, keyword, true, !covered),
+            item.Kind == ActivityTicketPlanner.ServiceKind ? ReviewCategory.Service : ReviewCategory.Maintenance, row.InterventionId is not null);
+    }
+
+    // "Preluare" as it is: the category chosen, everything else as the ticket proposes it. A discard asks nothing more.
     public async Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default)
     {
-        await access.EnsureAsync("setari-import-activityapp.run", cancellationToken).ConfigureAwait(false);
+        if (decision == ReviewDecision.Discard) { await DiscardAsync(id, cancellationToken).ConfigureAwait(false); return; }
+        var detail = await GetDetailAsync(id, cancellationToken).ConfigureAwait(false);
+        var category = decision == ReviewDecision.Maintenance ? ReviewCategory.Maintenance : ReviewCategory.Service;
+        await TakeAsync(id, new ReviewTakeInput(category, detail.WorkPointId, detail.Item.PerformedOn, category == ReviewCategory.Maintenance ? detail.NotesMaintenance : detail.NotesService), cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAnyAsync(DecideKeys, cancellationToken).ConfigureAwait(false);
+        if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new ActivityImportException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
+        if (interventions is null) throw new ActivityImportException("Modulul Mentenanță nu este disponibil.");
+        var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
+        var item = (await ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false)).FirstOrDefault(entry => entry.Id == id);
+        var row = await FindAsync(id, cancellationToken).ConfigureAwait(false);
+        if (item is null || row is null || row.Status != ActivityReviewStore.Pending) throw new ActivityImportException("Tichetul nu mai așteaptă validarea (a fost decis între timp). Actualizează lista.");
+        var notes = TextNormalization.ForStorage((input.Notes ?? "").Replace("\r\n", "\n"));
+        if (notes.Length > OnDemandInterventionRules.NotesMaximumLength) throw new ActivityImportException($"Observațiile pot avea cel mult {OnDemandInterventionRules.NotesMaximumLength} de caractere.");
+        var maintenance = input.Category == ReviewCategory.Maintenance;
+        var edited = input.WorkPointId != row.WorkPointId || input.PerformedOn != row.PerformedOn;
+        int interventionId;
+        var gpsNote = "";
+        try
+        {
+            if (row.InterventionId is { } existing)
+            {
+                // A ticket proposed before the approval queue existed already has its on-demand intervention: the maintenance replaces it, the service keeps it.
+                interventionId = maintenance ? await ConvertToMaintenanceAsync(row, item, existing, cancellationToken).ConfigureAwait(false) : existing;
+            }
+            else
+            {
+                interventionId = maintenance
+                    ? await interventions.RecordMaintenanceUncoveredAsync(row.BeneficiaryId, input.WorkPointId, input.PerformedOn, notes, cancellationToken).ConfigureAwait(false)
+                    : await interventions.RecordAsync(row.BeneficiaryId, input.WorkPointId, input.PerformedOn, notes, cancellationToken).ConfigureAwait(false);
+                var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
+                if (stored is not null)
+                {
+                    var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+                    await ActivityTicketSourceStore.WriteAsync(configuration, interventionId, stored.Ticket, map, cancellationToken).ConfigureAwait(false);
+                    gpsNote = await CompleteCoordinatesAsync(input.WorkPointId, stored.Ticket.Gps, cancellationToken).ConfigureAwait(false);
+                    await ActivityTicketStore.SaveAsync(configuration, stored.Ticket, TicketStates.Imported, interventionId, cancellationToken).ConfigureAwait(false);
+                    await ImportStore.WriteMapAsync(configuration, ActivityTicketPlanner.TicketEntity, row.TicketId, interventionId, "created", ActivityTicketPlanner.HashOf(stored.Ticket), cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (ModuleUnavailableException) { throw new ActivityImportException("Modulul Mentenanță este oprit: tichetul se poate prelua după ce pornește."); }
+        catch (OnDemandInterventionOperationException exception) { throw new ActivityImportException(exception.Message); }
+        await ExecuteAsync("UPDATE activity_import_suggestions SET status=@status, decided_by=@by, decided_utc=@now, intervention_id=@intervention WHERE id=@id AND status='pending'", p =>
+        {
+            p.AddWithValue("@status", maintenance ? ActivityReviewStore.Confirmed : ActivityReviewStore.Rejected);
+            p.AddWithValue("@by", actor);
+            p.AddWithValue("@now", DateTime.UtcNow);
+            p.AddWithValue("@intervention", interventionId);
+            p.AddWithValue("@id", id);
+        }, cancellationToken).ConfigureAwait(false);
+        await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.DecideActivityMaintenance, id.ToString(),
+            maintenance ? "Preluare tichet ActivityApp ca mentenanță" : "Preluare tichet ActivityApp ca service la cerere",
+            AuditDetails.Identification(("Tichet", $"{item.TicketNumber} {item.Title}".Trim()), ("Beneficiar", item.Beneficiary.Length > 0 ? item.Beneficiary : "—"), ("Propus ca", item.Kind == ActivityTicketPlanner.ServiceKind ? "service" : "mentenanță"),
+                ("Decizie", maintenance ? "este mentenanță (intervenția devine mentenanță)" : "este service la cerere"), ("Modificat de operator", edited || notes.Length == 0 ? "da" : "nu"), ("Coordonate GPS punct de lucru", gpsNote.Length > 0 ? gpsNote : "neschimbate")), "", cancellationToken).ConfigureAwait(false);
+    }
+
+    // The GPS location of the event completes the work point when the point has none (a point that already has coordinates keeps them); 0, 0 and text that is not a pair are ignored.
+    // Returns what was written, for the journal ("" when nothing changed).
+    private async Task<string> CompleteCoordinatesAsync(int workPointId, string gps, CancellationToken cancellationToken)
+    {
+        if (!WorkPointCoordinates.TryParseLocated(gps, out var latitude, out var longitude)) return "";
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("UPDATE beneficiary_work_points SET latitude=@latitude, longitude=@longitude WHERE id=@id AND (latitude IS NULL OR longitude IS NULL OR (latitude=0 AND longitude=0))", connection);
+        command.Parameters.AddWithValue("@latitude", latitude);
+        command.Parameters.AddWithValue("@longitude", longitude);
+        command.Parameters.AddWithValue("@id", workPointId);
+        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) > 0 ? $"completate din eveniment: {WorkPointCoordinates.Format(latitude, longitude)}" : "";
+    }
+
+    public async Task DiscardAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAnyAsync(DecideKeys, cancellationToken).ConfigureAwait(false);
         if (!MariaDatabaseGuard.IsAllowedDatabase(configuration)) throw new ActivityImportException("Modificările sunt permise numai în baza BlazorStoc. Verifică numele bazei configurate.");
         var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
         var item = (await ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false)).FirstOrDefault(entry => entry.Id == id);
         var row = await FindAsync(id, cancellationToken).ConfigureAwait(false);
         if (item is null || row is null || row.Status != ActivityReviewStore.Pending) throw new ActivityImportException("Tichetul nu mai așteaptă validarea (a fost decis între timp). Actualizează lista.");
-        var outcome = decision switch { ReviewDecision.Maintenance => ActivityReviewStore.Confirmed, ReviewDecision.OnDemand => ActivityReviewStore.Rejected, _ => ActivityReviewStore.Discarded };
         try
         {
-            switch (decision)
-            {
-                case ReviewDecision.Maintenance when row.InterventionId is { } onDemand:
-                    await ConvertToMaintenanceAsync(row, item, onDemand, cancellationToken).ConfigureAwait(false);
-                    break;
-                case ReviewDecision.Discard:
-                    if (row.InterventionId is { } created && interventions is not null) await interventions.DeleteAsync(row.BeneficiaryId, created, "Discard tichet ActivityApp.", cancellationToken).ConfigureAwait(false);
-                    await ExecuteAsync("DELETE FROM service_intervention_source WHERE source_ticket_id=@ticket", p => p.AddWithValue("@ticket", row.TicketId), cancellationToken).ConfigureAwait(false);
-                    await ExecuteAsync("DELETE FROM activity_import_map WHERE entity='ticket' AND source_id=@ticket", p => p.AddWithValue("@ticket", row.TicketId), cancellationToken).ConfigureAwait(false);
-                    await ActivityTicketStore.DiscardAsync(configuration, row.TicketId, actor, cancellationToken).ConfigureAwait(false);
-                    break;
-            }
+            if (row.InterventionId is { } created && interventions is not null) await interventions.DeleteAsync(row.BeneficiaryId, created, "Discard tichet ActivityApp.", cancellationToken).ConfigureAwait(false);
         }
         catch (ModuleUnavailableException) { throw new ActivityImportException("Modulul Mentenanță este oprit: decizia se poate lua după ce pornește."); }
         catch (OnDemandInterventionOperationException exception) { throw new ActivityImportException(exception.Message); }
+        await ExecuteAsync("DELETE FROM service_intervention_source WHERE source_ticket_id=@ticket", p => p.AddWithValue("@ticket", row.TicketId), cancellationToken).ConfigureAwait(false);
+        await ExecuteAsync("DELETE FROM activity_import_map WHERE entity='ticket' AND source_id=@ticket", p => p.AddWithValue("@ticket", row.TicketId), cancellationToken).ConfigureAwait(false);
+        await ActivityTicketStore.DiscardAsync(configuration, row.TicketId, actor, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE activity_import_suggestions SET status=@status, decided_by=@by, decided_utc=@now WHERE id=@id AND status='pending'", p =>
         {
-            p.AddWithValue("@status", outcome);
+            p.AddWithValue("@status", ActivityReviewStore.Discarded);
             p.AddWithValue("@by", actor);
             p.AddWithValue("@now", DateTime.UtcNow);
             p.AddWithValue("@id", id);
         }, cancellationToken).ConfigureAwait(false);
-        var (action, title, text) = decision switch
-        {
-            ReviewDecision.Maintenance => (AuditActions.DecideActivityMaintenance, "Validare tichet ActivityApp ca mentenanță", "este mentenanță (intervenția devine mentenanță)"),
-            ReviewDecision.OnDemand => (AuditActions.DecideActivityMaintenance, "Validare tichet ActivityApp: nu este mentenanță", "nu este mentenanță (rămâne la cerere)"),
-            _ => (AuditActions.DiscardActivityTicket, "Discard tichet ActivityApp", "discard (intervenția se șterge, tichetul nu se mai preia)")
-        };
-        await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, action, id.ToString(), title,
-            AuditDetails.Identification(("Tichet", $"{item.TicketNumber} {item.Title}".Trim()), ("Beneficiar", item.Beneficiary.Length > 0 ? item.Beneficiary : "—"), ("Cuvânt cheie", item.Keyword),
-                ("Scris în tichet", item.Found), ("Decizie", text)), "", cancellationToken).ConfigureAwait(false);
+        await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.DiscardActivityTicket, id.ToString(), "Discard tichet ActivityApp",
+            AuditDetails.Identification(("Tichet", $"{item.TicketNumber} {item.Title}".Trim()), ("Beneficiar", item.Beneficiary.Length > 0 ? item.Beneficiary : "—"), ("Propus ca", item.Kind == ActivityTicketPlanner.ServiceKind ? "service" : "mentenanță"),
+                ("Decizie", "discard (tichetul nu se mai preia)")), "", cancellationToken).ConfigureAwait(false);
     }
 
-    // The on-demand intervention made at once becomes a maintenance one: the maintenance is recorded (the next due date moves by the cycle of the contract), the ticket is tied to it, and the
-    // on-demand one is deleted. When the register refuses (the contract expired since), nothing changes and the operator is told.
-    private async Task ConvertToMaintenanceAsync(Row row, ActivityReviewItem item, int onDemandId, CancellationToken cancellationToken)
+    // A ticket proposed before the queue (its on-demand intervention is already in the register) is confirmed as maintenance: the maintenance is recorded (the next due date moves by the cycle of
+    // the contract when there is one), the ticket is tied to it, and the on-demand one is deleted.
+    private async Task<int> ConvertToMaintenanceAsync(Row row, ActivityReviewItem item, int onDemandId, CancellationToken cancellationToken)
     {
-        if (interventions is null) throw new ActivityImportException("Modulul Mentenanță nu este disponibil.");
         var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
         var (problem, resolution) = stored is null ? ("", item.Resolution) : ActivityTicketPlanner.SplitReport(stored.Ticket.Problem, stored.Ticket.Report);
-        var notes = ActivityTicketPlanner.Notes(item.TicketNumber, item.Title, problem, resolution, stored?.Ticket.Executor ?? "", row.Keyword, true);
-        var maintenanceId = await interventions.RecordMaintenanceAsync(row.BeneficiaryId, row.WorkPointId, row.PerformedOn, notes, cancellationToken).ConfigureAwait(false);
+        var covered = await interventions!.IsCoveredAsync(row.BeneficiaryId, row.WorkPointId, cancellationToken).ConfigureAwait(false);
+        var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+        var notes = stored is null ? ActivityTicketPlanner.Notes(item.TicketNumber, item.Title, problem, resolution, "", row.Keyword, true, !covered)
+            : ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(stored.Ticket, map), map, row.Keyword, true, !covered);
+        var maintenanceId = await interventions.RecordMaintenanceUncoveredAsync(row.BeneficiaryId, row.WorkPointId, row.PerformedOn, notes, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE service_intervention_source SET intervention_id=@new WHERE intervention_id=@old", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@old", onDemandId); }, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE activity_import_map SET local_id=@new WHERE entity='ticket' AND source_id=@ticket", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@ticket", row.TicketId); }, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE activity_import_tickets SET intervention_id=@new, updated_utc=@now WHERE ticket_id=@ticket", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@now", DateTime.UtcNow); p.AddWithValue("@ticket", row.TicketId); }, cancellationToken).ConfigureAwait(false);
-        await ExecuteAsync("UPDATE activity_import_suggestions SET intervention_id=@new WHERE id=@id", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@id", row.Id); }, cancellationToken).ConfigureAwait(false);
         await interventions.DeleteAsync(row.BeneficiaryId, onDemandId, "Înlocuită cu mentenanța validată de operator (tichet ActivityApp).", cancellationToken).ConfigureAwait(false);
+        return maintenanceId;
     }
+
+    private static string Cut(string value, int length) => value.Length > length ? value[..length] : value;
 
     public async Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default)
     {
@@ -194,6 +310,14 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             items.Add(new(reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), DateTime.SpecifyKind(reader.GetDateTime(4), DateTimeKind.Utc), reader.GetInt64(5) != 0));
         return items;
+    }
+
+    public async Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync("setari-import-activityapp.view", cancellationToken).ConfigureAwait(false);
+        var stored = await ActivityTicketStore.FindAsync(configuration, ticketId, cancellationToken).ConfigureAwait(false);
+        if (stored is null || stored.State != TicketStates.Discarded) throw new ActivityImportException("Tichetul nu mai este discardat. Actualizează lista.");
+        return ActivityTicketPlanner.SourceOf(stored.Ticket);
     }
 
     public async Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default)
@@ -210,7 +334,7 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
     }
 }
 
-/// <summary>The notification for the administrator: one instance for each ticket waiting for validation, on the day it was found; it goes away by itself when he decides.</summary>
+/// <summary>The notification for the events waiting for validation (administrator and operators with the permission to validate tickets): ONE aggregated instance, on the day of the oldest event; it goes away by itself when the last one is decided.</summary>
 public sealed class ActivityReviewSource(IConfiguration configuration, string key = ActivityReviewSource.SourceKey) : IExpirySource
 {
     public const string SourceKey = "sistem.mentenanta-activityapp-de-validat";
@@ -218,30 +342,83 @@ public sealed class ActivityReviewSource(IConfiguration configuration, string ke
     public const string DetailsName = "detalii validare";
     public string Key => key;
     public string Category => "Sistem";
-    public string EventName => "Eveniment ActivityApp de validat ca mentenanță";
+    public string EventName => "Evenimente ActivityApp de validat ca mentenanță";
     public string DateLabel => "constatării";
     public int DefaultThresholdDays => 0;
-    public string RemovedReason => "Evenimentul a fost validat, respins sau discardat.";
+    public string RemovedReason => "Nu mai așteaptă niciun eveniment ActivityApp să fie validat.";
+
+    // What really happened: the decisions taken since the notification appeared (taken as maintenance, taken as service on demand, discarded), by whom and when;
+    // when none is recorded, the queue was emptied otherwise (events reactivated or the import reset), and the reason says so.
+    public async Task<string> RemovedReasonAsync(ExpiryNotification notification, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+            await using var command = new MySqlCommand("SELECT status, COUNT(*), MAX(decided_utc), GROUP_CONCAT(DISTINCT decided_by ORDER BY decided_by SEPARATOR ', ') FROM activity_import_suggestions WHERE status <> 'pending' AND decided_utc >= @since GROUP BY status", connection);
+            command.Parameters.AddWithValue("@since", notification.CreatedUtc);
+            int maintenance = 0, service = 0, discarded = 0;
+            DateTime? last = null;
+            var people = new SortedSet<string>(StringComparer.CurrentCultureIgnoreCase);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var count = (int)reader.GetInt64(1);
+                switch (reader.GetString(0))
+                {
+                    case ActivityReviewStore.Confirmed: maintenance = count; break;
+                    case ActivityReviewStore.Rejected: service = count; break;
+                    case ActivityReviewStore.Discarded: discarded = count; break;
+                    default: continue;
+                }
+                if (!reader.IsDBNull(2) && (last is null || reader.GetDateTime(2) > last)) last = reader.GetDateTime(2);
+                if (!reader.IsDBNull(3)) foreach (var person in reader.GetString(3).Split(", ", StringSplitOptions.RemoveEmptyEntries)) people.Add(person);
+            }
+            var parts = new List<string>();
+            if (maintenance > 0) parts.Add($"{maintenance} preluate ca mentenanță");
+            if (service > 0) parts.Add($"{service} preluate ca service la cerere");
+            if (discarded > 0) parts.Add($"{discarded} discardate");
+            if (parts.Count == 0)
+                return $"Coada de validare s-a golit fără nicio decizie înregistrată după apariția notificării ({notification.CreatedUtc.ToLocalTime():dd.MM.yyyy HH:mm}): evenimentele au fost scoase din coadă altfel (de exemplu reactivare sau resetarea preluării).";
+            return $"Coada de validare s-a golit: de la {notification.CreatedUtc.ToLocalTime():dd.MM.yyyy HH:mm} s-au decis {maintenance + service + discarded} evenimente ({string.Join(", ", parts)}) de {string.Join(", ", people)}; ultima decizie la {last!.Value.ToLocalTime():dd.MM.yyyy HH:mm}.";
+        }
+        catch (Exception exception) when (exception is MySqlException or InvalidOperationException) { return RemovedReason; }
+    }
     public string DefaultSubject => "Validează mentenanța: <tichet de validat>";
-    public string DefaultBody => "<detalii validare> Vezi Setări → Preluare ActivityApp, „Evenimente de validat”.";
+    public string DefaultBody => "<detalii validare> Vezi Mentenanță, secțiunea „Evenimente de validat”.";
     public IReadOnlyList<ExpiryPlaceholder> Placeholders { get; } =
     [
-        new(TicketName, "Tichetul din ActivityApp care așteaptă validarea", "T-1042 Revizie centrală"),
-        new(DetailsName, "Ce cuvânt cheie s-a găsit în tichet și la ce beneficiar", "La beneficiarul Alfa SRL, în tichet scrie «mentenanță» (cuvânt cheie «mentenanță»).")
+        new(TicketName, "Tichetul din ActivityApp care așteaptă validarea (sau numărul lor, dacă sunt mai multe)", "3 tichete"),
+        new(DetailsName, "Câte evenimente așteaptă și de unde vin (sau, pentru unul singur, ce s-a găsit în tichet și la ce beneficiar)", "3 evenimente ActivityApp așteaptă validarea (1 de tip mentenanță, 2 cu cuvânt cheie în text); cel mai vechi este din 12.03.2026.")
     ];
 
     public string DateChangedReason(DateOnly from, DateOnly to, ExpiryInstance current) =>
-        $"Constatarea s-a mutat de la {StockMovementRules.DisplayDate(from)} la {StockMovementRules.DisplayDate(to)}.";
+        $"Cel mai vechi eveniment de validat s-a mutat de la {StockMovementRules.DisplayDate(from)} la {StockMovementRules.DisplayDate(to)}.";
 
-    public static IReadOnlyList<ExpiryInstance> Instances(IReadOnlyList<ActivityReviewItem> items) =>
-        [.. items.Select(item => new ExpiryInstance(checked((int)item.Id), $"Tichet {item.TicketNumber} {item.Title}".Trim(), DateOnly.FromDateTime(item.CreatedUtc.ToLocalTime()),
-            new Dictionary<string, string>
+    /// <summary>The URL of the notification: the validation list in the maintenance page (an operator with the permission to validate tickets has no access to the settings).</summary>
+    public const string Url = "/mentenanta?tab=validare";
+    public const int AggregateId = 1;
+
+    /// <summary>One notification for every event waiting (not one per ticket): it keeps the day of the oldest one and goes away when the last is decided.</summary>
+    public static IReadOnlyList<ExpiryInstance> Instances(IReadOnlyList<ActivityReviewItem> items)
+    {
+        if (items.Count == 0) return [];
+        var oldest = items.Min(item => item.CreatedUtc);
+        var oldestDay = DateOnly.FromDateTime(oldest.ToLocalTime());
+        var service = items.Count(item => item.Kind == ActivityTicketPlanner.ServiceKind);
+        var single = items[0];
+        var ticket = items.Count == 1 ? $"{single.TicketNumber} {single.Title}".Trim() : $"{items.Count} tichete";
+        var details = items.Count == 1
+            ? single.Kind switch
             {
-                [TicketName] = $"{item.TicketNumber} {item.Title}".Trim(),
-                [DetailsName] = item.Kind == "exact"
-                    ? $"La beneficiarul {(item.Beneficiary.Length > 0 ? item.Beneficiary : "—")}, în tichet scrie «{item.Found}»: verifică dacă mentenanța s-a făcut cu adevărat."
-                    : $"La beneficiarul {(item.Beneficiary.Length > 0 ? item.Beneficiary : "—")}, în tichet scrie «{item.Found}» (seamănă cu «{item.Keyword}»): verifică dacă este mentenanță."
-            }, "/setari?tab=preluare-activityapp"))];
+                ActivityTicketPlanner.ServiceKind => $"La beneficiarul {(single.Beneficiary.Length > 0 ? single.Beneficiary : "—")}, un tichet de service așteaptă validarea: preia-l ca service sau ca mentenanță.",
+                "type" => $"La beneficiarul {(single.Beneficiary.Length > 0 ? single.Beneficiary : "—")}, tichetul este de un tip de mentenanță: verifică dacă mentenanța s-a făcut cu adevărat.",
+                "exact" => $"La beneficiarul {(single.Beneficiary.Length > 0 ? single.Beneficiary : "—")}, în tichet scrie «{single.Found}»: verifică dacă mentenanța s-a făcut cu adevărat.",
+                _ => $"La beneficiarul {(single.Beneficiary.Length > 0 ? single.Beneficiary : "—")}, în tichet scrie «{single.Found}» (seamănă cu «{single.Keyword}»): verifică dacă este mentenanță."
+            }
+            : $"{items.Count} evenimente ActivityApp așteaptă validarea ({items.Count - service} propuse ca mentenanță, {service} ca service); cel mai vechi este din {StockMovementRules.DisplayDate(oldestDay)}.";
+        return [new ExpiryInstance(AggregateId, items.Count == 1 ? $"Tichet {ticket}" : $"{items.Count} evenimente ActivityApp de validat", oldestDay,
+            new Dictionary<string, string> { [TicketName] = ticket, [DetailsName] = details }, Url)];
+    }
 
     public async Task<IReadOnlyList<ExpiryInstance>> GetInstancesAsync(CancellationToken cancellationToken = default) =>
         Instances(await MariaActivityReviewService.ReadPendingAsync(configuration, cancellationToken).ConfigureAwait(false));
@@ -251,15 +428,21 @@ internal sealed class GuardedActivityReviewService(IActivityReviewService inner,
 {
     private const string Id = ActivityImportModule.ModuleId;
     public Task<IReadOnlyList<ActivityReviewItem>> GetPendingAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetPendingAsync(cancellationToken));
+    public Task<ActivityReviewDetail> GetDetailAsync(long id, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDetailAsync(id, cancellationToken));
     public Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.DecideAsync(id, decision, cancellationToken));
+    public Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.TakeAsync(id, input, cancellationToken));
     public Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDiscardedAsync(cancellationToken));
+    public Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetDiscardedDetailAsync(ticketId, cancellationToken));
     public Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ReactivateAsync(ticketId, cancellationToken));
 }
 
 internal sealed class UnavailableActivityReviewService : IActivityReviewService
 {
     public Task<IReadOnlyList<ActivityReviewItem>> GetPendingAsync(CancellationToken cancellationToken = default) => Task.FromException<IReadOnlyList<ActivityReviewItem>>(new ModuleUnavailableException(ActivityImportModule.ModuleId));
+    public Task<ActivityReviewDetail> GetDetailAsync(long id, CancellationToken cancellationToken = default) => Task.FromException<ActivityReviewDetail>(new ModuleUnavailableException(ActivityImportModule.ModuleId));
     public Task DecideAsync(long id, ReviewDecision decision, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(ActivityImportModule.ModuleId));
+    public Task TakeAsync(long id, ReviewTakeInput input, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(ActivityImportModule.ModuleId));
     public Task<IReadOnlyList<ActivityDiscardedTicket>> GetDiscardedAsync(CancellationToken cancellationToken = default) => Task.FromException<IReadOnlyList<ActivityDiscardedTicket>>(new ModuleUnavailableException(ActivityImportModule.ModuleId));
+    public Task<TicketSource> GetDiscardedDetailAsync(long ticketId, CancellationToken cancellationToken = default) => Task.FromException<TicketSource>(new ModuleUnavailableException(ActivityImportModule.ModuleId));
     public Task ReactivateAsync(long ticketId, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(ActivityImportModule.ModuleId));
 }

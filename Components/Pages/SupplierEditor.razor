@@ -248,6 +248,7 @@
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException exception) { anafMessageKind = "error"; anafMessage = exception.Message; }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { anafMessageKind = "error"; anafMessage = "Modulul ANAF este oprit sau indisponibil momentan: datele nu se pot prelua din ANAF. Furnizorul se poate salva cu datele introduse manual; va fi marcat în registru."; }
         catch (Exception exception)
         {
             Logger.LogError("ANAF lookup for a supplier failed ({ErrorType}).", exception.GetType().Name);

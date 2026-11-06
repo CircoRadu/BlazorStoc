@@ -30,6 +30,34 @@ public static partial class MariaExtendedChecks
             return Task.FromResult<IReadOnlySet<long>>(Live.TryGetValue(kind, out var live) ? ids.Where(live.Contains).ToHashSet() : ids.ToHashSet());
         }
 
+        // A ticket of TicketRows as the window of the example ticket shows it: every column of the ticket and of its event, newest first, the next older one with beforeTicketId.
+        public Task<TicketSample?> ReadTicketSampleAsync(ActivityConnection connection, IReadOnlyList<ActivityColumn> actual, StructureReport structure, IReadOnlyList<long> typeIds, long? beforeTicketId, CancellationToken cancellationToken)
+        {
+            Calls++;
+            if (Failure is not null) return Task.FromException<TicketSample?>(Failure);
+            var rows = TicketRows.Where(ticket => (typeIds.Count == 0 || typeIds.Contains(ticket.TypeId)) && (beforeTicketId is null || ticket.Id < beforeTicketId)).OrderByDescending(ticket => ticket.Id).ToList();
+            if (rows.Count == 0) return Task.FromResult<TicketSample?>(null);
+            var ticket = rows[0];
+            var tables = new List<SampleTable>
+            {
+                new("Tickete", [new("ID", "bigint", ticket.Id.ToString(), false), new("NumeTicket", "nvarchar", ticket.Number, true), new("Subject", "nvarchar", ticket.Title, true), new("DescriptionInternal", "nvarchar", ticket.Problem, true),
+                    new("ProcesatDe", "nvarchar", ticket.Executor, true), new("Observatii", "nvarchar", ExtraValues.GetValueOrDefault((ticket.Id, "x:Tickete.Observatii")), true)]),
+                new("EvenimenteAgent", [new("ID", "bigint", ticket.EventId.ToString(), false), new("DescriptionInternal", "nvarchar", ticket.Report, true)])
+            };
+            return Task.FromResult<TicketSample?>(new TicketSample(ticket.Id, ticket.Number, ticket.Title, ticket.TicketDate, tables, ticket.Executor, rows.Count > 1));
+        }
+
+        public readonly List<long> ById = [];
+        public readonly Dictionary<(long Ticket, string Key), string> ExtraValues = [];
+
+        public Task<IReadOnlyList<ActivityTicket>> ReadTicketsByIdAsync(ActivityConnection connection, StructureReport structure, IReadOnlyList<long> ids, int pageSize, CancellationToken cancellationToken)
+        {
+            Calls++; LastTicketStructure = structure; ById.AddRange(ids);
+            // The extra fields of the structure report come with the ticket, as the real source reads them.
+            ActivityTicket WithExtras(ActivityTicket ticket) => structure.Extras.Count == 0 ? ticket : ticket with { Extras = structure.Extras.ToDictionary(extra => extra.Key, extra => ExtraValues.GetValueOrDefault((ticket.Id, extra.Key), "")) };
+            return Failure is null ? Task.FromResult<IReadOnlyList<ActivityTicket>>([.. TicketRows.Where(ticket => ids.Contains(ticket.Id)).Select(WithExtras)]) : Task.FromException<IReadOnlyList<ActivityTicket>>(Failure);
+        }
+
         public Task<IReadOnlyList<ActivityTicket>> ReadTicketsAsync(ActivityConnection connection, StructureReport structure, IReadOnlyList<long> typeIds, DateTime since, DateTime? modifiedSince, int pageSize, CancellationToken cancellationToken)
         {
             Calls++; LastTicketStructure = structure;
@@ -118,6 +146,8 @@ public static partial class MariaExtendedChecks
             var chosen = await service.GetTypesAsync();
             Check(chosen.Items.Single(item => item.Id == 4) is { Selected: true, Destination: ActivityDestination.OnDemand } && chosen.Items.Single(item => item.Id == 13) is { Selected: true, Destination: ActivityDestination.Maintenance }
                 && chosen.Items.Single(item => item.Id == 25) is { Selected: false, State: ActivityImportRules.StateNew }, "Activity import: the chosen types and their destinations are saved by the ID of the type; a type not chosen shows as new");
+            var keptTypes = await service.GetSavedTypesAsync();
+            Check(keptTypes.Items.Count == 3 && keptTypes.Items.Single(item => item.Id == 25) is { Selected: false, Name: "Intervenție la cerere" } && keptTypes.Items.Single(item => item.Id == 4).Selected, "Activity import: the list of types read from ActivityApp is keptTypes, so the unused types are there when the settings open (not only the chosen ones)");
 
             fake.Types = [new(4, "Service tehnic", "S", true, false, 293, 79, 6), fake.Types[1], fake.Types[2]];
             var renamed = await service.GetTypesAsync();

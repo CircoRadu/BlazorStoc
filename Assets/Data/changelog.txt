@@ -1,5 +1,98 @@
+## 0.5.45 | 06.11.2026
+- Setări, Preluare date ActivityApp, secțiunea 6: butonul „Deschide un tichet exemplu” arată cel mai recent tichet finalizat din ActivityApp cu toate coloanele tichetului și ale evenimentului și valorile lor, ce primește fiecare informație (cu setările de pe ecran, chiar nesalvate) și observațiile care ar rezulta. „Tichet anterior” încarcă tichetul dinaintea celui afișat (poți merge înapoi până găsești unul cu destule date), „Tichet mai nou” revine. Din fereastră poți alege o coloană pentru o informație sau ca nou câmp suplimentar. Nimic din tichet nu se păstrează; fiecare vizualizare apare în jurnal („Vizualizare tichet exemplu ActivityApp”, cu numărul tichetului).
+- Numele informațiilor opționale (problema, rezolvarea, raportul original, executantul) se pot edita în tabel; numele ales apare în ferestrele tichetului, în jurnal și în observațiile noi. Observațiile deja scrise rămân neatinse, iar o actualizare ulterioară le recunoaște după numele cu care au fost scrise. Schimbare de schemă 67.
+- La fiecare preluare de tichete se compară structura tichetelor (coloanele din Tickete și EvenimenteAgent) cu cea pentru care ai verificat corespondența. Dacă ActivityApp a adăugat, scos sau schimbat coloane, apare o notificare în centrul de notificări „Structura tichetelor”, cu lista modificărilor, care cere verificarea corespondenței; în secțiunea 6 apare același avertisment, iar butonul „Corespondența verificată” îl închide (jurnal: „Confirmare structură tichete ActivityApp”). Preluarea continuă cu corespondența actuală. Schimbare de schemă 68.
+
+## 0.5.44 | 06.11.2026
+- Setări, Preluare ActivityApp, secțiunea 6 „Informațiile din tichet”: pentru fiecare informație a tichetului (problema, rezolvarea, raportul original, executantul) comutator Pornit/Oprit, coloana din care se citește și destinația (în observații, câmp separat sau ambele). Titlul și numărul se preiau mereu. O informație oprită nu se mai citește, nu se mai scrie și nu apare în ferestrele tichetului.
+- Câmpuri suplimentare: orice coloană cu text din tabelele Tickete sau EvenimenteAgent, cu numele ales de administrator; apar în ferestrele tichetului (validare, discardate, intervenție) și, după destinație, în observații.
+- Când se pornește o informație sau se adaugă un câmp, tichetele deja preluate care nu îl au se citesc din nou din ActivityApp (la salvare, la butonul „Actualizează tichetele preluate” sau la următoarea sincronizare): se actualizează copia păstrată, înregistrarea sursă a intervenției și observațiile, dar observațiile modificate de un operator rămân neatinse. Jurnal: „Actualizare tichete ActivityApp preluate”. Schimbare de schemă 65.
+- Setări, Preluare Elcomtur: ora verificării zilnice se alege acum din setări (00:00–23:00, implicit 04:00); verificarea pornește de la ora aleasă, o dată pe zi. Schimbarea orei apare în jurnal. Schimbare de schemă 66.
+- Setări: cardurile „Preluare ActivityApp” și „Preluare Elcomtur” se numesc acum „Preluare date ActivityApp” și „Preluare date Elcomtur”, ca „Preluare date ANAF”.
+
+## 0.5.43 | 06.11.2026
+- Setări, Bază de date, card nou „HTTPS prin proxy”: comutator (implicit Oprit) și lista IP-urilor proxy-ului (de exemplu nginx), salvate cu parola de administrator. Pornit: se acceptă antetele X-Forwarded-For/Proto doar de la proxy-urile listate, cookie-ul de sesiune devine Secure, se trimite HSTS, iar accesul direct pe HTTP din rețea primește un mesaj clar (monitorizarea /health și accesul local rămân permise). Oprit: aplicația rămâne pe HTTP ca până acum.
+- Antete de securitate pe toate răspunsurile: nosniff, X-Frame-Options, frame-ancestors și Referrer-Policy.
+- Jurnal: acțiunea „Modificare HTTPS prin proxy” cu valorile vechi și noi.
+
+## 0.5.42 | 05.11.2026
+- Setări, Preluare Elcomtur (tab nou): preluare automată a backup-ului Elcomtur dintr-un director local sau NAS (cu cont și parolă), verificare zilnică la 04:00 după o mască de nume, firma aleasă cu nume, verificarea integrității arhivei, ultimele 2 backup-uri păstrate pe server, butoanele „Verifică acum” și „Preia ultimul backup acum”; schimbare de schemă 64.
+- Notificări: „Elcomtur: backup preluat”, „preluare eșuată” (cu cauza) și „backup lipsă” după pragul de zile setat.
+- Backup NAS: fiecare backup se face în subdirector propriu.
+- Preluare ActivityApp: tichetele discardate pot fi vizualizate; motivul notificărilor indică exact ce s-a întâmplat.
+
+## 0.5.41 | 05.11.2026
+- Adaugă produs: categoria și subcategoria se aleg dintr-un selector arborescent cu toată structura (orice adâncime; produsul se pune numai pe frunze), în locul celor două liste; parametrii și etichetele frunzei apar sub selector.
+- Intrări/ieșiri produs: comutatorul „Arată operator” afișează coloana Operator (ultimul operator care a modificat mișcarea, altfel cel care a creat-o).
+- Categorii și subcategorii: corectat textul rezidual „if (isAdministrator) { }” de sub listă; zona de plasare de la sfârșitul listei de categorii apare din nou pentru administrator.
+
+## 0.5.40 | 05.11.2026
+- Beneficiari: secțiunea „Balanță Elcomtur” apare la toți beneficiarii; fără balanță importată, antetul spune „Nu există balanță importată pentru acest beneficiar”.
+- Meniul lateral se actualizează imediat când un modul este oprit sau pornit din Setări, Module (înainte, după următoarea navigare).
+
+## 0.5.39 | 04.11.2026
+- Setări, Preluare ActivityApp, Tipuri de tichete: lista tipurilor citite din ActivityApp se păstrează (și tipurile nefolosite), nu doar cele alese; schimbare de schemă 63.
+- Notificări: tabul „Balanțe restante” devine roșu și arată numărul de beneficiari cu plăți restante; notificarea „Probleme de preluare” duce la tabul „Probleme import”, nu la Setări.
+
+## 0.5.38 | 04.11.2026
+- Modul nou Elcomtur: Administrare, Preluare Elcomtur încarcă un backup al programului Elcomtur (.elc) și calculează balanța de plată (facturat minus încasat) a fiecărui client persoană juridică care este beneficiar (potrivire după CUI); simulare înainte de aplicare; schimbare de schemă 62.
+- Fișa beneficiarului: secțiunea „Balanță Elcomtur" (antet verde „Nu sunt plăți restante" sau roșiatic cu suma și numărul de facturi cu termen depășit și în termen), cu tabelele facturilor neachitate și data backup-ului.
+- Notificări: tab nou „Balanțe restante", cu beneficiarii cu sold pozitiv, ordonare după sold și iconiță spre secțiunea din beneficiar; nu se generează notificări.
+- Permisiuni noi: elcomtur.view (vezi balanțele) și elcomtur.import (preluare); jurnalul înregistrează „Preluare date Elcomtur".
+
+## 0.5.37 | 04.11.2026
+- Preluare tichete ActivityApp: executantul este format din agenții atașați evenimentului; se preiau doar evenimentele în starea Finalizat; coordonatele GPS ale evenimentului completează punctul de lucru fără coordonate (schimbare de schemă 61); tichetul din coada de validare se actualizează dacă raportul sau executanții se schimbă în ActivityApp.
+- Notificări: coada de tichete de validat (cu tichetele discardate) și problemele importului sunt taburi în Notificări, nu mai sunt în Setări, Import ActivityApp.
+- Adăugarea unui beneficiar, furnizor sau vehicul se face într-o fereastră (popup); în analiza de risc dispare câmpul „Întocmită de”, iar data devine „Data întocmirii”; butoanele Închide și Anulează din formularul de adăugare funcționează.
+- Șabloane de facturi: CUI-ul furnizorului corectat manual rămâne la salvare, iar un CUI citit prin OCR cu o cifră dublată se corectează după cifra de control.
+- Module oprite: panourile Backup și Jurnal din Setări, căutarea ANAF și legarea intrării de factură arată mesaje clare când modulul lor este oprit.
+
+## 0.5.36 | 30.10.2026
+- Fișa beneficiarului, Intervenții: iconiță de vizualizare în fereastră (datele intervenției și tichetul ActivityApp din care provine) și posibilitatea de a schimba felul intervenției (Mentenanță / La cerere) la editare, dacă nu a mutat o scadență; operația apare în jurnal ca „Schimbare fel intervenție”.
+- Notificări: paginare la tabelele de notificări (restante, viitoare, rezolvate) și la coada de tichete de validat.
+
+## 0.5.35 | 30.10.2026
+- Coada de validare: intră doar tichetele de un tip de mentenanță și cele din categoriile alese care conțin un cuvânt cheie din nomenclator; tichetele de service fără cuvânt cheie nu se mai preiau, iar cele rămase în coadă din regula veche se scot la următoarea rulare a importului.
+
+## 0.5.34 | 30.10.2026
+- Preluare ActivityApp: toate tichetele de service și de mentenanță intră în coada de validare; niciun tichet nu se înregistrează automat, fără decizia unui utilizator.
+- Coada de validare: vizualizare, editare + preluare, doar preluare sau renunțare, toate în ferestre (popup).
+- Mentenanța se poate înregistra și la un punct de lucru fără contract de mentenanță (categoria rămâne mentenanță, fără mutarea scadențelor); schimbare de schemă 60.
+- Nomenclator: secțiunea „Analizor de risc”; la analiza de risc analizorul se alege din nomenclator, cu iconiță de adăugare în fereastră, iar lista se reîncarcă la închidere.
+- Analizorii de risc intră în copia de siguranță și în restaurare.
+
+## 0.5.33 | 30.10.2026
+- Fișiere atașate (puncte de lucru, contracte, intervenții, analize de risc): vizualizare în fereastră (imagini, PDF, TXT, CSV), redenumire (extensia rămâne), confirmare simplă la ștergere; redenumirea apare în jurnal.
+- Preluare ActivityApp: tichetele unui tip „de mentenanță” se preiau fără cuvânt cheie și, la un punct de lucru cu contract activ, intră în „Evenimente de validat”; la un punct fără contract se preiau la cerere. ActivityImport 0.5.0.
+- Notificare agregată unică pentru evenimentele de validat (nu una pe tichet). Notificări: taburi „Tichete de validat” și „Beneficiari de validat”, bannere „Sunt X tichete / Y beneficiari de validat” și taburi roșii când există ceva nevalidat; numărătoarea și textul se actualizează după fiecare validare.
+- Permisiuni noi, neacordate implicit: „Validare tichete ActivityApp” (Mentenanță) și „Validare beneficiari ActivityApp” (Beneficiari). Operatorii cu aceste drepturi validează din Notificări și Mentenanță; cardul „De verificat” din Beneficiari apare numai celor cu dreptul de validare beneficiari.
+- Mentenanță: filtrul din registrul de intervenții lucrează în timpul tastării.
+
+## 0.5.32 | 30.10.2026
+- Beneficiar: adăugarea și editarea punctelor de lucru, a contractelor de mentenanță, a intervențiilor, a analizelor de risc și adăugarea proiectelor se fac într-o fereastră (popup), nu în pagină.
+- Fișiere atașate (imagini, PDF, Word, Excel, TXT, CSV, până la 20 MB, cel mult 20 per obiect) la punctele de lucru, contractele de mentenanță, intervențiile și analizele de risc; descărcare, ștergere cu iconiță, jurnal („Adăugare fișier atașat”, „Ștergere fișier atașat”) și incluse în pachetele de backup. Un contract sau o analiză nouă rămâne deschisă după salvare, ca să primească imediat fișiere. Migrarea 58. Maintenance 1.4.0, RiskAnalyses 1.1.0, Journal 1.4.1.
+- Produse: eticheta unui parametru este împărțită în parametru și valoare, iar ambele filtrează (parametrul – produsele care au o valoare pentru el, valoarea – valoarea exactă); un parametru cu valoare fixă dintr-o familie arată numele familiei ca parametru.
+
 # Changelog-ul pachetelor de actualizare: o sectiune pe versiune, cea mai noua prima ("## versiune | data"), cate o linie "- " pe schimbare.
 # Se arata in Setari -> Actualizare (Istoric -> iconita de changelog) si ca note ale pachetului; tools\release.ps1 refuza un pachet fara sectiunea versiunii.
+## 0.5.31 | 29.10.2026
+- Preluare ActivityApp: se preiau automat și persoanele fizice (după nume, fără ANAF), iar sincronizarea ia toți partenerii noi, cu sau fără tichete (cel mult o dată la 6 ore la rulările programate, la fiecare „Rulează acum”). Cei curați devin beneficiari direct; cei cu probleme (fără adresă, ANAF fără răspuns sau care nu cunoaște CUI-ul, CUI sau nume repetat în ActivityApp, date refuzate) intră în Beneficiari → De verificat, cu motivul, iar tichetele lor așteaptă.
+- Notificarea pentru administratori este una singură („N beneficiari din ActivityApp de verificat”, cu motivele și numărul de tichete în așteptare), nu câte una pe beneficiar.
+- Setări → Preluare ActivityApp, secțiunea 3: comutator „Preia și beneficiarii fără tichete” și comutator „Import automat”; cu importul automat oprit, fiecare beneficiar nou așteaptă în coadă și îl accepți tu (se creează atunci, cu punctele lui de lucru).
+- Persoanele fizice ignorate de versiunile vechi se preiau la următoarea sincronizare. Migrarea 57. ActivityImport 0.3.0.
+
+## 0.5.30 | 28.10.2026
+- Mutare: o subcategorie care se întoarce sub părintele de la care avea copii ale parametrilor nu mai este blocată de familiile și parametrii cu același nume. Familia proprie se îmbină cu cea a părintelui după decizia ta („Îmbină cu cele de la noii părinți”): parametrii cu același nume se unesc, ceilalți intră în familia părintelui, iar produsele își păstrează valorile. Rămân blocate doar cazurile cu tip sau unitate diferite ori definiții arhivate.
+
+## 0.5.29 | 28.10.2026
+- Parametri, familii și etichete: cele folosite nu se mai șterg, ci se arhivează. Textul valorii se păstrează la sfârșitul modelului produsului, iar legătura rămâne marcată ca arhivată; restaurarea o desface și listează problemele (text lipsă, nume ocupat, prea lung) cu redenumire automată sau manuală. Cele nefolosite apar la „Nefolosite”, cu ștergere definitivă și istoric de folosire. O familie se arhivează împreună cu membrii ei.
+- Setări → Catalog: perioada după care se poate renunța definitiv la restaurare (30–360 de zile, implicit 30).
+- Categoriile pot avea parametri, familii și etichete proprii, moștenite de toate subcategoriile de sub ele; pictograma „Parametri și etichete” apare și pe titlul categoriei.
+- „Preia de la copil” (pe subcategorii cu copii și pe categorii): definițiile unui copil urcă la părinte, cu previzualizare reală anulată, decizie pentru omonime (îmbinare), listă de produse care devin incomplete și motiv.
+- Mutarea unei ramuri păstrează ce moștenea: parametrii, familiile și etichetele părinților părăsiți se copiază pe nodul mutat sau se îmbină cu omonimele noilor părinți, iar produsele care nu au valori pentru ce moștenesc acum sunt listate și trebuie acceptate (fereastra „Verificări la mutare”). Refuzurile vechi la mutarea între categorii au dispărut.
+- Tragerea pe niveluri: zone de plasare cu explicație lângă cursor (roșie și fără drop când mutarea e refuzată). O frunză trasă între categorii devine categorie nouă: alegi numele subcategoriei care păstrează produsele, parametrii și etichetele, verifici efectele, apoi confirmi; nimic nu se scrie înainte.
+- Jurnal: acțiuni noi pentru arhivare, restaurare, îmbinare, relocare și promovare de subcategorie în categorie; modulul trece la versiunea 1.4.0.
+
 ## 0.5.28 | 28.10.2026
 - Categorii: arbore de subcategorii pe oricâte niveluri. O subcategorie poate avea subcategorii copil; copilul moștenește automat parametrii obligatorii, familiile de parametri și etichetele părinților și își poate adăuga altele. Categoriile (primul nivel) nu au parametri și nici etichete. Produsele se asociază numai frunzelor; o frunză cu produse care primește un copil își mută produsele în el, păstrându-le parametrii și etichetele.
 - Categorii: aranjare și mutare prin tragere pentru orice nod (înainte, după sau ca subcategorie copil; titlul unei categorii îl pune ultimul la primul nivel). Mutarea duce toată structura de sub nod, inclusiv între categorii. Conflictele sunt refuzate cu mesaj: mutare în propriul subarbore, adâncime depășită, părinte cu produse, nume de parametru sau etichetă repetat, valori sau etichete moștenite care s-ar pierde.
@@ -11,7 +104,6 @@
 - Backup: tabela catalog_settings face parte din pachetele de backup.
 - Jurnal: acțiuni noi (adăugare subcategorie copil, mutare produse în subcategorie copil, mutare subcategorie, modificare adâncime maximă); modulul trece la versiunea 1.3.1. Inventar 1.1.0, Facturi 1.1.1.
 - Baza de date: migrările 54 (subcategories.parent_id) și 55 (tabela catalog_settings).
-- Interfață: butoanele de acțiune devin iconițe cu titlu (Salvează, Anulează, Șterge, Exportă CSV etc.); pe pagina produsului și în formularele ei butoanele rămân cu text.
 - Interfață: elementele paginii se reașază la îngustarea ferestrei (antete, filtre, grupuri de butoane), iar tabelele care nu încap au bară de defilare orizontală.
 - Produs: cardul „Descriere” sub cardul „Produs”, cu spațiu mai mic între carduri.
 - Meniul Stoc: un clic pe numele unei categorii sau subcategorii o deschide și o lasă deschisă; închiderea se face cu săgeata.

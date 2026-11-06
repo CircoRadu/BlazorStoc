@@ -1,0 +1,50 @@
+@using BlazorStoc.Services
+
+@* Where a parameter, a family or a tag was used (the usage log, migration 56): the log is kept even after the products and the definition are gone. *@
+<div class="delete-overlay">
+<section class="delete-dialog archive-dialog usage-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+    <div class="catalog-heading dialog-head"><h2 id="@TitleId">@Title</h2><HelpButton Topic="categorii-parametri" About="Istoricul de utilizare al unei definiții arhivate" /></div>
+    <p class="delete-object"><strong>@ObjectLabel</strong></p>
+    @if (Entries.Count == 0) { <p class="form-note">Nu există istoric de utilizare. Jurnalul de utilizare a pornit odată cu această funcție: pentru ce s-a întâmplat înainte nu există înregistrări.</p> }
+    else
+    {
+        <Paged Items="Ordered" Id="@($"usage-log-{instanceId}")" Label="Înregistrări pe pagină" DefaultSize="10" Sizes="@pageSizes">
+            <div class="table-scroll"><table class="save-summary usage-table"><thead><tr><th scope="col">Produs</th><th scope="col">Parametru</th><th scope="col">Valoare</th><th scope="col">Loc</th><th scope="col">Acțiune</th><th scope="col">Când</th><th scope="col">Utilizator</th></tr></thead><tbody>
+            @foreach (var entry in context)
+            {
+                <tr @key="entry.Id"><td>@(entry.ProductName.Length > 0 ? entry.ProductName : "—")</td><td>@entry.ParameterName</td><td>@(entry.Value.Length > 0 ? entry.Value : "—")</td><td>@entry.Node</td>
+                    <td>@ActionText(entry.Action)@(entry.Reason.Length > 0 ? $" · {entry.Reason}" : "")</td><td>@When(entry.OccurredUtc)</td><td>@(entry.Actor.Length > 0 ? entry.Actor : "—")</td></tr>
+            }
+            </tbody></table></div>
+        </Paged>
+    }
+    <div class="editor-actions"><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></div>
+</section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ObjectLabel { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<ParameterUsageEntry> Entries { get; set; } = [];
+    [Parameter, EditorRequired] public EventCallback Closed { get; set; }
+
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private readonly IReadOnlyList<int> pageSizes = [10, 25, 50, 0];
+    private string TitleId => $"usage-title-{instanceId}";
+    // Grouped by product, the newest entry of each product first.
+    private IReadOnlyList<ParameterUsageEntry> Ordered => Entries.OrderBy(entry => entry.ProductName, StringComparer.CurrentCultureIgnoreCase).ThenByDescending(entry => entry.Id).ToList();
+
+    private static string ActionText(string action) => action switch
+    {
+        ParameterUsageActions.Applied => "Aplicat pe produs",
+        ParameterUsageActions.Removed => "Scos de pe produs",
+        ParameterUsageActions.Archived => "Arhivat",
+        ParameterUsageActions.Restored => "Restaurat",
+        ParameterUsageActions.GivenUp => "Renunțat definitiv",
+        ParameterUsageActions.ProductDeleted => "Produs șters",
+        ParameterUsageActions.Deleted => "Definiție ștearsă",
+        _ => action
+    };
+
+    private static string When(string utc) => MariaTimeText.ParseOrNull(utc) is { } time ? time.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) : utc;
+}

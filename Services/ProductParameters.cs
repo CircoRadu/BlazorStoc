@@ -87,6 +87,36 @@ public interface IProductParameterRepository
         var state = await GetProductStateAsync(product.Id, cancellationToken).ConfigureAwait(false);
         return ProductParameterRules.Problems(ProductParameterRules.Slots(parameters, families), state.Choices.Select(choice => choice.ParameterId).ToHashSet());
     }
+
+    // ---- archive (migration 56): administrators only. A definition products use is archived, never deleted; see ParameterArchive.cs.
+    // The archived parameters and families (GetParametersAsync and GetFamiliesAsync return the live ones only).
+    Task<ArchivedParameters> GetArchivedAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ArchivedParameters([], []));
+    // Nothing is written by a preview; the apply repeats the checks in its transaction.
+    Task<ParameterArchivePreview> PreviewParameterArchiveAsync(SubcategoryParameter parameter, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ParameterArchivePreview([], []));
+    Task ArchiveParameterAsync(SubcategoryParameter original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task<ParameterArchivePreview> PreviewFamilyArchiveAsync(ParameterFamily family, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ParameterArchivePreview([], []));
+    Task ArchiveFamilyAsync(ParameterFamily original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    // Restore: the products whose name cannot simply be restored are listed with an automatic proposal; baseModels carries the model chosen (the proposal or typed
+    // by hand) for each of those products, keyed by product id.
+    Task<ParameterRestorePreview> PreviewParameterRestoreAsync(ArchivedParameter parameter, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ParameterRestorePreview([]));
+    Task RestoreParameterAsync(ArchivedParameter original, IReadOnlyDictionary<int, string> baseModels, string reason, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+    Task<ParameterRestorePreview> PreviewFamilyRestoreAsync(ArchivedFamily family, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ParameterRestorePreview([]));
+    Task RestoreFamilyAsync(ArchivedFamily original, IReadOnlyDictionary<int, string> baseModels, string reason, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+    // After the retention period set in Catalog: the products keep their names, the archived links are dropped and the definition becomes unused.
+    Task GiveUpParameterRestoreAsync(ArchivedParameter original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task GiveUpFamilyRestoreAsync(ArchivedFamily original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    // Unused archived definitions only (no product links to them).
+    Task DeleteArchivedParameterAsync(ArchivedParameter original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    Task DeleteArchivedFamilyAsync(ArchivedFamily original, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    // Where the parameters were used (the usage log, newest first).
+    Task<IReadOnlyList<ParameterUsageEntry>> GetUsageAsync(IReadOnlyList<int> parameterIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ParameterUsageEntry>>([]);
 }
 
 public static class ProductParameterRules

@@ -12,7 +12,7 @@ public sealed class SuppliersModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Furnizori și facturi de furnizor";
-    public Version Version { get; } = new(1, 0, 0);
+    public Version Version { get; } = new(1, 0, 1);
     // The entries sit in the Administration menu (MainLayout), which shows them only while the module works; no item of its own here.
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 

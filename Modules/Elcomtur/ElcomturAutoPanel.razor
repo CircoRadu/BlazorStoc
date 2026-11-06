@@ -1,0 +1,166 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Modules.Elcomtur
+@using BlazorStoc.Services
+@inject IElcomturAutoService Auto
+@inject IElcomturAutoAlertReader Alerts
+@inject ILogger<ElcomturAutoPanel> Logger
+@implements IDisposable
+@* Setari -> Preluare Elcomtur (administrator only): the directory (NAS share) where the Elcomtur program leaves its backup, the mask of the file name, the firm to import, the alert
+   threshold, the on/off switch of the daily automatic import (at the hour chosen here, 04:00 by default), and the manual check. The password is kept encrypted and is never shown again. *@
+
+<section class="catalog" id="elcomtur-auto">
+    <div class="catalog-heading"><h2>Preluare automată backup Elcomtur</h2><small>În fiecare zi la ora aleasă mai jos (implicit 04:00) se caută în director cel mai recent fișier care corespunde măștii. Dacă este mai nou decât ultima preluare, se copiază pe server, se verifică și se preia. Parola se păstrează criptat și nu se mai afișează.</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status" id="elcomtur-auto-notice">@notice</div> }
+        <div class="anaf-grid">
+            <ToggleSwitch Class="anaf-check" Id="elcomtur-auto-enabled" @bind-Value="enabled" OnText="Activ" OffText="Inactiv">Preluare automată</ToggleSwitch>
+            <label class="anaf-wide">Director cu backup-urile Elcomtur (cale de rețea \\server\partajare\folder sau director local)<input id="elcomtur-auto-path" @bind="path" maxlength="500" autocomplete="off" placeholder="\\192.168.100.50\Backup\Elcomtur" /></label>
+            <label>Cont (pentru o cale de rețea)<input id="elcomtur-auto-user" @bind="userName" maxlength="100" autocomplete="off" /></label>
+            <label>Parolă<input id="elcomtur-auto-password" type="password" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(hasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <label>Mască nume fișier<input id="elcomtur-auto-mask" @bind="mask" maxlength="200" autocomplete="off" placeholder="*elcomtur*" /><small class="muted">* înlocuiește orice text, ? un caracter. Se alege cel mai recent fișier care corespunde.</small></label>
+            <label>Firma de preluat
+                <select id="elcomtur-auto-firm" value="@firmFolder" @onchange="FirmChanged" disabled="@busy">
+                    @if (FirmOptions.Count == 0) { <option value="">— citește firmele din backup —</option> }
+                    @foreach (var firm in FirmOptions) { <option value="@firm.Folder">@firm.Label</option> }
+                </select>
+                <small class="muted">Se preiau datele unei singure firme.</small>
+            </label>
+            <label>Ora verificării zilnice
+                <select id="elcomtur-auto-hour" @bind="hour" disabled="@busy">
+                    @for (var value = ElcomturAutoRules.MinHour; value <= ElcomturAutoRules.MaxHour; value++) { <option value="@value">@ElcomturAutoRules.HourText(value)</option> }
+                </select>
+                <small class="muted">Verificarea pornește în fiecare zi de la această oră (ora serverului), o singură dată pe zi.</small>
+            </label>
+            <label>Prag alertă lipsă backup (zile)<input id="elcomtur-auto-days" type="number" min="@ElcomturAutoRules.MinAlertDays" max="@ElcomturAutoRules.MaxAlertDays" @bind="alertDays" /><small class="muted">Dacă de atâtea zile nu a apărut un backup nou în director, apare o notificare.</small></label>
+        </div>
+        <div class="editor-actions">
+            <button type="button" class="primary" id="elcomtur-auto-save" disabled="@busy" @onclick="SaveAsync">Salvează</button>
+            <button type="button" class="refresh act-reload" id="elcomtur-auto-test" disabled="@busy" @onclick="TestAsync">Testează conexiunea</button>
+            <button type="button" class="refresh act-reload" id="elcomtur-auto-firms" disabled="@busy" @onclick="ReadFirmsAsync" title="Deschide cel mai recent backup din director (fără să-l copieze) și arată firmele din el, cu numele lor">Citește firmele din backup</button>
+            <button type="button" class="refresh act-confirm" id="elcomtur-auto-check" disabled="@busy" @onclick="() => CheckAsync(false)" title="Face acum aceeași verificare ca cea zilnică: preia backup-ul din director numai dacă este mai nou decât ultima preluare">Verifică acum</button>
+            <button type="button" class="refresh act-confirm" id="elcomtur-auto-force" disabled="@busy" @onclick="() => CheckAsync(true)" title="Preia cel mai recent backup din director chiar dacă nu este mai nou decât ultima preluare">Preia ultimul backup acum</button>
+            @if (busy) { <span class="muted" role="status" data-operation-driver>@busyText</span> }
+        </div>
+        <p class="muted"><small>Verificarea automată rulează o singură dată pe zi, la @ElcomturAutoRules.HourText(current.ScheduledHour) (sau la prima pornire a serverului după aceea). Pe server rămân ultimele @ElcomturAutoRules.KeptBackups backup-uri preluate. Salvează înainte de „Verifică acum”: verificarea folosește setările salvate.</small></p>
+        <p class="muted" role="status" style="margin-top:12px" id="elcomtur-auto-status">
+            @if (current.LastCheckUtc is { } at) { <text>Ultima verificare: <strong>@at.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</strong> — @(current.LastCheckOk == true ? "reușită" : "eșuată"). @current.LastMessage</text> }
+            else { <text>Nicio verificare încă.</text> }
+        </p>
+        @if (current.LastImportUtc is { } imported)
+        {
+            <p class="muted" id="elcomtur-auto-last-import">Ultimul backup preluat: <strong>@current.LastFileName</strong> la @imported.ToLocalTime().ToString("dd.MM.yyyy HH:mm") (firma @current.FirmLabel, date din @(current.LastDataDate is { } data ? StockMovementRules.DisplayDate(data) : "—")). @current.LastSummary</p>
+        }
+        @if (model is { } shown && shown.Subject.Length > 0)
+        {
+            <h3>Model notificare „Backup lipsă”</h3>
+            <div class="notification-model" role="note" aria-label="Model de notificare, needitabil">
+                <strong>@shown.Subject</strong>
+                <p>@shown.Body</p>
+                <small class="muted">Model needitabil: textul propriu-zis se editează în Setări → Notificări → Sistem. Notificările acestei preluări (backup lipsă, preluare eșuată, backup preluat) apar numai cât „Preluare automată” este Activ.</small>
+            </div>
+        }
+    }
+    </div>
+</section>
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, busy, noticeOk, hasPassword, enabled;
+    private string? error, notice, busyText;
+    private string path = "", userName = "", password = "", mask = "", firmFolder = "", firmName = "";
+    private int alertDays = ElcomturAutoRules.DefaultAlertDays, hour = ElcomturAutoRules.DefaultHour;
+    private ElcomturAutoSettings current = ElcomturAutoSettings.Empty;
+    private List<ElcomturFirmChoice> firms = [];
+    private (string Subject, string Body)? model;
+
+    // The firms read from the newest backup; the saved firm stays selectable before they are read.
+    private List<ElcomturFirmChoice> FirmOptions
+    {
+        get
+        {
+            var options = new List<ElcomturFirmChoice>(firms);
+            if (firmFolder.Length > 0 && !options.Any(item => string.Equals(item.Folder, firmFolder, StringComparison.OrdinalIgnoreCase))) options.Insert(0, new ElcomturFirmChoice(firmFolder, firmName));
+            return options;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { Apply(await Auto.GetAsync(lifetime.Token)); await LoadModelAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Elcomtur automatic import settings loading failed ({ErrorType}).", ex.GetType().Name); error = "Setările nu au putut fi încărcate. Verifică conexiunea la baza de date."; }
+        finally { loading = false; }
+    }
+
+    private async Task LoadModelAsync()
+    {
+        try { model = ElcomturAutoAlertSource.Preview(await Alerts.GetAsync(lifetime.Token), DateOnly.FromDateTime(DateTime.Now)); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { model = null; }
+    }
+
+    private void Apply(ElcomturAutoSettings settings)
+    {
+        current = settings; enabled = settings.Enabled; path = settings.Path; userName = settings.UserName; hasPassword = settings.HasPassword; mask = settings.Mask;
+        firmFolder = settings.FirmFolder; firmName = settings.FirmName; alertDays = settings.AlertDays; hour = settings.ScheduledHour; password = "";
+    }
+
+    private ElcomturAutoInput Input => new(enabled, path, userName, string.IsNullOrEmpty(password) ? null : password, mask, firmFolder, firmName, alertDays, hour);
+
+    private void FirmChanged(ChangeEventArgs args)
+    {
+        firmFolder = args.Value?.ToString() ?? "";
+        firmName = FirmOptions.FirstOrDefault(item => string.Equals(item.Folder, firmFolder, StringComparison.OrdinalIgnoreCase))?.Name ?? "";
+    }
+
+    private async Task RunAsync(string working, Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; busyText = working; error = null; notice = null;
+        try { await action(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is ElcomturAutoException or ElcomturOperationException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Elcomtur automatic import action failed ({ErrorType}).", ex.GetType().Name); error = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    private Task SaveAsync() => RunAsync("Se salvează…", async () =>
+    {
+        if (enabled && ElcomturAutoRules.IsNetwork(ElcomturAutoRules.NormalizePath(path)) && !hasPassword && string.IsNullOrEmpty(password)) throw new ElcomturAutoException("Introdu parola contului (nu este salvată nici una).");
+        await Auto.SaveAsync(Input, lifetime.Token);
+        Apply(await Auto.GetAsync(lifetime.Token));
+        await LoadModelAsync();
+        noticeOk = true; notice = "Configurarea a fost salvată." + (enabled ? "" : " Atenție: „Preluare automată” este Inactiv, deci nu se face nicio verificare la ora " + ElcomturAutoRules.HourText(hour) + ".");
+    });
+
+    private Task TestAsync() => RunAsync("Se testează conexiunea…", async () =>
+    {
+        var result = await Auto.TestAsync(Input, lifetime.Token);
+        noticeOk = result.Ok; notice = result.Message;
+    });
+
+    private Task ReadFirmsAsync() => RunAsync("Se citesc firmele din backup…", async () =>
+    {
+        var result = await Auto.ReadFirmsAsync(Input, lifetime.Token);
+        noticeOk = result.Ok; notice = result.Message;
+        if (!result.Ok) return;
+        firms = [.. result.Firms];
+        // A firm that is not chosen yet: the first (firma1) is proposed, never saved without Salvează.
+        if (!firms.Any(item => string.Equals(item.Folder, firmFolder, StringComparison.OrdinalIgnoreCase))) { firmFolder = firms[0].Folder; firmName = firms[0].Name; }
+        else firmName = firms.First(item => string.Equals(item.Folder, firmFolder, StringComparison.OrdinalIgnoreCase)).Name;
+    });
+
+    private Task CheckAsync(bool force) => RunAsync(force ? "Se preia ultimul backup (poate dura câteva minute)…" : "Se verifică directorul (poate dura câteva minute)…", async () =>
+    {
+        var result = await Auto.CheckNowAsync(force, lifetime.Token);
+        noticeOk = result.Ok; notice = result.Message;
+        Apply(await Auto.GetAsync(lifetime.Token));
+        await LoadModelAsync();
+    });
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -17,7 +17,11 @@
 <div class="page-heading"><div><p class="eyebrow">PARTENERI STOC</p><h1>Beneficiari</h1><p class="muted">Gestionează persoanele fizice și juridice către care vor fi operate mișcările de stoc.</p></div><div class="heading-actions">@if (permAdd) { <button class="primary" disabled="@(loading || editing || deleting is not null)" @onclick="() => OpenEditorAsync(null)">+ Adaugă beneficiar</button> }</div></div>
 @if (error is not null) { <div class="error-banner" role="alert">@error <button class="primary" @onclick="RetryLoadAsync">Reîncearcă</button></div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
-@if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBeneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditorAsync" /> }
+@if (editing && editingBeneficiary is null)
+{
+    <div class="delete-overlay"><div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="beneficiary-editor-title"><BeneficiaryEditor @key="editorKey" Original="editingBeneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditorAsync" /></div></div>
+}
+else if (editing) { <BeneficiaryEditor @key="editorKey" Original="editingBeneficiary" Saved="BeneficiarySavedAsync" Closed="CloseEditorAsync" /> }
 
 <section class="metrics users-metrics" aria-label="Rezumat beneficiari">
     <article><span>Total beneficiari</span><strong>@(loaded ? beneficiaries.Count.ToString() : "—")</strong><small>În registrul disponibil</small><i>♧</i></article>

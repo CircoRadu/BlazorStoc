@@ -9,6 +9,7 @@
    missing). The tickets of their clients wait until they are clarified. The card shows only while there is something to verify. *@
 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
 @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+@if (items.Count == 0 && ShowEmpty && canEdit && error is null) { <section class="catalog"><div class="catalog-body"><p class="muted" id="checks-empty">Nu sunt beneficiari de validat.</p></div></section> }
 @if (items.Count > 0)
 {
     <section class="catalog" id="beneficiary-checks">
@@ -34,8 +35,8 @@
                         }
                         else
                         {
-                            <button type="button" class="row-icon renew" disabled="@(busy || item.Reason == BeneficiaryCheckReasons.CuiInvalidForm)" aria-label="@($"Reîncearcă verificarea în ANAF: {item.Name}")" title="@(item.Reason == BeneficiaryCheckReasons.CuiInvalidForm ? "CUI-ul are o formă invalidă: corectează-l întâi în fișa beneficiarului." : "Reîncearcă verificarea în ANAF")" @onclick="() => RetryAsync(item)"></button>
-                            <button type="button" class="row-icon check" disabled="@(busy || item.BeneficiaryId is null)" aria-label="@($"Acceptă beneficiarul: {item.Name}")" title="@(item.BeneficiaryId is null ? "Partenerul nu are încă un beneficiar (lipsește adresa în ActivityApp)." : "Acceptă beneficiarul (verificat de mine)")" @onclick="() => AcceptAsync(item)"></button>
+                            <button type="button" class="row-icon renew" disabled="@(busy || item.Reason == BeneficiaryCheckReasons.CuiInvalidForm || item.BeneficiaryId is null)" aria-label="@($"Reîncearcă verificarea în ANAF: {item.Name}")" title="@(item.Reason == BeneficiaryCheckReasons.CuiInvalidForm ? "CUI-ul are o formă invalidă: corectează-l întâi în fișa beneficiarului." : "Reîncearcă verificarea în ANAF")" @onclick="() => RetryAsync(item)"></button>
+                            <button type="button" class="row-icon check" disabled="@(busy || (item.BeneficiaryId is null && item.Reason != BeneficiaryCheckReasons.AwaitingAcceptance))" aria-label="@($"Acceptă beneficiarul: {item.Name}")" title="@(item.BeneficiaryId is null && item.Reason != BeneficiaryCheckReasons.AwaitingAcceptance ? "Partenerul nu are încă un beneficiar: corectează datele în ActivityApp (adresă, CUI sau nume)." : item.BeneficiaryId is null ? "Acceptă partenerul: se creează beneficiarul acum." : "Acceptă beneficiarul (verificat de mine)")" @onclick="() => AcceptAsync(item)"></button>
                             <button type="button" class="row-icon delete" disabled="@busy" aria-label="@($"Discard partener: {item.Name}")" title="Discard (nici partenerul, nici tichetele lui nu se mai preiau)" @onclick="() => discarding = item.Id"></button>
                         }
                     </td>
@@ -49,6 +50,8 @@
 
 @code {
     [Parameter] public EventCallback Changed { get; set; }
+    // True where the list is a page of its own (the Notifications tab): an empty queue says so instead of showing nothing.
+    [Parameter] public bool ShowEmpty { get; set; }
 
     private readonly CancellationTokenSource lifetime = new();
     private IReadOnlyList<BeneficiaryCheck> items = [];
@@ -58,7 +61,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        canEdit = await Access.HasAsync("beneficiari.edit");
+        canEdit = await Access.HasAsync("beneficiari.validare");
+        if (!canEdit) return;
         await RunAsync(async () => items = await Checks.GetPendingAsync(lifetime.Token), null);
     }
 

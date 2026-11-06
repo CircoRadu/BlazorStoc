@@ -27,9 +27,15 @@
                         <label class="check-label"><input type="radio" name="intervention-kind" checked="@(input.Kind == ServiceInterventionKind.OnDemand)" @onchange="() => SetKind(ServiceInterventionKind.OnDemand)" /> La cerere <small class="muted">în afara ciclului; nu modifică scadențele</small></label>
                         @if (CoveredPoints.Count == 0) { <small class="muted">Nu există puncte de lucru sub un contract activ (On), deci se poate înregistra doar o intervenție la cerere.</small> }
                     }
+                    else if (!Original.MovesDue)
+                    {
+                        <label class="check-label"><input type="radio" name="intervention-kind" checked="@(input.Kind == ServiceInterventionKind.Maintenance)" @onchange="() => input.Kind = ServiceInterventionKind.Maintenance" /> Mentenanță <small class="muted">fără contract și fără mutarea scadenței</small></label>
+                        <label class="check-label"><input type="radio" name="intervention-kind" checked="@(input.Kind == ServiceInterventionKind.OnDemand)" @onchange="() => input.Kind = ServiceInterventionKind.OnDemand" /> La cerere <small class="muted">în afara ciclului; nu modifică scadențele</small></label>
+                    }
                     else
                     {
                         <strong>@ServiceInterventionRules.KindLabel(Original.Kind)</strong>
+                        <small class="muted">O mentenanță care a mutat scadența nu își poate schimba felul; ștergerea ei readuce scadența.</small>
                     }
                 </div>
                 @if (Original is null)
@@ -114,6 +120,7 @@
             }
         }
     </div>
+    <EntityFilesPanel OwnerKind="@EntityFileOwners.Intervention" OwnerId="@(Original?.Id ?? 0)" />
 </section>
 
 @code {
@@ -183,7 +190,7 @@
     }
 
     private bool IsLatestMoving => Original is { MovesDue: true, IsMaintenance: true } original && ServiceInterventionRules.LatestMoving(Interventions, original.WorkPointId)?.Id == original.Id;
-    private bool DateEditable => Original is null || !Original.IsMaintenance || IsLatestMoving;
+    private bool DateEditable => Original is null || !Original.IsMaintenance || IsLatestMoving || input.Kind != Original.Kind;
 
     private DateOnly? PlannedDue => Original is null ? CurrentCoverage()?.Coverage.NextDue : Original.PlannedDue;
     private int Cycle => CurrentCoverage() is { } current ? current.Details.EffectiveCycle(current.Coverage) : ServiceContractRules.MinimumCycle;

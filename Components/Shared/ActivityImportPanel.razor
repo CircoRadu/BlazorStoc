@@ -1,10 +1,11 @@
+@using BlazorStoc.Components.Pages
 @using BlazorStoc.Modules.ActivityImport
 @using BlazorStoc.Services
 @inject IActivityImportService Import
 @inject IActivityPartnerImportService Partners
 @inject IActivityTicketImportService Tickets
+@inject IActivityTicketRefreshService Refresh
 @inject IActivitySyncService Sync
-@inject IActivityReviewService Reviews
 @inject ILogger<ActivityImportPanel> Logger
 @implements IDisposable
 @* Setari -> Preluare ActivityApp (administrator only): the connection of the read-only account, the check of the ActivityApp structure and the ticket types linked to service and
@@ -58,7 +59,7 @@
         </fieldset>
 
         <fieldset class="anaf-section"><legend>2. Tipuri de tichete</legend>
-            <p class="muted"><small>Alege tipurile de tichete din ActivityApp care se leagă de activitatea de service și mentenanță; importul folosește doar tipurile alese. „La cerere” nu atinge scadențele contractelor; „de mentenanță” cere un punct de lucru sub contract activ.</small></p>
+            <p class="muted"><small>Alege tipurile de tichete din ActivityApp care se leagă de activitatea de service și mentenanță; importul folosește doar tipurile alese. „La cerere” nu atinge scadențele contractelor; „de mentenanță”: tichetele tipului se preiau fără cuvânt cheie și, la un punct de lucru cu contract activ, intră în „Evenimente de validat” (operatorii cu permisiunea „Validare tichete ActivityApp” le pot valida și din pagina Mentenanță); la un punct fără contract se preiau la cerere.</small></p>
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadTypesAsync">Citește tipurile din ActivityApp</button>
                 <button type="button" class="primary" disabled="@(busy || types is null)" @onclick="SaveTypesAsync">Salvează alegerea</button>
@@ -83,7 +84,14 @@
             }
         </fieldset>
         <fieldset class="anaf-section"><legend>3. Beneficiari și puncte de lucru</legend>
-            <p class="muted"><small>Se preiau numai persoanele juridice cu CUI valid; persoanele fizice (fără CUI, cod personal sau un nume în câmpul CUI) nu se preiau și apar ca ignorate. Partenerii devin beneficiari, iar punctele lor de lucru devin puncte de lucru. Un partener care există deja la noi (același CUI) doar se leagă, fără a-i schimba datele. Firmele se verifică în ANAF (și se completează acolo adresa lipsă sau telefonul, care este opțional); un CUI necunoscut de ANAF nu se preia, iar dacă ANAF nu răspunde, firma cu CUI valid se preia marcată neverificată. Simularea nu scrie nimic; aplicarea creează prin regulile obișnuite ale aplicației și trece în Jurnal. Ce nu se poate prelua (CUI invalid sau repetat, fără adresă) apare ca problemă, nu se ghicește.</small></p>
+            <p class="muted"><small>Se preiau automat toți partenerii din ActivityApp, cu sau fără tichete: firmele (CUI cu cifre) ca persoane juridice, verificate în ANAF, iar persoanele fizice (fără CUI, cod personal sau un nume în câmpul CUI) ca persoane fizice, după nume, fără ANAF. Partenerii devin beneficiari, iar punctele lor de lucru devin puncte de lucru. Un partener care există deja la noi (același CUI) doar se leagă, fără a-i schimba datele. Firmele se verifică în ANAF (și se completează acolo adresa lipsă sau telefonul, care este opțional); un CUI necunoscut de ANAF sau fără răspuns de la ANAF se preia marcat „de verificat”. Simularea nu scrie nimic; aplicarea creează prin regulile obișnuite ale aplicației și trece în Jurnal. Ce nu se poate prelua curat (fără adresă, CUI sau nume repetat în ActivityApp, date refuzate) intră în Beneficiari → De verificat și administratorii primesc o notificare; nu se ghicește.</small></p>
+            <div class="anaf-toggles">
+                <ToggleSwitch Class="anaf-check" @bind-Value="takePartners" OnText="Da" OffText="Nu">Preia și beneficiarii fără tichete (toți partenerii din ActivityApp)</ToggleSwitch>
+                <p class="muted"><small>Oprit: se preiau numai clienții tichetelor citite.</small></p>
+                <ToggleSwitch Class="anaf-check" @bind-Value="autoAcceptPartners" OnText="Automat" OffText="Manual">Import automat al beneficiarilor curați</ToggleSwitch>
+                <p class="muted"><small>Oprit: fiecare beneficiar nou se pune în coada Beneficiari → De verificat, de unde îl accepți tu; tichetele lui așteaptă acceptarea.</small></p>
+                <div class="editor-actions"><button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează</button></div>
+            </div>
             @* The messages of this section's operations are shown here too, not only at the top of the window. *@
             @if (runArea == "partners" && error is not null) { <div class="error-banner" role="alert">@error</div> }
             @if (runArea == "partners" && notice is not null) { <div class="@(noticeOk ? "success-banner" : "error-banner")" role="status">@notice</div> }
@@ -125,7 +133,7 @@
                     </details>
                     <details class="ai-type-group" id="ai-plan-ignored-group">
                         <summary>Ignorați <span class="count-badge">@ignoredItems.Count</span></summary>
-                        <p class="muted"><small>Partenerii ignorați nu se preiau. „Include în preluare” îi preia după următoarea simulare sau rulare, ca persoană fizică sau persoană juridică (cu CUI cu cifre), cu mențiunea „neverificat, preluat manual”; tichetele lor se preiau după „Recitește tot”.</small></p>
+                        <p class="muted"><small>Partenerii ignorați nu se preiau (cei ignorați de versiunile vechi se preiau automat la următoarea sincronizare). „Include în preluare” îi preia după următoarea simulare sau rulare, ca persoană fizică sau persoană juridică (cu CUI cu cifre), cu mențiunea „neverificat, preluat manual”; tichetele lor se preiau după „Recitește tot”.</small></p>
                         @PlanTable(ignoredItems, "ai-plan-ignored", report.Applied, ignoredPaging, true)
                     </details>
                     @if (report.Truncated) { <p class="muted"><small>Sunt afișate primele @report.Items.Count (întâi problemele, apoi ce se preia, la urmă ce nu se preia); restul nu se afișează.</small></p> }
@@ -135,23 +143,9 @@
             {
                 <p class="muted" role="status">Ultima rulare: <strong>@KindLabel(lastRun.Kind)</strong>, @lastRun.StartedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), @lastRun.StartedBy — @lastRun.Status.</p>
             }
-            @if (issues.Count > 0)
-            {
-                <h3>Probleme deschise (@issues.Count)</h3>
-                <div class="table-scroll"><table class="catalog-table" id="ai-issues">
-                    <thead><tr><th>Ce</th><th>Cod ActivityApp</th><th>Denumire</th><th>Problemă</th><th></th></tr></thead>
-                    <tbody>
-                    @foreach (var issue in issues)
-                    {
-                        <tr><td>@EntityLabel(issue.Entity)</td><td>@issue.SourceId</td><td>@issue.SourceName</td><td>@issue.Message</td>
-                            <td><button type="button" class="refresh act-confirm" disabled="@busy" @onclick="() => ResolveAsync(issue.Id)">Marchează rezolvată</button></td></tr>
-                    }
-                    </tbody>
-                </table></div>
-            }
         </fieldset>
         <fieldset class="anaf-section"><legend>4. Tichete rezolvate</legend>
-            <p class="muted"><small>Tichetele rezolvate (cu eveniment de rezolvare) ale tipurilor alese în secțiunea 2, deschise de la data aleasă, care menționează un cuvânt cheie de mentenanță (Nomenclator) în ce s-a făcut, devin intervenții „la cerere” în Mentenanță, la beneficiarul clientului și la punctul de lucru al tichetului (altfel la cel principal). Problema și rezolvarea se despart din raportul lucrării. Se preiau numai după ce clientul a fost preluat (secțiunea 3). Tipurile cu destinația „de mentenanță” nu se preiau încă. Simularea nu scrie nimic.</small></p>
+            <p class="muted"><small>Tichetele rezolvate (cu eveniment de rezolvare) ale tipurilor alese în secțiunea 2, deschise de la data aleasă, intră în coada „Evenimente de validat” (Notificări, „Tichete de validat”), la beneficiarul clientului și la punctul de lucru al tichetului (altfel la cel principal). Niciun tichet nu se înregistrează singur: un operator îl vede, îl preia ca atare sau îl modifică și îl preia, ca mentenanță (tipurile „de mentenanță” și cele cu un cuvânt cheie din Nomenclator sunt propuse așa, chiar dacă punctul nu are contract) sau ca service la cerere, ori îl discardează. Problema și rezolvarea se despart din raportul lucrării. Se preiau numai după ce clientul a fost preluat (secțiunea 3). Simularea nu scrie nimic.</small></p>
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="SimulateTicketsAsync">Simulează tichetele</button>
                 <button type="button" class="primary" disabled="@(busy || ticketReport is null || ticketReport.Applied)" @onclick="() => confirmTickets = true">Aplică tichetele</button>
@@ -159,7 +153,7 @@
             @if (confirmTickets && ticketReport is not null)
             {
                 <div class="success-banner" role="alert">
-                    Se vor înregistra @ticketReport.Tickets.Create intervenții în Mentenanță; @ticketReport.Tickets.Skipped tichete se ignoră, @ticketReport.Tickets.Problems rămân probleme de rezolvat.
+                    Se vor pune @ticketReport.Tickets.Create tichete în coada de validare (nicio intervenție nu se înregistrează singură); @ticketReport.Tickets.Skipped tichete se ignoră, @ticketReport.Tickets.Problems rămân probleme de rezolvat.
                     <div class="editor-actions">
                         <button type="button" class="primary" disabled="@busy" @onclick="ApplyTicketsAsync">Da, aplică</button>
                         <button type="button" class="refresh" disabled="@busy" @onclick="() => confirmTickets = false">Renunță</button>
@@ -168,15 +162,15 @@
             }
             @if (ticketReport is not null)
             {
-                <p class="muted" role="status" id="ai-tickets-title"><strong>@(ticketReport.Applied ? "Tichete preluate" : "Simulare tichete")</strong> la @ticketReport.AtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") de @ticketReport.By, tichete deschise de la @ticketReport.Since.ToString("dd.MM.yyyy"), tipuri: @string.Join(", ", ticketReport.Types).</p>
+                <p class="muted" role="status" id="ai-tickets-title"><strong>@(ticketReport.Applied ? "Tichete puse la validare" : "Simulare tichete")</strong> la @ticketReport.AtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") de @ticketReport.By, tichete deschise de la @ticketReport.Since.ToString("dd.MM.yyyy"), tipuri: @string.Join(", ", ticketReport.Types).</p>
                 @if (ticketReport.StoppedTypes.Count > 0) { <p class="muted"><small>Oprite până la confirmare (nume schimbat în ActivityApp): @string.Join(", ", ticketReport.StoppedTypes).</small></p> }
                 <div class="table-scroll"><table class="catalog-table" id="ai-tickets-summary">
-                    <thead><tr><th>Total</th><th>@(ticketReport.Applied ? "Preluate" : "De preluat")</th><th>Deja preluate</th><th>Probleme</th><th>Ignorate</th></tr></thead>
+                    <thead><tr><th>Total</th><th>@(ticketReport.Applied ? "Puse la validare" : "De pus la validare")</th><th>Deja preluate</th><th>Probleme</th><th>Ignorate</th></tr></thead>
                     <tbody><tr><td>@ticketReport.Tickets.Total</td><td>@ticketReport.Tickets.Create</td><td>@ticketReport.Tickets.AlreadyLinked</td><td>@ticketReport.Tickets.Problems</td><td>@ticketReport.Tickets.Skipped</td></tr></tbody>
                 </table></div>
-                @if (ticketReport.Maintenance > 0 || ticketReport.MentionedOnly > 0 || ticketReport.ToValidate > 0)
+                @if (ticketReport.ToValidate > 0)
                 {
-                    <p class="muted" id="ai-tickets-maintenance"><small>Cuvinte cheie de mentenanță (Nomenclator): @ticketReport.Maintenance @(ticketReport.Applied ? "înregistrate" : "de înregistrat") ca mentenanță (mută scadența), @ticketReport.MentionedOnly menționează mentenanța dar punctul nu are contract activ (rămân la cerere), @ticketReport.ToValidate așteaptă validarea (cuvânt scris greșit sau incomplet; vezi secțiunea 7).</small></p>
+                    <p class="muted" id="ai-tickets-maintenance"><small>@ticketReport.ToValidate @(ticketReport.Applied ? "tichete așteaptă" : "tichete vor aștepta") validarea în Notificări, „Tichete de validat”: @ticketReport.Maintenance propuse ca mentenanță (tip de mentenanță sau cuvânt cheie), @ticketReport.Service ca service.</small></p>
                 }
                 @if (ticketReport.Items.Count > 0)
                 {
@@ -232,103 +226,124 @@
                 @if (ActivitySyncSchedule.NextRun(current, DateTime.Now) is { } nextRun) { <text> Următoarea programată: @nextRun.ToString("dd.MM.yyyy HH:mm")@(current.SyncMode == ActivitySyncSchedule.TimesMode ? "" : ", în fereastra orară").</text> }
             </p>
         </fieldset>
-        <fieldset class="anaf-section"><legend>6. Corespondența câmpurilor</legend>
-            <p class="muted"><small>Din ce coloană a ActivityApp se citește fiecare text al tichetului. Implicit sunt coloanele obișnuite; poți alege alta (doar coloane cu text din același tabel), de exemplu dacă ActivityApp mută textul într-o coloană nouă. Se aplică tichetelor care urmează să fie preluate; cele deja preluate rămân cum sunt. Simulează tichetele după o schimbare, ca să vezi rezultatul.</small></p>
+        <fieldset class="anaf-section"><legend>6. Informațiile din tichet</legend>
+            <p class="muted"><small>Ce se preia din fiecare tichet al ActivityApp și unde ajunge în BlazorStoc. Titlul și numărul se preiau mereu. Celelalte se pot opri (comutatorul Oprit: informația nu se mai citește, nu se mai scrie și nu apare în ferestre) și se poate alege dacă intră în observațiile intervenției, într-un câmp separat sau în ambele. La „Se citește din” poți alege altă coloană cu text din același tabel, de exemplu dacă ActivityApp mută textul. Se aplică tichetelor care urmează să fie preluate; când pornești o informație sau adaugi un câmp, tichetele deja preluate care nu o au se citesc din nou și se actualizează (observațiile se rescriu doar dacă nimeni nu le-a modificat). Simulează tichetele după o schimbare, ca să vezi rezultatul.</small></p>
+            @if (structureChange is { Any: true } change)
+            {
+                <div class="error-banner" role="status" id="ai-structure-change">
+                    Structura tichetelor din ActivityApp s-a modificat față de cea pentru care ai verificat corespondența: @change.Describe(). Preluarea continuă cu corespondența actuală. Verific-o mai jos (poți deschide un tichet exemplu), adapteaz-o noii scheme, apoi apasă „Corespondența verificată”.
+                    <div class="editor-actions"><button type="button" class="refresh act-confirm" id="ai-structure-confirm" disabled="@busy" @onclick="ConfirmStructureAsync">Corespondența verificată</button></div>
+                </div>
+            }
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadFieldsAsync">Citește coloanele din ActivityApp</button>
+                <button type="button" class="refresh act-nav" id="ai-open-sample" disabled="@busy" title="Deschide cel mai recent tichet finalizat din ActivityApp, cu toate coloanele și valorile lui, ca să vezi ce conține fiecare coloană" @onclick="OpenSampleAsync">Deschide un tichet exemplu</button>
                 <button type="button" class="primary" disabled="@(busy || fields is null)" @onclick="SaveFieldsAsync">Salvează corespondența</button>
-                <button type="button" class="refresh act-nav" disabled="@(busy || fields is null)" @onclick="ResetFields">Revino la coloanele implicite</button>
+                <button type="button" class="refresh act-nav" disabled="@(busy || fields is null)" @onclick="ResetFields">Revino la valorile implicite</button>
+                @if (outdated > 0)
+                {
+                    <button type="button" class="refresh act-reload" disabled="@busy" @onclick="RefreshTicketsAsync">Actualizează tichetele preluate (@outdated)</button>
+                }
             </div>
+            @if (outdated > 0) { <p class="muted" id="ai-outdated"><small>@outdated tichete păstrate nu au toate informațiile cerute acum; se actualizează după salvare, la butonul de mai sus sau la următoarea sincronizare.</small></p> }
             @if (fieldsError is not null) { <div class="error-banner" role="alert">@fieldsError</div> }
             @if (fields is not null)
             {
                 <div class="table-scroll"><table class="catalog-table" id="ai-fields">
-                    <thead><tr><th>Text al tichetului</th><th>Tabel</th><th>Coloana implicită</th><th>Se citește din</th><th>La ce se folosește</th></tr></thead>
+                    <thead><tr><th>Informație</th><th>Se preia</th><th>Se citește din</th><th>Se atașează ca</th><th>La ce se folosește</th></tr></thead>
                     <tbody>
                     @foreach (var row in fields)
                     {
                         <tr>
-                            <td>@row.Field.Label</td>
-                            <td>@row.Field.Table</td>
-                            <td>@row.Field.Column</td>
                             <td>
-                                <select aria-label="@($"Coloana pentru {row.Field.Label}")" @bind="row.Column">
-                                    @foreach (var name in row.Choices) { <option value="@name">@name@(name.Equals(row.Field.Column, StringComparison.OrdinalIgnoreCase) ? " (implicit)" : "")</option> }
-                                </select>
-                                @if (row.Missing) { <small class="muted"> coloana aleasă nu mai există în ActivityApp</small> }
+                                @if (row.Item.Mandatory) { <span>@row.Item.Label</span> }
+                                else { <input aria-label="@($"Numele informației {row.Item.Label}")" maxlength="@ActivityFieldMap.MaximumLabel" @bind="row.Label" autocomplete="off" /> }
                             </td>
-                            <td>@row.Field.Purpose</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table></div>
-            }
-        </fieldset>
-        <fieldset class="anaf-section"><legend>7. Evenimente de validat</legend>
-            <p class="muted"><small>Tichete închise cu un cuvânt cheie de mentenanță (găsit exact sau scris greșit sau incomplet, de exemplu de pe aplicația mobilă) la un punct de lucru cu contract de mentenanță activ. Tichetul este deja în intervențiile beneficiarului, la cerere, dar un text cu cuvântul poate spune că mentenanța NU s-a putut face. „Mentenanța s-a făcut” transformă intervenția în mentenanță (scadența următoare se mută după ciclicitatea contractului); „Nu este mentenanță” o lasă la cerere; „Discard” șterge intervenția și tichetul nu se mai preia (poate fi reactivat mai jos). Decizia se păstrează și nu se mai cere.</small></p>
-            <div class="editor-actions">
-                <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadReviewsAsync">Actualizează lista</button>
-            </div>
-            @if (reviews is not null && reviews.Count == 0) { <p class="muted" id="ai-review-empty">Nu sunt evenimente de validat.</p> }
-            @if (reviews is { Count: > 0 })
-            {
-                <div class="table-scroll"><table class="catalog-table" id="ai-reviews">
-                    <thead><tr><th>Tichet</th><th>Beneficiar / punct de lucru</th><th>Data</th><th>Cuvânt cheie</th><th>Scris în tichet</th><th>Ce s-a făcut</th><th>Operații</th></tr></thead>
-                    <tbody>
-                    @foreach (var review in reviews)
-                    {
-                        <tr @key="review.Id">
-                            <td>@review.TicketNumber @review.Title</td>
-                            <td>@review.Beneficiary<br /><small class="muted">@review.WorkPoint</small></td>
-                            <td>@review.PerformedOn.ToString("dd.MM.yyyy")</td>
-                            <td>@review.Keyword</td>
-                            <td>@review.Found</td>
-                            <td>@(review.Resolution.Length > 300 ? review.Resolution[..300] + "…" : review.Resolution)</td>
                             <td>
-                                @if (discardingReview == review.Id)
+                                @if (row.Item.Mandatory) { <span>Mereu</span> }
+                                else { <ToggleSwitch Compact @bind-Value="row.Enabled" OnText="Pornit" OffText="Oprit" AriaLabel="@($"Se preia: {row.Item.Label}")" /> }
+                            </td>
+                            <td>
+                                @if (row.Column is not null)
                                 {
-                                    <span class="muted">Discard? Intervenția se șterge și tichetul nu se mai preia.</span>
-                                    <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Confirmă discard: tichetul {review.TicketNumber}")" title="Da, discard" @onclick="() => DecideAsync(review.Id, ReviewDecision.Discard)"></button>
-                                    <button type="button" class="row-icon close" disabled="@busy" aria-label="Renunță la discard" title="Renunță" @onclick="() => discardingReview = null"></button>
+                                    <select aria-label="@($"Coloana pentru {row.Item.Label}")" disabled="@(!row.Enabled)" @bind="row.Column">
+                                        @foreach (var name in row.Choices) { <option value="@name">@name@(name.Equals(row.DefaultColumn, StringComparison.OrdinalIgnoreCase) ? " (implicit)" : "")</option> }
+                                    </select>
+                                    @if (row.Missing) { <small class="muted"> coloana aleasă nu mai există în ActivityApp</small> }
                                 }
+                                else { <span class="muted">din raport și problemă</span> }
+                            </td>
+                            <td>
+                                @if (row.Item.Mandatory) { <span>În observații și titlu</span> }
                                 else
                                 {
-                                    <button type="button" class="row-icon check" disabled="@busy" aria-label="@($"Mentenanța s-a făcut: tichetul {review.TicketNumber}")" title="Mentenanța s-a făcut (intervenția devine mentenanță)" @onclick="() => DecideAsync(review.Id, ReviewDecision.Maintenance)"></button>
-                                    <button type="button" class="row-icon close" disabled="@busy" aria-label="@($"Nu este mentenanță: tichetul {review.TicketNumber}")" title="Nu este mentenanță (rămâne la cerere)" @onclick="() => DecideAsync(review.Id, ReviewDecision.OnDemand)"></button>
-                                    <button type="button" class="row-icon delete" disabled="@busy" aria-label="@($"Discard tichet: {review.TicketNumber}")" title="Discard tichet (nu se mai preia)" @onclick="() => discardingReview = review.Id"></button>
+                                    <select aria-label="@($"Se atașează ca: {row.Item.Label}")" disabled="@(!row.Enabled)" @bind="row.Target">
+                                        <option value="@ActivityFieldMap.Notes">În observații</option>
+                                        <option value="@ActivityFieldMap.Separate">Câmp separat</option>
+                                        <option value="@ActivityFieldMap.Both">Observații și câmp separat</option>
+                                    </select>
                                 }
                             </td>
+                            <td>@row.Item.Purpose</td>
                         </tr>
                     }
                     </tbody>
                 </table></div>
-            }
-            <h3>Tichete discardate</h3>
-            <div class="editor-actions">
-                <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadDiscardedAsync">Arată tichetele discardate</button>
-            </div>
-            @if (discardedTickets is not null && discardedTickets.Count == 0) { <p class="muted" id="ai-discarded-empty">Nu sunt tichete discardate.</p> }
-            @if (discardedTickets is { Count: > 0 })
-            {
-                <div class="table-scroll"><table class="catalog-table" id="ai-discarded">
-                    <thead><tr><th>Tichet</th><th>Discardat de</th><th>La data</th><th>Operații</th></tr></thead>
-                    <tbody>
-                    @foreach (var discarded in discardedTickets)
-                    {
-                        <tr @key="discarded.TicketId">
-                            <td>@discarded.TicketNumber @discarded.Title</td>
-                            <td>@discarded.DiscardedBy</td>
-                            <td>@discarded.DiscardedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
-                            <td><button type="button" class="row-icon undo" disabled="@busy" aria-label="@($"Reactivează tichetul {discarded.TicketNumber}")" title="Reactivează tichetul (se preia la următoarea sincronizare)" @onclick="() => ReactivateAsync(discarded.TicketId)"></button></td>
-                        </tr>
-                    }
-                    </tbody>
-                </table></div>
+                <h3>Câmpuri suplimentare</h3>
+                <p class="muted"><small>Orice coloană cu text din tabelul Tickete sau EvenimenteAgent, cu numele ales de tine; apare în ferestrele tichetului și, după destinație, în observații. Cel mult @ActivityFieldMap.MaximumExtras câmpuri.</small></p>
+                @if (extras.Count > 0)
+                {
+                    <div class="table-scroll"><table class="catalog-table" id="ai-extras">
+                        <thead><tr><th>Nume</th><th>Tabel</th><th>Coloana</th><th>Se atașează ca</th><th>Operații</th></tr></thead>
+                        <tbody>
+                        @foreach (var extra in extras)
+                        {
+                            <tr @key="extra">
+                                <td><input aria-label="@($"Numele câmpului {extra.Column}")" maxlength="@ActivityFieldMap.MaximumLabel" @bind="extra.Label" /></td>
+                                <td>@extra.Table</td>
+                                <td>@extra.Column</td>
+                                <td>
+                                    <select aria-label="@($"Se atașează ca: {extra.Label}")" @bind="extra.Target">
+                                        <option value="@ActivityFieldMap.Notes">În observații</option>
+                                        <option value="@ActivityFieldMap.Separate">Câmp separat</option>
+                                        <option value="@ActivityFieldMap.Both">Observații și câmp separat</option>
+                                    </select>
+                                </td>
+                                <td><button type="button" class="row-icon delete" aria-label="@($"Scoate câmpul {extra.Label}")" title="@($"Scoate câmpul {extra.Label}")" disabled="@busy" @onclick="() => RemoveExtra(extra)"></button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table></div>
+                }
+                <div class="anaf-grid" id="ai-extra-add">
+                    <label>Tabel
+                        <select aria-label="Tabelul câmpului suplimentar" @bind="newTable">
+                            @foreach (var table in ActivityFieldMap.ExtraTables) { <option value="@table">@table</option> }
+                        </select>
+                    </label>
+                    <label>Coloana
+                        <select aria-label="Coloana câmpului suplimentar" @bind="newColumn">
+                            <option value="">— alege —</option>
+                            @foreach (var name in AvailableForNew) { <option value="@name">@name</option> }
+                        </select>
+                    </label>
+                    <label>Nume afișat<input aria-label="Numele câmpului suplimentar" maxlength="@ActivityFieldMap.MaximumLabel" @bind="newLabel" autocomplete="off" /></label>
+                </div>
+                @if (textColumns is null) { <p class="muted"><small>Apasă „Citește coloanele din ActivityApp” ca să vezi coloanele din care poți alege.</small></p> }
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-confirm" disabled="@(busy || newColumn.Length == 0 || newLabel.Trim().Length == 0 || extras.Count >= ActivityFieldMap.MaximumExtras)" @onclick="AddExtra">Adaugă câmp</button>
+                </div>
             }
         </fieldset>
     }
     </div>
 </section>
+@if (sample is { } shownSample)
+{
+    var shownMap = Settings(out var shownProblem);
+    <TicketSampleDialog Sample="shownSample" Map="shownMap" Problem="@shownProblem" Targets="SampleTargets" HasNewer="@(sampleIndex > 0)" Busy="sampleBusy" Error="@sampleError"
+                        Older="OlderSampleAsync" Newer="NewerSample" Close="CloseSample" Assign="AssignFromSample" />
+}
 
 @code {
     private sealed class Row(ActivityTypeItem item)
@@ -387,7 +402,8 @@
             var saved = await Import.GetSavedTypesAsync(lifetime.Token);
             if (saved.Items.Count > 0) types = [.. saved.Items.Select(item => new Row(item))];
             // The saved correspondence of the fields is shown at once too (the column lists come with "Citește coloanele din ActivityApp").
-            fields = [.. (await Import.GetFieldChoicesAsync(false, lifetime.Token)).Fields.Select(choice => new FieldRow(choice))];
+            Show(await Import.GetFieldChoicesAsync(false, lifetime.Token));
+            await CountOutdatedAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException ex) { error = ex.Message; }
@@ -399,10 +415,10 @@
     {
         current = settings; enabled = settings.Enabled; server = settings.Server; port = settings.Port; database = settings.Database; user = settings.User; hasPassword = settings.HasPassword;
         since = settings.SinceDate ?? settings.EffectiveSince(DateOnly.FromDateTime(DateTime.Now)); fromHour = settings.WindowFromHour; toHour = settings.WindowToHour; pageSize = settings.PageSize;
-        fillEmpty = settings.FillEmptyFields; syncEnabled = settings.SyncEnabled; syncHours = settings.SyncIntervalMinutes / 60; syncMinutes = settings.SyncIntervalMinutes % 60; syncMode = settings.SyncMode; syncTimes = settings.SyncTimes; password = "";
+        fillEmpty = settings.FillEmptyFields; syncEnabled = settings.SyncEnabled; syncHours = settings.SyncIntervalMinutes / 60; syncMinutes = settings.SyncIntervalMinutes % 60; syncMode = settings.SyncMode; syncTimes = settings.SyncTimes; takePartners = settings.TakePartners; autoAcceptPartners = settings.AutoAcceptPartners; password = "";
     }
 
-    private ActivityImportInput Input => new(enabled, server, port, database, user, string.IsNullOrEmpty(password) ? null : password, since, fromHour, toHour, pageSize, fillEmpty, syncEnabled, syncHours * 60 + syncMinutes, syncMode, syncTimes);
+    private ActivityImportInput Input => new(enabled, server, port, database, user, string.IsNullOrEmpty(password) ? null : password, since, fromHour, toHour, pageSize, fillEmpty, syncEnabled, syncHours * 60 + syncMinutes, syncMode, syncTimes, takePartners, autoAcceptPartners);
 
     private static string Count(int? value) => value?.ToString() ?? "—";
 
@@ -450,7 +466,6 @@
 
     private ImportReport? report;
     private ImportRunInfo? lastRun;
-    private List<ImportIssue> issues = [];
     private bool confirmApply;
 
     private async Task LoadImportStateAsync()
@@ -458,8 +473,6 @@
         try
         {
             lastRun = await Partners.GetLastRunAsync(lifetime.Token);
-            issues = [.. await Partners.GetOpenIssuesAsync(lifetime.Token)];
-            reviews = await Reviews.GetPendingAsync(lifetime.Token);
         }
         catch (AccessDeniedException) { }
     }
@@ -488,12 +501,6 @@
         report = await Partners.SimulateAsync(lifetime.Token);
         await LoadImportStateAsync();
         noticeOk = true; notice = "Partenerul a fost inclus în preluare (neverificat, preluat manual); apare în lista de preluat. Tichetele lui se preiau după „Recitește tot”.";
-    }, "partners");
-
-    private Task ResolveAsync(long id) => RunAsync("Se marchează…", async () =>
-    {
-        await Partners.ResolveIssueAsync(id, lifetime.Token);
-        await LoadImportStateAsync();
     }, "partners");
 
     private TicketReport? ticketReport;
@@ -564,84 +571,212 @@
         var progress = new Progress<string>(text => { busyText = text; _ = InvokeAsync(StateHasChanged); });
         ticketReport = await Tickets.ApplyAsync(progress, lifetime.Token);
         await LoadImportStateAsync();
-        noticeOk = true; notice = $"Tichete preluate: {ticketReport.Tickets.Create} intervenții înregistrate, {ticketReport.Tickets.Problems} probleme.";
+        noticeOk = true; notice = $"Tichete puse la validare: {ticketReport.Tickets.Create} (Notificări, „Tichete de validat”), {ticketReport.Tickets.Problems} probleme.";
     });
 
-    private sealed class FieldRow(ActivityFieldChoice choice)
+    private sealed class FieldRow(ActivityInfoItem item, ActivityFieldChoice? choice, bool enabled, string target)
     {
-        public ActivityMappableField Field { get; } = choice.Field;
-        public bool Missing { get; } = choice.CurrentMissing;
-        public string Column { get; set; } = choice.Current;
+        public ActivityInfoItem Item { get; } = item;
+        // The name shown for the piece of information (editable for the optional ones).
+        public string Label { get; set; } = item.Label;
+        public bool Enabled { get; set; } = item.Mandatory || enabled;
+        public string Target { get; set; } = target;
+        public string DefaultColumn { get; } = choice?.Field.Column ?? "";
+        public bool Missing { get; } = choice?.CurrentMissing ?? false;
+        // Null for a piece that is not read from a column of its own (the resolution comes from the problem and the report).
+        public string? Column { get; set; } = choice?.Current;
+        public string? FieldKey => choice?.Field.Key;
         // The columns found in ActivityApp; the one in use and the default are always listed (so a column that is gone is still shown, and the default can be chosen back).
-        public List<string> Choices { get; } = [.. choice.Available.Concat([choice.Current, choice.Field.Column]).Distinct(StringComparer.OrdinalIgnoreCase)];
+        public List<string> Choices { get; } = choice is null ? [] : [.. choice.Available.Concat([choice.Current, choice.Field.Column]).Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    private sealed class ExtraRow(string table, string column, string label, string target)
+    {
+        public string Table { get; } = table;
+        public string Column { get; } = column;
+        public string Label { get; set; } = label;
+        public string Target { get; set; } = target;
     }
 
     private List<FieldRow>? fields;
+    private readonly List<ExtraRow> extras = [];
+    private IReadOnlyDictionary<string, IReadOnlyList<string>>? textColumns;
+    private string newTable = ActivityFieldMap.ExtraTables[0], newColumn = "", newLabel = "";
     private string? fieldsError;
+    private int outdated;
+    private TicketStructureDiff? structureChange;
+
+    private IEnumerable<string> AvailableForNew =>
+        (textColumns is not null && textColumns.TryGetValue(newTable, out var list) ? list : [])
+            .Where(name => !extras.Any(extra => extra.Table == newTable && extra.Column.Equals(name, StringComparison.OrdinalIgnoreCase)));
+
+    // The rows of the screen from the settings in force (and, when the source was read, the columns ActivityApp has now).
+    private void Show(ActivityFieldMapView view)
+    {
+        fieldsError = view.SourceError;
+        structureChange = view.StructureChange;
+        var map = view.Map ?? ActivityFieldMap.Empty;
+        fields = [.. ActivityFieldMap.Info.Select(item => new FieldRow(item, item.FieldKey is null ? null : view.Fields.FirstOrDefault(choice => choice.Field.Key == item.FieldKey), map.IsEnabled(item.Key), item.Mandatory ? ActivityFieldMap.Notes : map.TargetOf(item.Key)) { Label = map.LabelOf(item.Key) })];
+        extras.Clear();
+        extras.AddRange(map.Extras.Select(extra => new ExtraRow(extra.Table, extra.Column, extra.Label, extra.Target)));
+        if (view.TextColumns is not null) textColumns = view.TextColumns;
+        newColumn = "";
+    }
 
     private async Task ReadFieldsAsync()
     {
-        var view = await Import.GetFieldChoicesAsync(true, lifetime.Token);
-        fieldsError = view.SourceError;
-        fields = [.. view.Fields.Select(choice => new FieldRow(choice))];
+        Show(await Import.GetFieldChoicesAsync(true, lifetime.Token));
+        await CountOutdatedAsync();
+    }
+
+    private async Task CountOutdatedAsync()
+    {
+        try { outdated = await Refresh.CountOutdatedAsync(lifetime.Token); }
+        catch (Exception ex) when (ex is ActivityImportException or AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { outdated = 0; }
     }
 
     private Task LoadFieldsAsync() => RunAsync("Se citesc coloanele…", ReadFieldsAsync);
 
+    // The settings as the screen holds them: only the columns that differ from the default, the pieces switched off, the destinations chosen and the extra fields.
+    private ActivityFieldMap? Settings(out string? problem)
+    {
+        var columns = fields!.Where(row => row.FieldKey is not null && row.Column is not null).ToDictionary(row => row.FieldKey!, row => row.Column!);
+        var off = fields!.Where(row => !row.Item.Mandatory && !row.Enabled).Select(row => row.Item.Key);
+        var targets = fields!.Where(row => !row.Item.Mandatory).ToDictionary(row => row.Item.Key, row => row.Target);
+        var labels = fields!.Where(row => !row.Item.Mandatory).ToDictionary(row => row.Item.Key, row => row.Label);
+        return ActivityFieldMap.Create(columns, off, targets, extras.Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), labels, out problem);
+    }
+
     private Task SaveFieldsAsync() => RunAsync("Se salvează corespondența…", async () =>
     {
-        await Import.SaveFieldMapAsync(fields!.ToDictionary(row => row.Field.Key, row => row.Column), lifetime.Token);
+        var settings = Settings(out var problem) ?? throw new ActivityImportException(problem ?? "Corespondența câmpurilor nu este validă.");
+        await Import.SaveFieldSettingsAsync(settings, lifetime.Token);
         await ReadFieldsAsync();
         noticeOk = true; notice = "Corespondența câmpurilor a fost salvată.";
+        if (outdated > 0) await RefreshAfterSaveAsync();
     });
+
+    // After a save that asks for more than the tickets kept hold: they are read again at once. A failure here (no connection, ActivityApp does not answer) leaves the settings saved.
+    private async Task RefreshAfterSaveAsync()
+    {
+        try { await RefreshCoreAsync(); }
+        catch (Exception ex) when (ex is ActivityImportException or ActivitySourceException)
+        {
+            noticeOk = true; notice = "Corespondența a fost salvată, dar tichetele preluate nu s-au putut actualiza acum: " + ex.Message + " Se actualizează la următoarea sincronizare.";
+        }
+    }
+
+    private async Task RefreshCoreAsync()
+    {
+        var progress = new Progress<string>(text => { busyText = text; _ = InvokeAsync(StateHasChanged); });
+        var report = await Refresh.RefreshAsync(progress, lifetime.Token);
+        await CountOutdatedAsync();
+        noticeOk = report.Problems.Count == 0;
+        notice = $"Corespondența a fost salvată. Tichete actualizate: {report.Updated}" + (report.NotFound > 0 ? $", {report.NotFound} negăsite în ActivityApp" : "") +
+            $"; înregistrări sursă rescrise: {report.SourceRecords}; observații actualizate: {report.NotesUpdated}" + (report.NotesEdited > 0 ? $", {report.NotesEdited} modificate de operator (lăsate neatinse)" : "") +
+            (report.Problems.Count > 0 ? "; probleme: " + string.Join(" ", report.Problems.Take(3)) : ".");
+    }
+
+    private Task RefreshTicketsAsync() => RunAsync("Se actualizează tichetele preluate…", RefreshCoreAsync);
+
+    private void AddExtra()
+    {
+        var label = newLabel.Trim();
+        if (newColumn.Length == 0 || label.Length == 0) return;
+        if (extras.Any(extra => extra.Label.Equals(label, StringComparison.OrdinalIgnoreCase)) || ActivityFieldMap.Info.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)))
+        {
+            fieldsError = $"Numele „{label}” este deja folosit."; return;
+        }
+        fieldsError = null;
+        extras.Add(new ExtraRow(newTable, newColumn, label, ActivityFieldMap.Both));
+        newColumn = ""; newLabel = "";
+    }
+
+    private void RemoveExtra(ExtraRow extra) => extras.Remove(extra);
+
+    // The correspondence was checked for the structure ActivityApp has now: the notification ends and the next changes are compared with this structure.
+    private Task ConfirmStructureAsync() => RunAsync("Se confirmă structura…", async () =>
+    {
+        await Import.ConfirmTicketStructureAsync(lifetime.Token);
+        await ReadFieldsAsync();
+        noticeOk = true; notice = "Corespondența a fost confirmată pentru structura actuală a tichetelor din ActivityApp.";
+    });
+
+    // The example ticket: the newest finished one, and the ones before it as "Tichet anterior"; the ones already loaded are kept for "Tichet mai nou". Nothing of them is kept after the window is closed.
+    private readonly List<TicketSample> samples = [];
+    private int sampleIndex;
+    private bool sampleBusy;
+    private string? sampleError;
+    private TicketSample? sample => samples.Count > 0 ? samples[sampleIndex] : null;
+
+    private IReadOnlyList<TicketSampleDialog.SampleTarget> SampleTargets =>
+        [.. ActivityFieldMap.Info.Where(item => item.FieldKey is not null).Select(item => new TicketSampleDialog.SampleTarget(item.Key, fields?.FirstOrDefault(row => row.Item.Key == item.Key)?.Label ?? item.Label, item.FieldKey!.Split('.')[0]))];
+
+    private Task OpenSampleAsync() => RunAsync("Se citește tichetul exemplu…", async () =>
+    {
+        var view = await Import.GetTicketSampleAsync(null, lifetime.Token);
+        if (view.Sample is null) { fieldsError = view.Error; return; }
+        fieldsError = null; sampleError = null;
+        samples.Clear(); samples.Add(view.Sample); sampleIndex = 0;
+    });
+
+    private async Task OlderSampleAsync()
+    {
+        if (sampleBusy || sample is not { } current) return;
+        if (sampleIndex < samples.Count - 1) { sampleIndex++; sampleError = null; return; }
+        sampleBusy = true; sampleError = null;
+        try
+        {
+            var view = await Import.GetTicketSampleAsync(current.TicketId, lifetime.Token);
+            if (view.Sample is null) sampleError = view.Error;
+            else { samples.Add(view.Sample); sampleIndex = samples.Count - 1; }
+        }
+        catch (Exception ex) when (ex is ActivityImportException or ActivitySourceException or AccessDeniedException) { sampleError = ex.Message; }
+        finally { sampleBusy = false; }
+    }
+
+    private void NewerSample() { if (sampleIndex > 0) { sampleIndex--; sampleError = null; } }
+
+    private void CloseSample() { samples.Clear(); sampleIndex = 0; sampleError = null; }
+
+    // A column chosen in the window: it becomes the column of the information (a column of the same table), or a new extra field named after it.
+    private void AssignFromSample(TicketSampleDialog.SampleAssignment choice)
+    {
+        sampleError = null;
+        if (choice.For == "extra")
+        {
+            if (extras.Count >= ActivityFieldMap.MaximumExtras) { sampleError = $"Cel mult {ActivityFieldMap.MaximumExtras} câmpuri suplimentare."; return; }
+            if (extras.Any(extra => extra.Table == choice.Table && extra.Column.Equals(choice.Column, StringComparison.OrdinalIgnoreCase))) { sampleError = "Coloana este deja câmp suplimentar."; return; }
+            var label = choice.Column;
+            for (var number = 2; extras.Any(extra => extra.Label.Equals(label, StringComparison.OrdinalIgnoreCase)) || ActivityFieldMap.Info.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)); number++) label = $"{choice.Column} ({number})";
+            extras.Add(new ExtraRow(choice.Table, choice.Column, label, ActivityFieldMap.Both));
+            return;
+        }
+        if (fields?.FirstOrDefault(row => row.Item.Key == choice.For) is not { Column: not null } target) return;
+        if (!target.Choices.Contains(choice.Column, StringComparer.OrdinalIgnoreCase)) target.Choices.Add(choice.Column);
+        target.Column = choice.Column;
+        target.Enabled = true;
+    }
 
     private void ResetFields()
     {
-        foreach (var row in fields!) row.Column = row.Field.Column;
+        foreach (var row in fields!)
+        {
+            if (row.Column is not null) row.Column = row.DefaultColumn;
+            row.Enabled = true;
+            row.Target = row.Item.DefaultTarget;
+            row.Label = row.Item.Label;
+        }
+        extras.Clear();
     }
 
-
-    private IReadOnlyList<ActivityReviewItem>? reviews;
-
-    private async Task ReadReviewsAsync() => reviews = await Reviews.GetPendingAsync(lifetime.Token);
-
-    private Task LoadReviewsAsync() => RunAsync("Se citește lista…", ReadReviewsAsync);
-
-    private long? discardingReview;
-    private IReadOnlyList<ActivityDiscardedTicket>? discardedTickets;
-
-    private async Task ReadDiscardedAsync() => discardedTickets = await Reviews.GetDiscardedAsync(lifetime.Token);
-
-    private Task DecideAsync(long id, ReviewDecision decision) => RunAsync("Se salvează decizia…", async () =>
-    {
-        discardingReview = null;
-        await Reviews.DecideAsync(id, decision, lifetime.Token);
-        await ReadReviewsAsync();
-        if (discardedTickets is not null) await ReadDiscardedAsync();
-        noticeOk = true;
-        notice = decision switch
-        {
-            ReviewDecision.Maintenance => "Decizia a fost salvată: intervenția a devenit mentenanță (scadența următoare s-a mutat după ciclicitatea contractului).",
-            ReviewDecision.OnDemand => "Decizia a fost salvată: intervenția rămâne la cerere.",
-            _ => "Tichetul a fost discardat: intervenția a fost ștearsă și tichetul nu se mai preia."
-        };
-    });
-
-    private Task LoadDiscardedAsync() => RunAsync("Se citește lista…", ReadDiscardedAsync);
-
-    private Task ReactivateAsync(long ticketId) => RunAsync("Se reactivează…", async () =>
-    {
-        await Reviews.ReactivateAsync(ticketId, lifetime.Token);
-        await ReadDiscardedAsync();
-        noticeOk = true; notice = "Tichetul a fost reactivat: se preia la următoarea sincronizare sau la „Importă acum”.";
-    });
 
     private Task ResetReadingAsync() => RunAsync("Se salvează…", async () =>
     {
         await Sync.ResetReadingAsync(lifetime.Token);
         noticeOk = true; notice = "Următoarea sincronizare citește din nou toate tichetele.";
     });
-    private bool syncEnabled;
+    private bool syncEnabled, takePartners = true, autoAcceptPartners = true;
     private string syncMode = ActivitySyncSchedule.IntervalMode, syncTimes = "";
     private int syncHours = ActivityImportRules.DefaultSyncMinutes / 60, syncMinutes = ActivityImportRules.DefaultSyncMinutes % 60;
 

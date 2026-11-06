@@ -1,0 +1,211 @@
+@page "/preluare-elcomtur"
+@namespace BlazorStoc.Components.Pages
+@attribute [Authorize(Policy = "perm:elcomtur.import")]
+@attribute [BlazorStoc.Modules.Module(BlazorStoc.Modules.Elcomtur.ElcomturModule.ModuleId)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using BlazorStoc.Modules.Elcomtur
+@using BlazorStoc.Services
+@inject IElcomturImportService Import
+@inject IElcomturBalanceRepository Balances
+@inject IJSRuntime Js
+@inject ILogger<ElcomturImport> Logger
+@implements IAsyncDisposable
+<PageBoundary>
+
+<PageTitle>Preluare date Elcomtur · BlazorStoc</PageTitle>
+<div class="page-heading">
+    <div><p class="eyebrow">ADMINISTRARE</p><h1>Preluare date Elcomtur</h1><p class="muted">Din backup-ul programului Elcomtur (fișier .elc) se calculează balanța de plată a fiecărui client persoană juridică care este beneficiar în BlazorStoc: facturat minus încasat. Balanța și facturile neachitate apar în fișa beneficiarului și în Notificări. Beneficiarii se potrivesc după CUI; nu se creează beneficiari noi.</p></div>
+</div>
+@if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+@if (notice is not null) { <div class="success-banner" role="status" id="elcomtur-notice">@notice</div> }
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Ultima preluare</h2></div>
+    <div class="catalog-body" id="elcomtur-info">
+        @if (!infoLoaded) { <p class="muted" role="status">Se citește…</p> }
+        else if (info is null) { <p class="muted">Nu s-a făcut nicio preluare: beneficiarii nu au balanță Elcomtur.</p> }
+        else { <p>Date din backup-ul de la <strong>@StockMovementRules.DisplayDate(info.DataDate)</strong> (firma <strong>@info.Firm</strong>), preluate la @info.ImportedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") de @info.ImportedBy; @info.Beneficiaries beneficiari cu balanță.</p> }
+    </div>
+</section>
+
+<section class="catalog">
+    <div class="catalog-heading"><h2>Fișier Elcomtur</h2></div>
+    <div class="catalog-body">
+        <FileDropZone Id="elcomtur-file" Accept=".elc" Disabled="@busy" OnChange="FileChosenAsync" Text="Alege backup-ul Elcomtur (.elc)" />
+        @if (uploading) { <p class="muted" role="status" id="elcomtur-uploading">@(percent < 100 ? $"Se încarcă fișierul: {percent}%…" : "Fișierul este încărcat; se verifică…")</p> }
+        else if (busy) { <p class="muted" role="status">@busyText</p> }
+        @if (fileId is not null && firms.Count > 1)
+        {
+            <div class="editor-grid">
+                <label for="elcomtur-firm">Firma din arhivă
+                    <select id="elcomtur-firm" value="@firm" @onchange="FirmChangedAsync" disabled="@busy">
+                        @foreach (var item in firms) { <option value="@item">@item</option> }
+                    </select><small>Se preiau datele unei singure firme; implicit firma1 (Electric Standard Prest).</small></label>
+            </div>
+        }
+    </div>
+    @if (report is not null)
+    {
+        <div class="table-scroll">
+            <table class="catalog-table" id="elcomtur-report">
+                <caption class="sr-only">Rezultatul @(report.Applied ? "preluării" : "simulării")</caption>
+                <tbody>
+                    <tr><th scope="row">Firma, data backup-ului</th><td>@report.Firm · @StockMovementRules.DisplayDate(report.DataDate)</td></tr>
+                    <tr><th scope="row">Clienți în arhivă</th><td>@report.Clients (persoane juridice: @report.LegalClients)</td></tr>
+                    <tr><th scope="row">Potriviți cu beneficiari (după CUI)</th><td><strong>@report.Matched</strong></td></tr>
+                    <tr><th scope="row">Cu plăți restante</th><td><strong>@report.MatchedOwed</strong> · total <strong>@ElcomturFormat.Money(report.OwedTotal)</strong></td></tr>
+                    <tr><th scope="row">Clienți cu sold pozitiv, fără beneficiar</th><td>@report.UnmatchedOwed · total @ElcomturFormat.Money(report.UnmatchedOwedTotal)</td></tr>
+                </tbody>
+            </table>
+        </div>
+        @if (report.UnmatchedList.Count > 0)
+        {
+            <div class="catalog-body">
+                <h3>Clienți cu sold pozitiv care nu sunt beneficiari @(report.UnmatchedOwed > report.UnmatchedList.Count ? $"(primii {report.UnmatchedList.Count} după sold)" : "")</h3>
+                <p class="muted"><small>Nu se preiau: adaugă-i ca beneficiari (cu același CUI) și repetă preluarea ca să li se calculeze balanța.</small></p>
+            </div>
+            <Paged Items="report.UnmatchedList" Id="elcomtur-unmatched-size" Context="pageRows">
+                <div class="table-scroll"><table class="catalog-table" id="elcomtur-unmatched">
+                    <thead><tr><th>Cod Elcomtur</th><th>Client</th><th>CUI</th><th>Sold</th></tr></thead>
+                    <tbody>
+                    @foreach (var client in pageRows) { <tr><td>@client.Code</td><td>@client.Name</td><td>@client.Cui</td><td>@ElcomturFormat.Money(client.Balance)</td></tr> }
+                    </tbody>
+                </table></div>
+            </Paged>
+        }
+        @if (!report.Applied)
+        {
+            <div class="catalog-body">
+                <div class="editor-actions">
+                    <button type="button" class="primary" id="elcomtur-apply" disabled="@(busy || report.Matched == 0)" @onclick="ApplyAsync">Aplică preluarea</button>
+                    <button type="button" class="refresh act-close" disabled="@busy" @onclick="DiscardAsync">Renunță</button>
+                </div>
+                <p class="muted"><small>Simularea nu a scris nimic. La aplicare balanțele existente se înlocuiesc cu cele din acest backup; operația se înscrie în jurnal.</small></p>
+            </div>
+        }
+    }
+</section>
+
+</PageBoundary>
+
+@code {
+    private ElcomturImportInfo? info;
+    private bool infoLoaded, busy, uploading, disposed;
+    private string busyText = "";
+    private int percent;
+    private string? error, notice, fileId, firm;
+    private IReadOnlyList<string> firms = [];
+    private ElcomturReport? report;
+    private DotNetObjectReference<ElcomturImport>? reference;
+
+    protected override async Task OnInitializedAsync() => await LoadInfoAsync();
+
+    private async Task LoadInfoAsync()
+    {
+        try { info = await Balances.GetInfoAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Report(exception); }
+        infoLoaded = true;
+    }
+
+    private async Task FileChosenAsync(InputFileChangeEventArgs args)
+    {
+        if (busy) return;
+        error = notice = null;
+        report = null;
+        await ForgetFileAsync();
+        busy = uploading = true;
+        percent = 0;
+        // The file (hundreds of MB) does not go through the connection of the page: the browser sends it in one HTTP request (wwwroot/update-upload.js -> /api/elcomtur/incarcare).
+        reference?.Dispose();
+        reference = DotNetObjectReference.Create(this);
+        try { await Js.InvokeVoidAsync("updateUpload.send", "elcomtur-file", reference, args.File.Name, "/api/elcomtur/incarcare", "X-File-Name"); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            error = "Încărcarea nu a putut porni. Reîncarcă pagina și încearcă din nou.";
+            busy = uploading = false;
+        }
+    }
+
+    [JSInvokable]
+    public Task UploadProgress(int value) => InvokeAsync(() => { if (disposed) return; percent = value; StateHasChanged(); });
+
+    [JSInvokable]
+    public Task UploadFinished(string? id, string? failure) => InvokeAsync(async () =>
+    {
+        if (disposed) return;
+        uploading = false;
+        if (failure is not null) { error = failure; busy = false; StateHasChanged(); return; }
+        fileId = id;
+        try
+        {
+            firms = await Import.GetFirmsAsync(id!);
+            firm = firms.FirstOrDefault(item => string.Equals(item, "firma1", StringComparison.OrdinalIgnoreCase)) ?? firms.FirstOrDefault();
+            busyText = "Se citește arhiva și se simulează preluarea…";
+            StateHasChanged();
+            if (firm is not null) report = await Import.RunAsync(id!, firm, apply: false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Report(exception); }
+        busy = false;
+        StateHasChanged();
+    });
+
+    private async Task FirmChangedAsync(ChangeEventArgs args)
+    {
+        if (busy || fileId is null || args.Value?.ToString() is not { Length: > 0 } chosen) return;
+        firm = chosen;
+        await RunAsync("Se simulează preluarea…", async () => report = await Import.RunAsync(fileId, chosen, apply: false));
+    }
+
+    private Task ApplyAsync() => RunAsync("Se aplică preluarea…", async () =>
+    {
+        if (fileId is null || firm is null) return;
+        report = await Import.RunAsync(fileId, firm, apply: true);
+        notice = $"Preluare aplicată: {report.Matched} beneficiari cu balanță, {report.MatchedOwed} cu plăți restante (total {ElcomturFormat.Money(report.OwedTotal)}).";
+        await Import.DiscardAsync(fileId);
+        fileId = null;
+        await LoadInfoAsync();
+    });
+
+    private async Task DiscardAsync()
+    {
+        await ForgetFileAsync();
+        report = null;
+    }
+
+    private async Task ForgetFileAsync()
+    {
+        var id = fileId;
+        fileId = null; firm = null; firms = [];
+        if (id is null) return;
+        try { await Import.DiscardAsync(id); } catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogWarning("Elcomtur upload could not be discarded ({ErrorType}).", exception.GetType().Name); }
+    }
+
+    private async Task RunAsync(string working, Func<Task> action)
+    {
+        if (busy) return;
+        busy = true; busyText = working; error = notice = null;
+        try { await action(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Report(exception); }
+        finally { busy = false; }
+    }
+
+    private void Report(Exception exception)
+    {
+        switch (exception)
+        {
+            case ElcomturOperationException or AccessDeniedException: error = exception.Message; break;
+            case BlazorStoc.Modules.ModuleUnavailableException: error = "Modulul Elcomtur este oprit sau indisponibil momentan."; break;
+            default:
+                Logger.LogError("Elcomtur import failed ({ErrorType}).", exception.GetType().Name);
+                error = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației.";
+                break;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        reference?.Dispose();
+        if (fileId is not null) { try { await Import.DiscardAsync(fileId); } catch (Exception) { } }
+    }
+}

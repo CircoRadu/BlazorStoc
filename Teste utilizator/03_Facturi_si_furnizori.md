@@ -86,3 +86,15 @@ Pasi:
 1. Furnizor nou -> factura prin preluare -> intrari legate de factura.
 2. Corectare numar pe /facturi -> jurnal.
 3. Furnizor -> pagina lui -> lista facturilor.
+
+## Modificari de testat - adaugarea in popup (04.11.2026)
+
+**Ce s-a adaugat:** adaugarea unui furnizor se face intr-un popup peste pagina; editarea ramane in pagina.
+**Ce face acum:** butonul de adaugare deschide popup-ul; salvarea si inchiderea functioneaza ca inainte.
+
+| Nr | Pas | Rezultat asteptat | Rezultat |
+|----|-----|-------------------|----------|
+| 1 | Apasa "Adauga furnizor" | Se deschide popup-ul cu formularul | |
+| 2 | Scrie ceva si apasa "Inchide" | Intrebarea "Parasesti editarea?" | |
+| 3 | Salveaza | furnizor apare in lista | |
+| 4 | Creion pe un rand existent | Editarea se deschide in pagina (nu in popup) | |

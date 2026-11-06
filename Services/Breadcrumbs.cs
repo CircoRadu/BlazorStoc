@@ -69,6 +69,7 @@ public static partial class Breadcrumbs
                     : parts.Length == 2 ? Chain(new("Administrare"), new("Vehicule", "/vehicule"), new("Vehicul"))
                     : Chain(new("Administrare"), new("Vehicule", "/vehicule"), new("Vehicul", $"/vehicule/{id}"), new("Echipamente"));
             case "nomenclator": return Chain(new("Administrare"), new("Nomenclator"));
+            case "preluare-elcomtur": return Chain(new("Administrare"), new("Preluare date Elcomtur"));
             case "mentenanta": return parts.Length == 1 ? Chain(new("Mentenanță")) : Chain(new("Mentenanță", "/mentenanta"), new("Harta"));
             case "intretinere": return Chain(new("Întreținere"));
             case "oferte":

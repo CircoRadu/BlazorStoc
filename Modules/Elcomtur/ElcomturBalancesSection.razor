@@ -1,0 +1,74 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Modules.Elcomtur
+@using BlazorStoc.Services
+@inject IElcomturBalanceRepository Balances
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+@inject ILogger<ElcomturBalancesSection> Logger
+
+@* The beneficiaries with payments overdue or due according to the last import of the Elcomtur backup (a tab of the Notifications page). A list only: it makes no notification. The icon opens the
+   Elcomtur balance section of the file of the beneficiary. *@
+<section class="catalog" id="elcomtur-balances">
+    <div class="catalog-heading"><h2>Balanțe restante <span class="count-badge">@(owed?.Count ?? 0)</span></h2>@if (info is not null) { <span class="balance-date" id="elcomtur-balances-date">Balanța este generată la <strong>@StockMovementRules.DisplayDate(info.DataDate)</strong></span> }</div>
+    <div class="catalog-body">
+        <p class="muted"><small>Beneficiarii cu balanță pozitivă (facturat minus încasat) după ultima preluare din backup-ul Elcomtur. Nu se generează notificări; lista se schimbă la fiecare preluare din Administrare → Preluare date Elcomtur.</small></p>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (owed is null && error is null) { <p class="muted" role="status">Se citește lista…</p> }
+        else if (owed is { Count: 0 }) { <p class="muted" id="elcomtur-balances-empty">Niciun beneficiar nu are plăți restante.</p> }
+        else if (owed is not null) { <p id="elcomtur-balances-total">Total plăți restante: <strong>@ElcomturFormat.Money(owed.Sum(item => item.Balance))</strong></p> }
+    </div>
+    @if (owed is { Count: > 0 })
+    {
+        var today = Today;
+        <Paged Items="Sorted" Id="elcomtur-balances-size" Context="pageRows">
+            <div class="table-scroll"><table class="catalog-table notification-table" id="elcomtur-balances-table">
+                <thead><tr><th>BENEFICIAR</th><th aria-sort="@(descending ? "descending" : "ascending")"><button type="button" class="sort-header" id="elcomtur-sort" @onclick="ToggleSort" aria-label="Sortează după balanță @(descending ? "crescător" : "descrescător")">BALANȚĂ <span aria-hidden="true">@(descending ? "▼" : "▲")</span></button></th><th>FACTURI DEPĂȘITE</th><th>FACTURI ÎN TERMEN</th><th>DATE LA</th><th><span class="sr-only">Operații</span></th></tr></thead>
+                <tbody>
+                @foreach (var item in pageRows)
+                {
+                    <tr @key="item.BeneficiaryId">
+                        <td><a class="category-table-link" href="@($"/beneficiari/{item.BeneficiaryId}")"><strong>@item.BeneficiaryName</strong></a></td>
+                        <td><strong>@ElcomturFormat.Money(item.Balance)</strong></td>
+                        <td>@item.Overdue(today).Count</td>
+                        <td>@item.InTerm(today).Count</td>
+                        <td>@StockMovementRules.DisplayDate(item.DataDate)</td>
+                        <td class="row-actions"><button type="button" class="row-icon view" aria-label="@($"Vezi balanța beneficiarului {item.BeneficiaryName}")" title="@($"Vezi balanța beneficiarului {item.BeneficiaryName}")" @onclick="() => Open(item.BeneficiaryId)"></button></td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </Paged>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<BeneficiaryBalance>? owed;
+    private ElcomturImportInfo? info;
+    private string? error;
+    // Largest balance first by default; the header of the balance column reverses it.
+    private bool descending = true;
+    private IReadOnlyList<BeneficiaryBalance> Sorted => owed is null ? [] : [.. (descending ? owed.OrderByDescending(item => item.Balance) : owed.OrderBy(item => item.Balance)).ThenBy(item => item.BeneficiaryName, StringComparer.CurrentCultureIgnoreCase)];
+    private void ToggleSort() => descending = !descending;
+
+    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            owed = await Balances.GetOwedAsync();
+            info = await Balances.GetInfoAsync();
+        }
+        catch (Exception exception) when (exception is AccessDeniedException) { error = exception.Message; owed = []; }
+        catch (BlazorStoc.Modules.ModuleUnavailableException) { error = "Modulul Elcomtur este oprit sau indisponibil momentan."; owed = []; }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError("Elcomtur balances loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Lista balanțelor nu a putut fi încărcată.";
+            owed = [];
+        }
+    }
+
+    // The link of the icon: the file of the beneficiary with the balance section open.
+    private void Open(int beneficiaryId) => Navigation.NavigateTo($"/beneficiari/{beneficiaryId}?balanta=1");
+}

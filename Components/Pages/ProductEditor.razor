@@ -20,8 +20,8 @@
             <div class="editor-grid">
                 <label class="full-width" for="product-code">@(HasParameters ? "Model" : ProductCode.Label) *<input id="product-code" value="@CodeText" @oninput="args => CodeText = args.Value?.ToString() ?? string.Empty" maxlength="100" autocomplete="off" aria-describedby="product-code-note" />@if (HasParameters) { <small id="product-code-note" class="form-note">Introdu modelul stabilit de producător, fără variantă (aceasta se alege mai jos). Codul produsului se compune din model și valorile alese.</small> } else { <small id="product-code-note" class="form-note">Introdu codul stabilit de producător. Codul trebuie să fie unic în catalog.</small> }<ValidationMessage For="() => input.Name" /></label>
                 @if (InvoiceAmbiguity.Found(CodeText) is { Length: > 0 } codeDoubt) { <p class="uncertain-note full-width" id="product-code-doubt" role="status"><span class="uncertain-badge">⚠ caractere nesigure: @codeDoubt</span> Codul conține caractere care se confundă ușor cu litere sau cifre (o liniuță verticală în loc de I, l sau 1 etc.). Verifică-l: căutarea imaginii folosește exact acest cod.</p> }
-                <label for="product-category">Categorie *<InputSelect id="product-category" @bind-Value="input.Category" @bind-Value:after="CategoryChangedAsync">@foreach (var category in Categories) { <option value="@category">@category</option> }</InputSelect><ValidationMessage For="() => input.Category" /></label>
-                <label for="product-subcategory">Subcategorie *<InputSelect id="product-subcategory" @bind-Value="input.Subcategory" @bind-Value:after="GroupChanged">@foreach (var subcategory in Subcategories) { <option value="@subcategory">@subcategory</option> }</InputSelect><ValidationMessage For="() => input.Subcategory" /></label>
+                <GroupTreePicker Id="product-group" Categories="Categories" Nodes="treeNodes" Flat="CurrentGroups" Category="@input.Category" Subcategory="@input.Subcategory" Disabled="saving" Picked="GroupPickedAsync" />
+                <ValidationMessage class="full-width" For="() => input.Subcategory" />
                 <p class="form-note full-width">Poți selecta numai categorii și subcategorii existente. Pentru o structură nouă, folosește pagina <a href="/categorii">Categorii și subcategorii</a>@if (Original is null) { <text> sau <button type="button" class="refresh act-confirm" @onclick="OpenCategories">Adaugă categorie / subcategorie</button> (se deschide într-o fereastră separată)</text> }.</p>
                 @if (!HasSelectableGroup) { <p class="validation-message full-width" role="alert">Nu există nicio combinație categorie–subcategorie disponibilă. Creează mai întâi o subcategorie în pagina dedicată.</p> }
                 @if (HasParameters)
@@ -222,8 +222,9 @@
         if (names.Count == 0 && !string.IsNullOrWhiteSpace(input.Subcategory)) names.Add(input.Subcategory);
         return names;
     }
-    private bool InLineage(string subcategory) => Lineage().Contains(subcategory, StringComparer.OrdinalIgnoreCase);
-    private int LineageIndex(string subcategory) => Lineage().FindIndex(name => string.Equals(name, subcategory, StringComparison.OrdinalIgnoreCase));
+    // A definition with no subcategory belongs to the category and reaches every subcategory of it (migration 56).
+    private bool InLineage(string subcategory) => subcategory.Length == 0 || Lineage().Contains(subcategory, StringComparer.OrdinalIgnoreCase);
+    private int LineageIndex(string subcategory) => subcategory.Length == 0 ? -1 : Lineage().FindIndex(name => string.Equals(name, subcategory, StringComparison.OrdinalIgnoreCase));
     private bool IsLeafName(string subcategory) => treeNodes.FirstOrDefault(item => string.Equals(item.Category, input.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Name, subcategory, StringComparison.OrdinalIgnoreCase))?.IsLeaf ?? true;
 
     private int inVehicles;
@@ -441,9 +442,11 @@
             await InvokeAsync(StateHasChanged);
         }
     }
-    private Task CategoryChangedAsync()
+    // A leaf of the tree was chosen: its category and subcategory replace the old ones; the parameters and tags of the leaf (with the inherited ones) follow.
+    private Task GroupPickedAsync(ProductGroup group)
     {
-        input.Subcategory = Subcategories.FirstOrDefault() ?? "";
+        input.Category = group.Category;
+        input.Subcategory = group.Subcategory;
         GroupChanged();
         return Task.CompletedTask;
     }

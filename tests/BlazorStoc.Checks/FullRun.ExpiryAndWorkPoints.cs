@@ -118,6 +118,10 @@ public static partial class FullRun
             Check(Coordinates("45.7489, 21.2087") == "45.7489|21.2087" && Coordinates("45.7489 21.2087") == "45.7489|21.2087" && Coordinates("45,7489 21,2087") == "45.7489|21.2087" &&
                   Coordinates("45,7489; 21,2087") == "45.7489|21.2087" && Coordinates("-33.8688,151.2093") == "-33.8688|151.2093" && Coordinates("45.12345678, 21.1") == "45.123457|21.1",
                 "Coordinates are read as pasted from a map (dot or comma decimals, comma, space or semicolon between) and rounded to 6 decimals");
+            static string Located(string text) => WorkPointCoordinates.TryParseLocated(text, out var latitude, out var longitude) ? WorkPointCoordinates.Format(latitude, longitude) : "none";
+            Check(Located("45,8827287, 22,9065762") == "45.882729, 22.906576" && Located("45.8827, 22.9065") == "45.8827, 22.9065" && Located("45.88 , 22.9") == "45.88, 22.9" &&
+                  Located("0,0") == "none" && Located("0, 0") == "none" && Located("0.0, 0.0") == "none" && Located("") == "none" && Located("abc") == "none",
+                "Event coordinates: decimal commas are read as dots, dot pairs as they are, 0,0 and unreadable text are ignored");
             Check(Coordinates("") == "error" && Coordinates("abc") == "error" && Coordinates("45.7") == "error" && Coordinates("45.7, 21.2, 3") == "error" && Coordinates("90.1, 10") == "error" &&
                   Coordinates("-91, 10") == "error" && Coordinates("10, 180.5") == "error" && Coordinates("90, 180") == "90|180" && Coordinates("-90, -180") == "-90|-180",
                 "Unreadable coordinates and values out of range (latitude -90..90, longitude -180..180) are refused");

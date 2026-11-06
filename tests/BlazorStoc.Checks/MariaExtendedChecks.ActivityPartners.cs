@@ -77,14 +77,14 @@ public static partial class MariaExtendedChecks
             var beneficiariesBefore = await Count("SELECT COUNT(*) FROM beneficiaries");
             var pointsBefore = await Count("SELECT COUNT(*) FROM beneficiary_work_points");
             var simulation = await partners.SimulateAsync();
-            Check(!simulation.Applied && simulation.Partners is { Total: 5, Create: 1, Link: 1, Problems: 1, Skipped: 2 } && simulation.Points is { Total: 5, Link: 2, Create: 2, Skipped: 1 },
-                "Activity partners: the simulation counts what an application would do (1 beneficiary to create, 1 to link, 1 problem, 2 persons not taken; 2 points to link, 2 to create, 1 skipped)");
+            Check(!simulation.Applied && simulation.Partners is { Total: 5, Create: 3, Link: 1, Problems: 1, Skipped: 0 } && simulation.Points is { Total: 5, Link: 3, Create: 2, Skipped: 0 },
+                "Activity partners: the simulation counts what an application would do (3 beneficiaries to create - one company and 2 persons, 1 to link, 1 problem; 3 points to link, 2 to create)");
             Check(await Count("SELECT COUNT(*) FROM beneficiaries") == beneficiariesBefore && await Count("SELECT COUNT(*) FROM beneficiary_work_points") == pointsBefore && await Count("SELECT COUNT(*) FROM activity_import_map") == 0,
                 "Activity partners: the simulation writes nothing (no beneficiary, no work point, no tie)");
             Check(simulation.Items.Count(item => item.Action == "Problem") == 1 && simulation.Items.Any(item => item.SourceId == 9005 && item.Message.Contains("adres", StringComparison.Ordinal))
-                && simulation.Items.Any(item => item.SourceId == 9004 && item.Action == "Skipped" && item.Message == ActivityPartnerPlanner.PersonNotTaken) && simulation.AnafUnverified == 1
-                && simulation.Items[0].Action == "Problem" && simulation.Items.Single(item => item.SourceId == 9001).Action == "Create" && simulation.Items.Single(item => item.SourceId == 9001).Message.Contains("De verificat", StringComparison.Ordinal) && simulation.Items[^1].Action == "Skipped",
-                "Activity partners: the report lists first the problem, then the company to create (to verify), and last what is not taken (the persons and their points)");
+                && simulation.Items.Any(item => item.SourceId == 9004 && item.Action == "Create" && item.Message.Contains(ActivityPartnerPlanner.PersonNote, StringComparison.Ordinal)) && simulation.AnafUnverified == 1
+                && simulation.Items[0].Action == "Problem" && simulation.Items.Single(item => item.SourceId == 9001).Action == "Create" && simulation.Items.Single(item => item.SourceId == 9001).Message.Contains("De verificat", StringComparison.Ordinal),
+                "Activity partners: the report lists first the problem, then the company to create (to verify), then the persons to create");
             Check(await Count("SELECT COUNT(*) FROM activity_import_runs WHERE kind='simulation' AND status='completed'") == 1, "Activity partners: the simulation is recorded as a run");
 
             var notEnabled = 0;
@@ -93,10 +93,11 @@ public static partial class MariaExtendedChecks
             await settings.SaveSettingsAsync(new ActivityImportInput(true, "SERVER-" + suffix, 1433, "TIPActivity", "citire", null, null, 0, 24, 200, false));
 
             var applied = await partners.ApplyAsync();
-            Check(applied.Applied && applied.Partners is { Create: 1, Link: 1, Problems: 1, Skipped: 2 } && applied.Points is { Create: 2, Link: 2, Skipped: 1 }, "Activity partners: the application does what the simulation showed");
+            Check(applied.Applied && applied.Partners is { Create: 3, Link: 1, Problems: 1, Skipped: 0 } && applied.Points is { Create: 2, Link: 3, Skipped: 0 }, "Activity partners: the application does what the simulation showed");
             var created = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Cui == cuiNew);
             Check(created.Name == $"Ext Import Nou {suffix} SRL" && created.Address == "Str. Florilor 5, Timisoara, Timis" && created.Phone == "0722111222" && !created.IsIndividual, "Activity partners: a company is created with the CUI without RO, the address put together and the phone normalized");
-            Check(await Named("Ext Import Persoana " + suffix) == 0 && applied.Items.Any(item => item.SourceId == 9003 && item.Action == "Skipped"), "Activity partners: a partner without tax id is a person: not imported, listed as ignored");
+            var person = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == "Ext Import Persoana " + suffix);
+            Check(person is { Kind: BeneficiaryKinds.Individual, AnafVerified: false } && applied.Items.All(item => item.SourceId != 9003 || item.Action == "Create"), "Activity partners: a partner without tax id is a person: taken automatically as an individual, not verified in ANAF");
             var createdPoints = await workPoints.GetAsync(created.Id);
             var depot = createdPoints.Single(point => point.Name == "Depozit");
             Check(createdPoints.Count == 2 && createdPoints.Count(point => point.IsPrimary) == 1 && depot.Latitude == 45.7489m && depot.Longitude == 21.2087m && depot.Description.Contains("sistat", StringComparison.Ordinal),
@@ -104,32 +105,37 @@ public static partial class MariaExtendedChecks
             var existingPoints = await workPoints.GetAsync(existing.Id);
             Check((await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Id == existing.Id) == existing && existingPoints.Count == 2 && existingPoints.Single(point => !point.IsPrimary) is { Name: "Magazin" } shop && shop.Description.Contains("inactiv", StringComparison.Ordinal),
                 "Activity partners: an existing beneficiary is not changed; its main point is tied to the point with the same address and the other becomes an additional point");
-            Check(await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='partner'") == 4 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='workpoint'") == 4
-                && await Count($"SELECT COUNT(*) FROM activity_import_map WHERE entity='partner' AND source_id=9002 AND local_id={existing.Id} AND origin='linked'") == 1 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE origin='created'") == 3 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE origin='ignored' AND local_id=0") == 2,
-                "Activity partners: the ties are remembered (the beneficiary created, the existing one linked, the 2 persons marked as ignored, 4 points)");
+            Check(await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='partner'") == 4 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='workpoint'") == 5
+                && await Count($"SELECT COUNT(*) FROM activity_import_map WHERE entity='partner' AND source_id=9002 AND local_id={existing.Id} AND origin='linked'") == 1 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE origin='created'") == 5 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE local_id=0") == 0,
+                "Activity partners: the ties are remembered (3 beneficiaries created, the existing one linked, 5 points, no partner marked as ignored)");
             Check(await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE status='pending' AND reason='anaf_unavailable' AND beneficiary_id IS NOT NULL") == 1 && await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE partner_id=9005 AND status='pending' AND beneficiary_id IS NULL") == 1
                 && (await new MariaBeneficiaryCheckService(configuration, admin, audit, beneficiaries).GetPendingAsync()).Count == 2,
                 "Activity partners: the company that ANAF could not verify and the one without address are in the queue of the beneficiaries to verify"); 
             var openIssues = await partners.GetOpenIssuesAsync();
-            Check(openIssues.Count == 1 && openIssues.Any(issue => issue.SourceId == 9005 && issue.Message.Contains("adres", StringComparison.Ordinal)), "Activity partners: what could not be imported is kept as open problems");
+            Check(openIssues.Count == 0 && await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE partner_id=9005 AND status='pending' AND beneficiary_id IS NULL") == 1, "Activity partners: a partner that could not be imported waits in the queue of the beneficiaries to verify, not in the list of problems");
 
             var beneficiariesAfter = await Count("SELECT COUNT(*) FROM beneficiaries");
             var pointsAfter = await Count("SELECT COUNT(*) FROM beneficiary_work_points");
             var again = await partners.ApplyAsync();
-            Check(again.Partners is { Create: 0, Link: 0, AlreadyLinked: 2, Problems: 1, Skipped: 2 } && again.Points.Create == 0 && await Count("SELECT COUNT(*) FROM beneficiaries") == beneficiariesAfter && await Count("SELECT COUNT(*) FROM beneficiary_work_points") == pointsAfter,
+            Check(again.Partners is { Create: 0, Link: 0, AlreadyLinked: 4, Problems: 1, Skipped: 0 } && again.Points.Create == 0 && await Count("SELECT COUNT(*) FROM beneficiaries") == beneficiariesAfter && await Count("SELECT COUNT(*) FROM beneficiary_work_points") == pointsAfter,
                 "Activity partners: a second application creates nothing again (the ties make it idempotent)");
-            Check((await partners.GetOpenIssuesAsync()).Count == 1, "Activity partners: the problems of the new application replace the open ones (no duplicates)");
+            Check((await partners.GetOpenIssuesAsync()).Count == 0 && await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE partner_id=9005") == 1, "Activity partners: the queue holds one row for a partner however many times it is planned (no duplicates)");
 
             // The partner whose address was missing is completed in ActivityApp: the next application takes it (and its problem goes away).
             fake.Partners = [.. fake.Partners.Select(partner => partner.Id == 9005 ? partner with { Address = "Str. B 2", City = "Oras", County = "J" } : partner)];
             var fixedUp = await partners.ApplyAsync();
             Check(fixedUp.Partners.Create == 1 && fixedUp.Partners.Problems == 0 && (await partners.GetOpenIssuesAsync()).Count == 0 && await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE partner_id=9005 AND reason='anaf_unavailable' AND beneficiary_id IS NOT NULL") == 1,
                 "Activity partners: a partner completed in ActivityApp is taken at the next application, its problem is gone, and it is still to verify (ANAF could not answer)");
-            // A new problem (a name too long for a beneficiary), to mark as resolved.
-            fake.Partners = [.. fake.Partners, new(9006, $"Ext Import Lung {suffix} " + new string('x', 210), "RO" + cuiNew + "9", "Str. Lunga 1", "Oras", "J", "0722000444", "")];
+            // A name too long for a beneficiary waits in the queue with the reason; a tie to a beneficiary deleted since is a problem for the administrator (to mark as resolved).
+            await Exec(probe, "INSERT INTO activity_import_map (entity, source_id, local_id, origin, content_hash, imported_utc) VALUES ('partner', 9007, 99999999, 'linked', '', NOW())");
+            fake.Partners = [.. fake.Partners, new(9006, $"Ext Import Lung {suffix} " + new string('x', 210), "RO" + cuiNew + "9", "Str. Lunga 1", "Oras", "J", "0722000444", ""),
+                new(9007, $"Ext Import Sters {suffix} SRL", "RO" + cuiNew + "8", "Str. Stearsa 1", "Oras", "J", "0722000555", "")];
             await partners.ApplyAsync();
+            Check(await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE partner_id=9006 AND status='pending' AND reason='invalid_data'") == 1, "Activity partners: a partner whose data BlazorStoc refuses waits in the queue with the reason");
             await partners.ResolveIssueAsync((await partners.GetOpenIssuesAsync()).Single().Id);
             Check((await partners.GetOpenIssuesAsync()).Count == 0 && await Count("SELECT COUNT(*) FROM activity_import_issues WHERE resolved=1") == 1, "Activity partners: a problem marked resolved leaves the open list and is kept");
+            fake.Partners = [.. fake.Partners.Where(partner => partner.Id < 9006)];
+            await Exec(probe, "DELETE FROM activity_import_map WHERE source_id=9007");
 
             fake.Failure = new ActivitySourceException("ActivityApp nu a răspuns la timp.");
             var down = 0;
@@ -144,13 +150,14 @@ public static partial class MariaExtendedChecks
             var creations = (await audit.QueryAsync(new AuditQuery(Text: $"Ext Import Nou {suffix}", Entity: AuditEntities.Beneficiary), 1, 20)).Events;
             Check(creations.Any(entry => entry.ActorUsername == "integration.tester"), "Activity partners: the beneficiaries created by the import are in the journal under the administrator who ran it");
 
-            // An ignored person included by hand is taken as an individual, not verified in ANAF, and the inclusion is journaled.
-            await partners.IncludeAsync(9003, false);
-            await partners.ApplyAsync();
+            // A person an earlier version marked as ignored (a tie with no beneficiary) is taken by the next application.
             var manual = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == "Ext Import Persoana " + suffix);
-            Check(manual is { Kind: BeneficiaryKinds.Individual, AnafVerified: false } && await Count($"SELECT COUNT(*) FROM activity_import_map WHERE entity='partner' AND source_id=9003 AND local_id={manual.Id} AND origin='created'") == 1
-                && (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 100)).Events.Any(entry => entry.TimestampUtc >= started && entry.Action == AuditActions.IncludeActivityPartner && entry.Details.Contains("neverificat, preluat manual", StringComparison.Ordinal)),
-                "Activity partners: an ignored person included by hand is created as an individual, not verified, and the inclusion is journaled");
+            await Exec(probe, $"UPDATE activity_import_map SET local_id=0, origin='ignored' WHERE entity='partner' AND source_id=9003");
+            await beneficiaries.DeleteAsync(manual, "Ext import test: persoana ignorata de o versiune veche");
+            await partners.ApplyAsync();
+            var retaken = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == "Ext Import Persoana " + suffix);
+            Check(retaken is { Kind: BeneficiaryKinds.Individual } && await Count($"SELECT COUNT(*) FROM activity_import_map WHERE entity='partner' AND source_id=9003 AND local_id={retaken.Id} AND origin='created'") == 1,
+                "Activity partners: a person marked as ignored by an earlier version is taken by the next application");
             var includeTwice = 0;
             try { await partners.IncludeAsync(9003, false); } catch (ActivityImportException) { includeTwice++; }
             Check(includeTwice == 1, "Activity partners: a partner already taken cannot be included again");
@@ -224,6 +231,23 @@ public static partial class MariaExtendedChecks
             var checkEvents = (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.ActivityImport), 1, 300)).Events.Where(entry => entry.TimestampUtc >= started).ToList();
             Check(checkEvents.Any(entry => entry.Action == AuditActions.RetryActivityPartnerCheck) && checkEvents.Any(entry => entry.Action == AuditActions.DiscardActivityPartner && entry.Details.Contains("Motiv", StringComparison.Ordinal)),
                 "Activity partners: a retry that verifies and a discard are in the journal by their exact action");
+
+            // Automatic import off: a clean partner waits in the queue, nothing is created, its point waits too; accepted by hand it becomes a beneficiary (and the notification counts the queue as one).
+            await settings.SaveSettingsAsync(new ActivityImportInput(true, "SERVER-" + suffix, 1433, "TIPActivity", "citire", null, null, 0, 24, 200, false, AutoAcceptPartners: false));
+            Check(!(await settings.GetSettingsAsync()).AutoAcceptPartners && (await settings.GetSettingsAsync()).TakePartners, "Activity partners: the choice of the manual acceptance is saved (and the one to take the partners without tickets stays on)");
+            fake.Partners = [new(9401, $"Ext Import Manual {suffix}", "-", "Str. Manuala 4", "Oras", "J", "0722000999", "")];
+            fake.Points = [new(9411, 9401, "Str. Manuala 4", "Oras", "J", "", "", "", true, null)];
+            var manualRun = await partners.ApplyAsync();
+            Check(manualRun.Partners.Waiting == 1 && manualRun.Partners.Create == 0 && await Named("Ext Import Manual " + suffix) == 0 && manualRun.Points.Create == 0
+                  && await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE partner_id=9401 AND status='pending' AND reason='awaiting_acceptance' AND beneficiary_id IS NULL") == 1 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='workpoint' AND source_id=9411") == 0,
+                "Activity partners: with the automatic import off a new partner waits in the queue (no beneficiary, no work point) until it is accepted");
+            var awaiting = (await new MariaBeneficiaryCheckService(configuration, admin, audit, beneficiaries, null, partners).GetPendingAsync()).Single(item => item.PartnerId == 9401);
+            Check(awaiting.ReasonText.Contains("acceptarea manuală", StringComparison.Ordinal) && ActivityPartnerCheckSource.Instances([awaiting]).Single().Values[ActivityPartnerCheckSource.NameKey] == "un beneficiar", "Activity partners: the queue says the partner waits for the manual acceptance and the notification counts it");
+            await new MariaBeneficiaryCheckService(configuration, admin, audit, beneficiaries, null, partners).AcceptAsync(awaiting.Id);
+            var accepted = (await beneficiaries.GetBeneficiariesAsync()).Single(item => item.Name == "Ext Import Manual " + suffix);
+            Check(accepted.IsIndividual && await Count("SELECT COUNT(*) FROM activity_import_partner_checks WHERE partner_id=9401 AND status='resolved'") == 1 && await Count("SELECT COUNT(*) FROM activity_import_map WHERE entity='partner' AND source_id=9401 AND origin='created'") == 1
+                  && (await workPoints.GetAsync(accepted.Id)).Count == 1, "Activity partners: accepted by hand, the partner is made a beneficiary with its work point and leaves the queue");
+            await settings.SaveSettingsAsync(new ActivityImportInput(true, "SERVER-" + suffix, 1433, "TIPActivity", "citire", null, null, 0, 24, 200, false));
 
             var operatorAccess = new TestAccessControl(false, "operator.ext");
             var denied = new MariaActivityPartnerImportService(configuration, settings, fake, beneficiaries, workPoints, operatorAccess, audit);

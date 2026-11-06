@@ -25,6 +25,20 @@ public interface ISubcategoryTree
     // into its own subtree, exceed the maximum depth, put a child under a subcategory that has products, repeat a parameter or tag name of the new ancestors, or
     // cut products from parameter values or tags they have from their present ancestors.
     Task<SubcategoryMoveResult> MoveAsync(ProductGroup node, ProductGroup? newParent, string targetCategory, int position, CancellationToken cancellationToken = default);
+    // A branch that changes its ancestors keeps the parameters, families and tags it inherited (they are copied onto the moved node, or merged into the namesakes of the new ancestors),
+    // and gets those of the new ancestors. MoveAsync above throws MoveNeedsVerificationException when that is the case: the preview (a rolled-back run) lists what happens, the move
+    // with the choices applies it. Without definitions involved the preview is plain and the plain MoveAsync does the work.
+    Task<BranchMovePreview> PreviewMoveAsync(ProductGroup node, ProductGroup? newParent, string targetCategory, int position, BranchMoveChoices? choices, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new BranchMovePreview([], [], []));
+    Task<SubcategoryMoveResult> MoveAsync(ProductGroup node, ProductGroup? newParent, string targetCategory, int position, BranchMoveChoices choices, CancellationToken cancellationToken = default) =>
+        MoveAsync(node, newParent, targetCategory, position, cancellationToken);
+    // A leaf (a subcategory with no children) becomes a category (stage 7): the category takes the leaf's name, the leaf stays under it as the only subcategory with the new name
+    // (the products, parameters and tags stay on it; what it inherited from the old parents is copied onto it as in a branch move). The new category goes at the given place
+    // among the categories (0 = first). Everything runs in one transaction; the preview is the same run rolled back. Administrator only.
+    Task<BranchMovePreview> PreviewPromotionAsync(ProductGroup leaf, string newName, int categoryPosition, BranchMoveChoices? choices, CancellationToken cancellationToken = default) =>
+        throw new ProductOperationException(SubcategoryTreeRules.PromotionUnavailableMessage);
+    Task<SubcategoryMoveResult> PromoteAsync(ProductGroup leaf, string newName, int categoryPosition, BranchMoveChoices choices, CancellationToken cancellationToken = default) =>
+        throw new ProductOperationException(SubcategoryTreeRules.PromotionUnavailableMessage);
 }
 
 public static class SubcategoryTreeRules
@@ -32,6 +46,9 @@ public static class SubcategoryTreeRules
     // The depth cap itself is a setting (Setari -> Catalog, at most CatalogSettingsRules.MaxSubcategoryDepth); this is only the guard of the walks in memory.
     public const int WalkGuard = CatalogSettingsRules.MaxSubcategoryDepth;
     public const string LeafOnlyProductsMessage = "Produsele se asociază numai subcategoriilor fără subcategorii copil (frunze). Alege o subcategorie de la ultimul nivel.";
+    public const string PromotionUnavailableMessage = "Transformarea unei subcategorii în categorie nu este disponibilă în acest catalog.";
+    public const string PromoteLeafOnlyMessage = "Doar subcategoriile fără subcategorii copil pot deveni categorii. Mută întâi copiii sau trage o frunză.";
+    public static string PromotionSameNameMessage(string category) => $"Subcategoria nouă trebuie să aibă alt nume decât categoria «{category}»: numele categoriilor și ale subcategoriilor sunt unice împreună.";
     public const string HasChildrenMessage = "Subcategoria are subcategorii copil și nu poate fi ștearsă. Șterge sau mută întâi copiii.";
     public const string CategoryChangeNotRootMessage = "O subcategorie copil rămâne în categoria părintelui ei. Categoria se schimbă numai la o subcategorie de la primul nivel.";
     public static string TooDeepMessage(int maximum) => $"Arborele de subcategorii poate avea cel mult {maximum} niveluri (Setări → Catalog).";
@@ -187,9 +204,89 @@ public sealed partial class MariaProductRepository : ISubcategoryTree
         return new ProductGroup(result.CategoryName, cleanName);
     }
 
-    public async Task<SubcategoryMoveResult> MoveAsync(ProductGroup node, ProductGroup? newParent, string targetCategory, int position, CancellationToken cancellationToken = default)
+    private sealed class DryRunMove(BranchMovePreview preview) : Exception("Previzualizare")
+    {
+        public BranchMovePreview Preview { get; } = preview;
+    }
+
+    public Task<SubcategoryMoveResult> MoveAsync(ProductGroup node, ProductGroup? newParent, string targetCategory, int position, CancellationToken cancellationToken = default) =>
+        MoveCoreAsync(node, newParent, targetCategory, position, null, false, null, cancellationToken);
+
+    public Task<SubcategoryMoveResult> MoveAsync(ProductGroup node, ProductGroup? newParent, string targetCategory, int position, BranchMoveChoices choices, CancellationToken cancellationToken = default) =>
+        MoveCoreAsync(node, newParent, targetCategory, position, choices, false, null, cancellationToken);
+
+    public async Task<BranchMovePreview> PreviewMoveAsync(ProductGroup node, ProductGroup? newParent, string targetCategory, int position, BranchMoveChoices? choices, CancellationToken cancellationToken = default)
+    {
+        try { await MoveCoreAsync(node, newParent, targetCategory, position, choices, true, null, cancellationToken).ConfigureAwait(false); }
+        catch (DryRunMove done) { return done.Preview; }
+        return new BranchMovePreview([], [], []);
+    }
+
+    // The promotion of a leaf to a category (stage 7) is a branch move into a category created in the same transaction, after the leaf got its new name.
+    private sealed record PromotionRequest(string NewName, int CategoryPosition);
+
+    public async Task<BranchMovePreview> PreviewPromotionAsync(ProductGroup leaf, string newName, int categoryPosition, BranchMoveChoices? choices, CancellationToken cancellationToken = default)
+    {
+        try { await MoveCoreAsync(leaf, null, "", 0, choices, true, new PromotionRequest(newName, categoryPosition), cancellationToken).ConfigureAwait(false); }
+        catch (DryRunMove done) { return done.Preview; }
+        return new BranchMovePreview([], [], []);
+    }
+
+    public Task<SubcategoryMoveResult> PromoteAsync(ProductGroup leaf, string newName, int categoryPosition, BranchMoveChoices choices, CancellationToken cancellationToken = default) =>
+        MoveCoreAsync(leaf, null, "", 0, choices, false, new PromotionRequest(newName, categoryPosition), cancellationToken);
+
+    // Before the move: the leaf is renamed (its old name goes to the new category) and the category is created at its place. Returns the leaf under its new name, the new category and the products on the leaf.
+    private static async Task<(ProductGroup Leaf, string Category, int Products)> PromoteStepAsync(MySqlConnection connection, MySqlTransaction transaction, ProductGroup leaf, PromotionRequest request, CancellationToken token)
+    {
+        int id; string oldName, oldCategory;
+        await using (var find = Command(connection, transaction, """
+            SELECT s.id,s.name,c.name FROM subcategories s INNER JOIN categories c ON c.id=s.category_id
+            WHERE s.normalized_name=@sub AND c.normalized_name=@cat FOR UPDATE
+            """, ("@sub", TextNormalization.UniquenessKey(leaf.Subcategory)), ("@cat", TextNormalization.UniquenessKey(leaf.Category))))
+        await using (var reader = await find.ExecuteReaderAsync(token).ConfigureAwait(false))
+        {
+            if (!await reader.ReadAsync(token).ConfigureAwait(false)) throw new ProductOperationException("Subcategoria nu mai există. Actualizează lista.");
+            (id, oldName, oldCategory) = (checked((int)reader.GetInt64(0)), reader.GetString(1), reader.GetString(2));
+        }
+        if (await SubcategoryAncestry.HasChildrenAsync(connection, transaction, id, token).ConfigureAwait(false)) throw new ProductOperationException(SubcategoryTreeRules.PromoteLeafOnlyMessage);
+        var name = ProductGroupManagementRules.Name(request.NewName, "Denumire subcategorie");
+        var key = TextNormalization.UniquenessKey(name);
+        if (key == TextNormalization.UniquenessKey(oldName)) throw new ProductOperationException(SubcategoryTreeRules.PromotionSameNameMessage(oldName));
+        await using (var sameSubcategory = Command(connection, transaction, """
+            SELECT s.name,c.name FROM subcategories s INNER JOIN categories c ON c.id=s.category_id WHERE s.normalized_name=@key AND s.id<>@id LIMIT 1
+            """, ("@key", key), ("@id", id)))
+        await using (var reader = await sameSubcategory.ExecuteReaderAsync(token).ConfigureAwait(false))
+            if (await reader.ReadAsync(token).ConfigureAwait(false)) throw new ProductOperationException(ProductGroupManagementRules.NameTakenBySubcategory(reader.GetString(0), reader.GetString(1)));
+        await using (var sameCategory = Command(connection, transaction, "SELECT name FROM categories WHERE normalized_name=@key LIMIT 1", ("@key", key)))
+            if (await sameCategory.ExecuteScalarAsync(token).ConfigureAwait(false) is string category) throw new ProductOperationException(ProductGroupManagementRules.NameTakenByCategory(category));
+        int products;
+        await using (var count = Command(connection, transaction, "SELECT COUNT(*) FROM products WHERE subcategory_id=@id", ("@id", id)))
+            products = Convert.ToInt32(await count.ExecuteScalarAsync(token).ConfigureAwait(false), CultureInfo.InvariantCulture);
+        await using (var rename = Command(connection, transaction, "UPDATE subcategories SET name=@name,normalized_name=@key WHERE id=@id", ("@name", name), ("@key", key), ("@id", id)))
+            await rename.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        int categoryId;
+        await using (var insert = Command(connection, transaction, "INSERT INTO categories(name,normalized_name,sort_order) VALUES(@name,@key,0)",
+                         ("@name", oldName), ("@key", TextNormalization.UniquenessKey(oldName))))
+        {
+            await insert.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+            categoryId = checked((int)insert.LastInsertedId);
+        }
+        var order = new List<int>();
+        await using (var select = Command(connection, transaction, "SELECT id FROM categories WHERE id<>@id ORDER BY sort_order,name", ("@id", categoryId)))
+        await using (var reader = await select.ExecuteReaderAsync(token).ConfigureAwait(false))
+            while (await reader.ReadAsync(token).ConfigureAwait(false)) order.Add(checked((int)reader.GetInt64(0)));
+        order.Insert(Math.Clamp(request.CategoryPosition, 0, order.Count), categoryId);
+        for (var index = 0; index < order.Count; index++)
+            await using (var number = Command(connection, transaction, "UPDATE categories SET sort_order=@order WHERE id=@id", ("@order", index + 1), ("@id", order[index])))
+                await number.ExecuteNonQueryAsync(token).ConfigureAwait(false);
+        return (new ProductGroup(oldCategory, name), oldName, products);
+    }
+
+    private async Task<SubcategoryMoveResult> MoveCoreAsync(ProductGroup node, ProductGroup? newParent, string targetCategory, int position, BranchMoveChoices? choices, bool dryRun, PromotionRequest? promotion, CancellationToken cancellationToken)
     {
         if (accessControl is not null) await accessControl.EnsureAdministratorAsync(cancellationToken).ConfigureAwait(false);
+        var actor = accessControl is null ? "" : await accessControl.GetUsernameAsync(cancellationToken).ConfigureAwait(false) ?? "";
+        var reasonText = choices is null || choices.Reason.Length == 0 ? "" : ProductGroupManagementRules.Reason(choices.Reason);
         var result = await WriteAsync(async (connection, transaction) =>
         {
             async Task<(int Id, string Name, int CategoryId, string Category)> FindAsync(ProductGroup group, string missing)
@@ -202,7 +299,15 @@ public sealed partial class MariaProductRepository : ISubcategoryTree
                 if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) throw new ProductOperationException(missing);
                 return (checked((int)reader.GetInt64(0)), reader.GetString(1), checked((int)reader.GetInt64(2)), reader.GetString(3));
             }
-            var moved = await FindAsync(node, "Subcategoria nu mai există. Actualizează lista.").ConfigureAwait(false);
+            var promotedProducts = 0;
+            var targetName = targetCategory;
+            var nodeGroup = node;
+            if (promotion is not null)
+            {
+                var step = await PromoteStepAsync(connection, transaction, node, promotion, cancellationToken).ConfigureAwait(false);
+                (nodeGroup, targetName, promotedProducts) = (step.Leaf, step.Category, step.Products);
+            }
+            var moved = await FindAsync(nodeGroup, "Subcategoria nu mai există. Actualizează lista.").ConfigureAwait(false);
             int? parentId = null;
             string? parentName = null;
             int categoryId;
@@ -215,7 +320,7 @@ public sealed partial class MariaProductRepository : ISubcategoryTree
             else
             {
                 await using var findCategory = Command(connection, transaction, "SELECT id,name FROM categories WHERE normalized_name=@key",
-                    ("@key", TextNormalization.UniquenessKey(targetCategory)));
+                    ("@key", TextNormalization.UniquenessKey(targetName)));
                 await using var reader = await findCategory.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                 if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) throw new ProductOperationException("Categoria destinație nu mai există. Actualizează lista.");
                 (categoryId, categoryName) = (checked((int)reader.GetInt64(0)), reader.GetString(1));
@@ -231,6 +336,9 @@ public sealed partial class MariaProductRepository : ISubcategoryTree
             var sameBranch = oldParentId == parentId && moved.CategoryId == categoryId;   // a root moved to another category is a move, not a new place
             var fromParent = oldParentId is { } oldId ? await NameOfAsync(connection, transaction, oldId, cancellationToken).ConfigureAwait(false) : null;
 
+            BranchMovePlan? plan = null;
+            IReadOnlySet<int> incompleteBefore = new HashSet<int>();
+            var archivedBlocks = new List<string>();
             if (!sameBranch)
             {
                 var maximum = await MariaCatalogSettings.ReadAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
@@ -242,35 +350,24 @@ public sealed partial class MariaProductRepository : ISubcategoryTree
                     if (Convert.ToInt32(await hasProducts.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture) > 0)
                         throw new ProductOperationException($"Subcategoria «{parentName}» are produse și nu poate primi subcategorii copil. Mută întâi produsele ei într-o frunză.");
                 }
-                // A parameter or tag of the moved branch must not repeat one of the new ancestors.
-                if (newAncestors.Count > 0)
-                    foreach (var (table, label) in new[] { ("subcategory_parameters", "parametrul"), ("subcategory_tags", "eticheta") })
-                    {
-                        await using var clash = Command(connection, transaction, $"""
-                            SELECT a.name FROM {table} a INNER JOIN {table} b ON b.normalized_name=a.normalized_name
-                            WHERE a.subcategory_id IN ({SubcategoryAncestry.InList(newAncestors)}) AND b.subcategory_id IN ({SubcategoryAncestry.InList(subtree)}) LIMIT 1
-                            """);
-                        if (await clash.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is string repeated)
-                            throw new ProductOperationException($"Mutarea nu se poate face: {label} «{repeated}» există atât la noii părinți, cât și în ramura mutată.");
-                    }
-                // Products of the branch must not lose values or tags they have from the ancestors the branch leaves.
-                var lost = oldAncestors.Where(id => !newAncestors.Contains(id)).ToList();
-                if (lost.Count > 0)
+                // The definitions the branch inherits (stage 6): planned on the tree as it is now, executed after the structure changes.
+                var snapshot = await MariaDefinitionRelocation.LoadAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+                plan = BranchMovePlanner.Plan(snapshot, moved.Id, parentId, categoryId, choices?.ConfirmedMerges);
+                var lostOwners = oldAncestors.Where(id => !newAncestors.Contains(id)).Select(id => id).ToList();
+                var lostOwnerSql = string.Join(",", lostOwners.Select(id => id.ToString(CultureInfo.InvariantCulture)).Concat(moved.CategoryId != categoryId ? [(-moved.CategoryId).ToString(CultureInfo.InvariantCulture)] : []));
+                if (lostOwnerSql.Length > 0)
                 {
-                    await using var used = Command(connection, transaction, $"""
-                        SELECT (SELECT COUNT(DISTINCT pv.product_id) FROM product_parameter_values pv
-                                INNER JOIN subcategory_parameters sp ON sp.id=pv.parameter_id INNER JOIN products p ON p.id=pv.product_id
-                                WHERE sp.subcategory_id IN ({SubcategoryAncestry.InList(lost)}) AND p.subcategory_id IN ({SubcategoryAncestry.InList(subtree)}))
-                             + (SELECT COUNT(DISTINCT pt.product_id) FROM product_tags pt
-                                INNER JOIN subcategory_tags st ON st.id=pt.tag_id INNER JOIN products p ON p.id=pt.product_id
-                                WHERE st.subcategory_id IN ({SubcategoryAncestry.InList(lost)}) AND p.subcategory_id IN ({SubcategoryAncestry.InList(subtree)}))
+                    // An archived parameter of a parent the branch leaves cannot be restored for the products of the branch afterwards.
+                    await using var archived = Command(connection, transaction, $"""
+                        SELECT DISTINCT sp.name FROM product_parameter_values pv INNER JOIN subcategory_parameters sp ON sp.id=pv.parameter_id INNER JOIN products p ON p.id=pv.product_id
+                        WHERE sp.archived_utc IS NOT NULL AND COALESCE(sp.subcategory_id,-sp.category_id) IN ({lostOwnerSql}) AND p.subcategory_id IN ({SubcategoryAncestry.InList(subtree)})
                         """);
-                    var affected = Convert.ToInt32(await used.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
-                    if (affected > 0)
-                        throw new ProductOperationException($"Mutarea nu se poate face: produse din ramura mutată au valori de parametri sau etichete moștenite de la părinții actuali ({affected} legături), care s-ar pierde. Scoate-le întâi din produse.");
+                    await using var archivedReader = await archived.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                    while (await archivedReader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                        archivedBlocks.Add($"Parametrul arhivat «{archivedReader.GetString(0)}» al unui părinte pe care ramura îl părăsește are produse în ramură; restaurează-l sau renunță la restaurare înainte de mutare.");
                 }
+                incompleteBefore = await MariaProductParameterRepository.IncompleteIdsAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
             }
-
             var categoryChanged = moved.CategoryId != categoryId;
             if (!sameBranch)
             {
@@ -301,26 +398,53 @@ public sealed partial class MariaProductRepository : ISubcategoryTree
                 await number.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            // Products that miss values of parameters the branch now inherits are signalled (the stock stays blocked for them until they are completed).
-            var incomplete = 0;
-            var gained = newAncestors.Where(id => !oldAncestors.Contains(id)).ToList();
-            if (gained.Count > 0)
+            // The definitions: copied, merged and measured on the real result (the products that miss values of parameters the branch now inherits are listed).
+            var incompleteNow = new List<IncompleteProduct>();
+            var copied = 0;
+            var merged = 0;
+            if (plan is not null)
             {
-                await using var needs = Command(connection, transaction, $"""
-                    SELECT (SELECT COUNT(*) FROM subcategory_parameters WHERE subcategory_id IN ({SubcategoryAncestry.InList(gained)}) AND kind<>4)
-                         + (SELECT COUNT(*) FROM parameter_families WHERE subcategory_id IN ({SubcategoryAncestry.InList(gained)}))
-                    """);
-                if (Convert.ToInt32(await needs.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture) > 0)
+                var blocks = plan.Blocks.Concat(archivedBlocks).ToList();
+                var undecided = plan.Items.Any(item => item.Action is BranchMoveAction.NeedsDecision or BranchMoveAction.Blocked) || blocks.Count > 0;
+                if (!undecided)
                 {
-                    await using var count = Command(connection, transaction, $"SELECT COUNT(*) FROM products WHERE subcategory_id IN ({SubcategoryAncestry.InList(subtree)})");
-                    incomplete = Convert.ToInt32(await count.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false), CultureInfo.InvariantCulture);
+                    foreach (var operation in plan.Operations) await MariaDefinitionRelocation.ExecuteBranchAsync(connection, transaction, operation, subtree, actor, reasonText, cancellationToken).ConfigureAwait(false);
+                    var after = await MariaProductParameterRepository.IncompleteIdsAsync(connection, transaction, cancellationToken).ConfigureAwait(false);
+                    var newly = after.Where(id => !incompleteBefore.Contains(id)).ToList();
+                    if (newly.Count > 0)
+                    {
+                        await using var names = Command(connection, transaction, $"SELECT id,name FROM products WHERE id IN ({SubcategoryAncestry.InList(newly)}) ORDER BY name");
+                        await using var nameReader = await names.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                        while (await nameReader.ReadAsync(cancellationToken).ConfigureAwait(false)) incompleteNow.Add(new IncompleteProduct(checked((int)nameReader.GetInt64(0)), nameReader.GetString(1)));
+                    }
+                    copied = plan.Items.Count(item => item.Action == BranchMoveAction.Copy);
+                    merged = plan.Items.Count(item => item.Action is BranchMoveAction.CopyMerged or BranchMoveAction.OwnMerged);
                 }
+                var preview = new BranchMovePreview(plan.Items, blocks, incompleteNow);
+                if (dryRun) throw new DryRunMove(preview);
+                if (undecided)
+                {
+                    if (choices is null) throw new MoveNeedsVerificationException();
+                    throw new ProductOperationException(blocks.Count > 0 ? blocks[0] : RelocationMessages.Undecided(plan.Items.First(item => item.Action == BranchMoveAction.NeedsDecision).Name));
+                }
+                if (!preview.Plain && choices is null) throw new MoveNeedsVerificationException();
+                if (incompleteNow.Count > 0 && choices is { AcceptIncomplete: false }) throw new ProductOperationException(RelocationMessages.NotAccepted(incompleteNow.Count));
             }
+            else if (dryRun) throw new DryRunMove(new BranchMovePreview([], [], []));
+            var incomplete = incompleteNow.Count;
             return (Id: moved.Id, Name: moved.Name, FromCategory: moved.Category, FromParent: fromParent, ToCategory: categoryName, ToParent: parentName,
-                Size: subtree.Count, SameBranch: sameBranch, Incomplete: incomplete, Place: place + 1);
+                Size: subtree.Count, SameBranch: sameBranch, Incomplete: incomplete, Place: place + 1, Copied: copied, Merged: merged, Products: promotedProducts);
         }, cancellationToken).ConfigureAwait(false);
         var target = $"{result.ToCategory} / {result.Name}";
-        if (result.SameBranch)
+        if (promotion is not null)
+            await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Subcategory, AuditActions.PromoteSubcategory,
+                result.Id.ToString(CultureInfo.InvariantCulture), target,
+                AuditDetails.Identification(("Subcategorie veche", node.Subcategory), ("Din categoria", result.FromCategory), ("Categorie nouă", result.ToCategory), ("Subcategorie nouă", result.Name),
+                    ("Poziția categoriei", (Math.Max(promotion.CategoryPosition, 0) + 1).ToString(CultureInfo.InvariantCulture)), ("Produse rămase pe subcategorie", result.Products.ToString(CultureInfo.InvariantCulture)),
+                    ("Definiții copiate pe nod", result.Copied.ToString(CultureInfo.InvariantCulture)), ("Definiții îmbinate", result.Merged.ToString(CultureInfo.InvariantCulture)),
+                    ("Produse devenite incomplete", result.Incomplete.ToString(CultureInfo.InvariantCulture))),
+                reasonText.Length > 0 ? reasonText : "Subcategoria a devenit categorie prin tragere.", cancellationToken).ConfigureAwait(false);
+        else if (result.SameBranch)
             await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Subcategory, AuditActions.ReorderSubcategories,
                 result.Id.ToString(CultureInfo.InvariantCulture), target,
                 AuditDetails.Identification(("Subcategorie", result.Name), ("Părinte", result.ToParent ?? result.ToCategory), ("Poziția nouă", result.Place.ToString(CultureInfo.InvariantCulture))),
@@ -329,8 +453,10 @@ public sealed partial class MariaProductRepository : ISubcategoryTree
             await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.Subcategory, AuditActions.MoveSubcategory,
                 result.Id.ToString(CultureInfo.InvariantCulture), target,
                 AuditDetails.Identification(("Subcategorie", result.Name), ("Din", result.FromParent is null ? result.FromCategory : $"{result.FromCategory} / {result.FromParent}"),
-                    ("În", result.ToParent is null ? result.ToCategory : $"{result.ToCategory} / {result.ToParent}"), ("Noduri mutate (cu tot ce e sub ea)", result.Size.ToString(CultureInfo.InvariantCulture))),
-                "Subcategoria a fost mutată prin tragere, împreună cu structura de sub ea.", cancellationToken).ConfigureAwait(false);
+                    ("În", result.ToParent is null ? result.ToCategory : $"{result.ToCategory} / {result.ToParent}"), ("Noduri mutate (cu tot ce e sub ea)", result.Size.ToString(CultureInfo.InvariantCulture)),
+                    ("Definiții copiate pe nod", result.Copied.ToString(CultureInfo.InvariantCulture)), ("Definiții îmbinate", result.Merged.ToString(CultureInfo.InvariantCulture)),
+                    ("Produse devenite incomplete", result.Incomplete.ToString(CultureInfo.InvariantCulture))),
+                reasonText.Length > 0 ? reasonText : "Subcategoria a fost mutată prin tragere, împreună cu structura de sub ea.", cancellationToken).ConfigureAwait(false);
         return new SubcategoryMoveResult(result.Size, result.Incomplete, result.SameBranch);
     }
 

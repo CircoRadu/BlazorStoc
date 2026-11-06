@@ -1,0 +1,226 @@
+@using BlazorStoc.Services
+@inject ISubcategoryTree Tree
+@inject IProductParameterRepository Parameters
+@inject IProductTagRepository Tags
+@inject IDefinitionRelocation Relocation
+@inject ILogger<TakeFromChildDialog> Logger
+@implements IDisposable
+
+@* "Preia de la copil": the parameters, families and tags a child defines move up to the node (or the category). Step 1 picks the child and what to take; step 2 shows what the
+   relocation service would do (the real run, rolled back): the values that unite, the namesakes of the sibling branches that must be merged (the user decides: merge, or leave
+   the definition out), the products that would become incomplete (they need an explicit acceptance) and asks for the reason. *@
+<div class="delete-overlay">
+<section class="delete-dialog archive-dialog take-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+    <div class="catalog-heading dialog-head"><h2 id="@TitleId">Preia definiții de la un copil · @NodeName</h2><HelpButton Topic="categorii-parametri" About="Preluarea parametrilor și etichetelor de la un copil" /></div>
+    @if (loading)
+    {
+        <div class="empty-state compact" role="status"><div class="spinner"></div></div>
+    }
+    else if (children.Count == 0)
+    {
+        <p class="form-note">@NodeName nu are subcategorii copil de la care să preia definiții.</p>
+        <div class="editor-actions"><button type="button" class="danger" @onclick="() => Closed.InvokeAsync()">Închide</button></div>
+    }
+    else if (!previewing)
+    {
+        <p class="form-note">Parametrii, familiile și etichetele alese trec la @NodeName și sunt moștenite de toate subcategoriile de sub el (frații copilului primesc astfel parametrii și etichetele). Dacă un frate are deja o definiție cu același nume, vei decide în pasul următor dacă se îmbină.</p>
+        <label class="take-child">Copil
+            <select id="take-child" @bind="childName" @bind:after="ChildChangedAsync" disabled="@busy">
+                @foreach (var child in children) { <option value="@child.Name" selected="@(child.Name == childName)">@child.Name</option> }
+            </select>
+        </label>
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (candidates.Count == 0) { <p class="form-note">Copilul nu are parametri, familii sau etichete proprii de preluat.</p> }
+        else
+        {
+            <div class="editor-actions"><button type="button" class="refresh act-confirm" disabled="@busy" @onclick="SelectAll">Alege tot</button><button type="button" class="refresh act-close" disabled="@busy" @onclick="() => selected.Clear()">Nu alege nimic</button></div>
+            <div class="table-scroll"><table class="def-table take-table"><thead><tr><th>PRELUARE</th><th>TIP</th><th>DENUMIRE</th><th>DETALII</th><th>PRODUSE</th></tr></thead><tbody>
+            @foreach (var candidate in candidates)
+            {
+                <tr @key="@($"{candidate.Ref.Kind}:{candidate.Ref.Id}")"><td><ToggleSwitch Compact="true" AriaLabel="@($"Preia {candidate.Name}")" Value="@selected.Contains(candidate.Ref)" Disabled="@busy" ValueChanged="on => SetSelected(candidate.Ref, on)" /></td>
+                    <td>@candidate.Kind</td><td><strong>@candidate.Name</strong></td><td>@candidate.Detail</td><td>@candidate.Products produse</td></tr>
+            }
+            </tbody></table></div>
+        }
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@(busy || selected.Count == 0)" @onclick="PreviewAsync">Continuă</button>
+            <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => Closed.InvokeAsync()">Anulează</button>
+        </div>
+    }
+    else if (preview is not null)
+    {
+        <p class="delete-object"><strong>@childName → @NodeName</strong></p>
+        @foreach (var block in preview.Blocks) { <div class="error-banner" role="alert">@block</div> }
+        <div class="table-scroll"><table class="save-summary take-preview"><thead><tr><th scope="col">Definiție</th><th scope="col">Ce se întâmplă</th><th scope="col">Decizie</th></tr></thead><tbody>
+        @foreach (var item in preview.Items)
+        {
+            <tr @key="@($"{item.Ref.Kind}:{item.Ref.Id}")" class="@(item.Action is RelocationAction.NeedsDecision or RelocationAction.Blocked ? "restore-problem" : "")">
+                <td><strong>@item.Name</strong><small class="muted"> · @KindText(item.Ref.Kind)</small></td>
+                <td>
+                    @ActionText(item)
+                    @if (item.Absorbs.Count > 0) { <small class="muted"> Îmbină: @string.Join("; ", item.Absorbs)</small> }
+                    @if (item.Values.Count > 0)
+                    {
+                        <details class="take-values"><summary>Valori (@item.Values.Count)</summary>
+                            <ul>@foreach (var value in item.Values) { <li>@value.Value — @(value.ExistsAtSurvivor ? "există deja" : "valoare nouă") (@value.Products produse)</li> }</ul>
+                        </details>
+                    }
+                </td>
+                <td>
+                    @if (item.Action is RelocationAction.NeedsDecision or RelocationAction.Merge or RelocationAction.Absorb)
+                    {
+                        <ToggleSwitch Value="@confirmed.Contains(item.Ref)" Disabled="@busy" ValueChanged="on => SetMergeAsync(item.Ref, on)">Îmbină cu cele existente</ToggleSwitch>
+                    }
+                    else { <span class="muted">—</span> }
+                </td></tr>
+        }
+        </tbody></table></div>
+        @if (preview.Incomplete.Count > 0)
+        {
+            <div class="info-banner take-incomplete" role="status">@preview.Incomplete.Count @(preview.Incomplete.Count == 1 ? "produs devine incomplet" : "produse devin incomplete"): nu au valoare pentru un parametru care devine obligatoriu și rămân blocate la mișcări de stoc până li se aleg valorile.</div>
+            <Paged Items="preview.Incomplete" Id="take-incomplete" Label="Produse pe pagină" DefaultSize="10" Sizes="@pageSizes">
+                <div class="table-scroll"><table class="save-summary"><thead><tr><th scope="col">Produse care devin incomplete</th></tr></thead><tbody>
+                @foreach (var product in context) { <tr @key="product.ProductId"><td>@product.Name</td></tr> }
+                </tbody></table></div>
+            </Paged>
+            <ToggleSwitch Value="@accepted" Disabled="@busy" ValueChanged="on => accepted = on">Accept ca aceste produse să rămână blocate până li se aleg valorile</ToggleSwitch>
+        }
+        <ChangeReasonField Id="take-reason" @bind-Value="reason" Error="@reasonError" Disabled="@busy" Hint="Descrie motivul mutării. Informația va fi păstrată în jurnalul de activitate." />
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@(busy || !CanApply)" @onclick="ApplyAsync">@(busy ? "Se aplică…" : "Preia")</button>
+            <button type="button" class="refresh act-confirm" disabled="@busy" @onclick="Back">Înapoi</button>
+            <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => Closed.InvokeAsync()">Anulează</button>
+        </div>
+    }
+</section>
+</div>
+
+@code {
+    private sealed record Candidate(DefinitionRef Ref, string Kind, string Name, string Detail, int Products);
+
+    // The node (subcategory) or category (empty Subcategory) that receives the definitions.
+    [Parameter, EditorRequired] public ProductGroup Target { get; set; } = new("", "");
+    [Parameter] public EventCallback Closed { get; set; }
+    // The definitions moved: the page reloads what it shows.
+    [Parameter] public EventCallback Changed { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private readonly IReadOnlyList<int> pageSizes = [10, 25, 50, 0];
+    private IReadOnlyList<SubcategoryNode> children = [];
+    private IReadOnlyList<Candidate> candidates = [];
+    private readonly HashSet<DefinitionRef> selected = [], confirmed = [];
+    private RelocationPreview? preview;
+    private bool loading = true, busy, previewing, accepted;
+    private string childName = "", reason = "";
+    private string? error, reasonError;
+    private string TitleId => $"take-title-{instanceId}";
+    private string NodeName => Target.Subcategory.Length == 0 ? Target.Category : Target.Subcategory;
+    private bool CanApply => preview is { CanApply: true } && (preview.Incomplete.Count == 0 || accepted);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            children = (await Tree.GetTreeAsync(lifetime.Token)).Where(node => string.Equals(node.Category, Target.Category, StringComparison.OrdinalIgnoreCase)
+                && (Target.Subcategory.Length == 0 ? node.Parent is null : string.Equals(node.Parent, Target.Subcategory, StringComparison.OrdinalIgnoreCase))).ToList();
+            if (children.Count > 0) { childName = children[0].Name; await LoadCandidatesAsync(); }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Child definitions loading failed ({ErrorType}).", exception.GetType().Name); error = "Definițiile copilului nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private static bool Same(string category, string subcategory, ProductGroup group) =>
+        string.Equals(category, group.Category, StringComparison.OrdinalIgnoreCase) && string.Equals(subcategory, group.Subcategory, StringComparison.OrdinalIgnoreCase);
+
+    private async Task LoadCandidatesAsync()
+    {
+        var child = new ProductGroup(Target.Category, childName);
+        var parameters = await Parameters.GetParametersAsync(lifetime.Token);
+        var families = await Parameters.GetFamiliesAsync(lifetime.Token);
+        var tags = await Tags.GetTagsAsync(lifetime.Token);
+        var list = new List<Candidate>();
+        foreach (var family in families.Where(item => Same(item.Category, item.Subcategory, child)))
+        {
+            var members = parameters.Where(parameter => parameter.FamilyId == family.Id).ToList();
+            list.Add(new(new(DefinitionKind.Family, family.Id), "Familie", family.Name, string.Join(" · ", members.Select(member => member.Name)), members.Sum(member => member.ProductCount)));
+        }
+        foreach (var parameter in parameters.Where(item => item.FamilyId is null && Same(item.Category, item.Subcategory, child)))
+            list.Add(new(new(DefinitionKind.Parameter, parameter.Id), "Parametru", parameter.Name, $"{ProductParameterRules.KindLabel(parameter.Kind)}{(parameter.Unit.Length > 0 ? $", {parameter.Unit}" : "")} · {parameter.Values.Count} valori", parameter.ProductCount));
+        foreach (var tag in tags.Where(item => Same(item.Category, item.Subcategory, child)))
+            list.Add(new(new(DefinitionKind.Tag, tag.Id), "Etichetă", tag.Name, "", tag.ProductCount));
+        candidates = list;
+        selected.Clear();
+        confirmed.Clear();
+    }
+
+    private async Task ChildChangedAsync()
+    {
+        error = null;
+        try { await LoadCandidatesAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) { Logger.LogError("Child definitions loading failed ({ErrorType}).", exception.GetType().Name); error = "Definițiile copilului nu au putut fi încărcate."; }
+    }
+
+    private void SetSelected(DefinitionRef reference, bool on) { if (on) selected.Add(reference); else selected.Remove(reference); }
+    private void SelectAll() { foreach (var candidate in candidates) selected.Add(candidate.Ref); }
+
+    private RelocationRequest Request() => new(Target, [.. selected], [.. confirmed], accepted);
+
+    private async Task PreviewAsync()
+    {
+        if (busy) return;
+        busy = true; error = null;
+        try
+        {
+            preview = await Relocation.PreviewAsync(Request(), lifetime.Token);
+            previewing = true;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Relocation preview failed ({ErrorType}).", exception.GetType().Name); error = "Efectul mutării nu a putut fi calculat. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private async Task SetMergeAsync(DefinitionRef reference, bool on)
+    {
+        if (on) confirmed.Add(reference); else confirmed.Remove(reference);
+        accepted = false;
+        await PreviewAsync();
+    }
+
+    private void Back() { previewing = false; preview = null; accepted = false; error = null; }
+
+    private async Task ApplyAsync()
+    {
+        if (busy || preview is null) return;
+        reasonError = ChangeReasonRules.ValidationError(ChangeReasonRules.Normalize(reason));
+        if (reasonError is not null) return;
+        busy = true; error = null;
+        try
+        {
+            await Relocation.ApplyAsync(Request(), ChangeReasonRules.Normalize(reason), lifetime.Token);
+            await Changed.InvokeAsync();
+            await Closed.InvokeAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; }
+        catch (Exception exception) { Logger.LogError("Relocation failed ({ErrorType}).", exception.GetType().Name); error = "Mutarea nu a reușit. Actualizează lista și reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private static string KindText(DefinitionKind kind) => kind switch { DefinitionKind.Parameter => "parametru", DefinitionKind.Family => "familie", _ => "etichetă" };
+
+    private string ActionText(RelocationItem item) => item.Action switch
+    {
+        RelocationAction.Move => $"Se mută la {item.To}.",
+        RelocationAction.Merge => $"Se îmbină cu definiția de la {item.To}.",
+        RelocationAction.Absorb => $"Se mută la {item.To} și absoarbe definițiile cu același nume din ramurile de sub el.",
+        RelocationAction.NeedsDecision => $"Există deja o definiție cu același nume ({string.Join("; ", item.Absorbs)}): îmbin-o sau scoate definiția din cerere.",
+        _ => item.Note
+    };
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

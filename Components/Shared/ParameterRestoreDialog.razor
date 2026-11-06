@@ -1,0 +1,136 @@
+@using BlazorStoc.Services
+
+@* Restoring an archived parameter or family (migration 56): the text baked into the models of the products leaves them and the parameter is required again. A
+   product whose name cannot simply be restored is listed with a problem and an automatic proposal shown under its current name; the proposal can be accepted
+   or replaced by a model typed by hand, and nothing can be applied until every product has a valid name. *@
+<div class="delete-overlay">
+<section class="delete-dialog archive-dialog restore-dialog" role="dialog" aria-modal="true" aria-labelledby="@TitleId">
+    <div class="catalog-heading dialog-head"><h2 id="@TitleId">@Title</h2><HelpButton Topic="categorii-parametri" About="Restaurarea parametrilor și familiilor arhivate" /></div>
+    <p class="delete-object"><strong>@ObjectLabel</strong></p>
+    <p>@Description</p>
+    @if (Preview.Blocked)
+    {
+        <div class="error-banner" role="alert">Unele produse nu mai aparțin subcategoriei parametrului, deci restaurarea nu se poate face. Poți renunța la restaurare după perioada de păstrare.</div>
+    }
+    @if (Preview.Items.Count == 0) { <p class="form-note">@EmptyText</p> }
+    else
+    {
+        @if (Preview.Problems.Count > 0)
+        {
+            <p class="form-note restore-problems" role="status">@Preview.Problems.Count @(Preview.Problems.Count == 1 ? "produs cere" : "produse cer") o decizie. Numele propus apare sub numele curent; îl poți păstra sau scrie tu modelul.</p>
+            <div class="editor-actions"><button type="button" class="refresh act-confirm" disabled="@Busy" @onclick="AutoAll">Redenumește automat tot</button></div>
+        }
+        <Paged Items="Preview.Items" Id="@($"restore-preview-{instanceId}")" Label="Produse pe pagină" DefaultSize="10" Sizes="@pageSizes">
+            <div class="table-scroll"><table class="save-summary archive-preview restore-table"><thead><tr><th scope="col">Produs</th><th scope="col">Problemă</th><th scope="col">Nume</th><th scope="col">Rezolvare</th></tr></thead><tbody>
+            @foreach (var item in context)
+            {
+                var invalid = RowError(item);
+                <tr @key="item.ProductId" class="@(item.Problem == RestoreProblem.None ? "" : "restore-problem")">
+                    <td>@item.OldName</td>
+                    <td>@(item.Problem == RestoreProblem.None ? "—" : ProblemText(item.Problem))</td>
+                    <td>
+                        @if (item.Problem == RestoreProblem.OutOfScope) { <span class="muted">@item.OldName</span> }
+                        else
+                        {
+                            <span class="restore-current">@item.OldName</span>
+                            <strong class="restore-new">@FinalName(item)</strong>
+                            @if (invalid is not null) { <span class="validation-message" role="alert">@invalid</span> }
+                        }
+                    </td>
+                    <td>
+                        @if (item.Problem is RestoreProblem.None or RestoreProblem.OutOfScope) { <span class="muted">@(item.Problem == RestoreProblem.None ? "Automat" : "Blocat")</span> }
+                        else
+                        {
+                            <ToggleSwitch Value="@manual.Contains(item.ProductId)" Disabled="@Busy" ValueChanged="on => SetManual(item, on)">Redenumire manuală</ToggleSwitch>
+                            @if (manual.Contains(item.ProductId))
+                            {
+                                <input aria-label="@($"Modelul produsului {item.OldName}")" maxlength="@ProductParameterRules.ProductNameMaximumLength" disabled="@Busy" autocomplete="off"
+                                       value="@Typed(item)" @oninput="args => typed[item.ProductId] = args.Value?.ToString() ?? string.Empty" />
+                            }
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody></table></div>
+        </Paged>
+    }
+    <ChangeReasonField Id="@($"restore-reason-{instanceId}")" @bind-Value="reason" Error="@reasonError" Disabled="@Busy" Hint="Descrie motivul restaurării. Informația va fi păstrată în jurnalul de activitate." />
+    @if (Error is not null) { <div class="error-banner delete-error" role="alert">@Error</div> }
+    <div class="editor-actions">
+        <button type="button" class="primary" disabled="@(Busy || Preview.Blocked || HasErrors)" @onclick="ConfirmAsync">@(Busy ? "Se restaurează…" : "Restaurează")</button>
+        <button type="button" class="refresh act-close" disabled="@Busy" @onclick="() => Cancelled.InvokeAsync()">Anulează</button>
+    </div>
+</section>
+</div>
+
+@code {
+    public sealed record Decision(IReadOnlyDictionary<int, string> BaseModels, string Reason);
+
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ObjectLabel { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public string EmptyText { get; set; } = "Niciun produs nu are valori arhivate pentru această definiție.";
+    [Parameter, EditorRequired] public ParameterRestorePreview Preview { get; set; } = new([]);
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter, EditorRequired] public EventCallback<Decision> Confirmed { get; set; }
+    [Parameter, EditorRequired] public EventCallback Cancelled { get; set; }
+
+    private readonly string instanceId = Guid.NewGuid().ToString("N");
+    private readonly IReadOnlyList<int> pageSizes = [10, 25, 50, 0];
+    private readonly HashSet<int> manual = [];
+    private readonly Dictionary<int, string> typed = [];
+    private string reason = "";
+    private string TitleId => $"restore-title-{instanceId}";
+    private string? reasonError;
+
+    private static string ProblemText(RestoreProblem problem) => problem switch
+    {
+        RestoreProblem.BakedTextMissing => "Textul copt nu mai e la finalul modelului",
+        RestoreProblem.NameClash => "Numele se ciocnește cu alt produs",
+        RestoreProblem.NameTooLong => "Numele ar depăși lungimea maximă",
+        RestoreProblem.OutOfScope => "Produsul a părăsit subcategoria",
+        _ => ""
+    };
+
+    private string Typed(ParameterRestoreItem item) => typed.TryGetValue(item.ProductId, out var text) ? text : item.ProposedBaseModel;
+
+    // The part of the name after the model (the values), kept whatever the model is.
+    private static string Suffix(ParameterRestoreItem item) =>
+        item.NewName.StartsWith(item.ProposedBaseModel, StringComparison.Ordinal) ? item.NewName[item.ProposedBaseModel.Length..] : string.Empty;
+
+    private string FinalName(ParameterRestoreItem item) => manual.Contains(item.ProductId) ? Typed(item).Trim() + Suffix(item) : item.NewName;
+
+    private IEnumerable<string> FinalNames => Preview.Items.Where(item => item.Problem != RestoreProblem.OutOfScope).Select(FinalName);
+
+    private string? RowError(ParameterRestoreItem item)
+    {
+        if (item.Problem == RestoreProblem.OutOfScope) return null;
+        if (manual.Contains(item.ProductId) && Typed(item).Trim().Length == 0) return "Completează modelul produsului.";
+        var name = FinalName(item);
+        if (name.Length > ProductParameterRules.ProductNameMaximumLength) return $"Numele depășește {ProductParameterRules.ProductNameMaximumLength} de caractere.";
+        if (item.Problem == RestoreProblem.NameTooLong && !manual.Contains(item.ProductId)) return "Scrie un model mai scurt.";
+        if (FinalNames.Count(other => TextNormalization.SameUniqueValue(other, name)) > 1) return "Același nume rezultă pentru două produse.";
+        return null;
+    }
+
+    private bool HasErrors => Preview.Items.Any(item => RowError(item) is not null);
+
+    private void SetManual(ParameterRestoreItem item, bool on)
+    {
+        if (on) { manual.Add(item.ProductId); typed.TryAdd(item.ProductId, item.ProposedBaseModel); }
+        else manual.Remove(item.ProductId);
+    }
+
+    private void AutoAll() => manual.Clear();
+
+    private async Task ConfirmAsync()
+    {
+        reasonError = ChangeReasonRules.ValidationError(ChangeReasonRules.Normalize(reason));
+        if (reasonError is not null) return;
+        var models = new Dictionary<int, string>();
+        foreach (var item in Preview.Items.Where(item => item.Problem is not (RestoreProblem.None or RestoreProblem.OutOfScope)))
+            models[item.ProductId] = manual.Contains(item.ProductId) ? Typed(item).Trim() : item.ProposedBaseModel;
+        await Confirmed.InvokeAsync(new Decision(models, ChangeReasonRules.Normalize(reason)));
+    }
+}

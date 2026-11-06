@@ -74,6 +74,7 @@
             <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : Original is null ? "Adaugă contractul" : "Salvează contractul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
         </fieldset>
     </EditForm>
+    <EntityFilesPanel OwnerKind="@EntityFileOwners.Contract" OwnerId="@(Original?.Contract.Id ?? 0)" />
 </section>
 
 @code {

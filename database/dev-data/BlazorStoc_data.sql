@@ -83,10 +83,13 @@ LOCK TABLES `archive_operations` WRITE;
 /*!40000 ALTER TABLE `archive_operations` DISABLE KEYS */;
 REPLACE INTO `archive_operations` (`id`, `entity_type`, `original_id`, `original_version`, `deleted_utc`, `actor_username`, `actor_role`, `motif`, `target`, `details`, `data_json`, `protected_data_json`) VALUES ('474461ab-d495-44cc-a13d-4a253be2418e','Proiect','1',0,'2026-09-24T12:30:35.8361653Z','administrator.demo','Administrator','Proiectul nu va mai fi folosit','Renovare hala productie','Denumire: Renovare hala productie; Beneficiar: Construct Demo SRL; Observații: Lucrari in doua etape','{\"id\":1,\"beneficiaryId\":1,\"name\":\"Renovare hala productie\",\"observations\":\"Lucrari in doua etape\",\"version\":0,\"createdAtUtc\":\"2026-09-24T12:28:27.0574186Z\",\"updatedAtUtc\":\"2026-09-24T12:28:27.0574186Z\"}',NULL),
 ('619a8fb0-5d11-4061-9672-552c1c19d691','Furnizor','7',0,'2026-10-12T05:36:57.548Z','administrator.demo','Administrator','Furnizorul nu va mai fi folosit','#7 · altex','Denumire: altex; CUI / cod TVA: 2864518','{\"id\":7,\"name\":\"altex\",\"cui\":\"2864518\",\"country\":\"RO\",\"version\":0,\"address\":\"121\",\"phone\":\"0254225226\",\"registryNumber\":\"\",\"postalCode\":\"\",\"caenCode\":\"\",\"source\":\"M\",\"verifiedUtc\":null,\"movementCount\":0,\"invoiceCount\":0,\"templateCount\":0,\"aliases\":null,\"aliasList\":[],\"isExternal\":false,\"identifier\":\"CUI 2864518\",\"inUse\":false}',NULL),
+('66dd0cba-7b47-453a-b220-0fc20ea94f42','PunctLucru','15',0,'2026-10-30T09:10:00.063Z','claude.dev','Administrator','Punctul de lucru nu va mai fi folosit','#2 · Atelier Tehnic SRL 22 · punct de lucru «ZZ Test confirmare»','Nume: ZZ Test confirmare; Adresă: Str. Test Confirmare 3; Beneficiar: Atelier Tehnic SRL 22','{\"id\":15,\"beneficiaryId\":2,\"name\":\"ZZ Test confirmare\",\"address\":\"Str. Test Confirmare 3\",\"phone\":\"\",\"contactPerson\":\"\",\"version\":0,\"isPrimary\":false,\"description\":\"\",\"latitude\":null,\"longitude\":null,\"hasCoordinates\":false}',NULL),
 ('9bbaeabd-aaa1-49ff-ba46-946a0f17aefa','Observatie','1',0,'2026-09-24T12:30:20.0430141Z','administrator.demo','Administrator','Observatia nu va mai fi folosita','Verificare santier','Denumire: Verificare santier; Proiect: Renovare hala productie; Autor: administrator.demo','{\"id\":1,\"projectId\":1,\"name\":\"Verificare santier\",\"content\":\"\",\"author\":\"administrator.demo\",\"version\":0,\"createdAtUtc\":\"2026-09-24T12:28:58.3024678Z\",\"updatedAtUtc\":\"2026-09-24T12:28:58.3024678Z\"}',NULL),
 ('cdaa3acf-91aa-4276-9b68-3f9bccc8149f','Furnizor','2',0,'2026-10-06T11:53:38.047Z','administrator.demo','Administrator','Furnizorul nu va mai fi folosit','#2 · TELESYSTEM SRL','Denumire: TELESYSTEM SRL; CUI / cod TVA: 22460883','{\"id\":2,\"name\":\"TELESYSTEM SRL\",\"cui\":\"22460883\",\"country\":\"RO\",\"version\":0,\"address\":\"JUD. BACAU, MUN. BACAU, CAL. MARASESTI, NR.110, SC.C, ET.1, AP.7\",\"phone\":\"0334418118\",\"registryNumber\":\"J2007001650049\",\"postalCode\":\"600073\",\"caenCode\":\"8009\",\"source\":\"A\",\"verifiedUtc\":\"2026-10-06T11:49:54.519Z\",\"movementCount\":0,\"invoiceCount\":0,\"templateCount\":0,\"aliases\":null,\"aliasList\":[],\"isExternal\":false,\"identifier\":\"CUI 22460883\",\"inUse\":false}',NULL),
+('d23293b9-4ff9-4488-997e-4f6f454a764e','PunctLucru','13',0,'2026-10-30T08:55:55.680Z','claude.dev','Administrator','Punctul de lucru nu va mai fi folosit','#2 · Atelier Tehnic SRL 22 · punct de lucru «ZZ Test fisiere»','Nume: ZZ Test fisiere; Adresă: Str. Test Fisiere 1; Beneficiar: Atelier Tehnic SRL 22','{\"id\":13,\"beneficiaryId\":2,\"name\":\"ZZ Test fisiere\",\"address\":\"Str. Test Fisiere 1\",\"phone\":\"\",\"contactPerson\":\"\",\"version\":0,\"isPrimary\":false,\"description\":\"\",\"latitude\":null,\"longitude\":null,\"hasCoordinates\":false}',NULL),
 ('d5c533a5-c629-4b1b-97cd-3e48f6c535ed','Proiect','3',0,'2026-09-24T13:37:14.5638531Z','administrator.demo','Administrator','Proiectul nu va mai fi folosit','instalare efractie','Denumire: instalare efractie; Beneficiar: Atelier Tehnic SRL 22; Observații:','{\"id\":3,\"beneficiaryId\":2,\"name\":\"instalare efractie\",\"observations\":\"\",\"version\":0,\"createdAtUtc\":\"2026-09-24T13:37:01.6573449Z\",\"updatedAtUtc\":\"2026-09-24T13:37:01.6573449Z\"}',NULL),
 ('e0b2a36f-0523-4ffe-a339-ca70747f84b9','Proiect','7',0,'2026-10-09T10:32:38.271Z','administrator.demo','Administrator','Proiectul nu va mai fi folosit','Sistem TVCI IP','Denumire: Sistem TVCI IP; Beneficiar: SPITALUL GENERAL CAI FERATE SIMERIA; Observații:','{\"id\":7,\"beneficiaryId\":9,\"name\":\"Sistem TVCI IP\",\"observations\":\"\",\"version\":0,\"createdAtUtc\":\"2026-10-09T10:22:10.661Z\",\"updatedAtUtc\":\"2026-10-09T10:22:10.661Z\"}',NULL),
+('e610db2a-9b9e-4ba6-840a-e19b277f289c','PunctLucru','14',0,'2026-10-30T09:06:07.530Z','claude.dev','Administrator','Punctul de lucru nu va mai fi folosit','#2 · Atelier Tehnic SRL 22 · punct de lucru «ZZ Test fisiere 2»','Nume: ZZ Test fisiere 2; Adresă: Str. Test Fisiere 2; Beneficiar: Atelier Tehnic SRL 22','{\"id\":14,\"beneficiaryId\":2,\"name\":\"ZZ Test fisiere 2\",\"address\":\"Str. Test Fisiere 2\",\"phone\":\"\",\"contactPerson\":\"\",\"version\":0,\"isPrimary\":false,\"description\":\"\",\"latitude\":null,\"longitude\":null,\"hasCoordinates\":false}',NULL),
 ('ea82438f-389d-4519-8c7a-c31b12815000','Proiect','4',2,'2026-09-25T05:37:25.3989522Z','administrator.demo','Administrator','Proiectul nu va mai fi folosit','Hala nord test B','Denumire: Hala nord test B; Beneficiar: Construct Demo SRL; Observații: modificat din tab B','{\"id\":4,\"beneficiaryId\":1,\"name\":\"Hala nord test B\",\"observations\":\"modificat din tab B\",\"version\":2,\"createdAtUtc\":\"2026-09-25T05:33:42.8842763Z\",\"updatedAtUtc\":\"2026-09-25T05:36:37.7869726Z\"}',NULL),
 ('f4255dbc-0eec-48f0-ac34-2da7222b9eac','FisierObservatie','1',0,'2026-09-24T13:30:25.1583204Z','administrator.demo','Administrator','Fisierul nu va mai fi folosit','Beach_Nature_Ultra_HD_Wallpaper_for_4K_UHD_Widescr.jpg','Nume fișier: Beach_Nature_Ultra_HD_Wallpaper_for_4K_UHD_Widescr.jpg; Autor: administrator.demo','{\"id\":1,\"observationId\":2,\"originalName\":\"Beach_Nature_Ultra_HD_Wallpaper_for_4K_UHD_Widescr.jpg\",\"storedName\":\"b3a431e0fbb443cc9c909f1bbc9afe0f.jpg\",\"contentType\":\"image/jpeg\",\"sizeBytes\":2294044,\"sha256\":\"7cff1c1e3721a528dedea5f32165b4b17e12dc4de8136cf598385d9c71a6352d\",\"author\":\"administrator.demo\",\"uploadedAtUtc\":\"2026-09-24T13:28:43.4523563Z\"}',NULL),
 ('f635276a-7c20-4578-9fcf-5f71296cedce','Beneficiar','9',0,'2026-10-09T10:32:49.719Z','administrator.demo','Administrator','Beneficiarul nu va mai fi folosit','#9 · SPITALUL GENERAL CAI FERATE SIMERIA','Denumire: SPITALUL GENERAL CAI FERATE SIMERIA; CUI: 4375160','{\"id\":9,\"name\":\"SPITALUL GENERAL CAI FERATE SIMERIA\",\"cui\":\"4375160\",\"version\":0,\"kind\":\"PJ\",\"address\":\"JUD. HUNEDOARA, ORS. SIMERIA, STR. AVRAM IANCU, NR.26\",\"phone\":\"\\u002B40254260681\",\"registryNumber\":\"\",\"postalCode\":\"335900\",\"caenCode\":\"\",\"anafVerified\":false,\"isIndividual\":false,\"identifier\":\"4375160\"}',NULL),
@@ -173,18 +176,21 @@ UNLOCK TABLES;
 
 LOCK TABLES `archive_work_points` WRITE;
 /*!40000 ALTER TABLE `archive_work_points` DISABLE KEYS */;
+REPLACE INTO `archive_work_points` (`archive_id`, `original_id`, `beneficiary_id`, `name`, `address`, `phone`, `contact_person`, `description`, `latitude`, `longitude`, `is_primary`, `version`) VALUES ('66dd0cba-7b47-453a-b220-0fc20ea94f42',15,2,'ZZ Test confirmare','Str. Test Confirmare 3','','','',NULL,NULL,0,0),
+('d23293b9-4ff9-4488-997e-4f6f454a764e',13,2,'ZZ Test fisiere','Str. Test Fisiere 1','','','',NULL,NULL,0,0),
+('e610db2a-9b9e-4ba6-840a-e19b277f289c',14,2,'ZZ Test fisiere 2','Str. Test Fisiere 2','','','',NULL,NULL,0,0);
 /*!40000 ALTER TABLE `archive_work_points` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `backup_nas_settings` WRITE;
 /*!40000 ALTER TABLE `backup_nas_settings` DISABLE KEYS */;
-REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-10-28T08:00:27.488Z',1,'Copiate 1, deja pe NAS 5.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
+REPLACE INTO `backup_nas_settings` (`id`, `unc_path`, `username`, `password_protected`, `copy_enabled`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `last_attempt_utc`, `last_ok`, `last_message`, `updated_by`, `updated_utc`, `max_age_days`, `last_error_utc`, `last_error`) VALUES (1,'\\\\192.168.100.50\\BackupStocDepozit','EspStoc','CfDJ8K0zpf6bAUBDhx3Tp8Qg3Xav6-YSC473xDg_-5Es-Xeb0VlR6nNgopDby_NVUByUlbuSC9dwi2qq2xCHZ3boQt1MyvdM1n0h3JLOKAI7SWCrjIvwV387zr0s1A9cCxH2kA',1,1,'11:10','2026-10-08','2026-11-06T08:00:37.841Z',1,'Copiate 1, deja pe NAS 5.','administrator.demo','2026-10-19T05:43:21.076Z',2,NULL,NULL);
 /*!40000 ALTER TABLE `backup_nas_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `backup_settings` WRITE;
 /*!40000 ALTER TABLE `backup_settings` DISABLE KEYS */;
-REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-10-28',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
+REPLACE INTO `backup_settings` (`id`, `schedule_enabled`, `schedule_time`, `last_scheduled_date`, `max_age_days`, `retention_enabled`, `retention_days`, `last_error_utc`, `last_error`, `updated_by`, `updated_utc`, `ntp_check_enabled`, `ntp_servers`, `clock_issue_utc`, `clock_skew_minutes`, `schedule_days`) VALUES (1,1,'10:00','2026-11-06',2,1,7,'2026-10-15T10:06:40.073Z','Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).','administrator.demo','2026-10-09T06:41:42.369Z',1,'time.cloudflare.com, pool.ntp.org, time.windows.com',NULL,0,31);
 /*!40000 ALTER TABLE `backup_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -242,6 +248,27 @@ REPLACE INTO `categories` (`id`, `name`, `normalized_name`, `sort_order`) VALUES
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
+LOCK TABLES `elcomtur_auto_settings` WRITE;
+/*!40000 ALTER TABLE `elcomtur_auto_settings` DISABLE KEYS */;
+REPLACE INTO `elcomtur_auto_settings` (`id`, `enabled`, `directory_path`, `username`, `password_protected`, `file_mask`, `firm_folder`, `firm_name`, `alert_days`, `last_scheduled_date`, `last_check_utc`, `last_check_ok`, `last_message`, `failing_since_utc`, `last_file_name`, `last_file_modified_utc`, `last_import_utc`, `last_data_date`, `last_summary`, `updated_by`, `updated_utc`) VALUES (1,0,'','',NULL,'','firma3','KS TEST ENERGY SRL',2,'2026-11-05','2026-11-05T11:55:24.515Z',1,'Nu există un backup mai nou decât ultima preluare (cel mai recent fișier: Backup_elcomtur_sintetic.elc, modificat 05.11.2026 10:54).',NULL,'Backup_elcomtur_sintetic.elc','2026-11-05T08:54:12.000Z','2026-11-05T11:54:45.904Z','2026-10-30','0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON)','claude.dev','2026-11-05T11:55:46.729Z');
+/*!40000 ALTER TABLE `elcomtur_auto_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `elcomtur_balances` WRITE;
+/*!40000 ALTER TABLE `elcomtur_balances` DISABLE KEYS */;
+/*!40000 ALTER TABLE `elcomtur_balances` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `elcomtur_invoices` WRITE;
+/*!40000 ALTER TABLE `elcomtur_invoices` DISABLE KEYS */;
+/*!40000 ALTER TABLE `elcomtur_invoices` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `entity_files` WRITE;
+/*!40000 ALTER TABLE `entity_files` DISABLE KEYS */;
+/*!40000 ALTER TABLE `entity_files` ENABLE KEYS */;
+UNLOCK TABLES;
+
 LOCK TABLES `expiry_notifications` WRITE;
 /*!40000 ALTER TABLE `expiry_notifications` DISABLE KEYS */;
 REPLACE INTO `expiry_notifications` (`id`, `template_id`, `source_key`, `object_id`, `expiry_date`, `created_utc`, `acknowledged_by`, `acknowledged_utc`, `snooze_until`, `snooze_days`, `version`, `resolved_by`, `resolved_utc`, `resolved_reason`, `resolved_auto`, `object_label`, `snapshot_values`, `snapshot_subject`, `snapshot_body`, `snapshot_source`) VALUES (1,1,'vehicul.itp',1,'2026-10-15','2026-09-30T10:21:03.873Z','administrator.demo','2026-09-30T10:40:51.531Z',NULL,NULL,1,NULL,NULL,NULL,0,NULL,NULL,NULL,NULL,NULL),
@@ -253,7 +280,10 @@ REPLACE INTO `expiry_notifications` (`id`, `template_id`, `source_key`, `object_
 (7,12,'sistem.copie-nas-lipsa',1,'2026-10-16','2026-10-15T08:50:21.165Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-15T10:41:18.617Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 16.10.2026 la 19.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"12.10.2026 10:00\",\"cauza copiere\":\"Copiate 1, deja pe NAS 7.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 15.10.2026 13:20. Cauza: Copiate 2, deja pe NAS 4.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
 (8,12,'sistem.copie-nas-lipsa',1,'2026-10-19','2026-10-19T05:34:21.535Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-19T05:44:36.960Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 19.10.2026 la 23.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"15.10.2026 13:20\",\"cauza copiere\":\"Copiate 2, deja pe NAS 4.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 19.10.2026 08:44. Cauza: Pachetul nou a fost copiat pe NAS: Copie siguranta la cerere 19.10.2026 08-44-01 Administrator administrator demo.zip.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
 (9,11,'sistem.backup-lipsa',1,'2026-10-27','2026-10-26T07:09:23.059Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-26T08:00:44.262Z','S-a făcut un backup nou: termenul s-a mutat de la 27.10.2026 la 30.10.2026.',1,'Backup-ul bazei de date','{\"ultimul backup\":\"23.10.2026 10:00\",\"ultima eroare backup\":\"15.10.2026 13:06 \\u2014 Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).\",\"vechime maxima\":\"4\"}','Backup lipsă – ultimul: 26.10.2026 10:00','Nu s-a făcut niciun backup de peste 4 zile. Ultimul backup: 26.10.2026 10:00. Ultima eroare: 15.10.2026 13:06 — Copia de siguranta nu a putut fi generata (eroare la exportul bazei de date). Cauza: utilitarul mariadb-dump nu a fost gasit pe server (se seteaza Database:MariaDumpExecutablePath la calea lui).. Verifică Setări → Backup NAS și programarea zilnică.','Sistem · Backup lipsă'),
-(10,12,'sistem.copie-nas-lipsa',1,'2026-10-27','2026-10-26T07:09:23.062Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-26T08:00:44.264Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 27.10.2026 la 30.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"23.10.2026 10:00\",\"cauza copiere\":\"Copiate 1, deja pe NAS 22.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 26.10.2026 10:00. Cauza: Copiate 1, deja pe NAS 8.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă');
+(10,12,'sistem.copie-nas-lipsa',1,'2026-10-27','2026-10-26T07:09:23.062Z',NULL,NULL,NULL,NULL,1,'sistem','2026-10-26T08:00:44.264Z','S-a făcut o încercare nouă de copiere: termenul s-a mutat de la 27.10.2026 la 30.10.2026.',1,'Copia backup-urilor pe NAS','{\"ultima copiere\":\"23.10.2026 10:00\",\"cauza copiere\":\"Copiate 1, deja pe NAS 22.\"}','Copie pe NAS lipsă','Backup-ul nu a ajuns pe NAS. Ultima încercare: 26.10.2026 10:00. Cauza: Copiate 1, deja pe NAS 8.. Verifică Setări → Backup NAS: conexiunea, contul și spațiul de pe NAS.','Sistem · Copie pe NAS lipsă'),
+(11,16,'sistem.mentenanta-activityapp-de-validat',1,'2026-10-30','2026-10-30T10:41:51.991Z',NULL,NULL,NULL,NULL,3,'sistem','2026-10-30T10:43:06.108Z','Evenimentul a fost validat, respins sau discardat.',1,'2 evenimente ActivityApp de validat','{\"tichet de validat\":\"2 tichete\",\"detalii validare\":\"2 evenimente ActivityApp a\\u0219teapt\\u0103 validarea (1 propuse ca mentenan\\u021B\\u0103, 1 ca service); cel mai vechi este din 30.10.2026.\"}','Validează mentenanța: 2 tichete','2 evenimente ActivityApp așteaptă validarea (1 propuse ca mentenanță, 1 ca service); cel mai vechi este din 30.10.2026. Vezi Setări → Preluare ActivityApp, „Evenimente de validat”.','Sistem · Evenimente ActivityApp de validat ca mentenanță'),
+(12,18,'sistem.preluare-elcomtur',2,'2026-11-05','2026-11-05T11:55:09.854Z',NULL,NULL,NULL,NULL,1,'sistem','2026-11-05T11:55:32.527Z','O verificare ulterioară a reușit sau preluarea automată a fost oprită.',1,'Preluarea automată Elcomtur','{\"situatie elcomtur\":\"preluare e\\u0219uat\\u0103\",\"detalii elcomtur\":\"Ultima verificare (05.11.2026 13:55) a e\\u0219uat: \\u00CEn directorul C:\\\\Users\\\\Alex\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\695cbb0e11510863\\\\d9628788-3100-4729-ac9c-61812c76bcbf\\\\scratchpad\\\\elc-nas nu exist\\u0103 niciun fi\\u0219ier care s\\u0103 corespund\\u0103 m\\u0103\\u0219tii \\u201E*lipsa*\\u201D. Verific\\u0103 masca \\u0219i dac\\u0103 backup-ul Elcomtur se salveaz\\u0103 \\u00EEn acel director.\"}','Elcomtur: preluare eșuată','Ultima verificare (05.11.2026 13:55) a eșuat: În directorul C:\\Users\\Alex\\AppData\\Local\\Temp\\claude\\695cbb0e11510863\\d9628788-3100-4729-ac9c-61812c76bcbf\\scratchpad\\elc-nas nu există niciun fișier care să corespundă măștii „*lipsa*”. Verifică masca și dacă backup-ul Elcomtur se salvează în acel director. Vezi Setări → Preluare Elcomtur.','Sistem · Preluare automată backup Elcomtur'),
+(13,18,'sistem.preluare-elcomtur',3,'2026-11-05','2026-11-05T11:55:09.858Z',NULL,NULL,NULL,NULL,1,'claude.dev','2026-11-05T11:56:10.241Z','Marcată manual ca rezolvată.',0,'Backup Elcomtur preluat','{\"situatie elcomtur\":\"backup preluat\",\"detalii elcomtur\":\"Backup-ul Backup_elcomtur_sintetic.elc a fost preluat la 05.11.2026 13:54 pentru firma3 \\u2014 KS TEST ENERGY SRL, date din 30.10.2026: 0 beneficiari cu balan\\u021B\\u0103, 0 cu pl\\u0103\\u021Bi restante (total 0,00 RON).\"}','Elcomtur: backup preluat','Backup-ul Backup_elcomtur_sintetic.elc a fost preluat la 05.11.2026 13:54 pentru firma3 — KS TEST ENERGY SRL, date din 30.10.2026: 0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON). Vezi Setări → Preluare Elcomtur.','Sistem · Preluare automată backup Elcomtur');
 /*!40000 ALTER TABLE `expiry_notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -310,6 +340,7 @@ REPLACE INTO `notification_template_seeds` (`source_key`, `seeded_utc`) VALUES (
 ('sistem.copie-nas-lipsa','2026-10-08T08:47:08.991Z'),
 ('sistem.mentenanta-activityapp-de-validat','2026-10-24T11:46:00.937Z'),
 ('sistem.preluare-activityapp','2026-10-24T11:46:00.933Z'),
+('sistem.preluare-elcomtur','2026-11-05T11:53:01.460Z'),
 ('stoc.iesiri-peste-stoc','2026-10-08T08:47:08.971Z'),
 ('stoc.rezervare-fara-miscare','2026-10-08T08:47:08.981Z'),
 ('stoc.sub-minim','2026-10-08T08:47:08.975Z'),
@@ -337,7 +368,8 @@ REPLACE INTO `notification_templates` (`id`, `source_key`, `subject`, `body`, `t
 (14,'analiza-risc.expirare','Expirare analiză de risc – <beneficiar>, <punct de lucru>','Analiza de risc nr. <numar inregistrare> a punctului de lucru <punct de lucru> (<adresa punct de lucru>) al beneficiarului <beneficiar>, întocmită de <intocmit de>, expiră la data de <data expirare> (ultima reînnoire: <data ultima reinnoire>; valabilitate: <valabilitate luni> luni; zile rămase: <zile ramase>; zile de depășire: <zile depasire>).',60,1,0,'analiza-risc.expirare'),
 (15,'sistem.preluare-activityapp','Preluare ActivityApp: <problema preluare>','<detalii preluare> Vezi Setări → Preluare ActivityApp.',1,1,0,'sistem.preluare-activityapp'),
 (16,'sistem.mentenanta-activityapp-de-validat','Validează mentenanța: <tichet de validat>','<detalii validare> Vezi Setări → Preluare ActivityApp, „Evenimente de validat”.',1,1,0,'sistem.mentenanta-activityapp-de-validat'),
-(17,'sistem.beneficiari-activityapp-de-verificat','Verifică beneficiarul: <beneficiar de verificat>','<detalii verificare> Vezi Beneficiari → De verificat.',1,1,0,'sistem.beneficiari-activityapp-de-verificat');
+(17,'sistem.beneficiari-activityapp-de-verificat','Verifică beneficiarul: <beneficiar de verificat>','<detalii verificare> Vezi Beneficiari → De verificat.',1,1,0,'sistem.beneficiari-activityapp-de-verificat'),
+(18,'sistem.preluare-elcomtur','Elcomtur: <situatie elcomtur>','<detalii elcomtur> Vezi Setări → Preluare Elcomtur.',1,1,0,'sistem.preluare-elcomtur');
 /*!40000 ALTER TABLE `notification_templates` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -365,6 +397,12 @@ UNLOCK TABLES;
 LOCK TABLES `parameter_families` WRITE;
 /*!40000 ALTER TABLE `parameter_families` DISABLE KEYS */;
 /*!40000 ALTER TABLE `parameter_families` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `parameter_usage_log` WRITE;
+/*!40000 ALTER TABLE `parameter_usage_log` DISABLE KEYS */;
+REPLACE INTO `parameter_usage_log` (`id`, `definition_kind`, `definition_id`, `parameter_name`, `value_text`, `product_id`, `product_name`, `node_path`, `action`, `actor`, `reason`, `occurred_utc`) VALUES (1,'parameter',4,'ZZ Test arhiva','',NULL,'','Supraveghere Video / Camere Video IP','stergere definitie','claude.dev','Definitia nu va mai fi folosita','2026-10-28T10:51:25.995Z');
+/*!40000 ALTER TABLE `parameter_usage_log` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `parameter_values` WRITE;
@@ -817,13 +855,19 @@ UNLOCK TABLES;
 
 LOCK TABLES `risk_analyses` WRITE;
 /*!40000 ALTER TABLE `risk_analyses` DISABLE KEYS */;
-REPLACE INTO `risk_analyses` (`id`, `beneficiary_id`, `work_point_id`, `registration_number`, `author`, `initial_date`, `last_renewal_date`, `validity_months`, `is_active`, `active_work_point_id`, `notes`, `version`) VALUES (1,2,2,'11/10.10.2026','Krech Stefan Alexandru','2026-10-10','2026-10-10',36,1,2,'',0);
+REPLACE INTO `risk_analyses` (`id`, `beneficiary_id`, `work_point_id`, `registration_number`, `author`, `initial_date`, `last_renewal_date`, `validity_months`, `is_active`, `active_work_point_id`, `notes`, `version`, `analyzer_id`) VALUES (1,2,2,'11/10.10.2026','Krech Stefan Alexandru','2026-10-10','2026-10-10',36,1,2,'',0,NULL);
 /*!40000 ALTER TABLE `risk_analyses` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `risk_analysis_renewals` WRITE;
 /*!40000 ALTER TABLE `risk_analysis_renewals` DISABLE KEYS */;
 /*!40000 ALTER TABLE `risk_analysis_renewals` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `risk_analyzers` WRITE;
+/*!40000 ALTER TABLE `risk_analyzers` DISABLE KEYS */;
+REPLACE INTO `risk_analyzers` (`id`, `name`, `name_key`, `notes`, `version`, `created_utc`, `updated_utc`) VALUES (3,'ttet','ttet','',0,'2026-11-04T07:37:23.522Z','2026-11-04T07:37:23.522Z');
+/*!40000 ALTER TABLE `risk_analyzers` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `schema_migrations` WRITE;
@@ -882,7 +926,17 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (52,'Produse: familii de parametri (cel putin 2 parametri ai aceleiasi subcategorii; un produs are exact unul activ din familie)','2a4c7a6afa55e91f0028c64df27600e1042e5212d1fe08ddd4cc47c1a8202664','applied','2026-10-26 09:59:33','0.5.22'),
 (53,'Produse: etichete pe subcategorie (On/Off pe produs, neobligatorii, folosite la filtrarea catalogului)','03ec7f4856bf28467d53a4fc7936842f00c85dcd35b5a144a17b041f1b77b19c','applied','2026-10-27 13:05:03','0.5.26'),
 (54,'Produse: arbore de subcategorii (o subcategorie poate avea subcategorii copil, pe oricate niveluri)','cc95ad7f610714cf73b5ec8e1db73f69c21c3309b72fb85127c650074d133213','applied','2026-10-28 05:46:38','0.5.27'),
-(55,'Produse: setari de catalog (adancimea maxima a arborelui de subcategorii)','54d4e8bcac7a0266a5e4a3d2df47c6deba00d1bac18192264280b48c28460013','applied','2026-10-28 05:46:38','0.5.27');
+(55,'Produse: setari de catalog (adancimea maxima a arborelui de subcategorii)','54d4e8bcac7a0266a5e4a3d2df47c6deba00d1bac18192264280b48c28460013','applied','2026-10-28 05:46:38','0.5.27'),
+(56,'Produse: arhivarea parametrilor si etichetelor, parametri si etichete pe categorie, jurnal de utilizare','3036181973f67a24bc336305f0640ed70d153d8a41f29d792f1e9050b89bbc3c','applied','2026-10-28 10:49:50','0.5.28'),
+(57,'Preluare ActivityApp: preluarea beneficiarilor (si a celor fara tichete) si importul automat sau punerea in coada pentru acceptare manuala','81780d8d6223dfcfd6e474e2eecbd9505b4c8af6def57009a013b0f61a2be573','applied','2026-10-30 08:47:57','0.5.31'),
+(58,'Fisiere atasate punctelor de lucru, contractelor de mentenanta, interventiilor si analizelor de risc (entity_files)','3b0a959e7162d08d93fa8a2f70abaadc539eaa4ef4273a456946651d2ef0ad64','applied','2026-10-30 08:47:57','0.5.31'),
+(59,'Nomenclator Analizor de risc (risk_analyzers) si analizorul ales la analiza de risc (risk_analyses.analyzer_id)','a94e59f2f6f574a24a904d1607ebbdfb70991f8771234557dfca417932ec01f2','applied','2026-10-30 10:37:04','0.5.33'),
+(60,'Mentenanta inregistrata fara contract (tichet ActivityApp validat ca mentenanta la un punct fara contract activ): service_interventions.without_contract','5fdbd178fbdf9e339274f908cf84854b95f3e9cef2d85a4c62d2a20993ef504d','applied','2026-10-30 10:37:04','0.5.33'),
+(61,'Coordonatele GPS ale evenimentului de rezolvare al unui tichet ActivityApp: activity_import_tickets.gps','afc2e69fefc77a36801c7ad29e2e203c93a3ac26bd4da7dc2b37fcb4ee8ec9b7','applied','2026-11-04 13:11:00','0.5.37'),
+(62,'Balantele de plata din Elcomtur pe beneficiar (elcomtur_balances) si facturile lor neachitate (elcomtur_invoices)','cb2649052d51c173d931f9233088f194ccd9719815e5adc13c394934e7de124e','applied','2026-11-04 13:11:00','0.5.37'),
+(63,'Lista tipurilor de tichete citita din ActivityApp se pastreaza (activity_import_settings.known_types)','14ea226bd3cc99901dc54c847eab07e5eede2d8f49fd7fb5eb58bfc1a6b0cf8b','applied','2026-11-05 09:21:38','0.5.40'),
+(64,'Preluarea automata a backup-ului Elcomtur de pe un director (NAS): setari si rezultatul ultimei verificari (elcomtur_auto_settings)','ffbf9952023b6c424d220671bcea682984a3ecf40771ffc313b7d44c7c1381b9','applied','2026-11-05 11:53:01','0.5.41'),
+(65,'Campurile tichetelor ActivityApp: ce s-a citit pentru fiecare tichet (fields_read), campurile suplimentare (extras) si unde au intrat in observatii (notes_items)','a1fde9af25a3ee44c929d78aa3ebd5c342380db03356fe45840c3912c7a0454d','applied','2026-11-06 09:11:30','0.5.44');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1385,7 +1439,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `subcategory_parameters` WRITE;
 /*!40000 ALTER TABLE `subcategory_parameters` DISABLE KEYS */;
-REPLACE INTO `subcategory_parameters` (`id`, `subcategory_id`, `name`, `normalized_name`, `unit`, `kind`, `position`, `version`, `family_id`) VALUES (3,63,'Lentila','LENTILA','mm',1,1,0,NULL);
+REPLACE INTO `subcategory_parameters` (`id`, `subcategory_id`, `name`, `normalized_name`, `unit`, `kind`, `position`, `version`, `family_id`, `category_id`, `archived_utc`, `archived_by`) VALUES (3,63,'Lentila','LENTILA','mm',1,1,0,NULL,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `subcategory_parameters` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1460,11 +1514,14 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'beneficiari.delete'),
 (1,'beneficiari.edit'),
 (1,'beneficiari.export'),
+(1,'beneficiari.validare'),
 (1,'beneficiari.view'),
 (1,'categorii.add'),
 (1,'categorii.delete'),
 (1,'categorii.edit'),
 (1,'categorii.view'),
+(1,'elcomtur.import'),
+(1,'elcomtur.view'),
 (1,'export-consum.export'),
 (1,'export-consum.view'),
 (1,'facturi.add'),
@@ -1489,6 +1546,7 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'mentenanta.delete'),
 (1,'mentenanta.edit'),
 (1,'mentenanta.export'),
+(1,'mentenanta.validare'),
 (1,'mentenanta.view'),
 (1,'nomenclator.add'),
 (1,'nomenclator.delete'),
@@ -1526,6 +1584,9 @@ REPLACE INTO `user_type_permissions` (`user_type_id`, `permission_key`) VALUES (
 (1,'setari-import-activityapp.reset'),
 (1,'setari-import-activityapp.run'),
 (1,'setari-import-activityapp.view'),
+(1,'setari-import-elcomtur.edit'),
+(1,'setari-import-elcomtur.run'),
+(1,'setari-import-elcomtur.view'),
 (1,'setari-jurnal.edit'),
 (1,'setari-jurnal.view'),
 (1,'setari-module.retry'),

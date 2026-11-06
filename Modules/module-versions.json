@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.2.0",
-                                           "hash":  "3e3d48fb3eeae79619a28cff3c6a14eba71872e29f7217f9e117529872e7c98b",
+                                           "version":  "0.12.0",
+                                           "hash":  "73af2f3f35074298b100ecbfa4b13ae31b4129b39c2ef081c5cb01ffbeedab83",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -13,6 +13,71 @@
                                                                "version":  "0.2.0",
                                                                "date":  "25.10.2026",
                                                                "note":  "Corespondenta campurilor ActivityApp: coloanele salvate se afiseaza imediat la deschiderea panoului"
+                                                           },
+                                                           {
+                                                               "version":  "0.3.0",
+                                                               "date":  "29.10.2026",
+                                                               "note":  "Preluare automată a persoanelor fizice și a partenerilor fără tichete; coadă unică de verificare; notificare agregată; comutatoare pentru preluare și import automat"
+                                                           },
+                                                           {
+                                                               "version":  "0.4.0",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Tipul de mentenanta se preia (propus la validare), notificare agregata, lista de validare si pentru operatori"
+                                                           },
+                                                           {
+                                                               "version":  "0.5.0",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Cozi de validare agregate pentru operatori (permisiune beneficiari.validare)"
+                                                           },
+                                                           {
+                                                               "version":  "0.6.0",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Toate tichetele merg in coada de validare (nu se inregistreaza singure); popup pentru vizualizare, modificare si preluare, discard; mentenanta fara contract"
+                                                           },
+                                                           {
+                                                               "version":  "0.6.1",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Tichetele de service fara cuvant cheie din nomenclator nu mai intra in coada de validare; se scot cele ramase"
+                                                           },
+                                                           {
+                                                               "version":  "0.6.2",
+                                                               "date":  "30.10.2026",
+                                                               "note":  "Paginare la coada de tichete de validat"
+                                                           },
+                                                           {
+                                                               "version":  "0.6.3",
+                                                               "date":  "04.11.2026",
+                                                               "note":  "Executantul tichetului = agentii atasati evenimentului (nu ProcesatDe); tichetul din coada de validare se actualizeaza cand raportul sau executantii se schimba in ActivityApp"
+                                                           },
+                                                           {
+                                                               "version":  "0.7.0",
+                                                               "date":  "04.11.2026",
+                                                               "note":  "Preluare tichete: coordonatele GPS ale evenimentului completeaza punctul de lucru fara coordonate (0,0 ignorat; 45,88 22,90 cu virgule devine 45.88, 22.90)"
+                                                           },
+                                                           {
+                                                               "version":  "0.8.0",
+                                                               "date":  "04.11.2026",
+                                                               "note":  "Coada de validat cu tichetele discardate si problemele importului ca taburi in Notificari (scoase din Setari -\u003e Import ActivityApp)"
+                                                           },
+                                                           {
+                                                               "version":  "0.9.0",
+                                                               "date":  "04.11.2026",
+                                                               "note":  "Lista tipurilor de tichete citite din ActivityApp se pastreaza (migrarea 63); alerta Probleme de preluare duce la tabul Probleme import din Notificari"
+                                                           },
+                                                           {
+                                                               "version":  "0.10.0",
+                                                               "date":  "05.11.2026",
+                                                               "note":  "Tichete discardate: vizualizare tichet (popup doar pentru citire); motivul notificarii de validare spune ce s-a decis efectiv"
+                                                           },
+                                                           {
+                                                               "version":  "0.11.0",
+                                                               "date":  "06.11.2026",
+                                                               "note":  "Informatiile din tichet cu On/Off, destinatie si campuri suplimentare; recitirea tichetelor preluate"
+                                                           },
+                                                           {
+                                                               "version":  "0.12.0",
+                                                               "date":  "06.11.2026",
+                                                               "note":  "Tichet exemplu, nume editabile, verificarea structurii tichetelor si notificarea"
                                                            }
                                                        ]
                                        },
@@ -60,8 +125,8 @@
                                                   ]
                                   },
                     "Invoices":  {
-                                     "version":  "1.1.2",
-                                     "hash":  "eedbd2a67b797da9ebb2ba8b32d1693964711734dbaa08d01be6c943d4b0be6c",
+                                     "version":  "1.1.3",
+                                     "hash":  "f3e11612edd65ce1a5b43388dd804587b759170c83df6640b08e6708db8bd6ec",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -82,12 +147,17 @@
                                                          "version":  "1.1.2",
                                                          "date":  "28.10.2026",
                                                          "note":  "Tabelele preluarii facturii sunt in containere cu defilare orizontala"
+                                                     },
+                                                     {
+                                                         "version":  "1.1.3",
+                                                         "date":  "04.11.2026",
+                                                         "note":  "CUI furnizor corectat manual in sablon ramane la salvare (nu mai e rescris cu valoarea citita prin OCR)"
                                                      }
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.3.1",
-                                    "hash":  "a5a397156390f97363e348d3086276bdfcb38306fe8fcc3f93bdaf91e50c9ba5",
+                                    "version":  "1.4.9",
+                                    "hash":  "90dacab146c42340a598597a837b4fc7a07e00c0fa3029484121fc039ff7f3ed",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -123,12 +193,62 @@
                                                         "version":  "1.3.1",
                                                         "date":  "28.10.2026",
                                                         "note":  "Filtrul jurnalului cunoaste actiunea de mutare a subcategoriilor"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.0",
+                                                        "date":  "28.10.2026",
+                                                        "note":  "Acțiune nouă în jurnal: promovare subcategorie în categorie"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.1",
+                                                        "date":  "30.10.2026",
+                                                        "note":  "Filtre pentru adaugarea/stergerea fisierelor atasate"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.2",
+                                                        "date":  "30.10.2026",
+                                                        "note":  "Filtru pentru redenumirea fisierelor atasate"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.3",
+                                                        "date":  "30.10.2026",
+                                                        "note":  "Filtrul jurnalului cunoaste analizorii de risc (entitate si actiuni)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.4",
+                                                        "date":  "30.10.2026",
+                                                        "note":  "Actiunea Schimbare fel interventie in filtrul jurnalului"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.5",
+                                                        "date":  "04.11.2026",
+                                                        "note":  "Filtrul jurnalului: entitatea Preluare Elcomtur si actiunea Preluare date Elcomtur"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.6",
+                                                        "date":  "05.11.2026",
+                                                        "note":  "Filtrul de actiuni cunoaste operatiile preluarii automate Elcomtur (setari, testare, verificare, preluare, esec)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.7",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Actiunea \u0027Modificare HTTPS prin proxy\u0027 in filtrul jurnalului"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.8",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Actiunea Actualizare tichete ActivityApp preluate in filtrul jurnalului"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.9",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Tichet exemplu, nume editabile, verificarea structurii tichetelor si notificarea"
                                                     }
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.3.1",
-                                        "hash":  "8ba316cc74369679bd6ad70ee20cba2912db9001405104521221e4ee462d6da0",
+                                        "version":  "1.7.2",
+                                        "hash":  "40cc189a1eeba9fc5959a4db8d829d751c2bc46d76861ac919fe51198c0092f9",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -189,17 +309,82 @@
                                                             "version":  "1.3.1",
                                                             "date":  "28.10.2026",
                                                             "note":  "Tabelul punctelor contractului este in container cu defilare orizontala"
+                                                        },
+                                                        {
+                                                            "version":  "1.4.0",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Editoare in popup; fisiere atasate la puncte de lucru, contracte si interventii"
+                                                        },
+                                                        {
+                                                            "version":  "1.5.0",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Tab Evenimente de validat (permisiunea Validare tichete ActivityApp)"
+                                                        },
+                                                        {
+                                                            "version":  "1.5.1",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Filtrul din registru lucreaza in timpul tastarii; tab rosu pentru evenimente de validat"
+                                                        },
+                                                        {
+                                                            "version":  "1.6.0",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Mentenanta inregistrata fara contract (migrarea 60)"
+                                                        },
+                                                        {
+                                                            "version":  "1.7.0",
+                                                            "date":  "30.10.2026",
+                                                            "note":  "Vizualizare intervenție în popup (cu tichetul ActivityApp) și schimbarea felului intervenției la editare"
+                                                        },
+                                                        {
+                                                            "version":  "1.7.1",
+                                                            "date":  "04.11.2026",
+                                                            "note":  "Modificari ale interventiilor de mentenanta din 30.10.2026, inregistrate in evidenta de versiuni"
+                                                        },
+                                                        {
+                                                            "version":  "1.7.2",
+                                                            "date":  "06.11.2026",
+                                                            "note":  "Campurile suplimentare ale tichetului in fereastra interventiei; observatiile unei interventii se pot reinnoi din tichet"
                                                         }
                                                     ]
                                     },
                     "Notifications":  {
-                                          "version":  "1.0.0",
-                                          "hash":  "6d9722f673fb299b208788b496a7c7b407cb86b6305ca66c3b6fc55309d58eae",
+                                          "version":  "1.3.2",
+                                          "hash":  "ea4c39fdc33e3bad0bdbb4824ad916a56214194858f8d1eb1eb82d5059e54a8d",
                                           "history":  [
                                                           {
                                                               "version":  "1.0.0",
                                                               "date":  "24.10.2026",
                                                               "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                          },
+                                                          {
+                                                              "version":  "1.1.0",
+                                                              "date":  "30.10.2026",
+                                                              "note":  "Taburi Tichete/Beneficiari de validat, bannere si taburi rosii"
+                                                          },
+                                                          {
+                                                              "version":  "1.1.1",
+                                                              "date":  "30.10.2026",
+                                                              "note":  "Paginare la tabelele de notificari"
+                                                          },
+                                                          {
+                                                              "version":  "1.2.0",
+                                                              "date":  "04.11.2026",
+                                                              "note":  "Coada de validat cu tichetele discardate si problemele importului ca taburi in Notificari (scoase din Setari -\u003e Import ActivityApp)"
+                                                          },
+                                                          {
+                                                              "version":  "1.3.0",
+                                                              "date":  "04.11.2026",
+                                                              "note":  "Tab Balante restante (beneficiari cu plati restante din Elcomtur)"
+                                                          },
+                                                          {
+                                                              "version":  "1.3.1",
+                                                              "date":  "04.11.2026",
+                                                              "note":  "Tabul Balante restante vine dintr-o componenta a modulului Elcomtur (rosu cu numarul de beneficiari restanti)"
+                                                          },
+                                                          {
+                                                              "version":  "1.3.2",
+                                                              "date":  "05.11.2026",
+                                                              "note":  "Motivul rezolvarii automate poate fi compus de sursa notificarii (RemovedReasonAsync)"
                                                           }
                                                       ]
                                       },
@@ -253,8 +438,8 @@
                                                        ]
                                        },
                     "RiskAnalyses":  {
-                                         "version":  "1.0.2",
-                                         "hash":  "46230dff36438ae02309610b087bc0ac259c712764b20edf250459e682df39f2",
+                                         "version":  "1.3.0",
+                                         "hash":  "3277fd6713009b1b1d7ef6211ab92766d9727c782a50ba0360685f89a107d897",
                                          "history":  [
                                                          {
                                                              "version":  "1.0.0",
@@ -270,23 +455,53 @@
                                                              "version":  "1.0.2",
                                                              "date":  "28.10.2026",
                                                              "note":  "Tabelul istoricului analizei este in container cu defilare orizontala"
+                                                         },
+                                                         {
+                                                             "version":  "1.1.0",
+                                                             "date":  "30.10.2026",
+                                                             "note":  "Editor in popup; fisiere atasate analizelor de risc"
+                                                         },
+                                                         {
+                                                             "version":  "1.2.0",
+                                                             "date":  "30.10.2026",
+                                                             "note":  "Nomenclator Analizor de risc: lista analizorilor, alegerea analizorului la analiza de risc cu popup de adaugare"
+                                                         },
+                                                         {
+                                                             "version":  "1.2.1",
+                                                             "date":  "30.10.2026",
+                                                             "note":  "Analizor: citire blocata cu LOCK IN SHARE MODE (MariaDB)"
+                                                         },
+                                                         {
+                                                             "version":  "1.2.2",
+                                                             "date":  "04.11.2026",
+                                                             "note":  "Butoanele Inchide/Anuleaza din formularul de adaugare functioneaza pe pagina Analize de risc (lipsea gazda avertizarii de modificari nesalvate)"
+                                                         },
+                                                         {
+                                                             "version":  "1.3.0",
+                                                             "date":  "04.11.2026",
+                                                             "note":  "Formularul analizei de risc: fara campul Intocmita de; Data inregistrarii devine Data intocmirii"
                                                          }
                                                      ]
                                      },
                     "Suppliers":  {
-                                      "version":  "1.0.0",
-                                      "hash":  "3b01368653f5c562307a7df71cfaf3844c65766d9b06f146e4838472b6f491ae",
+                                      "version":  "1.0.1",
+                                      "hash":  "7238f057e17c2ca25b62b43c64e78bd2e40955da092c99a80702fc8add350c88",
                                       "history":  [
                                                       {
                                                           "version":  "1.0.0",
                                                           "date":  "24.10.2026",
                                                           "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                      },
+                                                      {
+                                                          "version":  "1.0.1",
+                                                          "date":  "04.11.2026",
+                                                          "note":  "Adaugarea unui furnizor se face in popup"
                                                       }
                                                   ]
                                   },
                     "Vehicles":  {
-                                     "version":  "1.0.1",
-                                     "hash":  "b3e354374d9f19fa6efcee97a5d279dc9e71d2b85379cfa4c3ebb19b812f57c1",
+                                     "version":  "1.0.2",
+                                     "hash":  "a1d5687e2b3c5d69896ee09c0048efeea41b0701fc6556a0581c52c616ac8aa9",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -297,6 +512,42 @@
                                                          "version":  "1.0.1",
                                                          "date":  "28.10.2026",
                                                          "note":  "Registrul vehiculelor are iconita de deschidere a paginii vehiculului pe fiecare rand"
+                                                     },
+                                                     {
+                                                         "version":  "1.0.2",
+                                                         "date":  "04.11.2026",
+                                                         "note":  "Adaugarea unui vehicul se face in popup"
+                                                     }
+                                                 ]
+                                 },
+                    "Elcomtur":  {
+                                     "version":  "1.3.0",
+                                     "hash":  "f724a049629bd6332649734c959042875eb75a96af33655ab831577bf3ac8453",
+                                     "history":  [
+                                                     {
+                                                         "version":  "1.0.0",
+                                                         "date":  "04.11.2026",
+                                                         "note":  "Versiune de pornire (inceputul versionarii modulelor)"
+                                                     },
+                                                     {
+                                                         "version":  "1.1.0",
+                                                         "date":  "04.11.2026",
+                                                         "note":  "Numarul de beneficiari cu plati restante pentru tabul din Notificari (CountOwedAsync)"
+                                                     },
+                                                     {
+                                                         "version":  "1.1.1",
+                                                         "date":  "05.11.2026",
+                                                         "note":  "Sectiunea de balanta apare la toti beneficiarii; fara balanta importata, antetul spune asta"
+                                                     },
+                                                     {
+                                                         "version":  "1.2.0",
+                                                         "date":  "05.11.2026",
+                                                         "note":  "Preluare automata zilnica a backup-ului Elcomtur de pe un director/NAS (04:00): masca, firma cu nume, verificare integritate, ultimele 2 fisiere pe server, notificari (lipsa, esec, preluat), Setari -\u003e Preluare Elcomtur"
+                                                     },
+                                                     {
+                                                         "version":  "1.3.0",
+                                                         "date":  "06.11.2026",
+                                                         "note":  "Ora verificarii zilnice a preluarii automate se alege din setari"
                                                      }
                                                  ]
                                  }

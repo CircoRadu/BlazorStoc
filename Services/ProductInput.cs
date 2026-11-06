@@ -47,7 +47,7 @@ public sealed class ProductInput
         Category = product.Category, Subcategory = product.Subcategory };
 }
 
-public sealed class ProductOperationException(string message) : Exception(message);
+public class ProductOperationException(string message) : Exception(message);
 
 public static class ProductCode
 {

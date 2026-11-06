@@ -1,0 +1,61 @@
+@namespace BlazorStoc.Components.Pages
+@using BlazorStoc.Services
+@inject IRiskAnalyzerRepository Repository
+@inject ILogger<RiskAnalyzerDialog> Logger
+@implements IDisposable
+
+<div class="delete-overlay">
+    <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="risk-analyzer-dialog-title">
+        <section class="product-editor">
+            <div class="catalog-heading dialog-head"><h2 id="risk-analyzer-dialog-title">@(Original is null ? "Adaugă analizor de risc" : $"Editează analizorul {Original.Name}")</h2><HelpButton Topic="analizor-risc-editor" About="Formularul analizorului de risc" /></div>
+            @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+            <EditForm Model="this" OnSubmit="SaveAsync" FormName="risk-analyzer-dialog">
+                <fieldset disabled="@saving">
+                    <div class="editor-grid">
+                        <label for="risk-analyzer-name" class="full-width">Denumire *<InputTextLive id="risk-analyzer-name" @bind-Value="name" maxlength="@RiskAnalyzerRules.NameMaximumLength" autocomplete="off" placeholder="Persoana sau firma care întocmește analize de risc" /></label>
+                        <label for="risk-analyzer-notes" class="full-width">Observații<textarea id="risk-analyzer-notes" rows="3" maxlength="@RiskAnalyzerRules.NotesMaximumLength" @bind="notes" @bind:event="oninput"></textarea></label>
+                    </div>
+                    <div class="editor-actions"><button class="primary" type="submit">@(saving ? "Se salvează…" : Original is null ? "Adaugă analizorul" : "Salvează analizorul")</button><button class="danger" type="button" @onclick="CloseAsync">Anulează</button></div>
+                </fieldset>
+            </EditForm>
+        </section>
+    </div>
+</div>
+
+@code {
+    [Parameter] public RiskAnalyzer? Original { get; set; }
+    // The saved analyzer (new or changed); the dialog stays open until the caller closes it.
+    [Parameter] public EventCallback<RiskAnalyzer> Saved { get; set; }
+    [Parameter] public EventCallback Closed { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private string name = "", notes = "";
+    private bool saving;
+    private string? error;
+
+    protected override void OnInitialized()
+    {
+        if (Original is not null) { name = Original.Name; notes = Original.Notes; }
+    }
+
+    private Task CloseAsync() => saving ? Task.CompletedTask : Closed.InvokeAsync();
+
+    private async Task SaveAsync()
+    {
+        if (saving) return;
+        error = null; saving = true;
+        RiskAnalyzer? saved = null;
+        try { saved = Original is null ? await Repository.CreateAsync(name, notes, lifetime.Token) : await Repository.UpdateAsync(Original, name, notes, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is RiskAnalyzerOperationException or AccessDeniedException) { error = ex.Message; }
+        catch (Exception ex)
+        {
+            Logger.LogError("Risk analyzer saving failed ({ErrorType}).", ex.GetType().Name);
+            error = "Analizorul nu a putut fi salvat. Datele au fost păstrate; reîncearcă.";
+        }
+        finally { saving = false; }
+        if (saved is not null) await Saved.InvokeAsync(saved);
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

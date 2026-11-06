@@ -7,8 +7,12 @@
 
 @if (adding || editing is not null)
 {
-    <ServiceContractEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Original="editing"
-                           Saved="SavedAsync" Closed="CloseEditorAsync" />
+    <div class="delete-overlay">
+        <div class="delete-dialog template-popup" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="contract-editor-title">
+            <ServiceContractEditor @key="editorKey" BeneficiaryId="BeneficiaryId" WorkPoints="WorkPoints" Contracts="Contracts" Original="editing"
+                                   Saved="SavedAsync" Closed="CloseEditorAsync" />
+        </div>
+    </div>
 }
 
 @if (activation is not null)
@@ -127,8 +131,11 @@
     private async Task SavedAsync(ServiceContractDetails saved)
     {
         notice = adding ? $"Contractul {saved.Contract.Label} a fost adăugat." : $"Contractul {saved.Contract.Label} a fost actualizat.";
+        // A new contract stays open for editing, so its files can be added right away.
+        var wasNew = adding;
         adding = false;
-        editing = null;
+        editing = wasNew ? saved : null;
+        if (wasNew) editorKey = Guid.NewGuid();
         await Changed.InvokeAsync();
     }
 

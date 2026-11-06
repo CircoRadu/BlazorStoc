@@ -20,7 +20,8 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
                EXISTS(SELECT 1 FROM stock_movement_history h WHERE h.movement_id=m.id),
                m.destination,m.vehicle_id,dv.plate_number,m.source_vehicle_id,sv.plate_number,
                m.invoice_id,si.`number`,su.name,si.supplier_id,
-               m.free_entry_type,m.free_supplier_id,fs.name,m.reference,m.over_stock_cause,m.operation_id,m.voided_utc,m.void_reason,m.voided_by,m.return_of_movement_id
+               m.free_entry_type,m.free_supplier_id,fs.name,m.reference,m.over_stock_cause,m.operation_id,m.voided_utc,m.void_reason,m.voided_by,m.return_of_movement_id,
+               (SELECT h.actor FROM stock_movement_history h WHERE h.movement_id=m.id ORDER BY h.id DESC LIMIT 1)
         FROM stock_movements m
         LEFT JOIN beneficiaries b ON b.id=m.beneficiary_id
         LEFT JOIN projects p ON p.id=m.project_id
@@ -1188,10 +1189,17 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
     // A product of a subcategory with required parameters that misses a value is blocked until it is completed (migration 37).
     internal static async Task EnsureParametersCompleteAsync(MySqlConnection connection, MySqlTransaction transaction, int productId, string name, CancellationToken token)
     {
+        var missing = await MissingParametersAsync(connection, transaction, productId, token).ConfigureAwait(false);
+        if (missing.Count > 0) throw new StockMovementOperationException(ProductParameterRules.MissingMessage(name, missing));
+    }
+
+    // The required parameters (own, inherited from the ancestors and from the category) and the families a product still lacks a value for.
+    internal static async Task<List<string>> MissingParametersAsync(MySqlConnection connection, MySqlTransaction? transaction, int productId, CancellationToken token)
+    {
         await using var command = Command(connection, transaction, """
             WITH RECURSIVE chain(id,parent_id) AS (SELECT s.id,s.parent_id FROM subcategories s INNER JOIN products q ON q.subcategory_id=s.id WHERE q.id=@id UNION ALL SELECT s.id,s.parent_id FROM subcategories s INNER JOIN chain c ON s.id=c.parent_id)
-            SELECT sp.name FROM products p INNER JOIN subcategory_parameters sp ON sp.subcategory_id IN (SELECT id FROM chain)
-            WHERE p.id=@id AND sp.family_id IS NULL AND sp.kind<>4 AND NOT EXISTS(SELECT 1 FROM product_parameter_values pv WHERE pv.product_id=p.id AND pv.parameter_id=sp.id)
+            SELECT sp.name FROM products p INNER JOIN subcategory_parameters sp ON (sp.subcategory_id IN (SELECT id FROM chain) OR sp.category_id=p.category_id)
+            WHERE p.id=@id AND sp.family_id IS NULL AND sp.kind<>4 AND sp.archived_utc IS NULL AND NOT EXISTS(SELECT 1 FROM product_parameter_values pv WHERE pv.product_id=p.id AND pv.archived=0 AND pv.parameter_id=sp.id)
             ORDER BY sp.position,sp.id
             """, ("@id", productId));
         var missing = new List<string>();
@@ -1202,15 +1210,15 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             WITH RECURSIVE chain(id,parent_id) AS (SELECT s.id,s.parent_id FROM subcategories s INNER JOIN products q ON q.subcategory_id=s.id WHERE q.id=@id UNION ALL SELECT s.id,s.parent_id FROM subcategories s INNER JOIN chain c ON s.id=c.parent_id)
             SELECT t.name,t.chosen,t.members FROM (
                 SELECT f.name,f.position,
-                       (SELECT COUNT(*) FROM product_parameter_values pv INNER JOIN subcategory_parameters m ON m.id=pv.parameter_id WHERE pv.product_id=p.id AND m.family_id=f.id) AS chosen,
+                       (SELECT COUNT(*) FROM product_parameter_values pv INNER JOIN subcategory_parameters m ON m.id=pv.parameter_id WHERE pv.product_id=p.id AND pv.archived=0 AND m.family_id=f.id) AS chosen,
                        (SELECT GROUP_CONCAT(m.name ORDER BY m.position,m.id SEPARATOR ', ') FROM subcategory_parameters m WHERE m.family_id=f.id) AS members
-                FROM products p INNER JOIN parameter_families f ON f.subcategory_id IN (SELECT id FROM chain) WHERE p.id=@id) t
+                FROM products p INNER JOIN parameter_families f ON (f.subcategory_id IN (SELECT id FROM chain) OR f.category_id=p.category_id) AND f.archived_utc IS NULL WHERE p.id=@id) t
             WHERE t.chosen<>1 ORDER BY t.position
             """, ("@id", productId));
         await using (var reader = await families.ExecuteReaderAsync(token).ConfigureAwait(false))
             while (await reader.ReadAsync(token).ConfigureAwait(false))
                 missing.Add(reader.GetInt64(1) == 0 ? $"{reader.GetString(0)} (alege una dintre: {reader.GetString(2)})" : $"{reader.GetString(0)} (un singur parametru poate fi activ)");
-        if (missing.Count > 0) throw new StockMovementOperationException(ProductParameterRules.MissingMessage(name, missing));
+        return missing;
     }
 
     // Atomic increment under the product row lock: concurrent movements cannot overwrite each other's stock change.
@@ -1380,7 +1388,7 @@ public sealed class MariaStockMovementRepository(IConfiguration configuration, I
             reader.IsDBNull(28) ? null : (OverStockCause)ToInt32(reader.GetInt64(28)),
             reader.IsDBNull(29) ? null : ToInt32(reader.GetInt64(29)),
             reader.IsDBNull(30) ? null : reader.GetString(30), reader.IsDBNull(31) ? null : reader.GetString(31), reader.IsDBNull(32) ? null : reader.GetString(32),
-            reader.IsDBNull(33) ? null : ToInt32(reader.GetInt64(33)));
+            reader.IsDBNull(33) ? null : ToInt32(reader.GetInt64(33)), reader.IsDBNull(34) ? null : reader.GetString(34));
     }
 
     private static DateTime ReadUpdated(MySqlDataReader reader, DateTime fallback)

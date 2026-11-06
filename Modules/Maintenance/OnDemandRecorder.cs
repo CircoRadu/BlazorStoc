@@ -13,6 +13,9 @@ internal sealed class OnDemandInterventionRecorder(IServiceInterventionRepositor
     public Task<int> RecordMaintenanceAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default) =>
         RecordAsync(ServiceInterventionKind.Maintenance, beneficiaryId, workPointId, performedOn, notes, cancellationToken);
 
+    public Task<int> RecordMaintenanceUncoveredAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default) =>
+        RecordAsync(ServiceInterventionKind.Maintenance, beneficiaryId, workPointId, performedOn, notes, cancellationToken, allowUncovered: true);
+
     public Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) =>
         interventions.IsCoveredAsync(beneficiaryId, workPointId, cancellationToken);
 
@@ -24,13 +27,32 @@ internal sealed class OnDemandInterventionRecorder(IServiceInterventionRepositor
         catch (ServiceInterventionOperationException exception) { throw new OnDemandInterventionOperationException(exception.Message); }
     }
 
-    private async Task<int> RecordAsync(ServiceInterventionKind kind, int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken)
+    public async Task<string?> GetNotesAsync(int beneficiaryId, int interventionId, CancellationToken cancellationToken = default) =>
+        (await interventions.GetForBeneficiaryAsync(beneficiaryId, cancellationToken).ConfigureAwait(false)).FirstOrDefault(item => item.Id == interventionId)?.Notes;
+
+    // Only the notes change: the kind, the work point, the date and the choice of the next due stay as they are, so the register moves no due date. A different text than expected means someone edited it.
+    public async Task<bool> UpdateNotesAsync(int beneficiaryId, int interventionId, string expectedNotes, string newNotes, CancellationToken cancellationToken = default)
+    {
+        var original = (await interventions.GetForBeneficiaryAsync(beneficiaryId, cancellationToken).ConfigureAwait(false)).FirstOrDefault(item => item.Id == interventionId);
+        if (original is null || original.Notes != expectedNotes) return false;
+        try
+        {
+            await interventions.UpdateAsync(original, new ServiceInterventionInput
+            {
+                Kind = original.Kind, WorkPointId = original.WorkPointId, PerformedOn = original.PerformedOn, Notes = newNotes, Basis = original.Basis ?? ServiceNextDueBasis.FromPerformed, ChosenDue = original.NextDueSet
+            }, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (ServiceInterventionOperationException) { return false; }
+    }
+
+    private async Task<int> RecordAsync(ServiceInterventionKind kind, int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken, bool allowUncovered = false)
     {
         try
         {
             var saved = await interventions.RecordAsync(beneficiaryId, new ServiceInterventionInput
             {
-                Kind = kind, WorkPointId = workPointId, PerformedOn = performedOn, Notes = notes, Basis = ServiceNextDueBasis.FromPerformed
+                Kind = kind, WorkPointId = workPointId, PerformedOn = performedOn, Notes = notes, Basis = ServiceNextDueBasis.FromPerformed, AllowUncovered = allowUncovered
             }, cancellationToken).ConfigureAwait(false);
             return saved.Intervention.Id;
         }
@@ -43,6 +65,7 @@ internal sealed class UnavailableOnDemandInterventionRecorder : IOnDemandInterve
     private static Task<T> Out<T>() => Task.FromException<T>(new ModuleUnavailableException(MaintenanceModule.ModuleId));
     public Task<int> RecordAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default) => Out<int>();
     public Task<int> RecordMaintenanceAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default) => Out<int>();
+    public Task<int> RecordMaintenanceUncoveredAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default) => Out<int>();
     public Task<bool> IsCoveredAsync(int beneficiaryId, int workPointId, CancellationToken cancellationToken = default) => Out<bool>();
     public Task DeleteAsync(int beneficiaryId, int interventionId, string reason, CancellationToken cancellationToken = default) => Task.FromException(new ModuleUnavailableException(MaintenanceModule.ModuleId));
 }

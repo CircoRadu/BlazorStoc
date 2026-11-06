@@ -94,6 +94,12 @@ public static class WorkPointCoordinates
 {
     private static readonly Regex DotPair = new(@"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    private static readonly Regex CommaPair = new(@"^\s*(-?\d+),(\d+)\s*[,;]\s*(-?\d+),(\d+)\s*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    /// <summary>The coordinates of an ActivityApp event: nothing for text that is not a pair or for 0, 0 (no location); otherwise as <see cref="TryParse"/>.</summary>
+    public static bool TryParseLocated(string? text, out decimal latitude, out decimal longitude) =>
+        TryParse(text, out latitude, out longitude, out _) && !(latitude == 0 && longitude == 0);
+
     public static bool TryParse(string? text, out decimal latitude, out decimal longitude, out string? error)
     {
         latitude = longitude = 0;
@@ -102,6 +108,8 @@ public static class WorkPointCoordinates
         if (value.Length == 0) { error = "Completează coordonatele (latitudine, longitudine) sau oprește comutatorul „Coordonate”."; return false; }
         string[] parts;
         if (DotPair.Match(value) is { Success: true } pair) parts = [pair.Groups[1].Value, pair.Groups[2].Value];
+        // "45,8827287, 22,9065762" (decimal commas, the two numbers separated by a comma and a space): taken as 45.8827287, 22.9065762.
+        else if (CommaPair.Match(value) is { Success: true } commas) parts = [$"{commas.Groups[1].Value}.{commas.Groups[2].Value}", $"{commas.Groups[3].Value}.{commas.Groups[4].Value}"];
         else parts = value.Replace(';', ' ').Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Select(part => part.Replace(',', '.')).ToArray();
         if (parts.Length != 2 ||
             !decimal.TryParse(parts[0], NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out latitude) ||

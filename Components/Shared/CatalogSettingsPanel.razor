@@ -20,6 +20,9 @@
                 <label>Adâncimea maximă a arborelui de subcategorii
                     <input id="catalog-max-depth" type="number" min="@CatalogSettingsRules.MinSubcategoryDepth" max="@CatalogSettingsRules.MaxSubcategoryDepth" step="1" @bind="maxDepth" @bind:event="oninput" disabled="@(busy || !isAdmin)" />
                     <small>Între @CatalogSettingsRules.MinSubcategoryDepth și @CatalogSettingsRules.MaxSubcategoryDepth niveluri. Arborele are acum @currentDepth @(currentDepth == 1 ? "nivel" : "niveluri"); valoarea nu poate fi mai mică.</small></label>
+                <label>Perioada de păstrare pentru restaurare (zile)
+                    <input id="catalog-restore-days" type="number" min="@ParameterArchiveRules.MinRetentionDays" max="@ParameterArchiveRules.MaxRetentionDays" step="1" @bind="restoreDays" @bind:event="oninput" disabled="@(busy || !isAdmin)" />
+                    <small>Între @ParameterArchiveRules.MinRetentionDays și @ParameterArchiveRules.MaxRetentionDays de zile. Un parametru, o familie sau o etichetă arhivată poate fi lăsată definitiv fără restaurare (produsele rămân cu numele actual) abia după acest număr de zile de la arhivare.</small></label>
             </div>
             <div class="editor-actions">
                 <button type="button" class="refresh act-confirm" disabled="@(busy || !isAdmin)" @onclick="SaveAsync">@(busy ? "Se salvează…" : "Salvează")</button>
@@ -31,7 +34,7 @@
 
 @code {
     private readonly CancellationTokenSource lifetime = new();
-    private int maxDepth = CatalogSettingsRules.DefaultSubcategoryDepth, currentDepth = 1;
+    private int maxDepth = CatalogSettingsRules.DefaultSubcategoryDepth, currentDepth = 1, restoreDays = ParameterArchiveRules.DefaultRetentionDays;
     private bool loading = true, busy, isAdmin;
     private string? error, notice;
 
@@ -41,6 +44,7 @@
         {
             isAdmin = await Access.IsAdministratorAsync(lifetime.Token);
             maxDepth = await Settings.GetMaxSubcategoryDepthAsync(lifetime.Token);
+            restoreDays = await Settings.GetRestoreRetentionDaysAsync(lifetime.Token);
             currentDepth = Math.Max(1, (await Tree.GetTreeAsync(lifetime.Token)).Select(node => node.Depth + 1).DefaultIfEmpty(1).Max());
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
@@ -59,7 +63,8 @@
         try
         {
             await Settings.SaveMaxSubcategoryDepthAsync(maxDepth, lifetime.Token);
-            notice = $"Arborele de subcategorii poate avea acum cel mult {maxDepth} niveluri.";
+            await Settings.SaveRestoreRetentionDaysAsync(restoreDays, lifetime.Token);
+            notice = $"Arborele de subcategorii poate avea acum cel mult {maxDepth} niveluri, iar restaurarea se poate abandona după {restoreDays} de zile de la arhivare.";
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception exception) when (exception is ProductOperationException or AccessDeniedException) { error = exception.Message; }

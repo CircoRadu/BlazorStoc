@@ -1,0 +1,32 @@
+@using BlazorStoc.Services
+@* Renames a file: only the name before the extension is edited, the extension is shown fixed after the field. The field is wide enough for the whole name. *@
+<span class="file-name-editor">
+    <input aria-label="@($"Noul nume al fișierului {OriginalName}")" @bind="stem" @bind:event="oninput" maxlength="@(255 - extension.Length)" autocomplete="off" size="@Math.Clamp(stem.Length + 2, 24, 80)" disabled="@Busy" @onkeydown="KeyAsync" />
+    <span class="file-extension" aria-hidden="true">@extension</span>
+    <button type="button" class="row-icon check" disabled="@Busy" aria-label="@($"Salvează numele fișierului {OriginalName}")" title="@($"Salvează numele fișierului {OriginalName}")" @onclick="SubmitAsync"></button>
+    <button type="button" class="row-icon close" disabled="@Busy" aria-label="@($"Renunță la redenumirea fișierului {OriginalName}")" title="@($"Renunță la redenumirea fișierului {OriginalName}")" @onclick="() => Cancelled.InvokeAsync()"></button>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string OriginalName { get; set; } = "";
+    [Parameter] public bool Busy { get; set; }
+    // The new full name (edited name + the unchanged extension).
+    [Parameter, EditorRequired] public EventCallback<string> Submitted { get; set; }
+    [Parameter] public EventCallback Cancelled { get; set; }
+    private string stem = "", extension = "", loadedFor = "\0";
+
+    protected override void OnParametersSet()
+    {
+        if (loadedFor == OriginalName) return;
+        loadedFor = OriginalName;
+        (stem, extension) = FileNameParts.Split(OriginalName);
+    }
+
+    private Task SubmitAsync() => Submitted.InvokeAsync(stem.Trim() + extension);
+
+    private async Task KeyAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SubmitAsync();
+        else if (e.Key == "Escape") await Cancelled.InvokeAsync();
+    }
+}

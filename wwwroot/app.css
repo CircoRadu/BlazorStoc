@@ -1362,6 +1362,10 @@ tr[data-subcategory-index].drop-after>td{box-shadow:inset 0 -3px 0 var(--green)}
 .parameter-tags { display: flex; flex-wrap: wrap; gap: 4px 6px; }
 .param-tag { height: auto; min-height: 0; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); font: inherit; font-size: 12px; line-height: 1.5; cursor: pointer; }
 .param-tag:hover { border-color: var(--green); }
+.param-tag-split { display: inline-flex; }
+.param-tag-split .param-name { border-radius: 999px 0 0 999px; border-right-width: 0; color: var(--muted); }
+.param-tag-split .param-value { border-radius: 0 999px 999px 0; }
+.param-tag-split .param-name.active { color: #fff; }
 .param-tag.active { background: var(--green); border-color: var(--green); color: #fff; }
 .param-tag.label-tag { border-radius: 4px; }
 .parameter-filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 24px 12px; }
@@ -1395,6 +1399,14 @@ tr[data-node-name].drop-before>td{box-shadow:inset 0 3px 0 var(--green)}
 tr[data-node-name].drop-after>td{box-shadow:inset 0 -3px 0 var(--green)}
 tr[data-node-name].drop-inside>td{background:var(--c-eaf4f0);box-shadow:inset 0 0 0 1px var(--green)}
 [data-category-drop].drop-inside{outline:2px dashed var(--green);outline-offset:2px;border-radius:4px}
+/* Stage 7: while a node is dragged, strips between the categories turn a leaf into a new category; a tooltip next to the pointer says what a drop does (red when refused). */
+.category-drop-strip{display:none}
+body.dragging-node .category-drop-strip{display:block;height:18px;margin:2px 0;border:2px dashed var(--c-9fc9bd);border-radius:6px}
+body.dragging-node .category-drop-strip.drop-inside{background:var(--c-eaf4f0);border-color:var(--green)}
+body.dragging-node .category-drop-strip.drop-blocked{background:var(--c-fff0eb);border-color:var(--c-eacbc0)}
+.drag-tip{position:fixed;z-index:1000;max-width:380px;pointer-events:none;background:var(--c-192d31);color:var(--c-ffffff);border:1px solid var(--green);border-radius:8px;padding:9px 12px;font-size:12px;line-height:1.5}
+.drag-tip[hidden]{display:none}
+.drag-tip.blocked{background:var(--c-a83d35);border-color:var(--c-eacbc0)}
 
 /* The menu of the stock section is a tree; the sidebar widens by --sidebar-extra (set by the layout from the open branches) and the page follows. */
 .sidebar{width:calc(236px + var(--sidebar-extra,0px));transition:width .18s ease}
@@ -1407,12 +1419,6 @@ tr[data-node-name].drop-inside>td{background:var(--c-eaf4f0);box-shadow:inset 0 
 .menu-tree-toggle:hover,.menu-tree-toggle.active{background:var(--c-edf5f1);color:var(--green);font-weight:650;box-shadow:inset 4px 0 0 var(--green)}
 .menu-tree-children{display:grid;gap:2px;margin:2px 0 4px 10px;padding-left:9px;border-left:1px solid var(--c-d6e4df)}
 .category-submenu a,.menu-tree-children a{white-space:nowrap}
-
-/* Icon buttons: icon-buttons.js sets data-ico + --ico; the label stays in the DOM (title/aria-label) but is not shown. */
-button[data-ico], a[data-ico] { font-size: 0 !important; gap: 0; width: 40px; min-width: 40px; padding-left: 0; padding-right: 0; flex: 0 0 auto; }
-td button[data-ico], .table-scroll button[data-ico], td a[data-ico] { width: 32px; min-width: 32px; }
-button[data-ico]::before, a[data-ico]::before { content: ""; width: 20px; height: 20px; flex: 0 0 20px; background-color: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
-button[data-ico] > *, a[data-ico] > * { display: none; }
 
 /* Responsive reflow: blocks wrap and share the available width instead of overlapping or forcing a horizontal scroll. */
 .page-heading { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-start; justify-content: space-between; }
@@ -1454,3 +1460,76 @@ tr[data-depth="3"] > td { background: var(--c-f3ecfa); }
 tr[data-depth="4"] > td, tr[data-depth="5"] > td, tr[data-depth="6"] > td { background: var(--c-fbeceb); }
 tr[data-depth] > td { border-bottom: 2px solid var(--c-d6e4df); }
 tr[data-depth="0"] > td { border-top: 4px solid var(--c-d6e4df); }
+
+/* ---- Archive of parameters, families and tags (migration 56) ---- */
+.row-icon.archive { color:var(--c-4f6b73); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4h18v4H3z'/%3E%3Cpath d='M5 8v12h14V8'/%3E%3Cpath d='M10 12h4'/%3E%3C/svg%3E"); }
+.row-icon.restore { color:var(--green); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 3-6.7L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3C/svg%3E"); }
+.archive-dialog { width:min(860px,94vw); max-height:92vh; overflow:auto; padding:22px 28px 28px; line-height:1.5; }
+.archive-dialog > .catalog-heading { padding:0 0 14px; }
+.restore-dialog { width:min(1040px,94vw); }
+.restore-table .restore-current { display:block; color:var(--c-5c706d); font-size:.9em; }
+.restore-table .restore-new { display:block; }
+.restore-table tr.restore-problem > td { background:var(--c-fbf3e3); }
+.restore-table td input { width:100%; min-width:180px; margin-top:6px; }
+.archive-table .muted { font-weight:400; }
+.row-icon.pull { color:var(--c-4f6b73); --row-icon-shape:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 18V6'/%3E%3Cpath d='M6 11l6-6 6 6'/%3E%3Cpath d='M5 21h14'/%3E%3C/svg%3E"); }
+.take-dialog { width:min(980px,94vw); }
+.take-child select { max-width:420px; }
+.take-values summary { cursor:pointer; color:var(--c-5c706d); font-size:.9em; }
+.take-preview tr.restore-problem > td { background:var(--c-fbf3e3); }
+.delete-dialog.file-preview { display: flex; flex-direction: column; width: min(1000px, 94vw); }
+.file-preview-body { overflow: auto; text-align: center; }
+.file-preview-body img { max-width: 100%; max-height: 78vh; }
+.file-preview-frame { width: 100%; height: 78vh; border: 1px solid var(--line); background: var(--paper); }
+/* Validation queues (ActivityApp): a tab with something waiting is red; the banners above the tabs say how many events wait. */
+.settings-tab.needs-attention { color: var(--c-a63a32); }
+.settings-tab.needs-attention:hover { color: var(--c-a63a32); }
+.settings-tab.needs-attention.active { color: var(--c-a63a32); border-color: var(--c-a63a32); }
+.settings-tab.needs-attention .count-badge { background: var(--c-a63a32); color: #fff; }
+.validation-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 12px; padding: 10px 16px; border: 1px solid var(--c-a63a32); border-radius: 8px; color: var(--c-a63a32); font-weight: 650; background: var(--paper); }
+/* Popups of the validation queue (tickets of ActivityApp). */
+.delete-dialog.review-popup { width: min(900px, 94vw); }
+.review-facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 12px 0 18px; }
+.review-facts dt { color: var(--muted); font-weight: 650; }
+.review-facts dd { margin: 0; }
+.review-facts dd.review-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Risk analysis editor: the analyzer choice with the add icon beside it. */
+.analyzer-field { display:flex; align-items:flex-end; gap:8px; }
+.analyzer-field > label { flex:1; min-width:0; font-size:13px; font-weight:600; }
+.analyzer-field select { width:100%; }
+.analyzer-field > .row-icon { margin-bottom:2px; align-self:flex-start; margin-top:20px; }
+
+/* Rename of a file: the name field is wide, the extension stays fixed after it. */
+.file-name-editor { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.file-name-editor input { flex:1 1 360px; min-width:24ch; max-width:100%; }
+.file-name-editor .file-extension { font-weight:600; color:var(--muted); }
+
+/* Balanta Elcomtur (fisa beneficiarului): antet verde fara plati restante, rosiatic cu plati restante */
+.elcomtur-balance > summary.catalog-heading { border-radius: 10px 10px 0 0; flex-wrap: wrap; }
+.elcomtur-balance.balance-ok > summary.catalog-heading { background: var(--c-eaf5ee); color: var(--c-27684b); }
+.elcomtur-balance.balance-due > summary.catalog-heading { background: var(--c-fff0eb); color: var(--c-a3332c); }
+.elcomtur-balance > summary .balance-summary { display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.elcomtur-balance > summary .balance-count { padding: 3px 10px; border-radius: 12px; background: var(--c-ffffff); border: 1px solid currentColor; font-weight: 600; }
+.elcomtur-balance h3 { margin: 18px 0 8px; font-size: 14px; }
+.balance-date { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 8px; }
+.elcomtur-balance > summary .balance-date { color: inherit; }
+/* The coloured header spans the whole card (the generic rule gives the direct children of a card a side margin; on a white header it does not show, on a coloured one it does) */
+.catalog > details.catalog-collapse.elcomtur-balance { margin-left: 0 !important; margin-right: 0 !important; }
+
+/* Group picker of the product form: the whole category tree, products go on leaves */
+.editor-grid .group-picker { grid-column:1 / -1; position:relative; }
+.group-picker-label { display:block; font-size:13px; font-weight:600; }
+.group-picker-trigger { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; margin-top:8px; min-height:39px; padding:8px 12px; border:1px solid var(--c-e0e7e3); border-radius:6px; background:var(--c-ffffff); color:var(--ink); font-size:13px; text-align:left; }
+.group-picker-trigger:focus-visible { outline:0; border-color:var(--green); box-shadow:0 0 0 1px var(--green); }
+.group-picker-caret { color:var(--muted); }
+.group-tree { margin-top:8px; max-height:340px; overflow:auto; border:1px solid var(--c-e0e7e3); border-radius:6px; background:var(--c-ffffff); padding:8px; }
+.group-tree-node { display:block; }
+.group-tree-children { display:grid; gap:2px; margin:2px 0 4px 12px; padding-left:9px; border-left:1px solid var(--c-d6e4df); }
+.group-tree-toggle, .group-tree-leaf { display:flex; align-items:center; gap:8px; width:100%; padding:7px 10px; border:0; border-radius:6px; background:transparent; color:var(--ink); font-size:13px; text-align:left; }
+.group-tree-category { font-weight:650; }
+.group-tree-caret { width:12px; color:var(--c-62766f); }
+.group-tree-toggle:hover, .group-tree-leaf:hover { background:var(--c-edf5f1); }
+.group-tree-leaf { padding-left:30px; }
+.group-tree-leaf.selected { background:var(--c-edf5f1); color:var(--green); font-weight:650; box-shadow:inset 4px 0 0 var(--green); }
+.group-tree-empty { margin:4px 10px 8px 30px; }

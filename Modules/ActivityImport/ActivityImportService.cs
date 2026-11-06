@@ -38,12 +38,15 @@ public sealed record ActivityImportSettings(bool Enabled, string Server, int Por
     /// <summary>The latest modification date of a closing event seen by the last successful ticket import (migration 50); null reads everything.</summary>
     public DateTime? SourceWatermark { get; init; }
     public string SyncTimes { get; init; } = "";
+    /// <summary>Beneficiaries (migration 57): also take the partners that have no ticket; and make a clean partner a beneficiary at once (off: every new partner waits in the queue for a manual acceptance).</summary>
+    public bool TakePartners { get; init; } = true;
+    public bool AutoAcceptPartners { get; init; } = true;
 }
 
 /// <summary>What the administrator typed. A null or empty <see cref="Password"/> keeps the stored one.</summary>
 public sealed record ActivityImportInput(bool Enabled, string Server, int Port, string Database, string User, string? Password, DateOnly? SinceDate, int WindowFromHour, int WindowToHour,
     int PageSize, bool FillEmptyFields, bool SyncEnabled = false, int SyncIntervalMinutes = ActivityImportRules.DefaultSyncMinutes,
-    string SyncMode = ActivitySyncSchedule.IntervalMode, string SyncTimes = "");
+    string SyncMode = ActivitySyncSchedule.IntervalMode, string SyncTimes = "", bool TakePartners = true, bool AutoAcceptPartners = true);
 
 public sealed record ActivityTestResult(bool Ok, string Message, StructureStatus Structure, bool WritableAccount, bool StructureChanged);
 
@@ -114,6 +117,18 @@ public interface IActivityImportService
     Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default);
     /// <summary>Saves the chosen columns (key "Table.Column" of the contract, value the real column; the default or an empty value clears the choice). Journaled.</summary>
     Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default);
+    /// <summary>Saves the settings of the ticket fields as a whole: the columns, the pieces of information switched off, their destinations and the extra fields. Journaled.</summary>
+    Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// A real ticket with every column and its value: the newest finished one of the chosen types, or the next older than <paramref name="beforeTicketId"/>. Needs the right to run the import; journaled
+    /// (the ticket number, not its content). Nothing of it is kept.
+    /// </summary>
+    Task<ActivityTicketSampleView> GetTicketSampleAsync(long? beforeTicketId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// The administrator checked the correspondence of the fields for the structure ActivityApp has now: it becomes the one the next structures are compared with and the notification ends. Reads the structure
+    /// of ActivityApp. Journaled.
+    /// </summary>
+    Task ConfirmTicketStructureAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed class MariaActivityImportService(IConfiguration configuration, IDataProtectionProvider protection, IActivitySource source, IAccessControl access, IAuditTrail audit) : IActivityImportService
@@ -135,7 +150,7 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         await using var command = new MySqlCommand("""
             SELECT enabled, server_name, server_port, database_name, username, password_protected, since_date, window_from_hour, window_to_hour, page_size, fill_empty_fields,
                    last_test_utc, last_test_ok, last_test_message, structure_status, structure_fingerprint, structure_report, structure_checked_utc, updated_by, updated_utc,
-                   sync_enabled, sync_interval_minutes, last_sync_utc, last_sync_ok, last_sync_message, sync_failures, sync_mode, sync_times, source_watermark
+                   sync_enabled, sync_interval_minutes, last_sync_utc, last_sync_ok, last_sync_message, sync_failures, sync_mode, sync_times, source_watermark, take_partners, auto_accept_partners
             FROM activity_import_settings WHERE id = 1
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -155,7 +170,8 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         {
             SyncEnabled = reader.GetBoolean(20), SyncIntervalMinutes = reader.GetInt32(21), LastSyncUtc = reader.IsDBNull(22) ? null : DateTime.SpecifyKind(reader.GetDateTime(22), DateTimeKind.Utc),
             LastSyncOk = reader.IsDBNull(23) ? null : reader.GetBoolean(23), LastSyncMessage = reader.GetString(24), SyncFailures = reader.GetInt32(25),
-            SyncMode = reader.GetString(26), SyncTimes = reader.GetString(27), SourceWatermark = reader.IsDBNull(28) ? null : reader.GetDateTime(28)
+            SyncMode = reader.GetString(26), SyncTimes = reader.GetString(27), SourceWatermark = reader.IsDBNull(28) ? null : reader.GetDateTime(28),
+            TakePartners = reader.GetBoolean(29), AutoAcceptPartners = reader.GetBoolean(30)
         };
         return (settings, password);
     }
@@ -186,11 +202,11 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         {
             await using var command = new MySqlCommand("""
                 INSERT INTO activity_import_settings (id, enabled, server_name, server_port, database_name, username, password_protected, since_date, window_from_hour, window_to_hour,
-                    page_size, fill_empty_fields, sync_enabled, sync_interval_minutes, sync_mode, sync_times, updated_by, updated_utc)
-                VALUES (1, @enabled, @server, @port, @database, @user, @pass, @since, @from, @to, @page, @fill, @sync, @interval, @mode, @times, @by, @now)
+                    page_size, fill_empty_fields, sync_enabled, sync_interval_minutes, sync_mode, sync_times, take_partners, auto_accept_partners, updated_by, updated_utc)
+                VALUES (1, @enabled, @server, @port, @database, @user, @pass, @since, @from, @to, @page, @fill, @sync, @interval, @mode, @times, @take, @auto, @by, @now)
                 ON DUPLICATE KEY UPDATE enabled=@enabled, server_name=@server, server_port=@port, database_name=@database, username=@user,
                     password_protected=IF(@changed=1, @pass, password_protected), since_date=@since, window_from_hour=@from, window_to_hour=@to, page_size=@page,
-                    fill_empty_fields=@fill, sync_enabled=@sync, sync_interval_minutes=@interval, sync_mode=@mode, sync_times=@times, updated_by=@by, updated_utc=@now
+                    fill_empty_fields=@fill, sync_enabled=@sync, sync_interval_minutes=@interval, sync_mode=@mode, sync_times=@times, take_partners=@take, auto_accept_partners=@auto, updated_by=@by, updated_utc=@now
                 """, connection);
             command.Parameters.AddWithValue("@enabled", input.Enabled);
             command.Parameters.AddWithValue("@server", input.Server);
@@ -208,6 +224,8 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
             command.Parameters.AddWithValue("@interval", input.SyncIntervalMinutes);
             command.Parameters.AddWithValue("@mode", input.SyncMode);
             command.Parameters.AddWithValue("@times", ActivitySyncSchedule.FormatTimes(ActivitySyncSchedule.ParseTimes(input.SyncTimes, out _)));
+            command.Parameters.AddWithValue("@take", input.TakePartners);
+            command.Parameters.AddWithValue("@auto", input.AutoAcceptPartners);
             command.Parameters.AddWithValue("@by", actor);
             command.Parameters.AddWithValue("@now", DateTime.UtcNow);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -228,7 +246,9 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
             new AuditChange("Sincronizare periodică", Flag(old.SyncEnabled), Flag(input.SyncEnabled)),
             new AuditChange("Interval sincronizare (minute)", old.SyncIntervalMinutes.ToString(), input.SyncIntervalMinutes.ToString()),
             new AuditChange("Mod sincronizare", ActivitySyncSchedule.ModeLabel(old.SyncMode), ActivitySyncSchedule.ModeLabel(input.SyncMode)),
-            new AuditChange("Ore fixe sincronizare", Show(old.SyncTimes), Show(ActivitySyncSchedule.FormatTimes(ActivitySyncSchedule.ParseTimes(input.SyncTimes, out _))))
+            new AuditChange("Ore fixe sincronizare", Show(old.SyncTimes), Show(ActivitySyncSchedule.FormatTimes(ActivitySyncSchedule.ParseTimes(input.SyncTimes, out _)))),
+            new AuditChange("Preluare beneficiari fără tichete", Flag(old.TakePartners), Flag(input.TakePartners)),
+            new AuditChange("Import automat beneficiari", Flag(old.AutoAcceptPartners), Flag(input.AutoAcceptPartners))
         };
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.SetActivityImport, "", "Setări preluare ActivityApp",
             AuditDetails.Changes(changes), "", cancellationToken).ConfigureAwait(false);
@@ -313,6 +333,7 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
             var report = ActivityStructureChecker.Check(await source.ReadStructureAsync(connection, cancellationToken).ConfigureAwait(false));
             var rows = await source.ReadTypesAsync(connection, report, cancellationToken).ConfigureAwait(false);
             if (report.Fingerprint != settings.StructureFingerprint) await SaveStructureAsync(report, cancellationToken).ConfigureAwait(false);
+            await SaveKnownTypesAsync(rows, cancellationToken).ConfigureAwait(false);
             return new ActivityTypesView(Merge(rows, chosen), report.Status, null);
         }
         catch (ActivitySourceException exception) { return new ActivityTypesView(Merge([], chosen), settings.StructureStatus, exception.Message); }
@@ -323,6 +344,8 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         await access.EnsureAsync(View, cancellationToken).ConfigureAwait(false);
         var (settings, _) = await ReadAsync(cancellationToken).ConfigureAwait(false);
         var chosen = await ReadChosenAsync(cancellationToken).ConfigureAwait(false);
+        // The last list read from ActivityApp (chosen or not) is kept, so the unused types are there too when the page opens; before the first reading only the chosen ones are known.
+        if (await ReadKnownTypesAsync(cancellationToken).ConfigureAwait(false) is { Count: > 0 } known) return new ActivityTypesView(Merge(known, chosen), settings.StructureStatus, null);
         return new ActivityTypesView([.. chosen.Select(item => new ActivityTypeItem(item.Id, item.Name, "", null, null, null, null, null, item.Active, item.Destination, item.Active ? ActivityImportRules.StateSelected : ""))],
             settings.StructureStatus, null);
     }
@@ -336,6 +359,25 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         command.Parameters.AddWithValue("@report", JsonSerializer.Serialize(report.Issues));
         command.Parameters.AddWithValue("@now", DateTime.UtcNow);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    // The types of the last reading of ActivityApp (all of them, chosen or not), kept as JSON in the settings row.
+    private async Task SaveKnownTypesAsync(IReadOnlyList<ActivityTypeRow> rows, CancellationToken cancellationToken)
+    {
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("UPDATE activity_import_settings SET known_types=@types, known_types_utc=@now WHERE id = 1", connection);
+        command.Parameters.AddWithValue("@types", JsonSerializer.Serialize(rows));
+        command.Parameters.AddWithValue("@now", MariaTimeText.Format(DateTime.UtcNow));
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<ActivityTypeRow>?> ReadKnownTypesAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await using var command = new MySqlCommand("SELECT known_types FROM activity_import_settings WHERE id = 1", connection);
+        if (await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not string json || json.Length == 0) return null;
+        try { return JsonSerializer.Deserialize<List<ActivityTypeRow>>(json); }
+        catch (JsonException) { return null; }
     }
 
     private sealed record Chosen(long Id, string Name, bool Active, string Destination);
@@ -452,10 +494,12 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         await access.EnsureAsync(View, cancellationToken).ConfigureAwait(false);
         var map = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
         IReadOnlyList<ActivityFieldChoice> Offline() => [.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, map.ColumnOf(field), [], false))];
-        if (!readSource) return new ActivityFieldMapView(Offline(), null);
+        // What changed in ActivityApp since the correspondence was last confirmed (noticed at the last application of the ticket import), shown with the correspondence.
+        var pending = await ActivityTicketStructureStore.PendingAsync(configuration, cancellationToken).ConfigureAwait(false);
+        if (!readSource) return new ActivityFieldMapView(Offline(), null, map, null, pending);
         var (settings, password) = await ReadAsync(cancellationToken).ConfigureAwait(false);
         if (settings.Server.Length == 0 || settings.User.Length == 0 || password is null)
-            return new ActivityFieldMapView(Offline(), "Completează și salvează mai întâi conexiunea la ActivityApp.");
+            return new ActivityFieldMapView(Offline(), "Completează și salvează mai întâi conexiunea la ActivityApp.", map, null, pending);
         try
         {
             var actual = await source.ReadStructureAsync(new ActivityConnection(settings.Server, settings.Port, settings.Database, settings.User, password), cancellationToken).ConfigureAwait(false);
@@ -464,30 +508,80 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
                 var available = ActivityFieldMap.TextColumns(actual, field.Table);
                 var current = map.ColumnOf(field);
                 return new ActivityFieldChoice(field, current, available, !available.Contains(current, StringComparer.OrdinalIgnoreCase));
-            })], null);
+            })], null, map, ActivityFieldMap.ExtraTables.ToDictionary(table => table, table => ActivityFieldMap.TextColumns(actual, table)), pending);
         }
-        catch (ActivitySourceException exception) { return new ActivityFieldMapView(Offline(), exception.Message); }
+        catch (ActivitySourceException exception) { return new ActivityFieldMapView(Offline(), exception.Message, map, null, pending); }
     }
 
     public async Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
-        var map = ActivityFieldMap.Create(chosen, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        // Only the columns change: what was switched off, the destinations and the extra fields stay as they are.
+        var existing = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
+        var map = ActivityFieldMap.Create(chosen, existing.Off, existing.Targets, existing.Extras, existing.Labels, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        await SaveMapAsync(map, existing, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
+        var map = ActivityFieldMap.Create(settings.Columns, settings.Off, settings.Targets, settings.Extras, settings.Labels, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        await SaveMapAsync(map, await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<ActivityTicketSampleView> GetTicketSampleAsync(long? beforeTicketId, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync("setari-import-activityapp.run", cancellationToken).ConfigureAwait(false);
+        var (settings, password) = await ReadAsync(cancellationToken).ConfigureAwait(false);
+        if (settings.Server.Length == 0 || settings.User.Length == 0 || password is null)
+            return new ActivityTicketSampleView(null, "Completează și salvează mai întâi conexiunea la ActivityApp.");
+        try
+        {
+            var connection = new ActivityConnection(settings.Server, settings.Port, settings.Database, settings.User, password);
+            var actual = await source.ReadStructureAsync(connection, cancellationToken).ConfigureAwait(false);
+            var map = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
+            var structure = ActivityStructureChecker.Check(actual, null, map);
+            var typeIds = (await GetSavedTypesAsync(cancellationToken).ConfigureAwait(false)).Items.Where(item => item.Selected).Select(item => item.Id).ToList();
+            var sample = await source.ReadTicketSampleAsync(connection, actual, structure, typeIds, beforeTicketId, cancellationToken).ConfigureAwait(false);
+            if (sample is null) return new ActivityTicketSampleView(null, beforeTicketId is null ? "Nu există niciun tichet finalizat de afișat." : "Nu există un tichet finalizat mai vechi.");
+            await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.ViewActivityTicketSample, sample.TicketId.ToString(), "Tichet exemplu ActivityApp",
+                AuditDetails.Identification(("Tichet", $"{sample.Number} {sample.Title}".Trim()), ("Scop", "să se vadă ce conține fiecare câmp (corespondența câmpurilor)")), "", cancellationToken).ConfigureAwait(false);
+            return new ActivityTicketSampleView(sample, null);
+        }
+        catch (ActivitySourceException exception) { return new ActivityTicketSampleView(null, exception.Message); }
+    }
+
+    public async Task ConfirmTicketStructureAsync(CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
         EnsureAllowedDatabase();
-        var before = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
+        var (settings, password) = await ReadAsync(cancellationToken).ConfigureAwait(false);
+        if (settings.Server.Length == 0 || settings.User.Length == 0 || password is null) throw new ActivityImportException("Completează și salvează mai întâi conexiunea la ActivityApp.");
+        IReadOnlyList<ActivityColumn> actual;
+        try { actual = await source.ReadStructureAsync(new ActivityConnection(settings.Server, settings.Port, settings.Database, settings.User, password), cancellationToken).ConfigureAwait(false); }
+        catch (ActivitySourceException exception) { throw new ActivityImportException(exception.Message); }
+        var pending = await ActivityTicketStructureStore.PendingAsync(configuration, cancellationToken).ConfigureAwait(false);
+        await ActivityTicketStructureStore.AcknowledgeAsync(configuration, actual, cancellationToken).ConfigureAwait(false);
+        await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.ConfirmActivityTicketStructure, "", "Structura tichetelor ActivityApp",
+            AuditDetails.Identification(("Corespondența câmpurilor", "verificată pentru structura actuală"), ("Ce se schimbase", pending.Any ? pending.Describe() : "nimic notat")), "", cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SaveMapAsync(ActivityFieldMap map, ActivityFieldMap before, CancellationToken cancellationToken)
+    {
+        EnsureAllowedDatabase();
         if (before.ToJson() == map.ToJson()) return;
         var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
         await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
             // The row exists after the first save of the connection; before that there is nothing to map.
             await using var command = new MySqlCommand("UPDATE activity_import_settings SET field_map=@map, updated_by=@by, updated_utc=@now WHERE id = 1", connection);
-            command.Parameters.AddWithValue("@map", map.Columns.Count == 0 ? DBNull.Value : map.ToJson());
+            command.Parameters.AddWithValue("@map", map.ToJson() is { Length: > 0 } json ? json : DBNull.Value);
             command.Parameters.AddWithValue("@by", actor);
             command.Parameters.AddWithValue("@now", DateTime.UtcNow);
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 0) throw new ActivityImportException("Salvează mai întâi conexiunea la ActivityApp.");
         }
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.SetActivityFieldMap, "", "Corespondența câmpurilor ActivityApp",
-            AuditDetails.Changes(new AuditChange("Câmpuri citite din altă coloană", before.Describe(), map.Describe())), "", cancellationToken).ConfigureAwait(false);
+            AuditDetails.Changes(new AuditChange("Câmpurile tichetului (coloane, informații oprite, destinații, câmpuri suplimentare)", before.Describe(), map.Describe())), "", cancellationToken).ConfigureAwait(false);
     }
 
     private static ActivityImportInput Normalize(ActivityImportInput input) => input with
@@ -513,6 +607,9 @@ internal sealed class UnavailableActivityImportService : IActivityImportService
     public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Out<ActivityFieldMap>();
     public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) => Out<ActivityFieldMapView>();
     public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) => Out<object>();
+    public Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default) => Out<object>();
+    public Task<ActivityTicketSampleView> GetTicketSampleAsync(long? beforeTicketId, CancellationToken cancellationToken = default) => Out<ActivityTicketSampleView>();
+    public Task ConfirmTicketStructureAsync(CancellationToken cancellationToken = default) => Out<object>();
 }
 
 /// <summary>The entry points of the module behind the circuit breaker of the registry (a source that does not answer is an expected answer, not a fault).</summary>
@@ -529,4 +626,7 @@ internal sealed class GuardedActivityImportService(IActivityImportService inner,
     public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFieldMapAsync(cancellationToken));
     public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFieldChoicesAsync(readSource, cancellationToken));
     public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SaveFieldMapAsync(chosen, cancellationToken));
+    public Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SaveFieldSettingsAsync(settings, cancellationToken));
+    public Task<ActivityTicketSampleView> GetTicketSampleAsync(long? beforeTicketId, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetTicketSampleAsync(beforeTicketId, cancellationToken));
+    public Task ConfirmTicketStructureAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.ConfirmTicketStructureAsync(cancellationToken));
 }

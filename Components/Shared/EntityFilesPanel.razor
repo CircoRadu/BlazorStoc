@@ -1,0 +1,191 @@
+@using BlazorStoc.Services
+@inject IEntityFileStore Store
+@inject ILogger<EntityFilesPanel> Logger
+@implements IDisposable
+
+<div class="work-point-photos entity-files">
+    <div class="catalog-heading"><h3>Fișiere <span>@files.Count</span></h3></div>
+    @if (OwnerId <= 0)
+    {
+        <p class="form-note">Fișierele se adaugă după salvare; fereastra rămâne deschisă după salvare, ca să le poți adăuga imediat.</p>
+    }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        <div class="image-inputs">
+            <FileDropZone OnChange="SelectedAsync" Multiple="true" Accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" Text="Alege fișiere" Disabled="@(uploading || busy)" />
+            <small>JPG, PNG, WebP, GIF, PDF, Word, Excel, TXT sau CSV, cel mult 20 MB fiecare, cel mult @EntityFileRules.MaximumPerOwner de fișiere. Se salvează imediat, fără să apeși butonul de salvare al formularului.</small>
+            @if (uploading) { <span role="status">Se încarcă…</span> }
+        </div>
+        @if (files.Count == 0)
+        {
+            <p class="muted">Nu există fișiere atașate.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Fișier</th><th>Încărcat</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var file in files)
+                    {
+                        <tr @key="file.Id">
+                            @if (renamingId == file.Id)
+                            {
+                                <td colspan="3"><FileNameEditor OriginalName="@file.OriginalName" Busy="@busy" Submitted="name => RenameAsync(file, name)" Cancelled="CancelRename" /></td>
+                            }
+                            else
+                            {
+                                <td><a href="@($"/media/entity-files/{file.Id}")" target="_blank" rel="noopener">@file.OriginalName</a></td>
+                                <td>@file.UploadedBy · @StockMovementRules.DisplayDate(DateOnly.FromDateTime(file.UploadedUtc.ToLocalTime()))</td>
+                                <td>
+                                    <button type="button" class="row-icon view" aria-label="Vizualizează fișierul @file.OriginalName" title="Vizualizează fișierul @file.OriginalName" @onclick="() => previewing = file"></button>
+                                    <button type="button" class="row-icon edit" disabled="@(uploading || busy)" aria-label="Redenumește fișierul @file.OriginalName" title="Redenumește fișierul @file.OriginalName" @onclick="() => StartRename(file)"></button>
+                                    <button type="button" class="row-icon delete" disabled="@(uploading || busy)" aria-label="Șterge fișierul @file.OriginalName" title="Șterge fișierul @file.OriginalName" @onclick="() => confirmingDelete = file"></button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</div>
+
+@if (confirmingDelete is { } doomed)
+{
+    <div class="delete-overlay" @onkeydown="ConfirmKey">
+        <section class="delete-dialog" role="alertdialog" aria-modal="true" tabindex="-1" aria-labelledby="file-delete-title">
+            <h2 id="file-delete-title">Ștergi fișierul?</h2>
+            <p class="delete-object"><strong>@doomed.OriginalName</strong></p>
+            <p>Fișierul este șters definitiv din @EntityFileOwners.Label(doomed.OwnerKind).</p>
+            <div class="editor-actions">
+                <button type="button" class="danger" disabled="@busy" @onclick="ConfirmDeleteAsync">@(busy ? "Se șterge…" : "Șterge")</button>
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="() => confirmingDelete = null">Anulează</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (previewing is { } shown)
+{
+    <EntityFilePreview File="shown" Closed="ClosePreview" />
+}
+
+@code {
+    [Parameter, EditorRequired] public string OwnerKind { get; set; } = "";
+    [Parameter] public int OwnerId { get; set; }
+    // Raised after a file was added or deleted.
+    [Parameter] public EventCallback Changed { get; set; }
+    private IReadOnlyList<EntityFile> files = Array.Empty<EntityFile>();
+    private bool uploading, busy;
+    private string? error;
+    private int? renamingId;
+    private EntityFile? previewing, confirmingDelete;
+    private int loadedFor;
+    private readonly CancellationTokenSource lifetime = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (OwnerId > 0 && loadedFor != OwnerId) { loadedFor = OwnerId; await LoadAsync(); }
+    }
+
+    private async Task LoadAsync()
+    {
+        try { files = await Store.GetAsync(OwnerKind, OwnerId, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            Logger.LogWarning("Attached files loading failed ({ErrorType}).", exception.GetType().Name);
+            error = "Fișierele nu au putut fi încărcate.";
+        }
+    }
+
+    // Each chosen file is stored at once (and journaled); a refused file is reported and the others are still stored.
+    private async Task SelectedAsync(InputFileChangeEventArgs eventArgs)
+    {
+        if (OwnerId <= 0 || uploading) return;
+        uploading = true;
+        error = null;
+        var problems = new List<string>();
+        try
+        {
+            foreach (var file in eventArgs.GetMultipleFiles(EntityFileRules.MaximumPerOwner))
+            {
+                try
+                {
+                    await using var stream = file.OpenReadStream(EntityFileRules.MaximumBytes, lifetime.Token);
+                    using var buffer = new MemoryStream();
+                    await stream.CopyToAsync(buffer, lifetime.Token);
+                    await Store.AddAsync(OwnerKind, OwnerId, file.Name, file.ContentType, buffer.ToArray(), lifetime.Token);
+                }
+                catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+                catch (WorkPointOperationException exception) { problems.Add($"{file.Name}: {exception.Message}"); }
+                catch (AccessDeniedException exception) { problems.Add($"{file.Name}: {exception.Message}"); }
+                catch (IOException) { problems.Add($"{file.Name}: fișierul depășește 20 MB sau nu a putut fi citit."); }
+                catch (Exception exception)
+                {
+                    Logger.LogError("Attached file upload failed ({ErrorType}).", exception.GetType().Name);
+                    problems.Add($"{file.Name}: fișierul nu a putut fi încărcat.");
+                }
+            }
+        }
+        finally { uploading = false; }
+        if (problems.Count > 0) error = string.Join(" ", problems);
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private void ClosePreview() => previewing = null;
+    private void CancelRename() => renamingId = null;
+    private void StartRename(EntityFile file) { renamingId = file.Id; error = null; }
+    // The displayed name only (the extension stays); the journal records the old and the new name.
+    private async Task RenameAsync(EntityFile file, string newName)
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try { await Store.RenameAsync(file.Id, newName, lifetime.Token); renamingId = null; }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Attached file renaming failed ({ErrorType}).", exception.GetType().Name);
+            error = "Fișierul nu a putut fi redenumit.";
+        }
+        finally { busy = false; }
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    private void ConfirmKey(KeyboardEventArgs e) { if (e.Key == "Escape" && !busy) confirmingDelete = null; }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (confirmingDelete is not { } file) return;
+        await DeleteAsync(file);
+        confirmingDelete = null;
+    }
+
+    // One step after the confirmation (no text to type), like deleting a photo: the journal records the file name and its owner.
+    private async Task DeleteAsync(EntityFile file)
+    {
+        if (busy) return;
+        busy = true;
+        error = null;
+        try { await Store.DeleteAsync(file.Id, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (WorkPointOperationException exception) { error = exception.Message; }
+        catch (AccessDeniedException exception) { error = exception.Message; }
+        catch (Exception exception)
+        {
+            Logger.LogError("Attached file deletion failed ({ErrorType}).", exception.GetType().Name);
+            error = "Fișierul nu a putut fi șters.";
+        }
+        finally { busy = false; }
+        await LoadAsync();
+        await Changed.InvokeAsync();
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

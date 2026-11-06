@@ -362,7 +362,7 @@ else
                 <div class="editor-grid">
                     <label>Denumirea șablonului *<input id="invoice-template-name" @bind="templateName" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxNameLength" autocomplete="off" /></label>
                     <label>Furnizor (vânzător) *<input @bind="supplierName" @bind:event="oninput" maxlength="@InvoiceTemplateRules.MaxSupplierNameLength" autocomplete="off" /></label>
-                    <label>CUI/CIF furnizor *<input @bind="supplierCui" @bind:event="oninput" maxlength="20" autocomplete="off" />
+                    <label>CUI/CIF furnizor *<input value="@supplierCui" @oninput="SupplierCuiInput" maxlength="20" autocomplete="off" />
                         <small>@(InvoiceValues.NormalizeCui(supplierCui).Length == 0 ? "CUI/CIF-ul este obligatoriu: cu el se recunoaște furnizorul." : "CUI reținut: " + InvoiceValues.NormalizeCui(supplierCui))</small></label>
                 </div>
                 @if (RegistrySupplier is { } registered)
@@ -387,7 +387,6 @@ else
                 @* The same messages under the buttons: on a scrolled page the ones at the top are out of sight and the user would not know why the saving does not work. *@
                 @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
                 @foreach (var problem in problems) { <div class="validation-message" role="alert">@problem</div> }
-                @if (RegistrySupplier is null && registryLoaded) { <div class="invoice-warning" role="status">⚠ Furnizorul nu este în baza de date@(supplierName.Trim().Length > 0 ? " (" + supplierName.Trim() + ")" : ""): adaugă-l sau alege-l din listă, șablonul se leagă de furnizor.</div> }
             </details>
         </div>
     </div>

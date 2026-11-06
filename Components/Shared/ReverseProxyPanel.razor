@@ -1,0 +1,89 @@
+@using BlazorStoc.Services
+@inject IReverseProxySettingsService Settings
+@inject ILogger<ReverseProxyPanel> Logger
+@implements IDisposable
+@* Setari -> Baza de date -> Conexiune -> HTTPS prin proxy: the application is reached through a reverse proxy (nginx) that ends TLS. Off = plain HTTP as before.
+   On = the headers of the listed proxies are trusted, the cookies are Secure and HSTS is sent. Saved with the administrator's password; applied at the next start. *@
+
+<section class="catalog reverse-proxy">
+    <div class="catalog-heading"><h2>HTTPS prin proxy</h2><small>Aplicația rămâne pe HTTP în rețeaua internă; criptarea o face proxy-ul (de exemplu nginx).</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+        <ToggleSwitch Class="anaf-check" @bind-Value="enabled" OnText="Pornit" OffText="Oprit">Aplicația este servită prin HTTPS (proxy)</ToggleSwitch>
+        <div class="anaf-grid">
+            <label>IP-urile proxy-ului (unul pe rând, sau separate prin virgulă; se acceptă și rețele, de exemplu 10.0.0.0/24)
+                <textarea id="proxy-addresses" rows="3" @bind="addresses" @bind:event="oninput" autocomplete="off" placeholder="10.0.0.1"></textarea>
+            </label>
+        </div>
+        <p class="muted"><small>Scrie adresa pe care proxy-ul o are față de această mașină virtuală. Doar de la aceste adrese se acceptă antetele X-Forwarded-For și X-Forwarded-Proto. Cu HTTPS pornit, cookie-urile cer conexiune sigură: o vizită directă pe HTTP la portul aplicației nu mai permite autentificarea, deci accesul se face prin adresa https a proxy-ului. Oprit = comportamentul de până acum, pe HTTP.</small></p>
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@busy" @onclick="Ask">Salvează</button>
+        </div>
+    }
+    </div>
+</section>
+@if (asking)
+{
+    <AdminOperationDialog Title="Salvează setările HTTPS prin proxy" Intro="Setările se aplică la următoarea pornire a aplicației (butonul Repornește aplicația de mai sus)."
+                          ConfirmText="Salvează" Busy="busy" BusyText="Se salvează…" Error="@dialogError"
+                          @bind-AdminPassword="adminPassword" Confirmed="ConfirmAsync" Cancelled="Cancel" />
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, busy, asking, enabled;
+    private string? error, notice, dialogError;
+    private string adminPassword = "", addresses = "";
+    private ReverseProxyOptions saved = ReverseProxyOptions.Off;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try { Apply(await Settings.GetAsync(lifetime.Token)); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Reverse proxy settings loading failed ({ErrorType}).", ex.GetType().Name); error = "Setările nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private void Apply(ReverseProxyOptions options)
+    {
+        saved = options; enabled = options.Enabled; addresses = string.Join(Environment.NewLine, options.TrustedProxies); adminPassword = "";
+    }
+
+    private void Ask()
+    {
+        if (busy) return;
+        notice = null; error = null;
+        var list = ReverseProxyRules.Parse(addresses, out var problem);
+        if (problem is not null) { error = problem; return; }
+        if (ReverseProxyRules.Validate(new(enabled, list)) is { } invalid) { error = invalid; return; }
+        adminPassword = ""; dialogError = null; asking = true;
+    }
+
+    private void Cancel() { asking = false; adminPassword = ""; dialogError = null; }
+
+    private async Task ConfirmAsync()
+    {
+        if (busy) return;
+        busy = true; dialogError = null;
+        try
+        {
+            var list = ReverseProxyRules.Parse(addresses, out _);
+            var result = await Settings.SaveAsync(new(enabled, list), adminPassword, lifetime.Token);
+            if (!result.Success) { dialogError = result.Message; return; }
+            Apply(await Settings.GetAsync(lifetime.Token));
+            notice = result.Message;
+            Cancel();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is DatabaseSettingsException or AccessDeniedException) { dialogError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Reverse proxy settings saving failed ({ErrorType}).", ex.GetType().Name); dialogError = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}
