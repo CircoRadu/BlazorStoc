@@ -62,6 +62,8 @@
         get
         {
             var uri = new Uri(Navigation.BaseUri);
+            // Behind the HTTPS proxy the address people type is the proxy's, not the port of the application: the page comes back to the same address.
+            if (ReverseProxyRules.Read(Configuration).Enabled) return Navigation.BaseUri;
             // Without a saved port the application listens on the port its start script proposes (Hosting:DefaultPort), otherwise it stays where it is.
             var port = appPort ?? Configuration.GetValue<int?>("Hosting:DefaultPort") ?? (uri.IsDefaultPort ? (uri.Scheme == "https" ? 443 : 80) : uri.Port);
             return $"{uri.Scheme}://{uri.Host}:{port}/";

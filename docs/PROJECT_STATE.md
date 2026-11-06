@@ -9,6 +9,10 @@ Actualizat: 27.10.2026, Europe/Bucharest (Claude, agent unic, mod `claude_only`)
 - Motorul de facturi este geometric (`Services/Invoices`); utilizatorii obisnuiti creeaza/modifica sabloane, stergerea ramane administratorului.
 - Harta codului: `docs/HARTA_COD.md`. Reguli permanente: `CLAUDE.md`.
 
+## Ultimul lucru facut (06.11.2026): versiunea 0.5.43 (HTTPS prin proxy, branch claude/https)
+- Card nou Setari -> Baza de date -> Conexiune: "HTTPS prin proxy" (`Components/Shared/ReverseProxyPanel.razor`, `Services/ReverseProxySettings.cs`, `Startup/ReverseProxyStartup.cs`). Comutator implicit Oprit + lista IP/CIDR ale proxy-ului, in `reverse-proxy.json` (radacina de date, sursa de configurare `Hosting:Https`). Pornit: forwarded headers doar de la proxy-urile listate, cookie Secure, HSTS, acces direct pe HTTP din retea refuzat cu mesaj (loopback si /health permise). Antete de securitate mereu. Jurnal: "Modificare HTTPS prin proxy". Journal 1.4.7.
+- Verificat: teste tintite (dbsettings, help, pickup) 0 esecuri, card verificat in browser pe instanta separata. Neverificat cu un nginx real (pasii in Teste utilizator/09). Cardul nu are topic .help (vezi docs/HELP_DE_REGENERAT.md).
+
 ## Ultimul lucru facut (27.10.2026): versiunile 0.5.24 - 0.5.27 (parametri, familii, etichete, popup produs)
 - Catalog: coloana PARAMETRI cu etichete de filtrare, filtru "Doar incomplete", iconita de editare pe rand; editarea unui produs se face intr-un popup (`Components/Pages/Home.razor`, `ProductEditor.razor`).
 - Parametri obligatori: tip Valoare fixa (`ParameterKind.Fixed`, doar in familie), schimbarea tipului la editare, stergerea unui parametru cu produse (codurile se rescriu), produsele incomplete sunt blocate in toate operatiile de stoc (storno permis, banner pe pagina produsului).

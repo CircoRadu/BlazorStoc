@@ -31,6 +31,7 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Database:Password"]) ||
 var modules = new BlazorStoc.Modules.ModuleRegistry();
 builder.Services
     .AddWebAndSecurity(builder.Configuration)
+    .AddReverseProxy(builder.Configuration)
     .AddCoreServices()
     .AddModules(builder.Configuration, modules)
     .AddUserServices()
@@ -69,6 +70,8 @@ try
 }
 catch (Exception exception) when (exception is MySqlConnector.MySqlException or InvalidOperationException or MaintenanceInProgressException)
 { app.Logger.LogWarning("The default notification templates were not created ({ErrorType}).", exception.GetType().Name); }
+// First in the pipeline: the forwarded headers of the trusted proxy (when HTTPS through a proxy is on) and the security headers.
+app.UseReverseProxy();
 if (!app.Environment.IsDevelopment()) app.UseExceptionHandler("/Error", createScopeForErrors: true);
 // Romanian culture for every request and circuit: framework texts and number formats follow it (Task 1).
 app.UseRequestLocalization(new RequestLocalizationOptions

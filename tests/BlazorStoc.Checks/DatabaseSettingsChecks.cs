@@ -41,6 +41,7 @@ public static class DatabaseSettingsChecks
         await GateAsync(check);
         Dialogs(check);
         await DatabaseServerChecks.RunAsync(check);
+        await ReverseProxyChecks.RunAsync(check);
     }
 
     private static void Rules(Action<bool, string> check)

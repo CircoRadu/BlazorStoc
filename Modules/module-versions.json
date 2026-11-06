@@ -146,8 +146,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.6",
-                                    "hash":  "0d81222852d24792bca2dc08b95b9e08fc316cbe69705490362c3189ea813b47",
+                                    "version":  "1.4.7",
+                                    "hash":  "911764e29fb5b0283a2dbab77485d68be01ec95f3a28ff2ab0183d7ea4420daf",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -218,6 +218,11 @@
                                                         "version":  "1.4.6",
                                                         "date":  "05.11.2026",
                                                         "note":  "Filtrul de actiuni cunoaste operatiile preluarii automate Elcomtur (setari, testare, verificare, preluare, esec)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.7",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Actiunea \u0027Modificare HTTPS prin proxy\u0027 in filtrul jurnalului"
                                                     }
                                                 ]
                                 },

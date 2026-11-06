@@ -1,3 +1,8 @@
+## 0.5.43 | 06.11.2026
+- Setări, Bază de date, card nou „HTTPS prin proxy”: comutator (implicit Oprit) și lista IP-urilor proxy-ului (de exemplu nginx), salvate cu parola de administrator. Pornit: se acceptă antetele X-Forwarded-For/Proto doar de la proxy-urile listate, cookie-ul de sesiune devine Secure, se trimite HSTS, iar accesul direct pe HTTP din rețea primește un mesaj clar (monitorizarea /health și accesul local rămân permise). Oprit: aplicația rămâne pe HTTP ca până acum.
+- Antete de securitate pe toate răspunsurile: nosniff, X-Frame-Options, frame-ancestors și Referrer-Policy.
+- Jurnal: acțiunea „Modificare HTTPS prin proxy” cu valorile vechi și noi.
+
 ## 0.5.42 | 05.11.2026
 - Setări, Preluare Elcomtur (tab nou): preluare automată a backup-ului Elcomtur dintr-un director local sau NAS (cu cont și parolă), verificare zilnică la 04:00 după o mască de nume, firma aleasă cu nume, verificarea integrității arhivei, ultimele 2 backup-uri păstrate pe server, butoanele „Verifică acum” și „Preia ultimul backup acum”; schimbare de schemă 64.
 - Notificări: „Elcomtur: backup preluat”, „preluare eșuată” (cu cauza) și „backup lipsă” după pragul de zile setat.

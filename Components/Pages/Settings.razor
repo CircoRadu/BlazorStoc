@@ -115,7 +115,7 @@
             @SubtabBar(DatabaseSubtabs, "Secțiuni bază de date")
             @if (databaseSubtab == DatabaseConnectionSubtab)
             {
-                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab"><DatabaseServerPanel Changed="ServerChanged" /><DatabaseConnectionPanel @key="@($"connection-{connectionRevision}")" /><ApplicationPanel @key="@($"application-{connectionRevision}")" /><DatabaseAccountsPanel /></div>
+                <div role="tabpanel" id="subpanel-@DatabaseConnectionSubtab" aria-labelledby="subtab-@DatabaseConnectionSubtab"><DatabaseServerPanel Changed="ServerChanged" /><DatabaseConnectionPanel @key="@($"connection-{connectionRevision}")" /><ApplicationPanel @key="@($"application-{connectionRevision}")" /><ReverseProxyPanel /><DatabaseAccountsPanel /></div>
             }
             else
             {

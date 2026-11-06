@@ -334,7 +334,7 @@ Pasi:
 |---|---|---|
 | 1 | Deschide Setari -> Notificari -> Sabloane notificari | Taburile de categorii; fiecare cu cel putin un sablon activ |
 | 2 | Tabul "Stoc" -> Editeaza un sablon, schimba textul, salveaza | Modificarea apare in lista tabului |
-| 3 | Sterge un sablon, repornește aplicatia | Sablonul sters nu reapare |
+| 3 | Sterge un sablon, reporneste aplicatia | Sablonul sters nu reapare |
 | 4 | Deschide Jurnal, filtreaza "Adaugare sablon notificare" | Sabloanele de pornire apar create de "sistem" |
 
 ### 08.10.2026 - Trei notificari noi de stoc
@@ -452,3 +452,19 @@ Pasi:
 |----|-----|-------------------|----------|
 | 1 | Dupa o preluare Elcomtur cu beneficiari cu sold pozitiv, deschide Notificari | Tabul "Balante restante" este rosu si arata numarul de beneficiari restanti | |
 | 2 | Fara beneficiari restanti | Tabul nu e rosu si arata 0 | |
+
+## Modificari de testat - HTTPS prin proxy (06.11.2026, branch claude/https)
+
+**Ce s-a adaugat:** card nou "HTTPS prin proxy" in Setari -> Baza de date -> Conexiune (sub cardul Aplicatia): comutator Pornit/Oprit (implicit Oprit) si lista IP-urilor sau retelelor proxy-ului (nginx). Antete de securitate (nosniff, X-Frame-Options, frame-ancestors) pe toate raspunsurile.
+**Ce face acum:** cu comutatorul Oprit aplicatia merge pe HTTP exact ca pana acum. Pornit, aplicatia accepta antetele X-Forwarded-For si X-Forwarded-Proto doar de la IP-urile listate, cookie-urile devin Secure (autentificarea directa pe HTTP la portul aplicatiei nu mai merge) si trimite HSTS pe raspunsurile https. Setarea se aplica la urmatoarea pornire.
+
+| Pas | Ce faci | Rezultat asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Setari -> Baza de date, deruleaza la cardul "HTTPS prin proxy" | Comutator Oprit, caseta de IP goala | |
+| 2 | Porneste comutatorul si apasa Salveaza fara IP | Eroare: scrie cel putin un IP | |
+| 3 | Scrie `abc` si Salveaza | Eroare: nu este o adresa IP valida | |
+| 4 | Scrie IP-ul proxy-ului (cum il vede VM-ul), Salveaza, parola de administrator | Mesaj ca se aplica la urmatoarea pornire; in Jurnal apare "Modificare HTTPS prin proxy" cu valorile vechi si noi | |
+| 5 | Apasa "Reporneste aplicația" din cardul Aplicatia | Aplicatia revine; deschide adresa https a proxy-ului (nginx) | |
+| 6 | Autentifica-te prin adresa https | Login reuseste, sesiunea se pastreaza, paginile se incarca fara reconectari | |
+| 7 | Deschide direct `http://ip-vm:port` din alt calculator | Autentificarea nu reuseste (cookie Secure): accesul se face doar prin proxy | |
+| 8 | Opreste comutatorul, salveaza, reporneste | Aplicatia functioneaza din nou pe HTTP direct | |

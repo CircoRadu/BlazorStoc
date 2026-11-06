@@ -276,6 +276,7 @@ public static class AuditActions
     public const string RevertDatabaseConnection = "Revenire la configurația anterioară a conexiunii bazei de date";
     public const string ResetDatabaseConnection = "Resetare conexiune bază de date la configurația de bază";
     public const string SetAppPort = "Modificare port aplicație";
+    public const string SetReverseProxy = "Modificare HTTPS prin proxy";
     // Setari -> Baza de date -> Conexiune: the server of the database (Windows service) and the application itself.
     public const string StopDatabaseServer = "Oprire server bază de date";
     public const string StartDatabaseServer = "Pornire server bază de date";
