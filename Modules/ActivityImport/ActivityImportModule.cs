@@ -12,7 +12,7 @@ public sealed class ActivityImportModule : IModule
 
     public string Id => ModuleId;
     public string Name => "Preluare tichete ActivityApp";
-    public Version Version { get; } = new(0, 10, 0);
+    public Version Version { get; } = new(0, 11, 0);
     public IReadOnlyList<ModuleNavItem> Nav { get; } = [];
 
     public void Register(IServiceCollection services, IConfiguration configuration)
@@ -27,6 +27,9 @@ public sealed class ActivityImportModule : IModule
         services.AddScoped<IActivitySyncService>(provider => new GuardedActivitySyncService(ActivatorUtilities.CreateInstance<MariaActivitySyncService>(provider,
             provider.GetRequiredService<IActivityImportService>(), provider.GetRequiredService<IActivityPartnerImportService>(), provider.GetRequiredService<IActivityTicketImportService>()), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IActivityImportAlertReader, MariaActivityImportAlertReader>();
+        services.AddScoped<IActivityTicketVisibility, MariaActivityTicketVisibility>();
+        services.AddScoped<IActivityTicketRefreshService>(provider => new GuardedActivityTicketRefreshService(ActivatorUtilities.CreateInstance<MariaActivityTicketRefreshService>(provider,
+            provider.GetRequiredService<IActivityImportService>()), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IActivityKeywordService>(provider => new GuardedActivityKeywordService(ActivatorUtilities.CreateInstance<MariaActivityKeywordService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IActivityReviewService>(provider => new GuardedActivityReviewService(ActivatorUtilities.CreateInstance<MariaActivityReviewService>(provider), provider.GetRequiredService<ModuleRegistry>()));
         services.AddScoped<IBeneficiaryCheckService>(provider => new GuardedBeneficiaryCheckService(ActivatorUtilities.CreateInstance<MariaBeneficiaryCheckService>(provider), provider.GetRequiredService<ModuleRegistry>()));
@@ -51,5 +54,7 @@ public sealed class ActivityImportModule : IModule
         services.AddScoped<IActivityKeywordService, UnavailableActivityKeywordService>();
         services.AddScoped<IBeneficiaryCheckService, UnavailableBeneficiaryCheckService>();
         services.AddScoped<IValidationQueues, UnavailableValidationQueues>();
+        services.AddScoped<IActivityTicketVisibility, AllTicketFieldsVisible>();
+        services.AddScoped<IActivityTicketRefreshService, UnavailableActivityTicketRefreshService>();
     }
 }

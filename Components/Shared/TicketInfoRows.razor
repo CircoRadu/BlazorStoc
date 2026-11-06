@@ -1,0 +1,35 @@
+@using BlazorStoc.Services
+@inject IServiceProvider Services
+@* The pieces of information of a ticket of ActivityApp inside a <dl>: only the ones switched on in Setari -> Preluare ActivityApp (section 6), then the extra fields under the names the
+   administrator gave them. Title and number are shown by the window itself (they are always taken). Without the import module everything is shown. ShowEmpty: an empty piece shows a dash
+   (the review windows); without it an empty piece is left out (the window of the intervention). *@
+@if (visibility.Problem && (ShowEmpty || Problem.Length > 0)) { <dt>Problema</dt><dd class="review-text">@Show(Problem)</dd> }
+@if (visibility.Resolution && (ShowEmpty || Resolution.Length > 0)) { <dt>Rezolvarea</dt><dd class="review-text">@Show(Resolution)</dd> }
+@if (visibility.Report && (ShowEmpty || (Report.Length > 0 && Report != Resolution))) { <dt>@ReportLabel</dt><dd class="review-text">@Show(Report)</dd> }
+@if (visibility.Executor && (ShowEmpty || Executor.Length > 0)) { <dt>Executant</dt><dd>@Show(Executor)</dd> }
+@foreach (var extra in visibility.Extras)
+{
+    var value = Extras is not null && Extras.TryGetValue(extra.Key, out var found) ? found : "";
+    @if (ShowEmpty || value.Length > 0) { <dt>@extra.Label</dt><dd class="review-text">@Show(value)</dd> }
+}
+
+@code {
+    [Parameter] public string Problem { get; set; } = "";
+    [Parameter] public string Resolution { get; set; } = "";
+    [Parameter] public string Report { get; set; } = "";
+    [Parameter] public string Executor { get; set; } = "";
+    [Parameter] public IReadOnlyDictionary<string, string>? Extras { get; set; }
+    [Parameter] public bool ShowEmpty { get; set; }
+    [Parameter] public string ReportLabel { get; set; } = "Raportul original";
+
+    private TicketVisibility visibility = TicketVisibility.All;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Services.GetService(typeof(IActivityTicketVisibility)) is not IActivityTicketVisibility source) return;
+        try { visibility = await source.GetAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { visibility = TicketVisibility.All; }
+    }
+
+    private string Show(string value) => value.Length > 0 ? value : "—";
+}

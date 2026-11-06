@@ -1,8 +1,8 @@
 {
     "modules":  {
                     "ActivityImport":  {
-                                           "version":  "0.10.0",
-                                           "hash":  "0deb63a271baf65d209fd46e40886cc78d9eb2d1380ab2409862aa54c9c5ca5e",
+                                           "version":  "0.11.0",
+                                           "hash":  "fe8175b9e5de9adf497f3ef8faa8c4608928de56db076620139175ee6007ce61",
                                            "history":  [
                                                            {
                                                                "version":  "0.1.0",
@@ -68,6 +68,11 @@
                                                                "version":  "0.10.0",
                                                                "date":  "05.11.2026",
                                                                "note":  "Tichete discardate: vizualizare tichet (popup doar pentru citire); motivul notificarii de validare spune ce s-a decis efectiv"
+                                                           },
+                                                           {
+                                                               "version":  "0.11.0",
+                                                               "date":  "06.11.2026",
+                                                               "note":  "Informatiile din tichet cu On/Off, destinatie si campuri suplimentare; recitirea tichetelor preluate"
                                                            }
                                                        ]
                                        },
@@ -146,8 +151,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.7",
-                                    "hash":  "911764e29fb5b0283a2dbab77485d68be01ec95f3a28ff2ab0183d7ea4420daf",
+                                    "version":  "1.4.8",
+                                    "hash":  "afaf91f79d91484c86662056d795e6c2297edaa3f87ac2147faaa89683591698",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -223,12 +228,17 @@
                                                         "version":  "1.4.7",
                                                         "date":  "06.11.2026",
                                                         "note":  "Actiunea \u0027Modificare HTTPS prin proxy\u0027 in filtrul jurnalului"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.8",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Actiunea Actualizare tichete ActivityApp preluate in filtrul jurnalului"
                                                     }
                                                 ]
                                 },
                     "Maintenance":  {
-                                        "version":  "1.7.1",
-                                        "hash":  "b5c8c54ed410eb09d464d8c35440bc87b857933b8b5241eb892a6d79f94c6687",
+                                        "version":  "1.7.2",
+                                        "hash":  "40cc189a1eeba9fc5959a4db8d829d751c2bc46d76861ac919fe51198c0092f9",
                                         "history":  [
                                                         {
                                                             "version":  "1.0.0",
@@ -319,6 +329,11 @@
                                                             "version":  "1.7.1",
                                                             "date":  "04.11.2026",
                                                             "note":  "Modificari ale interventiilor de mentenanta din 30.10.2026, inregistrate in evidenta de versiuni"
+                                                        },
+                                                        {
+                                                            "version":  "1.7.2",
+                                                            "date":  "06.11.2026",
+                                                            "note":  "Campurile suplimentare ale tichetului in fereastra interventiei; observatiile unei interventii se pot reinnoi din tichet"
                                                         }
                                                     ]
                                     },
@@ -496,8 +511,8 @@
                                                  ]
                                  },
                     "Elcomtur":  {
-                                     "version":  "1.2.0",
-                                     "hash":  "386dd1974638daf611d384cbc67a8a851d8fa64133a8dce81eb5c8095182ee8d",
+                                     "version":  "1.3.0",
+                                     "hash":  "f724a049629bd6332649734c959042875eb75a96af33655ab831577bf3ac8453",
                                      "history":  [
                                                      {
                                                          "version":  "1.0.0",
@@ -518,6 +533,11 @@
                                                          "version":  "1.2.0",
                                                          "date":  "05.11.2026",
                                                          "note":  "Preluare automata zilnica a backup-ului Elcomtur de pe un director/NAS (04:00): masca, firma cu nume, verificare integritate, ultimele 2 fisiere pe server, notificari (lipsa, esec, preluat), Setari -\u003e Preluare Elcomtur"
+                                                     },
+                                                     {
+                                                         "version":  "1.3.0",
+                                                         "date":  "06.11.2026",
+                                                         "note":  "Ora verificarii zilnice a preluarii automate se alege din setari"
                                                      }
                                                  ]
                                  }

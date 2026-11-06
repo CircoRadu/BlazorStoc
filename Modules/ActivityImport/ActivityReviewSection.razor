@@ -55,11 +55,8 @@
                 <dt>Beneficiar</dt><dd>@view.Item.Beneficiary</dd>
                 <dt>Punct de lucru</dt><dd>@view.Item.WorkPoint</dd>
                 <dt>Data efectuării</dt><dd>@StockMovementRules.DisplayDate(view.Item.PerformedOn)</dd>
-                <dt>Executant</dt><dd>@(view.Source.Executor.Length > 0 ? view.Source.Executor : "—")</dd>
                 <dt>Propus ca</dt><dd>@CategoryText(view.Item) · @Why(view.Item)</dd>
-                <dt>Problema</dt><dd class="review-text">@(view.Source.Problem.Length > 0 ? view.Source.Problem : "—")</dd>
-                <dt>Rezolvarea</dt><dd class="review-text">@(view.Source.Resolution.Length > 0 ? view.Source.Resolution : "—")</dd>
-                <dt>Raportul original</dt><dd class="review-text">@(view.Source.Report.Length > 0 ? view.Source.Report : "—")</dd>
+                <TicketInfoRows ShowEmpty Problem="@view.Source.Problem" Resolution="@view.Source.Resolution" Report="@view.Source.Report" Executor="@view.Source.Executor" Extras="@view.Source.Extras" />
             </dl>
             <div class="editor-actions">
                 <button type="button" class="primary" disabled="@busy" @onclick="() => TakeAsProposedAsync(view.Item)">Preia ca @CategoryText(view.Item).ToLowerInvariant()</button>

@@ -112,6 +112,20 @@ public static partial class MariaExtendedChecks
             var next = await service.RunScheduledAsync(day.AddDays(1).AddHours(1));
             Check(before is null && run is { Ok: true } && second is null && next is { Ok: true } && (await service.GetAsync()).LastScheduledDate == new DateOnly(2099, 1, 11),
                 "Elcomtur automatic: the scheduled check does not run before 04:00, runs once a day and again the next day");
+            // The hour chosen in the settings: the default stays 04:00, another hour moves the check (saved, journaled, used by the schedule).
+            Check((await service.GetAsync()).ScheduledHour == 4, "Elcomtur automatic: the hour of the check is 04:00 until another one is chosen");
+            await service.SaveAsync(input with { ScheduledHour = 9 });
+            var later = new DateTime(2099, 2, 10, 8, 0, 0);
+            var early = await service.RunScheduledAsync(later);
+            var atNine = await service.RunScheduledAsync(later.AddHours(1));
+            var thirdTry = await service.RunScheduledAsync(later.AddHours(2));
+            Check((await service.GetAsync()).ScheduledHour == 9 && early is null && atNine is { Ok: true } && thirdTry is null, "Elcomtur automatic: with 09:00 chosen the scheduled check waits for 09:00 and runs once that day");
+            var hourFailure = "";
+            try { await service.SaveAsync(input with { ScheduledHour = 25 }); } catch (ElcomturAutoException exception) { hourFailure = exception.Message; }
+            Check(hourFailure == ElcomturAutoRules.HourMessage && (await service.GetAsync()).ScheduledHour == 9, "Elcomtur automatic: an hour outside the day is refused and the saved one stays");
+            var hourEvents = (await audit.QueryAsync(new AuditQuery(Entity: AuditEntities.Elcomtur), 1, 200)).Events.Where(entry => entry.Action == AuditActions.SetElcomturAuto && entry.Details.Contains("Ora verificării automate: 04:00 → 09:00", StringComparison.Ordinal)).ToList();
+            Check(hourEvents.Count >= 1, "Elcomtur automatic: the change of the hour is in the journal with the old and the new hour");
+            await service.SaveAsync(input with { ScheduledHour = 4 });
 
             // The wrong firm and the switch off.
             await service.SaveAsync(input with { FirmFolder = "firma9", FirmName = "" });

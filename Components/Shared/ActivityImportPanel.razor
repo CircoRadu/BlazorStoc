@@ -4,6 +4,7 @@
 @inject IActivityImportService Import
 @inject IActivityPartnerImportService Partners
 @inject IActivityTicketImportService Tickets
+@inject IActivityTicketRefreshService Refresh
 @inject IActivitySyncService Sync
 @inject ILogger<ActivityImportPanel> Logger
 @implements IDisposable
@@ -225,36 +226,102 @@
                 @if (ActivitySyncSchedule.NextRun(current, DateTime.Now) is { } nextRun) { <text> Următoarea programată: @nextRun.ToString("dd.MM.yyyy HH:mm")@(current.SyncMode == ActivitySyncSchedule.TimesMode ? "" : ", în fereastra orară").</text> }
             </p>
         </fieldset>
-        <fieldset class="anaf-section"><legend>6. Corespondența câmpurilor</legend>
-            <p class="muted"><small>Din ce coloană a ActivityApp se citește fiecare text al tichetului. Implicit sunt coloanele obișnuite; poți alege alta (doar coloane cu text din același tabel), de exemplu dacă ActivityApp mută textul într-o coloană nouă. Se aplică tichetelor care urmează să fie preluate; cele deja preluate rămân cum sunt. Simulează tichetele după o schimbare, ca să vezi rezultatul.</small></p>
+        <fieldset class="anaf-section"><legend>6. Informațiile din tichet</legend>
+            <p class="muted"><small>Ce se preia din fiecare tichet al ActivityApp și unde ajunge în BlazorStoc. Titlul și numărul se preiau mereu. Celelalte se pot opri (comutatorul Oprit: informația nu se mai citește, nu se mai scrie și nu apare în ferestre) și se poate alege dacă intră în observațiile intervenției, într-un câmp separat sau în ambele. La „Se citește din” poți alege altă coloană cu text din același tabel, de exemplu dacă ActivityApp mută textul. Se aplică tichetelor care urmează să fie preluate; când pornești o informație sau adaugi un câmp, tichetele deja preluate care nu o au se citesc din nou și se actualizează (observațiile se rescriu doar dacă nimeni nu le-a modificat). Simulează tichetele după o schimbare, ca să vezi rezultatul.</small></p>
             <div class="editor-actions">
                 <button type="button" class="refresh act-reload" disabled="@busy" @onclick="LoadFieldsAsync">Citește coloanele din ActivityApp</button>
                 <button type="button" class="primary" disabled="@(busy || fields is null)" @onclick="SaveFieldsAsync">Salvează corespondența</button>
-                <button type="button" class="refresh act-nav" disabled="@(busy || fields is null)" @onclick="ResetFields">Revino la coloanele implicite</button>
+                <button type="button" class="refresh act-nav" disabled="@(busy || fields is null)" @onclick="ResetFields">Revino la valorile implicite</button>
+                @if (outdated > 0)
+                {
+                    <button type="button" class="refresh act-reload" disabled="@busy" @onclick="RefreshTicketsAsync">Actualizează tichetele preluate (@outdated)</button>
+                }
             </div>
+            @if (outdated > 0) { <p class="muted" id="ai-outdated"><small>@outdated tichete păstrate nu au toate informațiile cerute acum; se actualizează după salvare, la butonul de mai sus sau la următoarea sincronizare.</small></p> }
             @if (fieldsError is not null) { <div class="error-banner" role="alert">@fieldsError</div> }
             @if (fields is not null)
             {
                 <div class="table-scroll"><table class="catalog-table" id="ai-fields">
-                    <thead><tr><th>Text al tichetului</th><th>Tabel</th><th>Coloana implicită</th><th>Se citește din</th><th>La ce se folosește</th></tr></thead>
+                    <thead><tr><th>Informație</th><th>Se preia</th><th>Se citește din</th><th>Se atașează ca</th><th>La ce se folosește</th></tr></thead>
                     <tbody>
                     @foreach (var row in fields)
                     {
                         <tr>
-                            <td>@row.Field.Label</td>
-                            <td>@row.Field.Table</td>
-                            <td>@row.Field.Column</td>
+                            <td>@row.Item.Label</td>
                             <td>
-                                <select aria-label="@($"Coloana pentru {row.Field.Label}")" @bind="row.Column">
-                                    @foreach (var name in row.Choices) { <option value="@name">@name@(name.Equals(row.Field.Column, StringComparison.OrdinalIgnoreCase) ? " (implicit)" : "")</option> }
-                                </select>
-                                @if (row.Missing) { <small class="muted"> coloana aleasă nu mai există în ActivityApp</small> }
+                                @if (row.Item.Mandatory) { <span>Mereu</span> }
+                                else { <ToggleSwitch Compact @bind-Value="row.Enabled" OnText="Pornit" OffText="Oprit" AriaLabel="@($"Se preia: {row.Item.Label}")" /> }
                             </td>
-                            <td>@row.Field.Purpose</td>
+                            <td>
+                                @if (row.Column is not null)
+                                {
+                                    <select aria-label="@($"Coloana pentru {row.Item.Label}")" disabled="@(!row.Enabled)" @bind="row.Column">
+                                        @foreach (var name in row.Choices) { <option value="@name">@name@(name.Equals(row.DefaultColumn, StringComparison.OrdinalIgnoreCase) ? " (implicit)" : "")</option> }
+                                    </select>
+                                    @if (row.Missing) { <small class="muted"> coloana aleasă nu mai există în ActivityApp</small> }
+                                }
+                                else { <span class="muted">din raport și problemă</span> }
+                            </td>
+                            <td>
+                                @if (row.Item.Mandatory) { <span>În observații și titlu</span> }
+                                else
+                                {
+                                    <select aria-label="@($"Se atașează ca: {row.Item.Label}")" disabled="@(!row.Enabled)" @bind="row.Target">
+                                        <option value="@ActivityFieldMap.Notes">În observații</option>
+                                        <option value="@ActivityFieldMap.Separate">Câmp separat</option>
+                                        <option value="@ActivityFieldMap.Both">Observații și câmp separat</option>
+                                    </select>
+                                }
+                            </td>
+                            <td>@row.Item.Purpose</td>
                         </tr>
                     }
                     </tbody>
                 </table></div>
+                <h3>Câmpuri suplimentare</h3>
+                <p class="muted"><small>Orice coloană cu text din tabelul Tickete sau EvenimenteAgent, cu numele ales de tine; apare în ferestrele tichetului și, după destinație, în observații. Cel mult @ActivityFieldMap.MaximumExtras câmpuri.</small></p>
+                @if (extras.Count > 0)
+                {
+                    <div class="table-scroll"><table class="catalog-table" id="ai-extras">
+                        <thead><tr><th>Nume</th><th>Tabel</th><th>Coloana</th><th>Se atașează ca</th><th>Operații</th></tr></thead>
+                        <tbody>
+                        @foreach (var extra in extras)
+                        {
+                            <tr @key="extra">
+                                <td><input aria-label="@($"Numele câmpului {extra.Column}")" maxlength="@ActivityFieldMap.MaximumLabel" @bind="extra.Label" /></td>
+                                <td>@extra.Table</td>
+                                <td>@extra.Column</td>
+                                <td>
+                                    <select aria-label="@($"Se atașează ca: {extra.Label}")" @bind="extra.Target">
+                                        <option value="@ActivityFieldMap.Notes">În observații</option>
+                                        <option value="@ActivityFieldMap.Separate">Câmp separat</option>
+                                        <option value="@ActivityFieldMap.Both">Observații și câmp separat</option>
+                                    </select>
+                                </td>
+                                <td><button type="button" class="row-icon delete" aria-label="@($"Scoate câmpul {extra.Label}")" title="@($"Scoate câmpul {extra.Label}")" disabled="@busy" @onclick="() => RemoveExtra(extra)"></button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table></div>
+                }
+                <div class="anaf-grid" id="ai-extra-add">
+                    <label>Tabel
+                        <select aria-label="Tabelul câmpului suplimentar" @bind="newTable">
+                            @foreach (var table in ActivityFieldMap.ExtraTables) { <option value="@table">@table</option> }
+                        </select>
+                    </label>
+                    <label>Coloana
+                        <select aria-label="Coloana câmpului suplimentar" @bind="newColumn">
+                            <option value="">— alege —</option>
+                            @foreach (var name in AvailableForNew) { <option value="@name">@name</option> }
+                        </select>
+                    </label>
+                    <label>Nume afișat<input aria-label="Numele câmpului suplimentar" maxlength="@ActivityFieldMap.MaximumLabel" @bind="newLabel" autocomplete="off" /></label>
+                </div>
+                @if (textColumns is null) { <p class="muted"><small>Apasă „Citește coloanele din ActivityApp” ca să vezi coloanele din care poți alege.</small></p> }
+                <div class="editor-actions">
+                    <button type="button" class="refresh act-confirm" disabled="@(busy || newColumn.Length == 0 || newLabel.Trim().Length == 0 || extras.Count >= ActivityFieldMap.MaximumExtras)" @onclick="AddExtra">Adaugă câmp</button>
+                </div>
             }
         </fieldset>
     }
@@ -318,7 +385,8 @@
             var saved = await Import.GetSavedTypesAsync(lifetime.Token);
             if (saved.Items.Count > 0) types = [.. saved.Items.Select(item => new Row(item))];
             // The saved correspondence of the fields is shown at once too (the column lists come with "Citește coloanele din ActivityApp").
-            fields = [.. (await Import.GetFieldChoicesAsync(false, lifetime.Token)).Fields.Select(choice => new FieldRow(choice))];
+            Show(await Import.GetFieldChoicesAsync(false, lifetime.Token));
+            await CountOutdatedAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException ex) { error = ex.Message; }
@@ -489,37 +557,130 @@
         noticeOk = true; notice = $"Tichete puse la validare: {ticketReport.Tickets.Create} (Notificări, „Tichete de validat”), {ticketReport.Tickets.Problems} probleme.";
     });
 
-    private sealed class FieldRow(ActivityFieldChoice choice)
+    private sealed class FieldRow(ActivityInfoItem item, ActivityFieldChoice? choice, bool enabled, string target)
     {
-        public ActivityMappableField Field { get; } = choice.Field;
-        public bool Missing { get; } = choice.CurrentMissing;
-        public string Column { get; set; } = choice.Current;
+        public ActivityInfoItem Item { get; } = item;
+        public bool Enabled { get; set; } = item.Mandatory || enabled;
+        public string Target { get; set; } = target;
+        public string DefaultColumn { get; } = choice?.Field.Column ?? "";
+        public bool Missing { get; } = choice?.CurrentMissing ?? false;
+        // Null for a piece that is not read from a column of its own (the resolution comes from the problem and the report).
+        public string? Column { get; set; } = choice?.Current;
+        public string? FieldKey => choice?.Field.Key;
         // The columns found in ActivityApp; the one in use and the default are always listed (so a column that is gone is still shown, and the default can be chosen back).
-        public List<string> Choices { get; } = [.. choice.Available.Concat([choice.Current, choice.Field.Column]).Distinct(StringComparer.OrdinalIgnoreCase)];
+        public List<string> Choices { get; } = choice is null ? [] : [.. choice.Available.Concat([choice.Current, choice.Field.Column]).Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    private sealed class ExtraRow(string table, string column, string label, string target)
+    {
+        public string Table { get; } = table;
+        public string Column { get; } = column;
+        public string Label { get; set; } = label;
+        public string Target { get; set; } = target;
     }
 
     private List<FieldRow>? fields;
+    private readonly List<ExtraRow> extras = [];
+    private IReadOnlyDictionary<string, IReadOnlyList<string>>? textColumns;
+    private string newTable = ActivityFieldMap.ExtraTables[0], newColumn = "", newLabel = "";
     private string? fieldsError;
+    private int outdated;
+
+    private IEnumerable<string> AvailableForNew =>
+        (textColumns is not null && textColumns.TryGetValue(newTable, out var list) ? list : [])
+            .Where(name => !extras.Any(extra => extra.Table == newTable && extra.Column.Equals(name, StringComparison.OrdinalIgnoreCase)));
+
+    // The rows of the screen from the settings in force (and, when the source was read, the columns ActivityApp has now).
+    private void Show(ActivityFieldMapView view)
+    {
+        fieldsError = view.SourceError;
+        var map = view.Map ?? ActivityFieldMap.Empty;
+        fields = [.. ActivityFieldMap.Info.Select(item => new FieldRow(item, item.FieldKey is null ? null : view.Fields.FirstOrDefault(choice => choice.Field.Key == item.FieldKey), map.IsEnabled(item.Key), item.Mandatory ? ActivityFieldMap.Notes : map.TargetOf(item.Key)))];
+        extras.Clear();
+        extras.AddRange(map.Extras.Select(extra => new ExtraRow(extra.Table, extra.Column, extra.Label, extra.Target)));
+        if (view.TextColumns is not null) textColumns = view.TextColumns;
+        newColumn = "";
+    }
 
     private async Task ReadFieldsAsync()
     {
-        var view = await Import.GetFieldChoicesAsync(true, lifetime.Token);
-        fieldsError = view.SourceError;
-        fields = [.. view.Fields.Select(choice => new FieldRow(choice))];
+        Show(await Import.GetFieldChoicesAsync(true, lifetime.Token));
+        await CountOutdatedAsync();
+    }
+
+    private async Task CountOutdatedAsync()
+    {
+        try { outdated = await Refresh.CountOutdatedAsync(lifetime.Token); }
+        catch (Exception ex) when (ex is ActivityImportException or AccessDeniedException or BlazorStoc.Modules.ModuleUnavailableException) { outdated = 0; }
     }
 
     private Task LoadFieldsAsync() => RunAsync("Se citesc coloanele…", ReadFieldsAsync);
 
+    // The settings as the screen holds them: only the columns that differ from the default, the pieces switched off, the destinations chosen and the extra fields.
+    private ActivityFieldMap? Settings(out string? problem)
+    {
+        var columns = fields!.Where(row => row.FieldKey is not null && row.Column is not null).ToDictionary(row => row.FieldKey!, row => row.Column!);
+        var off = fields!.Where(row => !row.Item.Mandatory && !row.Enabled).Select(row => row.Item.Key);
+        var targets = fields!.Where(row => !row.Item.Mandatory).ToDictionary(row => row.Item.Key, row => row.Target);
+        return ActivityFieldMap.Create(columns, off, targets, extras.Select(extra => new ActivityExtraField(extra.Table, extra.Column, extra.Label, extra.Target)), out problem);
+    }
+
     private Task SaveFieldsAsync() => RunAsync("Se salvează corespondența…", async () =>
     {
-        await Import.SaveFieldMapAsync(fields!.ToDictionary(row => row.Field.Key, row => row.Column), lifetime.Token);
+        var settings = Settings(out var problem) ?? throw new ActivityImportException(problem ?? "Corespondența câmpurilor nu este validă.");
+        await Import.SaveFieldSettingsAsync(settings, lifetime.Token);
         await ReadFieldsAsync();
         noticeOk = true; notice = "Corespondența câmpurilor a fost salvată.";
+        if (outdated > 0) await RefreshAfterSaveAsync();
     });
+
+    // After a save that asks for more than the tickets kept hold: they are read again at once. A failure here (no connection, ActivityApp does not answer) leaves the settings saved.
+    private async Task RefreshAfterSaveAsync()
+    {
+        try { await RefreshCoreAsync(); }
+        catch (Exception ex) when (ex is ActivityImportException or ActivitySourceException)
+        {
+            noticeOk = true; notice = "Corespondența a fost salvată, dar tichetele preluate nu s-au putut actualiza acum: " + ex.Message + " Se actualizează la următoarea sincronizare.";
+        }
+    }
+
+    private async Task RefreshCoreAsync()
+    {
+        var progress = new Progress<string>(text => { busyText = text; _ = InvokeAsync(StateHasChanged); });
+        var report = await Refresh.RefreshAsync(progress, lifetime.Token);
+        await CountOutdatedAsync();
+        noticeOk = report.Problems.Count == 0;
+        notice = $"Corespondența a fost salvată. Tichete actualizate: {report.Updated}" + (report.NotFound > 0 ? $", {report.NotFound} negăsite în ActivityApp" : "") +
+            $"; înregistrări sursă rescrise: {report.SourceRecords}; observații actualizate: {report.NotesUpdated}" + (report.NotesEdited > 0 ? $", {report.NotesEdited} modificate de operator (lăsate neatinse)" : "") +
+            (report.Problems.Count > 0 ? "; probleme: " + string.Join(" ", report.Problems.Take(3)) : ".");
+    }
+
+    private Task RefreshTicketsAsync() => RunAsync("Se actualizează tichetele preluate…", RefreshCoreAsync);
+
+    private void AddExtra()
+    {
+        var label = newLabel.Trim();
+        if (newColumn.Length == 0 || label.Length == 0) return;
+        if (extras.Any(extra => extra.Label.Equals(label, StringComparison.OrdinalIgnoreCase)) || ActivityFieldMap.Info.Any(item => item.Label.Equals(label, StringComparison.OrdinalIgnoreCase)))
+        {
+            fieldsError = $"Numele „{label}” este deja folosit."; return;
+        }
+        fieldsError = null;
+        extras.Add(new ExtraRow(newTable, newColumn, label, ActivityFieldMap.Both));
+        newColumn = ""; newLabel = "";
+    }
+
+    private void RemoveExtra(ExtraRow extra) => extras.Remove(extra);
 
     private void ResetFields()
     {
-        foreach (var row in fields!) row.Column = row.Field.Column;
+        foreach (var row in fields!)
+        {
+            if (row.Column is not null) row.Column = row.DefaultColumn;
+            row.Enabled = true;
+            row.Target = row.Item.DefaultTarget;
+        }
+        extras.Clear();
     }
 
 

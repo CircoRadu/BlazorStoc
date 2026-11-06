@@ -72,7 +72,7 @@ public sealed class ServiceInterventionInput : IValidatableObject
 }
 
 /// <summary>The ActivityApp ticket an intervention was taken from (kept apart from the notes): number, title, problem, resolution, the report as written and the executor.</summary>
-public sealed record InterventionTicket(string Number, string Title, string Problem, string Resolution, string Report, string Executor, DateTime ImportedUtc);
+public sealed record InterventionTicket(string Number, string Title, string Problem, string Resolution, string Report, string Executor, DateTime ImportedUtc, IReadOnlyDictionary<string, string>? Extras = null);
 
 public sealed class ServiceInterventionOperationException(string message) : Exception(message);
 

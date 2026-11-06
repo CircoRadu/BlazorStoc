@@ -7,13 +7,13 @@ using MySqlConnector;
 
 namespace BlazorStoc.Modules.Elcomtur;
 
-// The automatic import of the Elcomtur backup (Setari -> Preluare Elcomtur). Once a day at 04:00 the directory (a NAS share, or a local folder) is read: the newest file whose name fits the
+// The automatic import of the Elcomtur backup (Setari -> Preluare Elcomtur). Once a day, at the hour chosen in the settings (04:00 by default), the directory (a NAS share, or a local folder) is read: the newest file whose name fits the
 // mask is taken, and when it was modified after the last import it is copied to the server, checked (every file inside the archive is read to the end and its CRC compared), and imported
 // for the chosen firm. The last two files that were imported stay on the server. Everything is journaled; the outcome (done, failed, no backup for too long) is a notification.
 
 public sealed record ElcomturAutoSettings(bool Enabled, string Path, string UserName, bool HasPassword, string Mask, string FirmFolder, string FirmName, int AlertDays,
     DateTime? LastCheckUtc, bool? LastCheckOk, string LastMessage, DateTime? FailingSinceUtc, string LastFileName, DateTime? LastFileModifiedUtc, DateTime? LastImportUtc,
-    DateOnly? LastDataDate, string LastSummary, DateTime UpdatedUtc, DateOnly? LastScheduledDate = null)
+    DateOnly? LastDataDate, string LastSummary, DateTime UpdatedUtc, DateOnly? LastScheduledDate = null, int ScheduledHour = ElcomturAutoRules.DefaultHour)
 {
     public static ElcomturAutoSettings Empty { get; } = new(false, "", "", false, "", "", "", ElcomturAutoRules.DefaultAlertDays, null, null, "", null, "", null, null, null, "", DateTime.UtcNow);
 
@@ -22,7 +22,7 @@ public sealed record ElcomturAutoSettings(bool Enabled, string Path, string User
 }
 
 /// <summary>What the administrator typed. A null <see cref="Password"/> keeps the stored one.</summary>
-public sealed record ElcomturAutoInput(bool Enabled, string Path, string UserName, string? Password, string Mask, string FirmFolder, string FirmName, int AlertDays);
+public sealed record ElcomturAutoInput(bool Enabled, string Path, string UserName, string? Password, string Mask, string FirmFolder, string FirmName, int AlertDays, int ScheduledHour = ElcomturAutoRules.DefaultHour);
 
 public sealed record ElcomturAutoResult(bool Ok, string Message, bool Imported = false);
 
@@ -35,7 +35,12 @@ public sealed class ElcomturAutoException(string message) : Exception(message);
 
 public static class ElcomturAutoRules
 {
-    public const int ScheduledHour = 4;
+    // The hour (0-23, local time) from which the daily check is due; 04:00 unless the administrator chose another one.
+    public const int DefaultHour = 4, MinHour = 0, MaxHour = 23;
+    public const string HourMessage = "Ora verificării trebuie să fie între 00:00 și 23:00.";
+
+    /// <summary>"04:00": an hour as it is shown.</summary>
+    public static string HourText(int hour) => hour.ToString("00", CultureInfo.InvariantCulture) + ":00";
     public const int DefaultAlertDays = 3;
     public const int MinAlertDays = 1, MaxAlertDays = 365;
     // A file modified less than this ago is still being written by the backup of the Elcomtur program.
@@ -72,6 +77,7 @@ public static class ElcomturAutoRules
     public static string? Validate(ElcomturAutoInput input)
     {
         if (input.AlertDays is < MinAlertDays or > MaxAlertDays) return AlertMessage;
+        if (input.ScheduledHour is < MinHour or > MaxHour) return HourMessage;
         if (!input.Enabled) return null;
         if (PathError(input.Path) is { } path) return path;
         if (IsNetwork(NormalizePath(input.Path)) && (string.IsNullOrWhiteSpace(input.UserName) || input.UserName.Trim().Length > 100)) return UserMessage;
@@ -97,8 +103,8 @@ public static class ElcomturAutoRules
     /// <summary>A file is new when it was modified after the reference (the file of the last import, or the time of the last import itself).</summary>
     public static bool IsNewer(DateTime fileModifiedUtc, DateTime referenceUtc) => TruncateToSeconds(fileModifiedUtc) > TruncateToSeconds(referenceUtc);
 
-    /// <summary>The scheduled check is due from 04:00 on, once a day (the day of the last scheduled attempt is not repeated).</summary>
-    public static bool IsDue(DateTime localNow, DateOnly? lastScheduledDate) => localNow.Hour >= ScheduledHour && lastScheduledDate != DateOnly.FromDateTime(localNow);
+    /// <summary>The scheduled check is due from the chosen hour on (04:00 by default), once a day (the day of the last scheduled attempt is not repeated).</summary>
+    public static bool IsDue(DateTime localNow, DateOnly? lastScheduledDate, int hour = DefaultHour) => localNow.Hour >= hour && lastScheduledDate != DateOnly.FromDateTime(localNow);
 
     public static string Describe(DateTime? utc) => utc is null ? "niciodată" : utc.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);
 
@@ -125,7 +131,7 @@ public interface IElcomturAutoService
     Task<ElcomturAutoFirms> ReadFirmsAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default);
     /// <summary>The check of the scheduled run, on request: imports the newest file when it is newer than the last import (or whatever the newest is, when force is true).</summary>
     Task<ElcomturAutoResult> CheckNowAsync(bool force, CancellationToken cancellationToken = default);
-    /// <summary>The scheduled run for the system: null when it is not due (off, before 04:00, or already tried today).</summary>
+    /// <summary>The scheduled run for the system: null when it is not due (off, before the chosen hour, or already tried today).</summary>
     Task<ElcomturAutoResult?> RunScheduledAsync(DateTime localNow, CancellationToken cancellationToken = default);
 }
 
@@ -146,7 +152,7 @@ public sealed class MariaElcomturAutoStore(IConfiguration configuration, IDataPr
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand("""
             SELECT enabled,directory_path,username,password_protected,file_mask,firm_folder,firm_name,alert_days,last_check_utc,last_check_ok,last_message,failing_since_utc,
-                   last_file_name,last_file_modified_utc,last_import_utc,last_data_date,last_summary,updated_utc,last_scheduled_date FROM elcomtur_auto_settings WHERE id=1
+                   last_file_name,last_file_modified_utc,last_import_utc,last_data_date,last_summary,updated_utc,last_scheduled_date,scheduled_hour FROM elcomtur_auto_settings WHERE id=1
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return (ElcomturAutoSettings.Empty, null);
@@ -158,7 +164,7 @@ public sealed class MariaElcomturAutoStore(IConfiguration configuration, IDataPr
         var settings = new ElcomturAutoSettings(reader.GetBoolean(0), reader.GetString(1), reader.GetString(2), password is not null, reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetInt32(7),
             At(8), reader.IsDBNull(9) ? null : reader.GetBoolean(9), Text(10), At(11), Text(12), At(13), At(14),
             reader.IsDBNull(15) ? null : DateOnly.ParseExact(reader.GetString(15), "yyyy-MM-dd", CultureInfo.InvariantCulture), Text(16), MariaTimeText.Parse(reader.GetString(17)),
-            reader.IsDBNull(18) ? null : DateOnly.ParseExact(reader.GetString(18), "yyyy-MM-dd", CultureInfo.InvariantCulture));
+            reader.IsDBNull(18) ? null : DateOnly.ParseExact(reader.GetString(18), "yyyy-MM-dd", CultureInfo.InvariantCulture), reader.IsDBNull(19) ? ElcomturAutoRules.DefaultHour : reader.GetInt32(19));
         return (settings, password);
     }
 
@@ -174,10 +180,10 @@ public sealed class MariaElcomturAutoStore(IConfiguration configuration, IDataPr
         await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
             await using var command = new MySqlCommand("""
-                INSERT INTO elcomtur_auto_settings (id,enabled,directory_path,username,password_protected,file_mask,firm_folder,firm_name,alert_days,updated_by,updated_utc)
-                VALUES (1,@enabled,@path,@user,@pass,@mask,@firm,@firmName,@days,@by,@now)
+                INSERT INTO elcomtur_auto_settings (id,enabled,directory_path,username,password_protected,file_mask,firm_folder,firm_name,alert_days,scheduled_hour,updated_by,updated_utc)
+                VALUES (1,@enabled,@path,@user,@pass,@mask,@firm,@firmName,@days,@hour,@by,@now)
                 ON DUPLICATE KEY UPDATE enabled=@enabled,directory_path=@path,username=@user,password_protected=IF(@changed=1,@pass,password_protected),file_mask=@mask,
-                    firm_folder=@firm,firm_name=@firmName,alert_days=@days,updated_by=@by,updated_utc=@now
+                    firm_folder=@firm,firm_name=@firmName,alert_days=@days,scheduled_hour=@hour,updated_by=@by,updated_utc=@now
                 """, connection);
             command.Parameters.AddWithValue("@enabled", input.Enabled);
             command.Parameters.AddWithValue("@path", path);
@@ -188,6 +194,7 @@ public sealed class MariaElcomturAutoStore(IConfiguration configuration, IDataPr
             command.Parameters.AddWithValue("@firm", input.FirmFolder.Trim());
             command.Parameters.AddWithValue("@firmName", input.FirmName.Trim());
             command.Parameters.AddWithValue("@days", input.AlertDays);
+            command.Parameters.AddWithValue("@hour", input.ScheduledHour);
             command.Parameters.AddWithValue("@by", actor);
             command.Parameters.AddWithValue("@now", MariaTimeText.Format(DateTime.UtcNow));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -200,7 +207,8 @@ public sealed class MariaElcomturAutoStore(IConfiguration configuration, IDataPr
             new AuditChange("Parola director", old.HasPassword ? "setată" : "—", passwordChanged ? "schimbată" : old.HasPassword ? "setată" : "—"),
             new AuditChange("Mască fișier", Show(old.Mask), Show(input.Mask.Trim())),
             new AuditChange("Firmă", Show(old.FirmLabel), Show(new ElcomturFirmChoice(input.FirmFolder.Trim(), input.FirmName.Trim()).Label)),
-            new AuditChange("Prag alertă lipsă backup (zile)", old.AlertDays.ToString(CultureInfo.InvariantCulture), input.AlertDays.ToString(CultureInfo.InvariantCulture))
+            new AuditChange("Prag alertă lipsă backup (zile)", old.AlertDays.ToString(CultureInfo.InvariantCulture), input.AlertDays.ToString(CultureInfo.InvariantCulture)),
+            new AuditChange("Ora verificării automate", ElcomturAutoRules.HourText(old.ScheduledHour), ElcomturAutoRules.HourText(input.ScheduledHour))
         };
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.Elcomtur, AuditActions.SetElcomturAuto, "", "Configurare preluare automată Elcomtur",
             AuditDetails.Changes(changes), "", cancellationToken).ConfigureAwait(false);
@@ -348,7 +356,7 @@ public sealed class ElcomturAutoService(IConfiguration configuration, IDataProte
     public async Task<ElcomturAutoResult?> RunScheduledAsync(DateTime localNow, CancellationToken cancellationToken = default)
     {
         var (settings, _) = await store.ReadAsync(cancellationToken).ConfigureAwait(false);
-        if (!settings.Enabled || !ElcomturAutoRules.IsDue(localNow, settings.LastScheduledDate)) return null;
+        if (!settings.Enabled || !ElcomturAutoRules.IsDue(localNow, settings.LastScheduledDate, settings.ScheduledHour)) return null;
         return await CheckAsync(false, DateOnly.FromDateTime(localNow), cancellationToken).ConfigureAwait(false);
     }
 
@@ -362,7 +370,7 @@ public sealed class ElcomturAutoService(IConfiguration configuration, IDataProte
     private async Task<ElcomturAutoResult> CheckCoreAsync(bool force, DateOnly? scheduledDate, CancellationToken cancellationToken)
     {
         var (settings, password) = await store.ReadAsync(cancellationToken).ConfigureAwait(false);
-        var input = new ElcomturAutoInput(settings.Enabled, settings.Path, settings.UserName, password, settings.Mask, settings.FirmFolder, settings.FirmName, settings.AlertDays);
+        var input = new ElcomturAutoInput(settings.Enabled, settings.Path, settings.UserName, password, settings.Mask, settings.FirmFolder, settings.FirmName, settings.AlertDays, settings.ScheduledHour);
         // A manual check also works while the automatic import is off, but never without a complete configuration (nothing is recorded then).
         if (settings.Path.Length == 0 || ElcomturAutoRules.PathError(settings.Path) is not null || ElcomturAutoRules.MaskError(settings.Mask) is not null || settings.FirmFolder.Length == 0
             || (ElcomturAutoRules.IsNetwork(ElcomturAutoRules.NormalizePath(settings.Path)) && (password is null || settings.UserName.Length == 0)))

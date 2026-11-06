@@ -111,7 +111,7 @@ public sealed class ElcomturAutoAlertSource(IElcomturAutoAlertReader reader, str
 }
 
 /// <summary>
-/// The scheduled check: once a minute the worker asks whether the check is due (the import is on, it is 04:00 or later and no scheduled attempt was made today) and runs it as the system
+/// The scheduled check: once a minute the worker asks whether the check is due (the import is on, it is the chosen hour or later and no scheduled attempt was made today) and runs it as the system
 /// (no user). It waits while the module is out. Nothing here can take the application down: a failure is recorded by the check itself, anything unexpected is written to the log.
 /// </summary>
 public sealed class ElcomturAutoWorker(IServiceScopeFactory scopes, ModuleRegistry modules, ILogger<ElcomturAutoWorker> logger, TimeProvider? clock = null) : BackgroundService

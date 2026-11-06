@@ -16,6 +16,10 @@ public interface IOnDemandInterventionRecorder
     Task<int> RecordMaintenanceUncoveredAsync(int beneficiaryId, int workPointId, DateOnly performedOn, string notes, CancellationToken cancellationToken = default);
     /// <summary>Deletes an intervention of the beneficiary (archived, with the reason). An intervention that does not exist any more is not an error.</summary>
     Task DeleteAsync(int beneficiaryId, int interventionId, string reason, CancellationToken cancellationToken = default);
+    /// <summary>The notes of an intervention of the beneficiary, or null when it does not exist (or the register cannot tell).</summary>
+    Task<string?> GetNotesAsync(int beneficiaryId, int interventionId, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+    /// <summary>Replaces the notes of an intervention, only when they still are <paramref name="expectedNotes"/> (nobody edited them meanwhile). False = nothing was changed.</summary>
+    Task<bool> UpdateNotesAsync(int beneficiaryId, int interventionId, string expectedNotes, string newNotes, CancellationToken cancellationToken = default) => Task.FromResult(false);
 }
 
 public sealed class OnDemandInterventionOperationException(string message) : Exception(message);

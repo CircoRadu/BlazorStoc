@@ -23,11 +23,15 @@ public static class ActivityImportPanelChecks
         public Task SaveTypesAsync(IReadOnlyList<ActivityTypeChoice> choices, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ActivityConnection?> GetConnectionAsync(CancellationToken cancellationToken = default) => Task.FromResult<ActivityConnection?>(null);
         public Dictionary<string, string>? SavedMap;
-        public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Task.FromResult(ActivityFieldMap.Empty);
+        public ActivityFieldMap Map = ActivityFieldMap.Empty;
+        public ActivityFieldMap? SavedSettings;
+        public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Task.FromResult(Map);
         public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ActivityFieldMapView([.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, SavedMap?.GetValueOrDefault(field.Key) ?? field.Column,
-                field.Table == "Tickete" ? ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject"] : ["DescriptionInternal", "Rezumat"], false))], null));
+            Task.FromResult(new ActivityFieldMapView([.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, Map.ColumnOf(field),
+                field.Table == "Tickete" ? ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject"] : ["DescriptionInternal", "Rezumat"], false))], null, Map,
+                readSource ? new Dictionary<string, IReadOnlyList<string>> { ["Tickete"] = ["Description", "DescriptionInternal", "Detalii", "NumeTicket", "ProcesatDe", "Subject", "Observatii"], ["EvenimenteAgent"] = ["DescriptionInternal", "Rezumat"] } : null));
         public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) { SavedMap = new(chosen); return Task.CompletedTask; }
+        public Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default) { SavedSettings = settings; SavedMap = new(settings.Columns); Map = settings; return Task.CompletedTask; }
     }
 
     private sealed class FakePartners : IActivityPartnerImportService
@@ -43,6 +47,19 @@ public static class ActivityImportPanelChecks
         public Task<IReadOnlyList<ImportIssue>> GetOpenIssuesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ImportIssue>>([.. Issues]);
         public Task IncludeAsync(long partnerId, bool asCompany, CancellationToken cancellationToken = default) { Included.Add((partnerId, asCompany)); return Task.CompletedTask; }
         public Task ResolveIssueAsync(long issueId, CancellationToken cancellationToken = default) { Resolved++; Issues.RemoveAll(issue => issue.Id == issueId); return Task.CompletedTask; }
+    }
+
+    private sealed class FakeRefresh : IActivityTicketRefreshService
+    {
+        public int Outdated, Refreshes;
+        public Task<int> CountOutdatedAsync(CancellationToken cancellationToken = default) => Task.FromResult(Outdated);
+        public Task<TicketRefreshReport> RefreshAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+        {
+            Refreshes++;
+            var report = new TicketRefreshReport(Outdated, Outdated, 0, 2, 1, 1, []);
+            Outdated = 0;
+            return Task.FromResult(report);
+        }
     }
 
     private sealed class FakeTickets : IActivityTicketImportService
@@ -104,6 +121,8 @@ public static class ActivityImportPanelChecks
         context.Services.AddSingleton<IActivityPartnerImportService>(partners);
         var ticketService = new FakeTickets();
         context.Services.AddSingleton<IActivityTicketImportService>(ticketService);
+        var refresh = new FakeRefresh();
+        context.Services.AddSingleton<IActivityTicketRefreshService>(refresh);
         var syncService = new FakeSync();
         context.Services.AddSingleton<IActivitySyncService>(syncService);
         var reviewService = new FakeReviews();
@@ -235,17 +254,33 @@ public static class ActivityImportPanelChecks
         cut.Find("#ai-types-unused input[role=switch]").Change(true);
         check(cut.FindAll("#ai-types-unused tbody tr").Count == 1 && cut.FindAll("#ai-types tbody tr").Count == 2, "Activity import panel: a type whose switch is turned on moves to the used group");
         // Since 0.5.19 the saved correspondence is shown at once (with the default columns), before the columns are read from ActivityApp.
-        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Fields.Count && !cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").HasAttribute("disabled"), "Activity import panel: the saved correspondence of the fields is shown at once, before the columns are read");
+        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Info.Count && !cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").HasAttribute("disabled"), "Activity import panel: the saved correspondence of the fields is shown at once, before the columns are read");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Citește coloanele din ActivityApp").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-fields tbody tr").Count == 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Fields.Count && cut.Find("#ai-fields").TextContent.Contains("Detalii", StringComparison.Ordinal) && cut.Find("#ai-fields").TextContent.Contains("DescriptionInternal (implicit)", StringComparison.Ordinal),
-            "Activity import panel: every mappable field is listed with its default column and the text columns found in ActivityApp");
-        cut.FindAll("#ai-fields select")[1].Change("Detalii");
+        check(cut.FindAll("#ai-fields tbody tr").Count == ActivityFieldMap.Info.Count && cut.Find("#ai-fields").TextContent.Contains("Detalii", StringComparison.Ordinal) && cut.Find("#ai-fields").TextContent.Contains("DescriptionInternal (implicit)", StringComparison.Ordinal),
+            "Activity import panel: every piece of information of the ticket is listed with its default column and the text columns found in ActivityApp");
+        // Title and number are always taken (no switch); the other four have a switch, and the destination can be chosen.
+        check(cut.FindAll("#ai-fields input[role=switch]").Count == 4 && cut.Find("#ai-fields tbody tr:nth-child(1)").TextContent.Contains("Mereu", StringComparison.Ordinal) && cut.Find("#ai-fields tbody tr:nth-child(2)").TextContent.Contains("Mereu", StringComparison.Ordinal),
+            "Activity import panel: the title and the number are always taken (no switch), the other pieces of information have a switch");
+        cut.FindAll("#ai-fields select")[2].Change("Detalii");
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").Click();
         cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Corespondența câmpurilor a fost salvată", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(settingsService.SavedMap is { } saved && saved["Tickete.DescriptionInternal"] == "Detalii" && saved["Tickete.Subject"] == "Subject", "Activity import panel: saving sends the column chosen for each field");
-        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Revino la coloanele implicite").Click();
-        check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[1].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
+        check(settingsService.SavedMap is { } saved && saved.Count == 1 && saved["Tickete.DescriptionInternal"] == "Detalii", "Activity import panel: saving sends the column chosen (only the ones that differ from the default are kept)");
+        // A piece switched off and a destination chosen are saved; an extra field is added from the columns read; saving with something missing from the tickets kept refreshes them.
+        cut.FindAll("#ai-fields input[role=switch]")[2].Change(false);
+        cut.FindAll("#ai-fields select").Single(select => select.GetAttribute("aria-label") == "Se atașează ca: Executantul").Change(ActivityFieldMap.Separate);
+        cut.Find("#ai-extra-add select[aria-label='Coloana câmpului suplimentar']").Change("Observatii");
+        cut.Find("#ai-extra-add input").Change("Observații client");
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Adaugă câmp").Click();
+        check(cut.FindAll("#ai-extras tbody tr").Count == 1 && cut.Find("#ai-extras input").GetAttribute("value") == "Observații client", "Activity import panel: an extra field is added from the text columns read, under a name chosen by the administrator");
+        refresh.Outdated = 3;
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Salvează corespondența").Click();
+        cut.WaitForAssertion(() => { if (!cut.Markup.Contains("Tichete actualizate", StringComparison.Ordinal)) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
+        check(settingsService.SavedSettings is { } savedSettings && !savedSettings.IsEnabled(ActivityFieldMap.Report) && savedSettings.TargetOf(ActivityFieldMap.Executor) == ActivityFieldMap.Separate
+              && savedSettings.Extras.Count == 1 && savedSettings.Extras[0].Column == "Observatii" && savedSettings.Extras[0].Label == "Observații client" && refresh.Refreshes == 1,
+            "Activity import panel: the switch, the destination and the extra field are saved, and the tickets kept that lack something are read again after the save");
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Revino la valorile implicite").Click();
+        check(cut.FindAll("#ai-fields select").All(select => select.GetAttribute("aria-label") is not null) && cut.FindAll("#ai-fields select")[2].GetAttribute("aria-label")!.Contains("Problema", StringComparison.Ordinal),
             "Activity import panel: the selects of the fields are named for the field");
         cut.Find("#ai-issues button").Click();
         cut.WaitForAssertion(() => { if (cut.FindAll("#ai-issues").Count != 0) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));

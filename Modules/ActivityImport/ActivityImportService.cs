@@ -117,6 +117,8 @@ public interface IActivityImportService
     Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default);
     /// <summary>Saves the chosen columns (key "Table.Column" of the contract, value the real column; the default or an empty value clears the choice). Journaled.</summary>
     Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default);
+    /// <summary>Saves the settings of the ticket fields as a whole: the columns, the pieces of information switched off, their destinations and the extra fields. Journaled.</summary>
+    Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default);
 }
 
 public sealed class MariaActivityImportService(IConfiguration configuration, IDataProtectionProvider protection, IActivitySource source, IAccessControl access, IAuditTrail audit) : IActivityImportService
@@ -482,10 +484,10 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
         await access.EnsureAsync(View, cancellationToken).ConfigureAwait(false);
         var map = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
         IReadOnlyList<ActivityFieldChoice> Offline() => [.. ActivityFieldMap.Fields.Select(field => new ActivityFieldChoice(field, map.ColumnOf(field), [], false))];
-        if (!readSource) return new ActivityFieldMapView(Offline(), null);
+        if (!readSource) return new ActivityFieldMapView(Offline(), null, map);
         var (settings, password) = await ReadAsync(cancellationToken).ConfigureAwait(false);
         if (settings.Server.Length == 0 || settings.User.Length == 0 || password is null)
-            return new ActivityFieldMapView(Offline(), "Completează și salvează mai întâi conexiunea la ActivityApp.");
+            return new ActivityFieldMapView(Offline(), "Completează și salvează mai întâi conexiunea la ActivityApp.", map);
         try
         {
             var actual = await source.ReadStructureAsync(new ActivityConnection(settings.Server, settings.Port, settings.Database, settings.User, password), cancellationToken).ConfigureAwait(false);
@@ -494,30 +496,43 @@ public sealed class MariaActivityImportService(IConfiguration configuration, IDa
                 var available = ActivityFieldMap.TextColumns(actual, field.Table);
                 var current = map.ColumnOf(field);
                 return new ActivityFieldChoice(field, current, available, !available.Contains(current, StringComparer.OrdinalIgnoreCase));
-            })], null);
+            })], null, map, ActivityFieldMap.ExtraTables.ToDictionary(table => table, table => ActivityFieldMap.TextColumns(actual, table)));
         }
-        catch (ActivitySourceException exception) { return new ActivityFieldMapView(Offline(), exception.Message); }
+        catch (ActivitySourceException exception) { return new ActivityFieldMapView(Offline(), exception.Message, map); }
     }
 
     public async Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default)
     {
         await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
-        var map = ActivityFieldMap.Create(chosen, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        // Only the columns change: what was switched off, the destinations and the extra fields stay as they are.
+        var existing = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
+        var map = ActivityFieldMap.Create(chosen, existing.Off, existing.Targets, existing.Extras, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        await SaveMapAsync(map, existing, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default)
+    {
+        await access.EnsureAsync(Edit, cancellationToken).ConfigureAwait(false);
+        var map = ActivityFieldMap.Create(settings.Columns, settings.Off, settings.Targets, settings.Extras, out var error) ?? throw new ActivityImportException(error ?? "Corespondența câmpurilor nu este validă.");
+        await SaveMapAsync(map, await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SaveMapAsync(ActivityFieldMap map, ActivityFieldMap before, CancellationToken cancellationToken)
+    {
         EnsureAllowedDatabase();
-        var before = await ReadFieldMapAsync(cancellationToken).ConfigureAwait(false);
         if (before.ToJson() == map.ToJson()) return;
         var actor = (await RepositoryAudit.ActorAsync(access, cancellationToken).ConfigureAwait(false)).Username;
         await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         {
             // The row exists after the first save of the connection; before that there is nothing to map.
             await using var command = new MySqlCommand("UPDATE activity_import_settings SET field_map=@map, updated_by=@by, updated_utc=@now WHERE id = 1", connection);
-            command.Parameters.AddWithValue("@map", map.Columns.Count == 0 ? DBNull.Value : map.ToJson());
+            command.Parameters.AddWithValue("@map", map.ToJson() is { Length: > 0 } json ? json : DBNull.Value);
             command.Parameters.AddWithValue("@by", actor);
             command.Parameters.AddWithValue("@now", DateTime.UtcNow);
             if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 0) throw new ActivityImportException("Salvează mai întâi conexiunea la ActivityApp.");
         }
         await AuditRecorder.RecordActionAsync(audit, access, AuditEntities.ActivityImport, AuditActions.SetActivityFieldMap, "", "Corespondența câmpurilor ActivityApp",
-            AuditDetails.Changes(new AuditChange("Câmpuri citite din altă coloană", before.Describe(), map.Describe())), "", cancellationToken).ConfigureAwait(false);
+            AuditDetails.Changes(new AuditChange("Câmpurile tichetului (coloane, informații oprite, destinații, câmpuri suplimentare)", before.Describe(), map.Describe())), "", cancellationToken).ConfigureAwait(false);
     }
 
     private static ActivityImportInput Normalize(ActivityImportInput input) => input with
@@ -543,6 +558,7 @@ internal sealed class UnavailableActivityImportService : IActivityImportService
     public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => Out<ActivityFieldMap>();
     public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) => Out<ActivityFieldMapView>();
     public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) => Out<object>();
+    public Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default) => Out<object>();
 }
 
 /// <summary>The entry points of the module behind the circuit breaker of the registry (a source that does not answer is an expected answer, not a fault).</summary>
@@ -559,4 +575,5 @@ internal sealed class GuardedActivityImportService(IActivityImportService inner,
     public Task<ActivityFieldMap> GetFieldMapAsync(CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFieldMapAsync(cancellationToken));
     public Task<ActivityFieldMapView> GetFieldChoicesAsync(bool readSource, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.GetFieldChoicesAsync(readSource, cancellationToken));
     public Task SaveFieldMapAsync(IReadOnlyDictionary<string, string> chosen, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SaveFieldMapAsync(chosen, cancellationToken));
+    public Task SaveFieldSettingsAsync(ActivityFieldMap settings, CancellationToken cancellationToken = default) => modules.RunAsync(Id, () => inner.SaveFieldSettingsAsync(settings, cancellationToken));
 }

@@ -153,7 +153,10 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
             ?? throw new ActivityImportException("Tichetul nu mai așteaptă validarea (a fost decis între timp). Actualizează lista.");
         var row = await FindAsync(id, cancellationToken).ConfigureAwait(false) ?? throw new ActivityImportException("Tichetul nu mai așteaptă validarea. Actualizează lista.");
         var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
+        var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+        // The window shows what the ticket holds (hiding what the settings switch off); the notes are made with the settings.
         var source = stored is null ? new TicketSource(row.TicketId, 0, 0, item.TicketNumber, item.Title, "", item.Resolution, item.Resolution, "") : ActivityTicketPlanner.SourceOf(stored.Ticket);
+        var forNotes = stored is null ? source : ActivityTicketPlanner.SourceOf(stored.Ticket, map);
         var points = new List<ReviewWorkPoint>();
         await using (var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false))
         await using (var command = new MySqlCommand("SELECT id, name, address FROM beneficiary_work_points WHERE beneficiary_id=@id ORDER BY is_primary DESC, name", connection))
@@ -167,8 +170,8 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         catch (ModuleUnavailableException) { }
         var keyword = item.Keyword;
         return new ActivityReviewDetail(item, row.BeneficiaryId, row.WorkPointId, source, points, covered,
-            ActivityTicketPlanner.Notes(source.Number, source.Title, source.Problem, source.Resolution, source.Executor, keyword, false),
-            ActivityTicketPlanner.Notes(source.Number, source.Title, source.Problem, source.Resolution, source.Executor, keyword, true, !covered),
+            ActivityTicketPlanner.Notes(forNotes, map, keyword, false),
+            ActivityTicketPlanner.Notes(forNotes, map, keyword, true, !covered),
             item.Kind == ActivityTicketPlanner.ServiceKind ? ReviewCategory.Service : ReviewCategory.Maintenance, row.InterventionId is not null);
     }
 
@@ -211,7 +214,8 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
                 var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
                 if (stored is not null)
                 {
-                    await WriteSourceAsync(interventionId, ActivityTicketPlanner.SourceOf(stored.Ticket), cancellationToken).ConfigureAwait(false);
+                    var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+                    await ActivityTicketSourceStore.WriteAsync(configuration, interventionId, stored.Ticket, map, cancellationToken).ConfigureAwait(false);
                     gpsNote = await CompleteCoordinatesAsync(input.WorkPointId, stored.Ticket.Gps, cancellationToken).ConfigureAwait(false);
                     await ActivityTicketStore.SaveAsync(configuration, stored.Ticket, TicketStates.Imported, interventionId, cancellationToken).ConfigureAwait(false);
                     await ImportStore.WriteMapAsync(configuration, ActivityTicketPlanner.TicketEntity, row.TicketId, interventionId, "created", ActivityTicketPlanner.HashOf(stored.Ticket), cancellationToken).ConfigureAwait(false);
@@ -283,37 +287,15 @@ public sealed class MariaActivityReviewService(IConfiguration configuration, IAc
         var stored = await ActivityTicketStore.FindAsync(configuration, row.TicketId, cancellationToken).ConfigureAwait(false);
         var (problem, resolution) = stored is null ? ("", item.Resolution) : ActivityTicketPlanner.SplitReport(stored.Ticket.Problem, stored.Ticket.Report);
         var covered = await interventions!.IsCoveredAsync(row.BeneficiaryId, row.WorkPointId, cancellationToken).ConfigureAwait(false);
-        var notes = ActivityTicketPlanner.Notes(item.TicketNumber, item.Title, problem, resolution, stored?.Ticket.Executor ?? "", row.Keyword, true, !covered);
+        var map = await ActivityFieldSettingsStore.ReadAsync(configuration, cancellationToken).ConfigureAwait(false);
+        var notes = stored is null ? ActivityTicketPlanner.Notes(item.TicketNumber, item.Title, problem, resolution, "", row.Keyword, true, !covered)
+            : ActivityTicketPlanner.Notes(ActivityTicketPlanner.SourceOf(stored.Ticket, map), map, row.Keyword, true, !covered);
         var maintenanceId = await interventions.RecordMaintenanceUncoveredAsync(row.BeneficiaryId, row.WorkPointId, row.PerformedOn, notes, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE service_intervention_source SET intervention_id=@new WHERE intervention_id=@old", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@old", onDemandId); }, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE activity_import_map SET local_id=@new WHERE entity='ticket' AND source_id=@ticket", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@ticket", row.TicketId); }, cancellationToken).ConfigureAwait(false);
         await ExecuteAsync("UPDATE activity_import_tickets SET intervention_id=@new, updated_utc=@now WHERE ticket_id=@ticket", p => { p.AddWithValue("@new", maintenanceId); p.AddWithValue("@now", DateTime.UtcNow); p.AddWithValue("@ticket", row.TicketId); }, cancellationToken).ConfigureAwait(false);
         await interventions.DeleteAsync(row.BeneficiaryId, onDemandId, "Înlocuită cu mentenanța validată de operator (tichet ActivityApp).", cancellationToken).ConfigureAwait(false);
         return maintenanceId;
-    }
-
-    // The detail of the source of the intervention: the problem, the resolution, the original report and the executor, kept apart from the notes.
-    private async Task WriteSourceAsync(int interventionId, TicketSource source, CancellationToken cancellationToken)
-    {
-        await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("""
-            INSERT INTO service_intervention_source (intervention_id, source_ticket_id, source_type_id, source_event_id, ticket_number, title, problem, resolution, report, executor, imported_utc)
-            VALUES (@intervention, @ticket, @type, @event, @number, @title, @problem, @resolution, @report, @executor, @now)
-            ON DUPLICATE KEY UPDATE intervention_id=@intervention, source_type_id=@type, source_event_id=@event, ticket_number=@number, title=@title, problem=@problem, resolution=@resolution,
-                report=@report, executor=@executor, imported_utc=@now
-            """, connection);
-        command.Parameters.AddWithValue("@intervention", interventionId);
-        command.Parameters.AddWithValue("@ticket", source.TicketId);
-        command.Parameters.AddWithValue("@type", source.TypeId);
-        command.Parameters.AddWithValue("@event", source.EventId);
-        command.Parameters.AddWithValue("@number", Cut(source.Number, 100));
-        command.Parameters.AddWithValue("@title", Cut(source.Title, 500));
-        command.Parameters.AddWithValue("@problem", source.Problem);
-        command.Parameters.AddWithValue("@resolution", source.Resolution);
-        command.Parameters.AddWithValue("@report", source.Report);
-        command.Parameters.AddWithValue("@executor", Cut(source.Executor, 200));
-        command.Parameters.AddWithValue("@now", DateTime.UtcNow);
-        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static string Cut(string value, int length) => value.Length > length ? value[..length] : value;

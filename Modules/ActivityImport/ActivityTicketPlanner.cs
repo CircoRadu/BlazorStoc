@@ -9,7 +9,7 @@ namespace BlazorStoc.Modules.ActivityImport;
 // ticket looks like: a type taken as maintenance, or a keyword in what was done (exact, or one that only resembles it), mean "maintenance"; the rest mean "service". The problem and the
 // resolution are told apart from the report of the event (see SplitReport). Tickets whose client was not imported are not errors: they wait, and are taken after the partner is.
 
-public sealed record TicketSource(long TicketId, long TypeId, long EventId, string Number, string Title, string Problem, string Resolution, string Report, string Executor);
+public sealed record TicketSource(long TicketId, long TypeId, long EventId, string Number, string Title, string Problem, string Resolution, string Report, string Executor, IReadOnlyDictionary<string, string>? Extras = null);
 
 public sealed record TicketPlan(long SourceId, string Title, PlanAction Action, int? BeneficiaryId, int? WorkPointId, DateOnly? PerformedOn, string Notes, TicketSource? Source, string Message, string Hash,
     string Keyword = "", string Approximate = "", string Found = "", bool NeedsValidation = false, string MatchKind = "")
@@ -60,35 +60,103 @@ public static class ActivityTicketPlanner
         return (opening, Collapse(rest).Length == 0 ? "" : rest);
     }
 
-    /// <summary>The ticket as the intervention keeps it apart: the problem and the resolution told apart from the report, the executor, the number.</summary>
-    public static TicketSource SourceOf(ActivityTicket ticket)
+    /// <summary>
+    /// The ticket as the intervention keeps it apart: the problem and the resolution told apart from the report, the executor, the number and the extra fields. With the settings of the fields
+    /// (<paramref name="map"/>) a piece of information that is switched off is empty and only the extra fields of the settings are kept; without them everything the ticket holds is kept.
+    /// </summary>
+    public static TicketSource SourceOf(ActivityTicket ticket, ActivityFieldMap? map = null)
     {
         var title = TextNormalization.ForObjectNameOrCode(ticket.Title);
         var (problem, resolution) = SplitReport(ticket.Problem, ticket.Report);
-        return new TicketSource(ticket.Id, ticket.TypeId, ticket.EventId, TextNormalization.ForObjectNameOrCode(ticket.Number), title, problem, resolution, ticket.Report, TextNormalization.ForObjectNameOrCode(ticket.Executor));
+        var report = ticket.Report;
+        var executor = TextNormalization.ForObjectNameOrCode(ticket.Executor);
+        IReadOnlyDictionary<string, string>? extras = ticket.Extras;
+        if (map is not null)
+        {
+            if (!map.IsEnabled(ActivityFieldMap.Problem)) problem = "";
+            if (!map.IsEnabled(ActivityFieldMap.Resolution)) resolution = "";
+            if (!map.IsEnabled(ActivityFieldMap.Report)) report = "";
+            if (!map.IsEnabled(ActivityFieldMap.Executor)) executor = "";
+            extras = ticket.Extras is null ? null : map.Extras.Where(extra => ticket.Extras.ContainsKey(extra.Key)).ToDictionary(extra => extra.Key, extra => ticket.Extras[extra.Key]);
+        }
+        return new TicketSource(ticket.Id, ticket.TypeId, ticket.EventId, TextNormalization.ForObjectNameOrCode(ticket.Number), title, problem, resolution, report, executor, extras is { Count: > 0 } ? extras : null);
     }
 
-    public static string HashOf(ActivityTicket ticket)
+    public static string HashOf(ActivityTicket ticket, ActivityFieldMap? map = null)
     {
-        var source = SourceOf(ticket);
-        return ActivityPartnerPlanner.Hash(ticket.Id.ToString(), ticket.EventId.ToString(), source.Title, source.Problem, source.Resolution, source.Executor, (ticket.EventEnd ?? ticket.TicketDate)?.ToString("O") ?? "", ticket.Gps);
+        var source = SourceOf(ticket, map);
+        var values = new List<string> { ticket.Id.ToString(), ticket.EventId.ToString(), source.Title, source.Problem, source.Resolution, source.Executor, (ticket.EventEnd ?? ticket.TicketDate)?.ToString("O") ?? "", ticket.Gps };
+        // Only what the settings add changes the value: with the default settings it is the same as before, so no ticket waiting in the queue is renewed for nothing.
+        if (map is not null && map.IsEnabled(ActivityFieldMap.Report) && map.TargetOf(ActivityFieldMap.Report) != ActivityFieldMap.Separate) values.Add(source.Report);
+        if (source.Extras is not null) foreach (var pair in source.Extras.OrderBy(pair => pair.Key, StringComparer.Ordinal)) { values.Add(pair.Key); values.Add(pair.Value); }
+        return ActivityPartnerPlanner.Hash([.. values]);
     }
 
-    public static string Notes(string number, string title, string problem, string resolution, string executor, string keyword = "", bool maintenance = false, bool uncovered = false)
+    /// <summary>The lines of the notes that come from the ticket, in order: problem, resolution, report, executor (the pieces that are on and go to the notes) and the extra fields that go to the notes.</summary>
+    public static IReadOnlyList<(string Key, string Label, string Value)> NoteLines(TicketSource source, ActivityFieldMap map)
+    {
+        var lines = new List<(string, string, string)>();
+        void Add(string key, string label, string value) { if (map.IsEnabled(key) && map.InNotes(key) && value.Length > 0) lines.Add((key, label, value)); }
+        Add(ActivityFieldMap.Problem, "Problemă", source.Problem);
+        Add(ActivityFieldMap.Resolution, "Rezolvare", source.Resolution);
+        Add(ActivityFieldMap.Report, "Raport original", source.Report);
+        Add(ActivityFieldMap.Executor, "Executant", source.Executor);
+        foreach (var extra in map.Extras)
+            if (extra.Target is ActivityFieldMap.Notes or ActivityFieldMap.Both && source.Extras is not null && source.Extras.TryGetValue(extra.Key, out var value) && value.Length > 0) lines.Add((extra.Key, extra.Label, value));
+        return lines;
+    }
+
+    /// <summary>The keys of the pieces of information that went to the notes (kept with the source record, to know later what the generated text held).</summary>
+    public static string NotesItems(TicketSource source, ActivityFieldMap map) => string.Join(',', NoteLines(source, map).Select(line => line.Key));
+
+    /// <summary>The generated start of the notes: the header and the lines of the ticket, without the remarks about maintenance and without any cut.</summary>
+    public static string NotesPrefix(string number, string title, IEnumerable<(string Label, string Value)> lines)
     {
         var text = new StringBuilder();
         text.Append("Preluat din ActivityApp");
         if (number.Length > 0) text.Append($", tichet {number}");
         if (title.Length > 0) text.Append($": {title}");
-        if (problem.Length > 0) text.Append("\nProblemă: ").Append(problem);
-        if (resolution.Length > 0) text.Append("\nRezolvare: ").Append(resolution);
-        if (executor.Length > 0) text.Append("\nExecutant: ").Append(executor);
+        foreach (var (label, value) in lines) text.Append('\n').Append(label).Append(": ").Append(value);
+        return text.ToString();
+    }
+
+    /// <summary>The notes of an intervention taken from the ticket with the settings of the fields.</summary>
+    public static string Notes(TicketSource source, ActivityFieldMap map, string keyword = "", bool maintenance = false, bool uncovered = false) =>
+        Finish(NotesPrefix(source.Number, source.Title, NoteLines(source, map).Select(line => (line.Label, line.Value))), keyword, maintenance, uncovered);
+
+    public static string Notes(string number, string title, string problem, string resolution, string executor, string keyword = "", bool maintenance = false, bool uncovered = false) =>
+        Finish(NotesPrefix(number, title, new[] { ("Problemă", problem), ("Rezolvare", resolution), ("Executant", executor) }.Where(line => line.Item2.Length > 0)), keyword, maintenance, uncovered);
+
+    // The remarks about maintenance after the lines of the ticket, then the text as it is stored (with the cut at the maximum length).
+    private static string Finish(string prefix, string keyword, bool maintenance, bool uncovered)
+    {
+        var text = new StringBuilder(prefix);
         if (maintenance && uncovered) text.Append("\nMentenanță validată de operator; punctul nu are un contract de mentenanță activ (scadența nu s-a mutat).");
         else if (keyword == TypeKeyword) text.Append(maintenance ? "\nMentenanță: tichet de un tip de mentenanță." : "\nTichet de un tip de mentenanță, validat ca service la cerere.");
         else if (keyword.Length > 0) text.Append(maintenance ? $"\nMentenanță: recunoscută după „{keyword}”." : $"\nMenționează „{keyword}”, validat ca service la cerere.");
         var value = TextNormalization.ForStorage(text.ToString().Replace("\r\n", "\n"));
         return value.Length <= OnDemandInterventionRules.NotesMaximumLength ? value : value[..(OnDemandInterventionRules.NotesMaximumLength - 1)] + "…";
     }
+
+    /// <summary>
+    /// The notes with the generated start replaced by <paramref name="newPrefix"/>, when <paramref name="current"/> is still what the import wrote: the old generated start, then nothing or the one
+    /// remark about maintenance the import adds. Null when the text is anything else (an operator edited it, or it was cut): it is then left as it is.
+    /// </summary>
+    public static string? RebuildNotes(string current, string oldPrefix, string newPrefix)
+    {
+        var old = TextNormalization.ForStorage(oldPrefix.Replace("\r\n", "\n"));
+        if (!current.StartsWith(old, StringComparison.Ordinal)) return null;
+        var tail = current[old.Length..];
+        if (tail.Length > 0 && !IsGeneratedRemark(tail)) return null;
+        var value = TextNormalization.ForStorage((newPrefix + tail).Replace("\r\n", "\n"));
+        return value.Length <= OnDemandInterventionRules.NotesMaximumLength ? value : value[..(OnDemandInterventionRules.NotesMaximumLength - 1)] + "…";
+    }
+
+    // The notes are stored without diacritics (TextNormalization.ForStorage), so the remarks are compared the way they are stored.
+    private static readonly string[] RemarkStarts = [.. new[] { "Mentenanță validată de operator;", "Mentenanță: ", "Tichet de un tip de mentenanță", "Menționează „" }.Select(text => "\n" + TextNormalization.ForStorage(text))];
+
+    private static bool IsGeneratedRemark(string tail) =>
+        tail.StartsWith('\n') && !tail.AsSpan(1).Contains('\n') && RemarkStarts.Any(start => tail.StartsWith(start, StringComparison.Ordinal));
 
     /// <param name="tickets">The resolved tickets of the chosen types.</param>
     /// <param name="destinations">The chosen types and the destination of each (see <see cref="ActivityDestination"/>).</param>
@@ -97,7 +165,7 @@ public static class ActivityTicketPlanner
     /// <param name="today">For the rule that the date performed is not in the future.</param>
     public static IReadOnlyList<TicketPlan> Plan(IReadOnlyList<ActivityTicket> tickets, IReadOnlyDictionary<long, string> destinations, IReadOnlyList<ImportMapEntry> map,
         IReadOnlyDictionary<int, IReadOnlyList<WorkPoint>> localPoints, DateOnly today, IReadOnlyDictionary<long, IReadOnlyList<string>>? keywords = null,
-        IReadOnlySet<long>? ignoredPartners = null, IReadOnlySet<long>? waitingPartners = null, IReadOnlySet<long>? discarded = null, IReadOnlySet<long>? queued = null)
+        IReadOnlySet<long>? ignoredPartners = null, IReadOnlySet<long>? waitingPartners = null, IReadOnlySet<long>? discarded = null, IReadOnlySet<long>? queued = null, ActivityFieldMap? fields = null)
     {
         var partners = map.Where(entry => entry.Entity == ActivityPartnerPlanner.PartnerEntity).ToDictionary(entry => entry.SourceId, entry => entry.LocalId);
         var points = map.Where(entry => entry.Entity == ActivityPartnerPlanner.PointEntity).ToDictionary(entry => entry.SourceId, entry => entry.LocalId);
@@ -105,10 +173,10 @@ public static class ActivityTicketPlanner
         var plans = new List<TicketPlan>();
         foreach (var ticket in tickets.OrderBy(item => item.Id))
         {
-            var source = SourceOf(ticket);
+            var source = SourceOf(ticket, fields);
             var (title, problem, resolution, executor) = (source.Title, source.Problem, source.Resolution, source.Executor);
             var performed = ticket.EventEnd ?? ticket.TicketDate;
-            var hash = HashOf(ticket);
+            var hash = HashOf(ticket, fields);
             TicketPlan Make(PlanAction action, string message, int? beneficiary = null, int? point = null, DateOnly? date = null, string notes = "") =>
                 new(ticket.Id, title.Length > 0 ? title : $"Tichet {ticket.Id}", action, beneficiary, point, date, notes, source, message, hash);
             if (tied.ContainsKey(ticket.Id)) { plans.Add(Make(PlanAction.AlreadyLinked, "")); continue; }
@@ -134,7 +202,7 @@ public static class ActivityTicketPlanner
                 : keywords is not null && keywords.TryGetValue(ticket.TypeId, out var words) ? ActivityKeywords.Match(resolution, words) : KeywordMatch.None;
             // Only a maintenance type, or a ticket whose text has a keyword of the nomenclator, reaches the queue: any other ticket is not taken.
             if (match.Kind == KeywordMatchKind.None) { plans.Add(Make(PlanAction.Skipped, NoKeyword)); continue; }
-            var plan = Make(PlanAction.Create, AwaitingApproval, beneficiary, point, date, Notes(source.Number, title, problem, resolution, executor)) with { NeedsValidation = true };
+            var plan = Make(PlanAction.Create, AwaitingApproval, beneficiary, point, date, fields is null ? Notes(source.Number, title, problem, resolution, executor) : Notes(source, fields)) with { NeedsValidation = true };
             plans.Add(match.Kind switch
             {
                 KeywordMatchKind.Exact => plan with { Keyword = match.Word, Found = match.Found, MatchKind = byType ? "type" : "exact" },

@@ -208,11 +208,17 @@ public sealed class MariaServiceInterventionRepository(
     public async Task<InterventionTicket?> GetTicketAsync(int interventionId, CancellationToken cancellationToken = default)
     {
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
-        await using var command = Command(connection, null, "SELECT ticket_number, title, problem, resolution, report, executor, imported_utc FROM service_intervention_source WHERE intervention_id=@id", ("@id", interventionId));
+        await using var command = Command(connection, null, "SELECT ticket_number, title, problem, resolution, report, executor, imported_utc, extras FROM service_intervention_source WHERE intervention_id=@id", ("@id", interventionId));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) return null;
         string Text(int index) => reader.IsDBNull(index) ? "" : reader.GetString(index);
-        return new InterventionTicket(Text(0), Text(1), Text(2), Text(3), Text(4), Text(5), DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc));
+        IReadOnlyDictionary<string, string>? extras = null;
+        if (!reader.IsDBNull(7))
+        {
+            try { extras = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(reader.GetString(7)); }
+            catch (System.Text.Json.JsonException) { }
+        }
+        return new InterventionTicket(Text(0), Text(1), Text(2), Text(3), Text(4), Text(5), DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc), extras);
     }
 
     // Archived deletion: the row goes to archive_service_interventions, its photos to archive_service_photos with their files moved to the

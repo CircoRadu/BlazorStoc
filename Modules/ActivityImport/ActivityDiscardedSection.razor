@@ -45,10 +45,7 @@
             <dl class="review-facts">
                 <dt>Discardat de</dt><dd>@shown.DiscardedBy</dd>
                 <dt>La data</dt><dd>@shown.DiscardedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</dd>
-                <dt>Executant</dt><dd>@(source.Executor.Length > 0 ? source.Executor : "—")</dd>
-                <dt>Problema</dt><dd class="review-text">@(source.Problem.Length > 0 ? source.Problem : "—")</dd>
-                <dt>Rezolvarea</dt><dd class="review-text">@(source.Resolution.Length > 0 ? source.Resolution : "—")</dd>
-                <dt>Raportul original</dt><dd class="review-text">@(source.Report.Length > 0 ? source.Report : "—")</dd>
+                <TicketInfoRows ShowEmpty Problem="@source.Problem" Resolution="@source.Resolution" Report="@source.Report" Executor="@source.Executor" Extras="@source.Extras" />
             </dl>
         </div>
     </div>

@@ -30,6 +30,17 @@ public static partial class MariaExtendedChecks
             return Task.FromResult<IReadOnlySet<long>>(Live.TryGetValue(kind, out var live) ? ids.Where(live.Contains).ToHashSet() : ids.ToHashSet());
         }
 
+        public readonly List<long> ById = [];
+        public readonly Dictionary<(long Ticket, string Key), string> ExtraValues = [];
+
+        public Task<IReadOnlyList<ActivityTicket>> ReadTicketsByIdAsync(ActivityConnection connection, StructureReport structure, IReadOnlyList<long> ids, int pageSize, CancellationToken cancellationToken)
+        {
+            Calls++; LastTicketStructure = structure; ById.AddRange(ids);
+            // The extra fields of the structure report come with the ticket, as the real source reads them.
+            ActivityTicket WithExtras(ActivityTicket ticket) => structure.Extras.Count == 0 ? ticket : ticket with { Extras = structure.Extras.ToDictionary(extra => extra.Key, extra => ExtraValues.GetValueOrDefault((ticket.Id, extra.Key), "")) };
+            return Failure is null ? Task.FromResult<IReadOnlyList<ActivityTicket>>([.. TicketRows.Where(ticket => ids.Contains(ticket.Id)).Select(WithExtras)]) : Task.FromException<IReadOnlyList<ActivityTicket>>(Failure);
+        }
+
         public Task<IReadOnlyList<ActivityTicket>> ReadTicketsAsync(ActivityConnection connection, StructureReport structure, IReadOnlyList<long> typeIds, DateTime since, DateTime? modifiedSince, int pageSize, CancellationToken cancellationToken)
         {
             Calls++; LastTicketStructure = structure;

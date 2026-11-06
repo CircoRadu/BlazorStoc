@@ -35,6 +35,7 @@ public static class ActivityImportChecks
         Keywords(check);
         SqlScan(check);
         Wiring(check);
+        ActivityFieldSettingsChecks.Run(check);
         await ActivityImportPanelChecks.RunAsync(check);
         await ActivityKeywordsPanelChecks.RunAsync(check);
         await BeneficiaryChecksSectionChecks.RunAsync(check);

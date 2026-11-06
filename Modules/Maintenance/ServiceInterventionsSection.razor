@@ -39,10 +39,7 @@
                 <h3>Tichet ActivityApp</h3>
                 <dl class="review-facts">
                     <dt>Tichet</dt><dd>@ticket.Number @ticket.Title</dd>
-                    @if (ticket.Problem.Length > 0) { <dt>Problema</dt><dd class="review-text">@ticket.Problem</dd> }
-                    @if (ticket.Resolution.Length > 0) { <dt>Rezolvarea</dt><dd class="review-text">@ticket.Resolution</dd> }
-                    @if (ticket.Report.Length > 0 && ticket.Report != ticket.Resolution) { <dt>Raport complet</dt><dd class="review-text">@ticket.Report</dd> }
-                    @if (ticket.Executor.Length > 0) { <dt>Executant</dt><dd>@ticket.Executor</dd> }
+                    <TicketInfoRows ReportLabel="Raport complet" Problem="@ticket.Problem" Resolution="@ticket.Resolution" Report="@ticket.Report" Executor="@ticket.Executor" Extras="@ticket.Extras" />
                     <dt>Preluat la</dt><dd>@StockMovementRules.DisplayDate(DateOnly.FromDateTime(ticket.ImportedUtc.ToLocalTime()))</dd>
                 </dl>
             }

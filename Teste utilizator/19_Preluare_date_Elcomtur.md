@@ -25,3 +25,15 @@ Modul nou `Elcomtur` (branch `Elcomtur`). Balanta unui beneficiar persoana jurid
 | 14 | Opreste modulul Elcomtur (Setari -> Module) | Meniul si tabul dispar; sectiunea din beneficiar dispare; pagina spune "modul indisponibil" | |
 | 15 | Fisa unui beneficiar fara client Elcomtur (05.11.2026) | Sectiunea "Balanta Elcomtur" apare, cu antetul "Nu exista balanta importata pentru acest beneficiar" | |
 | 16 | Opreste apoi porneste modulul Elcomtur din Setari -> Module, fara sa navighezi | Intrarea "Preluare Elcomtur" din meniu dispare si reapare imediat (la fel la alte module) | |
+
+## Modificari de testat - ora verificarii zilnice (06.11.2026, versiunea 0.5.44)
+
+**Ce s-a adaugat:** Setari -> Preluare Elcomtur: lista "Ora verificarii zilnice" (00:00 - 23:00, implicit 04:00).
+**Ce face acum:** verificarea automata porneste de la ora aleasa (ora serverului), o singura data pe zi; textele din panou arata ora aleasa; schimbarea apare in Jurnal ("Ora verificarii automate: 04:00 -> 09:00").
+
+| Pas | Ce faci | Rezultat asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Deschide Setari -> Preluare Elcomtur | Lista "Ora verificarii zilnice" arata 04:00 | |
+| 2 | Alege 09:00 si salveaza | "Configurarea a fost salvata"; textul de sub butoane spune "la 09:00" | |
+| 3 | Jurnal activitate | Intrare "Configurare preluare automata Elcomtur" cu "Ora verificarii automate: 04:00 -> 09:00" | |
+| 4 | Alege o ora cu 1-2 minute dupa ora serverului, salveaza si asteapta | La acea ora apare "Ultima verificare" noua; nu se repeta in aceeasi zi | |

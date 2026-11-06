@@ -102,7 +102,7 @@ public interface IActivitySyncService
 }
 
 public sealed class MariaActivitySyncService(IConfiguration configuration, IActivityImportService import, IActivitySource source, IActivityPartnerImportService partners,
-    IActivityTicketImportService tickets, IAccessControl access, IAuditTrail audit) : IActivitySyncService
+    IActivityTicketImportService tickets, IAccessControl access, IAuditTrail audit, IActivityTicketRefreshService? refresh = null) : IActivitySyncService
 {
     private const string Run = "setari-import-activityapp.run";
     private const int SuspiciousMinimum = 20;
@@ -152,6 +152,12 @@ public sealed class MariaActivitySyncService(IConfiguration configuration, IActi
             TicketReport? ticketReport = null;
             try { ticketReport = await tickets.ApplyAsync(null, cancellationToken).ConfigureAwait(false); }
             catch (ActivityImportException exception) when (exception.Message == ActivityImportRules.NoTypesMessage) { }
+            // Tickets kept that lack what the settings of the fields now ask for are read again (a failure here never fails the synchronization: the next one tries again).
+            if (refresh is not null)
+            {
+                try { await refresh.RefreshAsync(null, cancellationToken).ConfigureAwait(false); }
+                catch (Exception exception) when (exception is ActivityImportException or ActivitySourceException or ModuleUnavailableException) { }
+            }
             var deleted = await DetectDeletedAsync(cancellationToken).ConfigureAwait(false);
             var problems = ticketReport?.Tickets.Problems ?? 0;
             var newBeneficiaries = (ticketReport?.NewBeneficiaries ?? 0) + (partnerReport?.Partners.Create ?? 0);

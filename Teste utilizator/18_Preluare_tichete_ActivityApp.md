@@ -229,3 +229,19 @@ Pasi: Notificari -> Tichete de validat -> Arata tichetele discardate -> iconita 
 |----|-----|-------------------|----------|
 | 1 | Setari -> Preluare ActivityApp -> "Citeste tipurile din ActivityApp", apoi iesi si reintra in pagina | Tipurile nefolosite apar fara sa mai apesi "Citeste" | |
 | 2 | Notificari -> notificarea "Probleme de preluare" -> Deschide obiectul | Se deschide Notificari, tabul "Probleme import" | |
+
+## Modificari de testat - informatiile din tichet (06.11.2026, versiunea 0.5.44)
+
+**Ce s-a adaugat:** Setari -> Preluare ActivityApp, sectiunea 6 "Informatiile din tichet": comutator Pornit/Oprit pe problema, rezolvare, raport original si executant (titlul si numarul sunt mereu preluate), coloana sursa, destinatia (in observatii / camp separat / ambele) si campuri suplimentare (orice coloana text din Tickete sau EvenimenteAgent, cu nume ales).
+**Ce face acum:** ce e Oprit nu se mai citeste, nu se mai scrie si nu apare in ferestrele tichetului (validare, discardate, interventie). Cand pornesti o informatie sau adaugi un camp, tichetele deja preluate care nu il au se citesc din nou din ActivityApp si se actualizeaza (copia pastrata, inregistrarea sursa si observatiile); observatiile modificate de un operator raman neatinse.
+
+| Pas | Ce faci | Rezultat asteptat | Rezultat |
+|---|---|---|---|
+| 1 | Deschide sectiunea 6 | 6 randuri; titlul si numarul au "Mereu", celelalte au comutator | |
+| 2 | Opreste "Executantul", salveaza | Dupa salvare un tichet nou nu mai are executant in observatii; fereastra tichetului nu mai arata Executant | |
+| 3 | Alege pentru "Raportul original" destinatia "Observatii si camp separat", salveaza | Tichetele noi au "Raport original: ..." in observatii | |
+| 4 | "Citeste coloanele din ActivityApp", adauga un camp suplimentar (alege coloana, scrie un nume), salveaza | Mesaj cu numarul de tichete actualizate, de inregistrari sursa rescrise si de observatii actualizate | |
+| 5 | Deschide o interventie preluata inainte | In fereastra tichetului apare campul suplimentar cu numele ales; observatiile au linia noua daca nu fusesera modificate | |
+| 6 | Modifica manual observatiile unei interventii preluate, apoi adauga alt camp suplimentar | Observatiile modificate manual raman neatinse; mesajul le numara ("modificate de operator") | |
+| 7 | Scoate campul suplimentar cu iconita de stergere, salveaza | Campul dispare din ferestre; datele ramase pe tichete nu se sterg | |
+| 8 | Journal activitate | Intrari "Modificare corespondenta campuri" si "Actualizare tichete ActivityApp preluate" cu valorile vechi/noi si numerele | |

@@ -28,7 +28,7 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
     private static SemaphoreSlim Gate => ImportStore.Gate;
 
     // Tickets: the tickets (read now or kept waiting) by id, to keep them as they are while they wait or after they are taken; NewWatermark: where the next incremental reading starts.
-    private sealed record Loaded(DateOnly Since, IReadOnlyList<string> Types, IReadOnlyList<string> Stopped, IReadOnlyList<TicketPlan> Plans, IReadOnlyDictionary<long, ActivityTicket> Tickets, DateTime? NewWatermark, int NewBeneficiaries = 0, int NewPoints = 0, int ToVerify = 0);
+    private sealed record Loaded(DateOnly Since, IReadOnlyList<string> Types, IReadOnlyList<string> Stopped, IReadOnlyList<TicketPlan> Plans, IReadOnlyDictionary<long, ActivityTicket> Tickets, DateTime? NewWatermark, int NewBeneficiaries = 0, int NewPoints = 0, int ToVerify = 0, ActivityFieldMap? Fields = null);
 
     public Task<TicketReport> SimulateAsync(CancellationToken cancellationToken = default) => ExecuteAsync(false, null, cancellationToken);
 
@@ -104,7 +104,9 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
         var since = settings.EffectiveSince(DateOnly.FromDateTime(DateTime.Now));
         // Incremental reading: only the tickets whose closing event was modified since the last successful import (with a margin of one day: a ticket is never taken twice, the map ties it); the
         // first run, and one after "Recitește tot", read everything. Tickets that wait for their beneficiary come from the table of the tickets kept, not from ActivityApp.
-        var read = await source.ReadTicketsAsync(connection, structure, [.. selected.Select(item => item.Id)], since.ToDateTime(TimeOnly.MinValue), settings.SourceWatermark?.AddDays(-1), settings.PageSize, cancellationToken).ConfigureAwait(false);
+        // What the settings switch off is not kept: the tickets are cut to what is read (and the extra fields are those of the settings).
+        var read = (await source.ReadTicketsAsync(connection, structure, [.. selected.Select(item => item.Id)], since.ToDateTime(TimeOnly.MinValue), settings.SourceWatermark?.AddDays(-1), settings.PageSize, cancellationToken).ConfigureAwait(false))
+            .Select(ticket => ActivityTicketFields.Collect(ticket, fields)).ToList();
         if (apply) await ActivityReviewStore.RemoveUnmatchedServiceAsync(configuration, cancellationToken).ConfigureAwait(false);
         var states = await ActivityTicketStore.StatesAsync(configuration, cancellationToken).ConfigureAwait(false);
         var tickets = read.ToDictionary(ticket => ticket.Id);
@@ -140,13 +142,13 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
         var keywords = new Dictionary<long, IReadOnlyList<string>>();
         if (words.Count > 0) foreach (var item in selected.Where(item => item.Destination != ActivityDestination.Maintenance)) keywords[item.Id] = words;
         var queued = states.Where(entry => entry.Value == TicketStates.PendingApproval).Select(entry => entry.Key).ToHashSet();
-        var plans = ActivityTicketPlanner.Plan([.. tickets.Values], destinations, map, locals, DateOnly.FromDateTime(DateTime.Now), keywords, ignoredPartners, waitingPartners, discarded, queued);
+        var plans = ActivityTicketPlanner.Plan([.. tickets.Values], destinations, map, locals, DateOnly.FromDateTime(DateTime.Now), keywords, ignoredPartners, waitingPartners, discarded, queued, fields);
         // The next reading starts from the latest modification seen, but not after a ticket that could not be taken for a problem (it is read again until it is solved).
         var heldBack = plans.Where(plan => plan.Action == PlanAction.Problem && tickets.TryGetValue(plan.SourceId, out var held) && held.EventModified is not null).Select(plan => tickets[plan.SourceId].EventModified!.Value).DefaultIfEmpty().Min();
         var latest = read.Where(ticket => ticket.EventModified is not null).Select(ticket => ticket.EventModified!.Value).DefaultIfEmpty().Max();
         DateTime? newWatermark = heldBack != default ? heldBack : latest != default ? latest : settings.SourceWatermark;
         if (newWatermark is not null && settings.SourceWatermark is { } previous && newWatermark < previous) newWatermark = previous;
-        return new Loaded(since, [.. selected.Select(item => $"{item.Id} {item.Name}")], stopped, plans, tickets, newWatermark, newBeneficiaries, newPoints, toVerify);
+        return new Loaded(since, [.. selected.Select(item => $"{item.Id} {item.Name}")], stopped, plans, tickets, newWatermark, newBeneficiaries, newPoints, toVerify, fields);
     }
 
     private async Task<TicketReport> ApplyPlanAsync(Loaded loaded, long runId, string actor, DateTime started, IProgress<string>? progress, CancellationToken cancellationToken)
@@ -168,7 +170,7 @@ public sealed class MariaActivityTicketImportService(IConfiguration configuratio
             // A ticket already in the queue is kept as the operator will see it: when ActivityApp changed meanwhile (the report finished after the first reading, other executors) the copy is renewed.
             if (plan.Action == PlanAction.AlreadyLinked && plan.Message == ActivityTicketPlanner.AwaitingApproval && loaded.Tickets.TryGetValue(plan.SourceId, out var current)
                 && await ActivityTicketStore.FindAsync(configuration, plan.SourceId, cancellationToken).ConfigureAwait(false) is { State: TicketStates.PendingApproval } kept
-                && ActivityTicketPlanner.HashOf(kept.Ticket) != plan.Hash)
+                && ActivityTicketPlanner.HashOf(kept.Ticket, loaded.Fields) != plan.Hash)
                 await ActivityTicketStore.SaveAsync(configuration, current, TicketStates.PendingApproval, null, cancellationToken).ConfigureAwait(false);
             if (plan.Action != PlanAction.Create) { results.Add((plan, plan.Action, plan.Message)); continue; }
             // Nothing is recorded: the ticket is kept whole and put in the queue, where an operator decides.

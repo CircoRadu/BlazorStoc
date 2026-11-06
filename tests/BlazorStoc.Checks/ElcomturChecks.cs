@@ -186,7 +186,13 @@ public static class ElcomturChecks
             "Elcomtur automatic: a file is new only when modified after the last import (compared by the second)");
         check(!ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 3, 59, 0), null) && ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 4, 0, 0), null) && ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 15, 0, 0), new DateOnly(2026, 11, 4))
             && !ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 4, 30, 0), new DateOnly(2026, 11, 5)), "Elcomtur automatic: the check is due from 04:00, once a day");
+        check(!ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 5, 59, 0), null, 6) && ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 6, 0, 0), null, 6) && !ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 23, 0, 0), new DateOnly(2026, 11, 5), 6)
+            && ElcomturAutoRules.IsDue(new DateTime(2026, 11, 5, 0, 0, 0), null, 0) && ElcomturAutoRules.HourText(4) == "04:00" && ElcomturAutoRules.HourText(23) == "23:00",
+            "Elcomtur automatic: the check is due from the hour chosen (any hour from 00:00 to 23:00), once a day");
         var input = new ElcomturAutoInput(true, @"\\nas\backup\elcomtur", "user", null, "*elcomtur*", "firma1", "X SRL", 3);
+        check(ElcomturAutoRules.Validate(input with { ScheduledHour = 0 }) is null && ElcomturAutoRules.Validate(input with { ScheduledHour = 23 }) is null && ElcomturAutoRules.Validate(input with { ScheduledHour = 24 }) == ElcomturAutoRules.HourMessage
+              && ElcomturAutoRules.Validate(input with { ScheduledHour = -1 }) == ElcomturAutoRules.HourMessage && ElcomturAutoRules.Validate(input with { Enabled = false, ScheduledHour = 30 }) == ElcomturAutoRules.HourMessage,
+            "Elcomtur automatic: the hour must be between 00:00 and 23:00 (also while the import is off)");
         check(ElcomturAutoRules.Validate(input) is null && ElcomturAutoRules.Validate(input with { Path = @"D:\Elcomtur", UserName = "" }) is null && ElcomturAutoRules.Validate(input with { Path = "relativ\\dir" }) is not null
             && ElcomturAutoRules.Validate(input with { UserName = " " }) is not null && ElcomturAutoRules.Validate(input with { Mask = "*" }) is not null && ElcomturAutoRules.Validate(input with { Mask = "a/b" }) is not null
             && ElcomturAutoRules.Validate(input with { FirmFolder = "" }) is not null && ElcomturAutoRules.Validate(input with { AlertDays = 0 }) is not null && ElcomturAutoRules.Validate(input with { Enabled = false, Path = "", Mask = "", FirmFolder = "" }) is null,
@@ -253,7 +259,7 @@ public static class ElcomturChecks
         public Task SaveAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default)
         {
             LastSaved = input;
-            Current = Current with { Enabled = input.Enabled, Path = input.Path, Mask = input.Mask, FirmFolder = input.FirmFolder, FirmName = input.FirmName, AlertDays = input.AlertDays, UserName = input.UserName, HasPassword = input.Password is not null || Current.HasPassword };
+            Current = Current with { Enabled = input.Enabled, Path = input.Path, Mask = input.Mask, FirmFolder = input.FirmFolder, FirmName = input.FirmName, AlertDays = input.AlertDays, ScheduledHour = input.ScheduledHour, UserName = input.UserName, HasPassword = input.Password is not null || Current.HasPassword };
             return Task.CompletedTask;
         }
         public Task<ElcomturAutoResult> TestAsync(ElcomturAutoInput input, CancellationToken cancellationToken = default) => Task.FromResult(new ElcomturAutoResult(true, "Conexiunea funcționează."));
@@ -298,10 +304,12 @@ public static class ElcomturChecks
         cut.Find("#elcomtur-auto-firm").Change("firma3");
         cut.Find("input[role=switch]").Change(true);
         cut.Find("#elcomtur-auto-days").Change("5");
+        check(cut.FindAll("#elcomtur-auto-hour option").Count == 24 && cut.Find("#elcomtur-auto-hour").GetAttribute("value") is null or "4" or "", "Elcomtur automatic panel: the hour of the daily check is chosen from the 24 hours of the day, 04:00 by default");
+        cut.Find("#elcomtur-auto-hour").Change("7");
         cut.Find("#elcomtur-auto-save").Click();
         cut.WaitForAssertion(() => { if (auto.LastSaved is null) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
-        check(auto.LastSaved is { Enabled: true, FirmFolder: "firma3", FirmName: "KS DIGITAL ENERGY SRL", Mask: "*elcomtur*", AlertDays: 5, UserName: "elcomtur", Password: "secret-1" } && auto.LastSaved.Path == @"\\nas\backup\elcomtur",
-            "Elcomtur automatic panel: the save sends the switch, directory, account, password, mask, the chosen firm with its name and the threshold");
+        check(auto.LastSaved is { Enabled: true, FirmFolder: "firma3", FirmName: "KS DIGITAL ENERGY SRL", Mask: "*elcomtur*", AlertDays: 5, ScheduledHour: 7, UserName: "elcomtur", Password: "secret-1" } && auto.LastSaved.Path == @"\\nas\backup\elcomtur",
+            "Elcomtur automatic panel: the save sends the switch, directory, account, password, mask, the chosen firm with its name, the threshold and the hour");
         cut.WaitForAssertion(() => { if (!cut.Find("#elcomtur-auto-password").GetAttribute("placeholder")!.Contains("salvată")) throw new Exception("pending"); }, TimeSpan.FromSeconds(5));
         check(cut.Find("#elcomtur-auto-password").GetAttribute("value") is null or "" && cut.Find("#elcomtur-auto-notice").TextContent.Contains("salvată"), "Elcomtur automatic panel: after the save the password is not shown again (only that one is saved)");
         cut.Find("#elcomtur-auto-check").Click();

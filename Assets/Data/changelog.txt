@@ -1,3 +1,10 @@
+## 0.5.44 | 06.11.2026
+- Setări, Preluare ActivityApp, secțiunea 6 „Informațiile din tichet”: pentru fiecare informație a tichetului (problema, rezolvarea, raportul original, executantul) comutator Pornit/Oprit, coloana din care se citește și destinația (în observații, câmp separat sau ambele). Titlul și numărul se preiau mereu. O informație oprită nu se mai citește, nu se mai scrie și nu apare în ferestrele tichetului.
+- Câmpuri suplimentare: orice coloană cu text din tabelele Tickete sau EvenimenteAgent, cu numele ales de administrator; apar în ferestrele tichetului (validare, discardate, intervenție) și, după destinație, în observații.
+- Când se pornește o informație sau se adaugă un câmp, tichetele deja preluate care nu îl au se citesc din nou din ActivityApp (la salvare, la butonul „Actualizează tichetele preluate” sau la următoarea sincronizare): se actualizează copia păstrată, înregistrarea sursă a intervenției și observațiile, dar observațiile modificate de un operator rămân neatinse. Jurnal: „Actualizare tichete ActivityApp preluate”. Schimbare de schemă 65.
+- Setări, Preluare Elcomtur: ora verificării zilnice se alege acum din setări (00:00–23:00, implicit 04:00); verificarea pornește de la ora aleasă, o dată pe zi. Schimbarea orei apare în jurnal. Schimbare de schemă 66.
+- Setări: cardurile „Preluare ActivityApp” și „Preluare Elcomtur” se numesc acum „Preluare date ActivityApp” și „Preluare date Elcomtur”, ca „Preluare date ANAF”.
+
 ## 0.5.43 | 06.11.2026
 - Setări, Bază de date, card nou „HTTPS prin proxy”: comutator (implicit Oprit) și lista IP-urilor proxy-ului (de exemplu nginx), salvate cu parola de administrator. Pornit: se acceptă antetele X-Forwarded-For/Proto doar de la proxy-urile listate, cookie-ul de sesiune devine Secure, se trimite HSTS, iar accesul direct pe HTTP din rețea primește un mesaj clar (monitorizarea /health și accesul local rămân permise). Oprit: aplicația rămâne pe HTTP ca până acum.
 - Antete de securitate pe toate răspunsurile: nosniff, X-Frame-Options, frame-ancestors și Referrer-Policy.
