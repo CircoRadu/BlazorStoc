@@ -935,7 +935,8 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (61,'Coordonatele GPS ale evenimentului de rezolvare al unui tichet ActivityApp: activity_import_tickets.gps','afc2e69fefc77a36801c7ad29e2e203c93a3ac26bd4da7dc2b37fcb4ee8ec9b7','applied','2026-11-04 13:11:00','0.5.37'),
 (62,'Balantele de plata din Elcomtur pe beneficiar (elcomtur_balances) si facturile lor neachitate (elcomtur_invoices)','cb2649052d51c173d931f9233088f194ccd9719815e5adc13c394934e7de124e','applied','2026-11-04 13:11:00','0.5.37'),
 (63,'Lista tipurilor de tichete citita din ActivityApp se pastreaza (activity_import_settings.known_types)','14ea226bd3cc99901dc54c847eab07e5eede2d8f49fd7fb5eb58bfc1a6b0cf8b','applied','2026-11-05 09:21:38','0.5.40'),
-(64,'Preluarea automata a backup-ului Elcomtur de pe un director (NAS): setari si rezultatul ultimei verificari (elcomtur_auto_settings)','ffbf9952023b6c424d220671bcea682984a3ecf40771ffc313b7d44c7c1381b9','applied','2026-11-05 11:53:01','0.5.41');
+(64,'Preluarea automata a backup-ului Elcomtur de pe un director (NAS): setari si rezultatul ultimei verificari (elcomtur_auto_settings)','ffbf9952023b6c424d220671bcea682984a3ecf40771ffc313b7d44c7c1381b9','applied','2026-11-05 11:53:01','0.5.41'),
+(65,'Campurile tichetelor ActivityApp: ce s-a citit pentru fiecare tichet (fields_read), campurile suplimentare (extras) si unde au intrat in observatii (notes_items)','a1fde9af25a3ee44c929d78aa3ebd5c342380db03356fe45840c3912c7a0454d','applied','2026-11-06 09:11:30','0.5.44');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
