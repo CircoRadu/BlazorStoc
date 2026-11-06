@@ -339,6 +339,17 @@ if (args.Contains("--create-administrator"))
         return BlazorStoc.Services.AdministratorBootstrap.Failed;
     }
 }
+// "--reset-authenticator <user>": the way back when no administrator can sign in with a code (lost phone). Runs on the server, needs access to its system, removes the authenticator of the
+// account (the administrator of the configuration is "admin" or its configured name) and leaves a journal entry made by the system.
+if (args.Contains("--reset-authenticator"))
+{
+    try { return await BlazorStoc.Services.AuthenticatorReset.RunAsync(app.Services, app.Configuration, args, Console.Out); }
+    catch (Exception exception)
+    {
+        app.Logger.LogError("The authenticator was not reset ({ErrorType}): {Message}", exception.GetType().Name, exception.Message);
+        return 1;
+    }
+}
 app.Run();
 return 0;
 public partial class Program { }

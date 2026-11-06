@@ -277,6 +277,16 @@ public static class AuditActions
     public const string ResetDatabaseConnection = "Resetare conexiune bază de date la configurația de bază";
     public const string SetAppPort = "Modificare port aplicație";
     public const string SetReverseProxy = "Modificare HTTPS prin proxy";
+    public const string SetAccessSecurity = "Modificare securitate acces extern";
+    public const string ProvisionTwoFactor = "Asociere autentificator";
+    public const string ConfirmTwoFactor = "Confirmare autentificator";
+    public const string RevokeTwoFactor = "Revocare autentificator";
+    public const string SuspendTwoFactor = "Suspendare autentificator";
+    public const string ResumeTwoFactor = "Reactivare autentificator";
+    public const string DeleteTwoFactor = "Ștergere autentificator";
+    public const string ReplaceTwoFactor = "Înlocuire autentificator";
+    public const string RegenerateRecoveryCodes = "Regenerare coduri de recuperare";
+    public const string UnlockTwoFactor = "Deblocare autentificator";
     public const string RefreshActivityTickets = "Actualizare tichete ActivityApp preluate";
     public const string ViewActivityTicketSample = "Vizualizare tichet exemplu ActivityApp";
     public const string ConfirmActivityTicketStructure = "Confirmare structură tichete ActivityApp";
@@ -782,12 +792,11 @@ public static class AuditRecorder
     }
 
     public static Task RecordSessionAsync(IAuditTrail? trail, string actorUsername, string actorRole,
-        bool connected, CancellationToken cancellationToken, string? address = null, int? rememberedDays = null) => trail is null
+        bool connected, CancellationToken cancellationToken, string? address = null) => trail is null
         ? Task.CompletedTask
         : trail.RecordAsync(new(actorUsername, actorRole, AuditEntities.User,
             connected ? AuditActions.Login : AuditActions.Logout, actorUsername,
-            (connected ? "Sesiune autentificată" : "Sesiune încheiată") + (string.IsNullOrEmpty(address) ? "" : " · IP " + address) +
-            (rememberedDays is > 0 ? $" · păstrat autentificat {rememberedDays} zile" : ""),
+            (connected ? "Sesiune autentificată" : "Sesiune încheiată") + (string.IsNullOrEmpty(address) ? "" : " · IP " + address),
             string.Empty, string.Empty), cancellationToken);
 
     // A refused sign-in: the actor and the target are the user name typed (cleaned and cut), the reason and the address are in the details. The password is never passed here.

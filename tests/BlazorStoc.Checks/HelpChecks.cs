@@ -350,7 +350,7 @@ public static class HelpChecks
     private static readonly HashSet<string> DialogFilesWithoutHelp = new(StringComparer.OrdinalIgnoreCase)
     {
         "MainLayout.razor", "AdminOperationDialog.razor", "DeleteConfirmationDialog.razor", "SaveConfirmationDialog.razor", "UnsavedChangesDialog.razor", "RestoreConfirmationDialog.razor", "ForceUnlockDialog.razor",
-        "ParameterValueEditDialog.razor", "BackupSettingsPanel.razor", "ProjectComponentsSection.razor",
+        "ParameterValueEditDialog.razor", "BackupSettingsPanel.razor", "AccessSecurityPanel.razor", "AuthenticatorActions.razor", "ProjectComponentsSection.razor",
         "Home.razor", "Beneficiaries.razor", "Suppliers.razor", "Vehicles.razor", "InvoiceTemplatesList.razor", "OfferPickup.razor",
         // The editors of the beneficiary page open in a window made here around forms that have their own help button; the file panel has a delete confirmation and a plain file preview.
         "EntityFilePreview.razor", "BeneficiaryDetail.razor", "ServiceContractsSection.razor", "ServiceInterventionsSection.razor", "RiskAnalysesSection.razor", "EntityFilesPanel.razor",

@@ -11,56 +11,125 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace BlazorStoc.Pages.Account;
 [AllowAnonymous]
 public class LoginModel(IConfiguration configuration, IUserAuthenticator authenticator, IAuditTrail auditTrail,
-    ILogger<LoginModel> logger) : PageModel
+    ILogger<LoginModel> logger, ITwoFactorStore twoFactor) : PageModel
 {
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
-    // "Păstrează-mă autentificat": the cookie outlives the browser and lasts RememberDays; without it the session cookie ends with the browser (and after 8 hours).
-    [BindProperty] public bool RememberMe { get; set; }
-    public const int RememberDays = 30;
+    // The code of the authenticator application (or a recovery code): asked on this same page, together with the user and the password, when the settings require it for this visitor
+    // (Setari -> Autentificare). All three are checked together and a refusal never says which of them was wrong.
+    [BindProperty] public string Code { get; set; } = "";
+    public bool CodeRequired { get; private set; }
+    // There is no "stay signed in": the session cookie ends with the browser (and after 8 hours), and every sign-out means a full sign-in again.
     [BindProperty(SupportsGet = true)] public string? ReturnUrl { get; set; }
     public string? Error { get; private set; }
 
     [BindProperty(SupportsGet = true)] public string? Reason { get; set; }
 
+    // Wrong attempts per typed user name (whether or not the name exists, so a lock tells nothing about the accounts): 5 wrong attempts lock the name for 10 minutes, doubling at every lock.
+    private static readonly FailureThrottle<string> Attempts = new();
+
     public IActionResult OnGet()
     {
         if (User.Identity?.IsAuthenticated == true) return LocalRedirect("/");
+        CodeRequired = AccessSecurityRules.IsCodeRequired(configuration, HttpContext.Connection.RemoteIpAddress);
         if (Reason == "inchisa") Error = LoginMessages.SessionClosed;
         return Page();
     }
 
-    public async Task<IActionResult> OnPostAsync()
+    private enum PasswordStatus { Ok, Wrong, Inactive, DatabaseDown, Fault }
+    private sealed record PasswordOutcome(PasswordStatus Status, string? Username = null, string? DisplayName = null, string? Role = null, int? UserId = null, string Reason = "utilizator sau parolă incorecte");
+
+    // The first factor: the administrator of the configuration, then the accounts of the database. A wrong password for the configured administrator is rejected without querying SQL.
+    private async Task<PasswordOutcome> CheckPasswordAsync()
     {
         var expected = configuration["Authentication:Password"];
         var configuredUsername = configuration["Authentication:Username"] ?? "admin";
         if (!string.IsNullOrEmpty(expected) && string.Equals(Username, configuredUsername, StringComparison.Ordinal) &&
             CryptographicOperations.FixedTimeEquals(SHA256.HashData(Encoding.UTF8.GetBytes(Password ?? "")), SHA256.HashData(Encoding.UTF8.GetBytes(expected))))
-        {
-            return await SignInAsync(configuredUsername, "Administrator configurat", AccessRoles.Administrator, null);
-        }
-        // A wrong password for the configured administrator is rejected without querying SQL.
-        if (string.Equals(Username, configuredUsername, StringComparison.Ordinal)) return await RefusedAsync("parolă greșită");
+            return new(PasswordStatus.Ok, configuredUsername, "Administrator configurat", AccessRoles.Administrator, null);
+        if (string.Equals(Username, configuredUsername, StringComparison.Ordinal)) return new(PasswordStatus.Wrong, Reason: "parolă greșită");
         try
         {
             var result = await authenticator.AuthenticateAsync(Username, Password ?? "", HttpContext.RequestAborted);
-            if (result.Status == AuthenticationStatus.Inactive) return await RefusedAsync("cont inactiv", "Contul este inactiv. Contactează administratorul pentru reactivare.");
+            if (result.Status == AuthenticationStatus.Inactive) return new(PasswordStatus.Inactive, Reason: "cont inactiv");
             if (result.Status == AuthenticationStatus.Success && result.User is not null)
-                return await SignInAsync(result.User.Username, result.User.DisplayName, result.User.Role, result.User.Id);
+                return new(PasswordStatus.Ok, result.User.Username, result.User.DisplayName, result.User.Role, result.User.Id);
         }
         catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
             logger.LogError("Database user authentication failed ({ErrorType}).", exception.GetType().Name);
             // A database that does not answer (or a backup/restore that holds it) is not a wrong password: say so, so nobody keeps retyping credentials.
-            if (LoginMessages.IsDatabaseUnavailable(exception)) return InvalidLogin(LoginMessages.DatabaseUnavailable);
-            return InvalidLogin();   // an unexpected fault is not a refused sign-in: nothing to journal
+            return new(LoginMessages.IsDatabaseUnavailable(exception) ? PasswordStatus.DatabaseDown : PasswordStatus.Fault);
         }
-        return await RefusedAsync("utilizator sau parolă incorecte");
+        return new(PasswordStatus.Wrong);
+    }
+
+    public async Task<IActionResult> OnPostAsync()
+    {
+        var address = HttpContext.Connection.RemoteIpAddress;
+        CodeRequired = AccessSecurityRules.IsCodeRequired(configuration, address);
+        var key = (Username ?? "").Trim().ToUpperInvariant();
+        if (CodeRequired && Attempts.LockedUntil(key) is { } until)
+        {
+            await JournalRefusalAsync("autentificare blocată după prea multe încercări");
+            return InvalidLogin(LoginMessages.TooManyAttempts((int)Math.Ceiling((until - DateTimeOffset.UtcNow).TotalMinutes)));
+        }
+        var outcome = await CheckPasswordAsync();
+        if (outcome.Status == PasswordStatus.DatabaseDown) return InvalidLogin(LoginMessages.DatabaseUnavailable);
+        if (outcome.Status == PasswordStatus.Fault) return InvalidLogin();   // an unexpected fault is not a refused sign-in: nothing to journal
+
+        if (!CodeRequired)
+        {
+            if (outcome.Status == PasswordStatus.Inactive) return await RefusedAsync(outcome.Reason, "Contul este inactiv. Contactează administratorul pentru reactivare.");
+            if (outcome.Status != PasswordStatus.Ok) return await RefusedAsync(outcome.Reason);
+            return await SignInAsync(outcome);
+        }
+
+        // Password and code are always both checked, so the time of the answer tells nothing; the code of an account is only spent when the password was right.
+        string? failure;
+        if (outcome.Status == PasswordStatus.Ok)
+        {
+            TwoFactorCheck check;
+            try { check = await twoFactor.VerifyAsync(outcome.UserId ?? 0, Code ?? "", AuditRecorder.FormatAddress(address), HttpContext.RequestAborted); }
+            catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested) { throw; }
+            catch (Exception exception)
+            {
+                logger.LogError("Authenticator code could not be checked ({ErrorType}).", exception.GetType().Name);
+                return InvalidLogin(LoginMessages.IsDatabaseUnavailable(exception) ? LoginMessages.DatabaseUnavailable : LoginMessages.WrongCredentialsOrCode);
+            }
+            failure = check switch
+            {
+                TwoFactorCheck.Valid or TwoFactorCheck.ValidRecoveryCode => null,
+                TwoFactorCheck.NotEnrolled => "fără autentificator înrolat",
+                TwoFactorCheck.Suspended => "autentificator suspendat",
+                TwoFactorCheck.LockedOut => "autentificatorul este blocat după prea multe coduri greșite",
+                _ => "cod de autentificator greșit"
+            };
+            if (check == TwoFactorCheck.ValidRecoveryCode) logger.LogInformation("A recovery code was used to sign in.");
+        }
+        else
+        {
+            for (var i = 0; i < 3; i++) Totp.Compute(new byte[Totp.SecretBytes], i);   // the work of a code check, so a wrong password costs the same time
+            failure = outcome.Reason;
+        }
+        if (failure is null)
+        {
+            Attempts.Clear(key);
+            return await SignInAsync(outcome);
+        }
+        Attempts.Fail(key);
+        return await RefusedAsync(failure, LoginMessages.WrongCredentialsOrCode);
     }
 
     // A refused sign-in is journaled (user name typed, reason, address; never the password); a journal that cannot be written must not change what the user sees.
     private async Task<IActionResult> RefusedAsync(string reason, string message = LoginMessages.WrongCredentials)
+    {
+        await JournalRefusalAsync(reason);
+        return InvalidLogin(message);
+    }
+
+    private async Task JournalRefusalAsync(string reason)
     {
         try
         {
@@ -69,28 +138,22 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         }
         catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested) { throw; }
         catch (Exception exception) { logger.LogWarning("Failed sign-in could not be journaled ({ErrorType}).", exception.GetType().Name); }
-        return InvalidLogin(message);
     }
 
-    private async Task<IActionResult> SignInAsync(string username, string displayName, string role, int? userId)
+    private async Task<IActionResult> SignInAsync(PasswordOutcome user)
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Name, username),
-            new(ClaimTypes.GivenName, displayName),
-            new(ClaimTypes.Role, role)
+            new(ClaimTypes.Name, user.Username!),
+            new(ClaimTypes.GivenName, user.DisplayName!),
+            new(ClaimTypes.Role, user.Role!)
         };
-        if (userId is not null) claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.Value.ToString()));
+        if (user.UserId is not null) claims.Add(new Claim(ClaimTypes.NameIdentifier, user.UserId.Value.ToString()));
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var properties = new AuthenticationProperties();
-        if (RememberMe)
-        {
-            properties.IsPersistent = true;
-            properties.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(RememberDays);
-        }
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);
-        await AuditRecorder.RecordSessionAsync(auditTrail, username, role, true, HttpContext.RequestAborted,
-            AuditRecorder.FormatAddress(HttpContext.Connection.RemoteIpAddress), RememberMe ? RememberDays : null);
+        await AuditRecorder.RecordSessionAsync(auditTrail, user.Username!, user.Role!, true, HttpContext.RequestAborted,
+            AuditRecorder.FormatAddress(HttpContext.Connection.RemoteIpAddress));
         return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/");
     }
 

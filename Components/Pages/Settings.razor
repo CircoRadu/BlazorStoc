@@ -123,6 +123,10 @@
             }
         </div>
     }
+    else if (activeTab == AuthTab && allowedTabs.Contains(AuthTab))
+    {
+        <div role="tabpanel" id="panel-@AuthTab" aria-labelledby="tab-@AuthTab" class="settings-body"><AccessSecurityPanel /></div>
+    }
     else if (activeTab == MapTab && allowedTabs.Contains(MapTab))
     {
         <div role="tabpanel" id="panel-@MapTab" aria-labelledby="tab-@MapTab" class="settings-body">
@@ -196,6 +200,7 @@
     private const string CatalogTab = "catalog";
     // The Administrator role (every administrator, also the one configured in the private file) sees this tab; it is not a key of the catalog.
     private const string DatabaseTab = "baza-de-date";
+    private const string AuthTab = "autentificare";
     private const string DatabaseStatusSubtab = "stare";
     private const string DatabaseConnectionSubtab = "conexiune";
     private static readonly (string Id, string Title)[] DatabaseSubtabs = [(DatabaseStatusSubtab, "Stare"), (DatabaseConnectionSubtab, "Conexiune")];
@@ -220,7 +225,7 @@
     private const string BackupTimeSubtab = "backup-time";
     private static readonly (string Id, string Title)[] BackupSubtabs = [(BackupMainSubtab, "Backup și restaurare"), (NasTab, "Backup NAS"), (BackupTimeSubtab, "Verificare oră")];
     private string backupSubtab = BackupMainSubtab;
-    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (DatabaseTab, "Bază de date")];
+    private static readonly (string Id, string Title)[] Tabs = [(AnafTab, "Preluare date ANAF"), (ActivityImportTab, "Preluare date ActivityApp"), (ElcomturTab, "Preluare date Elcomtur"), (NotificationsTab, "Notificări"), (MapTab, "Hartă"), (InvoicesTab, "Facturi"), (BackupTab, "Backup"), (JournalTab, "Jurnal activitate"), (CatalogTab, "Catalog"), (ModulesTab, "Module"), (UpdateTab, "Actualizare"), (UsersTab, "Utilizatori"), (AuthTab, "Autentificare"), (DatabaseTab, "Bază de date")];
     // The key that opens each tab (what the user type of the signed-in user allows).
     private static readonly Dictionary<string, string> TabKeys = new()
     {
@@ -247,6 +252,7 @@
         UpdateTab => "↻",
         UsersTab => "♙",
         DatabaseTab => "▥",
+        AuthTab => "⚿",
         _ => "☰"
     };
 
@@ -265,6 +271,7 @@
         UpdateTab => "Versiunea aplicației, pachetele de actualizare și istoricul lor.",
         UsersTab => "Conturile utilizatorilor și drepturile fiecărui tip de utilizator.",
         DatabaseTab => "Starea serverului bazei de date și conexiunea aplicației la el.",
+        AuthTab => "Autentificarea în doi pași din exterior, rețeaua internă și autentificatoarele înrolate.",
         _ => ""
     };
 
@@ -287,7 +294,7 @@
         Navigation.LocationChanged += OnLocationChanged;
         // The Database tab depends only on the Administrator role (from the sign-in cookie, no database involved): it must open when the database is down,
         // because it is where the connection is fixed. A key that cannot be read (the database does not answer) only hides its own tab.
-        if (await Access.IsAdministratorAsync()) { allowedTabs.Add(DatabaseTab); allowedTabs.Add(CatalogTab); }
+        if (await Access.IsAdministratorAsync()) { allowedTabs.Add(DatabaseTab); allowedTabs.Add(CatalogTab); allowedTabs.Add(AuthTab); }
         foreach (var (tab, key) in TabKeys)
         {
             try { if (await Access.HasAsync(key)) allowedTabs.Add(tab); }

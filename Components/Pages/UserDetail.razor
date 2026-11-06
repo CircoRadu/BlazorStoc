@@ -4,6 +4,7 @@
 @using BlazorStoc.Services
 @inject IUserRepository Repository
 @inject IAccessControl Access
+@inject IAccessSecuritySettingsService Authenticators
 @inject ILogger<UserDetail> Logger
 @inject IChangeFeed ChangeFeed
 @inject ChangeOrigin Origin
@@ -46,6 +47,28 @@ else
         </dl>
         <p class="muted">Parola nu este afișată și nu poate fi recuperată.</p>
     </section>
+    @if (authRow is not null)
+    {
+        <section class="movement-card" aria-labelledby="user-auth-title">
+            <h2 id="user-auth-title">Autentificator</h2>
+            <dl class="movement-facts">
+                <dt>Stare</dt><dd>@AuthState(authRow)</dd>
+                @if (authRow.Status.Confirmed)
+                {
+                    <dt>Confirmat</dt><dd>@Local(authRow.Status.ConfirmedUtc)@(authRow.Status.ConfirmedBy is null ? "" : " · de " + authRow.Status.ConfirmedBy)</dd>
+                    <dt>Ultima folosire</dt><dd>@(authRow.Status.LastUsedUtc is null ? "încă nefolosit" : Local(authRow.Status.LastUsedUtc) + (authRow.Status.LastUsedIp is null ? "" : " · IP " + authRow.Status.LastUsedIp))</dd>
+                    <dt>Coduri de recuperare rămase</dt><dd>@authRow.Status.RecoveryLeft</dd>
+                }
+            </dl>
+            @if (authRow.Status.Suspended && authRow.AccountActive)
+            {
+                <p class="muted">Contul a fost reactivat, dar autentificatorul rămâne suspendat până alegi: <strong>Reactivează</strong> (același telefon) sau <strong>Revocă</strong> și asociază altul.</p>
+            }
+            @if (!authRow.AccountActive) { <p class="muted">Cât timp contul este inactiv, autentificatorul rămâne suspendat și nu poate fi folosit.</p> }
+            <AuthenticatorActions Row="authRow" Icons="false" Changed="ReloadAuthenticatorAsync" Notice="SetAuthNotice" />
+            @if (authNotice is not null) { <div class="success-banner" role="status">@authNotice</div> }
+        </section>
+    }
 }
 
 </PageBoundary>
@@ -54,7 +77,8 @@ else
     [Parameter] public int Id { get; set; }
     private WebUser? user;
     private bool loading = true, editing, canEdit;
-    private string? error, notice;
+    private string? error, notice, authNotice;
+    private AuthenticatorRow? authRow;
     private Guid editorKey;
     private readonly CancellationTokenSource lifetime = new();
 
@@ -82,6 +106,7 @@ else
             canEdit = await Access.HasAsync(Permissions.Key("utilizatori", Permissions.Edit), lifetime.Token);
             var users = await Repository.GetUsersAsync(lifetime.Token);
             user = users.FirstOrDefault(item => item.Id == Id);
+            await LoadAuthenticatorAsync();
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (AccessDeniedException exception) { user = null; error = exception.Message; }
@@ -93,6 +118,27 @@ else
         finally { loading = false; }
     }
 
+    // The authenticator card is only for administrators (it is the administrator who associates, revokes and resumes it).
+    private async Task LoadAuthenticatorAsync()
+    {
+        try { authRow = await Authenticators.GetAsync(Id, lifetime.Token); }
+        catch (AccessDeniedException) { authRow = null; }
+        catch (Exception exception) when (exception is not OperationCanceledException) { Logger.LogError("Authenticator state loading failed ({ErrorType}).", exception.GetType().Name); authRow = null; }
+    }
+
+    private async Task ReloadAuthenticatorAsync() { await LoadAuthenticatorAsync(); StateHasChanged(); }
+    private Task SetAuthNotice(string text) { authNotice = text; return Task.CompletedTask; }
+
+    private static string AuthState(AuthenticatorRow row) =>
+        row.Status.LockedUntil is { } until ? $"Blocat până la {until.ToLocalTime():HH:mm} (prea multe coduri greșite)"
+        : !row.Status.Exists ? "Neînrolat"
+        : !row.Status.Confirmed ? "În așteptare (asocierea nu a fost confirmată)"
+        : row.Status.Suspended ? "Suspendat"
+        : "Activ";
+
+    private static string Local(string? utc) =>
+        DateTime.TryParse(utc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var value) ? value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—";
+
     // Arriving on this page only shows the account; editing starts from the explicit "Editează" action.
     private Task OpenEditorAsync() { editing = true; editorKey = Guid.NewGuid(); notice = null; return Task.CompletedTask; }
     private Task CloseEditorAsync() { editing = false; return Task.CompletedTask; }
@@ -101,7 +147,7 @@ else
         user = saved;
         editing = false;
         notice = "Utilizatorul a fost actualizat.";
-        return Task.CompletedTask;
+        return LoadAuthenticatorAsync();
     }
 
     public void Dispose() { live?.Dispose(); lifetime.Cancel(); lifetime.Dispose(); }

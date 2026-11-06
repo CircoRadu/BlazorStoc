@@ -1,0 +1,146 @@
+@using BlazorStoc.Services
+@inject IAccessSecuritySettingsService Settings
+@inject IHttpContextAccessor HttpAccessor
+@inject ILogger<AccessSecurityPanel> Logger
+@implements IDisposable
+@* Setari -> Autentificare: when the code of an authenticator application is needed at sign-in (never / only outside the internal network / always), which addresses are the internal
+   network, and the authenticators of the accounts (the administrator associates them, sees their state and can revoke, unlock or give new recovery codes). *@
+
+<section class="catalog access-security">
+    <div class="catalog-heading"><h2>Cod din aplicația de autentificare</h2><small>Utilizator, parolă și cod se scriu pe aceeași pagină; un refuz nu spune care dintre ele a fost greșită.</small></div>
+    <div class="catalog-body">
+    @if (loading) { <div class="empty-state" role="status"><div class="spinner"></div><h3>Se încarcă</h3></div> }
+    else
+    {
+        @if (error is not null) { <div class="error-banner" role="alert">@error</div> }
+        @if (notice is not null) { <div class="success-banner" role="status">@notice</div> }
+        <div class="anaf-grid">
+            <label>Când se cere codul
+                <select id="two-factor-mode" @bind="mode">
+                    <option value="@TwoFactorMode.Off">Niciodată (doar utilizator și parolă)</option>
+                    <option value="@TwoFactorMode.External">Doar din exterior (rețeaua internă intră cu parolă)</option>
+                    <option value="@TwoFactorMode.Everyone">Pentru toți, din orice rețea</option>
+                </select>
+            </label>
+            <label>Rețeaua internă (unul pe rând, sau separate prin virgulă; adrese sau rețele, de exemplu 192.168.1.0/24)
+                <textarea id="internal-networks" rows="4" @bind="networks" @bind:event="oninput" autocomplete="off" placeholder="@string.Join(", ", AccessSecurityRules.DefaultNetworks)"></textarea>
+            </label>
+        </div>
+        <p class="muted"><small>Rețeaua internă contează doar la „Doar din exterior”. Lăsată goală, este formată din adresele private (10.x.x.x, 172.16-31.x.x, 192.168.x.x) și calculatorul însuși. Adresa vizitatorului se citește din conexiune; cu HTTPS prin proxy se folosește adresa trimisă de proxy-ul de încredere, deci fără proxy configurat toți vizitatorii ar apărea cu adresa proxy-ului.</small></p>
+        <p class="muted"><small>Adresa ta acum: <strong>@(clientAddress ?? "necunoscută")</strong> — @(onServer ? "pe server (localhost)" : clientInternal ? "rețea internă" : "exterior").</small></p>
+        <p class="muted"><small>Un cont fără autentificator confirmat nu poate intra când se cere codul. Autentificatorul îl asociază administratorul (mai jos sau pe pagina utilizatorului); pentru conturile de administrator asocierea, revocarea și celelalte modificări se fac doar de pe server (localhost). Dacă niciun administrator nu mai poate intra, pe server rulează <code>BlazorStoc.dll --reset-authenticator nume</code>.</small></p>
+        <div class="editor-actions">
+            <button type="button" class="primary" disabled="@busy" @onclick="Ask">Salvează</button>
+        </div>
+
+        <h3>Autentificatoare <span class="count-badge">@rows.Count</span></h3>
+        <div class="table-scroll">
+            <Paged Items="rows" Id="access-security-rows" Context="pageRows">
+                <table class="data-table">
+                    <thead><tr><th>Utilizator</th><th>Rol</th><th>Autentificator</th><th>Confirmat</th><th>Ultima folosire</th><th>Coduri recuperare</th><th class="row-actions-head">Operații</th></tr></thead>
+                    <tbody>
+                    @foreach (var row in pageRows)
+                    {
+                        <tr>
+                            <td>@row.Username @if (!row.AccountActive) { <small class="muted">(cont inactiv)</small> }</td>
+                            <td>@(row.IsAdministrator ? "Administrator" : "Utilizator")</td>
+                            <td>@StatusText(row)</td>
+                            <td>@(row.Status.Confirmed ? Show(row.Status.ConfirmedUtc) + (row.Status.ConfirmedBy is null ? "" : " · de " + row.Status.ConfirmedBy) : "—")</td>
+                            <td>@(row.Status.LastUsedUtc is null ? "—" : Show(row.Status.LastUsedUtc) + (row.Status.LastUsedIp is null ? "" : " · IP " + row.Status.LastUsedIp))</td>
+                            <td>@(row.Status.Confirmed ? row.Status.RecoveryLeft.ToString() : "—")</td>
+                            <td class="row-actions"><AuthenticatorActions Row="row" Icons="true" Changed="ReloadAsync" Notice="SetNotice" /></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </Paged>
+        </div>
+    }
+    </div>
+</section>
+@if (asking)
+{
+    <AdminOperationDialog Title="Salvează setările de autentificare" Intro="Setările se aplică de la următoarea autentificare."
+                          ConfirmText="Salvează" Busy="busy" BusyText="Se salvează…" Error="@dialogError"
+                          @bind-AdminPassword="adminPassword" Confirmed="ConfirmAsync" Cancelled="Cancel" />
+}
+
+@code {
+    private readonly CancellationTokenSource lifetime = new();
+    private bool loading = true, busy, asking, clientInternal, onServer;
+    private string? error, notice, dialogError, clientAddress;
+    private string adminPassword = "", networks = "";
+    private TwoFactorMode mode;
+    private List<AuthenticatorRow> rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var options = await Settings.GetAsync(lifetime.Token);
+            mode = options.Mode; networks = string.Join(Environment.NewLine, options.InternalNetworks);
+            var context = HttpAccessor.HttpContext;
+            var address = context?.Connection.RemoteIpAddress;
+            clientAddress = address is null ? null : AuditRecorder.FormatAddress(address);
+            clientInternal = AccessSecurityRules.IsInternal(address, options);
+            onServer = AccessSecurityRules.IsServerLocal(address, context?.Request.Headers);
+            await ReloadAsync();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AccessDeniedException ex) { error = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Access security settings loading failed ({ErrorType}).", ex.GetType().Name); error = "Setările nu au putut fi încărcate."; }
+        finally { loading = false; }
+    }
+
+    private async Task ReloadAsync()
+    {
+        try { rows = [.. await Settings.GetOverviewAsync(lifetime.Token)]; StateHasChanged(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is not OperationCanceledException) { Logger.LogError("Authenticator list loading failed ({ErrorType}).", ex.GetType().Name); error = "Lista autentificatoarelor nu a putut fi încărcată."; }
+    }
+
+    private Task SetNotice(string text) { notice = text; error = null; return Task.CompletedTask; }
+
+    private static string StatusText(AuthenticatorRow row) =>
+        row.Status.LockedUntil is { } until ? $"Blocat până la {until.ToLocalTime():HH:mm}"
+        : !row.Status.Exists ? "Neînrolat"
+        : !row.Status.Confirmed ? "În așteptare (neconfirmat)"
+        : row.Status.Suspended ? (row.AccountActive ? "Suspendat (cont reactivat: alege)" : "Suspendat (cont inactiv)")
+        : "Activ";
+
+    private static string Show(string? utc) =>
+        DateTime.TryParse(utc, null, System.Globalization.DateTimeStyles.RoundtripKind, out var value) ? value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—";
+
+    private void Ask()
+    {
+        if (busy) return;
+        notice = null; error = null;
+        var list = ReverseProxyRules.Parse(networks, out var problem);
+        if (problem is not null) { error = problem; return; }
+        if (AccessSecurityRules.Validate(new(mode, list)) is { } invalid) { error = invalid; return; }
+        adminPassword = ""; dialogError = null; asking = true;
+    }
+
+    private void Cancel() { asking = false; adminPassword = ""; dialogError = null; }
+
+    private async Task ConfirmAsync()
+    {
+        if (busy) return;
+        busy = true; dialogError = null;
+        try
+        {
+            var list = ReverseProxyRules.Parse(networks, out _);
+            var result = await Settings.SaveAsync(new(mode, list), adminPassword, lifetime.Token);
+            if (!result.Success) { dialogError = result.Message; return; }
+            notice = result.Message;
+            clientInternal = AccessSecurityRules.IsInternal(HttpAccessor.HttpContext?.Connection.RemoteIpAddress, new(mode, list));
+            Cancel();
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is DatabaseSettingsException or AccessDeniedException) { dialogError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Access security settings saving failed ({ErrorType}).", ex.GetType().Name); dialogError = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

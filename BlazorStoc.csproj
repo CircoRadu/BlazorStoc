@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- The version of the application as a whole (shown in Setari -> Module and in /health); tools
 elease.ps1 sets it for a release. -->
-    <Version>0.5.45</Version>
+    <Version>0.5.46</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**;keys/**;keys-test/**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -21,6 +21,7 @@ elease.ps1 sets it for a release. -->
   <ItemGroup>
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
+    <PackageReference Include="QRCoder" Version="1.8.1" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="9.0.10" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
     <PackageReference Include="PDFsharp" Version="6.2.1" />

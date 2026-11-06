@@ -146,6 +146,8 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                 if (passwordHash is not null) command.Parameters.AddWithValue("@passwordHash", passwordHash);
                 if (await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
                     throw new UserOperationException("Utilizatorul s-a schimbat între timp. Actualizează lista.");
+                // A deactivated account suspends its authenticator (kept, unusable); when the account is active again the administrator chooses to resume or revoke it.
+                if (original.IsActive && !value.IsActive) await TwoFactorSql.SuspendForUserAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
                 return new WebUser(original.Id, value.Username, value.DisplayName, type.Role, value.IsActive, version, type.Id, type.Name);
             }, cancellationToken).ConfigureAwait(false);
             var target = $"#{updated.Id} · {updated.Username}";
@@ -189,6 +191,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                     throw new UserOperationException("Sistemul trebuie să păstreze cel puțin un administrator activ.");
                 await MariaArchivePersistence.InsertAsync(connection, transaction, operation, [], token)
                     .ConfigureAwait(false);
+                await TwoFactorSql.DeleteForUserAsync(connection, transaction, original.Id, token).ConfigureAwait(false);   // the authenticator and its recovery codes go with the account
                 await using var command = Command(connection, transaction,
                     "DELETE FROM web_users WHERE id=@id AND version=@version", ("@id", original.Id), ("@version", original.Version));
                 if (await command.ExecuteNonQueryAsync(token).ConfigureAwait(false) != 1)

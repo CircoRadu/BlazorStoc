@@ -4,18 +4,24 @@ Fluxul: administratorul creeaza conturi (Administrator / Utilizator) -> autentif
 
 ## Modificari de testat
 
-### 22.10.2026 - Optiunea „Pastreaza-ma autentificat"
+### 06.11.2026 - Autentificare cu cod din aplicatia de autentificare (Setari -> Autentificare)
 
-**Ce s-a adaugat:** comutator On/Off „Pastreaza-ma autentificat" pe pagina de autentificare (implicit oprit).
+**Ce s-a adaugat:** sectiunea Setari -> Autentificare (mod: niciodata / doar din exterior / pentru toti, reteaua interna, tabelul autentificatoarelor cu stare, confirmare, ultima folosire si coduri de recuperare ramase), cardul "Autentificator" pe pagina utilizatorului, codul pe aceeasi pagina cu utilizatorul si parola, comanda de urgenta `BlazorStoc.dll --reset-authenticator nume`.
 
-**Ce face acum:** pornit, sesiunea tine 30 de zile si supravietuieste inchiderii browserului; oprit, sesiunea se incheie la inchiderea browserului sau dupa 8 ore. In Jurnal, evenimentul „Conectare" spune „pastrat autentificat 30 zile".
+**Ce face acum:** autentificatorul il asociaza administratorul (QR + cod de pe telefonul utilizatorului + 10 coduri de recuperare). Cand modul cere cod, utilizator, parola si cod se scriu pe aceeasi pagina, iar un refuz spune mereu "Utilizator, parola sau cod incorect". 5 incercari gresite pe un nume il blocheaza 10 minute (dublu la fiecare blocare). Inactivarea contului suspenda autentificatorul; la reactivare administratorul alege Reactiveaza sau Revoca. Stergerea utilizatorului sterge si autentificatorul. Pentru conturile de administrator toate modificarile se fac doar de pe server (localhost). Nu mai exista "Pastreaza-ma autentificat": sesiunea se incheie la inchiderea browserului sau dupa 8 ore, iar dupa orice deconectare urmeaza o autentificare completa.
 
-| Pas | Ce faci | Ce trebuie sa vezi | Rezultat |
+| Nr | Pas | Rezultat asteptat | Rezultat obtinut |
 |---|---|---|---|
-| 1 | Autentifica-te cu comutatorul oprit, inchide complet browserul, redeschide aplicatia | Esti dus la pagina de autentificare | |
-| 2 | Autentifica-te cu comutatorul pornit, inchide complet browserul, redeschide aplicatia | Esti inca autentificat | |
-| 3 | Deconecteaza-te din popup dupa pasul 2 | Esti dus la autentificare; la urmatoarea redeschidere trebuie sa te autentifici din nou | |
-| 4 | Jurnal activitate, evenimentul „Conectare" de la pasul 2 | Detaliile contin „pastrat autentificat 30 zile" | |
+| 1 | Pe server (localhost): Setari -> Autentificare, "Asociaza autentificator" pe un cont, parola de administrator | Apar QR-ul si cheia manuala; cod gresit = eroare, QR-ul ramane; cod corect de pe telefon = 10 coduri de recuperare, stare Activ | |
+| 2 | De pe alt calculator, ca administrator: butoanele de pe randurile conturilor de administrator | Dezactivate, cu explicatia "doar de pe server"; conturile obisnuite raman gestionabile | |
+| 3 | Alege "Pentru toti" si Salveaza (parola de administrator) | Refuzat daca niciun administrator activ nu are autentificator; altfel salvat si jurnalizat | |
+| 4 | Autentifica-te cu utilizator, parola si cod pe aceeasi pagina, din retea si de pe server | Intri; cod/parola/utilizator gresit sau lipsa = acelasi mesaj generic | |
+| 5 | Refoloseste acelasi cod, apoi un cod de recuperare de doua ori | Codul refolosit si codul de recuperare spendat sunt refuzate | |
+| 6 | Dezactiveaza un utilizator cu autentificator, apoi reactiveaza-l | Starea devine Suspendat; dupa reactivare cardul cere alegerea Reactiveaza / Revoca | |
+| 7 | Sterge un utilizator cu autentificator | Dispare si din tabelul autentificatoarelor | |
+| 8 | Pe server: `BlazorStoc.dll --reset-authenticator nume` | Autentificatorul contului este sters; Jurnal "Revocare autentificator" (sistem) | |
+| 9 | Pagina "Autentificatorul meu" (bara de sus) | Arata doar starea si instructiuni; utilizatorul nu mai inroleaza singur | |
+| 10 | Pe un autentificator activ: "Schimba telefonul", parola de administrator, scaneaza QR-ul cu telefonul nou, scrie codul de pe el | Pana la confirmare telefonul vechi merge; inchisa fereastra fara cod nu schimba nimic; cu cod valid telefonul vechi si codurile de recuperare vechi nu mai merg, apar 10 coduri noi; Jurnal "Inlocuire autentificator" | |
 
 ### 20.10.2026 - Utilizatorii se muta din Administrare in Setari
 

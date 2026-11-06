@@ -1,0 +1,198 @@
+@using BlazorStoc.Services
+@using QRCoder
+@inject IAccessSecuritySettingsService Settings
+@inject ILogger<AuthenticatorActions> Logger
+@implements IDisposable
+@* The operations of the administrator on the authenticator of one account (Setari -> Autentificare and the page of the user): associate (QR code + first code + recovery codes), revoke,
+   resume after the account was reactivated, new recovery codes, unlock. Every change asks the password of the administrator again; the authenticator of an administrator's account only
+   changes from the server itself. *@
+
+@{
+    var may = Settings.MayManage(Row);
+    var why = may ? null : AccessSecuritySettingsService.ServerOnlyMessage;
+    var status = Row.Status;
+    var associateText = status.Exists && !status.Confirmed ? "Reia asocierea" : "Asociază autentificator";
+}
+<span class="@(Icons ? "row-actions-inline" : "editor-actions")">
+    @if (!status.Confirmed)
+    {
+        @Op(Operation.Provision, associateText, "add", "act-confirm", !Row.AccountActive || !may, !Row.AccountActive ? "Contul este inactiv: reactivează-l întâi." : why)
+    }
+    @if (status.Confirmed && status.Suspended)
+    {
+        @Op(Operation.Resume, "Reactivează autentificatorul", "reactivate", "act-confirm", !Row.AccountActive || !may, !Row.AccountActive ? "Contul este inactiv: reactivează-l întâi." : why)
+    }
+    @if (status.Confirmed && !status.Suspended)
+    {
+        @Op(Operation.Replace, "Schimbă telefonul", "move", "act-edit", !may, why)
+        @Op(Operation.Regenerate, "Coduri de recuperare noi", "renew", "act-reload", !may, why)
+    }
+    @if (status.Confirmed)
+    {
+        @Op(Operation.Revoke, "Revocă autentificatorul", "delete", "act-close", !may, why)
+    }
+    @if (status.LockedUntil is not null)
+    {
+        <button type="button" class="@(Icons ? "row-icon undo" : "refresh act-reload")" disabled="@(busy || !may)" aria-label="@("Deblochează verificarea codului lui " + Row.Username)"
+                title="@(why ?? "Deblochează verificarea codului lui " + Row.Username)" @onclick="UnlockAsync">@(Icons ? "" : "Deblochează")</button>
+    }
+</span>
+
+@code {
+    private RenderFragment Op(Operation operation, string text, string icon, string tone, bool disabled, string? title) => @<button type="button" class="@(Icons ? "row-icon " + icon : "refresh " + tone)" disabled="@(disabled || busy)"
+        aria-label="@(text + " – " + Row.Username)" title="@(title ?? text + " – " + Row.Username)" @onclick="() => Ask(operation)">@(Icons ? "" : text)</button>;
+}
+
+@if (asking is not null)
+{
+    <AdminOperationDialog Title="@Title(asking.Value)" Intro="@Intro(asking.Value)" ConfirmText="@Confirm(asking.Value)" Busy="busy" BusyText="Se execută…" Error="@dialogError"
+                          @bind-AdminPassword="adminPassword" Confirmed="RunAsync" Cancelled="Cancel" />
+}
+@if (secret is not null)
+{
+    <div class="delete-overlay">
+        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="provision-title">
+            <div class="dialog-head"><h2 id="provision-title">@(replacing ? "Schimbă telefonul" : "Asociază autentificator") · @Row.Username</h2></div>
+            <p class="muted"><small>1. Pe telefonul utilizatorului, în Google Authenticator, Microsoft Authenticator sau Aegis, scanează codul QR (sau scrie cheia manual).<br />2. Scrie mai jos codul de 6 cifre afișat acum de aplicație. @(replacing ? "Până la confirmare merge în continuare telefonul vechi; după confirmare telefonul vechi și codurile de recuperare vechi nu mai funcționează." : "Fără acest cod autentificatorul nu devine activ.")<br />Codul QR se arată doar aici și doar acum: nu-l trimite prin mesaje sau e-mail.</small></p>
+            <div class="qr-code" role="img" aria-label="Cod QR pentru aplicația de autentificare">@((MarkupString)QrSvg)</div>
+            <p class="muted"><small>Cheie manuală: <code>@secret</code></small></p>
+            <div class="anaf-grid"><label>Cod de pe telefon<input id="provision-code" inputmode="numeric" autocomplete="off" maxlength="8" @bind="code" @bind:event="oninput" @onkeydown="CodeKeyAsync" /></label></div>
+            @if (dialogError is not null) { <div class="error-banner" role="alert">@dialogError</div> }
+            <div class="editor-actions">
+                <button type="button" class="primary" disabled="@(busy || code.Length < 6)" @onclick="ConfirmCodeAsync">Confirmă autentificatorul</button>
+                <button type="button" class="refresh act-close" disabled="@busy" @onclick="CloseProvision">Renunță</button>
+            </div>
+        </section>
+    </div>
+}
+@if (recovery is not null)
+{
+    <div class="delete-overlay">
+        <section class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
+            <div class="dialog-head"><h2 id="recovery-title">Coduri de recuperare · @Row.Username</h2></div>
+            <p class="muted"><small>Fiecare cod se poate folosi o singură dată, dacă utilizatorul pierde telefonul. Se afișează doar acum: dă-i-le utilizatorului și nu le păstra în alt loc.</small></p>
+            <pre class="recovery-codes">@string.Join(Environment.NewLine, recovery)</pre>
+            <div class="editor-actions"><button type="button" class="primary" @onclick="CloseRecovery">Am notat codurile</button></div>
+        </section>
+    </div>
+}
+
+@code {
+    private enum Operation { Provision, Replace, Revoke, Resume, Regenerate }
+
+    [Parameter, EditorRequired] public AuthenticatorRow Row { get; set; } = default!;
+    /// <summary>Row icons (tables) or buttons with text (the page of a user).</summary>
+    [Parameter] public bool Icons { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    /// <summary>The message after an operation, for the page to show.</summary>
+    [Parameter] public EventCallback<string> Notice { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private Operation? asking;
+    private bool busy, replacing;
+    private string adminPassword = "", code = "";
+    private string? dialogError, secret;
+    private IReadOnlyList<string>? recovery;
+
+    private string QrSvg
+    {
+        get
+        {
+            using var generator = new QRCodeGenerator();
+            using var data = generator.CreateQrCode(Totp.ProvisioningUri("BlazorStoc", Row.Username, secret ?? ""), QRCodeGenerator.ECCLevel.M);
+            return new SvgQRCode(data).GetGraphic(5);
+        }
+    }
+
+    private static string Title(Operation operation) => operation switch
+    {
+        Operation.Provision => "Asociază autentificator",
+        Operation.Replace => "Schimbă telefonul",
+        Operation.Revoke => "Revocă autentificatorul",
+        Operation.Resume => "Reactivează autentificatorul",
+        _ => "Coduri de recuperare noi"
+    };
+
+    private string Intro(Operation operation) => operation switch
+    {
+        Operation.Provision => $"Se generează un secret nou pentru {Row.Username}. Autentificatorul devine activ după ce scrii un cod valid de pe telefonul lui.",
+        Operation.Replace => $"Se generează un secret nou pentru telefonul nou al lui {Row.Username}. Telefonul vechi merge mai departe până scrii un cod valid de pe cel nou; abia atunci cel vechi nu mai funcționează. Dacă telefonul vechi s-a pierdut sau a fost furat, folosește Revocă.",
+        Operation.Revoke => $"Autentificatorul și codurile de recuperare ale lui {Row.Username} se șterg imediat. Nu mai poate intra cu cod până nu i se asociază unul nou.",
+        Operation.Resume => $"Autentificatorul lui {Row.Username} (suspendat când contul a fost dezactivat) redevine activ, pe același telefon. Dacă telefonul s-a schimbat, revocă-l și asociază altul.",
+        _ => $"Cele 10 coduri de recuperare actuale ale lui {Row.Username} nu mai funcționează; se generează altele noi."
+    };
+
+    private static string Confirm(Operation operation) => operation switch
+    {
+        Operation.Provision or Operation.Replace => "Generează secretul", Operation.Revoke => "Revocă", Operation.Resume => "Reactivează", _ => "Generează codurile"
+    };
+
+    private void Ask(Operation operation) { if (busy) return; adminPassword = ""; dialogError = null; asking = operation; }
+    private void Cancel() { asking = null; adminPassword = ""; dialogError = null; }
+    private void CloseProvision()
+    {
+        // Closing the dialog of a phone change drops the waiting secret: the old phone keeps working and nothing changes.
+        if (replacing) _ = Settings.CancelReplacementAsync(Row.Id, CancellationToken.None);
+        secret = null; code = ""; dialogError = null; replacing = false; _ = Changed.InvokeAsync();
+    }
+    private void CloseRecovery() { recovery = null; _ = Changed.InvokeAsync(); }
+
+    private async Task RunAsync()
+    {
+        if (busy || asking is null) return;
+        busy = true; dialogError = null;
+        try
+        {
+            switch (asking.Value)
+            {
+                case Operation.Replace:
+                    secret = await Settings.BeginReplacementAsync(Row.Id, adminPassword, lifetime.Token); code = ""; replacing = true; Cancel(); break;
+                case Operation.Provision:
+                    secret = await Settings.ProvisionAsync(Row.Id, adminPassword, lifetime.Token); code = ""; Cancel(); break;
+                case Operation.Revoke:
+                    await Settings.RevokeAsync(Row.Id, adminPassword, lifetime.Token); Cancel();
+                    await Notice.InvokeAsync($"Autentificatorul lui {Row.Username} a fost revocat."); await Changed.InvokeAsync(); break;
+                case Operation.Resume:
+                    await Settings.SetSuspendedAsync(Row.Id, false, adminPassword, lifetime.Token); Cancel();
+                    await Notice.InvokeAsync($"Autentificatorul lui {Row.Username} este din nou activ."); await Changed.InvokeAsync(); break;
+                default:
+                    recovery = await Settings.RegenerateRecoveryCodesAsync(Row.Id, adminPassword, lifetime.Token); Cancel(); break;
+            }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is DatabaseSettingsException or AccessDeniedException) { dialogError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Authenticator operation failed ({ErrorType}).", ex.GetType().Name); dialogError = "Operația a eșuat. Reîncearcă; detaliile sunt în jurnalul aplicației."; }
+        finally { busy = false; }
+    }
+
+    private async Task CodeKeyAsync(KeyboardEventArgs args) { if (args.Key == "Enter" && code.Length >= 6) await ConfirmCodeAsync(); }
+
+    private async Task ConfirmCodeAsync()
+    {
+        if (busy) return;
+        busy = true; dialogError = null;
+        try
+        {
+            var codes = replacing ? await Settings.ConfirmReplacementAsync(Row.Id, code, lifetime.Token) : await Settings.ConfirmAsync(Row.Id, code, lifetime.Token);
+            if (codes is null) { dialogError = "Cod incorect sau expirat. Scrie codul de 6 cifre afișat acum de aplicație."; return; }
+            secret = null; code = ""; recovery = codes; replacing = false;
+            await Notice.InvokeAsync($"Autentificatorul lui {Row.Username} este activ.");
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is DatabaseSettingsException or AccessDeniedException) { dialogError = ex.Message; }
+        catch (Exception ex) { Logger.LogError("Authenticator confirmation failed ({ErrorType}).", ex.GetType().Name); dialogError = "Operația a eșuat. Reîncearcă."; }
+        finally { busy = false; }
+    }
+
+    private async Task UnlockAsync()
+    {
+        if (busy) return;
+        busy = true;
+        try { await Settings.UnlockAsync(Row.Id, lifetime.Token); await Notice.InvokeAsync($"Verificarea codului lui {Row.Username} a fost deblocată."); await Changed.InvokeAsync(); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is DatabaseSettingsException or AccessDeniedException) { await Notice.InvokeAsync(ex.Message); }
+        finally { busy = false; }
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

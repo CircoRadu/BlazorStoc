@@ -250,7 +250,7 @@ UNLOCK TABLES;
 
 LOCK TABLES `elcomtur_auto_settings` WRITE;
 /*!40000 ALTER TABLE `elcomtur_auto_settings` DISABLE KEYS */;
-REPLACE INTO `elcomtur_auto_settings` (`id`, `enabled`, `directory_path`, `username`, `password_protected`, `file_mask`, `firm_folder`, `firm_name`, `alert_days`, `last_scheduled_date`, `last_check_utc`, `last_check_ok`, `last_message`, `failing_since_utc`, `last_file_name`, `last_file_modified_utc`, `last_import_utc`, `last_data_date`, `last_summary`, `updated_by`, `updated_utc`) VALUES (1,0,'','',NULL,'','firma3','KS TEST ENERGY SRL',2,'2026-11-05','2026-11-05T11:55:24.515Z',1,'Nu există un backup mai nou decât ultima preluare (cel mai recent fișier: Backup_elcomtur_sintetic.elc, modificat 05.11.2026 10:54).',NULL,'Backup_elcomtur_sintetic.elc','2026-11-05T08:54:12.000Z','2026-11-05T11:54:45.904Z','2026-10-30','0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON)','claude.dev','2026-11-05T11:55:46.729Z');
+REPLACE INTO `elcomtur_auto_settings` (`id`, `enabled`, `directory_path`, `username`, `password_protected`, `file_mask`, `firm_folder`, `firm_name`, `alert_days`, `last_scheduled_date`, `last_check_utc`, `last_check_ok`, `last_message`, `failing_since_utc`, `last_file_name`, `last_file_modified_utc`, `last_import_utc`, `last_data_date`, `last_summary`, `updated_by`, `updated_utc`, `scheduled_hour`) VALUES (1,0,'','',NULL,'','firma3','KS TEST ENERGY SRL',2,'2026-11-05','2026-11-05T11:55:24.515Z',1,'Nu există un backup mai nou decât ultima preluare (cel mai recent fișier: Backup_elcomtur_sintetic.elc, modificat 05.11.2026 10:54).',NULL,'Backup_elcomtur_sintetic.elc','2026-11-05T08:54:12.000Z','2026-11-05T11:54:45.904Z','2026-10-30','0 beneficiari cu balanță, 0 cu plăți restante (total 0,00 RON)','claude.dev','2026-11-05T11:55:46.729Z',4);
 /*!40000 ALTER TABLE `elcomtur_auto_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -936,7 +936,13 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (62,'Balantele de plata din Elcomtur pe beneficiar (elcomtur_balances) si facturile lor neachitate (elcomtur_invoices)','cb2649052d51c173d931f9233088f194ccd9719815e5adc13c394934e7de124e','applied','2026-11-04 13:11:00','0.5.37'),
 (63,'Lista tipurilor de tichete citita din ActivityApp se pastreaza (activity_import_settings.known_types)','14ea226bd3cc99901dc54c847eab07e5eede2d8f49fd7fb5eb58bfc1a6b0cf8b','applied','2026-11-05 09:21:38','0.5.40'),
 (64,'Preluarea automata a backup-ului Elcomtur de pe un director (NAS): setari si rezultatul ultimei verificari (elcomtur_auto_settings)','ffbf9952023b6c424d220671bcea682984a3ecf40771ffc313b7d44c7c1381b9','applied','2026-11-05 11:53:01','0.5.41'),
-(65,'Campurile tichetelor ActivityApp: ce s-a citit pentru fiecare tichet (fields_read), campurile suplimentare (extras) si unde au intrat in observatii (notes_items)','a1fde9af25a3ee44c929d78aa3ebd5c342380db03356fe45840c3912c7a0454d','applied','2026-11-06 09:11:30','0.5.44');
+(65,'Campurile tichetelor ActivityApp: ce s-a citit pentru fiecare tichet (fields_read), campurile suplimentare (extras) si unde au intrat in observatii (notes_items)','a1fde9af25a3ee44c929d78aa3ebd5c342380db03356fe45840c3912c7a0454d','applied','2026-11-06 09:11:30','0.5.44'),
+(66,'Ora verificarii zilnice a preluarii automate Elcomtur, aleasa din setari: elcomtur_auto_settings.scheduled_hour','060a7736f045c2e707575cac2354d8b5c569816e52fe35c3096b7b407d657473','applied','2026-11-06 11:56:08','0.5.45'),
+(67,'Numele cu care au intrat informatiile tichetului in observatiile unei interventii: service_intervention_source.notes_labels','1aaaa32c32fbbb493cf432232e6809a686d24a6001103cd1ac14e3103e3f33d6','applied','2026-11-06 11:56:08','0.5.45'),
+(68,'Structura tichetelor ActivityApp fata de care s-a verificat corespondenta campurilor: activity_import_settings.ticket_structure_snapshot, alert_ticket_structure_since, ticket_structure_diff','bccd667c28ed97b72ce9e965806c1579f7f52b1fff046e7160b8a11800d796f2','applied','2026-11-06 11:56:08','0.5.45'),
+(69,'Autentificare in doi pasi (TOTP) pentru accesul din afara retelei interne: secretul fiecarui utilizator (web_user_totp) si codurile de recuperare (web_user_recovery_codes)','117dd81dd5ee42c29332267e224d847f01cb515103974e18f4c71688b7654a35','applied','2026-11-06 11:56:08','0.5.45'),
+(70,'Autentificatorul asociat de administrator: stare suspendata (cont inactiv), ultima folosire (data si IP), cine l-a asociat si cine l-a confirmat: web_user_totp.suspended_utc, last_used_utc, last_used_ip, enrolled_by, confirmed_by','4247bf59c28f925c0790375176c83c5b043bc836a09e8584cf5d6ea46a0210c3','applied','2026-11-06 13:17:37','0.5.45'),
+(71,'Inlocuirea atomica a secretului autentificatorului (schimbarea telefonului): web_user_totp.pending_secret_protected','ff7236438b8db8f23501231ddd19cbbd13bc9832edd54d76d8372dd5fc5cc293','applied','2026-11-06 13:32:46','0.5.45');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1698,6 +1704,16 @@ LOCK TABLES `vehicles` WRITE;
 REPLACE INTO `vehicles` (`id`, `plate_number`, `normalized_plate`, `description`, `version`, `itp_expiry`, `insurance_expiry`, `rovinieta_expiry`) VALUES (1,'HD-03-ESP','HD-03-ESP','Dacia docker alba',3,'2026-10-15','2027-06-30','2027-09-30'),
 (2,'HD-04-ESP','HD-04-ESP','papuc',0,'2027-03-15','2027-06-30','2027-09-30');
 /*!40000 ALTER TABLE `vehicles` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `web_user_recovery_codes` WRITE;
+/*!40000 ALTER TABLE `web_user_recovery_codes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `web_user_recovery_codes` ENABLE KEYS */;
+UNLOCK TABLES;
+
+LOCK TABLES `web_user_totp` WRITE;
+/*!40000 ALTER TABLE `web_user_totp` DISABLE KEYS */;
+/*!40000 ALTER TABLE `web_user_totp` ENABLE KEYS */;
 UNLOCK TABLES;
 
 LOCK TABLES `web_users` WRITE;

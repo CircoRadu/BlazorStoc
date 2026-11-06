@@ -317,10 +317,42 @@ public static partial class MariaExtendedChecks
             Check((await users.AuthenticateAsync(name, "parola-ext-veche-123")).Status == AuthenticationStatus.InvalidCredentials, "The old password no longer works");
             await Rejects<UserOperationException>(() => users.UpdateAsync(user, WebUserInput.From(user)), "A stale user edit is rejected");
             user = edited;
+            var twoFactor = new MariaTwoFactorStore(configuration, new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
+            var secret = await twoFactor.ProvisionAsync(user.Id, "ext.admin");
+            Check(secret is not null && !(await twoFactor.GetStatusAsync(user.Id)).Confirmed, "An authenticator associated by the administrator is pending until a code confirms it");
+            var recovery = await twoFactor.ConfirmAsync(user.Id, Totp.Compute(Totp.FromBase32(secret!)!, Totp.StepOf(DateTimeOffset.UtcNow)), "ext.admin");
+            Check(recovery?.Count == 10 && (await twoFactor.GetStatusAsync(user.Id)) is { Active: true, ConfirmedBy: "ext.admin", RecoveryLeft: 10 }, "A first valid code confirms the authenticator and gives ten recovery codes");
+            // Changing the phone is atomic: the new secret waits while the old one works, and replaces it only with a valid code from the new phone.
+            var oldSecret = Totp.FromBase32(secret!)!;
+            var newSecretText = await twoFactor.BeginReplacementAsync(user.Id);
+            var newSecret = Totp.FromBase32(newSecretText!)!;
+            var nextStep = Totp.StepOf(DateTimeOffset.UtcNow) + 1;
+            Check(await twoFactor.ConfirmReplacementAsync(user.Id, "000000", "ext.admin") is null && await twoFactor.VerifyAsync(user.Id, Totp.Compute(oldSecret, nextStep)) == TwoFactorCheck.Valid,
+                "A wrong code does not replace the secret: the old phone still works");
+            await twoFactor.BeginReplacementAsync(user.Id);
+            await twoFactor.CancelReplacementAsync(user.Id);
+            Check(await twoFactor.ConfirmReplacementAsync(user.Id, Totp.Compute(newSecret, nextStep + 1), "ext.admin") is null, "Closing the dialog drops the waiting secret: nothing changes");
+            newSecretText = await twoFactor.BeginReplacementAsync(user.Id);
+            newSecret = Totp.FromBase32(newSecretText!)!;
+            var replaced = await twoFactor.ConfirmReplacementAsync(user.Id, Totp.Compute(newSecret, nextStep - 1), "ext.admin");
+            Check(replaced?.Count == 10 && await twoFactor.VerifyAsync(user.Id, Totp.Compute(oldSecret, nextStep)) == TwoFactorCheck.Wrong && await twoFactor.VerifyAsync(user.Id, recovery![1]) == TwoFactorCheck.Wrong
+                && await twoFactor.VerifyAsync(user.Id, replaced![1]) == TwoFactorCheck.ValidRecoveryCode, "A valid code from the new phone replaces the secret: the old code and the old recovery codes stop working, the new recovery codes work");
+            recovery = replaced;
             var inactive = WebUserInput.From(user); inactive.IsActive = false; inactive.Reason = "Ext dezactivare";
             user = await users.UpdateAsync(user, inactive);
             Check((await users.AuthenticateAsync(name, "parola-ext-noua-456")).Status == AuthenticationStatus.Inactive, "A deactivated user is reported as inactive");
+            Check((await twoFactor.GetStatusAsync(user.Id)) is { Confirmed: true, Suspended: true, Active: false }
+                && await twoFactor.VerifyAsync(user.Id, recovery![0]) == TwoFactorCheck.Suspended, "Deactivating the account suspends its authenticator: neither a code nor a recovery code works");
+            var reactivate = WebUserInput.From(user); reactivate.IsActive = true; reactivate.Reason = "Ext reactivare";
+            user = await users.UpdateAsync(user, reactivate);
+            Check((await twoFactor.GetStatusAsync(user.Id)).Suspended, "Reactivating the account leaves the authenticator suspended until the administrator chooses");
+            Check(await twoFactor.SetSuspendedAsync(user.Id, false) && (await twoFactor.GetStatusAsync(user.Id)).Active
+                && await twoFactor.VerifyAsync(user.Id, recovery![0]) == TwoFactorCheck.ValidRecoveryCode && await twoFactor.VerifyAsync(user.Id, recovery[0]) == TwoFactorCheck.Wrong, "Resuming makes the same authenticator usable again; a recovery code works once");
+            var inactiveAgain = WebUserInput.From(user); inactiveAgain.IsActive = false; inactiveAgain.Reason = "Ext dezactivare 2";
+            user = await users.UpdateAsync(user, inactiveAgain);
             await users.DeleteAsync(user, "Ext stergere");
+            Check(await ScalarLongAsync(probe, "SELECT COUNT(*) FROM web_user_totp WHERE user_id=@id", ("@id", user.Id)) == 0
+                && await ScalarLongAsync(probe, "SELECT COUNT(*) FROM web_user_recovery_codes WHERE user_id=@id", ("@id", user.Id)) == 0, "Deleting the user deletes its authenticator and recovery codes");
             Check(await ScalarLongAsync(probe, "SELECT COUNT(*) FROM archive_web_users WHERE original_id=@id", ("@id", user.Id)) == 1, "The deleted user is archived exactly once");
             user = null!;
         }

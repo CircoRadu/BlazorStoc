@@ -156,8 +156,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.9",
-                                    "hash":  "90dacab146c42340a598597a837b4fc7a07e00c0fa3029484121fc039ff7f3ed",
+                                    "version":  "1.4.12",
+                                    "hash":  "605c28ce86f3d8f561eccd4faef86fd7721b1d71012b67e97facd2a1ab1257ad",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -243,6 +243,21 @@
                                                         "version":  "1.4.9",
                                                         "date":  "06.11.2026",
                                                         "note":  "Tichet exemplu, nume editabile, verificarea structurii tichetelor si notificarea"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.10",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Filtrul de actiuni cunoaste operatiile de autentificare in doi pasi: modificare securitate acces extern, inrolare si resetare autentificator"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.11",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Filtrul de actiuni: operatiile autentificatorului asociat de administrator (asociere, confirmare, revocare, suspendare, reactivare, stergere, coduri de recuperare, deblocare)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.12",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Filtrul de actiuni cunoaste Inlocuire autentificator (schimbarea telefonului)"
                                                     }
                                                 ]
                                 },

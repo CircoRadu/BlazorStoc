@@ -391,7 +391,7 @@ public static class RunTrackingChecks
 
     private static async Task<string?> SignInErrorAsync(Func<AuthenticationResult> answer)
     {
-        var model = new LoginModel(Empty(), new FakeAuthenticator(answer), new TestAuditTrail(), NullLogger<LoginModel>.Instance)
+        var model = new LoginModel(Empty(), new FakeAuthenticator(answer), new TestAuditTrail(), NullLogger<LoginModel>.Instance, null!)
         {
             Username = "someone", Password = "whatever",
             PageContext = new Microsoft.AspNetCore.Mvc.RazorPages.PageContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() }

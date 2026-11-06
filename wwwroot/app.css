@@ -1314,15 +1314,6 @@ tr[data-subcategory-index].drop-after>td{box-shadow:inset 0 -3px 0 var(--green)}
 .update-changelog-dialog { width: min(640px, calc(100vw - 32px)); max-height: 80vh; overflow-y: auto; }
 .changelog-version h3 { margin: 18px 0 8px; font-size: 15px; }
 .changelog-version ul { margin: 0 0 6px; padding-left: 22px; display: grid; gap: 6px; }
-/* "Pastreaza-ma autentificat" on the sign-in page: self-contained, so no generic rule of the card (label, input) can show the check box or hide the track. */
-.login-card label.login-remember { position: relative; display: flex; align-items: center; gap: 10px; margin: 16px 0 0; font-size: 14px; font-weight: 600; cursor: pointer; }
-.login-card label.login-remember input[type=checkbox] { position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
-.login-card label.login-remember .toggle-track { display: block; position: relative; flex: none; width: 36px; height: 20px; border-radius: 10px; background: var(--c-aebbb7); border: 1px solid var(--c-8fa09b); box-sizing: border-box; }
-.login-card label.login-remember .toggle-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--c-ffffff); box-shadow: 0 1px 3px rgba(0,0,0,.35); transition: transform .15s ease; }
-.login-card label.login-remember input:checked + .toggle-track { background: var(--green); border-color: var(--c-0d5d51); }
-.login-card label.login-remember input:checked + .toggle-track::after { transform: translateX(16px); }
-.login-card label.login-remember input:focus-visible + .toggle-track { outline: 2px solid var(--c-72b6a7); outline-offset: 2px; }
-.login-card label.login-remember .row-toggle-label { display: block; font-size: 14px; font-weight: 600; }
 
 /* Settings as a dashboard: a tile for each section; an open section has a bar with the way back and its name. */
 .settings-dashboard { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px; padding:24px 0; }
