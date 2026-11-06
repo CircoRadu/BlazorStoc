@@ -156,8 +156,8 @@
                                                  ]
                                  },
                     "Journal":  {
-                                    "version":  "1.4.12",
-                                    "hash":  "605c28ce86f3d8f561eccd4faef86fd7721b1d71012b67e97facd2a1ab1257ad",
+                                    "version":  "1.4.14",
+                                    "hash":  "1e2f86ec2435f61eef2e892c7760265dfa9572cbc4761fb794616ef9bc5bf636",
                                     "history":  [
                                                     {
                                                         "version":  "1.0.0",
@@ -258,6 +258,16 @@
                                                         "version":  "1.4.12",
                                                         "date":  "06.11.2026",
                                                         "note":  "Filtrul de actiuni cunoaste Inlocuire autentificator (schimbarea telefonului)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.13",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Filtrul de actiuni cunoaste Schimbare parola proprie (si refuzata)"
+                                                    },
+                                                    {
+                                                        "version":  "1.4.14",
+                                                        "date":  "06.11.2026",
+                                                        "note":  "Filtrul de actiuni: Stabilire parola de catre administrator si Schimbare parola la prima autentificare"
                                                     }
                                                 ]
                                 },

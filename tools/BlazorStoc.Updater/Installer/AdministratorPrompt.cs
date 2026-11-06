@@ -23,6 +23,9 @@ public static partial class AdministratorRules
     public static string? PasswordProblem(string? password) =>
         password is null || password.Length < MinimumPasswordLength ? $"The password has at least {MinimumPasswordLength} characters."
         : password.Length > MaximumPasswordLength ? $"The password has at most {MaximumPasswordLength} characters."
+        // The same policy as the application (Services/WebUsers.cs, PasswordPolicy).
+        : !password.Any(char.IsLower) || !password.Any(char.IsUpper) || !password.Any(char.IsDigit) || !password.Any(character => !char.IsLetterOrDigit(character) && !char.IsWhiteSpace(character))
+            ? "The password needs a lower case letter, an upper case letter, a digit and a special character."
         : null;
 
     [GeneratedRegex(@"^[\p{L}0-9._-]+$")]

@@ -26,10 +26,10 @@ public static partial class FullRun
             "Reusing an existing group does not duplicate category or subcategory events");
         await auditedProducts.DeleteAsync(auditedProduct, "Curățare test");
         var auditedUsers = new DemoUserRepository(new TestAccessControl(true, "administrator.demo"), new DemoUserStore(), auditTrail);
-        var auditedUser = await auditedUsers.CreateAsync(new WebUserInput { Username = "audit.user", DisplayName = "Audit User", Role = AccessRoles.LimitedUser, Password = "secret-demo-123" });
+        var auditedUser = await auditedUsers.CreateAsync(new WebUserInput { Username = "audit.user", DisplayName = "Audit User", Role = AccessRoles.LimitedUser, Password = "Secret-demo-123!" });
         Check(auditTrail.Entries.Count == 6 && auditTrail.Entries.All(entry => entry.ActorUsername.Length > 0), "Product, group and user changes are written once to the audit trail");
         Check(auditTrail.Entries.Any(entry => entry.EntityType == AuditEntities.Product && entry.Action == AuditActions.Delete), "Audit trail identifies entity and operation");
-        Check(auditTrail.Entries.All(entry => !entry.Details.Contains("secret-demo-123", StringComparison.Ordinal)), "Audit trail never records passwords");
+        Check(auditTrail.Entries.All(entry => !entry.Details.Contains("Secret-demo-123!", StringComparison.Ordinal)), "Audit trail never records passwords");
         var deletedProductEvent = auditTrail.Entries.Single(entry => entry.EntityType == AuditEntities.Product && entry.Action == AuditActions.Delete);
         Check(deletedProductEvent.EntityId == auditedProduct.Id.ToString() &&
               deletedProductEvent.Details.Contains(auditedProduct.Name, StringComparison.Ordinal) &&
@@ -138,10 +138,10 @@ public static partial class FullRun
         var sensitiveAuditTrail = new TestAuditTrail();
         var sensitiveUsers = new DemoUserRepository(new TestAccessControl(true, "administrator.demo"), new DemoUserStore(), sensitiveAuditTrail);
         var sensitiveUser = await sensitiveUsers.CreateAsync(new WebUserInput
-            { Username = "audit.sensibil", DisplayName = "Audit Sensibil", Role = AccessRoles.LimitedUser, Password = "secret-initial-123" });
+            { Username = "audit.sensibil", DisplayName = "Audit Sensibil", Role = AccessRoles.LimitedUser, Password = "Secret-initial-123!" });
         var sensitiveInput = UserEdit(sensitiveUser, "Actualizare cont pentru test");
         sensitiveInput.DisplayName = "Audit Actualizat";
-        sensitiveInput.Password = "secret-schimbat-123";
+        sensitiveInput.Password = "Secret-schimbat-123!";
         await sensitiveUsers.UpdateAsync(sensitiveUser, sensitiveInput);
         var sensitiveEditEvent = sensitiveAuditTrail.Entries.Single(entry => entry.Action == AuditActions.Edit);
         Check(sensitiveEditEvent.Details.Contains("Nume afișat: Audit Sensibil → Audit Actualizat", StringComparison.Ordinal) &&

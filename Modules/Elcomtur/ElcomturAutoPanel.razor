@@ -20,7 +20,8 @@
             <ToggleSwitch Class="anaf-check" Id="elcomtur-auto-enabled" @bind-Value="enabled" OnText="Activ" OffText="Inactiv">Preluare automată</ToggleSwitch>
             <label class="anaf-wide">Director cu backup-urile Elcomtur (cale de rețea \\server\partajare\folder sau director local)<input id="elcomtur-auto-path" @bind="path" maxlength="500" autocomplete="off" placeholder="\\192.168.100.50\Backup\Elcomtur" /></label>
             <label>Cont (pentru o cale de rețea)<input id="elcomtur-auto-user" @bind="userName" maxlength="100" autocomplete="off" /></label>
-            <label>Parolă<input id="elcomtur-auto-password" type="password" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(hasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <label>Parolă<input id="elcomtur-auto-password" type="@(showPassword ? "text" : "password")" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(hasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <ToggleSwitch Id="elcomtur-auto-password-show" Class="full-width" @bind-Value="showPassword" OnText="Parola se vede" OffText="Parola este ascunsă">Arată parola</ToggleSwitch>
             <label>Mască nume fișier<input id="elcomtur-auto-mask" @bind="mask" maxlength="200" autocomplete="off" placeholder="*elcomtur*" /><small class="muted">* înlocuiește orice text, ? un caracter. Se alege cel mai recent fișier care corespunde.</small></label>
             <label>Firma de preluat
                 <select id="elcomtur-auto-firm" value="@firmFolder" @onchange="FirmChanged" disabled="@busy">
@@ -71,6 +72,7 @@
     private readonly CancellationTokenSource lifetime = new();
     private bool loading = true, busy, noticeOk, hasPassword, enabled;
     private string? error, notice, busyText;
+    private bool showPassword;
     private string path = "", userName = "", password = "", mask = "", firmFolder = "", firmName = "";
     private int alertDays = ElcomturAutoRules.DefaultAlertDays, hour = ElcomturAutoRules.DefaultHour;
     private ElcomturAutoSettings current = ElcomturAutoSettings.Empty;

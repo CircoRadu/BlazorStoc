@@ -3,8 +3,37 @@ using System.ComponentModel.DataAnnotations;
 namespace BlazorStoc.Services;
 
 // Role stays "Administrator" or "Utilizator" (Administrator exactly when the type is the system type of that name); the rights come from the type.
-public sealed record WebUser(int Id, string Username, string DisplayName, string Role, bool IsActive, long Version, long? TypeId = null, string TypeName = "");
-public sealed record AuthenticatedWebUser(int Id, string Username, string DisplayName, string Role);
+public sealed record WebUser(int Id, string Username, string DisplayName, string Role, bool IsActive, long Version, long? TypeId = null, string TypeName = "", [property: System.Text.Json.Serialization.JsonIgnore] bool MustChangePassword = false);
+public sealed record AuthenticatedWebUser(int Id, string Username, string DisplayName, string Role, bool MustChangePassword = false);
+
+/// <summary>The rules of every password of a web account (the one an administrator sets and the one a user chooses): minimum 8 characters with a lower case letter, an upper case letter, a digit and a special character.</summary>
+public static class PasswordPolicy
+{
+    public const int MinimumLength = 8;
+    public const int MaximumLength = 200;
+    public const string Summary = "minimum 8 caractere, cu cel puțin o literă mică, o literă mare, o cifră și un caracter special";
+
+    /// <summary>One condition of a password: the key (the page of the first sign-in checks the same keys in the browser), the text shown, what is said when it is missing, and the test.</summary>
+    public sealed record Rule(string Key, string Text, string Missing, Func<string, bool> Test);
+
+    public static readonly IReadOnlyList<Rule> Rules =
+    [
+        new("length", $"Minimum {MinimumLength} caractere", $"minimum {MinimumLength} caractere", password => password.Length >= MinimumLength),
+        new("lower", "Cel puțin o literă mică", "o literă mică", password => password.Any(char.IsLower)),
+        new("upper", "Cel puțin o literă mare", "o literă mare", password => password.Any(char.IsUpper)),
+        new("digit", "Cel puțin o cifră", "o cifră", password => password.Any(char.IsDigit)),
+        new("special", "Cel puțin un caracter special", "un caracter special", password => password.Any(character => !char.IsLetterOrDigit(character) && !char.IsWhiteSpace(character)))
+    ];
+
+    /// <summary>Null when the password follows the rules, otherwise what is missing.</summary>
+    public static string? Validate(string? password)
+    {
+        password ??= "";
+        var missing = Rules.Where(rule => !rule.Test(password)).Select(rule => rule.Missing).ToList();
+        if (password.Length > MaximumLength) return $"Parola poate avea cel mult {MaximumLength} de caractere.";
+        return missing.Count == 0 ? null : "Parola trebuie să aibă " + Summary + ". Lipsește: " + string.Join(", ", missing) + ".";
+    }
+}
 public enum AuthenticationStatus { Success, InvalidCredentials, Inactive }
 public sealed record AuthenticationResult(AuthenticationStatus Status, AuthenticatedWebUser? User = null);
 
@@ -27,7 +56,7 @@ public sealed class WebUserInput
 
     public bool IsActive { get; set; } = true;
 
-    public const int MinimumPasswordLength = 8;
+    public const int MinimumPasswordLength = PasswordPolicy.MinimumLength;
 
     [StringLength(200, ErrorMessage = "Parola poate avea cel mult 200 de caractere.")]
     public string Password { get; set; } = "";
@@ -60,8 +89,8 @@ public sealed class WebUserInput
             throw new UserOperationException(string.Join(" ", results.Select(result => result.ErrorMessage)));
         if (!AccessRoles.All.Contains(normalized.Role))
             throw new UserOperationException("Nivelul de acces selectat nu este valid.");
-        if ((isNew || normalized.Password.Length > 0) && normalized.Password.Length < MinimumPasswordLength)
-            throw new UserOperationException($"Parola trebuie să aibă minimum {MinimumPasswordLength} caractere.");
+        if ((isNew || normalized.Password.Length > 0) && PasswordPolicy.Validate(normalized.Password) is { } passwordProblem)
+            throw new UserOperationException(passwordProblem);
         if (isNew && !normalized.IsActive)
             throw new UserOperationException("Un utilizator nou trebuie creat activ; îl poți dezactiva ulterior.");
         if (!isNew && ChangeReasonRules.ValidationError(normalized.Reason) is { } reasonError)

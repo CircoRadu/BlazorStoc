@@ -96,6 +96,7 @@
                     <label>Repetă parola nouă<input id="accounts-new-password-2" type="@PasswordType" value="@newPassword2" @oninput="e => newPassword2 = e.Value?.ToString()" maxlength="100" autocomplete="new-password" />
                         <span class="password-match @(Matches(newPassword, newPassword2) ? "ok" : "bad")" role="status" aria-live="polite">@MatchText(newPassword, newPassword2, "Parolele")</span></label>
                 </div>
+                <PasswordRulesList Items="AccountPasswordLines(newPassword)" />
                 <div class="editor-actions">
                     <button type="button" class="refresh act-nav" disabled="@busy" @onclick="GenerateOne">Generează parola</button>
                     <ToggleSwitch Id="accounts-show-password" Class="full-width" @bind-Value="showPassword">Arată parola</ToggleSwitch>
@@ -112,6 +113,7 @@
                             <label>@state.Purpose (cel puțin 16 caractere)<input type="@PasswordType" value="@typedPasswords.GetValueOrDefault(key)" @oninput="e => typedPasswords[key] = e.Value?.ToString() ?? string.Empty" maxlength="100" autocomplete="new-password" /></label>
                             <label>Repetă parola<input type="@PasswordType" value="@typedRepeats.GetValueOrDefault(key)" @oninput="e => typedRepeats[key] = e.Value?.ToString() ?? string.Empty" maxlength="100" autocomplete="new-password" />
                                 <span class="password-match @(Matches(typedPasswords.GetValueOrDefault(key), typedRepeats.GetValueOrDefault(key)) ? "ok" : "bad")" role="status" aria-live="polite">@MatchText(typedPasswords.GetValueOrDefault(key), typedRepeats.GetValueOrDefault(key), "Parolele")</span></label>
+                            <div class="full-width"><PasswordRulesList Items="AccountPasswordLines(typedPasswords.GetValueOrDefault(key))" /></div>
                         }
                     </div>
                     <ToggleSwitch Id="accounts-show-all" Class="full-width" @bind-Value="showPassword">Arată parolele</ToggleSwitch>
@@ -132,6 +134,7 @@
                     <label>Repetă fraza-parolă<input id="accounts-passphrase-2" type="@PasswordType" value="@passphrase2" @oninput="e => passphrase2 = e.Value?.ToString()" maxlength="200" autocomplete="new-password" />
                         <span class="password-match @(Matches(passphrase, passphrase2) ? "ok" : "bad")" role="status" aria-live="polite">@MatchText(passphrase, passphrase2, "Frazele-parolă")</span></label>
                 </div>
+                <PasswordRulesList Items="PassphraseLines(passphrase)" />
                 <ToggleSwitch Id="accounts-include-admin" Class="full-width" @bind-Value="includeAdministration">Include contul de administrare al serverului</ToggleSwitch>
                 <ToggleSwitch Id="accounts-show-passphrase" Class="full-width" @bind-Value="showPassword">Arată fraza-parolă</ToggleSwitch>
                 break;
@@ -197,6 +200,17 @@
         Mode.Import => importBytes is null || string.IsNullOrEmpty(passphrase),
         _ => true
     };
+
+    // The conditions of the password of a database account and of the pass phrase of the exported file, as live lines (green when met, red otherwise).
+    private static IEnumerable<(string Text, bool Met)> AccountPasswordLines(string? password) =>
+    [
+        ($"Cel puțin {DatabaseAccounts.MinimumPasswordLength} de caractere", (password ?? "").Length >= DatabaseAccounts.MinimumPasswordLength),
+        ($"Cel mult {DatabaseAccounts.MaximumPasswordLength} de caractere", (password ?? "").Length <= DatabaseAccounts.MaximumPasswordLength),
+        ("Fără caractere de control", !(password ?? "").Any(char.IsControl))
+    ];
+
+    private static IEnumerable<(string Text, bool Met)> PassphraseLines(string? phrase) =>
+        [($"Cel puțin {DatabaseConfigurationFile.MinimumPassphraseLength} caractere", (phrase ?? "").Length >= DatabaseConfigurationFile.MinimumPassphraseLength)];
 
     private static bool Matches(string? first, string? second) => !string.IsNullOrEmpty(second) && string.Equals(first, second, StringComparison.Ordinal);
 

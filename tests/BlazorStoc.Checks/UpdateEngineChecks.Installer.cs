@@ -349,7 +349,7 @@ public static partial class UpdateEngineChecks
         // a plain run on a server without an installation: the first installation is made by itself, in the default folder (here one of the checks)
         var plain = new World(Path.Combine(work, "plain-world"));
         var exePlain = await BuildInstallerAsync(work, await plain.PackAsync(keys, "1.0.0"), "1.0.0", "inst-plain");
-        host = new FakeInstallerHost(exePlain, work, plain) { DefaultInstallRoot = plain.Layout.Root, Interactive = true, Administrator = new AdministratorAccount("boss", "Boss", "correct horse") };
+        host = new FakeInstallerHost(exePlain, work, plain) { DefaultInstallRoot = plain.Layout.Root, Interactive = true, Administrator = new AdministratorAccount("boss", "Boss", "Correct-Horse-9!") };
         code = await new InstallerRunner(host).RunAsync(["--yes"]);
         check(code == 0 && plain.Layout.Current == "1.0.0" && host.Commands[1].Contains("--trust-package-signer") && new TrustedKeys(plain.Layout.TrustedKeysFile).Load().Any(key => string.Equals(key.Fingerprint, signer, StringComparison.OrdinalIgnoreCase))
             && host.Output.Contains("trusted from now on"),
@@ -362,19 +362,19 @@ public static partial class UpdateEngineChecks
         check(code == InstallerExit.Cancelled && host.Commands.Count == 0 && !Directory.Exists(Path.Combine(work, "never-made")), "Installer: a person at the console is told what will be installed and n cancels before anything is made");
         var empty2 = Path.Combine(work, "empty-folder");
         Directory.CreateDirectory(empty2);
-        host = new FakeInstallerHost(exePlain, work, plain) { Interactive = true, Administrator = new AdministratorAccount("boss", "Boss", "correct horse") };
+        host = new FakeInstallerHost(exePlain, work, plain) { Interactive = true, Administrator = new AdministratorAccount("boss", "Boss", "Correct-Horse-9!") };
         code = await new InstallerRunner(host).RunAsync(["--yes", "--trust", signer, "--install-root", empty2]);
         check(code == 0 && host.Commands.Count == 3 && host.Commands[0].StartsWith("init "), "Installer: an empty folder named by --install-root is a new installation too");
         // the administrator account of the application
         var adm = new World(Path.Combine(work, "admin-world"));
         var exeAdm = await BuildInstallerAsync(work, await adm.PackAsync(keys, "1.0.0"), "1.0.0", "inst-admin");
-        Environment.SetEnvironmentVariable("BLAZORSTOC_ADMIN_PASSWORD", "correct horse");
+        Environment.SetEnvironmentVariable("BLAZORSTOC_ADMIN_PASSWORD", "Correct-Horse-9!");
         try
         {
             host = new FakeInstallerHost(exeAdm, work, adm);
             code = await new InstallerRunner(host).RunAsync(["--init", "--yes", "--install-root", adm.Layout.Root, "--admin-user", "boss", "--admin-name", "Boss B", "--no-task"]);
             check(code == 0 && host.Commands.Count == 3 && host.Commands[2] == "create-admin --install-root " + adm.Layout.Root && host.AdminEnvironment is { } env && env["BLAZORSTOC_ADMIN_USER"] == "boss" && env["BLAZORSTOC_ADMIN_NAME"] == "Boss B"
-                && env["BLAZORSTOC_ADMIN_PASSWORD"] == "correct horse" && !host.Commands.Any(command => command.Contains("correct horse")) && host.Messages.Any(message => message.Contains("Administrator account \"boss\" made")),
+                && env["BLAZORSTOC_ADMIN_PASSWORD"] == "Correct-Horse-9!" && !host.Commands.Any(command => command.Contains("Correct-Horse-9!")) && host.Messages.Any(message => message.Contains("Administrator account \"boss\" made")),
                 $"Installer: the administrator account is made after the version, with the details in the environment of the updater and never on a command line; exit code {code}");
             host = new FakeInstallerHost(exeAdm, work, adm) { AdminCode = 4 };
             code = await new InstallerRunner(host).RunAsync(["--repair", "--yes", "--install-root", adm.Layout.Root]);
@@ -528,13 +528,13 @@ public static partial class UpdateEngineChecks
         static IEnumerable<ConsoleKeyInfo> Keys(string text) => text.Select(character => character == '\n' ? new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false) : character == '<' ? new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false)
             : new ConsoleKeyInfo(character, ConsoleKey.A, false, false, false));
         // a user name too short, then boss, display name (Enter = same), a password too short, a good one whose repetition is wrong, again, the repetition corrected with Backspace
-        var queue = new Queue<ConsoleKeyInfo>(Keys("a\nboss\n\nabc\nabcd1234\nabcd1235\nabcd1234\nabcd1235<4\n"));
+        var queue = new Queue<ConsoleKeyInfo>(Keys("a\nboss\n\nabc\nAbcd-1234\nAbcd-1235\nAbcd-1234\nAbcd-1235<4\n"));
         var output = new StringWriter();
         var account = new AdministratorPrompt(queue.Dequeue, output).Ask();
         var text = output.ToString();
-        return account == new AdministratorAccount("boss", "boss", "abcd1234") && queue.Count == 0 && text.Contains(AdministratorRules.UsernameProblem("a")!) && text.Contains(AdministratorRules.PasswordProblem("abc")!)
-            && text.Contains(AdministratorPrompt.Differ) && text.Contains(AdministratorPrompt.Match) && text.Contains("The passwords are not the same") && !text.Contains("abcd1234") && !text.Contains("abcd1235")
-            && AdministratorRules.UsernameProblem("ana.pop-1_x") is null && AdministratorRules.UsernameProblem("a b") is not null && AdministratorRules.PasswordProblem("12345678") is null;
+        return account == new AdministratorAccount("boss", "boss", "Abcd-1234") && queue.Count == 0 && text.Contains(AdministratorRules.UsernameProblem("a")!) && text.Contains(AdministratorRules.PasswordProblem("abc")!)
+            && text.Contains(AdministratorPrompt.Differ) && text.Contains(AdministratorPrompt.Match) && text.Contains("The passwords are not the same") && !text.Contains("Abcd-1234") && !text.Contains("Abcd-1235")
+            && AdministratorRules.UsernameProblem("ana.pop-1_x") is null && AdministratorRules.UsernameProblem("a b") is not null && AdministratorRules.PasswordProblem("Abcd-1234") is null && AdministratorRules.PasswordProblem("12345678") is not null;
     }
 
     private static bool PortSelectorChecks()

@@ -10,7 +10,7 @@ public static class HelpContents
     /// <summary>The areas in the order they are listed, each with the prefixes of the topic keys that belong to it; a topic that matches none goes to <see cref="Other"/>.</summary>
     public static readonly (string Title, string[] Prefixes)[] Areas =
     [
-        ("Început și acces", ["acasa", "autentificare", "acces-refuzat"]),
+        ("Început și acces", ["acasa", "autentificare", "acces-refuzat", "schimbare-parola"]),
         ("Produse și stoc", ["produse", "iesire-multipla", "export-consum"]),
         ("Inventar", ["inventar"]),
         ("Furnizori și facturi", ["furnizori", "facturi", "preluare-factura"]),

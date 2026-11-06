@@ -266,6 +266,7 @@ public sealed class InstallerForm : Form
         _ when problem.Contains("3 to 100") => "Numele de utilizator are între 3 și 100 de caractere.",
         _ when problem.Contains("reserved") => "Numele „admin” este rezervat (administratorul din configurare). Alege alt nume.",
         _ when problem.Contains("letters") => "Numele poate conține litere, cifre, punct, cratimă și underscore.",
+        _ when problem.Contains("lower case") => "Parola trebuie să aibă o literă mică, o literă mare, o cifră și un caracter special.",
         _ when problem.Contains("at least") => $"Parola are cel puțin {AdministratorRules.MinimumPasswordLength} caractere.",
         _ => problem
     };

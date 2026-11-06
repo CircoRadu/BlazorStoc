@@ -306,17 +306,52 @@ public static partial class MariaExtendedChecks
     {
         var name = "ext." + Suffix();
         var users = new MariaUserRepository(configuration, admin, audit);
-        var user = await users.CreateAsync(new WebUserInput { Username = name, DisplayName = "Ext Utilizator", Role = AccessRoles.LimitedUser, Password = "parola-ext-veche-123" });
+        var user = await users.CreateAsync(new WebUserInput { Username = name, DisplayName = "Ext Utilizator", Role = AccessRoles.LimitedUser, Password = "Parola-ext-veche-123!" });
         try
         {
+            Check((await users.GetUsersAsync()).First(item => item.Id == user.Id).MustChangePassword && (await users.AuthenticateAsync(name, "Parola-ext-veche-123!")).User?.MustChangePassword == true,
+                "A new account has to change its password at the first sign-in");
+            await Rejects<UserOperationException>(() => users.CreateAsync(new WebUserInput { Username = name + ".slab", DisplayName = "Slab", Role = AccessRoles.LimitedUser, Password = "parola-slaba-123" }), "An administrator cannot set a password that breaks the policy");
             var noReason = WebUserInput.From(user); noReason.DisplayName = "Fara motiv";
             await Rejects<UserOperationException>(() => users.UpdateAsync(user, noReason), "A user edit without a reason is rejected");
-            var edit = WebUserInput.From(user); edit.DisplayName = "Ext Editat"; edit.Password = "parola-ext-noua-456"; edit.Reason = "Ext schimbare parola";
+            var edit = WebUserInput.From(user); edit.DisplayName = "Ext Editat"; edit.Password = "Parola-ext-noua-456!"; edit.Reason = "Ext schimbare parola";
             var edited = await users.UpdateAsync(user, edit);
-            Check((await users.AuthenticateAsync(name, "parola-ext-noua-456")).Status == AuthenticationStatus.Success, "An edited user authenticates with the new password");
-            Check((await users.AuthenticateAsync(name, "parola-ext-veche-123")).Status == AuthenticationStatus.InvalidCredentials, "The old password no longer works");
+            Check((await users.AuthenticateAsync(name, "Parola-ext-noua-456!")).Status == AuthenticationStatus.Success, "An edited user authenticates with the new password");
+            Check((await users.AuthenticateAsync(name, "Parola-ext-veche-123!")).Status == AuthenticationStatus.InvalidCredentials, "The old password no longer works");
             await Rejects<UserOperationException>(() => users.UpdateAsync(user, WebUserInput.From(user)), "A stale user edit is rejected");
             user = edited;
+            // The user changes their own password from the menu of the top bar: the current one is checked, the new one follows the rules, the journal says it without the password.
+            var own = new OwnAccountService(configuration, new TestAccessControl(false, name), audit, Microsoft.Extensions.Logging.Abstractions.NullLogger<OwnAccountService>.Instance);
+            // The first sign-in: the user chooses a new password that follows the policy and differs from the one the administrator set; the flag then goes away.
+            Check((await users.GetUsersAsync()).First(item => item.Id == user.Id).MustChangePassword, "The password set by an administrator has to be changed at the next sign-in");
+            Check(!(await own.ChangeForcedAsync(user.Id, "slaba", "slaba")).Success
+                && !(await own.ChangeForcedAsync(user.Id, "Parola-Fortata-789!", "Alta-Parola-789!")).Success
+                && (await own.ChangeForcedAsync(user.Id, "Parola-ext-noua-456!", "Parola-ext-noua-456!")) is { Success: false } same && same.Message.Contains("diferită de cea stabilită"),
+                "The first password change refuses a weak password, a different confirmation and the password the administrator set");
+            Check((await own.ChangeForcedAsync(user.Id, "Parola-Fortata-789!", "Parola-Fortata-789!")).Success
+                && !(await users.GetUsersAsync()).First(item => item.Id == user.Id).MustChangePassword
+                && (await users.AuthenticateAsync(name, "Parola-Fortata-789!")).User?.MustChangePassword == false
+                && (await users.AuthenticateAsync(name, "Parola-ext-noua-456!")).Status == AuthenticationStatus.InvalidCredentials, "The first password change takes effect and clears the flag");
+            Check(!(await own.ChangeForcedAsync(user.Id, "Alta-Parola-789!", "Alta-Parola-789!")).Success, "A password that does not have to be changed cannot be replaced through the first-sign-in page");
+            user = (await users.GetUsersAsync()).First(item => item.Id == user.Id);
+            var reset = WebUserInput.From(user); reset.Password = "Parola-ext-noua-456!"; reset.Reason = "Ext resetare parola";
+            user = await users.UpdateAsync(user, reset);
+            Check((await users.GetUsersAsync()).First(item => item.Id == user.Id).MustChangePassword, "A password set by an administrator makes the user change it again at the next sign-in");
+            Check(await own.CanChangePasswordAsync(), "A database user can change their own password");
+            Check(!(await own.ChangePasswordAsync("", "Parola-ext-schimbata-789!", "Parola-ext-schimbata-789!")).Success
+                && !(await own.ChangePasswordAsync("Parola-ext-noua-456!", "scurta", "scurta")).Success
+                && !(await own.ChangePasswordAsync("Parola-ext-noua-456!", "Parola-ext-schimbata-789!", "alta-parola-12345")).Success
+                && !(await own.ChangePasswordAsync("Parola-ext-noua-456!", "Parola-ext-noua-456!", "Parola-ext-noua-456!")).Success,
+                "An empty current password, a short new one, a different confirmation or the same password are refused");
+            Check((await own.ChangePasswordAsync("parola-gresita-000", "Parola-ext-schimbata-789!", "Parola-ext-schimbata-789!")) is { Success: false, Message: OwnAccountService.WrongCurrentMessage }
+                && (await users.AuthenticateAsync(name, "Parola-ext-noua-456!")).Status == AuthenticationStatus.Success, "A wrong current password does not change anything");
+            Check((await own.ChangePasswordAsync("Parola-ext-noua-456!", "Parola-ext-schimbata-789!", "Parola-ext-schimbata-789!")).Success
+                && (await users.AuthenticateAsync(name, "Parola-ext-schimbata-789!")).Status == AuthenticationStatus.Success
+                && (await users.AuthenticateAsync(name, "Parola-ext-noua-456!")).Status == AuthenticationStatus.InvalidCredentials, "The own password change takes effect: the new password works, the old one does not");
+            Check((await own.ChangePasswordAsync("Parola-ext-schimbata-789!", "Parola-ext-noua-456!", "Parola-ext-noua-456!")).Success, "The own password can be changed back");
+            Check(!(await users.GetUsersAsync()).First(item => item.Id == user.Id).MustChangePassword, "The own password change also clears the flag");
+            user = (await users.GetUsersAsync()).First(item => item.Id == user.Id);
+            Check((await audit.GetEventsAsync()).Any(item => item.Action == AuditActions.ChangeOwnPassword && item.Target == name && !item.Details.Contains("parola-ext")), "The journal says the own password change and never the password");
             var twoFactor = new MariaTwoFactorStore(configuration, new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
             var secret = await twoFactor.ProvisionAsync(user.Id, "ext.admin");
             Check(secret is not null && !(await twoFactor.GetStatusAsync(user.Id)).Confirmed, "An authenticator associated by the administrator is pending until a code confirms it");
@@ -340,7 +375,7 @@ public static partial class MariaExtendedChecks
             recovery = replaced;
             var inactive = WebUserInput.From(user); inactive.IsActive = false; inactive.Reason = "Ext dezactivare";
             user = await users.UpdateAsync(user, inactive);
-            Check((await users.AuthenticateAsync(name, "parola-ext-noua-456")).Status == AuthenticationStatus.Inactive, "A deactivated user is reported as inactive");
+            Check((await users.AuthenticateAsync(name, "Parola-ext-noua-456!")).Status == AuthenticationStatus.Inactive, "A deactivated user is reported as inactive");
             Check((await twoFactor.GetStatusAsync(user.Id)) is { Confirmed: true, Suspended: true, Active: false }
                 && await twoFactor.VerifyAsync(user.Id, recovery![0]) == TwoFactorCheck.Suspended, "Deactivating the account suspends its authenticator: neither a code nor a recovery code works");
             var reactivate = WebUserInput.From(user); reactivate.IsActive = true; reactivate.Reason = "Ext reactivare";

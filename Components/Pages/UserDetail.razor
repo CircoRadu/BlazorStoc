@@ -45,7 +45,7 @@ else
             <dt>Tip utilizator</dt><dd><span class="role-badge @(user.Role == AccessRoles.Administrator ? "admin" : "limited")">@(user.TypeName.Length > 0 ? user.TypeName : user.Role)</span></dd>
             <dt>Stare</dt><dd><span class="stock-badge @(user.IsActive ? "positive" : "zero")">@(user.IsActive ? "Activ" : "Inactiv")</span></dd>
         </dl>
-        <p class="muted">Parola nu este afișată și nu poate fi recuperată.</p>
+        <p class="muted">Parola nu este afișată și nu poate fi recuperată.@(user.MustChangePassword ? " Utilizatorul trebuie să aleagă o parolă nouă la prima autentificare (parola actuală a fost stabilită de un administrator)." : "")</p>
     </section>
     @if (authRow is not null)
     {

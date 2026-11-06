@@ -4,6 +4,44 @@ Fluxul: administratorul creeaza conturi (Administrator / Utilizator) -> autentif
 
 ## Modificari de testat
 
+### 06.11.2026 - Schimbarea parolei la prima autentificare si politica de parola
+
+**Ce s-a adaugat:** pagina "Alege o parola noua" (`/Account/ChangePassword`), indicatorul "Parola de schimbat" in lista de utilizatori, politica de parola (minimum 8 caractere, cu litera mica, litera mare, cifra si caracter special), jurnal "Stabilire parola de catre administrator" si "Schimbare parola la prima autentificare".
+
+**Ce face acum:** orice cont creat de un administrator, orice cont a carui parola o seteaza un administrator (altul decat propriul cont) si TOATE conturile care existau la aceasta versiune trebuie sa-si aleaga o parola noua la prima autentificare. Dupa ce utilizator, parola (si codul 2FA, cand se cere) sunt corecte, utilizatorul nu intra in aplicatie ci ajunge pe pagina de alegere a parolei noi; sesiunea se creeaza abia dupa. Parola noua trebuie sa respecte politica si sa fie diferita de cea stabilita de administrator. Politica se aplica oricarei parole: si celei setate de administrator si celei alese de utilizator (inclusiv "Schimba parola" din meniul contului). Administratorul din configurare nu este inclus.
+
+| Nr | Pas | Rezultat asteptat | Rezultat obtinut |
+|---|---|---|---|
+| 1 | Administrator: creeaza un utilizator cu parola "slaba" | Refuzat, mesajul spune ce lipseste (litera mare, cifra, caracter special...) | |
+| 2 | Creeaza utilizatorul cu o parola corecta (ex. Temp-Parola-123!) | In lista apare "Parola de schimbat" langa stare; pe pagina utilizatorului apare explicatia | |
+| 3 | Autentifica-te cu utilizatorul nou | Esti dus la "Alege o parola noua", nu in aplicatie; fara pagina nu poti deschide nimic | |
+| 4 | Scrie ca parola noua chiar parola primita de la administrator; apoi una slaba; apoi confirmare diferita | Mesaj clar de fiecare data, nimic nu se schimba | |
+| 5 | Scrie o parola noua corecta | Intri in aplicatie; indicatorul din lista a disparut; Jurnal "Schimbare parola la prima autentificare" | |
+| 6 | Autentifica-te din nou | Intri direct, cu parola noua; vechea nu mai merge | |
+| 7 | Administrator: seteaza o parola noua unui utilizator (Editeaza) | Jurnal "Stabilire parola de catre administrator"; utilizatorul isi alege alta parola la urmatoarea autentificare | |
+| 8 | Conturile care existau deja inainte de actualizare | La prima autentificare fiecare isi alege o parola noua; ramane valabila parola veche pana atunci | |
+| 9 | Autentificare cu 2FA obligatoriu, cont cu parola de schimbat | Intai utilizator + parola + cod, apoi pagina de alegere a parolei | |
+| 10 | Administratorul isi schimba propria parola in editor | Nu i se cere schimbarea la autentificarea urmatoare (parola e a lui) | |
+| 11 | Pe pagina "Alege o parola noua" si in fereastra "Schimba parola": scrie parola noua litera cu litera | Cele cinci conditii (8 caractere, litera mica, litera mare, cifra, caracter special) sunt pe randuri separate, rosii pana se indeplinesc, verzi dupa; la fel "Parolele introduse coincid" (si "Diferita de parola actuala" in fereastra); butonul se activeaza doar cand toate sunt verzi | |
+| 12 | Comutatorul "Arata parola" | Parolele se vad / se ascund (in fereastra, inclusiv parola actuala) | |
+| 13 | Setari -> Utilizatori -> Adauga utilizator (si Editeaza cu parola noua): scrie parola litera cu litera | Aceeasi lista de conditii pe randuri separate, rosii/verzi la tastare, "Parolele coincid" si comutatorul "Arata parola" | |
+| 14 | Setari -> Baza de date -> Conexiune: "Schimba parola contului ..." si exportul cu fraza-parola | Conditiile (cel putin 16 caractere / 12 pentru fraza-parola, fara caractere de control) pe randuri verzi/rosii; coincidenta ramane ca pana acum | |
+| 15 | Campurile "Parola" din Conexiune baza de date, Backup NAS, ActivityApp si Elcomtur | Au comutatorul "Arata parola" (fara conditii: sunt parolele altor sisteme) | |
+
+### 06.11.2026 - Meniul utilizatorului conectat (nume in bara de sus) si schimbarea propriei parole
+
+**Ce s-a adaugat:** numele utilizatorului conectat din bara de sus este acum un buton care deschide un meniu peste pagina, cu: Autentificatorul meu, Schimba parola (fereastra popup) si Deconectare. Legaturile separate "Autentificatorul meu" si "Deconectare" din bara de sus au fost mutate in meniu.
+
+**Ce face acum:** orice utilizator (indiferent de drepturi) isi schimba propria parola: scrie parola actuala, apoi parola noua de doua ori (minimum 8 caractere, diferita de cea actuala). Parola gresita nu schimba nimic; 5 incercari gresite blocheaza schimbarea 10 minute. Sesiunea curenta ramane deschisa. In Jurnal apare "Schimbare parola proprie" (parola nu se scrie). Administratorul din configurare nu isi poate schimba parola de aici.
+
+| Nr | Pas | Rezultat asteptat | Rezultat obtinut |
+|---|---|---|---|
+| 1 | Apasa numele tau in bara de sus | Se deschide meniul peste pagina (nume afisat, Autentificatorul meu, Schimba parola, Deconectare); clic in afara sau Escape il inchide | |
+| 2 | Schimba parola cu parola actuala gresita, apoi cu parola noua prea scurta, apoi cu confirmare diferita | Mesaj clar de fiecare data, nimic nu se schimba | |
+| 3 | Schimba parola corect | Mesaj de succes; la urmatoarea autentificare merge parola noua, cea veche nu; Jurnal "Schimbare parola proprie" | |
+| 4 | Apasa Deconectare din meniu | Apare confirmarea "Inchizi sesiunea?"; dupa confirmare esti dus la pagina de autentificare | |
+| 5 | Conectat ca administratorul din configurare: deschide meniul | "Schimba parola" este dezactivat cu explicatia ca parola e in fisierul de configurare | |
+
 ### 06.11.2026 - Autentificare cu cod din aplicatia de autentificare (Setari -> Autentificare)
 
 **Ce s-a adaugat:** sectiunea Setari -> Autentificare (mod: niciodata / doar din exterior / pentru toti, reteaua interna, tabelul autentificatoarelor cu stare, confirmare, ultima folosire si coduri de recuperare ramase), cardul "Autentificator" pe pagina utilizatorului, codul pe aceeasi pagina cu utilizatorul si parola, comanda de urgenta `BlazorStoc.dll --reset-authenticator nume`.

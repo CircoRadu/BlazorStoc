@@ -31,7 +31,7 @@ public static partial class MariaExtendedChecks
             await Rejects<UserOperationException>(() => repository.CreateAsync(new UserTypeInput { Name = "x" }), "A type name needs at least two characters");
 
             // A user of this type has exactly the keys of the type, and a change of the type applies at once.
-            user = await users.CreateAsync(new WebUserInput { Username = "ext.tipuri." + Suffix(), DisplayName = "Ext Tipuri", TypeId = type.Id, Password = "parola-ext-tipuri-1" });
+            user = await users.CreateAsync(new WebUserInput { Username = "ext.tipuri." + Suffix(), DisplayName = "Ext Tipuri", TypeId = type.Id, Password = "Parola-ext-tipuri-1!" });
             Check(user.Role == AccessRoles.LimitedUser && user.TypeId == type.Id && user.TypeName == name, "A user of a custom type has the role Utilizator and the name of the type");
             var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.Role, user.Role)], "test"));

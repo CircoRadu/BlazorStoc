@@ -9,6 +9,7 @@ public static class LoginMessages
     public const string WrongCredentials = "Utilizator sau parolă incorectă.";
     public const string WrongCredentialsOrCode = "Utilizator, parolă sau cod incorect.";
     public static string TooManyAttempts(int minutes) => $"Prea multe încercări. Autentificarea este blocată încă {Math.Max(1, minutes)} min.";
+    public const string PasswordChangeExpired = "Alegerea parolei noi a expirat. Autentifică-te din nou.";
     public const string DatabaseUnavailable = "Baza de date nu răspunde momentan sau este în curs un backup/o restaurare. Nu este o problemă a contului tău: încearcă din nou peste câteva momente.";
 
     public static bool IsDatabaseUnavailable(Exception exception) =>

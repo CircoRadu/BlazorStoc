@@ -1,0 +1,49 @@
+@using System.Security.Claims
+@using BlazorStoc.Services
+@inject AuthenticationStateProvider Auth
+@inject IOwnAccountService Account
+@* The name of the signed-in user in the top bar opens an overlay over the page with the options of their account: the state of their authenticator, a change of their own password
+   (a window over the page) and the sign-out (the confirmation window of the layout). Every user has it; it needs no right of the permission matrix. *@
+
+<div class="account-menu" @onkeydown="KeyDown">
+    <button type="button" id="account-trigger" class="account-trigger" aria-haspopup="menu" aria-expanded="@(open ? "true" : "false")" aria-controls="account-panel"
+            title="Contul tău" @onclick="Toggle">
+        <span>@name · @role</span><span class="account-caret" aria-hidden="true">▾</span>
+    </button>
+    @if (open)
+    {
+        <div class="account-backdrop" @onclick="Close"></div>
+        <div id="account-panel" class="account-panel" role="menu" aria-labelledby="account-trigger">
+            <div class="account-head"><strong>@display</strong><small>@name · @role</small></div>
+            <a class="account-item" role="menuitem" href="/Account/TwoFactor" @onclick="Close">Autentificatorul meu</a>
+            <button type="button" class="account-item" role="menuitem" disabled="@(!canChangePassword)" @onclick="OpenPassword"
+                    title="@(canChangePassword ? "Schimbă parola contului tău" : "Parola administratorului din configurare se schimbă din fișierul de configurare")">Schimbă parola</button>
+            @if (!canChangePassword) { <span class="account-note">Parola acestui cont este în fișierul de configurare.</span> }
+            <hr />
+            <button type="button" class="account-item account-logout" role="menuitem" data-logout-open aria-haspopup="dialog" @onclick="Close">Deconectare</button>
+        </div>
+    }
+</div>
+@if (changingPassword) { <ChangePasswordDialog Closed="ClosePassword" /> }
+
+@code {
+    private bool open, changingPassword, canChangePassword;
+    private string name = "", display = "", role = "Utilizator";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await Auth.GetAuthenticationStateAsync();
+        var user = state.User;
+        name = user.Identity?.Name ?? "";
+        display = user.FindFirstValue(ClaimTypes.GivenName) is { Length: > 0 } given ? given : name;
+        role = user.IsInRole("Administrator") ? "Administrator" : "Utilizator";
+        try { canChangePassword = await Account.CanChangePasswordAsync(); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { canChangePassword = false; }
+    }
+
+    private void Toggle() => open = !open;
+    private void Close() => open = false;
+    private void OpenPassword() { open = false; changingPassword = true; }
+    private void ClosePassword() => changingPassword = false;
+    private void KeyDown(KeyboardEventArgs args) { if (args.Key == "Escape") open = false; }
+}

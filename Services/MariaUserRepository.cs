@@ -27,7 +27,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
 
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = Command(connection, null, """
-            SELECT id,username,display_name,role,password_hash,is_active
+            SELECT id,username,display_name,role,password_hash,is_active,must_change_password
             FROM web_users WHERE normalized_username=@username LIMIT 1
             """, ("@username", TextNormalization.UniquenessKey(username)));
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -37,7 +37,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
             return new(AuthenticationStatus.InvalidCredentials);
         }
 
-        var user = new AuthenticatedWebUser(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3));
+        var user = new AuthenticatedWebUser(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetBoolean(6));
         var storedHash = reader.GetString(4);
         var isActive = reader.GetBoolean(5);
         var verification = PasswordHasher.VerifyHashedPassword(PasswordSubject, storedHash, password);
@@ -60,7 +60,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
         await using var connection = await MariaDb.OpenAsync(configuration, cancellationToken).ConfigureAwait(false);
         await using var command = new MySqlCommand(
             """
-            SELECT u.id,u.username,u.display_name,u.role,u.is_active,u.version,u.user_type_id,COALESCE(t.name,'')
+            SELECT u.id,u.username,u.display_name,u.role,u.is_active,u.version,u.user_type_id,COALESCE(t.name,''),u.must_change_password
             FROM web_users u LEFT JOIN user_types t ON t.id=u.user_type_id ORDER BY u.username,u.id
             """, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -84,12 +84,12 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                 await EnsureUniqueUsernameAsync(connection, transaction, normalized, null, cancellationToken).ConfigureAwait(false);
                 var type = await ResolveTypeAsync(connection, transaction, value, cancellationToken).ConfigureAwait(false);
                 await using var command = Command(connection, transaction, """
-                    INSERT INTO web_users(username,normalized_username,display_name,password_hash,role,user_type_id,is_active,version)
-                    VALUES(@username,@normalized,@displayName,@passwordHash,@role,@typeId,1,0)
+                    INSERT INTO web_users(username,normalized_username,display_name,password_hash,role,user_type_id,is_active,version,must_change_password)
+                    VALUES(@username,@normalized,@displayName,@passwordHash,@role,@typeId,1,0,1)
                     """, ("@username", value.Username), ("@normalized", normalized), ("@displayName", value.DisplayName),
                     ("@passwordHash", passwordHash), ("@role", type.Role), ("@typeId", type.Id is null ? DBNull.Value : type.Id.Value));
                 await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-                return new WebUser(checked((int)command.LastInsertedId), value.Username, value.DisplayName, type.Role, true, 0, type.Id, type.Name);
+                return new WebUser(checked((int)command.LastInsertedId), value.Username, value.DisplayName, type.Role, true, 0, type.Id, type.Name, true);
             }, cancellationToken).ConfigureAwait(false);
             await AuditRecorder.RecordCreateAsync(auditTrail, accessControl, AuditEntities.User, user.Id.ToString(),
                 $"#{user.Id} · {user.Username}", AuditDetails.Identification(
@@ -135,7 +135,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                     throw new UserOperationException("Sistemul trebuie să păstreze cel puțin un administrator activ.");
 
                 var version = checked(original.Version + 1);
-                var passwordClause = passwordHash is null ? "" : ",password_hash=@passwordHash";
+                var passwordClause = passwordHash is null ? "" : ownAccount ? ",password_hash=@passwordHash" : ",password_hash=@passwordHash,must_change_password=1";
                 await using var command = Command(connection, transaction, $"""
                     UPDATE web_users SET username=@username,normalized_username=@normalized,display_name=@displayName,
                         role=@role,user_type_id=@typeId,is_active=@active,version=@version{passwordClause}
@@ -148,7 +148,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
                     throw new UserOperationException("Utilizatorul s-a schimbat între timp. Actualizează lista.");
                 // A deactivated account suspends its authenticator (kept, unusable); when the account is active again the administrator chooses to resume or revoke it.
                 if (original.IsActive && !value.IsActive) await TwoFactorSql.SuspendForUserAsync(connection, transaction, original.Id, cancellationToken).ConfigureAwait(false);
-                return new WebUser(original.Id, value.Username, value.DisplayName, type.Role, value.IsActive, version, type.Id, type.Name);
+                return new WebUser(original.Id, value.Username, value.DisplayName, type.Role, value.IsActive, version, type.Id, type.Name, original.MustChangePassword || (passwordHash is not null && !ownAccount));
             }, cancellationToken).ConfigureAwait(false);
             var target = $"#{updated.Id} · {updated.Username}";
             var typeChanged = original.TypeId != updated.TypeId || original.Role != updated.Role;
@@ -160,6 +160,10 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
             if (typeChanged)
                 await AuditRecorder.RecordEditAsync(auditTrail, accessControl, AuditEntities.User, updated.Id.ToString(), target,
                     changes.Where(change => change.Field is "Rol" or "Tip utilizator"), value.Reason, cancellationToken, AuditActions.ChangeUserType).ConfigureAwait(false);
+            // The password of another account set by an administrator is its own journal operation (the password itself is never recorded).
+            if (passwordHash is not null && !ownAccount)
+                await AuditRecorder.RecordActionAsync(auditTrail, accessControl, AuditEntities.User, AuditActions.SetUserPassword, updated.Id.ToString(), target,
+                    "Parola contului a fost stabilită de administrator; utilizatorul o schimbă la prima autentificare.", value.Reason, cancellationToken).ConfigureAwait(false);
             permissions?.Invalidate();
             return updated;
         }
@@ -246,7 +250,7 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     private static async Task<WebUser?> GetLockedAsync(MySqlConnection connection, MySqlTransaction transaction, int id, CancellationToken token)
     {
         await using var command = Command(connection, transaction, """
-            SELECT u.id,u.username,u.display_name,u.role,u.is_active,u.version,u.user_type_id,COALESCE(t.name,'')
+            SELECT u.id,u.username,u.display_name,u.role,u.is_active,u.version,u.user_type_id,COALESCE(t.name,''),u.must_change_password
             FROM web_users u LEFT JOIN user_types t ON t.id=u.user_type_id WHERE u.id=@id FOR UPDATE
             """, ("@id", id));
         await using var reader = await command.ExecuteReaderAsync(token).ConfigureAwait(false);
@@ -286,5 +290,5 @@ public sealed class MariaUserRepository(IConfiguration configuration, IAccessCon
     private Task EnsureAsync(string permission, CancellationToken token) => accessControl?.EnsureAsync(permission, token) ?? Task.CompletedTask;
     private Task<string?> GetCurrentUsernameAsync(CancellationToken token) => accessControl?.GetUsernameAsync(token) ?? Task.FromResult<string?>(null);
     private static WebUser ReadUser(MySqlDataReader reader) => new(reader.GetInt32(0), reader.GetString(1), reader.GetString(2),
-        reader.GetString(3), reader.GetBoolean(4), reader.GetInt64(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetString(7));
+        reader.GetString(3), reader.GetBoolean(4), reader.GetInt64(5), reader.IsDBNull(6) ? null : reader.GetInt64(6), reader.GetString(7), reader.GetBoolean(8));
 }

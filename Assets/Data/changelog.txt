@@ -1,3 +1,18 @@
+## 0.5.49 | 06.11.2026
+- Setări, Utilizatori, formularul de creare și de editare a unui utilizator: cele cinci condiții ale parolei sunt afișate pe rânduri separate și verificate pe măsură ce scrii (verde când sunt îndeplinite, roșu în caz contrar), iar „Arată parola” este acum un comutator On/Off, ca în restul aplicației.
+- Setări, Baza de date, Conexiune: la schimbarea parolei unui cont al bazei de date și la fraza-parolă a exportului, condițiile parolei (lungime, fără caractere de control) sunt afișate pe rânduri și verificate pe măsură ce scrii. Parolele altor sisteme (conexiunea la baza de date, copia pe NAS, ActivityApp, Elcomtur) au comutatorul „Arată parola”.
+
+## 0.5.48 | 06.11.2026
+- Alegerea unei parole noi (la prima autentificare și din meniul contului): comutatorul „Arată parola”, cele cinci condiții ale parolei afișate pe rânduri separate și verificate pe măsură ce scrii (verde când sunt îndeplinite, roșu în caz contrar), verificarea că parola și repetarea ei coincid și, în fereastra din meniu, verificarea că parola nouă diferă de cea actuală. Butonul de salvare se activează doar când toate condițiile sunt îndeplinite.
+- Parola nouă și repetarea ei sunt pe același rând, iar în fereastra „Schimbă parola” parola actuală este deasupra lor.
+
+## 0.5.47 | 06.11.2026
+- Parolele: la prima autentificare după această actualizare fiecare cont își alege o parolă nouă. Același lucru se întâmplă la primul cont creat de un administrator și la orice cont căruia un administrator îi stabilește parola. După ce utilizatorul și parola (și codul din aplicația de autentificare, când se cere) sunt corecte, utilizatorul ajunge pe pagina „Alege o parolă nouă” și intră în aplicație abia după ce a ales-o.
+- Regulile parolei, valabile pentru orice parolă (și pentru cea stabilită de administrator): minimum 8 caractere, cu cel puțin o literă mică, o literă mare, o cifră și un caracter special. Parola nouă trebuie să fie diferită de cea stabilită de administrator. Administratorul păstrează schimbarea parolelor utilizatorilor, iar lista de utilizatori arată „Parolă de schimbat” pentru conturile care urmează să o schimbe.
+- Meniul contului: numele utilizatorului din bara de sus deschide un meniu peste pagină cu „Autentificatorul meu”, „Schimbă parola” (fereastră proprie, cu parola actuală, parola nouă și repetarea ei alăturate) și „Deconectare”. Orice utilizator își poate schimba propria parolă; cinci parole actuale greșite blochează schimbarea 10 minute.
+- Jurnal: „Stabilire parolă de către administrator”, „Schimbare parolă la prima autentificare”, „Schimbare parolă proprie” (parola nu se înregistrează niciodată).
+- Instalatorul aplică aceleași reguli parolei primului administrator.
+
 ## 0.5.46 | 06.11.2026
 - Autentificare în doi pași: pe lângă utilizator și parolă, aplicația poate cere un cod din aplicația de autentificare (Google Authenticator, Microsoft Authenticator, Aegis). Utilizator, parolă și cod se scriu pe aceeași pagină, iar un refuz nu spune care dintre ele a fost greșită.
 - Setări, secțiunea nouă „Autentificare”: alegi când se cere codul (niciodată, doar din exterior sau pentru toți), rețeaua internă și vezi autentificatoarele conturilor (stare, cine l-a confirmat, ultima folosire, coduri de recuperare rămase). „Pentru toți” se poate porni doar după ce un administrator activ are autentificator confirmat.

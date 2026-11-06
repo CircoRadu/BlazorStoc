@@ -209,15 +209,21 @@ public static partial class FullRun
         Check((await demoUsers.AuthenticateAsync("administrator.demo", "admin-demo-123")).User?.Role == AccessRoles.Administrator, "Demo administrator can authenticate");
         Check((await demoUsers.AuthenticateAsync("utilizator.demo", "utilizator-demo-123")).User?.Role == AccessRoles.LimitedUser, "Demo product user can authenticate");
         Check((await demoUsers.AuthenticateAsync("utilizator.demo", "parola-gresita")).Status == AuthenticationStatus.InvalidCredentials, "Demo authentication rejects a wrong password");
-        var newUser = await demoUsers.CreateAsync(new WebUserInput { Username = "  Ión.Popescu  ", DisplayName = "  Ión   Popéscu  ", Role = AccessRoles.LimitedUser, Password = "parola-demo-123" });
+        var newUser = await demoUsers.CreateAsync(new WebUserInput { Username = "  Ión.Popescu  ", DisplayName = "  Ión   Popéscu  ", Role = AccessRoles.LimitedUser, Password = "Parola-demo-123!" });
         Check(newUser.Username == "Ion.Popescu" && newUser.DisplayName == "Ion Popescu" && newUser.Role == AccessRoles.LimitedUser && newUser.IsActive, "User values keep letter case and remove diacritics");
-        Check((await demoUsers.AuthenticateAsync("ion.popescu", "parola-demo-123")).User?.Id == newUser.Id, "New demo user can authenticate");
-        await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "ION.POPESCU", DisplayName = "Duplicat", Role = AccessRoles.LimitedUser, Password = "parola-demo-123" }), "Usernames are unique without case sensitivity");
-        await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "ab", DisplayName = "Invalid", Role = AccessRoles.LimitedUser, Password = "parola-demo-123" }), "Short username is rejected");
+        Check((await demoUsers.AuthenticateAsync("ion.popescu", "Parola-demo-123!")).User?.Id == newUser.Id, "New demo user can authenticate");
+        await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "ION.POPESCU", DisplayName = "Duplicat", Role = AccessRoles.LimitedUser, Password = "Parola-demo-123!" }), "Usernames are unique without case sensitivity");
+        await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "ab", DisplayName = "Invalid", Role = AccessRoles.LimitedUser, Password = "Parola-demo-123!" }), "Short username is rejected");
         await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "user-valid", DisplayName = "Invalid", Role = AccessRoles.LimitedUser, Password = "scurta" }), "Short password is rejected");
         await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "user-sapte", DisplayName = "Invalid", Role = AccessRoles.LimitedUser, Password = "1234567" }), "A 7-character password is rejected");
-        var eightCharUser = await demoUsers.CreateAsync(new WebUserInput { Username = "user-opt", DisplayName = "Opt Caractere", Role = AccessRoles.LimitedUser, Password = "12345678" });
-        Check(WebUserInput.MinimumPasswordLength == 8 && (await demoUsers.AuthenticateAsync("user-opt", "12345678")).User?.Id == eightCharUser.Id, "A password of 8 characters is accepted (the minimum)");
+        var eightCharUser = await demoUsers.CreateAsync(new WebUserInput { Username = "user-opt", DisplayName = "Opt Caractere", Role = AccessRoles.LimitedUser, Password = "Ab1!cdef" });
+        Check(WebUserInput.MinimumPasswordLength == 8 && (await demoUsers.AuthenticateAsync("user-opt", "Ab1!cdef")).User?.Id == eightCharUser.Id, "A password of 8 characters that follows the policy is accepted (the minimum)");
+        await RejectedUser(() => demoUsers.CreateAsync(new WebUserInput { Username = "user-cifre", DisplayName = "Invalid", Role = AccessRoles.LimitedUser, Password = "12345678" }), "A password of digits only is rejected by the policy");
+        Check(PasswordPolicy.Validate("Ab1!cdef") is null && PasswordPolicy.Validate("Parola-Lunga-123!") is null && PasswordPolicy.Validate("abcdefg1!") is { } noUpper && noUpper.Contains("literă mare")
+              && PasswordPolicy.Validate("ABCDEFG1!") is { } noLower && noLower.Contains("literă mică") && PasswordPolicy.Validate("Abcdefgh!") is { } noDigit && noDigit.Contains("cifră")
+              && PasswordPolicy.Validate("Abcdefg12") is { } noSpecial && noSpecial.Contains("caracter special") && PasswordPolicy.Validate("Ab1!cde") is { } tooShort && tooShort.Contains("minimum 8")
+              && PasswordPolicy.Validate("") is not null && PasswordPolicy.Validate(new string('A', 201)) is { } tooLong && tooLong.Contains("cel mult"),
+            "The password policy asks 8 characters, a lower case letter, an upper case letter, a digit and a special character, and says what is missing");
         Check(new WebUserInput { Password = "abcdefgh", PasswordConfirmation = "abcdefgh" }.PasswordConfirmationError() is null &&
               new WebUserInput { Password = "abcdefgh", PasswordConfirmation = "abcdefgH" }.PasswordConfirmationError() is { } mismatch && mismatch.Contains("nu coincide") &&
               new WebUserInput { Password = "abcdefgh" }.PasswordConfirmationError() is not null && new WebUserInput().PasswordConfirmationError() is null,
@@ -228,7 +234,7 @@ public static partial class FullRun
         var inactiveUser = await demoUsers.UpdateAsync(newUser, userEdit);
         Check(!inactiveUser.IsActive && inactiveUser.Version == 1 && inactiveUser.DisplayName == "Ion Popescu Editat",
             "User can be edited, space-normalized and deactivated without changing password");
-        Check((await demoUsers.AuthenticateAsync("ion.popescu", "parola-demo-123")).Status == AuthenticationStatus.Inactive, "Inactive demo user receives inactive status");
+        Check((await demoUsers.AuthenticateAsync("ion.popescu", "Parola-demo-123!")).Status == AuthenticationStatus.Inactive, "Inactive demo user receives inactive status");
         await RejectedUser(() => demoUsers.UpdateAsync(newUser, UserEdit(newUser)), "Stale user edit is rejected");
         await RejectedUser(() => demoUsers.DeleteAsync(inactiveUser, "  "), "User deletion requires a reason");
         Check((await demoUsers.GetUsersAsync()).Any(user => user.Id == inactiveUser.Id), "Rejected user deletion preserves the account");
@@ -238,7 +244,7 @@ public static partial class FullRun
         var demotion = UserEdit(onlyAdmin); demotion.Role = AccessRoles.LimitedUser;
         await RejectedUser(() => demoUsers.UpdateAsync(onlyAdmin, demotion), "Last active administrator cannot be demoted");
         await RejectedUser(() => demoUsers.DeleteAsync(onlyAdmin, "Test automat"), "Last active administrator cannot be deleted");
-        var secondAdmin = await demoUsers.CreateAsync(new WebUserInput { Username = "admin.doi", DisplayName = "Administrator Doi", Role = AccessRoles.Administrator, Password = "parola-admin-123" });
+        var secondAdmin = await demoUsers.CreateAsync(new WebUserInput { Username = "admin.doi", DisplayName = "Administrator Doi", Role = AccessRoles.Administrator, Password = "Parola-admin-123!" });
         var demoted = await demoUsers.UpdateAsync(onlyAdmin, demotion);
         Check(demoted.Role == AccessRoles.LimitedUser && secondAdmin.Role == AccessRoles.Administrator, "Administrator can be demoted when another active administrator remains");
         var selfUsers = new DemoUserRepository(new TestAccessControl(true, "administrator.demo"));

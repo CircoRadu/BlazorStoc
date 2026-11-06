@@ -370,12 +370,12 @@ public static class MariaIntegrationChecks
             var user = await repository.CreateAsync(new WebUserInput
             {
                 Username = "integrare.test", DisplayName = "Integrare Test", Role = AccessRoles.LimitedUser,
-                Password = "parola-integrare-test-123"
+                Password = "Parola-integrare-test-123!"
             }).ConfigureAwait(false);
             try
             {
                 check(user.Id > 0 && user.IsActive, "A new user is created active in blazorstoc_test");
-                var ok = await repository.AuthenticateAsync("integrare.test", "parola-integrare-test-123").ConfigureAwait(false);
+                var ok = await repository.AuthenticateAsync("integrare.test", "Parola-integrare-test-123!").ConfigureAwait(false);
                 check(ok.Status == AuthenticationStatus.Success && ok.User?.Id == user.Id, "Authenticating with the right password succeeds");
                 var wrong = await repository.AuthenticateAsync("integrare.test", "parola-gresita-oarecare").ConfigureAwait(false);
                 check(wrong.Status == AuthenticationStatus.InvalidCredentials, "Authenticating with the wrong password is rejected");
@@ -384,7 +384,7 @@ public static class MariaIntegrationChecks
                     await repository.CreateAsync(new WebUserInput
                     {
                         Username = "INTEGRARE.TEST", DisplayName = "Duplicat", Role = AccessRoles.LimitedUser,
-                        Password = "parola-integrare-test-123"
+                        Password = "Parola-integrare-test-123!"
                     }).ConfigureAwait(false);
                     throw new Exception("A duplicate username was accepted");
                 }

@@ -20,7 +20,8 @@
             <ToggleSwitch Class="anaf-check" @bind-Value="copyEnabled" OnText="Activ" OffText="Inactiv">Copiere pe NAS</ToggleSwitch>
             <label class="anaf-wide">Cale partajare (de forma \\server\partajare sau \\server\partajare\folder)<input id="nas-path" @bind="path" maxlength="500" autocomplete="off" placeholder="\\192.168.100.50\BackupStocDepozit" /></label>
             <label>Cont<input id="nas-user" @bind="userName" maxlength="100" autocomplete="off" /></label>
-            <label>Parolă<input id="nas-password" type="password" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(hasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <label>Parolă<input id="nas-password" type="@(showPassword ? "text" : "password")" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(hasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <ToggleSwitch Id="nas-password-show" Class="full-width" @bind-Value="showPassword" OnText="Parola se vede" OffText="Parola este ascunsă">Arată parola</ToggleSwitch>
         </div>
         <div class="editor-actions">
             <button type="button" class="primary" disabled="@busy" @onclick="SaveAsync">Salvează</button>
@@ -52,6 +53,7 @@
     private bool loading = true, busy, noticeOk, hasPassword, copyEnabled;
     private BackupAlertState? alertState;
     private string? error, notice, busyText;
+    private bool showPassword;
     private string path = "", userName = "", password = "";
     private NasBackupSettings current = NasBackupSettings.Empty;
 

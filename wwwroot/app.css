@@ -1524,3 +1524,44 @@ tr[data-depth="0"] > td { border-top: 4px solid var(--c-d6e4df); }
 .group-tree-leaf { padding-left:30px; }
 .group-tree-leaf.selected { background:var(--c-edf5f1); color:var(--green); font-weight:650; box-shadow:inset 4px 0 0 var(--green); }
 .group-tree-empty { margin:4px 10px 8px 30px; }
+
+/* Menu of the signed-in user (top right): the name opens an overlay with the account options. */
+.account-menu { position: relative; }
+.account-trigger { display: inline-flex; align-items: center; gap: 8px; background: none; border: 1px solid transparent; border-radius: 8px; padding: 6px 10px; font: inherit; font-weight: 650; color: var(--ink); cursor: pointer; }
+.account-trigger:hover, .account-trigger[aria-expanded="true"] { background: var(--paper); border-color: var(--line); }
+.account-trigger .account-caret { font-size: 10px; color: var(--muted); }
+.account-backdrop { position: fixed; inset: 0; z-index: 900; background: transparent; }
+.account-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 901; width: 280px; background: var(--c-ffffff); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 40px #0002; padding: 8px; line-height: 1.4; }
+.account-panel .account-head { padding: 10px 12px 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.account-panel .account-head strong { display: block; font-size: 14px; }
+.account-panel .account-head small { display: block; color: var(--muted); margin-top: 2px; }
+.account-panel .account-item { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 10px 12px; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; text-decoration: none; }
+.account-panel .account-item:hover, .account-panel .account-item:focus-visible { background: var(--paper); }
+.account-panel .account-item.account-logout { color: var(--c-a83d35); }
+.account-panel hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.account-panel .account-note { display: block; color: var(--muted); font-size: 12px; padding: 0 12px 8px; }
+.password-dialog { max-width: 460px; }
+.password-dialog .anaf-grid { grid-template-columns: 1fr; }
+
+/* The new password and its repetition side by side (page of the first sign-in and the window of the menu); one under the other on a narrow screen. */
+.password-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.password-pair label { min-width: 0; }
+.password-dialog .anaf-grid.password-pair { grid-template-columns: 1fr 1fr; margin-top: 14px; }
+@media (max-width: 480px) { .password-pair, .password-dialog .anaf-grid.password-pair { grid-template-columns: 1fr; gap: 0; } }
+
+/* The conditions of a password, one per line, green when met and red otherwise (window of the menu and page of the first sign-in). */
+.password-rules { list-style: none; margin: 12px 0 4px; padding: 0; display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.password-rules li { display: flex; align-items: baseline; gap: 8px; }
+.password-rules li.ok { color: var(--c-13796a); }
+.password-rules li.bad { color: var(--c-b3261e); }
+.password-rules .rule-mark { flex: none; width: 14px; text-align: center; font-weight: 800; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.password-dialog .row-toggle.password-show { margin-top: 12px; }
+/* The "show the password" switch of the static page (self-contained: no generic rule of the card may show the check box or hide the track). */
+.login-card label.password-show { position: relative; display: flex; align-items: center; gap: 10px; margin: 14px 0 0; font-size: 14px; font-weight: 600; cursor: pointer; }
+.login-card label.password-show input[type=checkbox] { position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+.login-card label.password-show .toggle-track { display: block; position: relative; flex: none; width: 36px; height: 20px; border-radius: 10px; background: var(--line); border: 1px solid var(--muted); }
+.login-card label.password-show .toggle-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s; }
+.login-card label.password-show input:checked + .toggle-track { background: var(--green); border-color: var(--green); }
+.login-card label.password-show input:checked + .toggle-track::after { transform: translateX(16px); background: var(--c-ffffff); }
+.login-card label.password-show input:focus-visible + .toggle-track { outline: 2px solid var(--green); outline-offset: 2px; }

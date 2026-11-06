@@ -278,6 +278,10 @@ public static class AuditActions
     public const string SetAppPort = "Modificare port aplicație";
     public const string SetReverseProxy = "Modificare HTTPS prin proxy";
     public const string SetAccessSecurity = "Modificare securitate acces extern";
+    public const string SetUserPassword = "Stabilire parolă de către administrator";
+    public const string ForcedPasswordChange = "Schimbare parolă la prima autentificare";
+    public const string ChangeOwnPassword = "Schimbare parolă proprie";
+    public const string ChangeOwnPasswordFailed = "Schimbare parolă proprie refuzată";
     public const string ProvisionTwoFactor = "Asociere autentificator";
     public const string ConfirmTwoFactor = "Confirmare autentificator";
     public const string RevokeTwoFactor = "Revocare autentificator";

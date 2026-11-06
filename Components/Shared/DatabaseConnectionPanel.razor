@@ -22,7 +22,8 @@
             <label>Port la care se conectează<input id="db-port" type="number" min="1" max="65535" @bind="port" autocomplete="off" /></label>
             <label>Baza de date<input id="db-name" value="@current.Name" readonly title="Aplicația scrie numai în baza BlazorStoc; numele nu se schimbă de aici." /></label>
             <label>Utilizator<input id="db-user" @bind="user" maxlength="80" autocomplete="off" /></label>
-            <label>Parolă<input id="db-password" type="password" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(current.HasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <label>Parolă<input id="db-password" type="@(showPassword ? "text" : "password")" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(current.HasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <ToggleSwitch Id="db-password-show" Class="full-width" @bind-Value="showPassword" OnText="Parola se vede" OffText="Parola este ascunsă">Arată parola</ToggleSwitch>
             <label>Mod SSL
                 <select id="db-ssl" @bind="sslMode">
                     @foreach (var mode in DatabaseConnectionRules.SslModes) { <option value="@mode">@mode</option> }
@@ -68,6 +69,7 @@
     private readonly CancellationTokenSource lifetime = new();
     private bool loading = true, busy, noticeOk;
     private string? error, notice, busyText;
+    private bool showPassword;
     private string host = "", user = "", sslMode = "Required", password = "", adminPassword = "";
     private int port = 3307;
     private DatabaseConnectionSettings current = new("", 0, "", "", "Required", false, null, false, false, null, "");

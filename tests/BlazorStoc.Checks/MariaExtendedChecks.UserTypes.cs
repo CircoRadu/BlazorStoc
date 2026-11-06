@@ -43,7 +43,7 @@ public static partial class MariaExtendedChecks
 
         // A new user, and one whose role changes, get the matching system type.
         var users = new MariaUserRepository(configuration, admin, audit);
-        var user = await users.CreateAsync(new WebUserInput { Username = "ext.tip." + Suffix(), DisplayName = "Ext Tip", Role = AccessRoles.LimitedUser, Password = "parola-ext-tip-123" });
+        var user = await users.CreateAsync(new WebUserInput { Username = "ext.tip." + Suffix(), DisplayName = "Ext Tip", Role = AccessRoles.LimitedUser, Password = "Parola-ext-tip-123!" });
         try
         {
             Check(await ScalarLongAsync(probe, "SELECT user_type_id FROM web_users WHERE id=@id", ("@id", user.Id)) == limited, "A new user gets the system type of its role");

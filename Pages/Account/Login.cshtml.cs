@@ -5,13 +5,14 @@ using BlazorStoc.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace BlazorStoc.Pages.Account;
 [AllowAnonymous]
 public class LoginModel(IConfiguration configuration, IUserAuthenticator authenticator, IAuditTrail auditTrail,
-    ILogger<LoginModel> logger, ITwoFactorStore twoFactor) : PageModel
+    ILogger<LoginModel> logger, ITwoFactorStore twoFactor, IDataProtectionProvider protection) : PageModel
 {
     [BindProperty] public string Username { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
@@ -33,11 +34,12 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         if (User.Identity?.IsAuthenticated == true) return LocalRedirect("/");
         CodeRequired = AccessSecurityRules.IsCodeRequired(configuration, HttpContext.Connection.RemoteIpAddress);
         if (Reason == "inchisa") Error = LoginMessages.SessionClosed;
+        if (Reason == "parola") Error = LoginMessages.PasswordChangeExpired;
         return Page();
     }
 
     private enum PasswordStatus { Ok, Wrong, Inactive, DatabaseDown, Fault }
-    private sealed record PasswordOutcome(PasswordStatus Status, string? Username = null, string? DisplayName = null, string? Role = null, int? UserId = null, string Reason = "utilizator sau parolă incorecte");
+    private sealed record PasswordOutcome(PasswordStatus Status, string? Username = null, string? DisplayName = null, string? Role = null, int? UserId = null, string Reason = "utilizator sau parolă incorecte", bool MustChange = false);
 
     // The first factor: the administrator of the configuration, then the accounts of the database. A wrong password for the configured administrator is rejected without querying SQL.
     private async Task<PasswordOutcome> CheckPasswordAsync()
@@ -53,7 +55,7 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
             var result = await authenticator.AuthenticateAsync(Username, Password ?? "", HttpContext.RequestAborted);
             if (result.Status == AuthenticationStatus.Inactive) return new(PasswordStatus.Inactive, Reason: "cont inactiv");
             if (result.Status == AuthenticationStatus.Success && result.User is not null)
-                return new(PasswordStatus.Ok, result.User.Username, result.User.DisplayName, result.User.Role, result.User.Id);
+                return new(PasswordStatus.Ok, result.User.Username, result.User.DisplayName, result.User.Role, result.User.Id, MustChange: result.User.MustChangePassword);
         }
         catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested) { throw; }
         catch (Exception exception)
@@ -83,7 +85,7 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         {
             if (outcome.Status == PasswordStatus.Inactive) return await RefusedAsync(outcome.Reason, "Contul este inactiv. Contactează administratorul pentru reactivare.");
             if (outcome.Status != PasswordStatus.Ok) return await RefusedAsync(outcome.Reason);
-            return await SignInAsync(outcome);
+            return await FinishAsync(outcome);
         }
 
         // Password and code are always both checked, so the time of the answer tells nothing; the code of an account is only spent when the password was right.
@@ -116,7 +118,7 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         if (failure is null)
         {
             Attempts.Clear(key);
-            return await SignInAsync(outcome);
+            return await FinishAsync(outcome);
         }
         Attempts.Fail(key);
         return await RefusedAsync(failure, LoginMessages.WrongCredentialsOrCode);
@@ -140,20 +142,16 @@ public class LoginModel(IConfiguration configuration, IUserAuthenticator authent
         catch (Exception exception) { logger.LogWarning("Failed sign-in could not be journaled ({ErrorType}).", exception.GetType().Name); }
     }
 
-    private async Task<IActionResult> SignInAsync(PasswordOutcome user)
+    // Everything was right: the session is made, unless the account has to choose a new password first (created by an administrator, or its password set by one): then only a ticket is
+    // given and the user is sent to the page where the new password is chosen; the session is made there.
+    private async Task<IActionResult> FinishAsync(PasswordOutcome user)
     {
-        var claims = new List<Claim>
+        if (user.MustChange && user.UserId is not null)
         {
-            new(ClaimTypes.Name, user.Username!),
-            new(ClaimTypes.GivenName, user.DisplayName!),
-            new(ClaimTypes.Role, user.Role!)
-        };
-        if (user.UserId is not null) claims.Add(new Claim(ClaimTypes.NameIdentifier, user.UserId.Value.ToString()));
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var properties = new AuthenticationProperties();
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);
-        await AuditRecorder.RecordSessionAsync(auditTrail, user.Username!, user.Role!, true, HttpContext.RequestAborted,
-            AuditRecorder.FormatAddress(HttpContext.Connection.RemoteIpAddress));
+            new PasswordChangeTicket(user.UserId.Value, user.Username!, user.DisplayName!, user.Role!).Issue(HttpContext, protection);
+            return LocalRedirect("/Account/ChangePassword" + (Url.IsLocalUrl(ReturnUrl) ? "?ReturnUrl=" + Uri.EscapeDataString(ReturnUrl!) : ""));
+        }
+        await AccountSession.SignInAsync(HttpContext, auditTrail, user.Username!, user.DisplayName!, user.Role!, user.UserId);
         return LocalRedirect(Url.IsLocalUrl(ReturnUrl) ? ReturnUrl : "/");
     }
 

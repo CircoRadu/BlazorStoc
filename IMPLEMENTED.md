@@ -831,3 +831,19 @@ Cerut de utilizator la 06.10.2026 (verificarea fluxului, apoi deciziile: facturi
 - Setari -> Autentificare: mod (niciodata / doar din exterior / pentru toti), retea interna, tabel de autentificatoare; card Autentificator pe pagina utilizatorului; autentificatorul il asociaza administratorul (QR, cod de confirmare, 10 coduri de recuperare), schimbarea telefonului atomica, revocare, coduri noi, deblocare; login pe o singura pagina cu mesaj generic, blocare pe nume (5 incercari, 10 min, dublu), cod refolosit refuzat; inactivarea suspenda autentificatorul, stergerea utilizatorului il sterge; modificarile pentru administratori doar de pe server; comanda --reset-authenticator; scos Pastreaza-ma autentificat.
 - Fisiere: Services/TwoFactor.cs, AccessSecuritySettings.cs, AuthenticatorReset.cs, Pages/Account/Login + TwoFactor, Components/Shared/AccessSecurityPanel + AuthenticatorActions, migrarile 69-71, pachet QRCoder. Documentatie: docs/AUTENTIFICARE_2FA.md.
 - Verificat: teste tintite (dbsettings, help, runtracking, modules, moduleversions) 643 fara esecuri, sectiunea MariaDB Users, flux real pe instanta separata. Journal 1.4.12. Neverificat cu telefon real si proxy real; help nescris (docs/HELP_DE_REGENERAT.md).
+
+## Finalizat la 06.11.2026 17:23 - Versiunea 0.5.47: parola de schimbat la prima autentificare, politica de parola, meniul contului
+
+- Schimbarea parolei la prima autentificare (migrarea 72, pagina /Account/ChangePassword cu bilet cookie de 10 min), politica de parola pentru orice parola (8 caractere, litera mica, mare, cifra, caracter special), meniul contului (nume in bara de sus: Autentificatorul meu, Schimba parola, Deconectare), jurnal Stabilire parola de catre administrator / Schimbare parola la prima autentificare / Schimbare parola proprie.
+- Fisiere: Services/WebUsers.cs (PasswordPolicy), OwnAccount.cs, MariaUserRepository.cs, Pages/Account/ChangePassword + AccountSession, Components/Shared/AccountMenu + ChangePasswordDialog. Instalatorul aplica aceeasi politica.
+- Verificat: suita completa in memorie 2209, sectiunea MariaDB Users, flux real pe instanta separata. Journal 1.4.14. Neverificat: 2FA + parola de schimbat in browser; help neactualizat (docs/HELP_DE_REGENERAT.md).
+
+## Finalizat la 06.11.2026 17:39 - Versiunea 0.5.48: conditiile parolei live si Arata parola
+
+- Parola noua: comutatorul Arata parola, cele cinci conditii pe randuri separate verificate la tastare (verde/rosu), verificarea coincidentei si a diferentei fata de parola actuala; butonul de salvare activ doar cand totul e indeplinit. Pagina primei autentificari foloseste wwwroot/password-rules.js, fereastra din meniu PasswordRulesList; reguli ca date in PasswordPolicy.Rules.
+- Verificat: tema dark (contraste peste 6:1), browser pe ambele pagini, teste tintite (521) si suita completa la release. Pagina primei autentificari nu are tema dark (paginile de autentificare sunt mereu light).
+
+## Finalizat la 06.11.2026 17:53 - Versiunea 0.5.49: conditiile parolei live in editorul de utilizatori
+
+- Editorul de utilizatori (Setari -> Utilizatori): lista conditiilor parolei pe randuri separate, verificate la tastare, si Arata parola ca intrerupator (UserEditor.razor, PasswordRulesList.razor). Modificarile facute si in alte panouri din Setari (conturile bazei de date, parolele conexiunii, NAS, ActivityApp, Elcomtur) au fost retrase: cererea privea doar utilizatorii.
+- Verificat: suita completa la release (rulata de release.ps1).

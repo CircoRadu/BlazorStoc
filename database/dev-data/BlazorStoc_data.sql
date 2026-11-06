@@ -942,7 +942,8 @@ REPLACE INTO `schema_migrations` (`version`, `description`, `checksum`, `origin`
 (68,'Structura tichetelor ActivityApp fata de care s-a verificat corespondenta campurilor: activity_import_settings.ticket_structure_snapshot, alert_ticket_structure_since, ticket_structure_diff','bccd667c28ed97b72ce9e965806c1579f7f52b1fff046e7160b8a11800d796f2','applied','2026-11-06 11:56:08','0.5.45'),
 (69,'Autentificare in doi pasi (TOTP) pentru accesul din afara retelei interne: secretul fiecarui utilizator (web_user_totp) si codurile de recuperare (web_user_recovery_codes)','117dd81dd5ee42c29332267e224d847f01cb515103974e18f4c71688b7654a35','applied','2026-11-06 11:56:08','0.5.45'),
 (70,'Autentificatorul asociat de administrator: stare suspendata (cont inactiv), ultima folosire (data si IP), cine l-a asociat si cine l-a confirmat: web_user_totp.suspended_utc, last_used_utc, last_used_ip, enrolled_by, confirmed_by','4247bf59c28f925c0790375176c83c5b043bc836a09e8584cf5d6ea46a0210c3','applied','2026-11-06 13:17:37','0.5.45'),
-(71,'Inlocuirea atomica a secretului autentificatorului (schimbarea telefonului): web_user_totp.pending_secret_protected','ff7236438b8db8f23501231ddd19cbbd13bc9832edd54d76d8372dd5fc5cc293','applied','2026-11-06 13:32:46','0.5.45');
+(71,'Inlocuirea atomica a secretului autentificatorului (schimbarea telefonului): web_user_totp.pending_secret_protected','ff7236438b8db8f23501231ddd19cbbd13bc9832edd54d76d8372dd5fc5cc293','applied','2026-11-06 13:32:46','0.5.45'),
+(72,'Schimbarea parolei la prima autentificare: web_users.must_change_password','4854d1cb46e1ccbac890c1543a0e1c2fb7a553beea5c41f74a99bc62062f5922','applied','2026-11-06 15:11:42','0.5.46');
 /*!40000 ALTER TABLE `schema_migrations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1718,9 +1719,9 @@ UNLOCK TABLES;
 
 LOCK TABLES `web_users` WRITE;
 /*!40000 ALTER TABLE `web_users` DISABLE KEYS */;
-REPLACE INTO `web_users` (`id`, `username`, `normalized_username`, `display_name`, `password_hash`, `role`, `is_active`, `version`, `user_type_id`) VALUES (1,'administrator.demo','ADMINISTRATOR.DEMO','Administrator demonstratie','AQAAAAIAAYagAAAAEIeR3dzbxxPEXnPWJ2h6E1QnJg7VWSxKvvZFsk1/hylP26VxVBIILKj/Fr3b6PgsNA==','Administrator',1,0,1),
-(2,'utilizator.demo','UTILIZATOR.DEMO','Utilizator demonstratie','AQAAAAIAAYagAAAAEG6GfKQW+dSJCuHG4T16Zl9QvtaQHTwtCCh2KIHJ9kP9C37eKheuYMQLSONzkTzCpg==','Utilizator',1,0,2),
-(3,'claude.dev','CLAUDE.DEV','Claude dezvoltare','AQAAAAIAAYagAAAAEEBXl7JMCjpyL1OTU8p6ss62jlNj0l256D21S2Rs/FZMXZ4yYuLF9of+Z8Fw6667CQ==','Administrator',1,0,1);
+REPLACE INTO `web_users` (`id`, `username`, `normalized_username`, `display_name`, `password_hash`, `role`, `is_active`, `version`, `user_type_id`, `must_change_password`) VALUES (1,'administrator.demo','ADMINISTRATOR.DEMO','Administrator demonstratie','AQAAAAIAAYagAAAAEIeR3dzbxxPEXnPWJ2h6E1QnJg7VWSxKvvZFsk1/hylP26VxVBIILKj/Fr3b6PgsNA==','Administrator',1,0,1,1),
+(2,'utilizator.demo','UTILIZATOR.DEMO','Utilizator demonstratie','AQAAAAIAAYagAAAAEG6GfKQW+dSJCuHG4T16Zl9QvtaQHTwtCCh2KIHJ9kP9C37eKheuYMQLSONzkTzCpg==','Utilizator',1,0,2,1),
+(3,'claude.dev','CLAUDE.DEV','Claude dezvoltare','AQAAAAIAAYagAAAAEESqUBAG36THU/WhsRqsC2ZMgMkUTkFdG1AbUShu6Vk2UABSSi96auup9Sf/uUweyg==','Administrator',1,2,1,0);
 /*!40000 ALTER TABLE `web_users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

@@ -98,6 +98,16 @@ public static class AccessSecurityChecks
             Microsoft.Extensions.Logging.Abstractions.NullLogger<AccessSecuritySettingsService>.Instance);
         check(!noContext.MayManage(Row(AccessRoles.Administrator)) && noContext.MayManage(Row(AccessRoles.LimitedUser)), "Server only: without a known request an administrator's authenticator is not changed");
 
+        // The menu of the signed-in user: the administrator of the configuration cannot change a password written in the settings file from there.
+        var configured = new OwnAccountService(new ConfigurationBuilder().Build(), new TestAccessControl(true, "admin"), null!, Microsoft.Extensions.Logging.Abstractions.NullLogger<OwnAccountService>.Instance);
+        check(!configured.CanChangePasswordAsync().GetAwaiter().GetResult() && !configured.ChangePasswordAsync("x", "parola-noua-12345", "parola-noua-12345").GetAwaiter().GetResult().Success,
+            "Own password: the administrator of the configuration is told to use the settings file, nothing is changed");
+
+        // The conditions of a password are data: five lines, the same keys the page of the first sign-in checks in the browser, all met by a good password and each missing one named.
+        check(PasswordPolicy.Rules.Select(rule => rule.Key).SequenceEqual(["length", "lower", "upper", "digit", "special"]) && PasswordPolicy.Rules.All(rule => rule.Test("Ab1!cdef"))
+              && PasswordPolicy.Rules.Count(rule => !rule.Test("abcdefgh")) == 3 && PasswordPolicy.Validate("abcdefgh") is { } missingThree && missingThree.Contains("o literă mare") && missingThree.Contains("o cifră") && missingThree.Contains("un caracter special"),
+            "Password rules: five conditions as data, each missing one is named");
+
         var throttle = new FailureThrottle<string>();
         for (var i = 0; i < 4; i++) throttle.Fail("ana");
         check(throttle.LockedUntil("ana") is null, "Lock: four wrong attempts do not lock yet");

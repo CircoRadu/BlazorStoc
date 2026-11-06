@@ -27,7 +27,8 @@
                 <label>Port<input id="ai-port" type="number" min="1" max="65535" @bind="port" /></label>
                 <label>Bază de date<input id="ai-database" @bind="database" maxlength="128" autocomplete="off" /></label>
                 <label>Cont de citire<input id="ai-user" @bind="user" maxlength="128" autocomplete="off" /></label>
-                <label>Parolă<input id="ai-password" type="password" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(hasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+                <label>Parolă<input id="ai-password" type="@(showPassword ? "text" : "password")" @bind="password" maxlength="200" autocomplete="new-password" placeholder="@(hasPassword ? "salvată — lasă gol ca să o păstrezi" : "introdu parola contului")" /></label>
+            <ToggleSwitch Id="ai-password-show" Class="full-width" @bind-Value="showPassword" OnText="Parola se vede" OffText="Parola este ascunsă">Arată parola</ToggleSwitch>
                 <label>Tichete de la data<input id="ai-since" type="date" @bind="since" /></label>
                 <label>Fereastra orară: de la ora<input id="ai-from" type="number" min="0" max="23" @bind="fromHour" /></label>
                 <label>până la ora<input id="ai-to" type="number" min="1" max="24" @bind="toHour" /></label>
@@ -362,6 +363,7 @@
     private readonly CancellationTokenSource lifetime = new();
     private bool loading = true, busy, noticeOk, hasPassword, enabled, fillEmpty;
     private string? error, notice, busyText, typesError, runArea;
+    private bool showPassword;
     private string server = "", database = "TIPActivity", user = "", password = "";
     private int port = 1433, fromHour, toHour = 24, pageSize = 200;
     private DateOnly? since;
